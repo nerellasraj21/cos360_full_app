@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
-from app.db.base import Base
+from app.db.base import BaseOrg
    
-class RoleMenuPermission(Base):
+class RoleMenuPermission(BaseOrg):
     __tablename__ = 'role_menu_permissions'
     
     id = Column(Integer, primary_key=True, index=True)

@@ -1,9 +1,9 @@
-from app.db.base import Base
+from app.db.base import BasePublic
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 
 
-class Menu(Base):
+class Menu(BasePublic):
     __tablename__ = 'menus'
     
     id = Column(Integer, primary_key=True, index=True)

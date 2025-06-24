@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String, TIMESTAMP, func, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
-from app.db.base import Base
+from app.db.base import BaseOrg
 
-class Section(Base):
+class Section(BaseOrg):
     __tablename__ = 'sections'
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from app.models.auth import Organization
-from app.schemas.auth import OrganizationCreate, OrganizationUpdate
+from app.models.public import Organization
+from app.schemas.public import OrganizationCreate, OrganizationUpdate
 import logging as log
 from fastapi import HTTPException, status
 

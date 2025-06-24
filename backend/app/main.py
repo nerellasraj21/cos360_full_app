@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.api.v1.main_router import router as api_v1_router
-from app.db.base import Base
+from app.db.base import BasePublic
 from app.db.session import engine
 from app.tools.logging import configure_logging
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,8 +8,8 @@ from app.config import settings
 
 app = FastAPI()
 
-# Create DB tables
-Base.metadata.create_all(bind=engine)
+# Create only public schema tables at startup
+BasePublic.metadata.create_all(bind=engine)
 
 # Register Routers
 app.include_router(api_v1_router, prefix="/api/v1")

@@ -20,4 +20,4 @@ def login_user(db: Session, username: str, password: str):
         "username": user.username,
         "role": user.role.name
     })
-    return access_token
+    return access_token 

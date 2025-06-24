@@ -7,7 +7,7 @@ class MenuBase(BaseModel):
     level: str
     parent_id: Optional[int] = None
     
-class MenucCreate(MenuBase):
+class MenuCreate(MenuBase):
     pass
 
 class MenuUpdate(MenuBase):
@@ -21,4 +21,4 @@ class MenuRead(MenuBase):
     id: int
     
     class Config:
-        orm_mode = True
+        orm_mode = True 

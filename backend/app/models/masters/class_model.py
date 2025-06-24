@@ -1,8 +1,8 @@
 from sqlalchemy import TIMESTAMP, Column, Integer, String, func, Boolean
 from sqlalchemy.orm import relationship
-from app.db.base import Base
+from app.db.base import BaseOrg
 
-class Class(Base):
+class Class(BaseOrg):
     __tablename__ = 'classes'
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
