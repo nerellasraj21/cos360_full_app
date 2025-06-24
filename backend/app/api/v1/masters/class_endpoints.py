@@ -1,39 +1,35 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
-from app.service.masters.class_service import (
-    create_class, get_class, get_classes, update_class, delete_class
-)
-from app.schemas.masters.class_schema import ClassCreate, ClassOut, ClassUpdate
+from app.service.masters import class_service
+from app.schemas.masters.class_schema import ClassCreate, ClassRead, ClassUpdate
 from app.db.session import get_db
 
-router = APIRouter(prefix="/masters/classes", tags=["Masters/Classes"])
+router = APIRouter(prefix="/masters/class_sections", tags=["Masters/Class & Sections"])
 
-@router.post("/", response_model=ClassOut)
-def create_class_api(class_in: ClassCreate, db: Session = Depends(get_db)):
-    return create_class(db, class_in)
+# Create Class with Sections
+@router.post("/", response_model=ClassRead, status_code=status.HTTP_201_CREATED)
+def create_class(class_data: ClassCreate, db: Session = Depends(get_db)):
+    return class_service.create_class_with_sections(db, class_data)
 
-@router.get("/{class_id}", response_model=ClassOut)
-def read_class(class_id: int, db: Session = Depends(get_db)):
-    db_class = get_class(db, class_id)
+# Read Single Class with Sections
+@router.get("/{class_id}", response_model=ClassRead)
+def get_class(class_id: int, db: Session = Depends(get_db)):
+    db_class = class_service.get_class_with_sections(db, class_id)
     if not db_class:
-        raise HTTPException(status_code=404, detail="Class not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
     return db_class
 
-@router.get("/", response_model=list[ClassOut])
-def read_classes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return get_classes(db, skip, limit)
+# Read All Classes with Sections
+@router.get("/", response_model=List[ClassRead])
+def get_all_classes(db: Session = Depends(get_db)):
+    return class_service.get_all_classes_with_sections(db)
 
-@router.put("/{class_id}", response_model=ClassOut)
-def update_class_api(class_id: int, class_in: ClassUpdate, db: Session = Depends(get_db)):
-    db_class = update_class(db, class_id, class_in)
-    if not db_class:
-        raise HTTPException(status_code=404, detail="Class not found")
-    return db_class
-
-@router.delete("/{class_id}")
-def delete_class_api(class_id: int, db: Session = Depends(get_db)):
-    db_class = delete_class(db, class_id)
-    if not db_class:
-        raise HTTPException(status_code=404, detail="Class not found")
-    return {"ok": True}
+# Update Class and Replace Sections
+@router.put("/{class_id}", response_model=ClassRead)
+def update_class(class_id: int, class_data: ClassUpdate, db: Session = Depends(get_db)):
+    updated = class_service.update_class_with_sections(db, class_id, class_data)
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
+    return updated

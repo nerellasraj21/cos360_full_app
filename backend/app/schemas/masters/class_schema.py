@@ -1,23 +1,26 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
+from app.schemas.masters.sections_schema import SectionRead, SectionCreate
 from datetime import datetime
 
 class ClassBase(BaseModel):
     name: str
     description: Optional[str] = None
     is_active: bool = True
-    short_code: str 
+    short_code: str
 
 class ClassCreate(ClassBase):
-    pass
+    sections: Optional[List[SectionCreate]] = None  # Use create schema
 
-class ClassUpdate(ClassBase):
-    pass
+class ClassUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    short_code: Optional[str] = None
+    sections: Optional[List[SectionCreate]] = None  # Use create schema
 
-class ClassOut(ClassBase):
+class ClassRead(ClassBase):
     id: int
-    created_at: datetime
-    updated_at: datetime
+    sections: List[SectionRead] = []  # Use read schema for response
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}

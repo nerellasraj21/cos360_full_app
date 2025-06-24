@@ -10,6 +10,8 @@ class Section(BaseOrg):
     description = Column(String(50), nullable=True)
     is_active = Column(Boolean, default=False)
     class_id = Column(Integer, ForeignKey('classes.id'), nullable=False)
+    created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
+    updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
 
     # Correct relationship
     class_ = relationship("Class", back_populates="sections")

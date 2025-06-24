@@ -14,7 +14,7 @@ class Class(BaseOrg):
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
 
     # Correct relationship
-    sections = relationship("Section", back_populates="class_")
+    sections = relationship("Section", back_populates="class_", lazy='joined')
 
     def __repr__(self):
         return f"<Class(id={self.id}, name='{self.name}')>"
