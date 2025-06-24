@@ -8,6 +8,7 @@ class ClassBase(BaseModel):
     description: Optional[str] = None
     is_active: bool = True
     short_code: str
+    academic_year_id: int
 
 class ClassCreate(ClassBase):
     sections: Optional[List[SectionCreate]] = None  # Use create schema

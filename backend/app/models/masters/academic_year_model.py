@@ -13,6 +13,11 @@ class AcademicYear(BaseOrg):
     end_date = Column(Date, nullable=False)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
+    
+    # class relationship
+    class_ = relationship("Class", back_populates="academic_year")
+    # subject relationship
+    subjects = relationship("Subject", back_populates="academic_year")
 
     def __repr__(self):
         return f"name='{self.title}')"

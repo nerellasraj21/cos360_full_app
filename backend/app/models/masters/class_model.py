@@ -13,8 +13,10 @@ class Class(BaseOrg):
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
 
-    # Correct relationship
+    # Sections relationship
     sections = relationship("Section", back_populates="class_", lazy='joined')
+    # Academic Year relationship
+    academic_year = relationship("AcademicYear", back_populates="class_")
 
     def __repr__(self):
         return f"<Class(id={self.id}, name='{self.name}')>"

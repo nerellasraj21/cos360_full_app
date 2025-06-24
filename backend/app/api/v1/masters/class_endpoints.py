@@ -33,3 +33,11 @@ def update_class(class_id: int, class_data: ClassUpdate, db: Session = Depends(g
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
     return updated
+
+# Delete Class
+@router.delete("/{class_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_class(class_id: int, db: Session = Depends(get_db)):
+    deleted = class_service.delete_class_with_sections(db, class_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
+    return {"detail": "Class deleted successfully"}

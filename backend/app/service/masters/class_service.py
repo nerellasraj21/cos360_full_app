@@ -46,9 +46,14 @@ def get_class_with_sections(db: Session, class_id: int):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error fetching class with sections: {str(e)}")
 
-def get_all_classes_with_sections(db: Session):
+def get_all_classes_with_sections(db: Session, academic_year_id: int = None):
     try:
         classes = db.query(ClassModel).all()
+        if academic_year_id:
+            classes = classes.filter(ClassModel.academic_year_id == academic_year_id).all()
+        if not classes:
+            raise HTTPException(status_code=404, detail="No classes found in the given academic year")
+        # Fetch sections for each class
         for db_class in classes:
             sections = db.query(SectionModel).filter(SectionModel.class_id == db_class.id).all()
             db_class.sections = sections
@@ -86,4 +91,21 @@ def update_class_with_sections(db: Session, class_id: int, class_data: ClassUpda
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error updating class with sections: {str(e)}")
+    
+def delete_class_with_sections(db: Session, class_id: int):
+    try:
+        db_class = db.query(ClassModel).filter(ClassModel.id == class_id).first()
+        if not db_class:
+            raise HTTPException(status_code=404, detail="Class not found")
+        
+        # Delete all sections associated with the class
+        db.query(SectionModel).filter(SectionModel.class_id == class_id).delete()
+        
+        # Delete the class itself
+        db.delete(db_class)
+        db.commit()
+        return {"detail": "Class and associated sections deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error deleting class with sections: {str(e)}")
     
