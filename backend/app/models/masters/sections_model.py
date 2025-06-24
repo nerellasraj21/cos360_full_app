@@ -15,3 +15,6 @@ class Section(BaseOrg):
 
     # Correct relationship
     class_ = relationship("Class", back_populates="sections")
+    
+    def __repr__(self):
+        return f"<Section(id={self.id}, name='{self.name}', class_id={self.class_id})>"

@@ -16,6 +16,10 @@ class Subject(BaseOrg):
     #Acedemic Year relationship
     academic_year_id = Column(Integer, ForeignKey('academic_years.id'), nullable=False)
     academic_year = relationship("AcademicYear", back_populates="subjects")
+    
+    # class-subject mapping relationship
+    class_subject_mappings = relationship("ClassSubjectMap", back_populates="subject")
+
 
     def __repr__(self):
         return f"<Subject(id={self.id}, name='{self.name}')>"

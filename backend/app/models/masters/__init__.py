@@ -1,9 +1,13 @@
+from .academic_year_model import AcademicYear
 from .class_model import Class
 from .sections_model import Section
-from .academic_year_model import AcademicYear
+from .subject_model import Subject
+from .class_subject_mapping_model import ClassSubjectMap
 
 __all__ = [
+    "AcademicYear",
     "Class",
     "Section",
-    "AcademicYear"
+    "Subject",
+    "ClassSubjectMap"
 ]

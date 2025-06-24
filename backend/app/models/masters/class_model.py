@@ -1,4 +1,4 @@
-from sqlalchemy import TIMESTAMP, Column, Integer, String, func, Boolean
+from sqlalchemy import TIMESTAMP, Column, Integer, String, func, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from app.db.base import BaseOrg
 
@@ -16,7 +16,12 @@ class Class(BaseOrg):
     # Sections relationship
     sections = relationship("Section", back_populates="class_", lazy='joined')
     # Academic Year relationship
-    academic_year = relationship("AcademicYear", back_populates="class_")
+    academic_year_id = Column(Integer, ForeignKey('academic_years.id'), nullable=False, index=True)
+    academic_year = relationship("AcademicYear", backref="classes")
+    # Class-Subject Mapping relationship
+    class_subject_mappings = relationship("ClassSubjectMap", back_populates="class_")
+    
+
 
     def __repr__(self):
         return f"<Class(id={self.id}, name='{self.name}')>"
