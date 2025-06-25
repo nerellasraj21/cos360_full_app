@@ -10,10 +10,13 @@ class SectionCreate(SectionBase):
     pass  # class_id removed
 
 class SectionUpdate(BaseModel):
+    id: Optional[int]
     name: Optional[str] = None
     description: Optional[str] = None
     is_active: Optional[bool] = None
     # class_id removed or made optional if needed
+
+    model_config = {"from_attributes": True}
 
 class SectionRead(SectionBase):
     id: int

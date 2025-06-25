@@ -14,7 +14,7 @@ class Class(BaseOrg):
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
 
     # Sections relationship
-    sections = relationship("Section", back_populates="class_", lazy='joined')
+    sections = relationship("Section", back_populates="class_", lazy='joined', cascade="all, delete-orphan")
     # Academic Year relationship
     academic_year_id = Column(Integer, ForeignKey('academic_years.id'), nullable=False, index=True)
     academic_year = relationship("AcademicYear", backref="classes")

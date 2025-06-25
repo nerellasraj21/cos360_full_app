@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
-from app.schemas.masters.sections_schema import SectionRead, SectionCreate
+from app.schemas.masters.sections_schema import SectionRead, SectionCreate, SectionUpdate
 from datetime import datetime
 
 class ClassBase(BaseModel):
@@ -18,7 +18,8 @@ class ClassUpdate(BaseModel):
     description: Optional[str] = None
     is_active: Optional[bool] = None
     short_code: Optional[str] = None
-    sections: Optional[List[SectionCreate]] = None  # Use create schema
+    academic_year_id: Optional[int]
+    sections: Optional[List[SectionUpdate]] = None  # Use Update schema
 
 class ClassRead(ClassBase):
     id: int

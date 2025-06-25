@@ -27,7 +27,7 @@ def get_all_classes(db: Session = Depends(get_db)):
     return class_service.get_all_classes_with_sections(db)
 
 # Update Class and Replace Sections
-@router.put("/{class_id}", response_model=ClassRead)
+@router.put("/{class_id}", response_model=dict)
 def update_class(class_id: int, class_data: ClassUpdate, db: Session = Depends(get_db)):
     updated = class_service.update_class_with_sections(db, class_id, class_data)
     if not updated:

@@ -7,12 +7,24 @@ from fastapi import HTTPException, status
 log = log.getLogger("masters.academic_year_service")
 
 def create_academic_year(db: Session, academic_year: AcademicYearCreate):
+    existing = db.query(AcademicYear).filter(AcademicYear.title == academic_year.title).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Academic year already exists")
     try:
-        db_academic_year = AcademicYear(**academic_year.model_dump())
-        db.add(db_academic_year)
+        # db_academic_year = AcademicYear(**academic_year.model_dump())
+        if academic_year.is_active:
+            db.query(AcademicYear).filter(AcademicYear.is_active == True).update({"is_active": False})
+
+        new_year = AcademicYear(
+            title=academic_year.title,
+            start_date=academic_year.start_date,
+            end_date=academic_year.end_date,
+            is_active=academic_year.is_active
+        )
+        db.add(new_year)
         db.commit()
-        db.refresh(db_academic_year)
-        return db_academic_year
+        db.refresh(new_year)
+        return new_year
     except Exception as e:        
         log.error(f"Error creating academic year: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
