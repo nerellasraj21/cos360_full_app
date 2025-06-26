@@ -9,7 +9,16 @@ from app.config import settings
 app = FastAPI()
 
 # Create only public schema tables at startup
-BasePublic.metadata.create_all(bind=engine)
+# BasePublic.metadata.create_all(bind=engine)
+async def init_models():
+    async with engine.begin() as conn:
+        # await conn.run_sync(BasePublic.metadata.drop_all)
+        await conn.run_sync(BasePublic.metadata.create_all)
+
+# asyncio.run(init_models())
+@app.on_event("startup")
+async def startup():
+    await init_models()
 
 # Register Routers
 app.include_router(api_v1_router, prefix="/api/v1")
