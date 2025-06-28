@@ -21,7 +21,5 @@ class Class(BaseOrg):
     # Class-Subject Mapping relationship
     class_subject_mappings = relationship("ClassSubjectMap", back_populates="class_")
     
-
-
     def __repr__(self):
         return f"<Class(id={self.id}, name='{self.name}')>"
