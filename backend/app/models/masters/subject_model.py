@@ -22,4 +22,4 @@ class Subject(BaseOrg):
 
 
     def __repr__(self):
-        return f"<Subject(id={self.id}, name='{self.name}')>"
+        return f"<Subject(id={self.id}, name='{self.name}')>" 

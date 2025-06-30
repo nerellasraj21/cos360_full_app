@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Passw0rd!
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  web:
+    build: .
+    command: ["/start.sh"]
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql://postgres:Passw0rd!@db:5432/postgres
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+volumes:
+  postgres_data:

@@ -1,10 +1,12 @@
-from pydantic import AnyHttpUrl
+from pydantic import AnyHttpUrl, Field
 from pydantic_settings import BaseSettings
 from typing import List, Optional
 
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str
+    SYNC_DATABASE_URL: Optional[str] = Field(None, alias="SYNC_DATABASE_URL")
+    ASYNC_DATABASE_URL: Optional[str] = Field(None, alias="ASYNC_DATABASE_URL")
 
     # Secrets
     SECRET_KEY: str
@@ -29,5 +31,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        populate_by_name = True  # Enables Field(alias=...) to work
+
 
 settings = Settings()
