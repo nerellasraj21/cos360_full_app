@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String, Boolean, Date
-from app.db.base import Base
+from app.db.base import BaseOrg
 from sqlalchemy.orm import relationship
 
-class Vehicle(Base):
+class Vehicle(BaseOrg):
     __tablename__ = "vehicles"
 
     id = Column(Integer, primary_key=True, index=True)

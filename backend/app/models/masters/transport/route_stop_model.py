@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String, Time, Boolean, ForeignKey
-from app.db.base import Base
+from app.db.base import BaseOrg
 from sqlalchemy.orm import relationship
 
-class RouteStop(Base):
+class RouteStop(BaseOrg):
     __tablename__ = "route_stops"
 
     id = Column(Integer, primary_key=True, index=True)
