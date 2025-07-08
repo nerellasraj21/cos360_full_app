@@ -9,6 +9,8 @@ from .transport.route_stop_model import RouteStop
 from .transport.student_trip_model import StudentTrip
 from .transport.trip_model import Trip
 from .transport.vehicle_model import Vehicle
+from .timetable_slot_model import TimetableSlot
+from .timetable_subject_option_model import TimetableSubjectOption
 
 __all__ = [
     "AcademicYear",
@@ -19,7 +21,9 @@ __all__ = [
     "Holiday",
     "Route",
     "RouteStop",
-    "StudentTrip",
+    "StudentTrip", 
     "Trip",
-    "Vehicle"
+    "Vehicle",
+    "TimetableSlot",
+    "TimetableSubjectOption"
 ]

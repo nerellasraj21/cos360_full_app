@@ -12,6 +12,7 @@ from app.api.v1.masters.transport.route_stop_endpoints import router as route_st
 from app.api.v1.masters.transport.student_trip_endpoints import router as student_trip_router
 from app.api.v1.masters.transport.trip_endpoints import router as trip_router
 from app.api.v1.masters.transport.vehicle_endpoints import router as vehicle_router
+from app.api.v1.masters.timetable_routes import router as timetable_router
 
 router = APIRouter()
 router.include_router(academic_year_router)
@@ -26,4 +27,5 @@ router.include_router(route_stop_router)
 router.include_router(student_trip_router)
 router.include_router(trip_router)
 router.include_router(vehicle_router)
+router.include_router(timetable_router)
 
