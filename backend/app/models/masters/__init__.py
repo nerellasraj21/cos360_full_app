@@ -11,6 +11,17 @@ from .transport.trip_model import Trip
 from .transport.vehicle_model import Vehicle
 from .timetable_slot_model import TimetableSlot
 from .timetable_subject_option_model import TimetableSubjectOption
+from .admission_model import Admission
+from .attendance_model import StudentAttendance
+from .parent_model import Parent
+from .staff_attendance_model import StaffAttendance
+from .staff_model import Staff
+from .student_certificate_model import CertificateIssue
+from .student_document_model import StudentDocument
+from .student_homework_model import StudentHomework
+from .student_model import Student
+from .student_parent_association_model import StudentParentLink
+from .student_transport_model import StudentTransportAssignment
 
 __all__ = [
     "AcademicYear",
@@ -25,5 +36,16 @@ __all__ = [
     "Trip",
     "Vehicle",
     "TimetableSlot",
-    "TimetableSubjectOption"
+    "TimetableSubjectOption",
+    "Admission",
+    "StudentAttendance",
+    "Parent",
+    "StaffAttendance",
+    "Staff",
+    "CertificateIssue",
+    "StudentDocument",
+    "StudentHomework",
+    "Student",
+    "StudentParentLink",
+    "StudentTransportAssignment"
 ]

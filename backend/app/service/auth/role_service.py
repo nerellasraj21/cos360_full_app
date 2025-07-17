@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.models.auth import Role
 from app.schemas.auth import RoleCreate
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 async def create_role(db: AsyncSession, role: RoleCreate):
     db_role = Role(**role.dict())

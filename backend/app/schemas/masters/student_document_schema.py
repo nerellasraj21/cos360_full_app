@@ -1,0 +1,22 @@
+from pydantic import BaseModel, Field
+from typing import Optional
+from datetime import datetime
+
+class StudentDocumentBase(BaseModel):
+    document_type: str = Field(..., max_length=100)
+    file_path: str = Field(...)
+
+class StudentDocumentCreate(StudentDocumentBase):
+    student_id: int
+
+class StudentDocumentUpdate(BaseModel):
+    document_type: Optional[str] = Field(None, max_length=100)
+    file_path: Optional[str] = None
+
+class StudentDocumentOut(StudentDocumentBase):
+    id: int
+    student_id: int
+    uploaded_at: datetime
+
+    class Config:
+        orm_mode = True

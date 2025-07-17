@@ -13,3 +13,7 @@ class User(BaseOrg):
     role_id = Column(Integer, ForeignKey('roles.id'), nullable=False)
 
     role = relationship("Role", back_populates="users")
+
+    student = relationship("Student", back_populates="user", uselist=False)
+    parent = relationship("Parent", back_populates="user", uselist=False)
+    staff = relationship("Staff", back_populates="user", uselist=False)
