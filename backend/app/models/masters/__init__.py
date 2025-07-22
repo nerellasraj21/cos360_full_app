@@ -16,12 +16,12 @@ from .attendance_model import StudentAttendance
 from .parent_model import Parent
 from .staff_attendance_model import StaffAttendance
 from .staff_model import Staff
-from .student_certificate_model import CertificateIssue
-from .student_document_model import StudentDocument
-from .student_homework_model import StudentHomework
-from .student_model import Student
+from ..student.student_certificate_model import CertificateIssue
+from ..student.student_document_model import StudentDocument
+from ..student.student_homework_model import StudentHomework
+from ..student.student_model import Student
 from .student_parent_association_model import StudentParentLink
-from .student_transport_model import StudentTransportAssignment
+from ..student.student_transport_model import StudentTransportAssignment
 
 __all__ = [
     "AcademicYear",

@@ -13,14 +13,14 @@ from app.api.v1.masters.transport.student_trip_endpoints import router as studen
 from app.api.v1.masters.transport.trip_endpoints import router as trip_router
 from app.api.v1.masters.transport.vehicle_endpoints import router as vehicle_router
 from app.api.v1.masters.timetable_routes import router as timetable_router
-from app.api.v1.masters.admission_endpoints import router as admission_router
-from app.api.v1.masters.attendance_endpoints import router as attendance_router
-from app.api.v1.masters.certificate_endpoints import router as certificate_router
+from app.api.v1.student.admission_endpoints import router as admission_router
+from app.api.v1.student.attendance_endpoints import router as attendance_router
+from app.api.v1.student.certificate_endpoints import router as certificate_router
 from app.api.v1.masters.parent_endpoints import router as parent_router
 from app.api.v1.masters.staff_endpoints import router as staff_router
-from app.api.v1.masters.student_document_endpoints import router as student_document_router
+from app.api.v1.student.student_document_endpoints import router as student_document_router
 # from app.api.v1.masters.student_homework_endpoints import router as student_homework_router
-from app.api.v1.masters.student_transport_endpoints import router as student_transport_router
+from app.api.v1.student.student_transport_endpoints import router as student_transport_router
 
 router = APIRouter()
 router.include_router(academic_year_router)

@@ -1,22 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.schemas.masters.admission_schema import StudentAdmissionCreate, StudentAdmissionResponse, StudentAdmissionUpdate
-from app.schemas.masters.student_schema import StudentOut
-from app.schemas.masters.parent_schema import ParentOut
+from app.schemas.student.admission_schema import StudentAdmissionCreate, StudentAdmissionUpdate
 from app.models.masters.admission_model import Admission
-from app.models.masters.student_model import Student
+from app.models.student.student_model import Student
 from app.models.masters.parent_model import Parent
 from app.models.masters.student_parent_association_model import StudentParentLink
 from sqlalchemy.orm import selectinload
 from app.models.auth.user_model import User
-from app.db.session import get_db
 from sqlalchemy.future import select
 from app.tools.password_util import hash_password
 
-router = APIRouter(prefix="/students/admission", tags=["Student Admission"])
-
-@router.post("/")
-async def create_admission(admission: StudentAdmissionCreate, db: AsyncSession = Depends(get_db)):
+async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
 
     admission_dict = admission.dict(exclude={"student"})
 
@@ -98,8 +92,7 @@ async def create_admission(admission: StudentAdmissionCreate, db: AsyncSession =
 
     return admission_out
 
-@router.get("/{student_id}")
-async def get_admission(student_id: int, db: AsyncSession = Depends(get_db)):
+async def get_admission_by_id(student_id: int, db: AsyncSession):
     result = await db.execute(select(Admission).options(
             selectinload(Admission.student)
             .selectinload(Student.parent_links)
@@ -110,8 +103,7 @@ async def get_admission(student_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Admission not found")
     return admission
 
-@router.patch("/{student_id}")
-async def update_admission(student_id: int, data: StudentAdmissionUpdate, db: AsyncSession = Depends(get_db)):
+async def update_partial_details_admission(student_id: int, data: StudentAdmissionUpdate, db: AsyncSession):
     result = await db.execute(select(Admission).where(Admission.student_id == student_id))
     admission = result.scalar_one_or_none()
     if not admission:

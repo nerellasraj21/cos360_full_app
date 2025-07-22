@@ -1,22 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update, delete
-from app.db.session import get_db
-from app.models.masters.student_transport_model import StudentTransportAssignment
-from app.schemas.masters.student_transport_schema import (
+from app.models.student.student_transport_model import StudentTransportAssignment
+from app.schemas.student.student_transport_schema import (
     StudentTransportCreate,
     StudentTransportUpdate,
-    StudentTransportOut,
 )
 
-router = APIRouter(prefix="/student-transport", tags=["Student Transport"])
 
-
-@router.post("/", response_model=StudentTransportOut, status_code=status.HTTP_201_CREATED)
-async def create_student_transport(
+async def add_student_transport(
     data: StudentTransportCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession
 ):
     new_assignment = StudentTransportAssignment(**data.dict())
     db.add(new_assignment)
@@ -24,15 +18,11 @@ async def create_student_transport(
     await db.refresh(new_assignment)
     return new_assignment
 
-
-@router.get("/", response_model=list[StudentTransportOut])
-async def get_all_transport_assignments(db: AsyncSession = Depends(get_db)):
+async def get_transport_assignments(db: AsyncSession):
     result = await db.execute(select(StudentTransportAssignment))
     return result.scalars().all()
 
-
-@router.get("/student/{student_id}", response_model=list[StudentTransportOut])
-async def get_transport_by_student(student_id: int, db: AsyncSession = Depends(get_db)):
+async def get_transport_by_student_id(student_id: int, db: AsyncSession):
     result = await db.execute(
         select(StudentTransportAssignment).where(StudentTransportAssignment.student_id == student_id)
     )
@@ -41,12 +31,10 @@ async def get_transport_by_student(student_id: int, db: AsyncSession = Depends(g
         raise HTTPException(status_code=404, detail="No transport assignments found for this student.")
     return records
 
-
-@router.patch("/{transport_id}", response_model=StudentTransportOut)
-async def update_transport_assignment(
+async def update_partial_details_transport_assignment(
     transport_id: int,
     updates: StudentTransportUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession
 ):
     result = await db.execute(select(StudentTransportAssignment).where(StudentTransportAssignment.id == transport_id))
     assignment = result.scalar_one_or_none()
@@ -61,9 +49,7 @@ async def update_transport_assignment(
     await db.refresh(assignment)
     return assignment
 
-
-@router.delete("/{transport_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_transport_assignment(transport_id: int, db: AsyncSession = Depends(get_db)):
+async def unassign_transport(transport_id: int, db: AsyncSession):
     result = await db.execute(select(StudentTransportAssignment).where(StudentTransportAssignment.id == transport_id))
     assignment = result.scalar_one_or_none()
 

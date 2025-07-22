@@ -2,18 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.db.session import get_db
-from app.models.masters.student_document_model import StudentDocument
-from app.schemas.masters.student_document_schema import (
+from app.models.student.student_document_model import StudentDocument
+from app.schemas.student.student_document_schema import (
     StudentDocumentCreate,
     StudentDocumentUpdate,
     StudentDocumentOut
 )
 
-router = APIRouter(prefix="/students/documents", tags=["Student Documents"])
-
 # Create document
-@router.post("/", response_model=StudentDocumentOut, status_code=201)
-async def create_document(document: StudentDocumentCreate, db: AsyncSession = Depends(get_db)):
+async def upload_document(document: StudentDocumentCreate, db: AsyncSession = Depends(get_db)):
     try:
         new_doc = StudentDocument(**document.dict())
         db.add(new_doc)
@@ -26,8 +23,7 @@ async def create_document(document: StudentDocumentCreate, db: AsyncSession = De
 
 
 # Get all documents (optionally filter by student)
-@router.get("/", response_model=list[StudentDocumentOut])
-async def get_documents(student_id: int, db: AsyncSession = Depends(get_db)):
+async def get_documents_by_student(student_id: int, db: AsyncSession = Depends(get_db)):
     try:
         stmt = select(StudentDocument)
         if student_id:
@@ -39,8 +35,7 @@ async def get_documents(student_id: int, db: AsyncSession = Depends(get_db)):
 
 
 # Get single document by ID
-@router.get("/{document_id}", response_model=StudentDocumentOut)
-async def get_document(document_id: int, db: AsyncSession = Depends(get_db)):
+async def get_document_by_id(document_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(StudentDocument).where(StudentDocument.id == document_id))
     doc = result.scalar_one_or_none()
     if not doc:
@@ -49,8 +44,7 @@ async def get_document(document_id: int, db: AsyncSession = Depends(get_db)):
 
 
 # Update document
-@router.patch("/{document_id}", response_model=StudentDocumentOut)
-async def update_document(document_id: int, document_data: StudentDocumentUpdate, db: AsyncSession = Depends(get_db)):
+async def update_document_file(document_id: int, document_data: StudentDocumentUpdate, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(StudentDocument).where(StudentDocument.id == document_id))
         document = result.scalar_one_or_none()
@@ -69,8 +63,7 @@ async def update_document(document_id: int, document_data: StudentDocumentUpdate
 
 
 # Delete document
-@router.delete("/{document_id}", status_code=204)
-async def delete_document(document_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_document_file(document_id: int, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(StudentDocument).where(StudentDocument.id == document_id))
         doc = result.scalar_one_or_none()

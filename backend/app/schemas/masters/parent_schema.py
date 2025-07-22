@@ -45,5 +45,5 @@ class ParentOut(ParentBase):
         )
     
 
-from app.schemas.masters.student_schema import StudentOut
+from app.schemas.student.student_schema import StudentOut
 ParentOut.update_forward_refs()

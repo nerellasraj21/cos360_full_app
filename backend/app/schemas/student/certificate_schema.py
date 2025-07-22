@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from datetime import date
 from typing import Optional
 from enum import Enum
-from app.schemas.masters.admission_schema import StudentAdmissionResponse
+from app.schemas.student.admission_schema import StudentAdmissionResponse
 
 
 class CertificateType(str, Enum):

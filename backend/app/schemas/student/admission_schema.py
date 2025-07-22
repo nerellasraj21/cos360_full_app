@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 from datetime import date
-from app.schemas.masters.student_schema import StudentCreate, StudentOut, StudentDetailsOut
+from app.schemas.student.student_schema import StudentCreate, StudentOut, StudentDetailsOut
 
 class StudentAdmissionBase(BaseModel):
     admission_date: date
