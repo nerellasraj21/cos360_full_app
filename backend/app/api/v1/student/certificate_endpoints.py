@@ -20,7 +20,7 @@ router = APIRouter(prefix="/certificates", tags=["Certificates"])
 UPLOAD_DIR = "uploaded_certificates"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@router.post("/", response_model=CertificateIssueOut, status_code=201)
+@router.post("/", status_code=201)
 async def create_certificate(
     student_id: int = Form(...),
     certificate_type: CertificateType = Form(...),
@@ -32,23 +32,26 @@ async def create_certificate(
     return await upload_certificate(student_id,certificate_type,issue_date,description,certificate_file,db)
 
 
-@router.get("/", response_model=List[CertificateIssueOut])
+@router.get("/")
 async def get_certificates(db: AsyncSession = Depends(get_db)):
     return await get_all_certificates(db)
 
 
-@router.get("/{certificate_id}", response_model=CertificateIssueOut)
+@router.get("/{certificate_id}")
 async def get_certificate_by_id(certificate_id: int, db: AsyncSession = Depends(get_db)):
     return await get_certificate(certificate_id,db)
 
 
-@router.patch("/{certificate_id}", response_model=CertificateIssueOut)
+@router.patch("/{certificate_id}")
 async def update_certificate(
     certificate_id: int,
-    update_data: CertificateIssueUpdate,
-    db: AsyncSession = Depends(get_db)
+    certificate_type: CertificateType = Form(...),
+    issue_date: Optional[date] = Form(None),
+    remarks: Optional[str] = Form(None),
+    certificate_file: Optional[UploadFile] = File(None),
+    db: AsyncSession = Depends(get_db),
 ):
-    return await update_certificate_file(certificate_id,update_data,db)
+    return await update_certificate_file(certificate_id,certificate_type,issue_date,remarks,certificate_file,db)
 
 
 @router.delete("/{certificate_id}")

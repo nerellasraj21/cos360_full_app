@@ -16,7 +16,7 @@ class StudentDocumentUpdate(BaseModel):
 class StudentDocumentOut(StudentDocumentBase):
     id: int
     student_id: int
-    uploaded_at: datetime
+    upload_date: datetime
 
     class Config:
         orm_mode = True

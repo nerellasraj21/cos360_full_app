@@ -1,17 +1,19 @@
 import os
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from fastapi import UploadFile, File, Form, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 from fastapi.responses import FileResponse
-from typing import List, Optional
+from typing import Optional
 from datetime import date
 from uuid import uuid4
 
 from app.db.session import get_db
 from app.models.student.student_certificate_model import CertificateIssue
+from app.models.student.student_model import Student
 from app.schemas.student.certificate_schema import (
-    CertificateIssueOut,
     CertificateIssueUpdate,
+    CertificateIssueOut,
     CertificateType,
     CertificateFileResponse
 )
@@ -23,7 +25,7 @@ async def upload_certificate(
     student_id: int = Form(...),
     certificate_type: CertificateType = Form(...),
     issue_date: Optional[date] = Form(None),
-    description: Optional[str] = Form(None),
+    remarks: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -41,13 +43,22 @@ async def upload_certificate(
             student_id=student_id,
             certificate_type=certificate_type,
             issue_date=issue_date or date.today(),
-            description=description,
-            certificate_file=filename,
+            remarks=remarks,
+            file_path=filepath,
         )
 
         db.add(cert)
         await db.commit()
         await db.refresh(cert)
+        result = await db.execute(
+            select(CertificateIssue, Student)
+            .join(Student, CertificateIssue.student_id == Student.id)
+            .where(CertificateIssue.id == cert.id)
+        )
+        cert, student = result.one_or_none()
+        cert.student = student
+
+        # cert_with_student = result.scalar_one()
         return cert
 
     except Exception as e:
@@ -70,20 +81,42 @@ async def get_certificate(certificate_id: int, db: AsyncSession = Depends(get_db
 
 async def update_certificate_file(
     certificate_id: int,
-    update_data: CertificateIssueUpdate,
-    db: AsyncSession = Depends(get_db)
+    certificate_type: Optional[CertificateType] = Form(None),
+    issue_date: Optional[date] = Form(None),
+    remarks: Optional[str] = Form(None),
+    certificate_file: Optional[UploadFile] = File(None),
+    db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))
     cert = result.scalar_one_or_none()
     if not cert:
         raise HTTPException(status_code=404, detail="Certificate not found")
 
-    for field, value in update_data.dict(exclude_unset=True).items():
-        setattr(cert, field, value)
+    try:
+        # If new file uploaded, save it and update path
+        if certificate_file:
+            filename_str = str(certificate_file.filename)
+            extension = os.path.splitext(filename_str)[-1]
+            filename = f"{uuid4()}{extension}"
+            filepath = os.path.join(UPLOAD_DIR, filename)
+            with open(filepath, "wb") as buffer:
+                buffer.write(await certificate_file.read())
+            cert.file_path = filepath
 
-    await db.commit()
-    await db.refresh(cert)
-    return cert
+        if certificate_type is not None:
+            cert.certificate_type = certificate_type
+        if issue_date is not None:
+            cert.issue_date = issue_date
+        if remarks is not None:
+            cert.remarks = remarks
+
+        await db.commit()
+        await db.refresh(cert)
+        return cert
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating certificate: {str(e)}")
 
 
 async def delete_certificate_file(certificate_id: int, db: AsyncSession = Depends(get_db)):

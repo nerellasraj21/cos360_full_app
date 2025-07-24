@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends,Form,UploadFile,File
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.schemas.student.student_document_schema import (
@@ -13,8 +13,18 @@ router = APIRouter(prefix="/students/documents", tags=["Student Documents"])
 
 # Create document
 @router.post("/", response_model=StudentDocumentOut, status_code=201)
-async def create_document(document: StudentDocumentCreate, db: AsyncSession = Depends(get_db)):
-    return await upload_document(document,db)
+async def create_document(
+    student_id: int = Form(...),
+    document_type: str = Form(...),
+    document_file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    return await upload_document(
+        student_id=student_id,
+        document_type=document_type,
+        document_file=document_file,
+        db=db,
+    )
 
 
 # Get all documents (optionally filter by student)
@@ -31,8 +41,13 @@ async def get_document(document_id: int, db: AsyncSession = Depends(get_db)):
 
 # Update document
 @router.patch("/{document_id}", response_model=StudentDocumentOut)
-async def update_document(document_id: int, document_data: StudentDocumentUpdate, db: AsyncSession = Depends(get_db)):
-    return await update_document_file(document_id,document_data,db)
+async def update_document(
+    document_id: int,
+    document_type: str = Form(...),
+    document_file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    return await update_document_file(document_id, document_type, document_file, db)
 
 
 # Delete document

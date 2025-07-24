@@ -3,6 +3,7 @@ from datetime import date
 from typing import Optional
 from enum import Enum
 from app.schemas.student.admission_schema import StudentAdmissionResponse
+from pydantic import ConfigDict
 
 
 class CertificateType(str, Enum):
@@ -37,8 +38,7 @@ class CertificateIssueOut(CertificateIssueBase):
     id: int
     student: Optional[StudentAdmissionResponse]
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class CertificateFileResponse(BaseModel):
     certificate_type: str
