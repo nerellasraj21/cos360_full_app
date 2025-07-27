@@ -3,6 +3,7 @@ from pydantic import BaseModel, validator
 from datetime import date
 from typing import Optional, TYPE_CHECKING, ForwardRef
 from enum import Enum
+from pydantic import ConfigDict
 
 class AdmissionTypeEnum(str, Enum):
     primary = "primary"
@@ -46,8 +47,7 @@ class StudentOut(StudentBase):
     father: Optional["ParentOut"]
     mother: Optional["ParentOut"]
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 from app.schemas.masters.parent_schema import ParentCreate
 StudentCreate.update_forward_refs()

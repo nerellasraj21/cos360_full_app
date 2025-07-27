@@ -22,6 +22,8 @@ from ..student.student_homework_model import StudentHomework
 from ..student.student_model import Student
 from .student_parent_association_model import StudentParentLink
 from ..student.student_transport_model import StudentTransportAssignment
+from .slot_time_model import SlotTime
+from .timetable_model import Timetable
 
 __all__ = [
     "AcademicYear",
@@ -47,5 +49,7 @@ __all__ = [
     "StudentHomework",
     "Student",
     "StudentParentLink",
-    "StudentTransportAssignment"
+    "StudentTransportAssignment",
+    "SlotTime",
+    "Timetable"
 ]
