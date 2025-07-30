@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 class SectionBase(BaseModel):
     name: str
@@ -23,3 +24,19 @@ class SectionRead(SectionBase):
     class_id: int
 
     model_config = {"from_attributes": True}
+
+class ClassSectionInfo(BaseModel):
+    section_id: int
+    class_section_name: str
+
+class SectionOut(BaseModel):
+    id: int
+    name: str
+    description: str | None
+    is_active: bool
+    class_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

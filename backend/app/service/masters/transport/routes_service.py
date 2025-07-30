@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.models.masters.transport import Route
 from app.schemas.masters.transport import RouteCreate, RouteUpdate
 from fastapi import HTTPException
@@ -52,3 +53,15 @@ async def deactivate_route(route_id: int, db: AsyncSession):
     route.is_active = False 
     await db.commit()
     return {"message": "Route soft deleted"}
+
+async def get_stops_by_route_name(route_name: str, db):
+    stmt = (
+        select(Route)
+        .where(Route.route_name == route_name)
+        .options(selectinload(Route.stops))
+    )
+    result = await db.execute(stmt)
+    route = result.scalars().first()
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    return route.stops

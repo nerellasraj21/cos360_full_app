@@ -1,9 +1,12 @@
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session,joinedload,selectinload
 from sqlalchemy import select, delete
 from app.models.masters.class_model import Class as ClassModel
 from app.models.masters.sections_model import Section as SectionModel
+from app.models.student.student_model import Student
+from app.models.masters.admission_model import Admission
 from app.schemas.masters.class_schema import ClassCreate, ClassUpdate
+from app.schemas.masters.sections_schema import ClassSectionInfo
 import logging as log
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -130,4 +133,65 @@ async def delete_class_with_sections(db: AsyncSession, class_id: int):
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"Error deleting class with sections: {str(e)}")
+    
+async def get_class_section_list(db: AsyncSession) -> list[ClassSectionInfo]:
+    stmt = select(SectionModel).options(joinedload(SectionModel.class_)).order_by(SectionModel.class_id, SectionModel.name)
+    result = await db.execute(stmt)
+    sections = result.scalars().all()
+
+    return [
+        ClassSectionInfo(
+            section_id=section.id,
+            class_section_name=f"{section.class_.name} - {section.name}"
+        )
+        for section in sections
+    ]
+
+async def get_all_classes_data(db: AsyncSession):
+    result = await db.execute(select(ClassModel))
+    return result.scalars().all()
+
+async def get_all_sections_data(db: AsyncSession):
+    result = await db.execute(select(SectionModel))
+    return result.scalars().all()
+
+async def get_sections_by_class_name(db, class_name: str):
+    result = await db.execute(
+        select(ClassModel).where(ClassModel.name == class_name).options(selectinload(ClassModel.sections))
+    )
+    class_obj = result.scalars().first()
+
+    if not class_obj:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    return class_obj.sections
+
+async def get_students_by_class_section(class_name: str, section_name: str, db):
+    # Fetch class
+    class_result = await db.execute(select(ClassModel).where(ClassModel.name == class_name))
+    class_obj = class_result.scalars().first()
+    if not class_obj:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Fetch section
+    section_result = await db.execute(
+        select(SectionModel).where(SectionModel.name == section_name, SectionModel.class_id == class_obj.id)
+    )
+    section_obj = section_result.scalars().first()
+    if not section_obj:
+        raise HTTPException(status_code=404, detail="Section not found for given class")
+
+    # Get students with current class and section
+    stmt = (
+        select(Student)
+        .join(Admission)
+        .where(
+            Admission.current_class_id == class_obj.id,
+            Admission.current_section_id == section_obj.id
+        )
+        .options(selectinload(Student.admissions))
+    )
+    result = await db.execute(stmt)
+    students = result.scalars().all()
+    return students
     

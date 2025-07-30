@@ -7,7 +7,7 @@ class Subject(BaseOrg):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(50), nullable=False, unique=True)
-    category = Column(String(100), nullable=True)
+    category_id = Column(Integer, ForeignKey("subject_categories.id"), nullable=True)
     is_active = Column(Boolean, default=False)
     short_code = Column(String(10), nullable=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
@@ -16,6 +16,7 @@ class Subject(BaseOrg):
     #Acedemic Year relationship
     academic_year_id = Column(Integer, ForeignKey('academic_years.id'), nullable=False)
     academic_year = relationship("AcademicYear", back_populates="subjects")
+    category = relationship("SubjectCategory", back_populates="subjects")
     
     # class-subject mapping relationship
     class_subject_mappings = relationship("ClassSubjectMap", back_populates="subject")

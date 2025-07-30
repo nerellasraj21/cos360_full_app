@@ -11,10 +11,10 @@ from uuid import uuid4
 from app.db.session import get_db
 from app.models.student.student_certificate_model import CertificateIssue
 from app.models.student.student_model import Student
+from app.models.student.certificate_type_model import CertificateType
 from app.schemas.student.certificate_schema import (
     CertificateIssueUpdate,
     CertificateIssueOut,
-    CertificateType,
     CertificateFileResponse
 )
 
@@ -23,7 +23,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 async def upload_certificate(
     student_id: int = Form(...),
-    certificate_type: CertificateType = Form(...),
+    certificate_type_id: int = Form(...),
     issue_date: Optional[date] = Form(None),
     remarks: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
@@ -41,7 +41,7 @@ async def upload_certificate(
 
         cert = CertificateIssue(
             student_id=student_id,
-            certificate_type=certificate_type,
+            certificate_type_id=certificate_type_id,
             issue_date=issue_date or date.today(),
             remarks=remarks,
             file_path=filepath,
@@ -81,7 +81,7 @@ async def get_certificate(certificate_id: int, db: AsyncSession = Depends(get_db
 
 async def update_certificate_file(
     certificate_id: int,
-    certificate_type: Optional[CertificateType] = Form(None),
+    certificate_type_id: Optional[int] = Form(None),
     issue_date: Optional[date] = Form(None),
     remarks: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
@@ -103,8 +103,8 @@ async def update_certificate_file(
                 buffer.write(await certificate_file.read())
             cert.file_path = filepath
 
-        if certificate_type is not None:
-            cert.certificate_type = certificate_type
+        if certificate_type_id is not None:
+            cert.certificate_type_id = certificate_type_id
         if issue_date is not None:
             cert.issue_date = issue_date
         if remarks is not None:
@@ -176,3 +176,7 @@ async def list_all_certificates_of_student(student_id: int, db: AsyncSession = D
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error listing certificates: {str(e)}")
+    
+async def get_all_certificate_types(db: AsyncSession):
+    result = await db.execute(select(CertificateType))
+    return result.scalars().all()

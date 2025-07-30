@@ -1,10 +1,11 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+from app.schemas.masters.subject_category_schema import SubjectCategoryOut
 
 class SubjectBase(BaseModel):
     name: str
-    category: Optional[str] = None
+    category_id: int
     short_code: Optional[str] = None
     is_active: bool = True
     academic_year_id: int
@@ -21,5 +22,10 @@ class SubjectUpdate(BaseModel):
 
 class SubjectRead(SubjectBase):
     id: int
+    name: str
+    short_code: Optional[str] = None
+    is_active: bool = True
+    academic_year_id: int
+    category: SubjectCategoryOut
 
     model_config = {"from_attributes": True}
