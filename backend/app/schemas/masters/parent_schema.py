@@ -1,6 +1,7 @@
 from __future__ import annotations
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Literal, ForwardRef, TYPE_CHECKING
+from pydantic import ConfigDict
 
 class ParentBase(BaseModel):
     name: str
@@ -27,8 +28,7 @@ class ParentOut(ParentBase):
     id: int
     students: List["StudentOut"] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
     @staticmethod
     def from_orm_with_students(parent):

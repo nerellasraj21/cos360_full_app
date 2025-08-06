@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 from datetime import date
 from app.schemas.student.student_schema import StudentCreate, StudentOut, StudentDetailsOut
+from pydantic import ConfigDict
 
 class StudentAdmissionBase(BaseModel):
     admission_date: date
@@ -26,8 +27,7 @@ class StudentAdmissionResponse(StudentAdmissionBase):
     id: int
     student: StudentOut
 
-    class Config:
-        from_attributes=True
+    model_config = ConfigDict(from_attributes=True)
 
 class StudentAdmissionUpdate(BaseModel):
     first_name: Optional[str]

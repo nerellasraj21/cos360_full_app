@@ -6,14 +6,14 @@ from app.schemas.student.admission_schema import StudentAdmissionResponse
 from pydantic import ConfigDict
 
 
-class CertificateType(str, Enum):
-    bonafide = "Bonafide"
-    transfer = "Transfer"
-    conduct = "Conduct"
+# class CertificateType(str, Enum):
+#     bonafide = "Bonafide"
+#     transfer = "Transfer"
+#     conduct = "Conduct"
 
 class CertificateIssueBase(BaseModel):
     student_id: int = Field(..., gt=0)
-    certificate_type: CertificateType
+    certificate_type_id: int
     issue_date: Optional[date] = Field(default_factory=date.today)
     description: Optional[str] = Field(None, max_length=255)
     certificate_file: Optional[str] = Field(None, description="Path or filename of uploaded certificate")
@@ -26,7 +26,7 @@ class CertificateIssueCreate(CertificateIssueBase):
 
 
 class CertificateIssueUpdate(BaseModel):
-    certificate_type: Optional[CertificateType]
+    certificate_type_id: int
     issue_date: Optional[date]
     description: Optional[str] = Field(None, max_length=255)
     certificate_file: Optional[str]
@@ -41,7 +41,7 @@ class CertificateIssueOut(CertificateIssueBase):
     model_config = ConfigDict(from_attributes=True)
 
 class CertificateFileResponse(BaseModel):
-    certificate_type: str
+    certificate_type_id: int
     issue_date: Optional[date]
     file_path: Optional[str]
     exists_on_disk: bool

@@ -7,16 +7,24 @@ from fastapi import HTTPException
 from typing import Optional,List
 from datetime import date
 from app.tools.password_util import hash_password
+import enum
 
 
 from app.models.masters.staff_model import Staff
 from app.models.auth.user_model import User
+from app.models.auth.role_model import Role
 from app.models.masters.staff_attendance_model import StaffAttendance
+from app.models.masters.designations_model import Designation
 from app.schemas.masters.staff_schema import StaffEnrollmentCreate, StaffEnrollmentUpdate
 from app.schemas.masters.staff_attendance_schema import StaffAttendanceCreate, StaffAttendanceUpdate, StaffAttendanceOut
 
 
 # -------------------- Staff Enrollment --------------------
+
+class GenderEnum(enum.Enum):
+    male = "male"
+    female = "female"
+    other = "other"
 
 async def create_staff_enrollment(data: StaffEnrollmentCreate, db: AsyncSession):
     try:
@@ -165,3 +173,47 @@ async def delete_staff_attendance(attendance_id: int, db: AsyncSession):
     await db.delete(attendance)
     await db.commit()
     return {"detail": "Staff attendance deleted successfully"}
+
+async def get_staff_list_by_gender(
+    gender: Optional[GenderEnum],db: AsyncSession):
+    stmt = select(Staff)
+    if gender:
+        stmt = stmt.where(Staff.gender == gender)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+async def get_staff_details_by_designation(designation_id: Optional[int],db: AsyncSession):
+    stmt = select(Staff)
+    if designation_id:
+        stmt = stmt.where(Staff.designation_id == designation_id)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+async def get_all_designations_list(db: AsyncSession):
+    try:
+        result = await db.execute(select(Designation))
+        return result.scalars().all()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving designations: {str(e)}")
+    
+async def get_all_drivers_list(db: AsyncSession):
+    try:
+        stmt = (
+            select(Staff)
+            .join(Staff.designation_obj)
+            .options(selectinload(Staff.designation_obj))
+            .where(Designation.title == "Driver")
+        )
+
+        result = await db.execute(stmt)
+        drivers = result.scalars().all()
+
+        return [
+            {
+                "full_name": f"{driver.first_name} {driver.last_name or ''}".strip(),
+                "user_id": driver.user_id
+            }
+            for driver in drivers
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching drivers: {str(e)}")

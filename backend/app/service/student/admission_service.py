@@ -8,6 +8,7 @@ from app.models.masters.student_parent_association_model import StudentParentLin
 from sqlalchemy.orm import selectinload
 from app.models.auth.user_model import User
 from sqlalchemy.future import select
+from sqlalchemy import or_, String
 from app.tools.password_util import hash_password
 
 async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
@@ -113,3 +114,30 @@ async def update_partial_details_admission(student_id: int, data: StudentAdmissi
     await db.commit()
     await db.refresh(admission)
     return admission
+
+async def get_student_by_admission_id(admission_id: int, db):
+    stmt = (
+        select(Admission)
+        .where(Admission.id == admission_id)
+        .options(selectinload(Admission.student))
+    )
+    result = await db.execute(stmt)
+    admission = result.scalars().first()
+    if not admission:
+        raise HTTPException(status_code=404, detail="Admission ID not found")
+    return admission.student
+
+async def search_students(query: str, db):
+    stmt = (
+        select(Student)
+        .join(Admission, Student.id == Admission.student_id)
+        .where(
+            or_(
+                Admission.id.cast(String).ilike(f"%{query}%"),
+                Student.first_name.ilike(f"%{query}%"),
+                Student.last_name.ilike(f"%{query}%")
+            )
+        )
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()

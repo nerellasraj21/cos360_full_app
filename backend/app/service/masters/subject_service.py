@@ -77,3 +77,8 @@ async def deactivate_subject(db: AsyncSession, subject_id: int):
         log.error(f"Failed to deactivate subject: {e}")
         raise HTTPException(status_code=400, detail="Subject deactivation failed.")
     return subject
+
+async def get_subjects_by_category_id(category_id: int, db: AsyncSession):
+    stmt = select(Subject).where(Subject.category_id == category_id)
+    result = await db.execute(stmt)
+    return result.scalars().all()

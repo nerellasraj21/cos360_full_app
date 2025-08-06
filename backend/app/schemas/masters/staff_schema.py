@@ -1,7 +1,12 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Literal
 from datetime import date
+import enum
 
+class GenderEnum(enum.Enum):
+    male = "male"
+    female = "female"
+    other = "other"
 
 class StaffEnrollmentBase(BaseModel):
     first_name: str = Field(..., description="Jane")
@@ -14,14 +19,13 @@ class StaffEnrollmentBase(BaseModel):
     qualification: Optional[str]
     experience_years: Optional[int]
     address: Optional[str]
-    designation: Optional[str]
+    designation_id: Optional[int] = Field(None, description="ID from the designations table")
     department: Optional[str]
     is_active: bool = True
 
 
 class StaffEnrollmentCreate(StaffEnrollmentBase):
     pass
-    role_id: int
 
 class StaffEnrollmentUpdate(BaseModel):
     email: Optional[EmailStr]
@@ -29,8 +33,8 @@ class StaffEnrollmentUpdate(BaseModel):
     gender: Optional[Literal["male", "female", "other"]]
     date_of_birth: Optional[date]
     joining_date: Optional[date]
-    role: Optional[str]
     qualification: Optional[str]
+    designation_id: Optional[int] = Field(None, description="ID from the designations table")
     experience_years: Optional[int]
     address: Optional[str]
     is_active: Optional[bool]
@@ -41,3 +45,37 @@ class StaffEnrollmentOut(StaffEnrollmentBase):
 
     class Config:
         orm_mode = True
+
+class DesignationCreate(BaseModel):
+    title: str
+
+class DesignationOut(BaseModel):
+    id: int
+    title: str
+
+    class Config:
+        from_attributes = True
+
+class StaffOut(BaseModel):
+    id: int
+    first_name: str
+    last_name: Optional[str]
+    email: Optional[str]
+    phone: Optional[str]
+    gender: Optional[GenderEnum]
+    date_of_birth: Optional[date]
+    joining_date: date
+    qualification: Optional[str]
+    experience_years: Optional[int]
+    address: Optional[str]
+    designation: Optional[DesignationOut]
+    department: Optional[str]
+    is_active: bool
+    user_id: int
+
+    class Config:
+        from_attributes = True
+
+class DriverOut(BaseModel):
+    full_name: str
+    user_id: int

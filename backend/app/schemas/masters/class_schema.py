@@ -26,3 +26,16 @@ class ClassRead(ClassBase):
     sections: List[SectionRead] = []  # Use read schema for response
 
     model_config = {"from_attributes": True}
+
+class ClassOut(BaseModel):
+    id: int
+    name: str
+    description: str | None
+    short_code: str | None
+    is_active: bool
+    academic_year_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

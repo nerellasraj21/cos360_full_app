@@ -22,7 +22,7 @@ class Staff(BaseOrg):
     qualification = Column(String(100), nullable=True)
     experience_years = Column(Integer, nullable=True)
     address = Column(String(255), nullable=True)
-    designation = Column(String(100), nullable=True)
+    designation_id = Column(Integer, ForeignKey("designations.id"), nullable=True)
     department = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
@@ -30,3 +30,4 @@ class Staff(BaseOrg):
     # Relationships
     attendances = relationship("StaffAttendance", back_populates="staff", cascade="all, delete-orphan")
     user = relationship("User", back_populates="staff")
+    designation_obj = relationship("Designation", back_populates="staff_members")

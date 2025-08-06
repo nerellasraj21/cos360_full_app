@@ -22,6 +22,11 @@ from ..student.student_homework_model import StudentHomework
 from ..student.student_model import Student
 from .student_parent_association_model import StudentParentLink
 from ..student.student_transport_model import StudentTransportAssignment
+from .slot_time_model import SlotTime
+from .timetable_model import Timetable
+from .designations_model import Designation
+from ..student.certificate_type_model import CertificateType
+from .subject_category_model import SubjectCategory
 
 __all__ = [
     "AcademicYear",
@@ -47,5 +52,10 @@ __all__ = [
     "StudentHomework",
     "Student",
     "StudentParentLink",
-    "StudentTransportAssignment"
+    "StudentTransportAssignment",
+    "SlotTime",
+    "Timetable",
+    "Designation",
+    "CertificateType",
+    "SubjectCategory"
 ]

@@ -2,19 +2,25 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import date
+import enum
 
 from app.db.session import get_db
-from app.schemas.masters.staff_schema import StaffEnrollmentCreate, StaffEnrollmentUpdate, StaffEnrollmentOut
+from app.schemas.masters.staff_schema import StaffEnrollmentCreate, StaffEnrollmentUpdate, StaffEnrollmentOut,StaffOut,DesignationOut,DriverOut
 from app.schemas.masters.staff_attendance_schema import StaffAttendanceCreate, StaffAttendanceUpdate, StaffAttendanceOut
 from app.service.masters.staff_service import (
     create_staff_enrollment, update_staff_enrollment, get_all_staff_enrollments,
     get_staff_enrollment_by_id, delete_staff_enrollment,
     create_staff_attendance, update_staff_attendance, get_all_staff_attendance,
-    get_attendance_for_staff, delete_staff_attendance,
-    get_attendance_for_staff
+    get_attendance_for_staff, delete_staff_attendance,get_all_designations_list,
+    get_attendance_for_staff, get_staff_list_by_gender,get_staff_details_by_designation,get_all_drivers_list
 )
 
 router = APIRouter(prefix="/staff", tags=["Staff"])
+
+class GenderEnum(enum.Enum):
+    male = "male"
+    female = "female"
+    other = "other"
 
 # -------------------- Staff Enrollment Endpoints --------------------
 
@@ -70,3 +76,25 @@ async def filter_staff_attendance(
     db: AsyncSession = Depends(get_db)
 ):
     return await get_attendance_for_staff(staff_id, db, start_date, end_date)
+
+@router.get("/", response_model=List[StaffOut])
+async def get_staff_list(
+    gender: Optional[GenderEnum] = Query(None, description="Filter by gender"),
+    db: AsyncSession = Depends(get_db)
+):
+    return await get_staff_list_by_gender(gender,db)
+
+@router.get("/by-designation")
+async def get_staff_by_designation(
+    designation_id: Optional[int] = Query(None, description="Filter staff by designation"),
+    db: AsyncSession = Depends(get_db)
+):
+    return await get_staff_details_by_designation(designation_id,db)
+
+@router.get("/", response_model=List[DesignationOut])
+async def get_all_designations(db: AsyncSession = Depends(get_db)):
+    return await get_all_designations_list(db)
+
+@router.get("/drivers", response_model=List[DriverOut])
+async def get_all_drivers(db: AsyncSession = Depends(get_db)):
+    return await get_all_drivers_list(db)

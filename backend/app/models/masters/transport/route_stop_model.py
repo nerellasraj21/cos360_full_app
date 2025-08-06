@@ -9,7 +9,7 @@ class RouteStop(BaseOrg):
     route_id = Column(Integer, ForeignKey("routes.id"))
     name = Column(String, nullable=False)
     number = Column(Integer)
-    time = Column(Time)
+    reaching_time = Column(Time)
     fees = Column(Integer)
     is_active = Column(Boolean, default=True)
 
