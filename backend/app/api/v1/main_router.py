@@ -22,6 +22,12 @@ from app.api.v1.student.student_document_endpoints import router as student_docu
 # from app.api.v1.masters.student_homework_endpoints import router as student_homework_router
 from app.api.v1.student.student_transport_endpoints import router as student_transport_router
 from app.api.v1.masters.subject_category_endpoints import router as subject_category_router
+from app.api.v1.fee.fee_term_endpoints import router as fee_term_router
+from app.api.v1.fee.fee_category_endpoints import router as fee_category_router
+from app.api.v1.fee.fee_type_endpoints import router as fee_type_router
+from app.api.v1.fee.fee_class_mapping_endpoints import router as fee_class_mapping_router
+from app.api.v1.fee.fee_class_map_term_amount_endpoints import router as fee_class_map_term_amount_router
+from app.api.v1.fee.fee_student_mapping_endpoints import router as fee_student_mapping_router
 
 router = APIRouter()
 router.include_router(academic_year_router)
@@ -46,3 +52,9 @@ router.include_router(student_document_router)
 router.include_router(student_transport_router)
 router.include_router(attendance_router)
 router.include_router(subject_category_router)
+router.include_router(fee_term_router)
+router.include_router(fee_category_router)
+router.include_router(fee_type_router)
+router.include_router(fee_class_mapping_router)
+router.include_router(fee_class_map_term_amount_router)
+router.include_router(fee_student_mapping_router)

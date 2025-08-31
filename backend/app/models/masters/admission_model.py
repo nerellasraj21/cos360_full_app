@@ -7,9 +7,11 @@ class Admission(BaseOrg):
 
     id = Column(Integer, primary_key=True, index=True)
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
+    admission_number = Column(String(50), nullable=True, unique=True)
 
     admission_date = Column(Date, nullable=False)
     academic_year_id = Column(Integer, ForeignKey("academic_years.id"))
+    admitted_academic_year_id = Column(Integer, ForeignKey("academic_years.id")) # Add this in migrations.
     admitted_class_id = Column(Integer, ForeignKey("classes.id"))
     admitted_section_id = Column(Integer, ForeignKey("sections.id"))
     current_class_id = Column(Integer, ForeignKey("classes.id"))

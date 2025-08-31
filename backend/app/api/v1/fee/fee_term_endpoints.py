@@ -1,37 +1,51 @@
 from fastapi import HTTPException, status, APIRouter, Depends
-from app.models.fee.fee_term_model import FeeTerm as FeeTermModel
-from app.models.fee.fee_term_dates_model import FeeTermDates as FeeTermDatesModel
 from app.schemas.fee.fee_term_schema import FeeTermCreate, FeeTermRead, FeeTermUpdate
 from app.db.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.service.fee.fee_term_service import create_fee_term_with_dates, get_fee_term_with_dates, get_all_fee_terms, update_fee_term_with_dates, delete_fee_term_with_dates
-
+from app.service.fee.fee_term_service import (
+    create_fee_term_with_dates, 
+    get_fee_term_with_dates, 
+    get_all_fee_terms, 
+    update_fee_term_with_dates, 
+    delete_fee_term_with_dates,
+    delete_fee_term_date
+)
+from typing import List
 
 router = APIRouter(prefix="/fee/terms", tags=["Fee/Fee Terms & Dates"])
 
 # Create Fee Term with Dates
 @router.post("/", response_model=FeeTermRead, status_code=status.HTTP_201_CREATED)
-async def create_fee_term(fee_term_data: FeeTermModel, db: AsyncSession = Depends(get_db)):
+async def create_fee_term(fee_term_data: FeeTermCreate, db: AsyncSession = Depends(get_db)):
+    """Create a new fee term with associated dates"""
     return await create_fee_term_with_dates(db, fee_term_data)
 
+# Get All Fee Terms
+@router.get("/", response_model=List[FeeTermRead])
+async def get_all_fee_terms_endpoint(db: AsyncSession = Depends(get_db)):
+    """Get all fee terms with their associated dates"""
+    return await get_all_fee_terms(db)
 
-# Read Single Fee term with Dates
+# Get Single Fee Term with Dates
 @router.get("/{fee_term_id}", response_model=FeeTermRead)
-async def get_fee_term_with_dates(fee_date_id: str, db:AsyncSession = Depends(get_db)):
-    db_fee_term = await get_fee_term_with_dates(db, fee_date_id)
-    if not db_fee_term:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee term not found")
-    return db_fee_term
+async def get_fee_term_endpoint(fee_term_id: str, db: AsyncSession = Depends(get_db)):
+    """Get a specific fee term with its associated dates"""
+    return await get_fee_term_with_dates(db, fee_term_id)
 
-# Read All Fee Terms with Dates
-@router.get("/", response_model=list[FeeTermRead])
-async def get_all_fee_terms(academic_year_id: int = None, db: AsyncSession = Depends(get_db)):
-    return await get_all_fee_terms(db, academic_year_id)
-
-# Update Fee Term and Replace Dates
-@router.put("/{fee_term_id}", response_model=dict)
-async def update_fee_term(fee_term_id: str, fee_term_data: FeeTermUpdate, db: AsyncSession = Depends(get_db)):
-    db_fee_term = await get_fee_term_with_dates(db, fee_term_id)
-    if not db_fee_term:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee term not found")
+# Update Fee Term with Dates
+@router.put("/{fee_term_id}", response_model=FeeTermRead)
+async def update_fee_term_endpoint(fee_term_id: str, fee_term_data: FeeTermUpdate, db: AsyncSession = Depends(get_db)):
+    """Update a fee term and its associated dates"""
     return await update_fee_term_with_dates(db, fee_term_id, fee_term_data)
+
+# Delete Fee Term with Dates
+@router.delete("/{fee_term_id}")
+async def delete_fee_term_endpoint(fee_term_id: str, db: AsyncSession = Depends(get_db)):
+    """Delete a fee term and all its associated dates"""
+    return await delete_fee_term_with_dates(db, fee_term_id)
+
+# Delete Fee Term Date
+@router.delete("/dates/{fee_term_date_id}")
+async def delete_fee_term_date_endpoint(fee_term_date_id: str, db: AsyncSession = Depends(get_db)):
+    """Delete a specific fee term date"""
+    return await delete_fee_term_date(db, fee_term_date_id)

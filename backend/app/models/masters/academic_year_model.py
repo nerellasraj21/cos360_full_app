@@ -22,6 +22,16 @@ class AcademicYear(BaseOrg):
     class_subject_mappings = relationship("ClassSubjectMap", back_populates="academic_year")
     # Holidays relationship
     holidays = relationship("Holiday", back_populates="academic_year")
+    # Fee terms relationship
+    fee_terms = relationship("FeeTerm", back_populates="academic_year")
+    # Fee categories relationship
+    fee_categories = relationship("FeeCategory", back_populates="academic_year")
+    # Fee types relationship
+    fee_types = relationship("FeeType", back_populates="academic_year")
+    # Fee class mappings relationship
+    fee_class_mappings = relationship("FeeClassMapping", back_populates="academic_year")
+    # Fee student mappings relationship
+    fee_student_mappings = relationship("FeeStudentMapping", back_populates="academic_year")
 
     def __repr__(self):
         return f"name='{self.title}')"

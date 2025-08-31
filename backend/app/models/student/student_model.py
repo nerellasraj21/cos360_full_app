@@ -32,3 +32,4 @@ class Student(BaseOrg):
     attendances = relationship("StudentAttendance", back_populates="student", cascade="all, delete-orphan")
     certificates = relationship("CertificateIssue", back_populates="student", cascade="all, delete-orphan")
     documents = relationship("StudentDocument", back_populates="student", cascade="all, delete-orphan")
+    fee_student_mappings = relationship("FeeStudentMapping", back_populates="student", cascade="all, delete-orphan")

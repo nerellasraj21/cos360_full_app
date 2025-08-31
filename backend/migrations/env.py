@@ -10,6 +10,12 @@ from alembic import context
 from app.db.base import Base
 from app.models.auth import User, Role, Menu, RoleMenuPermission
 from app.models.masters import Class, Section
+from app.models.fee.fee_category_model import FeeCategory
+from app.models.fee.fee_term_model import FeeTerm
+from app.models.fee.fee_term_dates_model import FeeTermDates
+from app.models.fee.fee_type_model import FeeType
+from app.models.fee.fee_class_mapping_model import FeeClassMapping
+from app.models.fee.fee_class_map_term_amount_model import FeeClassMappingTermAmount
 
 
 

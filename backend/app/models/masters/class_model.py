@@ -20,6 +20,10 @@ class Class(BaseOrg):
     academic_year = relationship("AcademicYear", backref="classes")
     # Class-Subject Mapping relationship
     class_subject_mappings = relationship("ClassSubjectMap", back_populates="class_")
+    # Fee Class Mapping relationship
+    fee_class_mappings = relationship("FeeClassMapping", back_populates="class_ref")
+    # Fee Student Mapping relationship
+    fee_student_mappings = relationship("FeeStudentMapping", back_populates="class_ref")
     
     def __repr__(self):
         return f"<Class(id={self.id}, name='{self.name}')>"
