@@ -9,6 +9,7 @@ from app.models.fee.fee_category_model import FeeCategory
 from app.models.fee.fee_term_model import FeeTerm
 from app.models.masters.academic_year_model import AcademicYear
 from app.schemas.fee.fee_type_schema import FeeTypeCreate, FeeTypeUpdate
+from app.tools.cache_utils import cache_dropdown, invalidate_cache
 from typing import List, Optional
 from uuid import UUID
 
@@ -115,6 +116,9 @@ async def create_fee_type(db: AsyncSession, fee_type_data: FeeTypeCreate):
         db.add(db_fee_type)
         await db.commit()
         await db.refresh(db_fee_type)
+        
+        # Invalidate cache after creating new fee type
+        invalidate_cache("dropdown", "fee_types")
         
         # Load with all relationships for response
         result = await db.execute(
@@ -230,8 +234,9 @@ async def get_all_fee_types(db: AsyncSession):
             detail="An error occurred while retrieving fee types"
         )
 
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
 async def get_fee_types_dropdown(db: AsyncSession, fee_category_id: Optional[str] = None):
-    """Get fee types for dropdown (id + type_name only)"""
+    """Get fee types for dropdown (id + type_name only) - Cached"""
     try:
         query = select(FeeTypeModel)
         
@@ -240,7 +245,10 @@ async def get_fee_types_dropdown(db: AsyncSession, fee_category_id: Optional[str
             query = query.where(FeeTypeModel.fee_category_id == fee_category_uuid)
         
         result = await db.execute(query)
-        return result.scalars().all()
+        fee_types = result.scalars().all()
+        
+        log.debug(f"Retrieved {len(fee_types)} fee types from database")
+        return fee_types
         
     except ValueError:
         raise HTTPException(
@@ -314,6 +322,9 @@ async def update_fee_type(db: AsyncSession, fee_type_id: str, fee_type_data: Fee
         await db.commit()
         await db.refresh(db_fee_type)
         
+        # Invalidate cache after updating fee type
+        invalidate_cache("dropdown", "fee_types")
+        
         # Load updated fee type with all relationships
         result = await db.execute(
             select(FeeTypeModel)
@@ -380,6 +391,10 @@ async def delete_fee_type(db: AsyncSession, fee_type_id: str):
         
         await db.delete(db_fee_type)
         await db.commit()
+        
+        # Invalidate cache after deleting fee type
+        invalidate_cache("dropdown", "fee_types")
+        
         return {"message": "Fee type deleted successfully"}
         
     except HTTPException:

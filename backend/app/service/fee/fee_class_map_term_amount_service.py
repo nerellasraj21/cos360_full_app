@@ -80,7 +80,7 @@ async def validate_term_count(db: AsyncSession, fee_class_mapping: FeeClassMappi
             detail=f"Number of term amounts ({len(term_amounts)}) must match number_of_terms ({fee_term.number_of_terms}) in the associated fee term"
         )
 
-async def validate_total_amount_matches(fee_class_mapping: FeeClassMapping, term_amounts: List):
+def validate_total_amount_matches(fee_class_mapping: FeeClassMapping, term_amounts: List):
     """Validate that the sum of term amounts equals the total fee in the mapping"""
     total_term_amount = sum(Decimal(str(term_amount.term_amount)) for term_amount in term_amounts)
     if total_term_amount != fee_class_mapping.total_fee:
@@ -99,7 +99,7 @@ async def create_fee_class_mapping_term_amounts(db: AsyncSession, bulk_data: Fee
         await validate_term_count(db, fee_class_mapping, bulk_data.term_amounts)
         
         # Validate total amount matches
-        await validate_total_amount_matches(fee_class_mapping, bulk_data.term_amounts)
+        validate_total_amount_matches(fee_class_mapping, bulk_data.term_amounts)
         
         # Validate all terms exist and are unique
         term_ids = []
@@ -217,7 +217,7 @@ async def update_fee_class_mapping_term_amounts(db: AsyncSession, bulk_data: Fee
             all_amounts_for_validation.append(MockAmount(amount.term_amount))
         
         await validate_term_count(db, fee_class_mapping, all_amounts_for_validation)
-        await validate_total_amount_matches(fee_class_mapping, all_amounts_for_validation)
+        validate_total_amount_matches(fee_class_mapping, all_amounts_for_validation)
         
         await db.commit()
         

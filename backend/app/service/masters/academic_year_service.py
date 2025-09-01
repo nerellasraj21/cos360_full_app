@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 from app.models.masters import AcademicYear
 from app.schemas.masters import AcademicYearCreate, AcademicYearUpdate
+from app.tools.cache_utils import cache_dropdown, invalidate_cache
 import logging as log
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +31,10 @@ async def create_academic_year(db: AsyncSession, academic_year: AcademicYearCrea
         db.add(new_year)
         await db.commit()
         await db.refresh(new_year)
+        
+        # Invalidate cache after creating new academic year
+        invalidate_cache("dropdown", "academic_years")
+        
         return new_year
     except Exception as e:        
         log.error(f"Error creating academic year: {str(e)}")
@@ -46,13 +51,18 @@ async def get_academic_year_by_id(db: AsyncSession, academic_year_id: int):
                             detail=f"Academic Year with id {academic_year_id} not found")
     return db_academic_year
 
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
 async def get_all_academic_years(db: AsyncSession, skip: int = 0, limit: int = 10, active_only: bool = True):
+    """Get all academic years for dropdown - Cached"""
     try:
         query = select(AcademicYear)
         if active_only:
             query = query.where(AcademicYear.is_active == True)
         result = await db.execute(query.offset(skip).limit(limit))
-        return result.unique().scalars().all()
+        academic_years = result.unique().scalars().all()
+        
+        log.debug(f"Retrieved {len(academic_years)} academic years from database")
+        return academic_years
     except Exception as e:
         log.error(f"Error fetching academic years: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -75,6 +85,10 @@ async def update_academic_year(db: AsyncSession, academic_year_id: int, academic
             await db.execute(update(AcademicYear).where(AcademicYear.id != academic_year_id).values(is_active=False))
         await db.commit()
         await db.refresh(db_academic_year)
+        
+        # Invalidate cache after updating academic year
+        invalidate_cache("dropdown", "academic_years")
+        
         return db_academic_year
     except Exception as e:
         log.error(f"Error updating academic year: {str(e)}")
@@ -91,6 +105,10 @@ async def deactivate_academic_year(db: AsyncSession, academic_year_id: int):
         db_academic_year.is_active = False
         await db.commit()
         await db.refresh(db_academic_year)
+        
+        # Invalidate cache after deactivating academic year
+        invalidate_cache("dropdown", "academic_years")
+        
         return db_academic_year
     except Exception as e:
         log.error(f"Error deactivating academic year: {str(e)}")

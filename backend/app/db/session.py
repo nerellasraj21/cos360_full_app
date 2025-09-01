@@ -4,7 +4,16 @@ from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = "postgresql+asyncpg://postgres:Passw0rd!@localhost/postgres"
 
-engine = create_async_engine(DATABASE_URL, echo=True)
+# Optimized connection pool configuration for high concurrency
+engine = create_async_engine(
+    DATABASE_URL, 
+    echo=False,  # Disable SQL echo for performance
+    pool_size=20,              # Number of connections to keep open in pool
+    max_overflow=30,           # Additional connections allowed beyond pool_size
+    pool_timeout=30,           # Timeout for getting connection from pool
+    pool_recycle=3600,         # Recycle connections every hour
+    pool_pre_ping=True,        # Verify connections before use
+)
 # engine = create_engine(DATABASE_URL)
 # SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

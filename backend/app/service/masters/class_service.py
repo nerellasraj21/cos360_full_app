@@ -7,6 +7,7 @@ from app.models.student.student_model import Student
 from app.models.masters.admission_model import Admission
 from app.schemas.masters.class_schema import ClassCreate, ClassUpdate
 from app.schemas.masters.sections_schema import ClassSectionInfo
+from app.tools.cache_utils import cache_dropdown, invalidate_cache
 import logging as log
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +36,11 @@ async def create_class_with_sections(db: AsyncSession, class_data: ClassCreate):
                 db.add(new_section)            
         await db.commit()
         await db.refresh(db_class)
+        
+        # Invalidate cache after creating new class/section
+        invalidate_cache("dropdown", "classes")
+        invalidate_cache("dropdown", "sections") 
+        
         return db_class
     except Exception as e:
         await db.rollback()
@@ -107,6 +113,11 @@ async def update_class_with_sections(db: AsyncSession, class_id: int, class_data
                 db.add(new_sec)
 
         await db.commit()
+        
+        # Invalidate cache after updating class/section  
+        invalidate_cache("dropdown", "classes")
+        invalidate_cache("dropdown", "sections")
+        
         return {"message": "Class and sections updated successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error fetching classes with sections: {str(e)}")
@@ -129,6 +140,11 @@ async def delete_class_with_sections(db: AsyncSession, class_id: int):
         # db.delete(db_class)
         await db.delete(db_class)
         await db.commit()
+        
+        # Invalidate cache after deleting class/section
+        invalidate_cache("dropdown", "classes")
+        invalidate_cache("dropdown", "sections")
+        
         return {"detail": "Class and associated sections deleted successfully"}
     except Exception as e:
         await db.rollback()
@@ -147,15 +163,27 @@ async def get_class_section_list(db: AsyncSession) -> list[ClassSectionInfo]:
         for section in sections
     ]
 
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
 async def get_all_classes_data(db: AsyncSession):
+    """Get all classes for dropdown - Cached"""
     result = await db.execute(select(ClassModel))
-    return result.scalars().all()
+    classes = result.scalars().all()
+    
+    log.debug(f"Retrieved {len(classes)} classes from database")
+    return classes
 
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
 async def get_all_sections_data(db: AsyncSession):
+    """Get all sections for dropdown - Cached"""
     result = await db.execute(select(SectionModel))
-    return result.scalars().all()
+    sections = result.scalars().all()
+    
+    log.debug(f"Retrieved {len(sections)} sections from database")
+    return sections
 
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
 async def get_sections_by_class_name(db, class_name: str):
+    """Get sections by class name for dropdown - Cached"""
     result = await db.execute(
         select(ClassModel).where(ClassModel.name == class_name).options(selectinload(ClassModel.sections))
     )
@@ -164,6 +192,7 @@ async def get_sections_by_class_name(db, class_name: str):
     if not class_obj:
         raise HTTPException(status_code=404, detail="Class not found")
 
+    log.debug(f"Retrieved {len(class_obj.sections)} sections for class {class_name} from database")
     return class_obj.sections
 
 async def get_students_by_class_section(class_name: str, section_name: str, db):

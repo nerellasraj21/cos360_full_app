@@ -4,9 +4,15 @@ from app.db.base import BasePublic
 from app.db.session import engine
 from app.tools.logging import configure_logging
 from fastapi.middleware.cors import CORSMiddleware
+from app.middleware.tenant_middleware import TenantMiddleware
+from app.middleware.rate_limit_middleware import limiter, rate_limit_handler, RateLimitExceeded
 from app.config import settings
 
 app = FastAPI()
+
+# Add rate limiting state and error handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
 # Create only public schema tables at startup
 # BasePublic.metadata.create_all(bind=engine)
@@ -25,6 +31,9 @@ app.include_router(api_v1_router, prefix="/api/v1")
 
 # Configure Logging
 configure_logging(log_file="cos360_errors.log")
+
+# Tenant detection middleware (must be added before other middlewares)
+app.add_middleware(TenantMiddleware)
 
 # CORS middleware
 app.add_middleware(

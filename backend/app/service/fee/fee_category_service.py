@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app.models.fee.fee_category_model import FeeCategory as FeeCategoryModel
 from app.models.masters.academic_year_model import AcademicYear
 from app.schemas.fee.fee_category_schema import FeeCategoryCreate, FeeCategoryUpdate
+from app.tools.cache_utils import cache_dropdown, invalidate_cache
 from typing import List, Optional
 from uuid import UUID
 
@@ -66,6 +67,9 @@ async def create_fee_category(db: AsyncSession, fee_category_data: FeeCategoryCr
         db.add(db_fee_category)
         await db.commit()
         await db.refresh(db_fee_category)
+        
+        # Invalidate cache after creating new category
+        invalidate_cache("dropdown", "fee_categories")
         
         # Load with academic year for response
         result = await db.execute(
@@ -158,16 +162,20 @@ async def get_all_fee_categories(db: AsyncSession):
             detail="An error occurred while retrieving fee categories"
         )
 
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
 async def get_fee_categories_dropdown(db: AsyncSession, academic_year_id: Optional[int] = None):
-    """Get fee categories for dropdown (id + category_name only)"""
+    """Get fee categories for dropdown (id + category_name only) - Cached"""
     try:
-        query = select(FeeCategoryModel)
+        query = select(FeeCategoryModel).order_by(FeeCategoryModel.category_name)
         
         if academic_year_id:
             query = query.where(FeeCategoryModel.academic_year_id == academic_year_id)
         
         result = await db.execute(query)
-        return result.scalars().all()
+        categories = result.scalars().all()
+        
+        log.debug(f"Retrieved {len(categories)} fee categories from database")
+        return categories
         
     except Exception as e:
         log.error(f"Error getting fee categories dropdown: {str(e)}")
@@ -223,6 +231,9 @@ async def update_fee_category(db: AsyncSession, fee_category_id: str, fee_catego
         
         await db.commit()
         await db.refresh(db_fee_category)
+        
+        # Invalidate cache after updating category
+        invalidate_cache("dropdown", "fee_categories")
         
         # Load updated fee category with academic year
         result = await db.execute(
@@ -282,6 +293,10 @@ async def delete_fee_category(db: AsyncSession, fee_category_id: str):
         
         await db.delete(db_fee_category)
         await db.commit()
+        
+        # Invalidate cache after deleting category
+        invalidate_cache("dropdown", "fee_categories")
+        
         return {"message": "Fee category deleted successfully"}
         
     except HTTPException:

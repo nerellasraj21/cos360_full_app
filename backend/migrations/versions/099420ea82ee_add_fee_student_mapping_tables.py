@@ -33,11 +33,11 @@ def upgrade() -> None:
         sa.Column('academic_year_id', sa.Integer(), nullable=False),
         sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.func.now(), nullable=False),
         sa.Column('updated_at', sa.TIMESTAMP(), server_default=sa.func.now(), nullable=False),
-        sa.Column('organization_id', sa.Integer(), nullable=False),
+        sa.Column('organization_id', sa.Integer(), nullable=True),
         sa.ForeignKeyConstraint(['academic_year_id'], ['academic_years.id'], ),
         sa.ForeignKeyConstraint(['class_id'], ['classes.id'], ),
         sa.ForeignKeyConstraint(['fee_type_id'], ['fee_types.id'], ),
-        sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ),
+        # sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ),  # Disabled - organizations table doesn't exist
         sa.ForeignKeyConstraint(['section_id'], ['sections.id'], ),
         sa.ForeignKeyConstraint(['student_admission_num'], ['student_admissions.admission_number'], ),
         sa.ForeignKeyConstraint(['student_id'], ['students.id'], ),
@@ -55,9 +55,9 @@ def upgrade() -> None:
         sa.Column('term_id', sa.dialects.postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.func.now(), nullable=False),
         sa.Column('updated_at', sa.TIMESTAMP(), server_default=sa.func.now(), nullable=False),
-        sa.Column('organization_id', sa.Integer(), nullable=False),
+        sa.Column('organization_id', sa.Integer(), nullable=True),
         sa.ForeignKeyConstraint(['fee_student_map_id'], ['fee_student_mappings.id'], ),
-        sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ),
+        # sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ),  # Disabled - organizations table doesn't exist
         sa.ForeignKeyConstraint(['term_id'], ['fee_terms.id'], ),
         sa.PrimaryKeyConstraint('id')
     )

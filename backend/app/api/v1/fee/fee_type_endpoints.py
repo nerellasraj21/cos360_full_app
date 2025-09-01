@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status, APIRouter, Depends, Query
+from fastapi import HTTPException, status, APIRouter, Depends, Query, Request
 from app.schemas.fee.fee_type_schema import (
     FeeTypeCreate, 
     FeeTypeRead, 
@@ -15,14 +15,20 @@ from app.service.fee.fee_type_service import (
     update_fee_type,
     delete_fee_type
 )
+from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
 from typing import List, Optional
 
 router = APIRouter(prefix="/fee/types", tags=["Fee/Fee Types"])
 
 # Create Fee Type
 @router.post("/", response_model=FeeTypeRead, status_code=status.HTTP_201_CREATED)
-async def create_fee_type_endpoint(fee_type_data: FeeTypeCreate, db: AsyncSession = Depends(get_db)):
-    """Create a new fee type"""
+@rate_limit_create("30 per minute")
+async def create_fee_type_endpoint(
+    request: Request, 
+    fee_type_data: FeeTypeCreate, 
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a new fee type. Rate limited to 30 creates per minute."""
     return await create_fee_type(db, fee_type_data)
 
 # Get All Fee Types
@@ -33,11 +39,13 @@ async def get_all_fee_types_endpoint(db: AsyncSession = Depends(get_db)):
 
 # Get Fee Types for Dropdown
 @router.get("/dropdown", response_model=List[FeeTypeDropdown])
+@rate_limit_dropdown("100 per minute")
 async def get_fee_types_dropdown_endpoint(
+    request: Request,
     fee_category_id: Optional[str] = Query(None, description="Filter by fee category ID"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get fee types for dropdown (id + type_name only). Optionally filter by fee category."""
+    """Get fee types for dropdown (id + type_name only). Optionally filter by fee category. Rate limited to 100 requests per minute."""
     return await get_fee_types_dropdown(db, fee_category_id)
 
 # Get Single Fee Type

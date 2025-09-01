@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status, APIRouter, Depends, Query
+from fastapi import HTTPException, status, APIRouter, Depends, Query, Request
 from app.schemas.fee.fee_category_schema import (
     FeeCategoryCreate, 
     FeeCategoryRead, 
@@ -15,14 +15,20 @@ from app.service.fee.fee_category_service import (
     update_fee_category,
     delete_fee_category
 )
+from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
 from typing import List, Optional
 
 router = APIRouter(prefix="/fee/categories", tags=["Fee/Fee Categories"])
 
 # Create Fee Category
 @router.post("/", response_model=FeeCategoryRead, status_code=status.HTTP_201_CREATED)
-async def create_fee_category_endpoint(fee_category_data: FeeCategoryCreate, db: AsyncSession = Depends(get_db)):
-    """Create a new fee category"""
+@rate_limit_create("30 per minute")
+async def create_fee_category_endpoint(
+    request: Request, 
+    fee_category_data: FeeCategoryCreate, 
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a new fee category. Rate limited to 30 creates per minute."""
     return await create_fee_category(db, fee_category_data)
 
 # Get All Fee Categories
@@ -37,7 +43,7 @@ async def get_fee_categories_dropdown_endpoint(
     academic_year_id: Optional[int] = Query(None, description="Filter by academic year ID"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get fee categories for dropdown (id + category_name only). Optionally filter by academic year."""
+    """Get fee categories for dropdown (id + category_name only). Optionally filter by academic year. Rate limited to 100 requests per minute."""
     return await get_fee_categories_dropdown(db, academic_year_id)
 
 # Get Single Fee Category

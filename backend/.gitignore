@@ -1,6 +1,9 @@
 # ignore virtual environment
 venv/
 
+# ignore claude.md
+claude.md
+
 # Ignore python compiled files
 *.pyc
 __pycache__/
