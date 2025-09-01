@@ -43,8 +43,7 @@ class StaffEnrollmentUpdate(BaseModel):
 class StaffEnrollmentOut(StaffEnrollmentBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 class DesignationCreate(BaseModel):
     title: str

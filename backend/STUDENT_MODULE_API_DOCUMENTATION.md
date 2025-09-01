@@ -8,10 +8,10 @@ The Student Module provides comprehensive management of student-related operatio
 
 ```
 /students/admission/
-/attendance/
-/certificates/
+/student/attendance/
+/student/certificates/
 /students/documents/
-/student-transport/
+/students/student-transport/
 ```
 
 ## Authentication
@@ -214,14 +214,14 @@ Track and manage student attendance with date-based records and status updates.
 
 ### Base URL
 ```
-/attendance
+/student/attendance
 ```
 
 ### Endpoints
 
 #### 1. Create Student Attendance
 
-**Endpoint:** `POST /attendance/`
+**Endpoint:** `POST /student/attendance/`
 
 **Request Body:**
 ```json
@@ -246,7 +246,7 @@ Track and manage student attendance with date-based records and status updates.
 
 #### 2. Get All Attendance Records
 
-**Endpoint:** `GET /attendance/`
+**Endpoint:** `GET /student/attendance/`
 
 **Response:** `200 OK`
 ```json
@@ -270,11 +270,11 @@ Track and manage student attendance with date-based records and status updates.
 
 #### 3. Get Attendance by ID
 
-**Endpoint:** `GET /attendance/{attendance_id}`
+**Endpoint:** `GET /student/attendance/{attendance_id}`
 
 #### 4. Update Attendance
 
-**Endpoint:** `PATCH /attendance/{attendance_id}`
+**Endpoint:** `PATCH /student/attendance/{attendance_id}`
 
 **Request Body:**
 ```json
@@ -285,7 +285,7 @@ Track and manage student attendance with date-based records and status updates.
 
 #### 5. Delete Attendance
 
-**Endpoint:** `DELETE /attendance/{attendance_id}`
+**Endpoint:** `DELETE /student/attendance/{attendance_id}`
 
 **Response:** `200 OK`
 ```json
@@ -303,14 +303,14 @@ Manage student certificates with file upload/download capabilities and certifica
 
 ### Base URL
 ```
-/certificates
+/student/certificates
 ```
 
 ### Endpoints
 
 #### 1. Create Certificate
 
-**Endpoint:** `POST /certificates/`
+**Endpoint:** `POST /student/certificates/`
 
 **Content-Type:** `multipart/form-data`
 
@@ -330,7 +330,7 @@ formData.append('issue_date', '2023-10-01');
 formData.append('description', 'Bonafide Certificate for Bank Account');
 formData.append('certificate_file', fileInput.files[0]);
 
-fetch('/certificates/', {
+fetch('/student/certificates/', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer ' + token
@@ -353,31 +353,31 @@ fetch('/certificates/', {
 
 #### 2. Get All Certificates
 
-**Endpoint:** `GET /certificates/`
+**Endpoint:** `GET /student/certificates/`
 
 #### 3. Get Certificate by ID
 
-**Endpoint:** `GET /certificates/certificateid/{certificate_id}`
+**Endpoint:** `GET /student/certificates/certificateid/{certificate_id}`
 
 #### 4. Update Certificate
 
-**Endpoint:** `PATCH /certificates/{certificate_id}`
+**Endpoint:** `PATCH /student/certificates/{certificate_id}`
 
 **Content-Type:** `multipart/form-data`
 
 #### 5. Delete Certificate
 
-**Endpoint:** `DELETE /certificates/{certificate_id}`
+**Endpoint:** `DELETE /student/certificates/{certificate_id}`
 
 #### 6. Download Certificate
 
-**Endpoint:** `GET /certificates/certificates/{certificate_id}/download`
+**Endpoint:** `GET /student/student/certificates/certificates/{certificate_id}/download`
 
 **Response:** File download (PDF/Image)
 
 #### 7. List Certificates for Student
 
-**Endpoint:** `GET /certificates/student/{student_id}`
+**Endpoint:** `GET /student/certificates/student/{student_id}`
 
 **Response:** `200 OK`
 ```json
@@ -393,7 +393,7 @@ fetch('/certificates/', {
 
 #### 8. Get Certificate Types
 
-**Endpoint:** `GET /certificates/certificate-types`
+**Endpoint:** `GET /student/certificates/certificate-types`
 
 **Response:** `200 OK`
 ```json
@@ -529,14 +529,14 @@ Manage student transport assignments including trip allocations, stop assignment
 
 ### Base URL
 ```
-/student-transport
+/students/student-transport
 ```
 
 ### Endpoints
 
 #### 1. Create Transport Assignment
 
-**Endpoint:** `POST /student-transport/`
+**Endpoint:** `POST /students/student-transport/`
 
 **Request Body:**
 ```json
@@ -565,7 +565,7 @@ Manage student transport assignments including trip allocations, stop assignment
 
 #### 2. Get All Transport Assignments
 
-**Endpoint:** `GET /student-transport/`
+**Endpoint:** `GET /students/student-transport/`
 
 **Response:** `200 OK`
 ```json
@@ -585,7 +585,7 @@ Manage student transport assignments including trip allocations, stop assignment
 
 #### 3. Get Transport by Student
 
-**Endpoint:** `GET /student-transport/student/{student_id}`
+**Endpoint:** `GET /students/student-transport/student/{student_id}`
 
 **Response:** `200 OK`
 ```json
@@ -605,7 +605,7 @@ Manage student transport assignments including trip allocations, stop assignment
 
 #### 4. Update Transport Assignment
 
-**Endpoint:** `PATCH /student-transport/{transport_id}`
+**Endpoint:** `PATCH /students/student-transport/{transport_id}`
 
 **Request Body:**
 ```json
@@ -618,7 +618,7 @@ Manage student transport assignments including trip allocations, stop assignment
 
 #### 5. Delete Transport Assignment
 
-**Endpoint:** `DELETE /student-transport/{transport_id}`
+**Endpoint:** `DELETE /students/student-transport/{transport_id}`
 
 **Response:** `204 No Content`
 
@@ -835,7 +835,7 @@ const transportData = {
   fee_per_term: 2500.00
 };
 
-await fetch('/student-transport/', {
+await fetch('/students/student-transport/', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -866,7 +866,7 @@ const attendanceRecords = [
 
 // Bulk create attendance
 const attendancePromises = attendanceRecords.map(record => 
-  fetch('/attendance/', {
+  fetch('/student/attendance/', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -880,7 +880,7 @@ await Promise.all(attendancePromises);
 
 // Get attendance for specific date range
 const getAttendanceForPeriod = async (studentId, startDate, endDate) => {
-  const response = await fetch(`/attendance/?student_id=${studentId}`, {
+  const response = await fetch(`/student/attendance/?student_id=${studentId}`, {
     headers: {
       'Authorization': 'Bearer ' + token
     }
@@ -911,7 +911,7 @@ const generateCertificate = async (studentId, certificateTypeId, description) =>
   formData.append('description', description);
   formData.append('certificate_file', certificateBlob, 'certificate.pdf');
 
-  const response = await fetch('/certificates/', {
+  const response = await fetch('/student/certificates/', {
     method: 'POST',
     headers: {
       'Authorization': 'Bearer ' + token
@@ -924,7 +924,7 @@ const generateCertificate = async (studentId, certificateTypeId, description) =>
 
 // Download certificate
 const downloadCertificate = async (certificateId) => {
-  const response = await fetch(`/certificates/certificates/${certificateId}/download`, {
+  const response = await fetch(`/student/certificates/certificates/${certificateId}/download`, {
     headers: {
       'Authorization': 'Bearer ' + token
     }

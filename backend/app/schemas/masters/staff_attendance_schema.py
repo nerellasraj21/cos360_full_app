@@ -20,5 +20,4 @@ class StaffAttendanceUpdate(BaseModel):
 class StaffAttendanceOut(StaffAttendanceBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}

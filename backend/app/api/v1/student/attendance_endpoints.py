@@ -8,7 +8,7 @@ from app.schemas.student.attendance_schema import (
 )
 from app.service.student.student_attendance_service import add_attendance, get_attendance_by_id, get_attendances, delete_attendance_data, update_partial_details_attendance
 
-router = APIRouter(prefix="/attendance", tags=["Student Attendance"])
+router = APIRouter(prefix="/student/attendance", tags=["Student/Student Attendance"])
 
 # Create Attendance
 @router.post("/", response_model=StudentAttendanceOut, status_code=status.HTTP_201_CREATED)

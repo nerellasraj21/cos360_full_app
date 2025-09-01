@@ -6,7 +6,7 @@ from app.db.session import get_db
 from typing import List
 from app.service.student.admission_service import add_admission, update_partial_details_admission, get_admission_by_id,get_student_by_admission_id,search_students
 
-router = APIRouter(prefix="/students/admission", tags=["Student Admission"])
+router = APIRouter(prefix="/students/admission", tags=["Student/Student Admission"])
 
 @router.post("/")
 async def create_admission(admission: StudentAdmissionCreate, db: AsyncSession = Depends(get_db)):

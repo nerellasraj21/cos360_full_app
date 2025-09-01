@@ -10,7 +10,7 @@ from sqlalchemy import update, delete
 from app.service.masters.transport import add_route, get_all_routes, get_each_route_by_id, deactivate_route, update__all_details_route, update_partial_details_route
 from app.service.masters.transport.routes_service import get_stops_by_route_name
 
-router = APIRouter(prefix="/routes", tags=["Routes"])
+router = APIRouter(prefix="/masters/routes", tags=["Masters/Routes"])
 
 @router.post("/", response_model=RouteOut)
 async def create_route(data: RouteCreate, db: AsyncSession = Depends(get_db)):

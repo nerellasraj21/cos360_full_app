@@ -20,5 +20,4 @@ class MenuUpdate(MenuBase):
 class MenuRead(MenuBase):
     id: int
     
-    class Config:
-        orm_mode = True 
+    model_config = {"from_attributes": True} 

@@ -18,5 +18,4 @@ class StudentDocumentOut(StudentDocumentBase):
     student_id: int
     upload_date: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}

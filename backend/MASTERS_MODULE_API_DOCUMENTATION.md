@@ -10,11 +10,11 @@ The Masters Module provides comprehensive management of core educational entitie
 /masters/
 /parents/
 /staff/
-/routes/
-/vehicles/
-/trips/
-/timetable/
-/subject_categories/
+/masters/routes/
+/masters/vehicles/
+/masters/trips/
+/students/timetable/
+/masters/subject_categories/
 ```
 
 ## Authentication
@@ -315,14 +315,14 @@ Manage academic subjects with category associations and academic year context.
 
 ### Base URL
 ```
-/subject_categories
+/masters/subject_categories
 ```
 
 ### Endpoints
 
 #### 1. Create Subject Category
 
-**Endpoint:** `POST /subject_categories/categories`
+**Endpoint:** `POST /masters/masters/subject_categories/categories`
 
 **Request Body:**
 ```json
@@ -333,7 +333,7 @@ Manage academic subjects with category associations and academic year context.
 
 #### 2. List Subject Categories
 
-**Endpoint:** `GET /subject_categories/categories`
+**Endpoint:** `GET /masters/masters/subject_categories/categories`
 
 **Response:** `200 OK`
 ```json
@@ -587,14 +587,14 @@ Comprehensive transportation management including routes, vehicles, and trips.
 
 ### Base URL
 ```
-/routes
+/masters/routes
 ```
 
 ### Endpoints
 
 #### 1. Create Route
 
-**Endpoint:** `POST /routes/`
+**Endpoint:** `POST /masters/routes/`
 
 **Request Body:**
 ```json
@@ -610,27 +610,27 @@ Comprehensive transportation management including routes, vehicles, and trips.
 
 #### 2. Get All Routes
 
-**Endpoint:** `GET /routes/all_routes`
+**Endpoint:** `GET /masters/routes/all_routes`
 
 #### 3. Get Route by ID
 
-**Endpoint:** `GET /routes/routeid/{route_id}`
+**Endpoint:** `GET /masters/routes/routeid/{route_id}`
 
 #### 4. Update Route
 
-**Endpoint:** `PUT /routes/{route_id}`
+**Endpoint:** `PUT /masters/routes/{route_id}`
 
 #### 5. Partial Update Route
 
-**Endpoint:** `PATCH /routes/{route_id}`
+**Endpoint:** `PATCH /masters/routes/{route_id}`
 
 #### 6. Delete Route
 
-**Endpoint:** `DELETE /routes/{route_id}`
+**Endpoint:** `DELETE /masters/routes/{route_id}`
 
 #### 7. Get Stops by Route Name
 
-**Endpoint:** `GET /routes/stops-by-route`
+**Endpoint:** `GET /masters/routes/stops-by-route`
 
 **Query Parameters:**
 - `route_name` (required): Name of the route
@@ -639,14 +639,14 @@ Comprehensive transportation management including routes, vehicles, and trips.
 
 ### Base URL
 ```
-/vehicles
+/masters/vehicles
 ```
 
 ### Endpoints
 
 #### 1. Create Vehicle
 
-**Endpoint:** `POST /vehicles/`
+**Endpoint:** `POST /masters/vehicles/`
 
 **Request Body:**
 ```json
@@ -661,36 +661,36 @@ Comprehensive transportation management including routes, vehicles, and trips.
 
 #### 2. Get All Vehicles
 
-**Endpoint:** `GET /vehicles/`
+**Endpoint:** `GET /masters/vehicles/`
 
 #### 3. Get Vehicle by ID
 
-**Endpoint:** `GET /vehicles/{vehicle_id}`
+**Endpoint:** `GET /masters/vehicles/{vehicle_id}`
 
 #### 4. Update Vehicle
 
-**Endpoint:** `PUT /vehicles/{vehicle_id}`
+**Endpoint:** `PUT /masters/vehicles/{vehicle_id}`
 
 #### 5. Partial Update Vehicle
 
-**Endpoint:** `PATCH /vehicles/{vehicle_id}`
+**Endpoint:** `PATCH /masters/vehicles/{vehicle_id}`
 
 #### 6. Delete Vehicle
 
-**Endpoint:** `DELETE /vehicles/{vehicle_id}`
+**Endpoint:** `DELETE /masters/vehicles/{vehicle_id}`
 
 ## Trips Management
 
 ### Base URL
 ```
-/trips
+/masters/trips
 ```
 
 ### Endpoints
 
 #### 1. Create Trip
 
-**Endpoint:** `POST /trips/`
+**Endpoint:** `POST /masters/trips/`
 
 **Request Body:**
 ```json
@@ -707,23 +707,23 @@ Comprehensive transportation management including routes, vehicles, and trips.
 
 #### 2. Get All Trips
 
-**Endpoint:** `GET /trips/`
+**Endpoint:** `GET /masters/trips/`
 
 #### 3. Get Trip by ID
 
-**Endpoint:** `GET /trips/{trip_id}`
+**Endpoint:** `GET /masters/trips/{trip_id}`
 
 #### 4. Update Trip
 
-**Endpoint:** `PUT /trips/{trip_id}`
+**Endpoint:** `PUT /masters/trips/{trip_id}`
 
 #### 5. Partial Update Trip
 
-**Endpoint:** `PATCH /trips/{trip_id}`
+**Endpoint:** `PATCH /masters/trips/{trip_id}`
 
 #### 6. Delete Trip
 
-**Endpoint:** `DELETE /trips/{trip_id}`
+**Endpoint:** `DELETE /masters/trips/{trip_id}`
 
 ---
 
@@ -734,14 +734,14 @@ Manage school timetables with bulk operations and section-based organization.
 
 ### Base URL
 ```
-/timetable
+/students/timetable
 ```
 
 ### Endpoints
 
 #### 1. Create Full Timetable
 
-**Endpoint:** `POST /timetable/bulk`
+**Endpoint:** `POST /students/students/timetable/bulk`
 
 **Request Body:**
 ```json
@@ -763,7 +763,7 @@ Manage school timetables with bulk operations and section-based organization.
 
 #### 2. Get Timetable by Section
 
-**Endpoint:** `GET /timetable/section/{section_id}`
+**Endpoint:** `GET /students/students/timetable/section/{section_id}`
 
 **Response:** `200 OK`
 ```json
@@ -787,7 +787,7 @@ Manage school timetables with bulk operations and section-based organization.
 
 #### 3. Bulk Update Timetable Slots
 
-**Endpoint:** `PATCH /timetable/timetable/slots/bulk`
+**Endpoint:** `PATCH /students/students/timetable/timetable/slots/bulk`
 
 **Request Body:**
 ```json
@@ -1005,7 +1005,7 @@ const routeData = {
 };
 
 // Step 1: Create route
-const routeResponse = await fetch('/routes/', {
+const routeResponse = await fetch('/masters/routes/', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -1025,7 +1025,7 @@ const vehicleData = {
   is_active: true
 };
 
-const vehicleResponse = await fetch('/vehicles/', {
+const vehicleResponse = await fetch('/masters/vehicles/', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -1047,7 +1047,7 @@ const tripData = {
   is_active: true
 };
 
-const tripResponse = await fetch('/trips/', {
+const tripResponse = await fetch('/masters/trips/', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',

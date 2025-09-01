@@ -6,8 +6,8 @@ from app.schemas.masters.transport import RouteStopCreate, RouteStopUpdate, Rout
 from app.db.session import get_db
 from app.service.masters.transport import add_route_stop, update_partial_details_route_stop, update_all_details_route_stop, deactivate_route_stop, get_each_route_stop_by_id, get_route_stops
 
-router = APIRouter(prefix="/route-stops", tags=["Route Stops"])
-
+router = APIRouter(prefix="/masters/route-stops", tags=["Masters/Route Stops"])
+ 
 @router.post("/", response_model=RouteStopOut)
 async def create_route_stop(data: RouteStopCreate, db: AsyncSession = Depends(get_db)):
     return await add_route_stop(data,db)

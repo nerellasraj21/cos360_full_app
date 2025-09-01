@@ -7,7 +7,7 @@ from app.db.session import get_db
 from app.service.masters.transport import update_partial_details_trip, update_all_details_trip, get_individual_trip_by_id, delete_a_trip, get_trips, add_trip
 
 
-router = APIRouter(prefix="/trips", tags=["Trips"])
+router = APIRouter(prefix="/masters/trips", tags=["Masters/Trips"])
 
 @router.post("/", response_model=TripOut)
 async def create_trip(data: TripCreate, db: AsyncSession = Depends(get_db)):

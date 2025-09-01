@@ -18,8 +18,7 @@ class CertificateIssueBase(BaseModel):
     description: Optional[str] = Field(None, max_length=255)
     certificate_file: Optional[str] = Field(None, description="Path or filename of uploaded certificate")
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 class CertificateIssueCreate(CertificateIssueBase):
     pass
@@ -31,8 +30,7 @@ class CertificateIssueUpdate(BaseModel):
     description: Optional[str] = Field(None, max_length=255)
     certificate_file: Optional[str]
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 class CertificateIssueOut(CertificateIssueBase):
     id: int
@@ -46,5 +44,4 @@ class CertificateFileResponse(BaseModel):
     file_path: Optional[str]
     exists_on_disk: bool
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}

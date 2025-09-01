@@ -9,7 +9,7 @@ from app.schemas.student.student_transport_schema import (
 
 from app.service.student.student_transport_service import get_transport_assignments,get_transport_by_student_id,update_partial_details_transport_assignment,add_student_transport,unassign_transport
 
-router = APIRouter(prefix="/student-transport", tags=["Student Transport"])
+router = APIRouter(prefix="/students/student-transport", tags=["Student/Student Transport"])
 
 
 @router.post("/", response_model=StudentTransportOut, status_code=status.HTTP_201_CREATED)

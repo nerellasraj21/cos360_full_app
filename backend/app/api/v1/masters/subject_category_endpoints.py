@@ -7,7 +7,7 @@ from app.models.masters.subject_category_model import SubjectCategory
 from app.schemas.masters.subject_category_schema import SubjectCategoryCreate, SubjectCategoryOut
 
 router = APIRouter()
-router = APIRouter(prefix="/subject_categories", tags=["SubjectCategories"])
+router = APIRouter(prefix="/masters/subject_categories", tags=["Masters/SubjectCategories"])
 
 @router.post("/categories", response_model=SubjectCategoryOut)
 async def create_category(data: SubjectCategoryCreate, db: AsyncSession = Depends(get_db)):

@@ -11,5 +11,4 @@ class RoleCreate(RoleBase):
 class RoleRead(RoleBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}

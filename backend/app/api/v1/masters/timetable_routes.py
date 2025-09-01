@@ -8,7 +8,7 @@ from app.service.masters.timetable_service import update_all_details_timetable_s
 from app.db.session import get_db
 from typing import List
 
-router = APIRouter(prefix="/timetable", tags=["Timetable"])
+router = APIRouter(prefix="/students/timetable", tags=["Student/Timetable"])
 
 # @router.post("/slots", response_model=TimetableSlotOut)
 # async def create_timetable_slot(slot: TimetableSlotCreate, db: AsyncSession = Depends(get_db)):

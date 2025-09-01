@@ -7,7 +7,7 @@ from app.db.session import get_db
 from app.service.masters.transport import update_partial_details_vehicle, update_all_details_vehicle, get_individual_vehicle_by_id, deactivate_vehicle, get_vehicles, add_vehicle
 
 
-router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
+router = APIRouter(prefix="/masters/vehicles", tags=["Masters/Vehicles"])
 
 @router.post("/", response_model=VehicleOut)
 async def create_vehicle(data: VehicleCreate, db: AsyncSession = Depends(get_db)):

@@ -9,7 +9,7 @@ from app.schemas.student.student_document_schema import (
 
 from app.service.student.student_document_service import get_documents_by_student,delete_document_file,update_document_file,get_document_by_id,upload_document
 
-router = APIRouter(prefix="/students/documents", tags=["Student Documents"])
+router = APIRouter(prefix="/students/documents", tags=["Student/Student Documents"])
 
 # Create document
 @router.post("/", response_model=StudentDocumentOut, status_code=201)

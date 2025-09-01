@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from app.models.masters.subject_model import Subject
 from app.schemas.masters.subject_schema import SubjectCreate, SubjectUpdate
 import logging
@@ -30,7 +31,7 @@ async def get_subject_by_id(db: AsyncSession, subject_id: int):
 
     log.info(f"Fetching subject with ID: {subject_id}")
     # subject = db.query(Subject).filter(Subject.id == subject_id).first()
-    result = await db.execute(select(Subject).where(Subject.id == subject_id))
+    result = await db.execute(select(Subject).options(selectinload(Subject.category)).where(Subject.id == subject_id))
     subject = result.scalar_one_or_none()
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
@@ -38,7 +39,7 @@ async def get_subject_by_id(db: AsyncSession, subject_id: int):
 
 async def get_all_subjects(db: AsyncSession, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: int = None):
     try:
-        query = select(Subject)
+        query = select(Subject).options(selectinload(Subject.category))
         if active_only:
             query = query.where(Subject.is_active == True)
         if academic_year_id is not None:
@@ -79,6 +80,6 @@ async def deactivate_subject(db: AsyncSession, subject_id: int):
     return subject
 
 async def get_subjects_by_category_id(category_id: int, db: AsyncSession):
-    stmt = select(Subject).where(Subject.category_id == category_id)
+    stmt = select(Subject).options(selectinload(Subject.category)).where(Subject.category_id == category_id)
     result = await db.execute(stmt)
     return result.scalars().all()

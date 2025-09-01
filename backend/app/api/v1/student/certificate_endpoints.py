@@ -14,7 +14,7 @@ from app.schemas.student.certificate_schema import (
 from app.schemas.student.certificate_type_schema import CertificateTypeOut
 from app.service.student.student_certificate_service import list_all_certificates_of_student,download_certificate_file,get_all_certificates,upload_certificate,update_certificate_file,delete_certificate_file,get_certificate,get_all_certificate_types
 
-router = APIRouter(prefix="/certificates", tags=["Certificates"])
+router = APIRouter(prefix="/student/certificates", tags=["Student/Student Certificates"])
 
 UPLOAD_DIR = "uploaded_certificates"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
