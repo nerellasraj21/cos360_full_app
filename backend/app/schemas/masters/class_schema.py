@@ -39,3 +39,8 @@ class ClassOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ClassDropdown(BaseModel):
+    id: int
+    name: str
+    model_config = {"from_attributes": True}

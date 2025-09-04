@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from app.models.masters.subject_model import Subject
 from app.schemas.masters.subject_schema import SubjectCreate, SubjectUpdate
+from app.tools.cache_utils import cache_dropdown, invalidate_cache
 import logging
 
 log = logging.getLogger("masters.subject_service")
@@ -15,6 +16,10 @@ async def create_subject(db: AsyncSession, subject_data: SubjectCreate) -> Subje
         db.add(subject)
         await db.commit()
         await db.refresh(subject)
+        
+        # Invalidate cache after creating new subject
+        invalidate_cache("dropdown", "subjects")
+        
         return subject
     except Exception as e:
         await db.rollback()
@@ -79,7 +84,46 @@ async def deactivate_subject(db: AsyncSession, subject_id: int):
         raise HTTPException(status_code=400, detail="Subject deactivation failed.")
     return subject
 
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
 async def get_subjects_by_category_id(category_id: int, db: AsyncSession):
-    stmt = select(Subject).options(selectinload(Subject.category)).where(Subject.category_id == category_id)
-    result = await db.execute(stmt)
-    return result.scalars().all()
+    """Get subjects by category ID - Cached"""
+    try:
+        stmt = select(Subject).options(selectinload(Subject.category)).where(Subject.category_id == category_id, Subject.is_active == True)
+        result = await db.execute(stmt)
+        subjects = result.scalars().all()
+        
+        log.debug(f"Retrieved {len(subjects)} subjects for category {category_id} from database")
+        return subjects
+    except Exception as e:
+        log.error(f"Error fetching subjects by category: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Fetching subjects by category failed: {str(e)}")
+
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
+async def get_subjects_dropdown(db: AsyncSession, active_only: bool = True):
+    """Get all subjects for dropdown (id + name only) - Cached"""
+    try:
+        query = select(Subject.id, Subject.name)
+        if active_only:
+            query = query.where(Subject.is_active == True)
+        result = await db.execute(query.order_by(Subject.name))
+        subjects = result.all()
+        
+        log.debug(f"Retrieved {len(subjects)} subjects for dropdown from database")
+        return [{"id": subj.id, "name": subj.name} for subj in subjects]
+    except Exception as e:
+        log.error(f"Error fetching subjects dropdown: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Fetching subjects dropdown failed: {str(e)}")
+
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
+async def get_subjects_by_category_id_dropdown(category_id: int, db: AsyncSession):
+    """Get subjects by category ID for dropdown (id + name only) - Cached"""
+    try:
+        stmt = select(Subject.id, Subject.name).where(Subject.category_id == category_id, Subject.is_active == True).order_by(Subject.name)
+        result = await db.execute(stmt)
+        subjects = result.all()
+        
+        log.debug(f"Retrieved {len(subjects)} subjects for dropdown for category {category_id} from database")
+        return [{"id": subj.id, "name": subj.name} for subj in subjects]
+    except Exception as e:
+        log.error(f"Error fetching subjects by category dropdown: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Fetching subjects by category dropdown failed: {str(e)}")

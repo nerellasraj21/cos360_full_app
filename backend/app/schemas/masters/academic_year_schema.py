@@ -20,3 +20,8 @@ class AcademicYearUpdate(BaseModel):
 class AcademicYearRead(AcademicYearBase):
     id: int    
     model_config = {"from_attributes": True}
+
+class AcademicYearDropdown(BaseModel):
+    id: int
+    title: str
+    model_config = {"from_attributes": True}

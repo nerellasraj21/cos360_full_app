@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.models.masters.academic_year_model import AcademicYear
-from app.schemas.masters.academic_year_schema import AcademicYearCreate, AcademicYearRead, AcademicYearUpdate
+from app.schemas.masters.academic_year_schema import AcademicYearCreate, AcademicYearRead, AcademicYearUpdate, AcademicYearDropdown
 from app.service.masters import academic_year_service
 from app.db.session import get_db
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
@@ -17,17 +17,23 @@ router = APIRouter(prefix="/masters/academic_years", tags=["Masters/Academic Yea
 async def create(request: Request, academic_year: AcademicYearCreate, db: AsyncSession = Depends(get_db)):
     return await academic_year_service.create_academic_year(db, academic_year)
 
+@router.get("/", response_model=List[AcademicYearRead])
+@rate_limit_dropdown("100 per minute")
+async def list(request: Request, skip: int = 0, limit: int = 10, active_only: bool = True, db: AsyncSession = Depends(get_db)):
+    return await academic_year_service.get_all_academic_years(db, skip, limit, active_only)
+
+@router.get("/dropdown", response_model=List[AcademicYearDropdown])
+@rate_limit_dropdown("100 per minute")
+async def get_dropdown(request: Request, active_only: bool = True, db: AsyncSession = Depends(get_db)):
+    """Get academic years for dropdown (id + title only). Rate limited to 100 requests per minute."""
+    return await academic_year_service.get_academic_years_dropdown(db, active_only)
+
 @router.get("/{academic_year_id}", response_model=AcademicYearRead)
 async def read(academic_year_id: int, db: AsyncSession = Depends(get_db)):
     academic_year = await academic_year_service.get_academic_year_by_id(db, academic_year_id)
     if not academic_year:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Academic Year not found")
     return academic_year
-
-@router.get("/", response_model=List[AcademicYearRead])
-@rate_limit_dropdown("100 per minute")
-async def list(request: Request, skip: int = 0, limit: int = 10, active_only: bool = True, db: AsyncSession = Depends(get_db)):
-    return await academic_year_service.get_all_academic_years(db, skip, limit, active_only)
 
 @router.put("/{academic_year_id}", response_model=AcademicYearRead)
 async def update(academic_year_id: int, academic_year_update: AcademicYearUpdate, db: AsyncSession = Depends(get_db)):

@@ -9,3 +9,8 @@ class SubjectCategoryOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SubjectCategoryDropdown(BaseModel):
+    id: int
+    name: str
+    model_config = {"from_attributes": True}

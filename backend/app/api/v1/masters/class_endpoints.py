@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from typing import List
-from app.service.masters.class_service import create_class_with_sections,get_all_classes_with_sections,update_class_with_sections,delete_class_with_sections,get_class_with_sections,get_class_section_list,get_all_classes_data,get_all_sections_data,get_sections_by_class_name,get_students_by_class_section
-from app.schemas.masters.class_schema import ClassCreate, ClassRead, ClassUpdate,ClassOut
-from app.schemas.masters.sections_schema import ClassSectionInfo,SectionOut
+from app.service.masters.class_service import create_class_with_sections,get_all_classes_with_sections,update_class_with_sections,delete_class_with_sections,get_class_with_sections,get_class_section_list,get_all_classes_data,get_all_sections_data,get_sections_by_class_name,get_students_by_class_section,get_classes_dropdown,get_sections_by_class_id
+from app.schemas.masters.class_schema import ClassCreate, ClassRead, ClassUpdate,ClassOut,ClassDropdown
+from app.schemas.masters.sections_schema import ClassSectionInfo,SectionOut,SectionDropdown
 from app.schemas.student.student_schema import StudentOut
 from app.db.session import get_db
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
@@ -63,6 +63,18 @@ async def get_all_sections(request: Request, db: AsyncSession = Depends(get_db))
 @rate_limit_dropdown("100 per minute")
 async def fetch_sections_by_class_name(request: Request, class_name: str = Query(..., description="Name of the class"), db: AsyncSession = Depends(get_db)):
     return await get_sections_by_class_name(db, class_name)
+
+@router.get("/dropdown", response_model=List[ClassDropdown])
+@rate_limit_dropdown("100 per minute")
+async def get_classes_dropdown_endpoint(request: Request, active_only: bool = True, db: AsyncSession = Depends(get_db)):
+    """Get classes for dropdown (id + name only). Rate limited to 100 requests per minute."""
+    return await get_classes_dropdown(db, active_only)
+
+@router.get("/by_class_id/{class_id}/sections", response_model=List[SectionDropdown])
+@rate_limit_dropdown("100 per minute")
+async def get_sections_by_class_id_endpoint(request: Request, class_id: int, db: AsyncSession = Depends(get_db)):
+    """Get sections by class ID for dropdown (id + name only). Rate limited to 100 requests per minute."""
+    return await get_sections_by_class_id(db, class_id)
 
 @router.get("/by-class-section")
 async def list_students_by_class_section(

@@ -223,4 +223,35 @@ async def get_students_by_class_section(class_name: str, section_name: str, db):
     result = await db.execute(stmt)
     students = result.scalars().all()
     return students
+
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
+async def get_classes_dropdown(db: AsyncSession, active_only: bool = True):
+    """Get classes for dropdown (id + name only) - Cached"""
+    try:
+        query = select(ClassModel.id, ClassModel.name)
+        if active_only:
+            query = query.where(ClassModel.is_active == True)
+        result = await db.execute(query.order_by(ClassModel.name))
+        classes = result.all()
+        
+        log.debug(f"Retrieved {len(classes)} classes for dropdown from database")
+        return [{"id": cls.id, "name": cls.name} for cls in classes]
+    except Exception as e:
+        log.error(f"Error fetching classes dropdown: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Fetching classes dropdown failed: {str(e)}")
+
+@cache_dropdown(ttl=300)  # Cache for 5 minutes  
+async def get_sections_by_class_id(db: AsyncSession, class_id: int):
+    """Get sections by class ID for dropdown - Cached"""
+    try:
+        result = await db.execute(
+            select(SectionModel.id, SectionModel.name).where(SectionModel.class_id == class_id, SectionModel.is_active == True).order_by(SectionModel.name)
+        )
+        sections = result.all()
+        
+        log.debug(f"Retrieved {len(sections)} sections for class {class_id} from database")
+        return [{"id": sec.id, "name": sec.name} for sec in sections]
+    except Exception as e:
+        log.error(f"Error fetching sections by class ID: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Fetching sections by class ID failed: {str(e)}")
     

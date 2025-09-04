@@ -29,3 +29,8 @@ class SubjectRead(SubjectBase):
     category: SubjectCategoryOut
 
     model_config = {"from_attributes": True}
+
+class SubjectDropdown(BaseModel):
+    id: int
+    name: str
+    model_config = {"from_attributes": True}

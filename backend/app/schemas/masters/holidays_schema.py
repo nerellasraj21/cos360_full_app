@@ -21,6 +21,10 @@ class HolidayUpdate(BaseModel):
     is_active: Optional[bool] = None
     
 class HolidayRead(HolidayBase):
-    pass
+    id: int
+    model_config = {"from_attributes": True}
 
-    
+class HolidayDropdown(BaseModel):
+    id: int
+    name: str
+    model_config = {"from_attributes": True}

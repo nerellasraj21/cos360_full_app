@@ -40,3 +40,8 @@ class SectionOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SectionDropdown(BaseModel):
+    id: int
+    name: str
+    model_config = {"from_attributes": True}

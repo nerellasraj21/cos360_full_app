@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
 from app.models.masters.holidays_model import Holiday as HolidayModel
 from app.schemas.masters.holidays_schema import HolidayCreate, HolidayUpdate
+from app.tools.cache_utils import cache_dropdown, invalidate_cache
 import logging as log
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,10 @@ async def create_holiday(db: AsyncSession, holiday_data: HolidayCreate):
         db.add(db_query)
         await db.commit()
         await db.refresh(db_query)
+        
+        # Invalidate cache after creating new holiday
+        invalidate_cache("dropdown", "holidays")
+        
         return db_query
     except Exception as e:
         await db.rollback()
@@ -64,6 +69,10 @@ async def update_holiday(db: AsyncSession, holiday_id: int, holiday_data: Holida
         
         await db.commit()
         await db.refresh(holiday)
+        
+        # Invalidate cache after updating holiday
+        invalidate_cache("dropdown", "holidays")
+        
         return holiday
     except Exception as e:
         await db.rollback()
@@ -78,6 +87,10 @@ async def deactivate_holiday(db: AsyncSession, holiday_id: int):
         holiday.is_active = False
         await db.commit()
         await db.refresh(holiday)
+        
+        # Invalidate cache after deactivating holiday
+        invalidate_cache("dropdown", "holidays")
+        
         return holiday
     except Exception as e:
         await db.rollback()
@@ -92,7 +105,27 @@ async def activate_holiday(db: AsyncSession, holiday_id: int):
         holiday.is_active = True
         await db.commit()
         await db.refresh(holiday)
+        
+        # Invalidate cache after activating holiday
+        invalidate_cache("dropdown", "holidays")
+        
         return holiday
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"Error activating holiday: {str(e)}")
+
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
+async def get_holidays_dropdown(db: AsyncSession, active_only: bool = True):
+    """Get holidays for dropdown (id + name only) - Cached"""
+    try:
+        query = select(HolidayModel.id, HolidayModel.name)
+        if active_only:
+            query = query.where(HolidayModel.is_active == True)
+        result = await db.execute(query.order_by(HolidayModel.name))
+        holidays = result.all()
+        
+        log.debug(f"Retrieved {len(holidays)} holidays for dropdown from database")
+        return [{"id": holiday.id, "name": holiday.name} for holiday in holidays]
+    except Exception as e:
+        log.error(f"Error fetching holidays dropdown: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Fetching holidays dropdown failed: {str(e)}")

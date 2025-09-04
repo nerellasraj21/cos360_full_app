@@ -114,3 +114,20 @@ async def deactivate_academic_year(db: AsyncSession, academic_year_id: int):
         log.error(f"Error deactivating academic year: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Academic Year deactivation failed: {str(e)}")
+
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
+async def get_academic_years_dropdown(db: AsyncSession, active_only: bool = True):
+    """Get academic years for dropdown (id + title only) - Cached"""
+    try:
+        query = select(AcademicYear.id, AcademicYear.title)
+        if active_only:
+            query = query.where(AcademicYear.is_active == True)
+        result = await db.execute(query.order_by(AcademicYear.title))
+        academic_years = result.all()
+        
+        log.debug(f"Retrieved {len(academic_years)} academic years for dropdown from database")
+        return [{"id": ay.id, "title": ay.title} for ay in academic_years]
+    except Exception as e:
+        log.error(f"Error fetching academic years dropdown: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Fetching academic years dropdown failed: {str(e)}")

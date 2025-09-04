@@ -1,16 +1,28 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 from app.db.session import get_db
-from app.schemas.masters.subject_schema import SubjectCreate, SubjectRead, SubjectUpdate
-from app.service.masters.subject_service import create_subject,get_subject_by_id,get_all_subjects,update_subject,deactivate_subject,get_subjects_by_category_id
+from app.schemas.masters.subject_schema import SubjectCreate, SubjectRead, SubjectUpdate, SubjectDropdown
+from app.service.masters.subject_service import create_subject,get_subject_by_id,get_all_subjects,update_subject,deactivate_subject,get_subjects_by_category_id,get_subjects_by_category_id_dropdown,get_subjects_dropdown
+from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_create
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/masters/subjects", tags=["Masters/Subjects"])
 
 @router.post("/", response_model=SubjectRead)
-async def create(subject: SubjectCreate, db: AsyncSession = Depends(get_db)):
+@rate_limit_create("30 per minute")
+async def create(request: Request, subject: SubjectCreate, db: AsyncSession = Depends(get_db)):
     return await create_subject(db, subject)
+
+@router.get("/", response_model=List[SubjectRead])
+async def list(skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: int = None, db: AsyncSession = Depends(get_db)):
+    return await get_all_subjects(db, skip, limit, active_only, academic_year_id)
+
+@router.get("/dropdown", response_model=List[SubjectDropdown])
+@rate_limit_dropdown("100 per minute")
+async def get_subjects_dropdown_endpoint(request: Request, active_only: bool = True, db: AsyncSession = Depends(get_db)):
+    """Get subjects for dropdown (id + name only). Rate limited to 100 requests per minute."""
+    return await get_subjects_dropdown(db, active_only)
 
 @router.get("/{subject_id}", response_model=SubjectRead)
 async def read(subject_id: int, db: AsyncSession = Depends(get_db)):
@@ -18,10 +30,6 @@ async def read(subject_id: int, db: AsyncSession = Depends(get_db)):
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
     return subject
-
-@router.get("/", response_model=List[SubjectRead])
-async def list(skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: int = None, db: AsyncSession = Depends(get_db)):
-    return await get_all_subjects(db, skip, limit, active_only, academic_year_id)
 
 @router.put("/{subject_id}", response_model=SubjectRead)
 async def update(subject_id: int, subject_update: SubjectUpdate, db: AsyncSession = Depends(get_db)):
@@ -33,4 +41,10 @@ async def deactivate(subject_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.get("/categories/{category_id}/subjects", response_model=List[SubjectRead])
 async def get_subjects_by_category(category_id: int, db: AsyncSession = Depends(get_db)):
-    await get_subjects_by_category_id(category_id,db)
+    return await get_subjects_by_category_id(category_id, db)
+
+@router.get("/categories/{category_id}/subjects/dropdown", response_model=List[SubjectDropdown])
+@rate_limit_dropdown("100 per minute")
+async def get_subjects_by_category_dropdown(request: Request, category_id: int, db: AsyncSession = Depends(get_db)):
+    """Get subjects by category ID for dropdown (id + name only). Rate limited to 100 requests per minute."""
+    return await get_subjects_by_category_id_dropdown(category_id, db)

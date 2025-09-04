@@ -2,14 +2,22 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.models.masters.transport import Route
 from app.schemas.masters.transport import RouteCreate, RouteUpdate
+from app.tools.cache_utils import cache_dropdown, invalidate_cache
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+import logging as log
+
+log = log.getLogger("masters.transport.routes_service")
 
 async def add_route(data: RouteCreate, db: AsyncSession):
     route = Route(**data.dict())
     db.add(route)
     await db.commit()
     await db.refresh(route)
+    
+    # Invalidate cache after creating new route
+    invalidate_cache("dropdown", "routes")
+    
     return route
 
 async def get_all_routes(db: AsyncSession):
@@ -65,3 +73,19 @@ async def get_stops_by_route_name(route_name: str, db):
     if not route:
         raise HTTPException(status_code=404, detail="Route not found")
     return route.stops
+
+@cache_dropdown(ttl=300)  # Cache for 5 minutes
+async def get_routes_dropdown(db: AsyncSession, active_only: bool = True):
+    """Get routes for dropdown (id + route_name only) - Cached"""
+    try:
+        query = select(Route.id, Route.route_name)
+        if active_only:
+            query = query.where(Route.is_active == True)
+        result = await db.execute(query.order_by(Route.route_name))
+        routes = result.all()
+        
+        log.debug(f"Retrieved {len(routes)} routes for dropdown from database")
+        return [{"id": route.id, "route_name": route.route_name} for route in routes]
+    except Exception as e:
+        log.error(f"Error fetching routes dropdown: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Fetching routes dropdown failed: {str(e)}")

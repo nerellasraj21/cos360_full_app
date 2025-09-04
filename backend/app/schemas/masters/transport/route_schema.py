@@ -34,3 +34,8 @@ class RouteOut(RouteBase):
 
     class Config:
         from_attributes = True
+
+class RouteDropdown(BaseModel):
+    id: int
+    route_name: str
+    model_config = {"from_attributes": True}
