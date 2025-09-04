@@ -3,7 +3,6 @@ import asyncio
 from httpx import AsyncClient
 from decimal import Decimal
 from app.main import app
-from tests.conftest import TestingSessionLocal
 from app.models.fee.fee_student_mapping_model import FeeStudentMapping
 from app.models.fee.fee_student_map_term_amount_model import FeeStudentMapTermAmount
 from app.models.student.student_model import Student

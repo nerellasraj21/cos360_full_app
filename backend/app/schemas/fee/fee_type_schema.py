@@ -1,12 +1,13 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional, List
+from uuid import UUID
 from app.schemas.fee.fee_term_dates_schema import FeeTermDatesRead
 
 class FeeTypeBase(BaseModel):
     type_name: str
-    fee_category_id: str  # UUID as string
+    fee_category_id: UUID
     fee_status: str = "active"
-    fee_term_id: str  # UUID as string
+    fee_term_id: UUID
     academic_year_id: int
     
     @field_validator('fee_status')
@@ -20,9 +21,9 @@ class FeeTypeCreate(FeeTypeBase):
 
 class FeeTypeUpdate(BaseModel):
     type_name: Optional[str] = None
-    fee_category_id: Optional[str] = None  # UUID as string
+    fee_category_id: Optional[UUID] = None
     fee_status: Optional[str] = None
-    fee_term_id: Optional[str] = None  # UUID as string
+    fee_term_id: Optional[UUID] = None
     academic_year_id: Optional[int] = None
     
     @field_validator('fee_status')
@@ -32,7 +33,7 @@ class FeeTypeUpdate(BaseModel):
         return v
 
 class FeeTypeRead(FeeTypeBase):
-    id: str  # UUID as string
+    id: UUID
     fee_category_name: Optional[str] = None
     fee_term_name: Optional[str] = None
     academic_year_name: Optional[str] = None
@@ -40,6 +41,6 @@ class FeeTypeRead(FeeTypeBase):
     model_config = {"from_attributes": True}
 
 class FeeTypeDropdown(BaseModel):
-    id: str  # UUID as string
+    id: UUID
     type_name: str
     model_config = {"from_attributes": True}

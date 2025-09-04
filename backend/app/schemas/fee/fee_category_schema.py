@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+from uuid import UUID
 
 class FeeCategoryBase(BaseModel):
     category_name: str
@@ -15,11 +16,11 @@ class FeeCategoryUpdate(BaseModel):
     academic_year_id: Optional[int] = None
 
 class FeeCategoryRead(FeeCategoryBase):
-    id: str  # UUID as string
+    id: UUID
     academic_year_title: Optional[str] = None  # For joined queries
     model_config = {"from_attributes": True}
 
 class FeeCategoryDropdown(BaseModel):
-    id: str  # UUID as string
+    id: UUID
     category_name: str
     model_config = {"from_attributes": True}

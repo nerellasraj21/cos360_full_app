@@ -1,6 +1,7 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from datetime import datetime
+from uuid import UUID
 from app.schemas.fee.fee_term_dates_schema import FeeTermDatesRead
 from app.schemas.fee.fee_term_dates_schema import FeeTermDatesCreate
 
@@ -50,6 +51,6 @@ class FeeTermUpdate(BaseModel):
         return v
     
 class FeeTermRead(FeeTermBase):
-    id: str  # UUID as string
+    id: UUID
     fee_term_dates: List[FeeTermDatesRead] = []
     model_config = {"from_attributes": True}

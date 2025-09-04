@@ -1,17 +1,18 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from decimal import Decimal
+from uuid import UUID
 
 # Forward reference for term amounts
 class FeeStudentMapTermAmountRead(BaseModel):
-    id: str
-    term_id: str
+    id: UUID
+    term_id: UUID
     term_amount: Decimal
     term_name: Optional[str] = None
     model_config = {"from_attributes": True}
 
 class FeeStudentMapTermAmountCreate(BaseModel):
-    term_id: str
+    term_id: UUID
     term_amount: Decimal
     
     @field_validator('term_amount')
@@ -33,7 +34,7 @@ class FeeStudentMappingBase(BaseModel):
     student_admission_num: str
     class_id: int
     section_id: int
-    fee_type_id: str  # UUID as string
+    fee_type_id: UUID
     total_fee: Decimal
     academic_year_id: int
     
@@ -51,7 +52,7 @@ class FeeStudentMappingUpdate(BaseModel):
     student_admission_num: Optional[str] = None
     class_id: Optional[int] = None
     section_id: Optional[int] = None
-    fee_type_id: Optional[str] = None  # UUID as string
+    fee_type_id: Optional[UUID] = None
     total_fee: Optional[Decimal] = None
     academic_year_id: Optional[int] = None
     
@@ -62,7 +63,7 @@ class FeeStudentMappingUpdate(BaseModel):
         return v
 
 class FeeStudentMappingRead(FeeStudentMappingBase):
-    id: str  # UUID as string
+    id: UUID
     student_details: Optional[StudentDetailsRead] = None
     fee_type_name: Optional[str] = None
     academic_year_name: Optional[str] = None
@@ -70,12 +71,12 @@ class FeeStudentMappingRead(FeeStudentMappingBase):
     model_config = {"from_attributes": True}
 
 class FeeStudentMappingList(BaseModel):
-    id: str  # UUID as string
+    id: UUID
     student_id: int
     student_admission_num: str
     class_id: int
     section_id: int
-    fee_type_id: str
+    fee_type_id: UUID
     fee_type_name: Optional[str] = None
     total_fee: Decimal
     academic_year_id: int
