@@ -10,7 +10,7 @@ class FeeTermBase(BaseModel):
     term_name: str
     term_status: str = "active"
     number_of_terms: int
-    academic_year_id: int
+    academic_year_id: UUID
     
 class FeeTermCreate(FeeTermBase):
     fee_term_dates: List[FeeTermDatesCreate] = []
@@ -32,7 +32,7 @@ class FeeTermUpdate(BaseModel):
     term_name: Optional[str] = None
     term_status: Optional[str] = None
     number_of_terms: Optional[int] = None
-    academic_year_id: Optional[int] = None
+    academic_year_id: Optional[UUID] = None
     fee_term_dates: Optional[List[FeeTermDatesCreate]] = None
     
     @field_validator('fee_term_dates')

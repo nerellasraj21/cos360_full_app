@@ -1,15 +1,17 @@
 from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 from sqlalchemy.sql import func
+import uuid
 
 class StudentTransportAssignment(Base):
     __tablename__ = "student_transport_assignments"
 
-    id = Column(Integer, primary_key=True, index=True)
-    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
-    trip_id = Column(Integer, ForeignKey("trips.id"), nullable=False)
-    stop_id = Column(Integer, ForeignKey("route_stops.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
+    trip_id = Column(UUID(as_uuid=True), ForeignKey("trips.id"), nullable=False)
+    stop_id = Column(UUID(as_uuid=True), ForeignKey("route_stops.id"), nullable=False)
     # fee_term_id = Column(Integer, ForeignKey("fee_terms.id"), nullable=True)
     fee_per_term = Column(Float, nullable=False)
 

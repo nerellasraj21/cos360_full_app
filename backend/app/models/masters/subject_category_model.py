@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.db.base import BaseOrg
+from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
 class SubjectCategory(BaseOrg):

@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Literal
 from datetime import date
+from uuid import UUID
 import enum
 
 class GenderEnum(enum.Enum):
@@ -19,7 +20,7 @@ class StaffEnrollmentBase(BaseModel):
     qualification: Optional[str]
     experience_years: Optional[int]
     address: Optional[str]
-    designation_id: Optional[int] = Field(None, description="ID from the designations table")
+    designation_id: Optional[UUID] = Field(None, description="ID from the designations table")
     department: Optional[str]
     is_active: bool = True
 
@@ -34,14 +35,14 @@ class StaffEnrollmentUpdate(BaseModel):
     date_of_birth: Optional[date]
     joining_date: Optional[date]
     qualification: Optional[str]
-    designation_id: Optional[int] = Field(None, description="ID from the designations table")
+    designation_id: Optional[UUID] = Field(None, description="ID from the designations table")
     experience_years: Optional[int]
     address: Optional[str]
     is_active: Optional[bool]
 
 
 class StaffEnrollmentOut(StaffEnrollmentBase):
-    id: int
+    id: UUID
 
     model_config = {"from_attributes": True}
 
@@ -49,14 +50,14 @@ class DesignationCreate(BaseModel):
     title: str
 
 class DesignationOut(BaseModel):
-    id: int
+    id: UUID
     title: str
 
     class Config:
         from_attributes = True
 
 class StaffOut(BaseModel):
-    id: int
+    id: UUID
     first_name: str
     last_name: Optional[str]
     email: Optional[str]
@@ -70,11 +71,11 @@ class StaffOut(BaseModel):
     designation: Optional[DesignationOut]
     department: Optional[str]
     is_active: bool
-    user_id: int
+    user_id: UUID
 
     class Config:
         from_attributes = True
 
 class DriverOut(BaseModel):
     full_name: str
-    user_id: int
+    user_id: UUID

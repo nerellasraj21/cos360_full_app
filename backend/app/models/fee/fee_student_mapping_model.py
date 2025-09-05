@@ -8,13 +8,13 @@ class FeeStudentMapping(BaseOrg):
     __tablename__ = 'fee_student_mappings'
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
-    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
     student_admission_num = Column(String(50), ForeignKey("student_admissions.admission_number"), nullable=False)
-    class_id = Column(Integer, ForeignKey("classes.id"), nullable=False)
-    section_id = Column(Integer, ForeignKey("sections.id"), nullable=False)
+    class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False)
+    section_id = Column(UUID(as_uuid=True), ForeignKey("sections.id"), nullable=False)
     fee_type_id = Column(UUID(as_uuid=True), ForeignKey("fee_types.id"), nullable=False)
     total_fee = Column(Numeric(10, 2), nullable=False)
-    academic_year_id = Column(Integer, ForeignKey("academic_years.id"), nullable=False)
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"), nullable=False)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
     

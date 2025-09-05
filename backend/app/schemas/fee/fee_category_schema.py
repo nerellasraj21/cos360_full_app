@@ -5,7 +5,7 @@ from uuid import UUID
 class FeeCategoryBase(BaseModel):
     category_name: str
     category_status: str = "active"
-    academic_year_id: int
+    academic_year_id: UUID
 
 class FeeCategoryCreate(FeeCategoryBase):
     pass
@@ -13,7 +13,7 @@ class FeeCategoryCreate(FeeCategoryBase):
 class FeeCategoryUpdate(BaseModel):
     category_name: Optional[str] = None
     category_status: Optional[str] = None
-    academic_year_id: Optional[int] = None
+    academic_year_id: Optional[UUID] = None
 
 class FeeCategoryRead(FeeCategoryBase):
     id: UUID

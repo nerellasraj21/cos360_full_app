@@ -1,10 +1,11 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
 from datetime import date
+from uuid import UUID
 
 
 class StaffAttendanceBase(BaseModel):
-    staff_id: int = Field(..., description="1")
+    staff_id: UUID = Field(..., description="Staff UUID")
     date: date
     status: str
 
@@ -18,6 +19,6 @@ class StaffAttendanceUpdate(BaseModel):
 
 
 class StaffAttendanceOut(StaffAttendanceBase):
-    id: int
+    id: UUID
 
     model_config = {"from_attributes": True}

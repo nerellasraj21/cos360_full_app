@@ -1,21 +1,23 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date, Text
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import BaseOrg
+import uuid
 
 class Admission(BaseOrg):
     __tablename__ = "student_admissions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
     admission_number = Column(String(50), nullable=True, unique=True)
 
     admission_date = Column(Date, nullable=False)
-    academic_year_id = Column(Integer, ForeignKey("academic_years.id"))
-    admitted_academic_year_id = Column(Integer, ForeignKey("academic_years.id")) # Add this in migrations.
-    admitted_class_id = Column(Integer, ForeignKey("classes.id"))
-    admitted_section_id = Column(Integer, ForeignKey("sections.id"))
-    current_class_id = Column(Integer, ForeignKey("classes.id"))
-    current_section_id = Column(Integer, ForeignKey("sections.id"))
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"))
+    admitted_academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id")) # Add this in migrations.
+    admitted_class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"))
+    admitted_section_id = Column(UUID(as_uuid=True), ForeignKey("sections.id"))
+    current_class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"))
+    current_section_id = Column(UUID(as_uuid=True), ForeignKey("sections.id"))
 
     address_line1 = Column(String(255))
     address_line2 = Column(String(255), nullable=True)

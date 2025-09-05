@@ -2,6 +2,7 @@ from __future__ import annotations
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Literal, ForwardRef, TYPE_CHECKING
 from pydantic import ConfigDict
+from uuid import UUID
 
 class ParentBase(BaseModel):
     name: str
@@ -25,7 +26,7 @@ class ParentUpdate(BaseModel):
     relation_to_student: Optional[Literal["Father", "Mother", "Guardian"]]
 
 class ParentOut(ParentBase):
-    id: int
+    id: UUID
     students: List["StudentOut"] = []
 
     model_config = ConfigDict(from_attributes=True)

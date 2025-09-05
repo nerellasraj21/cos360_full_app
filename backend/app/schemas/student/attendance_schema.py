@@ -1,17 +1,18 @@
 from pydantic import BaseModel, Field
 from datetime import date
 from typing import Optional
+from uuid import UUID
 
 
 class StudentAttendanceBase(BaseModel):
-    student_id : int
+    student_id : UUID
     date : date
     status : str = Field(..., description="Present, Absent")
     remarks : str
 
 
 class StudentAttendanceCreate(StudentAttendanceBase):
-    student_id: int = Field(..., description="ID of the student")
+    student_id: UUID = Field(..., description="ID of the student")
 
 
 class StudentAttendanceUpdate(BaseModel):
@@ -19,7 +20,7 @@ class StudentAttendanceUpdate(BaseModel):
 
 
 class StudentAttendanceOut(StudentAttendanceBase):
-    id: int
-    student_id: int
+    id: UUID
+    student_id: UUID
 
     model_config = {"from_attributes": True}

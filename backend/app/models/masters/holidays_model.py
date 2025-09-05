@@ -1,12 +1,14 @@
 from sqlalchemy import TIMESTAMP, Column, Integer, String, func, Boolean, ForeignKey, Date
 from sqlalchemy.orm import relationship
 from app.db.base import BaseOrg
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
 
 class Holiday(BaseOrg):
     __tablename__ = 'holidays'
     
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     name = Column(String(50), nullable=False)
     description = Column(String(100), nullable=True)
     start_date = Column(Date, nullable=False)
@@ -17,7 +19,7 @@ class Holiday(BaseOrg):
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
     
     # Academic Year
-    academic_year_id = Column(Integer, ForeignKey('academic_years.id'), nullable=False, index=True)
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey('academic_years.id'), nullable=False, index=True)
     academic_year = relationship("AcademicYear", back_populates="holidays")
     
     def __repr__(self):

@@ -11,7 +11,7 @@ class FeeTerm(BaseOrg):
     term_name = Column(String(50), nullable=False)
     term_status = Column(String(20), nullable=False, default='active')
     number_of_terms = Column(Integer, nullable=False)
-    academic_year_id = Column(Integer, ForeignKey("academic_years.id"), nullable=False)
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"), nullable=False)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
     

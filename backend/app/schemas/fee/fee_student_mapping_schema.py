@@ -23,20 +23,20 @@ class FeeStudentMapTermAmountCreate(BaseModel):
 
 # Student details schema for responses
 class StudentDetailsRead(BaseModel):
-    student_id: int
+    student_id: UUID
     student_name: str
     student_admission_number: str
     student_class: dict  # {"id": int, "name": str}
     student_section: dict  # {"id": int, "name": str}
 
 class FeeStudentMappingBase(BaseModel):
-    student_id: int
+    student_id: UUID
     student_admission_num: str
-    class_id: int
-    section_id: int
+    class_id: UUID
+    section_id: UUID
     fee_type_id: UUID
     total_fee: Decimal
-    academic_year_id: int
+    academic_year_id: UUID
     
     @field_validator('total_fee')
     def validate_total_fee(cls, v):
@@ -72,14 +72,14 @@ class FeeStudentMappingRead(FeeStudentMappingBase):
 
 class FeeStudentMappingList(BaseModel):
     id: UUID
-    student_id: int
+    student_id: UUID
     student_admission_num: str
-    class_id: int
-    section_id: int
+    class_id: UUID
+    section_id: UUID
     fee_type_id: UUID
     fee_type_name: Optional[str] = None
     total_fee: Decimal
-    academic_year_id: int
+    academic_year_id: UUID
     academic_year_name: Optional[str] = None
     student_details: Optional[StudentDetailsRead] = None
     student_fee_mapping_terms: List[FeeStudentMapTermAmountRead] = []

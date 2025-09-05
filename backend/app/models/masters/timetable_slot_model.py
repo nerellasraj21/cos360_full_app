@@ -1,14 +1,16 @@
 from sqlalchemy import TIMESTAMP, Column, Integer, String, func, Boolean, ForeignKey, Time
 from sqlalchemy.orm import relationship
 from app.db.base import BaseOrg
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
 class TimetableSlot(BaseOrg):
     __tablename__ = "timetable_slots"
 
-    id = Column(Integer, primary_key=True, index=True)
-    timetable_id = Column(Integer, ForeignKey("timetables.id"), nullable=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
+    timetable_id = Column(UUID(as_uuid=True), ForeignKey("timetables.id"), nullable=True)
     day = Column(String, nullable=False)
-    slot_time_id = Column(Integer, ForeignKey("slot_times.id"), nullable=True)
+    slot_time_id = Column(UUID(as_uuid=True), ForeignKey("slot_times.id"), nullable=True)
     is_break = Column(Boolean, default=False)
     break_label = Column(String, nullable=True)
 

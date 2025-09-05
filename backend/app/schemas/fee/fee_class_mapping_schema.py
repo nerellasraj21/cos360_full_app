@@ -12,10 +12,10 @@ class FeeClassMappingTermAmountRead(BaseModel):
     model_config = {"from_attributes": True}
 
 class FeeClassMappingBase(BaseModel):
-    class_id: int
+    class_id: UUID
     fee_type_id: UUID
     total_fee: Decimal
-    academic_year_id: int
+    academic_year_id: UUID
     all_by_default: bool = False
     
     @field_validator('total_fee')
@@ -50,12 +50,12 @@ class FeeClassMappingRead(FeeClassMappingBase):
 
 class FeeClassMappingList(BaseModel):
     id: UUID
-    class_id: int
+    class_id: UUID
     class_name: Optional[str] = None
     fee_type_id: UUID
     fee_type_name: Optional[str] = None
     total_fee: Decimal
-    academic_year_id: int
+    academic_year_id: UUID
     academic_year_name: Optional[str] = None
     all_by_default: bool
     class_fee_mapping_terms: List[FeeClassMappingTermAmountRead] = []

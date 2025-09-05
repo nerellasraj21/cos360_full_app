@@ -12,7 +12,7 @@ class FeeType(BaseOrg):
     fee_category_id = Column(UUID(as_uuid=True), ForeignKey("fee_categories.id"), nullable=False)
     fee_status = Column(String(20), nullable=False, default='active')
     fee_term_id = Column(UUID(as_uuid=True), ForeignKey("fee_terms.id"), nullable=False)
-    academic_year_id = Column(Integer, ForeignKey("academic_years.id"), nullable=False)
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"), nullable=False)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
     

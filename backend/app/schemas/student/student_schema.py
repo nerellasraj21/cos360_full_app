@@ -4,6 +4,7 @@ from datetime import date
 from typing import Optional, TYPE_CHECKING, ForwardRef
 from enum import Enum
 from pydantic import ConfigDict
+from uuid import UUID
 
 class AdmissionTypeEnum(str, Enum):
     primary = "primary"
@@ -36,12 +37,12 @@ class StudentCreate(StudentBase):
     mother: "ParentCreate"
 
 class StudentDetailsOut(StudentBase):
-    id: int
+    id: UUID
     first_name: str
     last_name: str
     
 class StudentOut(StudentBase):
-    id: int
+    id: UUID
     first_name: str
     last_name: str
     father: Optional["ParentOut"]

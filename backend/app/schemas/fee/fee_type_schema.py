@@ -8,7 +8,7 @@ class FeeTypeBase(BaseModel):
     fee_category_id: UUID
     fee_status: str = "active"
     fee_term_id: UUID
-    academic_year_id: int
+    academic_year_id: UUID
     
     @field_validator('fee_status')
     def validate_fee_status(cls, v):
@@ -24,7 +24,7 @@ class FeeTypeUpdate(BaseModel):
     fee_category_id: Optional[UUID] = None
     fee_status: Optional[str] = None
     fee_term_id: Optional[UUID] = None
-    academic_year_id: Optional[int] = None
+    academic_year_id: Optional[UUID] = None
     
     @field_validator('fee_status')
     def validate_fee_status(cls, v):

@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional
 from datetime import time
+from uuid import UUID
 
 
 # ----------------------------
@@ -8,18 +9,18 @@ from datetime import time
 # ----------------------------
 
 class TimetableSubjectOptionCreate(BaseModel):
-    subject_id: int
+    subject_id: UUID
 
 class TimetableSubjectOptionUpdate(BaseModel):
-    subject_ids: Optional[List[int]] = Field(None, description="Updated list of subject IDs")
+    subject_ids: Optional[List[UUID]] = Field(None, description="Updated list of subject IDs")
 
     class Config:
         from_attributes = True
 
 
 class TimetableSubjectOptionOut(BaseModel):
-    id: int
-    subject_id: Optional[int]
+    id: UUID
+    subject_id: Optional[UUID]
 
     class Config:
         from_attributes = True
@@ -53,12 +54,12 @@ class TimetableSlotCreate(TimetableSlotBase):
         return values
     
 class TimetableSlotCreateGrouped(BaseModel):
-    slot_time_id: int
+    slot_time_id: UUID
     slots: List[TimetableSlotCreate]
 
     
 class FullTimetableCreate(BaseModel):
-    section_id: int
+    section_id: UUID
     slot_time_data: List[TimetableSlotCreateGrouped]
     
 class TimetableSlotUpdate(BaseModel):
@@ -89,14 +90,14 @@ class TimetableSlotPartialUpdate(BaseModel):
 
 
 class TimetableSlotOut(TimetableSlotBase):
-    id: int
+    id: UUID
     subject_options: List[TimetableSubjectOptionOut]
 
     class Config:
         from_attributes = True
 
 class SlotTimeCreate(BaseModel):
-    section_id: int
+    section_id: UUID
     label: str = Field(..., description="Label like 'Period 1', 'Lunch'")
     start_time: time
     end_time: time
@@ -111,17 +112,17 @@ class SlotTimePartialUpdate(BaseModel):
     end_time: Optional[time] = None
 
 class SlotTimeOut(SlotTimeCreate):
-    id: int
+    id: UUID
 
     class Config:
         from_attributes = True
 
 class GroupedSlotOut(BaseModel):
-    slot_time_id: int
+    slot_time_id: UUID
     slots: List[TimetableSlotOut]
 
 class GroupedSectionTimetableOut(BaseModel):
-    section_id: int
+    section_id: UUID
     slot_time_data: List[GroupedSlotOut]
 
 
@@ -131,14 +132,14 @@ class GroupedSectionTimetableOut(BaseModel):
 # ----------------------------
 
 class SectionTimetableOut(BaseModel):
-    section_id: int
+    section_id: UUID
     slots: List[TimetableSlotOut]
 
 
 SectionTimetableOut.model_rebuild()
 
 class TimetableSlotBulkUpdateItem(BaseModel):
-    id: int  # Required to identify which slot to update
+    id: UUID  # Required to identify which slot to update
     day: Optional[str] = None
     is_break: Optional[bool] = None
     break_label: Optional[str] = None
