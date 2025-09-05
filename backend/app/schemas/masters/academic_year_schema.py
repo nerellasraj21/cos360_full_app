@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import date
 from typing import Optional
+from uuid import UUID
 
 class AcademicYearBase(BaseModel):
     title: str
@@ -18,10 +19,10 @@ class AcademicYearUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 class AcademicYearRead(AcademicYearBase):
-    id: int    
+    id: UUID    
     model_config = {"from_attributes": True}
 
 class AcademicYearDropdown(BaseModel):
-    id: int
+    id: UUID
     title: str
     model_config = {"from_attributes": True}

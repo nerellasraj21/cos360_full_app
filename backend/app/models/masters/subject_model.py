@@ -1,20 +1,22 @@
 from sqlalchemy import TIMESTAMP, Column, Integer, String, func, Boolean, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.db.base import BaseOrg
+import uuid
 
 class Subject(BaseOrg):
     __tablename__ = 'subjects'
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     name = Column(String(50), nullable=False, unique=True)
-    category_id = Column(Integer, ForeignKey("subject_categories.id"), nullable=True)
+    category_id = Column(UUID(as_uuid=True), ForeignKey("subject_categories.id"), nullable=True)
     is_active = Column(Boolean, default=False)
     short_code = Column(String(10), nullable=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())   
     
     #Acedemic Year relationship
-    academic_year_id = Column(Integer, ForeignKey('academic_years.id'), nullable=False)
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey('academic_years.id'), nullable=False)
     academic_year = relationship("AcademicYear", back_populates="subjects")
     category = relationship("SubjectCategory", back_populates="subjects")
     

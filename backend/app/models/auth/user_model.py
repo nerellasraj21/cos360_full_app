@@ -1,16 +1,18 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.db.base import BaseOrg
+import uuid
 
 class User(BaseOrg):
     __tablename__ = 'users'
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(100), unique=True, nullable=True)
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
-    role_id = Column(Integer, ForeignKey('roles.id'), nullable=False)
+    role_id = Column(UUID(as_uuid=True), ForeignKey('roles.id'), nullable=False)
 
     role = relationship("Role", back_populates="users")
 
