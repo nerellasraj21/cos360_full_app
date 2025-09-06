@@ -28,6 +28,9 @@ from app.api.v1.fee.fee_type_endpoints import router as fee_type_router
 from app.api.v1.fee.fee_class_mapping_endpoints import router as fee_class_mapping_router
 from app.api.v1.fee.fee_class_map_term_amount_endpoints import router as fee_class_map_term_amount_router
 from app.api.v1.fee.fee_student_mapping_endpoints import router as fee_student_mapping_router
+from app.api.v1.auth.seed_endpoints import router as seed_router
+from app.api.v1.auth.test_setup_endpoints import router as test_setup_router
+from app.api.v1.auth.test_jwt_endpoints import router as test_jwt_router
 
 router = APIRouter()
 router.include_router(academic_year_router)
@@ -58,3 +61,6 @@ router.include_router(fee_type_router)
 router.include_router(fee_class_mapping_router)
 router.include_router(fee_class_map_term_amount_router)
 router.include_router(fee_student_mapping_router)
+router.include_router(seed_router)
+router.include_router(test_setup_router)
+router.include_router(test_jwt_router)

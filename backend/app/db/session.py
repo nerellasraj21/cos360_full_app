@@ -39,3 +39,34 @@ def set_search_path(dbapi_connection, connection_record):
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
+
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def get_public_db():
+    """
+    Get database session for public schema operations
+    """
+    # Create a separate session for public schema operations
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    
+    # Use the same database URL but without the schema search_path constraint
+    public_engine = create_async_engine(
+        DATABASE_URL, 
+        echo=False,
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=3600,
+        pool_pre_ping=True,
+    )
+    
+    PublicSessionLocal = async_sessionmaker(bind=public_engine, expire_on_commit=False)
+    
+    async with PublicSessionLocal() as session:
+        # Explicitly set search_path to public schema
+        await session.execute("SET search_path TO public")
+        try:
+            yield session
+        finally:
+            await public_engine.dispose()

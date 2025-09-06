@@ -3,6 +3,7 @@ venv/
 
 # ignore claude.md
 claude.md
+SESSION_CONTEXT.md
 
 # Ignore python compiled files
 *.pyc
