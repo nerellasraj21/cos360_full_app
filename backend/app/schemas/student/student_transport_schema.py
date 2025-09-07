@@ -15,10 +15,10 @@ class StudentTransportCreate(StudentTransportBase):
     pass
 
 class StudentTransportUpdate(BaseModel):
-    trip_id: Optional[int]
-    stop_id: Optional[int]
-    fee_term_id: Optional[int]
-    fee_per_term: Optional[Annotated[float, confloat(gt=0)]]
+    trip_id: Optional[UUID] = None
+    stop_id: Optional[UUID] = None
+    fee_term_id: Optional[UUID] = None
+    fee_per_term: Optional[Annotated[float, confloat(gt=0)]] = None
 
 class StudentTransportOut(StudentTransportBase):
     id: UUID

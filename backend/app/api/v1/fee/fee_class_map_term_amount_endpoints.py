@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status, APIRouter, Depends
+from fastapi import HTTPException, status, APIRouter, Depends, Request
 from app.schemas.fee.fee_class_map_term_amount_schema import (
     FeeClassMappingTermAmountBulkCreate,
     FeeClassMappingTermAmountBulkUpdate,
@@ -13,32 +13,66 @@ from app.service.fee.fee_class_map_term_amount_service import (
     delete_fee_class_mapping_term_amounts
 )
 from typing import List
+from app.tools.simple_permissions import check_role_permission, get_current_user_token
 
 router = APIRouter(prefix="/fee/class-mapping-term-amounts", tags=["Fee/Fee Class Mapping Term Amounts"])
 
 # Create Fee Class Mapping Term Amounts (Bulk)
 @router.post("/", response_model=List[FeeClassMappingTermAmountRead], status_code=status.HTTP_201_CREATED)
 async def create_fee_class_mapping_term_amounts_endpoint(
-    bulk_data: FeeClassMappingTermAmountBulkCreate, 
+    bulk_data: FeeClassMappingTermAmountBulkCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
-    """Create multiple fee class mapping term amounts"""
+    """Create multiple fee class mapping term amounts - Admin only"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'fee_term_amounts', 'create')
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail=f"Insufficient permissions: {role} cannot create fee_term_amounts"
+        )
+    
     return await create_fee_class_mapping_term_amounts(db, bulk_data)
 
 # Update Fee Class Mapping Term Amounts (Bulk)
 @router.put("/", response_model=List[FeeClassMappingTermAmountRead])
 async def update_fee_class_mapping_term_amounts_endpoint(
-    bulk_data: FeeClassMappingTermAmountBulkUpdate, 
+    bulk_data: FeeClassMappingTermAmountBulkUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
-    """Update multiple fee class mapping term amounts (supports partial updates)"""
+    """Update multiple fee class mapping term amounts (supports partial updates) - Admin only"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'fee_term_amounts', 'update')
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail=f"Insufficient permissions: {role} cannot update fee_term_amounts"
+        )
+    
     return await update_fee_class_mapping_term_amounts(db, bulk_data)
 
 # Delete Fee Class Mapping Term Amounts (Bulk)
 @router.delete("/")
 async def delete_fee_class_mapping_term_amounts_endpoint(
-    bulk_data: FeeClassMappingTermAmountBulkDelete, 
+    bulk_data: FeeClassMappingTermAmountBulkDelete,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
-    """Delete multiple fee class mapping term amounts"""
+    """Delete multiple fee class mapping term amounts - Admin only"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'fee_term_amounts', 'delete')
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail=f"Insufficient permissions: {role} cannot delete fee_term_amounts"
+        )
+    
     return await delete_fee_class_mapping_term_amounts(db, bulk_data)

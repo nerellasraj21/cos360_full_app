@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import date
 import enum
 
 from app.db.session import get_db
+from app.tools.simple_permissions import check_role_permission, get_current_user_token
 from app.schemas.masters.staff_schema import StaffEnrollmentCreate, StaffEnrollmentUpdate, StaffEnrollmentOut,StaffOut,DesignationOut,DriverOut
 from app.schemas.masters.staff_attendance_schema import StaffAttendanceCreate, StaffAttendanceUpdate, StaffAttendanceOut
 from app.service.masters.staff_service import (
@@ -25,23 +26,73 @@ class GenderEnum(enum.Enum):
 # -------------------- Staff Enrollment Endpoints --------------------
 
 @router.post("/enrollment", response_model=StaffEnrollmentOut)
-async def create_enrollment(data: StaffEnrollmentCreate, db: AsyncSession = Depends(get_db)):
+async def create_enrollment(request: Request, data: StaffEnrollmentCreate, db: AsyncSession = Depends(get_db)):
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'staff', 'create')
+    if not has_permission:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Insufficient permissions: {role} cannot create staff"
+        )
+    
     return await create_staff_enrollment(data, db)
 
 @router.patch("/enrollment/{staff_id}", response_model=StaffEnrollmentOut)
-async def update_enrollment(staff_id: int, data: StaffEnrollmentUpdate, db: AsyncSession = Depends(get_db)):
+async def update_enrollment(request: Request, staff_id: int, data: StaffEnrollmentUpdate, db: AsyncSession = Depends(get_db)):
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'staff', 'update')
+    if not has_permission:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Insufficient permissions: {role} cannot update staff"
+        )
+    
     return await update_staff_enrollment(staff_id, data, db)
 
 @router.get("/enrollments", response_model=List[StaffEnrollmentOut])
-async def list_enrollments(db: AsyncSession = Depends(get_db)):
+async def list_enrollments(request: Request, db: AsyncSession = Depends(get_db)):
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'staff', 'list')
+    if not has_permission:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Insufficient permissions: {role} cannot list staff"
+        )
+    
     return await get_all_staff_enrollments(db)
 
 @router.get("/enrollment/{staff_id}", response_model=StaffEnrollmentOut)
-async def get_enrollment(staff_id: int, db: AsyncSession = Depends(get_db)):
+async def get_enrollment(request: Request, staff_id: int, db: AsyncSession = Depends(get_db)):
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'staff', 'read')
+    if not has_permission:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Insufficient permissions: {role} cannot read staff"
+        )
+    
     return await get_staff_enrollment_by_id(staff_id, db)
 
 @router.delete("/enrollment/{staff_id}")
-async def remove_enrollment(staff_id: int, db: AsyncSession = Depends(get_db)):
+async def remove_enrollment(request: Request, staff_id: int, db: AsyncSession = Depends(get_db)):
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'staff', 'delete')
+    if not has_permission:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Insufficient permissions: {role} cannot delete staff"
+        )
+    
     return await delete_staff_enrollment(staff_id, db)
 
 # -------------------- Staff Attendance Endpoints --------------------
@@ -79,16 +130,38 @@ async def filter_staff_attendance(
 
 @router.get("/", response_model=List[StaffOut])
 async def get_staff_list(
+    request: Request,
     gender: Optional[GenderEnum] = Query(None, description="Filter by gender"),
     db: AsyncSession = Depends(get_db)
 ):
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'staff', 'list')
+    if not has_permission:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Insufficient permissions: {role} cannot list staff"
+        )
+    
     return await get_staff_list_by_gender(gender,db)
 
 @router.get("/by-designation")
 async def get_staff_by_designation(
+    request: Request,
     designation_id: Optional[int] = Query(None, description="Filter staff by designation"),
     db: AsyncSession = Depends(get_db)
 ):
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'staff', 'list')
+    if not has_permission:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Insufficient permissions: {role} cannot list staff"
+        )
+    
     return await get_staff_details_by_designation(designation_id,db)
 
 @router.get("/", response_model=List[DesignationOut])

@@ -1,7 +1,27 @@
+# Fee Category Flow:
+
+Fee Categories is a basic CRUD operations template.
+Show all the categories in data tables with actions in the last column and add new button at the top of the table.
+
+# Fee terms and term dates flow:
+
+Fee terms and term dates must be sent together.
+When adding new fee terms, include the number of terms as well. For example, quarterly has 4 terms and half-yearly has 2 terms. At the end of each fee terms table, provide an option to add term dates. When users click on term dates, display new input boxes matching the number of terms. Users must select dates in these input boxes and submit, allowing fee terms and term dates to be submitted simultaneously.
+
+# Fee Types Flow:
+
+The fee type also follows basic CRUD operations. The only change is that while adding the fee type, make sure fee categories and fee terms are displayed in the drop-down. 
+
+# Free Class Mapping Flow:
+
+
+
 # Complete Fee Modules API Documentation
 
 ## Overview
+
 This document provides comprehensive API documentation for all fee management modules in the system:
+
 - Fee Categories
 - Fee Terms & Fee Term Dates
 - Fee Types
@@ -10,16 +30,19 @@ This document provides comprehensive API documentation for all fee management mo
 These modules work together to manage the complete fee structure for educational institutions.
 
 ## Authentication
-*Note: Authentication module is not implemented yet*
+
+_Note: Authentication module is not implemented yet_
 
 ---
 
 # 1. Fee Categories API
 
 ## Overview
+
 Fee Categories represent the main classification of fees (e.g., Academic Fee, Transport Fee, Library Fee). Each category is tied to an academic year and can contain multiple fee types.
 
 ## Base URL
+
 ```
 /fee/categories
 ```
@@ -27,16 +50,18 @@ Fee Categories represent the main classification of fees (e.g., Academic Fee, Tr
 ## Data Model
 
 ### Fee Category Entity
-| Field | Type | Description | Required | Constraints |
-|-------|------|-------------|----------|-------------|
-| id | UUID | Unique identifier | Auto-generated | Primary key |
-| category_name | String | Name of the fee category | Yes | Max 100 chars, unique per academic year |
-| category_status | String | Status of category | No | Default: "active" |
-| academic_year_id | Integer | Foreign key to academic_years | Yes | Must exist in academic_years table |
-| created_at | Timestamp | Record creation time | Auto-generated | Server default |
-| updated_at | Timestamp | Record last update time | Auto-generated | Server default, auto-update |
+
+| Field            | Type      | Description                   | Required       | Constraints                             |
+| ---------------- | --------- | ----------------------------- | -------------- | --------------------------------------- |
+| id               | UUID      | Unique identifier             | Auto-generated | Primary key                             |
+| category_name    | String    | Name of the fee category      | Yes            | Max 100 chars, unique per academic year |
+| category_status  | String    | Status of category            | No             | Default: "active"                       |
+| academic_year_id | Integer   | Foreign key to academic_years | Yes            | Must exist in academic_years table      |
+| created_at       | Timestamp | Record creation time          | Auto-generated | Server default                          |
+| updated_at       | Timestamp | Record last update time       | Auto-generated | Server default, auto-update             |
 
 ### Unique Constraints
+
 - Combination of `category_name` and `academic_year_id` must be unique
 
 ## API Endpoints
@@ -46,6 +71,7 @@ Fee Categories represent the main classification of fees (e.g., Academic Fee, Tr
 **POST** `/fee/categories/`
 
 #### Request Body
+
 ```json
 {
   "category_name": "Academic Fee",
@@ -55,6 +81,7 @@ Fee Categories represent the main classification of fees (e.g., Academic Fee, Tr
 ```
 
 #### Success Response (201 Created)
+
 ```json
 {
   "id": "123e4567-e89b-12d3-a456-426614174001",
@@ -66,6 +93,7 @@ Fee Categories represent the main classification of fees (e.g., Academic Fee, Tr
 ```
 
 #### Error Responses
+
 - **400 Bad Request**: Category name already exists for academic year
 - **404 Not Found**: Academic year not found
 
@@ -74,6 +102,7 @@ Fee Categories represent the main classification of fees (e.g., Academic Fee, Tr
 **GET** `/fee/categories/`
 
 #### Success Response (200 OK)
+
 ```json
 [
   {
@@ -91,11 +120,13 @@ Fee Categories represent the main classification of fees (e.g., Academic Fee, Tr
 **GET** `/fee/categories/dropdown?academic_year_id=1`
 
 #### Query Parameters
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| academic_year_id | integer | No | Filter by academic year ID |
+
+| Parameter        | Type    | Required | Description                |
+| ---------------- | ------- | -------- | -------------------------- |
+| academic_year_id | integer | No       | Filter by academic year ID |
 
 #### Success Response (200 OK)
+
 ```json
 [
   {
@@ -110,6 +141,7 @@ Fee Categories represent the main classification of fees (e.g., Academic Fee, Tr
 **GET** `/fee/categories/{fee_category_id}`
 
 #### Success Response (200 OK)
+
 ```json
 {
   "id": "123e4567-e89b-12d3-a456-426614174001",
@@ -125,6 +157,7 @@ Fee Categories represent the main classification of fees (e.g., Academic Fee, Tr
 **PUT** `/fee/categories/{fee_category_id}`
 
 #### Request Body (all fields optional)
+
 ```json
 {
   "category_name": "Updated Academic Fee",
@@ -137,6 +170,7 @@ Fee Categories represent the main classification of fees (e.g., Academic Fee, Tr
 **DELETE** `/fee/categories/{fee_category_id}`
 
 #### Success Response (200 OK)
+
 ```json
 {
   "message": "Fee category deleted successfully"
@@ -148,9 +182,11 @@ Fee Categories represent the main classification of fees (e.g., Academic Fee, Tr
 # 2. Fee Terms & Fee Term Dates API
 
 ## Overview
+
 Fee Terms define payment schedules (e.g., Quarterly, Monthly) and their associated payment dates. Terms are managed together with their dates as a single entity.
 
 ## Base URL
+
 ```
 /fee/terms
 ```
@@ -158,20 +194,22 @@ Fee Terms define payment schedules (e.g., Quarterly, Monthly) and their associat
 ## Data Models
 
 ### Fee Term Entity
-| Field | Type | Description | Required | Constraints |
-|-------|------|-------------|----------|-------------|
-| id | UUID | Unique identifier | Auto-generated | Primary key |
-| term_name | String | Name of the term | Yes | Max 50 chars |
-| term_status | String | Status of term | No | Default: "active" |
-| number_of_terms | Integer | Number of payment terms | Yes | Must match fee_term_dates count |
-| academic_year_id | Integer | Foreign key to academic_years | Yes | Must exist in academic_years table |
+
+| Field            | Type    | Description                   | Required       | Constraints                        |
+| ---------------- | ------- | ----------------------------- | -------------- | ---------------------------------- |
+| id               | UUID    | Unique identifier             | Auto-generated | Primary key                        |
+| term_name        | String  | Name of the term              | Yes            | Max 50 chars                       |
+| term_status      | String  | Status of term                | No             | Default: "active"                  |
+| number_of_terms  | Integer | Number of payment terms       | Yes            | Must match fee_term_dates count    |
+| academic_year_id | Integer | Foreign key to academic_years | Yes            | Must exist in academic_years table |
 
 ### Fee Term Dates Entity
-| Field | Type | Description | Required | Constraints |
-|-------|------|-------------|----------|-------------|
-| id | UUID | Unique identifier | Auto-generated | Primary key |
-| term_id | UUID | Foreign key to fee_terms | Yes | Must exist in fee_terms table |
-| fee_term_date | Date | Payment due date | Yes | No duplicates within same term |
+
+| Field         | Type | Description              | Required       | Constraints                    |
+| ------------- | ---- | ------------------------ | -------------- | ------------------------------ |
+| id            | UUID | Unique identifier        | Auto-generated | Primary key                    |
+| term_id       | UUID | Foreign key to fee_terms | Yes            | Must exist in fee_terms table  |
+| fee_term_date | Date | Payment due date         | Yes            | No duplicates within same term |
 
 ## API Endpoints
 
@@ -180,6 +218,7 @@ Fee Terms define payment schedules (e.g., Quarterly, Monthly) and their associat
 **POST** `/fee/terms/`
 
 #### Request Body
+
 ```json
 {
   "term_name": "Quarterly",
@@ -187,15 +226,16 @@ Fee Terms define payment schedules (e.g., Quarterly, Monthly) and their associat
   "number_of_terms": 4,
   "academic_year_id": 1,
   "fee_term_dates": [
-    {"fee_term_date": "2024-06-01"},
-    {"fee_term_date": "2024-09-01"},
-    {"fee_term_date": "2024-12-01"},
-    {"fee_term_date": "2025-03-01"}
+    { "fee_term_date": "2024-06-01" },
+    { "fee_term_date": "2024-09-01" },
+    { "fee_term_date": "2024-12-01" },
+    { "fee_term_date": "2025-03-01" }
   ]
 }
 ```
 
 #### Success Response (201 Created)
+
 ```json
 {
   "id": "123e4567-e89b-12d3-a456-426614174002",
@@ -214,6 +254,7 @@ Fee Terms define payment schedules (e.g., Quarterly, Monthly) and their associat
 ```
 
 #### Validation Rules
+
 - `number_of_terms` must equal the count of `fee_term_dates`
 - No duplicate dates within the same term
 - All dates must be valid
@@ -223,6 +264,7 @@ Fee Terms define payment schedules (e.g., Quarterly, Monthly) and their associat
 **GET** `/fee/terms/`
 
 #### Success Response (200 OK)
+
 ```json
 [
   {
@@ -241,6 +283,7 @@ Fee Terms define payment schedules (e.g., Quarterly, Monthly) and their associat
 **GET** `/fee/terms/{fee_term_id}`
 
 #### Success Response (200 OK)
+
 ```json
 {
   "id": "123e4567-e89b-12d3-a456-426614174002",
@@ -263,14 +306,15 @@ Fee Terms define payment schedules (e.g., Quarterly, Monthly) and their associat
 **PUT** `/fee/terms/{fee_term_id}`
 
 #### Request Body (all fields optional)
+
 ```json
 {
   "term_name": "Updated Quarterly",
   "number_of_terms": 3,
   "fee_term_dates": [
-    {"fee_term_date": "2024-08-01"},
-    {"fee_term_date": "2024-12-01"},
-    {"fee_term_date": "2025-04-01"}
+    { "fee_term_date": "2024-08-01" },
+    { "fee_term_date": "2024-12-01" },
+    { "fee_term_date": "2025-04-01" }
   ]
 }
 ```
@@ -292,9 +336,11 @@ Deletes only a specific fee term date.
 # 3. Fee Types API
 
 ## Overview
+
 Fee Types represent specific types of fees within categories (e.g., "Tuition Fee" within "Academic Fee" category). They connect categories, terms, and academic years.
 
 ## Base URL
+
 ```
 /fee/types
 ```
@@ -302,16 +348,18 @@ Fee Types represent specific types of fees within categories (e.g., "Tuition Fee
 ## Data Model
 
 ### Fee Type Entity
-| Field | Type | Description | Required | Constraints |
-|-------|------|-------------|----------|-------------|
-| id | UUID | Unique identifier | Auto-generated | Primary key |
-| type_name | String | Name of the fee type | Yes | Max 100 chars, unique per category |
-| fee_category_id | UUID | Foreign key to fee_categories | Yes | Must exist in fee_categories table |
-| fee_status | String | Status of fee type | No | Default: "active", values: "active"/"inactive" |
-| fee_term_id | UUID | Foreign key to fee_terms | Yes | Must exist in fee_terms table |
-| academic_year_id | Integer | Foreign key to academic_years | Yes | Must exist in academic_years table |
+
+| Field            | Type    | Description                   | Required       | Constraints                                    |
+| ---------------- | ------- | ----------------------------- | -------------- | ---------------------------------------------- |
+| id               | UUID    | Unique identifier             | Auto-generated | Primary key                                    |
+| type_name        | String  | Name of the fee type          | Yes            | Max 100 chars, unique per category             |
+| fee_category_id  | UUID    | Foreign key to fee_categories | Yes            | Must exist in fee_categories table             |
+| fee_status       | String  | Status of fee type            | No             | Default: "active", values: "active"/"inactive" |
+| fee_term_id      | UUID    | Foreign key to fee_terms      | Yes            | Must exist in fee_terms table                  |
+| academic_year_id | Integer | Foreign key to academic_years | Yes            | Must exist in academic_years table             |
 
 ### Unique Constraints
+
 - Combination of `type_name` and `fee_category_id` must be unique
 
 ## API Endpoints
@@ -321,6 +369,7 @@ Fee Types represent specific types of fees within categories (e.g., "Tuition Fee
 **POST** `/fee/types/`
 
 #### Request Body
+
 ```json
 {
   "type_name": "Tuition Fee",
@@ -332,6 +381,7 @@ Fee Types represent specific types of fees within categories (e.g., "Tuition Fee
 ```
 
 #### Success Response (201 Created)
+
 ```json
 {
   "id": "123e4567-e89b-12d3-a456-426614174004",
@@ -352,6 +402,7 @@ Fee Types represent specific types of fees within categories (e.g., "Tuition Fee
 **GET** `/fee/types/`
 
 #### Success Response (200 OK)
+
 ```json
 [
   {
@@ -374,11 +425,13 @@ Fee Types represent specific types of fees within categories (e.g., "Tuition Fee
 **GET** `/fee/types/dropdown?fee_category_id={category_id}`
 
 #### Query Parameters
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| fee_category_id | string (UUID) | No | Filter by fee category ID |
+
+| Parameter       | Type          | Required | Description               |
+| --------------- | ------------- | -------- | ------------------------- |
+| fee_category_id | string (UUID) | No       | Filter by fee category ID |
 
 #### Success Response (200 OK)
+
 ```json
 [
   {
@@ -393,6 +446,7 @@ Fee Types represent specific types of fees within categories (e.g., "Tuition Fee
 **GET** `/fee/types/{fee_type_id}`
 
 #### Success Response (200 OK)
+
 ```json
 {
   "id": "123e4567-e89b-12d3-a456-426614174004",
@@ -413,6 +467,7 @@ Fee Types represent specific types of fees within categories (e.g., "Tuition Fee
 **PUT** `/fee/types/{fee_type_id}`
 
 #### Request Body (all fields optional)
+
 ```json
 {
   "type_name": "Updated Tuition Fee",
@@ -425,6 +480,7 @@ Fee Types represent specific types of fees within categories (e.g., "Tuition Fee
 **DELETE** `/fee/types/{fee_type_id}`
 
 #### Success Response (200 OK)
+
 ```json
 {
   "message": "Fee type deleted successfully"
@@ -436,9 +492,11 @@ Fee Types represent specific types of fees within categories (e.g., "Tuition Fee
 # 4. Fee Class Mappings API
 
 ## Overview
+
 Fee Class Mappings link classes to specific fee types with amounts. This defines how much each class pays for each fee type.
 
 ## Base URL
+
 ```
 /fee/class-mappings
 ```
@@ -446,16 +504,18 @@ Fee Class Mappings link classes to specific fee types with amounts. This defines
 ## Data Model
 
 ### Fee Class Mapping Entity
-| Field | Type | Description | Required | Constraints |
-|-------|------|-------------|----------|-------------|
-| id | UUID | Unique identifier | Auto-generated | Primary key |
-| class_id | Integer | Foreign key to classes | Yes | Must exist in classes table |
-| fee_type_id | UUID | Foreign key to fee_types | Yes | Must exist in fee_types table |
-| total_fee | Decimal | Fee amount for the class | Yes | Must be non-negative (≥ 0) |
-| academic_year_id | Integer | Foreign key to academic_years | Yes | Must exist in academic_years table |
-| all_by_default | Boolean | Apply to all students in class | No | Default: false |
+
+| Field            | Type    | Description                    | Required       | Constraints                        |
+| ---------------- | ------- | ------------------------------ | -------------- | ---------------------------------- |
+| id               | UUID    | Unique identifier              | Auto-generated | Primary key                        |
+| class_id         | Integer | Foreign key to classes         | Yes            | Must exist in classes table        |
+| fee_type_id      | UUID    | Foreign key to fee_types       | Yes            | Must exist in fee_types table      |
+| total_fee        | Decimal | Fee amount for the class       | Yes            | Must be non-negative (≥ 0)         |
+| academic_year_id | Integer | Foreign key to academic_years  | Yes            | Must exist in academic_years table |
+| all_by_default   | Boolean | Apply to all students in class | No             | Default: false                     |
 
 ### Unique Constraints
+
 - Combination of `class_id`, `fee_type_id`, and `academic_year_id` must be unique
 
 ## API Endpoints
@@ -465,6 +525,7 @@ Fee Class Mappings link classes to specific fee types with amounts. This defines
 **POST** `/fee/class-mappings/`
 
 #### Request Body
+
 ```json
 {
   "class_id": 1,
@@ -476,6 +537,7 @@ Fee Class Mappings link classes to specific fee types with amounts. This defines
 ```
 
 #### Success Response (201 Created)
+
 ```json
 {
   "id": "123e4567-e89b-12d3-a456-426614174005",
@@ -495,11 +557,12 @@ Fee Class Mappings link classes to specific fee types with amounts. This defines
 **GET** `/fee/class-mappings/`
 
 #### Query Parameters
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| class_id | integer | No | Filter by class ID |
-| fee_type_id | string (UUID) | No | Filter by fee type ID |
-| all_by_default | boolean | No | Filter by all_by_default flag |
+
+| Parameter      | Type          | Required | Description                   |
+| -------------- | ------------- | -------- | ----------------------------- |
+| class_id       | integer       | No       | Filter by class ID            |
+| fee_type_id    | string (UUID) | No       | Filter by fee type ID         |
+| all_by_default | boolean       | No       | Filter by all_by_default flag |
 
 ### 4.3 Get Fee Class Mapping by ID
 
@@ -518,18 +581,20 @@ Fee Class Mappings link classes to specific fee types with amounts. This defines
 # Common Error Handling
 
 ## HTTP Status Codes
-| Status Code | Description |
-|-------------|-------------|
-| 200 | OK - Request successful |
-| 201 | Created - Resource created successfully |
-| 400 | Bad Request - Invalid request data or business rule violation |
-| 404 | Not Found - Resource not found |
-| 422 | Unprocessable Entity - Validation error |
-| 500 | Internal Server Error - Unexpected server error |
+
+| Status Code | Description                                                   |
+| ----------- | ------------------------------------------------------------- |
+| 200         | OK - Request successful                                       |
+| 201         | Created - Resource created successfully                       |
+| 400         | Bad Request - Invalid request data or business rule violation |
+| 404         | Not Found - Resource not found                                |
+| 422         | Unprocessable Entity - Validation error                       |
+| 500         | Internal Server Error - Unexpected server error               |
 
 ## Common Error Response Formats
 
 ### Validation Error (422)
+
 ```json
 {
   "detail": [
@@ -543,6 +608,7 @@ Fee Class Mappings link classes to specific fee types with amounts. This defines
 ```
 
 ### Business Rule Violation (400)
+
 ```json
 {
   "detail": "Fee type name 'Tuition Fee' already exists for this fee category"
@@ -550,6 +616,7 @@ Fee Class Mappings link classes to specific fee types with amounts. This defines
 ```
 
 ### Resource Not Found (404)
+
 ```json
 {
   "detail": "Fee category with id 123e4567-e89b-12d3-a456-426614174001 not found"
@@ -557,6 +624,7 @@ Fee Class Mappings link classes to specific fee types with amounts. This defines
 ```
 
 ### Invalid ID Format (400)
+
 ```json
 {
   "detail": "Invalid fee category ID format"
@@ -568,6 +636,7 @@ Fee Class Mappings link classes to specific fee types with amounts. This defines
 # Data Flow and Relationships
 
 ## Hierarchical Structure
+
 ```
 Academic Year
 └── Fee Category (e.g., "Academic Fee")
@@ -580,6 +649,7 @@ Academic Year
 ```
 
 ## Relationships
+
 1. **Academic Year** → Multiple Categories, Terms, Types, Mappings
 2. **Fee Category** → Multiple Fee Types
 3. **Fee Term** → Multiple Fee Term Dates, Multiple Fee Types
@@ -587,6 +657,7 @@ Academic Year
 5. **Class** → Multiple Fee Class Mappings
 
 ## Typical Workflow
+
 1. Create **Academic Year**
 2. Create **Fee Categories** for the academic year
 3. Create **Fee Terms** with their payment dates
@@ -600,6 +671,7 @@ Academic Year
 ## Setting up a Complete Fee Structure
 
 ### Step 1: Create Fee Category
+
 ```bash
 POST /fee/categories/
 {
@@ -609,6 +681,7 @@ POST /fee/categories/
 ```
 
 ### Step 2: Create Fee Term with Dates
+
 ```bash
 POST /fee/terms/
 {
@@ -625,6 +698,7 @@ POST /fee/terms/
 ```
 
 ### Step 3: Create Fee Type
+
 ```bash
 POST /fee/types/
 {
@@ -636,6 +710,7 @@ POST /fee/types/
 ```
 
 ### Step 4: Create Class Mapping
+
 ```bash
 POST /fee/class-mappings/
 {
@@ -650,11 +725,13 @@ POST /fee/class-mappings/
 ## Getting Dropdown Data for UI
 
 ### Get Categories for Dropdown
+
 ```bash
 GET /fee/categories/dropdown?academic_year_id=1
 ```
 
 ### Get Fee Types for a Specific Category
+
 ```bash
 GET /fee/types/dropdown?fee_category_id={category_id}
 ```
@@ -664,20 +741,24 @@ GET /fee/types/dropdown?fee_category_id={category_id}
 # Business Rules Summary
 
 ## Fee Categories
+
 - Category names must be unique within an academic year
 - Cannot be deleted if referenced by fee types
 
 ## Fee Terms
+
 - Number of term dates must match `number_of_terms`
 - No duplicate dates within the same term
 - Deleting a term cascades to all associated dates
 
 ## Fee Types
+
 - Type names must be unique within a fee category
 - Must reference valid category, term, and academic year
 - Status values: "active" or "inactive"
 
 ## Fee Class Mappings
+
 - Each class can have only one mapping per fee type per academic year
 - Total fee must be non-negative
 - Hard delete - only removes the mapping record

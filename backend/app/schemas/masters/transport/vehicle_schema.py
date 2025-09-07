@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date
+from uuid import UUID
 
 class VehicleBase(BaseModel):
     name: str
@@ -24,7 +25,7 @@ class VehicleUpdate(BaseModel):
     model_config = {"from_attributes": True}
 
 class VehicleOut(VehicleBase):
-    id: int
+    id: UUID
 
     class Config:
         from_attributes = True

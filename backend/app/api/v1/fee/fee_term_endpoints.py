@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status, APIRouter, Depends
+from fastapi import HTTPException, status, APIRouter, Depends, Request
 from app.schemas.fee.fee_term_schema import FeeTermCreate, FeeTermRead, FeeTermUpdate
 from app.db.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,42 +10,127 @@ from app.service.fee.fee_term_service import (
     delete_fee_term_with_dates,
     delete_fee_term_date
 )
+from app.tools.simple_permissions import check_role_permission, get_current_user_token
 from typing import List
 
 router = APIRouter(prefix="/fee/terms", tags=["Fee/Fee Terms & Dates"])
 
 # Create Fee Term with Dates
 @router.post("/", response_model=FeeTermRead, status_code=status.HTTP_201_CREATED)
-async def create_fee_term(fee_term_data: FeeTermCreate, db: AsyncSession = Depends(get_db)):
+async def create_fee_term(
+    request: Request,
+    fee_term_data: FeeTermCreate, 
+    db: AsyncSession = Depends(get_db)
+):
     """Create a new fee term with associated dates"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'fee_terms', 'create')
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Insufficient permissions: {role} cannot create fee_terms"
+        )
+    
     return await create_fee_term_with_dates(db, fee_term_data)
 
 # Get All Fee Terms
 @router.get("/", response_model=List[FeeTermRead])
-async def get_all_fee_terms_endpoint(db: AsyncSession = Depends(get_db)):
+async def get_all_fee_terms_endpoint(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
     """Get all fee terms with their associated dates"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'fee_terms', 'list')
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Insufficient permissions: {role} cannot list fee_terms"
+        )
+    
     return await get_all_fee_terms(db)
 
 # Get Single Fee Term with Dates
 @router.get("/{fee_term_id}", response_model=FeeTermRead)
-async def get_fee_term_endpoint(fee_term_id: str, db: AsyncSession = Depends(get_db)):
+async def get_fee_term_endpoint(
+    request: Request,
+    fee_term_id: str, 
+    db: AsyncSession = Depends(get_db)
+):
     """Get a specific fee term with its associated dates"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'fee_terms', 'read')
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Insufficient permissions: {role} cannot read fee_terms"
+        )
+    
     return await get_fee_term_with_dates(db, fee_term_id)
 
 # Update Fee Term with Dates
 @router.put("/{fee_term_id}", response_model=FeeTermRead)
-async def update_fee_term_endpoint(fee_term_id: str, fee_term_data: FeeTermUpdate, db: AsyncSession = Depends(get_db)):
+async def update_fee_term_endpoint(
+    request: Request,
+    fee_term_id: str, 
+    fee_term_data: FeeTermUpdate, 
+    db: AsyncSession = Depends(get_db)
+):
     """Update a fee term and its associated dates"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'fee_terms', 'update')
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Insufficient permissions: {role} cannot update fee_terms"
+        )
+    
     return await update_fee_term_with_dates(db, fee_term_id, fee_term_data)
 
 # Delete Fee Term with Dates
 @router.delete("/{fee_term_id}")
-async def delete_fee_term_endpoint(fee_term_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_fee_term_endpoint(
+    request: Request,
+    fee_term_id: str, 
+    db: AsyncSession = Depends(get_db)
+):
     """Delete a fee term and all its associated dates"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'fee_terms', 'delete')
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Insufficient permissions: {role} cannot delete fee_terms"
+        )
+    
     return await delete_fee_term_with_dates(db, fee_term_id)
 
 # Delete Fee Term Date
 @router.delete("/dates/{fee_term_date_id}")
-async def delete_fee_term_date_endpoint(fee_term_date_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_fee_term_date_endpoint(
+    request: Request,
+    fee_term_date_id: str, 
+    db: AsyncSession = Depends(get_db)
+):
     """Delete a specific fee term date"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'fee_terms', 'delete')
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Insufficient permissions: {role} cannot delete fee_terms"
+        )
+    
     return await delete_fee_term_date(db, fee_term_date_id)

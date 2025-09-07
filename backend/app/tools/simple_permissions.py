@@ -5,6 +5,8 @@ import logging
 from app.db.session import get_db
 from app.tools.jwt_utils import verify_access_token
 from app.service.auth.permission_service import PermissionService
+from app.service.auth.plan_service import PlanService
+from app.middleware.tenant_middleware import get_client_name_from_request
 
 logger = logging.getLogger("simple_permissions")
 
@@ -85,25 +87,180 @@ async def check_role_permission_db(db: AsyncSession, role: str, resource: str, a
 # Fallback hardcoded permissions for when database is not available or for testing
 ROLE_PERMISSIONS = {
     "Admin": {
+        # Academic Management - Full access
         "academic_years": ["create", "read", "update", "delete", "list"],
+        "classes": ["create", "read", "update", "delete", "list"],
+        "sections": ["create", "read", "update", "delete", "list"],
+        "subjects": ["create", "read", "update", "delete", "list"],
+        "subject_categories": ["create", "read", "update", "delete", "list"],
+        
+        # Fee Management - Full access
         "fee_categories": ["create", "read", "update", "delete", "list"],
-        # Add more resources as needed
+        "fee_types": ["create", "read", "update", "delete", "list"],
+        "fee_terms": ["create", "read", "update", "delete", "list"],
+        "fee_class_mappings": ["create", "read", "update", "delete", "list"],
+        "fee_student_mappings": ["create", "read", "update", "delete", "list"],
+        "fee_term_amounts": ["create", "read", "update", "delete", "list"],
+        
+        # Transport Management - Full access
+        "transport_routes": ["create", "read", "update", "delete", "list"],
+        "transport_vehicles": ["create", "read", "update", "delete", "list"],
+        "route_stops": ["create", "read", "update", "delete", "list"],
+        "transport_trips": ["create", "read", "update", "delete", "list"],
+        "student_transport": ["create", "read", "update", "delete", "list"],
+        
+        # Student Management - Full access
+        "student_admissions": ["create", "read", "update", "delete", "list"],
+        "student_attendance": ["create", "read", "update", "delete", "list"],
+        "student_certificates": ["create", "read", "update", "delete", "list"],
+        "student_documents": ["create", "read", "update", "delete", "list"],
+        
+        # Administrative - Full access
+        "parents": ["create", "read", "update", "delete", "list"],
+        "holidays": ["create", "read", "update", "delete", "list"],
+        "timetables": ["create", "read", "update", "delete", "list"],
+        
+        # System Management - Full access
+        "role_management": ["create", "read", "update", "delete", "list"],
+        "permission_management": ["create", "read", "update", "delete", "list"],
+        "menu_management": ["create", "read", "update", "delete", "list"],
     },
+    
     "Teacher": {
+        # Academic Management - Enhanced access for teaching
         "academic_years": ["read", "list"],
+        "classes": ["create", "read", "update", "delete", "list"],
+        "sections": ["create", "read", "update", "delete", "list"],
+        "subjects": ["create", "read", "update", "delete", "list"],
+        "subject_categories": ["read", "list"],
+        
+        # Student Academic Management - Full access
+        "student_attendance": ["create", "read", "update", "delete", "list"],
+        "student_certificates": ["create", "read", "update", "delete", "list"],
+        "student_admissions": ["read", "list"],
+        "student_documents": ["read", "list"],
+        
+        # Fee Information - Read access only
         "fee_categories": ["read", "list"],
+        "fee_types": ["read", "list"],
+        "fee_terms": ["read", "list"],
+        "fee_class_mappings": ["read", "list"],
+        "fee_student_mappings": ["read", "list"],
+        "fee_term_amounts": ["read", "list"],
+        
+        # Transport Information - Read access only
+        "transport_routes": ["read", "list"],
+        "transport_vehicles": ["read", "list"],
+        "route_stops": ["read", "list"],
+        "transport_trips": ["read", "list"],
+        "student_transport": ["read", "list"],
+        
+        # Administrative Information - Read access
+        "parents": ["read", "list"],
+        "holidays": ["read", "list"],
+        "timetables": ["read", "list"],
     },
+    
     "Student": {
+        # Academic Information - Read access only
         "academic_years": ["read", "list"],
+        "classes": ["read", "list"],
+        "sections": ["read", "list"],
+        "subjects": ["read", "list"],
+        "subject_categories": ["read", "list"],
+        
+        # Own Academic Records - Read access
+        "student_attendance": ["read", "list"],
+        "student_certificates": ["read", "list"],
+        "student_documents": ["read", "list"],
+        
+        # Fee Information - Read access only
         "fee_categories": ["read", "list"],
+        "fee_types": ["read", "list"],
+        "fee_terms": ["read", "list"],
+        "fee_class_mappings": ["read", "list"],
+        "fee_student_mappings": ["read", "list"],
+        "fee_term_amounts": ["read", "list"],
+        
+        # Transport Information - Read access only
+        "transport_routes": ["read", "list"],
+        "transport_vehicles": ["read", "list"],
+        "route_stops": ["read", "list"],
+        "transport_trips": ["read", "list"],
+        "student_transport": ["read", "list"],
+        
+        # School Information - Read access
+        "holidays": ["read", "list"],
+        "timetables": ["read", "list"],
     },
+    
     "Parent": {
+        # Academic Information - Read access for child's education
         "academic_years": ["read", "list"],
+        "classes": ["read", "list"],
+        "sections": ["read", "list"],
+        "subjects": ["read", "list"],
+        "subject_categories": ["read", "list"],
+        
+        # Child's Academic Records - Read access
+        "student_attendance": ["read", "list"],
+        "student_certificates": ["read", "list"],
+        "student_admissions": ["read", "list"],
+        "student_documents": ["read", "list"],
+        
+        # Fee Information - Read access for payment purposes
         "fee_categories": ["read", "list"],
+        "fee_types": ["read", "list"],
+        "fee_terms": ["read", "list"],
+        "fee_class_mappings": ["read", "list"],
+        "fee_student_mappings": ["read", "list"],
+        "fee_term_amounts": ["read", "list"],
+        
+        # Transport Information - Read access for child's transport
+        "transport_routes": ["read", "list"],
+        "transport_vehicles": ["read", "list"],
+        "route_stops": ["read", "list"],
+        "transport_trips": ["read", "list"],
+        "student_transport": ["read", "list"],
+        
+        # School Information - Read access
+        "holidays": ["read", "list"],
+        "timetables": ["read", "list"],
     },
+    
     "Staff": {
+        # Administrative Operations - Full CRUD access
+        "fee_categories": ["create", "read", "update", "delete", "list"],
+        "fee_types": ["create", "read", "update", "delete", "list"],
+        "fee_terms": ["create", "read", "update", "delete", "list"],
+        "fee_class_mappings": ["create", "read", "update", "delete", "list"],
+        "fee_student_mappings": ["create", "read", "update", "delete", "list"],
+        "fee_term_amounts": ["create", "read", "update", "delete", "list"],
+        
+        # Transport Management - Full CRUD access
+        "transport_routes": ["create", "read", "update", "delete", "list"],
+        "transport_vehicles": ["create", "read", "update", "delete", "list"],
+        "route_stops": ["create", "read", "update", "delete", "list"],
+        "transport_trips": ["create", "read", "update", "delete", "list"],
+        "student_transport": ["create", "read", "update", "delete", "list"],
+        
+        # Administrative Functions - Full CRUD access
+        "parents": ["create", "read", "update", "delete", "list"],
+        "holidays": ["create", "read", "update", "delete", "list"],
+        
+        # Academic Information - Read access for administrative support
         "academic_years": ["read", "list"],
-        "fee_categories": ["read", "list"],
+        "classes": ["read", "list"],
+        "sections": ["read", "list"],
+        "subjects": ["read", "list"],
+        "subject_categories": ["read", "list"],
+        "timetables": ["read", "list"],
+        
+        # Student Information - Read access for administrative support
+        "student_admissions": ["read", "list"],
+        "student_attendance": ["read", "list"],
+        "student_certificates": ["read", "list"],
+        "student_documents": ["read", "list"],
     }
 }
 
@@ -140,6 +297,109 @@ async def check_role_permission(db: AsyncSession, role: str, resource: str, acti
     except Exception as e:
         logger.error(f"Error in permission checking, using fallback: {str(e)}")
         return check_role_permission_fallback(role, resource, action)
+
+async def check_role_plan_permission(db: AsyncSession, client_name: str, role: str, resource: str, action: str) -> bool:
+    """
+    Multi-layer permission checking: Role + Plan validation.
+    
+    1. Check role has permission for resource:action
+    2. Check tenant's plan allows access to resource:action
+    3. Return True only if both layers allow access
+    
+    Args:
+        db: Database session
+        client_name: Tenant identifier
+        role: User role
+        resource: Resource name
+        action: Action name
+        
+    Returns:
+        bool: True if both role and plan allow access
+    """
+    try:
+        # Layer 1: Role permission check (existing)
+        role_has_permission = await check_role_permission(db, role, resource, action)
+        if not role_has_permission:
+            logger.info(f"Role permission denied: {role} -> {resource}:{action}")
+            return False
+        
+        # Layer 2: Plan permission check (new)
+        plan_allows_access = await PlanService.check_plan_permission(client_name, resource, action)
+        if not plan_allows_access:
+            logger.info(f"Plan permission denied: {client_name} -> {resource}:{action}")
+            return False
+        
+        logger.info(f"Multi-layer permission granted: {role}@{client_name} -> {resource}:{action}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error in multi-layer permission checking: {str(e)}")
+        # Fallback to role-only permission for safety
+        return await check_role_permission(db, role, resource, action)
+
+async def check_role_plan_permission_with_error(db: AsyncSession, request: Request, role: str, resource: str, action: str) -> bool:
+    """
+    Multi-layer permission checking with plan-specific error handling.
+    
+    Raises appropriate HTTPExceptions with plan upgrade information.
+    
+    Args:
+        db: Database session
+        request: FastAPI request object
+        role: User role
+        resource: Resource name
+        action: Action name
+        
+    Returns:
+        bool: True if access granted
+        
+    Raises:
+        HTTPException: With appropriate error code and plan information
+    """
+    try:
+        client_name = get_client_name_from_request(request)
+        
+        # Layer 1: Role permission check
+        role_has_permission = await check_role_permission(db, role, resource, action)
+        if not role_has_permission:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Insufficient permissions: {role} cannot {action} {resource}"
+            )
+        
+        # Layer 2: Plan permission check
+        plan_allows_access = await PlanService.check_plan_permission(client_name, resource, action)
+        if not plan_allows_access:
+            # Get detailed plan limitation info for user-friendly error
+            limitation_info = await PlanService.get_plan_limitation_info(client_name, resource, action)
+            
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "error": "plan_limitation",
+                    "message": limitation_info.get("message", "This feature requires a plan upgrade"),
+                    "current_plan": limitation_info.get("current_plan"),
+                    "required_plan": limitation_info.get("required_plan"),
+                    "resource": resource,
+                    "action": action,
+                    "upgrade_available": limitation_info.get("upgrade_available", True)
+                }
+            )
+        
+        return True
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in multi-layer permission checking: {str(e)}")
+        # Fallback to role-only permission
+        role_has_permission = await check_role_permission(db, role, resource, action)
+        if not role_has_permission:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Insufficient permissions: {role} cannot {action} {resource}"
+            )
+        return True
 
 # Permission check functions with role-based logic
 def RequireCreate(resource: str):

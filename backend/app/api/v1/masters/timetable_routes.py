@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, Request, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.masters.timetable_schema import (
     TimetableSlotCreate, TimetableSlotUpdate, TimetableSlotOut, TimetableSlotPartialUpdate,FullTimetableCreate, SlotTimeOut, SlotTimeCreate,SlotTimeUpdate,SlotTimePartialUpdate, GroupedSectionTimetableOut, TimetableSlotBulkUpdateRequest
@@ -7,6 +7,7 @@ from app.service.masters.timetable_service import update_all_details_timetable_s
 
 from app.db.session import get_db
 from typing import List
+from app.tools.simple_permissions import check_role_permission, get_current_user_token
 
 router = APIRouter(prefix="/students/timetable", tags=["Student/Timetable"])
 
@@ -17,8 +18,20 @@ router = APIRouter(prefix="/students/timetable", tags=["Student/Timetable"])
 @router.post("/bulk")
 async def create_full_timetable(
     data: FullTimetableCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
+    """Create full timetable - Admin only"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'timetable_management', 'create')
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail=f"Insufficient permissions: {role} cannot create timetable_management"
+        )
+    
     return await add_full_timetable(data, db)
 
 
@@ -63,8 +76,20 @@ async def create_full_timetable(
 @router.get("/section/{section_id}", response_model=GroupedSectionTimetableOut)
 async def fetch_timetable_by_section(
     section_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
+    """Get timetable by section - All authenticated users"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'timetable_management', 'read')
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail=f"Insufficient permissions: {role} cannot read timetable_management"
+        )
+    
     return await get_timetable_by_section(section_id, db)
 
 # # Full update (PUT)
@@ -88,6 +113,18 @@ async def fetch_timetable_by_section(
 @router.patch("/timetable/slots/bulk", response_model=List[TimetableSlotOut])
 async def bulk_patch_slots(
     data: TimetableSlotBulkUpdateRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
+    """Bulk update timetable slots - Admin only"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    has_permission = await check_role_permission(db, role, 'timetable_management', 'update')
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail=f"Insufficient permissions: {role} cannot update timetable_management"
+        )
+    
     return await bulk_update_timetable_slots(data, db)

@@ -1,7 +1,10 @@
 # Flow:
 
 ## Feature: Fee Class Mapping – Term Amounts
+Similar to FEE_TERM and TERM_DATES, FEE_CLASS_MAPPING is also CRUD operations where the user can add FEE_CLASS_MAPPING and FEE_CLASS_MAPPING_TERM_AMOUNTs together. 
 
+While adding fee class mapping, the user will have a dropdown of fee types and fee overall classes.
+Once the face is mapped to a specific class. 
 ## User Story:
 
 As a user, I want to enter or distribute the fee amount across multiple terms so that the total fee is correctly allocated according to the fee terms.

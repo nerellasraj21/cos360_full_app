@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import time
+from uuid import UUID
 
 class RouteBase(BaseModel):
     route_name: str
@@ -30,12 +31,12 @@ class RouteUpdate(BaseModel):
     model_config = {"from_attributes": True}
 
 class RouteOut(RouteBase):
-    id: int
+    id: UUID
 
     class Config:
         from_attributes = True
 
 class RouteDropdown(BaseModel):
-    id: int
+    id: UUID
     route_name: str
     model_config = {"from_attributes": True}
