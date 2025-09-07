@@ -3,7 +3,9 @@ from app.schemas.fee.fee_student_mapping_schema import (
     FeeStudentMappingCreate, 
     FeeStudentMappingRead, 
     FeeStudentMappingUpdate,
-    FeeStudentMappingList
+    FeeStudentMappingList,
+    FeeStudentMappingBulkCreate,
+    FeeStudentMappingBulkResponse
 )
 from app.db.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +14,8 @@ from app.service.fee.fee_student_mapping_service import (
     get_fee_student_mapping_by_id,
     get_all_fee_student_mappings,
     update_fee_student_mapping,
-    delete_fee_student_mapping
+    delete_fee_student_mapping,
+    create_bulk_fee_student_mappings
 )
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from typing import List, Optional
@@ -103,3 +106,19 @@ async def delete_fee_student_mapping_endpoint(
     await check_role_plan_permission_with_error(db, request, role, 'fee_student_mappings', 'delete')
     
     return await delete_fee_student_mapping(db, mapping_id)
+
+# Create Bulk Fee Student Mappings
+@router.post("/bulk", response_model=FeeStudentMappingBulkResponse, status_code=status.HTTP_201_CREATED)
+async def create_bulk_fee_student_mappings_endpoint(
+    request: Request,
+    bulk_data: FeeStudentMappingBulkCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Create fee mappings for multiple students from a class at once with comprehensive error handling"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    # Multi-layer permission check: Role + Plan validation (same permissions as single create)
+    await check_role_plan_permission_with_error(db, request, role, 'fee_student_mappings', 'create')
+    
+    return await create_bulk_fee_student_mappings(db, bulk_data)

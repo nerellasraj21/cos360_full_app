@@ -84,3 +84,39 @@ class FeeStudentMappingList(BaseModel):
     student_details: Optional[StudentDetailsRead] = None
     student_fee_mapping_terms: List[FeeStudentMapTermAmountRead] = []
     model_config = {"from_attributes": True}
+
+class FeeStudentMappingBulkCreate(BaseModel):
+    student_ids: List[UUID]
+    class_id: UUID
+    section_id: UUID
+    fee_type_id: UUID
+    total_fee: Decimal
+    academic_year_id: UUID
+    
+    @field_validator('total_fee')
+    def validate_total_fee(cls, v):
+        if v < 0:
+            raise ValueError('total_fee must be non-negative')
+        return v
+    
+    @field_validator('student_ids')
+    def validate_student_ids(cls, v):
+        if not v or len(v) == 0:
+            raise ValueError('at least one student_id is required')
+        if len(v) != len(set(v)):
+            raise ValueError('duplicate student_ids are not allowed')
+        return v
+
+class FeeStudentMappingBulkError(BaseModel):
+    student_id: UUID
+    student_name: Optional[str] = None
+    student_admission_num: Optional[str] = None
+    error: str
+    error_code: str
+
+class FeeStudentMappingBulkResponse(BaseModel):
+    success_count: int
+    total_count: int
+    created_mappings: List[FeeStudentMappingRead] = []
+    errors: List[FeeStudentMappingBulkError] = []
+    message: str

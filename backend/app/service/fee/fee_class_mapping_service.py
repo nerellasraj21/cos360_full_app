@@ -8,7 +8,7 @@ from app.models.fee.fee_class_mapping_model import FeeClassMapping as FeeClassMa
 from app.models.fee.fee_type_model import FeeType
 from app.models.masters.class_model import Class
 from app.models.masters.academic_year_model import AcademicYear
-from app.schemas.fee.fee_class_mapping_schema import FeeClassMappingCreate, FeeClassMappingUpdate
+from app.schemas.fee.fee_class_mapping_schema import FeeClassMappingCreate, FeeClassMappingUpdate, FeeClassMappingBulkCreate, FeeClassMappingBulkResponse, FeeClassMappingBulkError
 from typing import List, Optional
 from uuid import UUID
 
@@ -420,4 +420,137 @@ async def delete_fee_class_mapping(db: AsyncSession, mapping_id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while deleting fee class mapping"
+        )
+
+async def create_bulk_fee_class_mappings(db: AsyncSession, bulk_data: FeeClassMappingBulkCreate):
+    """Create fee mappings for multiple classes with comprehensive error handling"""
+    try:
+        # Validate fee type and academic year once (common to all mappings)
+        await validate_fee_type_exists(db, str(bulk_data.fee_type_id))
+        await validate_academic_year_exists(db, bulk_data.academic_year_id)
+        
+        created_mappings = []
+        errors = []
+        
+        # Process each class_id individually
+        for class_id in bulk_data.class_ids:
+            try:
+                # Validate class exists
+                class_obj = await validate_class_exists(db, class_id)
+                
+                # Check mapping uniqueness
+                await check_mapping_unique(
+                    db,
+                    class_id,
+                    str(bulk_data.fee_type_id),
+                    bulk_data.academic_year_id
+                )
+                
+                # Create individual mapping
+                db_mapping = FeeClassMappingModel(
+                    class_id=class_id,
+                    fee_type_id=bulk_data.fee_type_id,
+                    total_fee=bulk_data.total_fee,
+                    academic_year_id=bulk_data.academic_year_id,
+                    all_by_default=bulk_data.all_by_default
+                )
+                
+                db.add(db_mapping)
+                await db.flush()  # Flush to get the ID without committing
+                
+                # Load with relationships for response
+                result = await db.execute(
+                    select(FeeClassMappingModel)
+                    .options(
+                        selectinload(FeeClassMappingModel.class_ref),
+                        selectinload(FeeClassMappingModel.fee_type),
+                        selectinload(FeeClassMappingModel.academic_year),
+                        selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingModel.term_amounts.property.mapper.class_.fee_term)
+                    )
+                    .where(FeeClassMappingModel.id == db_mapping.id)
+                )
+                mapping = result.scalar_one()
+                
+                # Add relationship names to response
+                mapping.class_name = mapping.class_ref.name if mapping.class_ref else None
+                mapping.fee_type_name = mapping.fee_type.type_name if mapping.fee_type else None
+                mapping.academic_year_name = mapping.academic_year.title if mapping.academic_year else None
+                
+                # Add term names to term amounts
+                if hasattr(mapping, 'term_amounts'):
+                    for term_amount in mapping.term_amounts:
+                        term_amount.term_name = term_amount.fee_term.term_name if term_amount.fee_term else None
+                    mapping.class_fee_mapping_terms = mapping.term_amounts
+                else:
+                    mapping.class_fee_mapping_terms = []
+                
+                created_mappings.append(mapping)
+                
+            except HTTPException as he:
+                # Handle individual class errors without stopping bulk operation
+                class_name = None
+                try:
+                    class_result = await db.execute(select(Class).where(Class.id == class_id))
+                    class_obj = class_result.scalar_one_or_none()
+                    class_name = class_obj.name if class_obj else None
+                except:
+                    pass  # Class name is optional in error response
+                
+                error_code = "VALIDATION_ERROR"
+                if he.status_code == 404:
+                    error_code = "CLASS_NOT_FOUND"
+                elif he.status_code == 400 and "already exists" in he.detail:
+                    error_code = "DUPLICATE_MAPPING"
+                
+                errors.append(FeeClassMappingBulkError(
+                    class_id=class_id,
+                    class_name=class_name,
+                    error=he.detail,
+                    error_code=error_code
+                ))
+                
+            except Exception as e:
+                # Handle unexpected errors for individual classes
+                log.error(f"Unexpected error processing class {class_id}: {str(e)}")
+                errors.append(FeeClassMappingBulkError(
+                    class_id=class_id,
+                    class_name=None,
+                    error=f"Unexpected error: {str(e)}",
+                    error_code="SYSTEM_ERROR"
+                ))
+        
+        # Commit all successful mappings
+        if created_mappings:
+            await db.commit()
+        
+        # Prepare response message
+        total_count = len(bulk_data.class_ids)
+        success_count = len(created_mappings)
+        error_count = len(errors)
+        
+        if success_count == total_count:
+            message = f"Successfully created {success_count} fee class mappings"
+        elif success_count > 0:
+            message = f"Successfully created {success_count} out of {total_count} fee class mappings. {error_count} failed."
+        else:
+            message = f"Failed to create any fee class mappings. All {total_count} attempts failed."
+        
+        return FeeClassMappingBulkResponse(
+            success_count=success_count,
+            total_count=total_count,
+            created_mappings=created_mappings,
+            errors=errors,
+            message=message
+        )
+        
+    except HTTPException:
+        # Common validation errors (fee_type or academic_year not found)
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error in bulk fee class mapping creation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating bulk fee class mappings"
         )

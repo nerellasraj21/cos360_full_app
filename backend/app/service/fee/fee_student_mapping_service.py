@@ -13,7 +13,7 @@ from app.models.masters.admission_model import Admission
 from app.models.masters.class_model import Class
 from app.models.masters.sections_model import Section
 from app.models.masters.academic_year_model import AcademicYear
-from app.schemas.fee.fee_student_mapping_schema import FeeStudentMappingCreate, FeeStudentMappingUpdate
+from app.schemas.fee.fee_student_mapping_schema import FeeStudentMappingCreate, FeeStudentMappingUpdate, FeeStudentMappingBulkCreate, FeeStudentMappingBulkResponse, FeeStudentMappingBulkError
 from typing import List, Optional
 from uuid import UUID
 from decimal import Decimal
@@ -564,4 +564,188 @@ async def delete_fee_student_mapping(db: AsyncSession, mapping_id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while deleting fee student mapping"
+        )
+
+async def create_bulk_fee_student_mappings(db: AsyncSession, bulk_data: FeeStudentMappingBulkCreate):
+    """Create fee mappings for multiple students with comprehensive error handling"""
+    try:
+        # Validate common data once (class, section, fee_type, academic_year)
+        await validate_class_exists(db, bulk_data.class_id)
+        await validate_section_exists(db, bulk_data.section_id)
+        await validate_fee_type_exists(db, str(bulk_data.fee_type_id))
+        await validate_academic_year_exists(db, bulk_data.academic_year_id)
+        
+        created_mappings = []
+        errors = []
+        
+        # Process each student_id individually
+        for student_id in bulk_data.student_ids:
+            try:
+                # Get student details for the mapping (including admission number)
+                student_result = await db.execute(
+                    select(Student, Admission)
+                    .join(Admission, Student.id == Admission.student_id)
+                    .where(Student.id == student_id)
+                )
+                student_admission = student_result.first()
+                
+                if not student_admission:
+                    errors.append(FeeStudentMappingBulkError(
+                        student_id=student_id,
+                        student_name=None,
+                        student_admission_num=None,
+                        error=f"Student with id {student_id} not found or has no admission record",
+                        error_code="STUDENT_NOT_FOUND"
+                    ))
+                    continue
+                
+                student, admission = student_admission
+                
+                # Check mapping uniqueness
+                await check_mapping_unique(
+                    db,
+                    student_id,
+                    str(bulk_data.fee_type_id),
+                    bulk_data.academic_year_id
+                )
+                
+                # Create individual mapping
+                db_mapping = FeeStudentMappingModel(
+                    student_id=student_id,
+                    student_admission_num=admission.admission_number,
+                    class_id=bulk_data.class_id,
+                    section_id=bulk_data.section_id,
+                    fee_type_id=bulk_data.fee_type_id,
+                    total_fee=bulk_data.total_fee,
+                    academic_year_id=bulk_data.academic_year_id
+                )
+                
+                db.add(db_mapping)
+                await db.flush()  # Flush to get the ID without committing
+                
+                # Load with relationships for response
+                result = await db.execute(
+                    select(FeeStudentMappingModel)
+                    .options(
+                        selectinload(FeeStudentMappingModel.student).selectinload(Student.admissions),
+                        selectinload(FeeStudentMappingModel.class_ref),
+                        selectinload(FeeStudentMappingModel.section),
+                        selectinload(FeeStudentMappingModel.fee_type),
+                        selectinload(FeeStudentMappingModel.academic_year),
+                        selectinload(FeeStudentMappingModel.term_amounts).selectinload(FeeStudentMapTermAmountModel.fee_term)
+                    )
+                    .where(FeeStudentMappingModel.id == db_mapping.id)
+                )
+                mapping = result.scalar_one()
+                
+                # Add relationship names and student details
+                mapping.fee_type_name = mapping.fee_type.type_name if mapping.fee_type else None
+                mapping.academic_year_name = mapping.academic_year.title if mapping.academic_year else None
+                
+                # Add student details
+                if mapping.student:
+                    student_admission = mapping.student.admissions[0] if mapping.student.admissions else None
+                    mapping.student_details = {
+                        "student_id": mapping.student.id,
+                        "student_name": f"{mapping.student.first_name} {mapping.student.last_name}",
+                        "student_admission_number": student_admission.admission_number if student_admission else "",
+                        "student_class": {
+                            "id": mapping.class_ref.id,
+                            "name": mapping.class_ref.name
+                        } if mapping.class_ref else None,
+                        "student_section": {
+                            "id": mapping.section.id,
+                            "name": mapping.section.name
+                        } if mapping.section else None
+                    }
+                
+                # Add term names to term amounts
+                if hasattr(mapping, 'term_amounts'):
+                    for term_amount in mapping.term_amounts:
+                        term_amount.term_name = term_amount.fee_term.term_name if term_amount.fee_term else None
+                    mapping.student_fee_mapping_terms = mapping.term_amounts
+                else:
+                    mapping.student_fee_mapping_terms = []
+                
+                created_mappings.append(mapping)
+                
+            except HTTPException as he:
+                # Handle individual student errors without stopping bulk operation
+                student_name = None
+                student_admission_num = None
+                
+                try:
+                    # Try to get student name and admission number for error response
+                    student_result = await db.execute(
+                        select(Student, Admission)
+                        .join(Admission, Student.id == Admission.student_id, isouter=True)
+                        .where(Student.id == student_id)
+                    )
+                    student_data = student_result.first()
+                    if student_data:
+                        student, admission = student_data
+                        student_name = f"{student.first_name} {student.last_name}"
+                        student_admission_num = admission.admission_number if admission else None
+                except:
+                    pass  # Student name and admission num are optional in error response
+                
+                error_code = "VALIDATION_ERROR"
+                if he.status_code == 404:
+                    error_code = "STUDENT_NOT_FOUND"
+                elif he.status_code == 400 and "already exists" in he.detail:
+                    error_code = "DUPLICATE_MAPPING"
+                
+                errors.append(FeeStudentMappingBulkError(
+                    student_id=student_id,
+                    student_name=student_name,
+                    student_admission_num=student_admission_num,
+                    error=he.detail,
+                    error_code=error_code
+                ))
+                
+            except Exception as e:
+                # Handle unexpected errors for individual students
+                log.error(f"Unexpected error processing student {student_id}: {str(e)}")
+                errors.append(FeeStudentMappingBulkError(
+                    student_id=student_id,
+                    student_name=None,
+                    student_admission_num=None,
+                    error=f"Unexpected error: {str(e)}",
+                    error_code="SYSTEM_ERROR"
+                ))
+        
+        # Commit all successful mappings
+        if created_mappings:
+            await db.commit()
+        
+        # Prepare response message
+        total_count = len(bulk_data.student_ids)
+        success_count = len(created_mappings)
+        error_count = len(errors)
+        
+        if success_count == total_count:
+            message = f"Successfully created {success_count} fee student mappings"
+        elif success_count > 0:
+            message = f"Successfully created {success_count} out of {total_count} fee student mappings. {error_count} failed."
+        else:
+            message = f"Failed to create any fee student mappings. All {total_count} attempts failed."
+        
+        return FeeStudentMappingBulkResponse(
+            success_count=success_count,
+            total_count=total_count,
+            created_mappings=created_mappings,
+            errors=errors,
+            message=message
+        )
+        
+    except HTTPException:
+        # Common validation errors (class, section, fee_type, or academic_year not found)
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error in bulk fee student mapping creation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating bulk fee student mappings"
         )

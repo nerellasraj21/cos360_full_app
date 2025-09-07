@@ -1,24 +1,219 @@
-# COS360 API Documentation for Frontend Developers
+# COS360 API Documentation for Frontend Developers & Automation Testers
 
-## Base URL
-```
-http://localhost:8003
+## 🚀 Quick Start Guide
+
+### Environment Setup
+```bash
+# Clone and start the application
+git clone <repository-url>
+cd COS360
+pip install -r requirements.txt
+
+# Start development server
+uvicorn app.main:app --reload --port 8003
+
+# Database setup (if needed)
+alembic upgrade head
 ```
 
-## Authentication
-All protected endpoints require JWT authentication in the Authorization header:
+### Base URL
 ```
+Development: http://localhost:8003
+Production: https://your-domain.com
+```
+
+### Required Headers (ALL REQUESTS)
+```http
 Authorization: Bearer <your_jwt_token>
-```
-
-## Tenant Header
-All requests must include the tenant identifier:
-```
+Content-Type: application/json
 X-Client-Name: test_tenant
 ```
 
-## Response Format
-All endpoints return JSON responses with appropriate HTTP status codes:
+### Tenant Configuration
+Available test tenants:
+- `test_tenant` - Basic plan tenant for development
+- `test_basic` - Basic plan with limitations  
+- `default` - Enterprise plan with full access
+
+## 📊 Data Models & Schema Reference
+
+### Core Entity UUIDs (For Testing)
+```javascript
+// Sample UUIDs for testing - use these for consistent testing
+const TEST_ENTITIES = {
+  academic_year: "606ec4d2-f0e1-4262-bd06-9da9d1d8ee90",
+  classes: [
+    "550e8400-e29b-41d4-a716-446655440001", // Grade 10A
+    "550e8400-e29b-41d4-a716-446655440002", // Grade 10B
+    "550e8400-e29b-41d4-a716-446655440003"  // Grade 10C
+  ],
+  students: [
+    "550e8400-e29b-41d4-a716-446655441001", // John Doe
+    "550e8400-e29b-41d4-a716-446655441002", // Jane Smith  
+    "550e8400-e29b-41d4-a716-446655441003"  // Bob Wilson
+  ],
+  fee_types: [
+    "550e8400-e29b-41d4-a716-446655440010", // Tuition Fee
+    "550e8400-e29b-41d4-a716-446655440011"  // Lab Fee
+  ],
+  sections: [
+    "550e8400-e29b-41d4-a716-446655440101", // Section A
+    "550e8400-e29b-41d4-a716-446655440102"  // Section B
+  ]
+};
+```
+
+### Entity Relationships
+```
+Academic Year (1) → (N) Fee Categories → (N) Fee Types
+Class (1) → (N) Sections → (N) Students
+Fee Types + Classes = Fee Class Mappings
+Fee Types + Students = Fee Student Mappings
+Students (N) → (1) Admissions (admission_number)
+```
+
+### Common Field Types
+```javascript
+// UUID fields (string format)
+id: "550e8400-e29b-41d4-a716-446655440001"
+
+// Decimal fields (number format)  
+total_fee: 1500.00
+
+// Date fields (ISO string format)
+start_date: "2025-04-01"
+end_date: "2026-03-31"
+
+// Boolean fields
+is_active: true
+all_by_default: false
+```
+
+## 📋 Testing & Automation Guide
+
+### Postman Collection Setup
+```json
+// Environment Variables for Postman
+{
+  "base_url": "http://localhost:8003",
+  "admin_token": "{{admin_jwt_token}}",
+  "student_token": "{{student_jwt_token}}",
+  "tenant_name": "test_tenant",
+  "academic_year_id": "606ec4d2-f0e1-4262-bd06-9da9d1d8ee90"
+}
+```
+
+### Pre-request Script (Add to Postman Collection)
+```javascript
+// Auto-fetch JWT tokens before requests
+pm.sendRequest({
+    url: pm.environment.get("base_url") + "/api/v1/auth/test-jwt/admin-token",
+    method: 'GET',
+}, function (err, response) {
+    if (!err) {
+        const token = response.json().access_token;
+        pm.environment.set("admin_jwt_token", token);
+    }
+});
+```
+
+### Test Scenarios for Automation
+```javascript
+// 1. Authentication Test Cases
+const authTestCases = [
+  {
+    name: "Valid Admin Token",
+    token: "valid_admin_token",
+    expected: 200
+  },
+  {
+    name: "Invalid Token", 
+    token: "invalid_token",
+    expected: 401
+  },
+  {
+    name: "Missing Token",
+    token: null,
+    expected: 401
+  },
+  {
+    name: "Student Token on Admin Endpoint",
+    token: "valid_student_token",
+    expected: 403
+  }
+];
+
+// 2. Plan Limitation Test Cases  
+const planTestCases = [
+  {
+    tenant: "test_basic", // Basic plan
+    endpoint: "fee_categories",
+    action: "create",
+    expected: 402
+  },
+  {
+    tenant: "default", // Enterprise plan
+    endpoint: "fee_categories", 
+    action: "create",
+    expected: 201
+  }
+];
+
+// 3. Bulk Operations Test Cases
+const bulkTestCases = [
+  {
+    name: "All Success",
+    class_ids: ["uuid1", "uuid2", "uuid3"],
+    expected: { success_count: 3, total_count: 3 }
+  },
+  {
+    name: "Partial Success",
+    class_ids: ["valid_uuid", "invalid_uuid"], 
+    expected: { success_count: 1, total_count: 2 }
+  },
+  {
+    name: "All Failures",
+    class_ids: ["invalid1", "invalid2"],
+    expected: { success_count: 0, total_count: 2 }
+  }
+];
+```
+
+## Response Format & Error Handling
+
+### Standard Response Structure
+```json
+// Success Response (200/201)
+{
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "field1": "value1",
+  "field2": "value2",
+  "created_at": "2025-09-07T12:00:00Z"
+}
+
+// List Response (200)
+[
+  {
+    "id": "uuid1", 
+    "name": "Item 1"
+  },
+  {
+    "id": "uuid2",
+    "name": "Item 2" 
+  }
+]
+
+// Bulk Operation Response
+{
+  "success_count": 2,
+  "total_count": 3,
+  "created_mappings": [...],
+  "errors": [...],
+  "message": "Success summary"
+}
+```
+
+### HTTP Status Codes
 - `200` - Success (GET requests)
 - `201` - Created (POST requests)  
 - `401` - Unauthorized (Missing/invalid token)
@@ -27,6 +222,379 @@ All endpoints return JSON responses with appropriate HTTP status codes:
 - `404` - Not Found
 - `422` - Validation Error
 - `500` - Server Error
+
+### Complete Error Reference
+
+#### 401 Unauthorized
+```json
+{
+  "detail": "Not authenticated"
+}
+```
+
+#### 403 Forbidden  
+```json
+{
+  "detail": "Insufficient permissions: Student cannot create academic_years"
+}
+```
+
+#### 402 Plan Limitation
+```json
+{
+  "error": "plan_limitation",
+  "message": "This feature requires a Premium plan upgrade", 
+  "current_plan": "Basic",
+  "required_plan": "Premium",
+  "resource": "fee_categories",
+  "action": "create",
+  "upgrade_available": true
+}
+```
+
+#### 404 Not Found
+```json
+{
+  "detail": "Academic year with id 550e8400-e29b-41d4-a716-446655440001 not found"
+}
+```
+
+#### 422 Validation Errors
+```json
+{
+  "detail": [
+    {
+      "type": "value_error",
+      "loc": ["body", "total_fee"], 
+      "msg": "Value error, total_fee must be non-negative",
+      "input": -100.0,
+      "ctx": {"error": {}}
+    },
+    {
+      "type": "missing",
+      "loc": ["body", "academic_year_id"],
+      "msg": "Field required"
+    }
+  ]
+}
+```
+
+#### 500 Server Error
+```json
+{
+  "detail": "An error occurred while processing your request"
+}
+```
+
+### Business Logic Error Patterns
+```json
+// Duplicate Record
+{
+  "detail": "Academic year with title 'Test Year' already exists for this period"
+}
+
+// Related Record Not Found
+{
+  "detail": "Fee type with id 550e8400-e29b-41d4-a716-446655440010 not found" 
+}
+
+// Business Rule Violation
+{
+  "detail": "Cannot delete academic year: active fee mappings exist"
+}
+
+// Bulk Operation Errors
+{
+  "success_count": 1,
+  "total_count": 3,
+  "errors": [
+    {
+      "class_id": "550e8400-e29b-41d4-a716-446655440002",
+      "class_name": "Grade 10B",
+      "error": "Fee mapping already exists for this combination",
+      "error_code": "DUPLICATE_MAPPING"
+    },
+    {
+      "class_id": "550e8400-e29b-41d4-a716-446655440003", 
+      "error": "Class not found",
+      "error_code": "CLASS_NOT_FOUND"
+    }
+  ]
+}
+```
+
+## ⚡ Performance & Rate Limiting
+
+### Response Time Expectations
+```javascript
+// Expected response times (95th percentile)
+const performanceExpectations = {
+  "GET /single-record": "< 200ms",
+  "GET /list": "< 500ms", 
+  "POST /create": "< 300ms",
+  "PUT /update": "< 300ms",
+  "DELETE /delete": "< 200ms",
+  "POST /bulk": "< 2000ms" // Bulk operations
+};
+```
+
+### Rate Limiting
+```http
+# Current rate limits (per IP address)
+Rate-Limit: 1000 requests per hour
+Rate-Limit-Remaining: 995
+Rate-Limit-Reset: 1694123456
+
+# When rate limit exceeded (HTTP 429)
+{
+  "detail": "Rate limit exceeded. Try again in 3600 seconds.",
+  "retry_after": 3600
+}
+```
+
+### Pagination (For List Endpoints)
+```javascript
+// Large datasets automatically paginated
+// Use query parameters for pagination
+const paginationParams = {
+  page: 1,        // Page number (default: 1)
+  per_page: 50,   // Items per page (default: 50, max: 100)
+  sort_by: "created_at",  // Sort field
+  sort_order: "desc"      // asc or desc
+};
+
+// Response includes pagination metadata
+{
+  "data": [...],
+  "pagination": {
+    "page": 1,
+    "per_page": 50,
+    "total": 250,
+    "pages": 5,
+    "has_next": true,
+    "has_prev": false
+  }
+}
+```
+
+### Caching Headers
+```http
+# GET endpoints include caching headers
+Cache-Control: public, max-age=300
+ETag: "abc123def456"
+Last-Modified: Mon, 07 Sep 2025 12:00:00 GMT
+
+# Use conditional requests for efficiency
+If-None-Match: "abc123def456"
+If-Modified-Since: Mon, 07 Sep 2025 12:00:00 GMT
+```
+
+## 🧪 Frontend Integration Patterns
+
+### React/JavaScript Examples
+```javascript
+// 1. API Service Class
+class COS360API {
+  constructor(baseURL, authToken, tenantName) {
+    this.baseURL = baseURL;
+    this.authToken = authToken;
+    this.tenantName = tenantName;
+  }
+
+  async request(endpoint, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    const config = {
+      headers: {
+        'Authorization': `Bearer ${this.authToken}`,
+        'Content-Type': 'application/json',
+        'X-Client-Name': this.tenantName,
+        ...options.headers
+      },
+      ...options
+    };
+
+    try {
+      const response = await fetch(url, config);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new APIError(data, response.status);
+      }
+
+      return data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  handleError(error) {
+    if (error instanceof APIError) {
+      return error;
+    }
+    
+    // Network or other errors
+    return new APIError({ detail: 'Network error occurred' }, 0);
+  }
+
+  // Academic Years
+  async getAcademicYears() {
+    return this.request('/api/v1/masters/academic_years/');
+  }
+
+  async createAcademicYear(data) {
+    return this.request('/api/v1/masters/academic_years/', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  // Bulk Operations
+  async createBulkFeeClassMappings(data) {
+    return this.request('/api/v1/fee/class-mappings/bulk', {
+      method: 'POST', 
+      body: JSON.stringify(data)
+    });
+  }
+}
+
+// 2. Custom Error Class
+class APIError extends Error {
+  constructor(errorData, statusCode) {
+    super(errorData.detail || errorData.message || 'API Error');
+    this.statusCode = statusCode;
+    this.errorData = errorData;
+    
+    // Plan limitation error
+    if (statusCode === 402) {
+      this.isPlanLimitation = true;
+      this.currentPlan = errorData.current_plan;
+      this.requiredPlan = errorData.required_plan;
+    }
+    
+    // Validation error
+    if (statusCode === 422) {
+      this.isValidationError = true;
+      this.validationErrors = errorData.detail;
+    }
+  }
+}
+
+// 3. React Hook for API Integration
+function useAPI() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const apiCall = async (apiMethod, ...args) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await apiMethod(...args);
+      setLoading(false);
+      return result;
+    } catch (err) {
+      setError(err);
+      setLoading(false);
+      
+      // Handle specific error types
+      if (err.isPlanLimitation) {
+        // Show upgrade modal
+        showUpgradeModal(err.currentPlan, err.requiredPlan);
+      } else if (err.isValidationError) {
+        // Show validation errors
+        showValidationErrors(err.validationErrors);
+      }
+      
+      throw err;
+    }
+  };
+
+  return { loading, error, apiCall };
+}
+
+// 4. Component Usage Example
+function AcademicYearManager() {
+  const { loading, error, apiCall } = useAPI();
+  const [academicYears, setAcademicYears] = useState([]);
+
+  useEffect(() => {
+    loadAcademicYears();
+  }, []);
+
+  const loadAcademicYears = async () => {
+    try {
+      const years = await apiCall(api.getAcademicYears);
+      setAcademicYears(years);
+    } catch (err) {
+      console.error('Failed to load academic years:', err);
+    }
+  };
+
+  const createYear = async (yearData) => {
+    try {
+      const newYear = await apiCall(api.createAcademicYear, yearData);
+      setAcademicYears([...academicYears, newYear]);
+      showSuccessMessage('Academic year created successfully');
+    } catch (err) {
+      // Error handling is done in useAPI hook
+    }
+  };
+
+  if (loading) return <LoadingSpinner />;
+  
+  return (
+    <div>
+      {error && <ErrorMessage error={error} />}
+      <AcademicYearList years={academicYears} />
+      <CreateYearForm onSubmit={createYear} />
+    </div>
+  );
+}
+```
+
+### Validation Helper Functions
+```javascript
+// Field validation helpers
+const validators = {
+  uuid: (value) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(value);
+  },
+  
+  positiveDecimal: (value) => {
+    return typeof value === 'number' && value >= 0;
+  },
+  
+  dateString: (value) => {
+    return !isNaN(Date.parse(value));
+  },
+  
+  nonEmptyArray: (value) => {
+    return Array.isArray(value) && value.length > 0;
+  }
+};
+
+// Form validation example
+function validateBulkClassMapping(data) {
+  const errors = {};
+  
+  if (!validators.nonEmptyArray(data.class_ids)) {
+    errors.class_ids = 'At least one class must be selected';
+  } else if (!data.class_ids.every(validators.uuid)) {
+    errors.class_ids = 'All class IDs must be valid UUIDs';
+  }
+  
+  if (!validators.uuid(data.fee_type_id)) {
+    errors.fee_type_id = 'Fee type ID must be a valid UUID';
+  }
+  
+  if (!validators.positiveDecimal(data.total_fee)) {
+    errors.total_fee = 'Total fee must be a positive number';
+  }
+  
+  return Object.keys(errors).length ? errors : null;
+}
+```
 
 ## Plan-Based Access Control (NEW)
 All endpoints now support subscription-based access control with 4 plan tiers:
@@ -2036,11 +2604,436 @@ X-Client-Name: tenant_name
 - ✅ Admin role required
 - ✅ Enterprise plan required
 
+## Resource Permission Management ⚙️
+**Base URL:** `/api/v1/auth/resource-permissions`  
+**Permissions:** Admin only (critical system administration)
+**Plan Required:** Enterprise
+
+### Create Resource Permission
+```http
+POST /api/v1/auth/resource-permissions/
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+Content-Type: application/json
+
+{
+  "role_id": "550e8400-e29b-41d4-a716-446655440000",
+  "resource": "fee_categories",
+  "action": "create",
+  "is_granted": true
+}
+```
+**Multi-Layer Security:**
+- ✅ JWT Authentication required
+- ✅ Admin role required
+- ✅ Enterprise plan required
+
+### List All Resource Permissions
+```http
+GET /api/v1/auth/resource-permissions/?skip=0&limit=100
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+```
+
+### Get Permissions by Role
+```http
+GET /api/v1/auth/resource-permissions/role/{role_id}
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+```
+
+### Get Permissions by Resource
+```http
+GET /api/v1/auth/resource-permissions/resource/fee_categories
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+```
+
+### Bulk Create Permissions
+```http
+POST /api/v1/auth/resource-permissions/bulk
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+Content-Type: application/json
+
+{
+  "role_id": "550e8400-e29b-41d4-a716-446655440000",
+  "permissions": [
+    {
+      "resource": "students",
+      "action": "create",
+      "is_granted": true
+    },
+    {
+      "resource": "students", 
+      "action": "read",
+      "is_granted": true
+    }
+  ]
+}
+```
+
+### Get Role Permission Summary
+```http
+GET /api/v1/auth/resource-permissions/role/{role_id}/summary
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+```
+
+### Get Permission Matrix
+```http
+GET /api/v1/auth/resource-permissions/matrix/all
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+```
+
+### Update Resource Permission
+```http
+PUT /api/v1/auth/resource-permissions/{permission_id}
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+Content-Type: application/json
+
+{
+  "is_granted": false
+}
+```
+
+### Delete Resource Permission
+```http
+DELETE /api/v1/auth/resource-permissions/{permission_id}
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+```
+
+### Delete All Permissions for Role
+```http
+DELETE /api/v1/auth/resource-permissions/role/{role_id}/all
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+```
+
+### Get Available Resources (Dropdown)
+```http
+GET /api/v1/auth/resource-permissions/dropdown/resources
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+```
+
+### Get Available Actions (Dropdown)
+```http
+GET /api/v1/auth/resource-permissions/dropdown/actions
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+```
+
+### Check Permission Exists
+```http
+GET /api/v1/auth/resource-permissions/check/{role_id}/fee_categories/create
+Authorization: Bearer <admin_token>
+X-Client-Name: tenant_name
+```
+
+**Response:**
+```json
+{
+  "role_id": "550e8400-e29b-41d4-a716-446655440000",
+  "resource": "fee_categories",
+  "action": "create",
+  "permission_granted": true
+}
+```
+
 ---
 
-## 🎉 COMPLETE! All Modules Secured with Plan-Based Filtering
+## 📦 BULK OPERATIONS - Fee Management Efficiency Enhancement
 
-**🏆 FINAL SYSTEM STATUS:** All endpoint modules have been successfully secured with multi-layer validation!
+### **🚀 NEW: Bulk Fee Class Mapping**
+
+**Purpose**: Map a single fee type to multiple classes at once to reduce user interactions.
+
+#### Create Bulk Fee Class Mappings
+```http
+POST /api/v1/fee/class-mappings/bulk
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+X-Client-Name: tenant_name
+
+{
+  "class_ids": [
+    "550e8400-e29b-41d4-a716-446655440001",
+    "550e8400-e29b-41d4-a716-446655440002",
+    "550e8400-e29b-41d4-a716-446655440003"
+  ],
+  "fee_type_id": "550e8400-e29b-41d4-a716-446655440010",
+  "total_fee": 1500.00,
+  "academic_year_id": "606ec4d2-f0e1-4262-bd06-9da9d1d8ee90",
+  "all_by_default": false
+}
+```
+
+**Response (Partial Success Example):**
+```json
+{
+  "success_count": 2,
+  "total_count": 3,
+  "created_mappings": [
+    {
+      "id": "mapping-uuid-1",
+      "class_id": "550e8400-e29b-41d4-a716-446655440001",
+      "class_name": "Grade 10A",
+      "fee_type_id": "550e8400-e29b-41d4-a716-446655440010",
+      "fee_type_name": "Tuition Fee",
+      "total_fee": 1500.00,
+      "academic_year_id": "606ec4d2-f0e1-4262-bd06-9da9d1d8ee90",
+      "academic_year_name": "2025-26",
+      "all_by_default": false,
+      "class_fee_mapping_terms": []
+    },
+    {
+      "id": "mapping-uuid-2", 
+      "class_id": "550e8400-e29b-41d4-a716-446655440002",
+      "class_name": "Grade 10B",
+      "fee_type_name": "Tuition Fee",
+      "total_fee": 1500.00
+    }
+  ],
+  "errors": [
+    {
+      "class_id": "550e8400-e29b-41d4-a716-446655440003",
+      "class_name": "Grade 10C",
+      "error": "Fee class mapping already exists for this combination of class, fee type, and academic year",
+      "error_code": "DUPLICATE_MAPPING"
+    }
+  ],
+  "message": "Successfully created 2 out of 3 fee class mappings. 1 failed."
+}
+```
+
+**Validation Rules:**
+- `class_ids`: Must contain at least 1 UUID, no duplicates allowed
+- `total_fee`: Must be non-negative
+- All referenced entities (classes, fee_type, academic_year) must exist
+- Duplicate mappings for same class+fee_type+academic_year combination rejected
+
+### **🚀 NEW: Bulk Fee Student Mapping**
+
+**Purpose**: Map fees to multiple students from a class at once with comprehensive student details.
+
+#### Create Bulk Fee Student Mappings
+```http
+POST /api/v1/fee/student-mappings/bulk
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+X-Client-Name: tenant_name
+
+{
+  "student_ids": [
+    "550e8400-e29b-41d4-a716-446655441001", 
+    "550e8400-e29b-41d4-a716-446655441002",
+    "550e8400-e29b-41d4-a716-446655441003"
+  ],
+  "class_id": "550e8400-e29b-41d4-a716-446655440001",
+  "section_id": "550e8400-e29b-41d4-a716-446655440101", 
+  "fee_type_id": "550e8400-e29b-41d4-a716-446655440010",
+  "total_fee": 1500.00,
+  "academic_year_id": "606ec4d2-f0e1-4262-bd06-9da9d1d8ee90"
+}
+```
+
+**Response (Partial Success Example):**
+```json
+{
+  "success_count": 2,
+  "total_count": 3,
+  "created_mappings": [
+    {
+      "id": "student-mapping-uuid-1",
+      "student_id": "550e8400-e29b-41d4-a716-446655441001",
+      "student_admission_num": "ADM2025001",
+      "class_id": "550e8400-e29b-41d4-a716-446655440001",
+      "section_id": "550e8400-e29b-41d4-a716-446655440101",
+      "fee_type_id": "550e8400-e29b-41d4-a716-446655440010",
+      "total_fee": 1500.00,
+      "academic_year_id": "606ec4d2-f0e1-4262-bd06-9da9d1d8ee90",
+      "student_details": {
+        "student_id": "550e8400-e29b-41d4-a716-446655441001",
+        "student_name": "John Doe",
+        "student_admission_number": "ADM2025001",
+        "student_class": {
+          "id": "550e8400-e29b-41d4-a716-446655440001",
+          "name": "Grade 10"
+        },
+        "student_section": {
+          "id": "550e8400-e29b-41d4-a716-446655440101", 
+          "name": "Section A"
+        }
+      },
+      "fee_type_name": "Tuition Fee",
+      "academic_year_name": "2025-26",
+      "student_fee_mapping_terms": []
+    },
+    {
+      "id": "student-mapping-uuid-2",
+      "student_id": "550e8400-e29b-41d4-a716-446655441002",
+      "student_details": {
+        "student_name": "Jane Smith",
+        "student_admission_number": "ADM2025002"
+      },
+      "total_fee": 1500.00
+    }
+  ],
+  "errors": [
+    {
+      "student_id": "550e8400-e29b-41d4-a716-446655441003",
+      "student_name": "Bob Wilson",
+      "student_admission_num": "ADM2025003", 
+      "error": "Fee student mapping already exists for this combination of student, fee type, and academic year",
+      "error_code": "DUPLICATE_MAPPING"
+    }
+  ],
+  "message": "Successfully created 2 out of 3 fee student mappings. 1 failed."
+}
+```
+
+**Validation Rules:**
+- `student_ids`: Must contain at least 1 UUID, no duplicates allowed
+- `total_fee`: Must be non-negative
+- All referenced entities (students, class, section, fee_type, academic_year) must exist
+- Students must have valid admission records
+- Duplicate mappings for same student+fee_type+academic_year combination rejected
+
+### **JavaScript Usage Examples**
+
+#### Bulk Fee Class Mapping
+```javascript
+// Create bulk fee class mappings
+async function createBulkFeeClassMappings(authToken, tenantName, mappingData) {
+  try {
+    const response = await fetch('/api/v1/fee/class-mappings/bulk', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+        'X-Client-Name': tenantName
+      },
+      body: JSON.stringify(mappingData)
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log(`✅ Success: ${result.success_count}/${result.total_count} mappings created`);
+      console.log('Created mappings:', result.created_mappings);
+      
+      if (result.errors.length > 0) {
+        console.log('⚠️ Errors occurred:', result.errors);
+      }
+    } else {
+      console.error('❌ Request failed:', result.detail);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Network error:', error);
+    throw error;
+  }
+}
+
+// Usage
+const bulkClassMapping = {
+  class_ids: ['class-uuid-1', 'class-uuid-2', 'class-uuid-3'],
+  fee_type_id: 'fee-type-uuid',
+  total_fee: 1500.00,
+  academic_year_id: 'academic-year-uuid',
+  all_by_default: false
+};
+
+createBulkFeeClassMappings(adminToken, 'my_school', bulkClassMapping);
+```
+
+#### Bulk Fee Student Mapping
+```javascript
+// Create bulk fee student mappings
+async function createBulkFeeStudentMappings(authToken, tenantName, mappingData) {
+  try {
+    const response = await fetch('/api/v1/fee/student-mappings/bulk', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+        'X-Client-Name': tenantName
+      },
+      body: JSON.stringify(mappingData)
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log(`✅ Success: ${result.success_count}/${result.total_count} student mappings created`);
+      console.log('Created mappings:', result.created_mappings);
+      
+      // Log student details
+      result.created_mappings.forEach(mapping => {
+        if (mapping.student_details) {
+          console.log(`📝 Mapped fee to: ${mapping.student_details.student_name} (${mapping.student_details.student_admission_number})`);
+        }
+      });
+      
+      if (result.errors.length > 0) {
+        console.log('⚠️ Errors occurred:');
+        result.errors.forEach(error => {
+          console.log(`  - ${error.student_name || error.student_id}: ${error.error}`);
+        });
+      }
+    } else {
+      console.error('❌ Request failed:', result.detail);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Network error:', error);
+    throw error;
+  }
+}
+
+// Usage
+const bulkStudentMapping = {
+  student_ids: ['student-uuid-1', 'student-uuid-2', 'student-uuid-3'],
+  class_id: 'class-uuid',
+  section_id: 'section-uuid',
+  fee_type_id: 'fee-type-uuid',
+  total_fee: 1500.00,
+  academic_year_id: 'academic-year-uuid'
+};
+
+createBulkFeeStudentMappings(adminToken, 'my_school', bulkStudentMapping);
+```
+
+### **Error Handling Patterns**
+
+#### Common Error Codes
+- `VALIDATION_ERROR`: General validation failure
+- `STUDENT_NOT_FOUND` / `CLASS_NOT_FOUND`: Referenced entity doesn't exist
+- `DUPLICATE_MAPPING`: Mapping already exists for the combination
+- `SYSTEM_ERROR`: Unexpected server error
+
+#### Permission-Based Errors
+- **HTTP 401**: Missing or invalid authentication token
+- **HTTP 403**: Insufficient role permissions (only Admin can create mappings)
+- **HTTP 402**: Plan limitation (requires appropriate subscription tier)
+
+#### Best Practices
+1. **Always check the `success_count` vs `total_count`** to detect partial failures
+2. **Handle the `errors` array** to provide user-friendly feedback about failures
+3. **Use the error codes** to implement specific retry or correction logic
+4. **Display student names and details** from error responses for better user experience
+
+---
+
+## 🎉 COMPLETE! All Modules Secured with Plan-Based Filtering + Admin Tools + Bulk Operations
+
+**🏆 FINAL SYSTEM STATUS:** All endpoint modules have been successfully secured with multi-layer validation and enhanced with efficient bulk operations!
 
 ### Security Implementation Summary
 - ✅ **JWT Authentication** - Bearer token validation
@@ -2048,13 +3041,19 @@ X-Client-Name: tenant_name
 - ✅ **Plan-Based Filtering** - Subscription tier enforcement
 - ✅ **Multi-Tenant Support** - Tenant-specific database schemas
 
-### Modules Protected (Latest Update: Auth Module ✅)
+### Modules Protected (Latest Update: Bulk Operations ✅)
 1. **Academic Years** - Basic subscription tier access ✅ SECURED
-2. **Fee Management** - Standard+ tier for financial operations ✅ SECURED  
+2. **Fee Management** - Standard+ tier for financial operations ✅ SECURED + **BULK OPERATIONS**  
 3. **Masters Module** - Variable tier requirements ✅ SECURED
 4. **Student Module** - Basic to Enterprise tiers based on feature ✅ SECURED
 5. **Transport Module** - Premium+ for advanced features ✅ SECURED
 6. **Auth Module** - Enterprise tier for admin system configurations ✅ SECURED
+
+### Enhanced Feature Summary
+- **🔐 Security**: Multi-layer JWT + Role + Plan validation on **all endpoints**
+- **📦 Bulk Operations**: Efficient bulk fee mapping reduces user interaction time
+- **🏗️ Admin Tools**: Complete permission management for enterprise subscribers
+- **🌐 Multi-Tenant**: Full tenant isolation with subscription-based feature gating
 
 ### Plan Tier Feature Matrix
 | Feature Category | Basic | Standard | Premium | Enterprise |
