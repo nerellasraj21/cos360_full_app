@@ -10,7 +10,7 @@ from sqlalchemy import update, delete
 from app.service.masters.transport import add_route, get_all_routes, get_each_route_by_id, deactivate_route, update__all_details_route, update_partial_details_route
 from app.service.masters.transport.routes_service import get_stops_by_route_name, get_routes_dropdown
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_create
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
 router = APIRouter(prefix="/masters/routes", tags=["Masters/Routes"])
 
@@ -20,12 +20,8 @@ async def create_route(request: Request, data: RouteCreate, db: AsyncSession = D
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'routes', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot create routes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'routes', 'create')
     
     return await add_route(data,db)
 
@@ -34,12 +30,8 @@ async def get_routes(request: Request, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'routes', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list routes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'routes', 'list')
     
     return await get_all_routes(db)
 
@@ -48,12 +40,8 @@ async def get_route_by_id(request: Request, route_id: int, db: AsyncSession = De
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'routes', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot read routes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'routes', 'read')
     
     return await get_each_route_by_id(route_id,db)
 
@@ -62,12 +50,8 @@ async def update_route(request: Request, route_id: int, data: RouteCreate, db: A
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'routes', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot update routes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'routes', 'update')
     
     return await update__all_details_route(route_id,data,db)
 
@@ -76,12 +60,8 @@ async def patch_route(request: Request, route_id: int, data: RouteUpdate, db: As
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'routes', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot update routes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'routes', 'update')
     
     return await update_partial_details_route(route_id,data,db)
 
@@ -90,12 +70,8 @@ async def delete_route(request: Request, route_id: int, db: AsyncSession = Depen
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'routes', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot delete routes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'routes', 'delete')
     
     return await deactivate_route(route_id,db)
 
@@ -106,12 +82,8 @@ async def get_routes_dropdown_endpoint(request: Request, active_only: bool = Tru
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'routes', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list routes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'routes', 'list')
     
     return await get_routes_dropdown(db, active_only)
 
@@ -120,11 +92,7 @@ async def fetch_stops_by_route_name(request: Request, route_name: str = Query(..
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'routes', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot read routes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'routes', 'read')
     
     return await get_stops_by_route_name(route_name, db)

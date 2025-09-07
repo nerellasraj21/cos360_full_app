@@ -10,7 +10,7 @@ from app.service.fee.fee_term_service import (
     delete_fee_term_with_dates,
     delete_fee_term_date
 )
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from typing import List
 
 router = APIRouter(prefix="/fee/terms", tags=["Fee/Fee Terms & Dates"])
@@ -26,12 +26,8 @@ async def create_fee_term(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_terms', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot create fee_terms"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_terms', 'create')
     
     return await create_fee_term_with_dates(db, fee_term_data)
 
@@ -45,12 +41,8 @@ async def get_all_fee_terms_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_terms', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list fee_terms"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_terms', 'list')
     
     return await get_all_fee_terms(db)
 
@@ -65,12 +57,8 @@ async def get_fee_term_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_terms', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot read fee_terms"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_terms', 'read')
     
     return await get_fee_term_with_dates(db, fee_term_id)
 
@@ -86,12 +74,8 @@ async def update_fee_term_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_terms', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot update fee_terms"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_terms', 'update')
     
     return await update_fee_term_with_dates(db, fee_term_id, fee_term_data)
 
@@ -106,12 +90,8 @@ async def delete_fee_term_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_terms', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot delete fee_terms"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_terms', 'delete')
     
     return await delete_fee_term_with_dates(db, fee_term_id)
 
@@ -126,11 +106,7 @@ async def delete_fee_term_date_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_terms', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot delete fee_terms"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_terms', 'delete')
     
     return await delete_fee_term_date(db, fee_term_date_id)

@@ -7,7 +7,7 @@ from app.service.masters.timetable_service import update_all_details_timetable_s
 
 from app.db.session import get_db
 from typing import List
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
 router = APIRouter(prefix="/students/timetable", tags=["Student/Timetable"])
 
@@ -25,12 +25,8 @@ async def create_full_timetable(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'timetable_management', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot create timetable_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'timetable_management', 'create')
     
     return await add_full_timetable(data, db)
 
@@ -83,12 +79,8 @@ async def fetch_timetable_by_section(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'timetable_management', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot read timetable_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'timetable_management', 'read')
     
     return await get_timetable_by_section(section_id, db)
 
@@ -120,11 +112,7 @@ async def bulk_patch_slots(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'timetable_management', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot update timetable_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'timetable_management', 'update')
     
     return await bulk_update_timetable_slots(data, db)

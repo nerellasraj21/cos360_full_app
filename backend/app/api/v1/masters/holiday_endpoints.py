@@ -9,7 +9,7 @@ from app.service.masters.holiday_service import get_holidays_dropdown
 from app.db.session import get_db
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_create
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
 router = APIRouter(prefix="/masters/holidays", tags=["Masters/Holidays"])
 
@@ -20,12 +20,8 @@ async def create(request: Request, holiday: HolidayCreate, db: AsyncSession = De
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'holiday_management', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot create holiday_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'holiday_management', 'create')
     
     return await holiday_service.create_holiday(db, holiday)
 
@@ -35,12 +31,8 @@ async def list(request: Request, skip: int = 0, limit: int = 10, active_only: bo
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'holiday_management', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot list holiday_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'holiday_management', 'list')
     
     return await holiday_service.get_all_holidays(db, skip, limit, active_only, academic_year_id)
 
@@ -51,12 +43,8 @@ async def get_holidays_dropdown_endpoint(request: Request, active_only: bool = T
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'holiday_management', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot list holiday_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'holiday_management', 'list')
     
     return await get_holidays_dropdown(db, active_only)
 
@@ -66,12 +54,8 @@ async def read(holiday_id: int, request: Request, db: AsyncSession = Depends(get
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'holiday_management', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot read holiday_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'holiday_management', 'read')
     
     holiday = await holiday_service.get_holiday_by_id(db, holiday_id)
     if not holiday:
@@ -84,12 +68,8 @@ async def update(holiday_id: int, holiday_update: HolidayUpdate, request: Reques
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'holiday_management', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot update holiday_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'holiday_management', 'update')
     
     updated_holiday = await holiday_service.update_holiday(db, holiday_id, holiday_update)
     if not updated_holiday:
@@ -102,12 +82,8 @@ async def deactivate(holiday_id: int, request: Request, db: AsyncSession = Depen
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'holiday_management', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot delete holiday_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'holiday_management', 'delete')
     
     holiday = await holiday_service.deactivate_holiday(db, holiday_id)
     if not holiday:
@@ -120,12 +96,8 @@ async def activate(holiday_id: int, request: Request, db: AsyncSession = Depends
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'holiday_management', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot update holiday_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'holiday_management', 'update')
     
     holiday = await holiday_service.activate_holiday(db, holiday_id)
     if not holiday:

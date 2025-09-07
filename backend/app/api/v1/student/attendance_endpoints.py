@@ -7,7 +7,7 @@ from app.schemas.student.attendance_schema import (
     StudentAttendanceUpdate
 )
 from app.service.student.student_attendance_service import add_attendance, get_attendance_by_id, get_attendances, delete_attendance_data, update_partial_details_attendance
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
 router = APIRouter(prefix="/student/attendance", tags=["Student/Student Attendance"])
 
@@ -18,12 +18,8 @@ async def create_attendance(attendance: StudentAttendanceCreate, request: Reques
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_attendance', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot create student_attendance"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_attendance', 'create')
     
     try:
         return await add_attendance(attendance, db)
@@ -38,12 +34,8 @@ async def get_all_attendance(request: Request, db: AsyncSession = Depends(get_db
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_attendance', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot list student_attendance"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_attendance', 'list')
     
     return await get_attendances(db)
 
@@ -54,12 +46,8 @@ async def get_attendance(attendance_id: int, request: Request, db: AsyncSession 
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_attendance', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot read student_attendance"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_attendance', 'read')
     
     return await get_attendance_by_id(attendance_id,db)
 
@@ -70,12 +58,8 @@ async def update_attendance(attendance_id: int, update_data: StudentAttendanceUp
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_attendance', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot update student_attendance"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_attendance', 'update')
     
     return await update_partial_details_attendance(attendance_id,update_data,db)
 
@@ -86,11 +70,7 @@ async def delete_attendance(attendance_id: int, request: Request, db: AsyncSessi
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_attendance', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot delete student_attendance"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_attendance', 'delete')
     
     return await delete_attendance_data(attendance_id,db)

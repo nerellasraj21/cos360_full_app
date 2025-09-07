@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status, Request, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from app.schemas.student.student_transport_schema import (
     StudentTransportCreate,
     StudentTransportUpdate,
@@ -22,12 +22,8 @@ async def create_student_transport(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_transport', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot create student_transport"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_transport', 'create')
     
     return await add_student_transport(data,db)
 
@@ -36,12 +32,8 @@ async def get_all_transport_assignments(request: Request, db: AsyncSession = Dep
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_transport', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list student_transport"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_transport', 'list')
     
     return await get_transport_assignments(db)
 
@@ -51,12 +43,8 @@ async def get_transport_by_student(request: Request, student_id: int, db: AsyncS
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_transport', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot read student_transport"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_transport', 'read')
     
     return await get_transport_by_student_id(student_id,db)
 
@@ -71,12 +59,8 @@ async def update_transport_assignment(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_transport', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot update student_transport"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_transport', 'update')
     
     return await update_partial_details_transport_assignment(transport_id,updates,db)
 
@@ -86,11 +70,7 @@ async def delete_transport_assignment(request: Request, transport_id: int, db: A
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_transport', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot delete student_transport"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_transport', 'delete')
     
     return await unassign_transport(transport_id,db)

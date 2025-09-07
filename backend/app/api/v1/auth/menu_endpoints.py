@@ -4,9 +4,9 @@ from app.service.auth import create_menu, get_all_menus
 from app.schemas.auth import MenuCreate, MenuRead
 from app.db.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["Auth/Menus"])
 
 @router.post("/menus/", response_model=MenuRead, status_code=status.HTTP_201_CREATED)
 async def create_menu_endpoint(menu: MenuCreate, request: Request, db: AsyncSession = Depends(get_db)):
@@ -14,12 +14,8 @@ async def create_menu_endpoint(menu: MenuCreate, request: Request, db: AsyncSess
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'menu_management', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot create menu_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'menu_management', 'create')
     
     return await create_menu(db, menu)
 
@@ -29,11 +25,7 @@ async def get_menus_endpoint(request: Request, db: AsyncSession = Depends(get_db
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'menu_management', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot list menu_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'menu_management', 'list')
     
     return await get_all_menus(db)

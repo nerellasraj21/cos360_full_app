@@ -6,7 +6,7 @@ from app.schemas.masters.sections_schema import ClassSectionInfo,SectionOut,Sect
 from app.schemas.student.student_schema import StudentOut
 from app.db.session import get_db
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/masters/class_sections", tags=["Masters/Class & Sections"])
@@ -18,12 +18,8 @@ async def create_class(request: Request, class_data: ClassCreate, db: AsyncSessi
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'classes', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot create classes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'create')
     
     return await create_class_with_sections(db, class_data)
 
@@ -33,12 +29,8 @@ async def get_class(request: Request, class_id: int, db: AsyncSession = Depends(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'classes', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot read classes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'read')
     
     db_class = await get_class_with_sections(db, class_id)
     if not db_class:
@@ -51,12 +43,8 @@ async def get_classes_with_sections(request: Request, db: AsyncSession = Depends
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'classes', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list classes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'list')
     
     return await get_all_classes_with_sections(db)
 
@@ -66,12 +54,8 @@ async def update_class(request: Request, class_id: int, class_data: ClassUpdate,
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'classes', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot update classes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'update')
     
     updated = await update_class_with_sections(db, class_id, class_data)
     if not updated:
@@ -84,12 +68,8 @@ async def delete_class(request: Request, class_id: int, db: AsyncSession = Depen
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'classes', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot delete classes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'delete')
     
     deleted = await delete_class_with_sections(db, class_id)
     if not deleted:
@@ -101,12 +81,8 @@ async def list_class_sections(request: Request, db: AsyncSession = Depends(get_d
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'classes', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list classes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'list')
     
     return await get_class_section_list(db)
 
@@ -116,12 +92,8 @@ async def get_all_classes(request: Request, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'classes', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list classes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'list')
     
     return await get_all_classes_data(db)
 
@@ -131,12 +103,8 @@ async def get_all_sections(request: Request, db: AsyncSession = Depends(get_db))
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'classes', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list classes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'list')
     
     return await get_all_sections_data(db)
 
@@ -152,12 +120,8 @@ async def get_classes_dropdown_endpoint(request: Request, active_only: bool = Tr
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'classes', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list classes"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'list')
     
     return await get_classes_dropdown(db, active_only)
 

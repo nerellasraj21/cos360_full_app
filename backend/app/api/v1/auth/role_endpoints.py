@@ -4,7 +4,7 @@ from app.service.auth import create_role, get_all_roles
 from app.schemas.auth import RoleCreate, RoleRead
 from app.db.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
 router = APIRouter(prefix="/auth/roles", tags=["Auth/Roles"])
 
@@ -14,12 +14,8 @@ async def create_role_endpoint(role: RoleCreate, request: Request, db: AsyncSess
     current_user = await get_current_user_token(request)
     user_role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, user_role, 'role_management', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {user_role} cannot create role_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, user_role, 'role_management', 'create')
     
     return await create_role(db, role)
 
@@ -29,11 +25,7 @@ async def get_roles_endpoint(request: Request, db: AsyncSession = Depends(get_db
     current_user = await get_current_user_token(request)
     user_role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, user_role, 'role_management', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {user_role} cannot list role_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, user_role, 'role_management', 'list')
     
     return await get_all_roles(db)

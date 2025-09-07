@@ -5,7 +5,7 @@ from datetime import date
 import enum
 
 from app.db.session import get_db
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from app.schemas.masters.staff_schema import StaffEnrollmentCreate, StaffEnrollmentUpdate, StaffEnrollmentOut,StaffOut,DesignationOut,DriverOut
 from app.schemas.masters.staff_attendance_schema import StaffAttendanceCreate, StaffAttendanceUpdate, StaffAttendanceOut
 from app.service.masters.staff_service import (
@@ -30,12 +30,8 @@ async def create_enrollment(request: Request, data: StaffEnrollmentCreate, db: A
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'staff', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Insufficient permissions: {role} cannot create staff"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'staff', 'create')
     
     return await create_staff_enrollment(data, db)
 
@@ -44,12 +40,8 @@ async def update_enrollment(request: Request, staff_id: int, data: StaffEnrollme
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'staff', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Insufficient permissions: {role} cannot update staff"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'staff', 'update')
     
     return await update_staff_enrollment(staff_id, data, db)
 
@@ -58,12 +50,8 @@ async def list_enrollments(request: Request, db: AsyncSession = Depends(get_db))
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'staff', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Insufficient permissions: {role} cannot list staff"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'staff', 'list')
     
     return await get_all_staff_enrollments(db)
 
@@ -72,12 +60,8 @@ async def get_enrollment(request: Request, staff_id: int, db: AsyncSession = Dep
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'staff', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Insufficient permissions: {role} cannot read staff"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'staff', 'read')
     
     return await get_staff_enrollment_by_id(staff_id, db)
 
@@ -86,12 +70,8 @@ async def remove_enrollment(request: Request, staff_id: int, db: AsyncSession = 
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'staff', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Insufficient permissions: {role} cannot delete staff"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'staff', 'delete')
     
     return await delete_staff_enrollment(staff_id, db)
 
@@ -137,12 +117,8 @@ async def get_staff_list(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'staff', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Insufficient permissions: {role} cannot list staff"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'staff', 'list')
     
     return await get_staff_list_by_gender(gender,db)
 
@@ -155,12 +131,8 @@ async def get_staff_by_designation(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'staff', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Insufficient permissions: {role} cannot list staff"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'staff', 'list')
     
     return await get_staff_details_by_designation(designation_id,db)
 

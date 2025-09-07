@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 from app.db.session import get_db
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from app.schemas.masters.subject_schema import SubjectCreate, SubjectRead, SubjectUpdate, SubjectDropdown
 from app.service.masters.subject_service import create_subject,get_subject_by_id,get_all_subjects,update_subject,deactivate_subject,get_subjects_by_category_id,get_subjects_by_category_id_dropdown,get_subjects_dropdown
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_create
@@ -16,12 +16,8 @@ async def create(request: Request, subject: SubjectCreate, db: AsyncSession = De
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'subjects', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot create subjects"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'subjects', 'create')
     
     return await create_subject(db, subject)
 
@@ -30,12 +26,8 @@ async def list(request: Request, skip: int = 0, limit: int = 100, active_only: b
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'subjects', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list subjects"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'subjects', 'list')
     
     return await get_all_subjects(db, skip, limit, active_only, academic_year_id)
 
@@ -46,12 +38,8 @@ async def get_subjects_dropdown_endpoint(request: Request, active_only: bool = T
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'subjects', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list subjects"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'subjects', 'list')
     
     return await get_subjects_dropdown(db, active_only)
 
@@ -60,12 +48,8 @@ async def read(request: Request, subject_id: int, db: AsyncSession = Depends(get
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'subjects', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot read subjects"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'subjects', 'read')
     
     subject = await get_subject_by_id(db, subject_id)
     if not subject:
@@ -77,12 +61,8 @@ async def update(request: Request, subject_id: int, subject_update: SubjectUpdat
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'subjects', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot update subjects"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'subjects', 'update')
     
     return await update_subject(db, subject_id, subject_update)
 
@@ -91,12 +71,8 @@ async def deactivate(request: Request, subject_id: int, db: AsyncSession = Depen
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'subjects', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot delete subjects"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'subjects', 'delete')
     
     await deactivate_subject(db, subject_id)
 

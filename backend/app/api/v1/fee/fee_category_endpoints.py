@@ -48,12 +48,8 @@ async def get_all_fee_categories_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_categories', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list fee_categories"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_categories', 'list')
     
     return await get_all_fee_categories(db)
 
@@ -68,12 +64,8 @@ async def get_fee_categories_dropdown_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_categories', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list fee_categories"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_categories', 'list')
     
     return await get_fee_categories_dropdown(db, academic_year_id)
 
@@ -88,12 +80,8 @@ async def get_fee_category_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_categories', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot read fee_categories"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_categories', 'read')
     
     return await get_fee_category_by_id(db, fee_category_id)
 
@@ -109,12 +97,8 @@ async def update_fee_category_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_categories', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot update fee_categories"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_categories', 'update')
     
     return await update_fee_category(db, fee_category_id, fee_category_data)
 
@@ -129,11 +113,7 @@ async def delete_fee_category_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_categories', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot delete fee_categories"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_categories', 'delete')
     
     return await delete_fee_category(db, fee_category_id)

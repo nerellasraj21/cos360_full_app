@@ -13,7 +13,7 @@ from app.schemas.student.certificate_schema import (
 )
 from app.schemas.student.certificate_type_schema import CertificateTypeOut
 from app.service.student.student_certificate_service import list_all_certificates_of_student,download_certificate_file,get_all_certificates,upload_certificate,update_certificate_file,delete_certificate_file,get_certificate,get_all_certificate_types
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
 router = APIRouter(prefix="/student/certificates", tags=["Student/Student Certificates"])
 
@@ -34,12 +34,8 @@ async def create_certificate(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_certificates', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot create student_certificates"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_certificates', 'create')
     
     return await upload_certificate(student_id,certificate_type_id,issue_date,description,certificate_file,db)
 
@@ -50,12 +46,8 @@ async def get_certificates(request: Request, db: AsyncSession = Depends(get_db))
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_certificates', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot list student_certificates"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_certificates', 'list')
     
     return await get_all_certificates(db)
 
@@ -66,12 +58,8 @@ async def get_certificate_by_id(certificate_id: int, request: Request, db: Async
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_certificates', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot read student_certificates"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_certificates', 'read')
     
     return await get_certificate(certificate_id,db)
 
@@ -90,12 +78,8 @@ async def update_certificate(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_certificates', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot update student_certificates"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_certificates', 'update')
     
     return await update_certificate_file(certificate_id,certificate_type_id,issue_date,remarks,certificate_file,db)
 
@@ -106,12 +90,8 @@ async def delete_certificate(certificate_id: int, request: Request, db: AsyncSes
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_certificates', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot delete student_certificates"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_certificates', 'delete')
     
     return await delete_certificate_file(certificate_id,db)
 
@@ -121,12 +101,8 @@ async def download_certificate(certificate_id: int, request: Request, db: AsyncS
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_certificates', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot read student_certificates"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_certificates', 'read')
     
     return await download_certificate_file(certificate_id,db)
 
@@ -137,12 +113,8 @@ async def list_certificates_for_student(student_id: int, request: Request, db: A
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_certificates', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot list student_certificates"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_certificates', 'list')
     
     return await list_all_certificates_of_student(student_id,db)
 
@@ -152,11 +124,7 @@ async def list_certificate_types(request: Request, db: AsyncSession = Depends(ge
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'student_certificates', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot list student_certificates"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_certificates', 'list')
     
     return await get_all_certificate_types(db)

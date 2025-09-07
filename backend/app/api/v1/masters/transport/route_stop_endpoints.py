@@ -5,7 +5,7 @@ from app.models.masters.transport import RouteStop
 from app.schemas.masters.transport import RouteStopCreate, RouteStopUpdate, RouteStopOut
 from app.db.session import get_db
 from app.service.masters.transport import add_route_stop, update_partial_details_route_stop, update_all_details_route_stop, deactivate_route_stop, get_each_route_stop_by_id, get_route_stops
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
 router = APIRouter(prefix="/masters/route-stops", tags=["Masters/Route Stops"])
  
@@ -14,12 +14,8 @@ async def create_route_stop(request: Request, data: RouteStopCreate, db: AsyncSe
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'route_stops', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot create route_stops"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'route_stops', 'create')
     
     return await add_route_stop(data,db)
 
@@ -28,12 +24,8 @@ async def get_all_route_stops(request: Request, db: AsyncSession = Depends(get_d
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'route_stops', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list route_stops"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'route_stops', 'list')
     
     return await get_route_stops(db)
 
@@ -42,12 +34,8 @@ async def get_route_stop_by_id(request: Request, stop_id: int, db: AsyncSession 
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'route_stops', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot read route_stops"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'route_stops', 'read')
     
     return await get_each_route_stop_by_id(stop_id,db)
 
@@ -56,12 +44,8 @@ async def update_route_stop(request: Request, stop_id: int, data: RouteStopCreat
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'route_stops', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot update route_stops"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'route_stops', 'update')
     
     return await update_all_details_route_stop(stop_id,data,db)
 
@@ -70,12 +54,8 @@ async def patch_route_stop(request: Request, stop_id: int, data: RouteStopUpdate
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'route_stops', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot update route_stops"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'route_stops', 'update')
     
     return await update_partial_details_route_stop(stop_id,data,db)
 
@@ -84,11 +64,7 @@ async def delete_route_stop(request: Request, stop_id: int, db: AsyncSession = D
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'route_stops', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot delete route_stops"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'route_stops', 'delete')
     
     return await deactivate_route_stop(stop_id,db)

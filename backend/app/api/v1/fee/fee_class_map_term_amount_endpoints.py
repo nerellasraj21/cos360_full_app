@@ -13,7 +13,7 @@ from app.service.fee.fee_class_map_term_amount_service import (
     delete_fee_class_mapping_term_amounts
 )
 from typing import List
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
 router = APIRouter(prefix="/fee/class-mapping-term-amounts", tags=["Fee/Fee Class Mapping Term Amounts"])
 
@@ -28,12 +28,8 @@ async def create_fee_class_mapping_term_amounts_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_term_amounts', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot create fee_term_amounts"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_term_amounts', 'create')
     
     return await create_fee_class_mapping_term_amounts(db, bulk_data)
 
@@ -48,12 +44,8 @@ async def update_fee_class_mapping_term_amounts_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_term_amounts', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot update fee_term_amounts"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_term_amounts', 'update')
     
     return await update_fee_class_mapping_term_amounts(db, bulk_data)
 
@@ -68,11 +60,7 @@ async def delete_fee_class_mapping_term_amounts_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_term_amounts', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot delete fee_term_amounts"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_term_amounts', 'delete')
     
     return await delete_fee_class_mapping_term_amounts(db, bulk_data)

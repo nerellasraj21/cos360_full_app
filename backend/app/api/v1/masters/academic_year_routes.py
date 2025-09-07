@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Import the simplified permission system
 from app.tools.simple_permissions import (
     RequireRead, RequireCreate, RequireUpdate, RequireDelete, RequireList,
-    get_current_user, check_role_permission
+    get_current_user, check_role_permission, check_role_plan_permission_with_error
 )
 
 router = APIRouter(prefix="/masters/academic_years", tags=["Masters/Academic Years"])
@@ -38,14 +38,9 @@ async def create(
     
     Only Admin role has create permission.
     """
-    # Check permissions manually using database
+    # Multi-layer permission check: Role + Plan validation
     role = current_user.get('role')
-    has_perm = await check_role_permission(db, role, 'academic_years', 'create')
-    if not has_perm:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot create academic_years"
-        )
+    await check_role_plan_permission_with_error(db, request, role, 'academic_years', 'create')
     
     return await academic_year_service.create_academic_year(db, academic_year)
 
@@ -70,14 +65,9 @@ async def list(
     
     Available to Admin, Teacher, Student, Parent, Staff roles.
     """
-    # Check permissions manually using database
+    # Multi-layer permission check: Role + Plan validation
     role = current_user.get('role')
-    has_perm = await check_role_permission(db, role, 'academic_years', 'list')
-    if not has_perm:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list academic_years"
-        )
+    await check_role_plan_permission_with_error(db, request, role, 'academic_years', 'list')
         
     return await academic_year_service.get_all_academic_years(db, skip, limit, active_only)
 
@@ -101,14 +91,9 @@ async def get_dropdown(
     Available to Admin, Teacher, Student, Parent, Staff roles.
     Rate limited to 100 requests per minute.
     """
-    # Check permissions manually using database
+    # Multi-layer permission check: Role + Plan validation
     role = current_user.get('role')
-    has_perm = await check_role_permission(db, role, 'academic_years', 'read')
-    if not has_perm:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot read academic_years"
-        )
+    await check_role_plan_permission_with_error(db, request, role, 'academic_years', 'read')
         
     return await academic_year_service.get_academic_years_dropdown(db, active_only)
 
@@ -129,14 +114,9 @@ async def read(
     
     Available to Admin, Teacher, Student, Parent, Staff roles.
     """
-    # Check permissions manually using database
+    # Multi-layer permission check: Role + Plan validation
     role = current_user.get('role')
-    has_perm = await check_role_permission(db, role, 'academic_years', 'read')
-    if not has_perm:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot read academic_years"
-        )
+    await check_role_plan_permission_with_error(db, request, role, 'academic_years', 'read')
         
     academic_year = await academic_year_service.get_academic_year_by_id(db, academic_year_id)
     if not academic_year:
@@ -161,14 +141,9 @@ async def update(
     
     Only Admin role has update permission.
     """
-    # Check permissions manually using database
+    # Multi-layer permission check: Role + Plan validation
     role = current_user.get('role')
-    has_perm = await check_role_permission(db, role, 'academic_years', 'update')
-    if not has_perm:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot update academic_years"
-        )
+    await check_role_plan_permission_with_error(db, request, role, 'academic_years', 'update')
         
     updated_academic_year = await academic_year_service.update_academic_year(db, academic_year_id, academic_year_update)
     if not updated_academic_year:
@@ -192,14 +167,9 @@ async def deactivate(
     
     Only Admin role has delete permission.
     """
-    # Check permissions manually using database
+    # Multi-layer permission check: Role + Plan validation
     role = current_user.get('role')
-    has_perm = await check_role_permission(db, role, 'academic_years', 'delete')
-    if not has_perm:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot delete academic_years"
-        )
+    await check_role_plan_permission_with_error(db, request, role, 'academic_years', 'delete')
         
     academic_year = await academic_year_service.deactivate_academic_year(db, academic_year_id)
     if not academic_year:

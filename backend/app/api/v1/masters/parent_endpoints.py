@@ -11,7 +11,7 @@ from app.service.masters.parent_service import (
     delete_parent,
 )
 from app.db.session import get_db
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
 router = APIRouter(prefix="/parents", tags=["Parents"])
 
@@ -26,12 +26,8 @@ async def create_parent_profile(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'parent_management', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot create parent_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'parent_management', 'create')
     
     return await create_parent(parent_data, db)
 
@@ -46,12 +42,8 @@ async def read_parent(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'parent_management', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot read parent_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'parent_management', 'read')
     
     parent = await get_parent_by_id(parent_id, db)
     if not parent:
@@ -65,12 +57,8 @@ async def list_all_parents(request: Request, db: AsyncSession = Depends(get_db))
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'parent_management', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot list parent_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'parent_management', 'list')
     
     parents = await get_all_parents(db)
     return [ParentOut.from_orm_with_students(p) for p in parents]
@@ -87,12 +75,8 @@ async def update_parent_profile(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'parent_management', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot update parent_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'parent_management', 'update')
     
     updated = await update_parent(parent_id, parent_data, db)
     if not updated:
@@ -110,12 +94,8 @@ async def remove_parent_profile(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'parent_management', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail=f"Insufficient permissions: {role} cannot delete parent_management"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'parent_management', 'delete')
     
     deleted = await delete_parent(parent_id, db)
     if not deleted:

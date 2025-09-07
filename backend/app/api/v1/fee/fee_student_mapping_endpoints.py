@@ -14,7 +14,7 @@ from app.service.fee.fee_student_mapping_service import (
     update_fee_student_mapping,
     delete_fee_student_mapping
 )
-from app.tools.simple_permissions import check_role_permission, get_current_user_token
+from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from typing import List, Optional
 
 router = APIRouter(prefix="/fee/student-mappings", tags=["Fee/Fee Student Mappings"])
@@ -30,12 +30,8 @@ async def create_fee_student_mapping_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_student_mappings', 'create')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot create fee_student_mappings"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_student_mappings', 'create')
     
     return await create_fee_student_mapping(db, mapping_data)
 
@@ -54,12 +50,8 @@ async def get_all_fee_student_mappings_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_student_mappings', 'list')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot list fee_student_mappings"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_student_mappings', 'list')
     
     return await get_all_fee_student_mappings(db, student_id, class_id, section_id, fee_type_id, academic_year_id)
 
@@ -74,12 +66,8 @@ async def get_fee_student_mapping_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_student_mappings', 'read')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot read fee_student_mappings"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_student_mappings', 'read')
     
     return await get_fee_student_mapping_by_id(db, mapping_id)
 
@@ -95,12 +83,8 @@ async def update_fee_student_mapping_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_student_mappings', 'update')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot update fee_student_mappings"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_student_mappings', 'update')
     
     return await update_fee_student_mapping(db, mapping_id, mapping_data)
 
@@ -115,11 +99,7 @@ async def delete_fee_student_mapping_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
-    has_permission = await check_role_permission(db, role, 'fee_student_mappings', 'delete')
-    if not has_permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions: {role} cannot delete fee_student_mappings"
-        )
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'fee_student_mappings', 'delete')
     
     return await delete_fee_student_mapping(db, mapping_id)
