@@ -6,7 +6,7 @@ from app.models.masters.holidays_model import Holiday
 from app.schemas.masters.holidays_schema import HolidayCreate, HolidayRead, HolidayUpdate, HolidayDropdown
 from app.service.masters import holiday_service
 from app.service.masters.holiday_service import get_holidays_dropdown
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_create
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/masters/holidays", tags=["Masters/Holidays"])
 
 @router.post("/", response_model=HolidayRead)
 @rate_limit_create("30 per minute")
-async def create(request: Request, holiday: HolidayCreate, db: AsyncSession = Depends(get_db)):
+async def create(request: Request, holiday: HolidayCreate, db: AsyncSession = Depends(get_tenant_db)):
     """Create holiday - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -27,7 +27,7 @@ async def create(request: Request, holiday: HolidayCreate, db: AsyncSession = De
     return await holiday_service.create_holiday(db, holiday)
 
 @router.get("/", response_model=List[HolidayRead])
-async def list(request: Request, skip: int = 0, limit: int = 10, active_only: bool = True, academic_year_id: uuid = None, db: AsyncSession = Depends(get_db)):
+async def list(request: Request, skip: int = 0, limit: int = 10, active_only: bool = True, academic_year_id: UUID = None, db: AsyncSession = Depends(get_tenant_db)):
     """List holidays - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -39,7 +39,7 @@ async def list(request: Request, skip: int = 0, limit: int = 10, active_only: bo
 
 @router.get("/dropdown", response_model=List[HolidayDropdown])
 @rate_limit_dropdown("100 per minute")
-async def get_holidays_dropdown_endpoint(request: Request, active_only: bool = True, db: AsyncSession = Depends(get_db)):
+async def get_holidays_dropdown_endpoint(request: Request, active_only: bool = True, db: AsyncSession = Depends(get_tenant_db)):
     """Get holidays for dropdown (id + name only). Rate limited to 100 requests per minute."""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -50,7 +50,7 @@ async def get_holidays_dropdown_endpoint(request: Request, active_only: bool = T
     return await get_holidays_dropdown(db, active_only)
 
 @router.get("/{holiday_id}", response_model=HolidayRead)
-async def read(holiday_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def read(holiday_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Get holiday by ID - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -64,7 +64,7 @@ async def read(holiday_id: UUID, request: Request, db: AsyncSession = Depends(ge
     return holiday
 
 @router.put("/{holiday_id}", response_model=HolidayRead)
-async def update(holiday_id: UUID, holiday_update: HolidayUpdate, request: Request, db: AsyncSession = Depends(get_db)):
+async def update(holiday_id: UUID, holiday_update: HolidayUpdate, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Update holiday - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -78,7 +78,7 @@ async def update(holiday_id: UUID, holiday_update: HolidayUpdate, request: Reque
     return updated_holiday
 
 @router.delete("/{holiday_id}", response_model=HolidayRead)
-async def deactivate(holiday_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def deactivate(holiday_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Deactivate holiday - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -92,7 +92,7 @@ async def deactivate(holiday_id: UUID, request: Request, db: AsyncSession = Depe
     return holiday
 
 @router.patch("/{holiday_id}/activate", response_model=HolidayRead)
-async def activate(holiday_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def activate(holiday_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Activate holiday - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from uuid import UUID
 
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.service.auth.resource_permission_service import ResourcePermissionService
 from app.schemas.auth.resource_permission_schema import (
     ResourcePermissionCreate,
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/auth/resource-permissions", tags=["Auth/Resource Per
 @router.post("/", response_model=ResourcePermissionRead, status_code=status.HTTP_201_CREATED)
 async def create_resource_permission(request: Request, 
     permission_data: ResourcePermissionCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Create a new resource permission - Admin only"""
     current_user = await get_current_user_token(request)
@@ -39,7 +39,7 @@ async def create_resource_permission(request: Request,
 async def get_all_resource_permissions(request: Request,
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """List all resource permissions - Admin only"""
     current_user = await get_current_user_token(request)
@@ -54,7 +54,7 @@ async def get_all_resource_permissions(request: Request,
 @router.get("/{permission_id}", response_model=ResourcePermissionRead)
 async def get_resource_permission(request: Request, 
     permission_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get a specific resource permission by ID - Admin only"""
     current_user = await get_current_user_token(request)
@@ -69,7 +69,7 @@ async def get_resource_permission(request: Request,
 @router.put("/{permission_id}", response_model=ResourcePermissionRead)
 async def update_resource_permission(request: Request, 
     permission_id: UUID,
-    permission_data: ResourcePermissionUpdate,db: AsyncSession = Depends(get_db)
+    permission_data: ResourcePermissionUpdate,db: AsyncSession = Depends(get_tenant_db)
 ):
     """Update a resource permission - Admin only"""
     current_user = await get_current_user_token(request)
@@ -84,7 +84,7 @@ async def update_resource_permission(request: Request,
 @router.delete("/{permission_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_resource_permission(request: Request, 
     permission_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Delete a resource permission - Admin only"""
     current_user = await get_current_user_token(request)
@@ -98,7 +98,7 @@ async def delete_resource_permission(request: Request,
 @router.get("/role/{role_id}", response_model=List[ResourcePermissionRead])
 async def get_permissions_by_role(request: Request, 
     role_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get all permissions for a specific role - Admin only"""
     current_user = await get_current_user_token(request)
@@ -113,7 +113,7 @@ async def get_permissions_by_role(request: Request,
 @router.get("/resource/{resource}", response_model=List[ResourcePermissionWithRole])
 async def get_permissions_by_resource(request: Request, 
     resource: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get all permissions for a specific resource - Admin only"""
     current_user = await get_current_user_token(request)
@@ -137,7 +137,7 @@ async def get_permissions_by_resource(request: Request,
 @router.post("/bulk", response_model=List[ResourcePermissionRead])
 async def bulk_create_resource_permissions(request: Request, 
     bulk_data: ResourcePermissionBulkCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Bulk create resource permissions for a role - Admin only"""
     current_user = await get_current_user_token(request)
@@ -152,7 +152,7 @@ async def bulk_create_resource_permissions(request: Request,
 @router.get("/role/{role_id}/summary", response_model=ResourcePermissionSummary)
 async def get_role_permission_summary(request: Request, 
     role_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get permission summary for a role - Admin only"""
     current_user = await get_current_user_token(request)
@@ -165,7 +165,7 @@ async def get_role_permission_summary(request: Request,
 
 @router.get("/matrix/all", response_model=List[RolePermissionMatrix])
 async def get_permission_matrix(request: Request,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get permission matrix for all roles - Admin only"""
     current_user = await get_current_user_token(request)
@@ -179,7 +179,7 @@ async def get_permission_matrix(request: Request,
 @router.delete("/role/{role_id}/all", status_code=status.HTTP_200_OK)
 async def delete_all_permissions_for_role(request: Request, 
     role_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Delete all permissions for a role - Admin only"""
     current_user = await get_current_user_token(request)
@@ -194,7 +194,7 @@ async def delete_all_permissions_for_role(request: Request,
 @router.delete("/resource/{resource}/all", status_code=status.HTTP_200_OK)
 async def delete_all_permissions_for_resource(request: Request, 
     resource: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Delete all permissions for a resource - Admin only"""
     current_user = await get_current_user_token(request)
@@ -209,7 +209,7 @@ async def delete_all_permissions_for_resource(request: Request,
 # Utility endpoints for frontend dropdowns
 @router.get("/dropdown/resources", response_model=List[ResourceDropdown])
 async def get_available_resources(request: Request,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get available resources for dropdown - Admin only"""
     current_user = await get_current_user_token(request)
@@ -247,7 +247,7 @@ async def get_available_resources(request: Request,
 
 @router.get("/dropdown/actions", response_model=List[ActionDropdown])
 async def get_available_actions(request: Request,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get available actions for dropdown - Admin only"""
     current_user = await get_current_user_token(request)
@@ -284,7 +284,7 @@ async def check_permission_exists(request: Request,
     role_id: UUID,
     resource: str,
     action: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Check if a specific permission exists and is granted - Admin only"""
     current_user = await get_current_user_token(request)

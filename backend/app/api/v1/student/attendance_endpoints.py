@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.schemas.student.attendance_schema import (
     StudentAttendanceCreate,
     StudentAttendanceOut,
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/student/attendance", tags=["Student/Student Attendan
 
 # Create Attendance
 @router.post("/", response_model=StudentAttendanceOut, status_code=status.HTTP_201_CREATED)
-async def create_attendance(attendance: StudentAttendanceCreate, request: Request, db: AsyncSession = Depends(get_db)):
+async def create_attendance(attendance: StudentAttendanceCreate, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Create student attendance - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -30,7 +30,7 @@ async def create_attendance(attendance: StudentAttendanceCreate, request: Reques
 
 # Get All Attendance Records
 @router.get("/", response_model=list[StudentAttendanceOut])
-async def get_all_attendance(request: Request, db: AsyncSession = Depends(get_db)):
+async def get_all_attendance(request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Get all attendance records - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -42,7 +42,7 @@ async def get_all_attendance(request: Request, db: AsyncSession = Depends(get_db
 
 # Get Attendance by ID
 @router.get("/{attendance_id}", response_model=StudentAttendanceOut)
-async def get_attendance(attendance_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_attendance(attendance_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Get attendance by ID - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -54,7 +54,7 @@ async def get_attendance(attendance_id: UUID, request: Request, db: AsyncSession
 
 # Update Attendance (PATCH)
 @router.patch("/{attendance_id}", response_model=StudentAttendanceOut)
-async def update_attendance(attendance_id: UUID, update_data: StudentAttendanceUpdate, request: Request, db: AsyncSession = Depends(get_db)):
+async def update_attendance(attendance_id: UUID, update_data: StudentAttendanceUpdate, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Update attendance - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -66,7 +66,7 @@ async def update_attendance(attendance_id: UUID, update_data: StudentAttendanceU
 
 # Delete Attendance
 @router.delete("/{attendance_id}")
-async def delete_attendance(attendance_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def delete_attendance(attendance_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Delete attendance - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')

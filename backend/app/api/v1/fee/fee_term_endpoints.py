@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status, APIRouter, Depends, Request
 from app.schemas.fee.fee_term_schema import FeeTermCreate, FeeTermRead, FeeTermUpdate
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.fee.fee_term_service import (
     create_fee_term_with_dates, 
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/fee/terms", tags=["Fee/Fee Terms & Dates"])
 async def create_fee_term(request: Request, 
 
     fee_term_data: FeeTermCreate, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Create a new fee term with associated dates"""
     current_user = await get_current_user_token(request)
@@ -36,7 +36,7 @@ async def create_fee_term(request: Request,
 @router.get("/", response_model=List[FeeTermRead])
 async def get_all_fee_terms_endpoint(request: Request, 
 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get all fee terms with their associated dates"""
     current_user = await get_current_user_token(request)
@@ -52,7 +52,7 @@ async def get_all_fee_terms_endpoint(request: Request,
 async def get_fee_term_endpoint(request: Request, 
 
     fee_term_id: UUID, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get a specific fee term with its associated dates"""
     current_user = await get_current_user_token(request)
@@ -69,7 +69,7 @@ async def update_fee_term_endpoint(request: Request,
 
     fee_term_id: UUID, 
     fee_term_data: FeeTermUpdate, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Update a fee term and its associated dates"""
     current_user = await get_current_user_token(request)
@@ -85,7 +85,7 @@ async def update_fee_term_endpoint(request: Request,
 async def delete_fee_term_endpoint(request: Request, 
 
     fee_term_id: UUID, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Delete a fee term and all its associated dates"""
     current_user = await get_current_user_token(request)
@@ -101,7 +101,7 @@ async def delete_fee_term_endpoint(request: Request,
 async def delete_fee_term_date_endpoint(request: Request, 
 
     fee_term_date_id: UUID, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Delete a specific fee term date"""
     current_user = await get_current_user_token(request)

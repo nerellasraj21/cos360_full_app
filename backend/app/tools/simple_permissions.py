@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.tools.jwt_utils import verify_access_token
 from app.service.auth.permission_service import PermissionService
 from app.service.auth.plan_service import PlanService
@@ -37,7 +37,7 @@ async def get_current_user_token(request: Request) -> dict:
 
 async def get_current_user(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     token: dict = Depends(get_current_user_token)
 ) -> dict:
     """Get current user information from token"""

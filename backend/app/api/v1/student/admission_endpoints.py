@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, Request, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.student.admission_schema import StudentAdmissionCreate, StudentAdmissionUpdate
 from app.schemas.student.student_schema import StudentOut
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from typing import List
 from app.service.student.admission_service import add_admission, update_partial_details_admission, get_admission_by_id,get_student_by_admission_id,search_students
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
@@ -10,7 +10,7 @@ from uuid import UUID
 router = APIRouter(prefix="/students/admission", tags=["Student/Student Admission"])
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_admission(admission: StudentAdmissionCreate, request: Request, db: AsyncSession = Depends(get_db)):
+async def create_admission(admission: StudentAdmissionCreate, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Create a new student admission - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -22,7 +22,7 @@ async def create_admission(admission: StudentAdmissionCreate, request: Request, 
     return admission_respose
 
 @router.get("/id/{student_id}")
-async def get_admission(student_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_admission(student_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Get admission by student ID - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -34,7 +34,7 @@ async def get_admission(student_id: UUID, request: Request, db: AsyncSession = D
     return admission_details
 
 @router.patch("/{student_id}")
-async def update_admission(student_id: UUID, data: StudentAdmissionUpdate, request: Request, db: AsyncSession = Depends(get_db)):
+async def update_admission(student_id: UUID, data: StudentAdmissionUpdate, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Update student admission - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -47,7 +47,7 @@ async def update_admission(student_id: UUID, data: StudentAdmissionUpdate, reque
 
 # Get student by admission ID 
 @router.get("/by-admission/{admission_id}")
-async def fetch_student_by_admission(admission_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def fetch_student_by_admission(admission_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Get student by admission ID - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -59,7 +59,7 @@ async def fetch_student_by_admission(admission_id: UUID, request: Request, db: A
 
 # Search (get while typing)
 @router.get("/search")
-async def search_student_by_text(request: Request, db: AsyncSession = Depends(get_db), query: str = Query(..., min_length=1)):
+async def search_student_by_text(request: Request, db: AsyncSession = Depends(get_tenant_db), query: str = Query(..., min_length=1)):
     """Search students - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')

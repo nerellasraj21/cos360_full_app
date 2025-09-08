@@ -5,7 +5,7 @@ from app.schemas.fee.fee_class_map_term_amount_schema import (
     FeeClassMappingTermAmountBulkDelete,
     FeeClassMappingTermAmountRead
 )
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.fee.fee_class_map_term_amount_service import (
     create_fee_class_mapping_term_amounts,
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/fee/class-mapping-term-amounts", tags=["Fee/Fee Clas
 async def create_fee_class_mapping_term_amounts_endpoint(
     request: Request,
     bulk_data: FeeClassMappingTermAmountBulkCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Create multiple fee class mapping term amounts - Admin only"""
     current_user = await get_current_user_token(request)
@@ -38,7 +38,7 @@ async def create_fee_class_mapping_term_amounts_endpoint(
 async def update_fee_class_mapping_term_amounts_endpoint(
     request: Request,
     bulk_data: FeeClassMappingTermAmountBulkUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Update multiple fee class mapping term amounts (supports partial updates) - Admin only"""
     current_user = await get_current_user_token(request)
@@ -54,7 +54,7 @@ async def update_fee_class_mapping_term_amounts_endpoint(
 async def delete_fee_class_mapping_term_amounts_endpoint(
     request: Request,
     bulk_data: FeeClassMappingTermAmountBulkDelete,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Delete multiple fee class mapping term amounts - Admin only"""
     current_user = await get_current_user_token(request)

@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Form, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from uuid import uuid4
 from datetime import datetime
 from app.models.student.student_model import Student
@@ -27,7 +27,7 @@ async def upload_document(
     student_id: UUID = Form(...),
     document_type: str = Form(...),
     document_file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     try:
         # Validate content type
@@ -67,7 +67,7 @@ async def upload_document(
 
 
 # Get all documents (optionally filter by student)
-async def get_documents_by_student(student_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_documents_by_student(student_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     try:
         # Check if the student exists
         student_result = await db.execute(
@@ -90,7 +90,7 @@ async def get_documents_by_student(student_id: UUID, db: AsyncSession = Depends(
 
 
 # Get single document by ID
-async def get_document_by_id(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_document_by_id(document_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     result = await db.execute(select(StudentDocument).where(StudentDocument.id == document_id))
     doc = result.scalar_one_or_none()
     if not doc:
@@ -103,7 +103,7 @@ async def update_document_file(
     document_id: UUID,
     document_type: str = Form(...),
     document_file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     try:
         # Fetch the existing document
@@ -157,7 +157,7 @@ async def update_document_file(
 
 
 # Delete document
-async def delete_document_file(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_document_file(document_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     try:
         result = await db.execute(select(StudentDocument).where(StudentDocument.id == document_id))
         doc = result.scalar_one_or_none()

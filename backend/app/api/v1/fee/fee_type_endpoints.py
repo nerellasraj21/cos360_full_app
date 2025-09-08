@@ -5,7 +5,7 @@ from app.schemas.fee.fee_type_schema import (
     FeeTypeUpdate,
     FeeTypeDropdown
 )
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.fee.fee_type_service import (
     create_fee_type,
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/fee/types", tags=["Fee/Fee Types"])
 async def create_fee_type_endpoint(request: Request, 
 
     fee_type_data: FeeTypeCreate, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Create a new fee type. Rate limited to 30 creates per minute."""
     current_user = await get_current_user_token(request)
@@ -43,7 +43,7 @@ async def create_fee_type_endpoint(request: Request,
 @router.get("/", response_model=List[FeeTypeRead])
 async def get_all_fee_types_endpoint(request: Request, 
 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get all fee types with their related information"""
     current_user = await get_current_user_token(request)
@@ -60,7 +60,7 @@ async def get_all_fee_types_endpoint(request: Request,
 async def get_fee_types_dropdown_endpoint(request: Request, 
 
     fee_category_id: Optional[UUID] = Query(None, description="Filter by fee category ID"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get fee types for dropdown (id + type_name only). Optionally filter by fee category. Rate limited to 100 requests per minute."""
     current_user = await get_current_user_token(request)
@@ -76,7 +76,7 @@ async def get_fee_types_dropdown_endpoint(request: Request,
 async def get_fee_type_endpoint(request: Request, 
 
     fee_type_id: UUID, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get a specific fee type with all related information"""
     current_user = await get_current_user_token(request)
@@ -93,7 +93,7 @@ async def update_fee_type_endpoint(request: Request,
 
     fee_type_id: UUID, 
     fee_type_data: FeeTypeUpdate, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Update a fee type"""
     current_user = await get_current_user_token(request)
@@ -109,7 +109,7 @@ async def update_fee_type_endpoint(request: Request,
 async def delete_fee_type_endpoint(request: Request, 
 
     fee_type_id: UUID, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Delete a fee type"""
     current_user = await get_current_user_token(request)

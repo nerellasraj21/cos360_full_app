@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 import logging
@@ -96,7 +96,7 @@ async def seed_basic_permission_data():
         )
 
 @router.post("/create-test-users")
-async def create_test_users(db: AsyncSession = Depends(get_db)):
+async def create_test_users(db: AsyncSession = Depends(get_tenant_db)):
     """Create test users with different roles"""
     try:
         # First, create roles in tenant schema based on templates

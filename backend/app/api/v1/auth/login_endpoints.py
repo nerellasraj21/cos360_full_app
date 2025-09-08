@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy.orm import Session
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.schemas.auth.login_schema import (
     LoginRequest, 
     LoginResponse, 
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/auth/login", tags=["Auth/Login"])
                  401: {"model": LoginErrorResponse, "description": "Invalid connection or credentials"},
                  500: {"model": LoginErrorResponse, "description": "Server error"}
              })
-async def login(request: LoginRequest, fastapi_request: Request, db: AsyncSession = Depends(get_db)):
+async def login(request: LoginRequest, fastapi_request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """
     Multi-tenant login endpoint supporting:
     1. Client detection from cschema header or subdomain

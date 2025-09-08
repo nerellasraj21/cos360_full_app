@@ -25,15 +25,14 @@ async def validate_academic_year_exists(db: AsyncSession, academic_year_id: UUID
     return academic_year
 
 async def check_category_name_unique(db: AsyncSession, category_name: str, academic_year_id: UUID, exclude_id: Optional[UUID] = None):
-    """Check if category name is unique within academic year"""
+    """Check if category name is unique within academic year - FIXED UUID BUG"""
     query = select(FeeCategoryModel).where(
         FeeCategoryModel.category_name == category_name,
         FeeCategoryModel.academic_year_id == academic_year_id
     )
     
     if exclude_id:
-        exclude_uuid = UUID(exclude_id)
-        query = query.where(FeeCategoryModel.id != exclude_uuid)
+        query = query.where(FeeCategoryModel.id != exclude_id)
     
     result = await db.execute(query)
     existing_category = result.scalar_one_or_none()

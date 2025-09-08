@@ -5,7 +5,7 @@ from app.schemas.fee.fee_category_schema import (
     FeeCategoryUpdate,
     FeeCategoryDropdown
 )
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.fee.fee_category_service import (
     create_fee_category,
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/fee/categories", tags=["Fee/Fee Categories"])
 async def create_fee_category_endpoint(request: Request, 
 
     fee_category_data: FeeCategoryCreate, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Create a new fee category. Rate limited to 30 creates per minute. Requires plan validation."""
     current_user = await get_current_user_token(request)
@@ -43,7 +43,7 @@ async def create_fee_category_endpoint(request: Request,
 @router.get("/", response_model=List[FeeCategoryRead])
 async def get_all_fee_categories_endpoint(request: Request, 
 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get all fee categories with their academic year titles"""
     current_user = await get_current_user_token(request)
@@ -59,7 +59,7 @@ async def get_all_fee_categories_endpoint(request: Request,
 async def get_fee_categories_dropdown_endpoint(request: Request, 
 
     academic_year_id: Optional[UUID] = Query(None, description="Filter by academic year ID"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get fee categories for dropdown (id + category_name only). Optionally filter by academic year. Rate limited to 100 requests per minute."""
     current_user = await get_current_user_token(request)
@@ -75,7 +75,7 @@ async def get_fee_categories_dropdown_endpoint(request: Request,
 async def get_fee_category_endpoint(request: Request, 
 
     fee_category_id: UUID, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get a specific fee category with its academic year title"""
     current_user = await get_current_user_token(request)
@@ -92,7 +92,7 @@ async def update_fee_category_endpoint(request: Request,
 
     fee_category_id: UUID, 
     fee_category_data: FeeCategoryUpdate, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Update a fee category"""
     current_user = await get_current_user_token(request)
@@ -108,7 +108,7 @@ async def update_fee_category_endpoint(request: Request,
 async def delete_fee_category_endpoint(request: Request, 
 
     fee_category_id: UUID, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Delete a fee category"""
     current_user = await get_current_user_token(request)

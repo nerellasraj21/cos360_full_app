@@ -5,7 +5,7 @@ from app.schemas.fee.fee_category_schema import (
     FeeCategoryUpdate,
     FeeCategoryDropdown
 )
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.fee.fee_category_service import (
     create_fee_category,
@@ -33,7 +33,7 @@ router = APIRouter(prefix="/fee/categories", tags=["Fee/Fee Categories"])
 async def create_fee_category_endpoint(
     request: Request, 
     fee_category_data: FeeCategoryCreate, 
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user),
     _permission_check: bool = Depends(RequireCreate("fee_categories"))
 ):
@@ -53,7 +53,7 @@ async def create_fee_category_endpoint(
 # Get All Fee Categories - Protected with list permission
 @router.get("/", response_model=List[FeeCategoryRead])
 async def get_all_fee_categories_endpoint(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user),
     _permission_check: bool = Depends(RequireList("fee_categories"))
 ):
@@ -72,7 +72,7 @@ async def get_all_fee_categories_endpoint(
 @router.get("/dropdown", response_model=List[FeeCategoryDropdown])
 async def get_fee_categories_dropdown_endpoint(
     academic_year_id: Optional[UUID] = Query(None, description="Filter by academic year ID"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user),
     _permission_check: bool = Depends(RequireRead("fee_categories"))
 ):
@@ -92,7 +92,7 @@ async def get_fee_categories_dropdown_endpoint(
 @router.get("/{fee_category_id}", response_model=FeeCategoryRead)
 async def get_fee_category_endpoint(
     fee_category_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user),
     _permission_check: bool = Depends(RequireRead("fee_categories"))
 ):
@@ -112,7 +112,7 @@ async def get_fee_category_endpoint(
 async def update_fee_category_endpoint(
     fee_category_id: UUID,
     fee_category_data: FeeCategoryUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user),
     _permission_check: bool = Depends(RequireUpdate("fee_categories"))
 ):
@@ -131,7 +131,7 @@ async def update_fee_category_endpoint(
 @router.delete("/{fee_category_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_fee_category_endpoint(
     fee_category_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user),
     _permission_check: bool = Depends(RequireDelete("fee_categories"))
 ):
@@ -149,7 +149,7 @@ async def delete_fee_category_endpoint(
 # Example of multiple permission check - Export endpoint
 @router.get("/export/csv")
 async def export_fee_categories_endpoint(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user),
     _permission_check: bool = Depends(MultiplePermissions([
         ("fee_categories", "read"),
@@ -171,7 +171,7 @@ async def export_fee_categories_endpoint(
 # Example of optional permission - Get statistics (if user has access)
 @router.get("/statistics")
 async def get_fee_category_statistics_endpoint(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user),
     has_stats_permission: bool = Depends(RequireRead("fee_statistics", optional=True))
 ):

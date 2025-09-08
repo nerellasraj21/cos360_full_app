@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Form, UploadFile, File, Request, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.schemas.student.student_document_schema import (
     StudentDocumentCreate,
     StudentDocumentUpdate,
@@ -20,7 +20,7 @@ async def create_document(
     document_type: str = Form(...),
     document_file: UploadFile = File(...),
     request: Request = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     """Create student document - Admin only"""
     current_user = await get_current_user_token(request)
@@ -39,7 +39,7 @@ async def create_document(
 
 # Get all documents (optionally filter by student)
 @router.get("/", response_model=list[StudentDocumentOut])
-async def get_documents(student_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_documents(student_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Get all documents by student - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -52,7 +52,7 @@ async def get_documents(student_id: UUID, request: Request, db: AsyncSession = D
 
 # Get single document by ID
 @router.get("/{document_id}", response_model=StudentDocumentOut)
-async def get_document(document_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_document(document_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Get document by ID - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -70,7 +70,7 @@ async def update_document(
     document_type: str = Form(...),
     document_file: UploadFile = File(...),
     request: Request = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     """Update document - Admin only"""
     current_user = await get_current_user_token(request)
@@ -84,7 +84,7 @@ async def update_document(
 
 # Delete document
 @router.delete("/{document_id}", status_code=204)
-async def delete_document(document_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def delete_document(document_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Delete document - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')

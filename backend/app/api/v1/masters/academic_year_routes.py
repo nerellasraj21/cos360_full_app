@@ -7,7 +7,7 @@ from uuid import UUID
 from app.models.masters.academic_year_model import AcademicYear
 from app.schemas.masters.academic_year_schema import AcademicYearCreate, AcademicYearRead, AcademicYearUpdate, AcademicYearDropdown
 from app.service.masters import academic_year_service
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/masters/academic_years", tags=["Masters/Academic Yea
 async def create(
     request: Request, 
     academic_year: AcademicYearCreate, 
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -51,7 +51,7 @@ async def list(
     skip: int = 0, 
     limit: int = 10, 
     active_only: bool = True, 
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -76,7 +76,7 @@ async def list(
 async def get_dropdown(
     request: Request, 
     active_only: bool = True, 
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -101,7 +101,7 @@ async def get_dropdown(
 @rate_limit_dropdown("100 per minute")
 async def get_active(
     request: Request, 
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -126,7 +126,7 @@ async def get_active(
 async def read(
     request: Request,
     academic_year_id: UUID, 
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -154,7 +154,7 @@ async def update(
     request: Request,
     academic_year_id: UUID, 
     academic_year_update: AcademicYearUpdate, 
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -181,7 +181,7 @@ async def update(
 async def deactivate(
     request: Request,
     academic_year_id: UUID, 
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -208,7 +208,7 @@ async def deactivate(
 async def delete_permanent(
     request: Request,
     academic_year_id: UUID, 
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user)
 ):
     """

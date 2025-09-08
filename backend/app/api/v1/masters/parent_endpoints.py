@@ -10,7 +10,7 @@ from app.service.masters.parent_service import (
     update_parent,
     delete_parent,
 )
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
 router = APIRouter(prefix="/parents", tags=["Parents"])
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/parents", tags=["Parents"])
 async def create_parent_profile(
     parent_data: ParentCreate,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     """Create parent profile - Admin only"""
     current_user = await get_current_user_token(request)
@@ -36,7 +36,7 @@ async def create_parent_profile(
 async def read_parent(
     parent_id: UUID,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     """Get parent by ID - All authenticated users"""
     current_user = await get_current_user_token(request)
@@ -52,7 +52,7 @@ async def read_parent(
 
 
 @router.get("/", response_model=List[ParentOut])
-async def list_all_parents(request: Request, db: AsyncSession = Depends(get_db)):
+async def list_all_parents(request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """List all parents - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -69,7 +69,7 @@ async def update_parent_profile(
     parent_id: UUID,
     parent_data: ParentUpdate,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     """Update parent profile - Admin only"""
     current_user = await get_current_user_token(request)
@@ -88,7 +88,7 @@ async def update_parent_profile(
 async def remove_parent_profile(
     parent_id: UUID,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     """Delete parent profile - Admin only"""
     current_user = await get_current_user_token(request)

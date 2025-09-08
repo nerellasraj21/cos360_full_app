@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from app.schemas.masters.subject_schema import SubjectCreate, SubjectRead, SubjectUpdate, SubjectDropdown
 from app.service.masters.subject_service import create_subject,get_subject_by_id,get_all_subjects,update_subject,deactivate_subject,get_subjects_by_category_id,get_subjects_by_category_id_dropdown,get_subjects_dropdown
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/masters/subjects", tags=["Masters/Subjects"])
 
 @router.post("/", response_model=SubjectRead)
 @rate_limit_create("30 per minute")
-async def create(request: Request, subject: SubjectCreate, db: AsyncSession = Depends(get_db)):
+async def create(request: Request, subject: SubjectCreate, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -23,7 +23,7 @@ async def create(request: Request, subject: SubjectCreate, db: AsyncSession = De
     return await create_subject(db, subject)
 
 @router.get("/", response_model=List[SubjectRead])
-async def list(request: Request, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: UUID = None, db: AsyncSession = Depends(get_db)):
+async def list(request: Request, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: UUID = None, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -34,7 +34,7 @@ async def list(request: Request, skip: int = 0, limit: int = 100, active_only: b
 
 @router.get("/dropdown", response_model=List[SubjectDropdown])
 @rate_limit_dropdown("100 per minute")
-async def get_subjects_dropdown_endpoint(request: Request, active_only: bool = True, db: AsyncSession = Depends(get_db)):
+async def get_subjects_dropdown_endpoint(request: Request, active_only: bool = True, db: AsyncSession = Depends(get_tenant_db)):
     """Get subjects for dropdown (id + name only). Rate limited to 100 requests per minute."""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -45,7 +45,7 @@ async def get_subjects_dropdown_endpoint(request: Request, active_only: bool = T
     return await get_subjects_dropdown(db, active_only)
 
 @router.get("/categories", response_model=List[dict])
-async def get_categories(request: Request, db: AsyncSession = Depends(get_db)):
+async def get_categories(request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Get all subject categories"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -58,7 +58,7 @@ async def get_categories(request: Request, db: AsyncSession = Depends(get_db)):
     return await get_all_subject_categories(db)
 
 @router.get("/by-academic-year/{year_id}", response_model=List[SubjectRead])
-async def get_by_academic_year(request: Request, year_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_by_academic_year(request: Request, year_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     """Get subjects by academic year ID"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -69,7 +69,7 @@ async def get_by_academic_year(request: Request, year_id: UUID, db: AsyncSession
     return await get_all_subjects(db, skip=0, limit=1000, active_only=True, academic_year_id=year_id)
 
 @router.get("/{subject_id}", response_model=SubjectRead)
-async def read(request: Request, subject_id: UUID, db: AsyncSession = Depends(get_db)):
+async def read(request: Request, subject_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -82,7 +82,7 @@ async def read(request: Request, subject_id: UUID, db: AsyncSession = Depends(ge
     return subject
 
 @router.put("/{subject_id}", response_model=SubjectRead)
-async def update(request: Request, subject_id: UUID, subject_update: SubjectUpdate, db: AsyncSession = Depends(get_db)):
+async def update(request: Request, subject_id: UUID, subject_update: SubjectUpdate, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -92,7 +92,7 @@ async def update(request: Request, subject_id: UUID, subject_update: SubjectUpda
     return await update_subject(db, subject_id, subject_update)
 
 @router.delete("/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def deactivate(request: Request, subject_id: UUID, db: AsyncSession = Depends(get_db)):
+async def deactivate(request: Request, subject_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -102,11 +102,11 @@ async def deactivate(request: Request, subject_id: UUID, db: AsyncSession = Depe
     await deactivate_subject(db, subject_id)
 
 @router.get("/categories/{category_id}/subjects", response_model=List[SubjectRead])
-async def get_subjects_by_category(category_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_subjects_by_category(category_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     return await get_subjects_by_category_id(category_id, db)
 
 @router.get("/categories/{category_id}/subjects/dropdown", response_model=List[SubjectDropdown])
 @rate_limit_dropdown("100 per minute")
-async def get_subjects_by_category_dropdown(request: Request, category_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_subjects_by_category_dropdown(request: Request, category_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     """Get subjects by category ID for dropdown (id + name only). Rate limited to 100 requests per minute."""
     return await get_subjects_by_category_id_dropdown(category_id, db)

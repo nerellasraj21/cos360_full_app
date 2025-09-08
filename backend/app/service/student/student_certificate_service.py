@@ -9,7 +9,7 @@ from typing import Optional
 from datetime import date
 from uuid import uuid4
 
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.models.student.student_certificate_model import CertificateIssue
 from app.models.student.student_model import Student
 from app.models.student.certificate_type_model import CertificateType
@@ -28,7 +28,7 @@ async def upload_certificate(
     issue_date: Optional[date] = Form(None),
     remarks: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     try:
         filename = None
@@ -67,12 +67,12 @@ async def upload_certificate(
         raise HTTPException(status_code=500, detail=f"Error creating certificate: {str(e)}")
 
 
-async def get_all_certificates(db: AsyncSession = Depends(get_db)):
+async def get_all_certificates(db: AsyncSession = Depends(get_tenant_db)):
     result = await db.execute(select(CertificateIssue))
     return result.scalars().all()
 
 
-async def get_certificate(certificate_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_certificate(certificate_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))
     cert = result.scalar_one_or_none()
     if not cert:
@@ -86,7 +86,7 @@ async def update_certificate_file(
     issue_date: Optional[date] = Form(None),
     remarks: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))
     cert = result.scalar_one_or_none()
@@ -120,7 +120,7 @@ async def update_certificate_file(
         raise HTTPException(status_code=500, detail=f"Error updating certificate: {str(e)}")
 
 
-async def delete_certificate_file(certificate_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_certificate_file(certificate_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))
     cert = result.scalar_one_or_none()
     if not cert:
@@ -130,7 +130,7 @@ async def delete_certificate_file(certificate_id: UUID, db: AsyncSession = Depen
     await db.commit()
     return {"detail": "Certificate deleted successfully"}
 
-async def download_certificate_file(certificate_id: UUID, db: AsyncSession = Depends(get_db)):
+async def download_certificate_file(certificate_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))
     certificate = result.scalar_one_or_none()
     
@@ -149,7 +149,7 @@ async def download_certificate_file(certificate_id: UUID, db: AsyncSession = Dep
     return FileResponse(path=file_path_str, filename=os.path.basename(file_path_str), media_type = 'application/pdf')# For Direct Download change media_type='application/octet-stream')
 
 
-async def list_all_certificates_of_student(student_id: UUID, db: AsyncSession = Depends(get_db)):
+async def list_all_certificates_of_student(student_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     try:
         result = await db.execute(
             select(CertificateIssue).where(CertificateIssue.student_id == student_id)

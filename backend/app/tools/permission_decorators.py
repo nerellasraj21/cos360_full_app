@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Callable, Any
 import logging
 
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.tools.jwt_utils import verify_access_token
 from app.service.auth.multi_tenant_permission_service import MultiTenantPermissionService
 
@@ -50,7 +50,7 @@ class PermissionDependency:
     async def __call__(
         self,
         request: Request,
-        db: AsyncSession = Depends(get_db)
+        db: AsyncSession = Depends(get_tenant_db)
     ) -> bool:
         """
         Check if the current user has permission for the specified resource:action
@@ -111,7 +111,7 @@ class PermissionDependency:
 
 async def get_current_user(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     token: dict = Depends(get_current_user_token)
 ) -> dict:
     """
@@ -206,7 +206,7 @@ class MultiplePermissions:
     async def __call__(
         self,
         request: Request,
-        db: AsyncSession = Depends(get_db),
+        db: AsyncSession = Depends(get_tenant_db),
         token: dict = Depends(get_current_user_token)
     ) -> bool:
         """Check all specified permissions"""

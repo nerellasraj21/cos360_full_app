@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from typing import List, Optional
 from datetime import date
 
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.schemas.student.certificate_schema import (
     CertificateIssueOut,
     CertificateIssueUpdate,
@@ -29,7 +29,7 @@ async def create_certificate(
     description: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
     request: Request = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     """Create student certificate - Admin only"""
     current_user = await get_current_user_token(request)
@@ -42,7 +42,7 @@ async def create_certificate(
 
 
 @router.get("/")
-async def get_certificates(request: Request, db: AsyncSession = Depends(get_db)):
+async def get_certificates(request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Get all certificates - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -54,7 +54,7 @@ async def get_certificates(request: Request, db: AsyncSession = Depends(get_db))
 
 
 @router.get("/certificateid/{certificate_id}")
-async def get_certificate_by_id(certificate_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_certificate_by_id(certificate_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Get certificate by ID - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -73,7 +73,7 @@ async def update_certificate(
     remarks: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
     request: Request = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     """Update certificate - Admin only"""
     current_user = await get_current_user_token(request)
@@ -86,7 +86,7 @@ async def update_certificate(
 
 
 @router.delete("/{certificate_id}")
-async def delete_certificate(certificate_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def delete_certificate(certificate_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Delete certificate - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -97,7 +97,7 @@ async def delete_certificate(certificate_id: UUID, request: Request, db: AsyncSe
     return await delete_certificate_file(certificate_id,db)
 
 @router.get("/certificates/{certificate_id}/download", response_class=FileResponse)
-async def download_certificate(certificate_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def download_certificate(certificate_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Download certificate file - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -109,7 +109,7 @@ async def download_certificate(certificate_id: UUID, request: Request, db: Async
 
 
 @router.get("/student/{student_id}", response_model=List[CertificateFileResponse])
-async def list_certificates_for_student(student_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def list_certificates_for_student(student_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """List certificates for specific student - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -120,7 +120,7 @@ async def list_certificates_for_student(student_id: UUID, request: Request, db: 
     return await list_all_certificates_of_student(student_id,db)
 
 @router.get("/certificate-types", response_model=List[CertificateTypeOut])
-async def list_certificate_types(request: Request, db: AsyncSession = Depends(get_db)):
+async def list_certificate_types(request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """List certificate types - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')

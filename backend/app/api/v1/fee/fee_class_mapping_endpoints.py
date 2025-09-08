@@ -7,7 +7,7 @@ from app.schemas.fee.fee_class_mapping_schema import (
     FeeClassMappingBulkCreate,
     FeeClassMappingBulkResponse
 )
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.fee.fee_class_mapping_service import (
     create_fee_class_mapping,
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/fee/class-mappings", tags=["Fee/Fee Class Mappings"]
 async def create_fee_class_mapping_endpoint(request: Request, 
 
     mapping_data: FeeClassMappingCreate, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Create a new fee class mapping"""
     current_user = await get_current_user_token(request)
@@ -46,7 +46,7 @@ async def get_all_fee_class_mappings_endpoint(request: Request,
     class_id: Optional[UUID] = Query(None, description="Filter by class ID"),
     fee_type_id: Optional[UUID] = Query(None, description="Filter by fee type ID"),
     all_by_default: Optional[bool] = Query(None, description="Filter by all_by_default flag"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get all fee class mappings with optional filters"""
     current_user = await get_current_user_token(request)
@@ -62,7 +62,7 @@ async def get_all_fee_class_mappings_endpoint(request: Request,
 async def get_fee_class_mapping_endpoint(request: Request, 
 
     mapping_id: UUID, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get a specific fee class mapping with all related information"""
     current_user = await get_current_user_token(request)
@@ -79,7 +79,7 @@ async def update_fee_class_mapping_endpoint(request: Request,
 
     mapping_id: UUID, 
     mapping_data: FeeClassMappingUpdate, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Update a fee class mapping"""
     current_user = await get_current_user_token(request)
@@ -95,7 +95,7 @@ async def update_fee_class_mapping_endpoint(request: Request,
 async def delete_fee_class_mapping_endpoint(request: Request, 
 
     mapping_id: UUID, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Delete a fee class mapping"""
     current_user = await get_current_user_token(request)
@@ -111,7 +111,7 @@ async def delete_fee_class_mapping_endpoint(request: Request,
 async def create_bulk_fee_class_mappings_endpoint(request: Request, 
 
     bulk_data: FeeClassMappingBulkCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Create fee mappings for multiple classes at once with comprehensive error handling"""
     current_user = await get_current_user_token(request)

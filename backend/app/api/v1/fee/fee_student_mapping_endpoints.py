@@ -7,7 +7,7 @@ from app.schemas.fee.fee_student_mapping_schema import (
     FeeStudentMappingBulkCreate,
     FeeStudentMappingBulkResponse
 )
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.fee.fee_student_mapping_service import (
     create_fee_student_mapping,
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/fee/student-mappings", tags=["Fee/Fee Student Mappin
 async def create_fee_student_mapping_endpoint(request: Request, 
 
     mapping_data: FeeStudentMappingCreate, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Create a new fee student mapping with automatic term amount distribution"""
     current_user = await get_current_user_token(request)
@@ -48,7 +48,7 @@ async def get_all_fee_student_mappings_endpoint(request: Request,
     section_id: Optional[UUID] = Query(None, description="Filter by section ID"),
     fee_type_id: Optional[UUID] = Query(None, description="Filter by fee type ID"),
     academic_year_id: Optional[UUID] = Query(None, description="Filter by academic year ID"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get all fee student mappings with optional filters and full student details"""
     current_user = await get_current_user_token(request)
@@ -64,7 +64,7 @@ async def get_all_fee_student_mappings_endpoint(request: Request,
 async def get_fee_student_mapping_endpoint(request: Request, 
 
     mapping_id: UUID, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get a specific fee student mapping with all related information including student details and term amounts"""
     current_user = await get_current_user_token(request)
@@ -81,7 +81,7 @@ async def update_fee_student_mapping_endpoint(request: Request,
 
     mapping_id: UUID, 
     mapping_data: FeeStudentMappingUpdate, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Update a fee student mapping and recalculate term amounts if total_fee is updated"""
     current_user = await get_current_user_token(request)
@@ -97,7 +97,7 @@ async def update_fee_student_mapping_endpoint(request: Request,
 async def delete_fee_student_mapping_endpoint(request: Request, 
 
     mapping_id: UUID, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Delete a fee student mapping and all associated term amounts"""
     current_user = await get_current_user_token(request)
@@ -113,7 +113,7 @@ async def delete_fee_student_mapping_endpoint(request: Request,
 async def create_bulk_fee_student_mappings_endpoint(request: Request, 
 
     bulk_data: FeeStudentMappingBulkCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """Create fee mappings for multiple students from a class at once with comprehensive error handling"""
     current_user = await get_current_user_token(request)

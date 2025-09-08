@@ -212,22 +212,3 @@ async def get_tenant_db_by_client_name(client_name: str) -> AsyncGenerator[Async
             raise
         finally:
             await session.close()
-
-
-# Legacy compatibility - maintain existing get_db function
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Legacy database dependency for backward compatibility.
-    Uses the default schema (cos360_main).
-    """
-    async with AsyncSessionLocal() as session:
-        try:
-            # Set search path to default schema for backward compatibility
-            await session.execute(text("SET search_path TO cos360_main"))
-            yield session
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"Error in legacy database session: {str(e)}")
-            raise
-        finally:
-            await session.close()

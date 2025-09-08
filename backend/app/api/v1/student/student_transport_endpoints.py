@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, status, Request, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_db
+from app.db.tenant_session import get_tenant_db
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from app.schemas.student.student_transport_schema import (
     StudentTransportCreate,
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/students/student-transport", tags=["Student/Student 
 async def create_student_transport(
     request: Request,
     data: StudentTransportCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -29,7 +29,7 @@ async def create_student_transport(
     return await add_student_transport(data,db)
 
 @router.get("/", response_model=list[StudentTransportOut])
-async def get_all_transport_assignments(request: Request, db: AsyncSession = Depends(get_db)):
+async def get_all_transport_assignments(request: Request, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -40,7 +40,7 @@ async def get_all_transport_assignments(request: Request, db: AsyncSession = Dep
 
 
 @router.get("/student/{student_id}", response_model=list[StudentTransportOut])
-async def get_transport_by_student(request: Request, student_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_transport_by_student(request: Request, student_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -55,7 +55,7 @@ async def update_transport_assignment(
     request: Request,
     transport_id: UUID,
     updates: StudentTransportUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -67,7 +67,7 @@ async def update_transport_assignment(
 
 
 @router.delete("/{transport_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_transport_assignment(request: Request, transport_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_transport_assignment(request: Request, transport_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
