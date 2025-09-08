@@ -1,0 +1,324 @@
+{
+	"info": {
+		"_postman_id": "fee-term-crud-collection",
+		"name": "Level 1 - Fee Term CRUD (Depends: AcademicYear)",
+		"description": "Complete CRUD operations for Fee Term model (Level 1 - Single Dependency)\n\n🔧 **Configuration:**\n- Base URL: http://127.0.0.1:8003\n- Authentication: Admin JWT Token (auto-fetched)\n- Tenant: test_tenant\n- Path: /api/v1/fee/terms/\n\n📋 **Dependencies:**\n- **Requires**: AcademicYear ID (from Level 0)\n- **Foreign Key**: academic_year_id → academic_years.id\n- **Complex Validation**: number_of_terms must match fee_term_dates array length\n- **Date Validation**: No duplicate fee_term_dates allowed\n\n📋 **6 Endpoints Covered:**\n1. CREATE Fee Term (POST / - requires academic_year_id + fee_term_dates array)\n2. LIST Fee Terms (GET / - shows associated dates)\n3. GET Fee Term by ID (GET /{id})\n4. UPDATE Fee Term (PUT /{id})\n5. DELETE Fee Term (DELETE /{id})\n6. DELETE Fee Term Date (DELETE /dates/{fee_term_date_id})\n\n🎯 **Variable Chaining:**\n- Uses {{created_academic_year_id}} from Level 0\n- Auto-captures fee_term_id for dependent requests\n- Captures fee_term_date_id for date-specific operations\n- Complex nested object creation with validation\n\n⚠️ **Business Logic:**\n- fee_term_dates array must match number_of_terms count\n- All dates must be unique\n- Cascade delete for fee_term_dates\n\n🎯 **Features:**\n- Complex nested validation\n- UUID format validation\n- Date format validation\n- Business rule testing\n- Comprehensive error handling",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [{"key": "token", "value": "{{admin_token}}", "type": "string"}]
+	},
+	"event": [{
+		"listen": "prerequest",
+		"script": {
+			"type": "text/javascript",
+			"exec": [
+				"// Auto-fetch admin token if not present",
+				"if (!pm.globals.get('admin_token')) {",
+				"    pm.sendRequest({",
+				"        url: 'http://127.0.0.1:8003/api/v1/auth/test-jwt/admin-token',",
+				"        method: 'GET'",
+				"    }, function (err, response) {",
+				"        if (!err) {",
+				"            pm.globals.set('admin_token', response.json().access_token);",
+				"            console.log('Admin token refreshed');",
+				"        }",
+				"    });",
+				"}",
+				"",
+				"// Ensure AcademicYear dependency exists",
+				"if (!pm.globals.get('created_academic_year_id')) {",
+				"    console.warn('WARNING: academic_year_id not found. Run AcademicYear collection first!');",
+				"}"
+			]
+		}
+	}],
+	"variable": [
+		{"key": "base_url", "value": "http://127.0.0.1:8003", "type": "string"},
+		{"key": "tenant_schema", "value": "test_tenant", "type": "string"}
+	],
+	"item": [
+		{
+			"name": "0. Get Admin Token",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Token received and stored', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.access_token).to.exist;",
+						"    pm.expect(jsonData.user.role).to.eql('Admin');",
+						"    pm.globals.set('admin_token', jsonData.access_token);",
+						"    console.log('Admin token set for FeeTerm testing');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": "{{base_url}}/api/v1/auth/test-jwt/admin-token",
+				"description": "Get admin JWT token for authentication"
+			}
+		},
+		{
+			"name": "0.1 [DEPENDENCY] Create Academic Year for Testing",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Academic Year created successfully', function () {",
+						"    pm.response.to.have.status(201);",
+						"});",
+						"pm.test('Academic Year ID captured for dependency', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.id).to.exist;",
+						"    pm.globals.set('created_academic_year_id', jsonData.id);",
+						"    console.log('AcademicYear ID for FeeTerm dependency:', jsonData.id);",
+						"    ",
+						"    // UUID validation",
+						"    var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;",
+						"    pm.expect(jsonData.id).to.match(uuidRegex);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "POST",
+				"header": [
+					{"key": "Content-Type", "value": "application/json"},
+					{"key": "cschema", "value": "{{tenant_schema}}"}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"FeeTerm Dependency AY 2025-26\",\n    \"start_date\": \"2025-04-01\",\n    \"end_date\": \"2026-03-31\",\n    \"is_active\": true\n}"
+				},
+				"url": "{{base_url}}/api/v1/masters/academic_years/",
+				"description": "Create AcademicYear as dependency for FeeTerm testing"
+			}
+		},
+		{
+			"name": "1. CREATE Fee Term (Complex with nested dates)",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 201 Created', function () {",
+						"    pm.response.to.have.status(201);",
+						"});",
+						"pm.test('Fee Term created with proper complex structure', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.id).to.exist;",
+						"    pm.expect(jsonData.term_name).to.exist;",
+						"    pm.expect(jsonData.number_of_terms).to.eql(3);",
+						"    pm.expect(jsonData.academic_year_id).to.exist;",
+						"    ",
+						"    // Store for dependent requests",
+						"    pm.globals.set('created_fee_term_id', jsonData.id);",
+						"    console.log('Created Fee Term ID:', jsonData.id);",
+						"    ",
+						"    // UUID validation",
+						"    var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;",
+						"    pm.expect(jsonData.id).to.match(uuidRegex);",
+						"});",
+						"pm.test('Academic Year dependency correctly linked', function () {",
+						"    var jsonData = pm.response.json();",
+						"    var expectedAcademicYearId = pm.globals.get('created_academic_year_id');",
+						"    pm.expect(jsonData.academic_year_id).to.eql(expectedAcademicYearId);",
+						"    console.log('✅ Academic Year dependency verified');",
+						"});",
+						"pm.test('Fee Term Dates validation working', function () {",
+						"    var jsonData = pm.response.json();",
+						"    // Should have created associated fee_term_dates",
+						"    if (jsonData.fee_term_dates) {",
+						"        pm.expect(jsonData.fee_term_dates).to.be.an('array');",
+						"        pm.expect(jsonData.fee_term_dates).to.have.lengthOf(3);",
+						"        console.log('✅ Fee term dates created:', jsonData.fee_term_dates.length);",
+						"        ",
+						"        // Store first date ID for DELETE operation",
+						"        if (jsonData.fee_term_dates[0] && jsonData.fee_term_dates[0].id) {",
+						"            pm.globals.set('fee_term_date_id', jsonData.fee_term_dates[0].id);",
+						"        }",
+						"    }",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "POST",
+				"header": [
+					{"key": "Content-Type", "value": "application/json"},
+					{"key": "cschema", "value": "{{tenant_schema}}"}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"term_name\": \"Quarterly Term 2025\",\n    \"term_status\": \"active\",\n    \"number_of_terms\": 3,\n    \"academic_year_id\": \"{{created_academic_year_id}}\",\n    \"fee_term_dates\": [\n        {\n            \"fee_term_date\": \"2025-07-01\"\n        },\n        {\n            \"fee_term_date\": \"2025-10-01\"\n        },\n        {\n            \"fee_term_date\": \"2026-01-01\"\n        }\n    ]\n}"
+				},
+				"url": "{{base_url}}/api/v1/fee/terms/",
+				"description": "Create Fee Term with complex nested fee_term_dates validation"
+			}
+		},
+		{
+			"name": "2. LIST All Fee Terms",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Response is array with associated dates', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData).to.be.an('array');",
+						"    if (jsonData.length > 0) {",
+						"        pm.expect(jsonData[0].id).to.exist;",
+						"        pm.expect(jsonData[0].term_name).to.exist;",
+						"        pm.expect(jsonData[0].academic_year_id).to.exist;",
+						"        console.log('Fee term with dates:', jsonData[0].term_name);",
+						"    }",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/fee/terms/",
+				"description": "Get all fee terms with their associated dates"
+			}
+		},
+		{
+			"name": "3. GET Fee Term by ID",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Fee Term details returned correctly', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.id).to.exist;",
+						"    pm.expect(jsonData.term_name).to.exist;",
+						"    pm.expect(jsonData.academic_year_id).to.exist;",
+						"    ",
+						"    var expectedId = pm.globals.get('created_fee_term_id');",
+						"    pm.expect(jsonData.id).to.eql(expectedId);",
+						"    console.log('Fee Term details:', jsonData.term_name);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/fee/terms/{{created_fee_term_id}}",
+				"description": "Get specific fee term by UUID"
+			}
+		},
+		{
+			"name": "4. UPDATE Fee Term",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Fee Term updated successfully', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.term_name).to.include('Updated');",
+						"    pm.expect(jsonData.term_status).to.eql('inactive');",
+						"    console.log('Fee Term updated:', jsonData.term_name);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{"key": "Content-Type", "value": "application/json"},
+					{"key": "cschema", "value": "{{tenant_schema}}"}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"term_name\": \"Updated Quarterly Term 2025\",\n    \"term_status\": \"inactive\",\n    \"number_of_terms\": 3,\n    \"academic_year_id\": \"{{created_academic_year_id}}\"\n}"
+				},
+				"url": "{{base_url}}/api/v1/fee/terms/{{created_fee_term_id}}",
+				"description": "Update existing fee term"
+			}
+		},
+		{
+			"name": "5. DELETE Fee Term Date (Specific Operation)",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Fee Term Date deletion confirmed', function () {",
+						"    console.log('Fee Term Date deleted successfully');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "DELETE",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/fee/terms/dates/{{fee_term_date_id}}",
+				"description": "Delete specific fee term date"
+			}
+		},
+		{
+			"name": "6. DELETE Fee Term",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Fee Term deletion confirmed', function () {",
+						"    console.log('Fee Term deleted successfully (cascade delete for dates)');",
+						"    // Clear the variable since record is deleted",
+						"    pm.globals.unset('created_fee_term_id');",
+						"    pm.globals.unset('fee_term_date_id');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "DELETE",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/fee/terms/{{created_fee_term_id}}",
+				"description": "Delete fee term (cascade deletes associated dates)"
+			}
+		},
+		{
+			"name": "7. [CLEANUP] Delete Test Academic Year",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Cleanup successful', function () {",
+						"    pm.response.to.have.status(200);",
+						"    pm.globals.unset('created_academic_year_id');",
+						"    console.log('✅ Test cleanup completed');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "DELETE",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/masters/academic_years/{{created_academic_year_id}}/permanent",
+				"description": "Cleanup test academic year dependency"
+			}
+		}
+	]
+}

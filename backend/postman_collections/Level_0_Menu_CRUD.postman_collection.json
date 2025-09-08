@@ -1,0 +1,53 @@
+{
+	"info": {
+		"_postman_id": "menu-crud-collection",
+		"name": "Level 0 - Menu CRUD (Enhanced)",
+		"description": "Complete CRUD operations for Menu model (Level 0 - Self-referential)\n\n🔧 **Configuration:**\n- Base URL: http://127.0.0.1:8003\n- Authentication: Admin JWT Token (auto-fetched)\n- Tenant: test_tenant\n- Path: /api/v1/auth/menus/\n\n📋 **2 Endpoints Covered:**\n1. CREATE Menu (POST /)\n2. LIST Menus (GET /)\n\n⚠️ **Special Notes:**\n- Self-referential model (parent_id can be null)\n- CREATE: Admin only\n- LIST: All authenticated users\n\n🎯 **Features:**\n- Auto token refresh\n- Hierarchical menu support\n- Parent-child relationship handling",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [{"key": "token", "value": "{{admin_token}}", "type": "string"}]
+	},
+	"event": [{
+		"listen": "prerequest",
+		"script": {
+			"exec": [
+				"if (!pm.globals.get('admin_token')) {",
+				"    pm.sendRequest({url: 'http://127.0.0.1:8003/api/v1/auth/test-jwt/admin-token', method: 'GET'}, function (err, response) {",
+				"        if (!err) pm.globals.set('admin_token', response.json().access_token);",
+				"    });",
+				"}"
+			]
+		}
+	}],
+	"variable": [
+		{"key": "base_url", "value": "http://127.0.0.1:8003"},
+		{"key": "tenant_schema", "value": "test_tenant"}
+	],
+	"item": [
+		{
+			"name": "1. CREATE Menu",
+			"request": {
+				"method": "POST",
+				"header": [
+					{"key": "Content-Type", "value": "application/json"},
+					{"key": "cschema", "value": "{{tenant_schema}}"}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"Test Menu\",\n    \"path\": \"/test\",\n    \"icon\": \"test-icon\",\n    \"parent_id\": null\n}"
+				},
+				"url": "{{base_url}}/api/v1/auth/menus/"
+			}
+		},
+		{
+			"name": "2. LIST All Menus",
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/auth/menus/"
+			}
+		}
+	]
+}

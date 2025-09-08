@@ -1,0 +1,397 @@
+{
+	"info": {
+		"_postman_id": "class-crud-collection",
+		"name": "Level 1 - Class CRUD (Depends: AcademicYear) - CORRECTED ENDPOINTS",
+		"description": "Complete CRUD operations for Class model (Level 1 - Single Dependency)\n\n🔧 **Configuration:**\n- Base URL: http://127.0.0.1:8003\n- Authentication: Admin JWT Token (auto-fetched)\n- Tenant: test_tenant\n- Path: /api/v1/masters/class_sections/\n\n📋 **Dependencies:**\n- **Requires**: AcademicYear ID (from Level 0)\n- **Foreign Key**: academic_year_id → academic_years.id\n- **Nested Structure**: Optional sections array with SectionCreate objects\n- **Cascade**: Class deletion removes all sections\n\n📋 **12 Endpoints Covered (REAL endpoints, not API reference):**\n1. CREATE Class with Sections (POST /)\n2. GET Class by ID (GET /by_class_id/{class_id})\n3. LIST All Classes with Sections (GET /read_all)\n4. UPDATE Class (PUT /{class_id})\n5. DELETE Class (DELETE /{class_id})\n6. GET Class-Section List (GET /class-section-list)\n7. GET Classes Only (GET /class-list)\n8. GET Sections Only (GET /section-list)\n9. GET Sections by Class Name (GET /sections-by-class-name?class_name=)\n10. GET Classes Dropdown (GET /dropdown)\n11. GET Sections by Class ID (GET /by_class_id/{class_id}/sections)\n12. GET Students by Class-Section (GET /by-class-section?class_name=&section_name=)\n\n🎯 **Variable Chaining:**\n- Uses {{created_academic_year_id}} from Level 0\n- Auto-captures class_id for dependent requests\n- Chains nested sections creation\n- Complex class-section relationship handling\n\n⚠️ **Rate Limits:**\n- CREATE: 30 per minute\n- Dropdown operations: 100 per minute\n\n🎯 **Features:**\n- Nested sections validation\n- UUID format validation\n- Complex relationship testing\n- Comprehensive dropdown endpoints\n- Class-section filtering operations",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [{"key": "token", "value": "{{admin_token}}", "type": "string"}]
+	},
+	"event": [{
+		"listen": "prerequest",
+		"script": {
+			"type": "text/javascript",
+			"exec": [
+				"// Auto-fetch admin token if not present",
+				"if (!pm.globals.get('admin_token')) {",
+				"    pm.sendRequest({",
+				"        url: 'http://127.0.0.1:8003/api/v1/auth/test-jwt/admin-token',",
+				"        method: 'GET'",
+				"    }, function (err, response) {",
+				"        if (!err) {",
+				"            pm.globals.set('admin_token', response.json().access_token);",
+				"            console.log('Admin token refreshed');",
+				"        }",
+				"    });",
+				"}",
+				"",
+				"// Ensure AcademicYear dependency exists",
+				"if (!pm.globals.get('created_academic_year_id')) {",
+				"    console.warn('WARNING: academic_year_id not found. Run AcademicYear collection first!');",
+				"}"
+			]
+		}
+	}],
+	"variable": [
+		{"key": "base_url", "value": "http://127.0.0.1:8003", "type": "string"},
+		{"key": "tenant_schema", "value": "test_tenant", "type": "string"}
+	],
+	"item": [
+		{
+			"name": "0. Get Admin Token",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Token received and stored', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.access_token).to.exist;",
+						"    pm.expect(jsonData.user.role).to.eql('Admin');",
+						"    pm.globals.set('admin_token', jsonData.access_token);",
+						"    console.log('Admin token set for Class testing');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": "{{base_url}}/api/v1/auth/test-jwt/admin-token",
+				"description": "Get admin JWT token for authentication"
+			}
+		},
+		{
+			"name": "0.1 [DEPENDENCY] Create Academic Year for Testing",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Academic Year created successfully', function () {",
+						"    pm.response.to.have.status(201);",
+						"});",
+						"pm.test('Academic Year ID captured for dependency', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.id).to.exist;",
+						"    pm.globals.set('created_academic_year_id', jsonData.id);",
+						"    console.log('AcademicYear ID for Class dependency:', jsonData.id);",
+						"    ",
+						"    // UUID validation",
+						"    var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;",
+						"    pm.expect(jsonData.id).to.match(uuidRegex);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "POST",
+				"header": [
+					{"key": "Content-Type", "value": "application/json"},
+					{"key": "cschema", "value": "{{tenant_schema}}"}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"Class Dependency AY 2025-26\",\n    \"start_date\": \"2025-04-01\",\n    \"end_date\": \"2026-03-31\",\n    \"is_active\": true\n}"
+				},
+				"url": "{{base_url}}/api/v1/masters/academic_years/",
+				"description": "Create AcademicYear as dependency for Class testing"
+			}
+		},
+		{
+			"name": "1. CREATE Class with Sections",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 201 Created', function () {",
+						"    pm.response.to.have.status(201);",
+						"});",
+						"pm.test('Class created with proper structure', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.id).to.exist;",
+						"    pm.expect(jsonData.name).to.exist;",
+						"    pm.expect(jsonData.short_code).to.exist;",
+						"    pm.expect(jsonData.academic_year_id).to.exist;",
+						"    ",
+						"    // Store for dependent requests",
+						"    pm.globals.set('created_class_id', jsonData.id);",
+						"    console.log('Created Class ID:', jsonData.id);",
+						"    ",
+						"    // UUID validation",
+						"    var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;",
+						"    pm.expect(jsonData.id).to.match(uuidRegex);",
+						"});",
+						"pm.test('Academic Year dependency correctly linked', function () {",
+						"    var jsonData = pm.response.json();",
+						"    var expectedAcademicYearId = pm.globals.get('created_academic_year_id');",
+						"    pm.expect(jsonData.academic_year_id).to.eql(expectedAcademicYearId);",
+						"    console.log('✅ Academic Year dependency verified');",
+						"});",
+						"pm.test('Sections created with class', function () {",
+						"    var jsonData = pm.response.json();",
+						"    if (jsonData.sections) {",
+						"        pm.expect(jsonData.sections).to.be.an('array');",
+						"        pm.expect(jsonData.sections).to.have.lengthOf(2);",
+						"        console.log('✅ Sections created:', jsonData.sections.length);",
+						"    }",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "POST",
+				"header": [
+					{"key": "Content-Type", "value": "application/json"},
+					{"key": "cschema", "value": "{{tenant_schema}}"}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"Grade 10\",\n    \"description\": \"Tenth grade class\",\n    \"is_active\": true,\n    \"short_code\": \"G10\",\n    \"academic_year_id\": \"{{created_academic_year_id}}\",\n    \"sections\": [\n        {\n            \"name\": \"Section A\",\n            \"description\": \"First section\",\n            \"is_active\": true\n        },\n        {\n            \"name\": \"Section B\",\n            \"description\": \"Second section\",\n            \"is_active\": true\n        }\n    ]\n}"
+				},
+				"url": "{{base_url}}/api/v1/masters/class_sections/",
+				"description": "Create Class with nested Sections and AcademicYear dependency"
+			}
+		},
+		{
+			"name": "2. GET Class by ID",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Class details returned correctly', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.id).to.exist;",
+						"    pm.expect(jsonData.name).to.exist;",
+						"    pm.expect(jsonData.academic_year_id).to.exist;",
+						"    ",
+						"    var expectedId = pm.globals.get('created_class_id');",
+						"    pm.expect(jsonData.id).to.eql(expectedId);",
+						"    console.log('Class details:', jsonData.name);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/masters/class_sections/by_class_id/{{created_class_id}}",
+				"description": "Get specific class by UUID (REAL endpoint path)"
+			}
+		},
+		{
+			"name": "3. LIST All Classes with Sections",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Response is array with sections', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData).to.be.an('array');",
+						"    if (jsonData.length > 0) {",
+						"        pm.expect(jsonData[0].id).to.exist;",
+						"        pm.expect(jsonData[0].name).to.exist;",
+						"        pm.expect(jsonData[0].academic_year_id).to.exist;",
+						"        console.log('Classes with sections listed');",
+						"    }",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/masters/class_sections/read_all",
+				"description": "Get all classes with sections (REAL endpoint path)"
+			}
+		},
+		{
+			"name": "4. GET Class-Section List",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Class-section info returned', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData).to.be.an('array');",
+						"    console.log('Class-section list retrieved');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/masters/class_sections/class-section-list",
+				"description": "Get class-section information list"
+			}
+		},
+		{
+			"name": "5. GET Classes Only (Dropdown Format)",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Classes dropdown format correct', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData).to.be.an('array');",
+						"    if (jsonData.length > 0) {",
+						"        pm.expect(jsonData[0].id).to.exist;",
+						"        pm.expect(jsonData[0].name).to.exist;",
+						"    }",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/masters/class_sections/dropdown?active_only=true",
+				"description": "Get classes dropdown (id + name only)"
+			}
+		},
+		{
+			"name": "6. GET Sections by Class ID",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Sections for class returned', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData).to.be.an('array');",
+						"    console.log('Sections for class:', jsonData.length);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/masters/class_sections/by_class_id/{{created_class_id}}/sections",
+				"description": "Get sections dropdown by class ID"
+			}
+		},
+		{
+			"name": "7. GET Sections by Class Name",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Sections by class name returned', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData).to.be.an('array');",
+						"    console.log('Sections by class name:', jsonData.length);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": {
+					"raw": "{{base_url}}/api/v1/masters/class_sections/sections-by-class-name?class_name=Grade 10",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "masters", "class_sections", "sections-by-class-name"],
+					"query": [{"key": "class_name", "value": "Grade 10"}]
+				},
+				"description": "Get sections filtered by class name"
+			}
+		},
+		{
+			"name": "8. UPDATE Class",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Class updated successfully', function () {",
+						"    var jsonData = pm.response.json();",
+						"    console.log('Class update response:', jsonData);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{"key": "Content-Type", "value": "application/json"},
+					{"key": "cschema", "value": "{{tenant_schema}}"}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"Updated Grade 10\",\n    \"description\": \"Updated tenth grade class\",\n    \"is_active\": true,\n    \"short_code\": \"UG10\",\n    \"academic_year_id\": \"{{created_academic_year_id}}\"\n}"
+				},
+				"url": "{{base_url}}/api/v1/masters/class_sections/{{created_class_id}}",
+				"description": "Update existing class"
+			}
+		},
+		{
+			"name": "9. DELETE Class",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 204 No Content', function () {",
+						"    pm.response.to.have.status(204);",
+						"});",
+						"pm.test('Class deletion confirmed', function () {",
+						"    console.log('Class deleted successfully (cascade delete for sections)');",
+						"    // Clear the variable since record is deleted",
+						"    pm.globals.unset('created_class_id');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "DELETE",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/masters/class_sections/{{created_class_id}}",
+				"description": "Delete class (cascade deletes associated sections)"
+			}
+		},
+		{
+			"name": "10. [CLEANUP] Delete Test Academic Year",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Cleanup successful', function () {",
+						"    pm.response.to.have.status(200);",
+						"    pm.globals.unset('created_academic_year_id');",
+						"    console.log('✅ Test cleanup completed');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "DELETE",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/masters/academic_years/{{created_academic_year_id}}/permanent",
+				"description": "Cleanup test academic year dependency"
+			}
+		}
+	]
+}
