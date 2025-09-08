@@ -5,6 +5,7 @@ from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from typing import Optional,List
+from uuid import UUID
 from datetime import date
 from app.tools.password_util import hash_password
 import enum
@@ -56,7 +57,7 @@ async def get_all_staff_enrollments(db: AsyncSession):
     return result.scalars().all()
 
 
-async def get_staff_enrollment_by_id(staff_id: int, db: AsyncSession):
+async def get_staff_enrollment_by_id(staff_id: UUID, db: AsyncSession):
     result = await db.execute(select(Staff).where(Staff.id == staff_id))
     staff = result.scalar_one_or_none()
     if not staff:
@@ -64,7 +65,7 @@ async def get_staff_enrollment_by_id(staff_id: int, db: AsyncSession):
     return staff
 
 
-async def update_staff_enrollment(staff_id: int, data: StaffEnrollmentUpdate, db: AsyncSession):
+async def update_staff_enrollment(staff_id: UUID, data: StaffEnrollmentUpdate, db: AsyncSession):
     result = await db.execute(select(Staff).where(Staff.id == staff_id))
     staff = result.scalar_one_or_none()
     if not staff:
@@ -78,7 +79,7 @@ async def update_staff_enrollment(staff_id: int, data: StaffEnrollmentUpdate, db
     return staff
 
 
-async def delete_staff_enrollment(staff_id: int, db: AsyncSession):
+async def delete_staff_enrollment(staff_id: UUID, db: AsyncSession):
     result = await db.execute(select(Staff).where(Staff.id == staff_id))
     staff = result.scalar_one_or_none()
     if not staff:
@@ -129,7 +130,7 @@ async def get_all_staff_attendance(
 
 
 async def get_attendance_for_staff(
-    staff_id: int,
+    staff_id: UUID,
     db: AsyncSession,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
@@ -150,7 +151,7 @@ async def get_attendance_for_staff(
     return result.scalars().all()
 
 
-async def update_staff_attendance(attendance_id: int, data: StaffAttendanceUpdate, db: AsyncSession):
+async def update_staff_attendance(attendance_id: UUID, data: StaffAttendanceUpdate, db: AsyncSession):
     result = await db.execute(select(StaffAttendance).where(StaffAttendance.id == attendance_id))
     attendance = result.scalar_one_or_none()
     if not attendance:
@@ -164,7 +165,7 @@ async def update_staff_attendance(attendance_id: int, data: StaffAttendanceUpdat
     return attendance
 
 
-async def delete_staff_attendance(attendance_id: int, db: AsyncSession):
+async def delete_staff_attendance(attendance_id: UUID, db: AsyncSession):
     result = await db.execute(select(StaffAttendance).where(StaffAttendance.id == attendance_id))
     attendance = result.scalar_one_or_none()
     if not attendance:

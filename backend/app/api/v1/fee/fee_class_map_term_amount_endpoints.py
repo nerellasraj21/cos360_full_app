@@ -20,8 +20,8 @@ router = APIRouter(prefix="/fee/class-mapping-term-amounts", tags=["Fee/Fee Clas
 # Create Fee Class Mapping Term Amounts (Bulk)
 @router.post("/", response_model=List[FeeClassMappingTermAmountRead], status_code=status.HTTP_201_CREATED)
 async def create_fee_class_mapping_term_amounts_endpoint(
-    bulk_data: FeeClassMappingTermAmountBulkCreate,
     request: Request,
+    bulk_data: FeeClassMappingTermAmountBulkCreate,
     db: AsyncSession = Depends(get_db)
 ):
     """Create multiple fee class mapping term amounts - Admin only"""
@@ -36,8 +36,8 @@ async def create_fee_class_mapping_term_amounts_endpoint(
 # Update Fee Class Mapping Term Amounts (Bulk)
 @router.put("/", response_model=List[FeeClassMappingTermAmountRead])
 async def update_fee_class_mapping_term_amounts_endpoint(
-    bulk_data: FeeClassMappingTermAmountBulkUpdate,
     request: Request,
+    bulk_data: FeeClassMappingTermAmountBulkUpdate,
     db: AsyncSession = Depends(get_db)
 ):
     """Update multiple fee class mapping term amounts (supports partial updates) - Admin only"""
@@ -52,8 +52,8 @@ async def update_fee_class_mapping_term_amounts_endpoint(
 # Delete Fee Class Mapping Term Amounts (Bulk)
 @router.delete("/")
 async def delete_fee_class_mapping_term_amounts_endpoint(
-    bulk_data: FeeClassMappingTermAmountBulkDelete,
     request: Request,
+    bulk_data: FeeClassMappingTermAmountBulkDelete,
     db: AsyncSession = Depends(get_db)
 ):
     """Delete multiple fee class mapping term amounts - Admin only"""

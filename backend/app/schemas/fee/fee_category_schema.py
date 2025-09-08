@@ -24,3 +24,12 @@ class FeeCategoryDropdown(BaseModel):
     id: UUID
     category_name: str
     model_config = {"from_attributes": True}
+    
+class FeeCategoryRead(BaseModel):
+    id: UUID
+    category_name: str
+    category_status: str
+    academic_year_id: UUID
+    academic_year_title: Optional[str] = None
+    
+    model_config = {"from_attributes": True}

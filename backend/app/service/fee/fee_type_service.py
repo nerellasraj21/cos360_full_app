@@ -15,7 +15,7 @@ from uuid import UUID
 
 log = log.getLogger("fee.type_service")
 
-async def validate_academic_year_exists(db: AsyncSession, academic_year_id: int):
+async def validate_academic_year_exists(db: AsyncSession, academic_year_id: UUID):
     """Validate that academic year exists"""
     result = await db.execute(select(AcademicYear).where(AcademicYear.id == academic_year_id))
     academic_year = result.scalar_one_or_none()
@@ -26,7 +26,7 @@ async def validate_academic_year_exists(db: AsyncSession, academic_year_id: int)
         )
     return academic_year
 
-async def validate_fee_category_exists(db: AsyncSession, fee_category_id: str):
+async def validate_fee_category_exists(db: AsyncSession, fee_category_id: UUID):
     """Validate that fee category exists"""
     try:
         fee_category_uuid = UUID(fee_category_id)
@@ -44,7 +44,7 @@ async def validate_fee_category_exists(db: AsyncSession, fee_category_id: str):
             detail="Invalid fee category ID format"
         )
 
-async def validate_fee_term_exists(db: AsyncSession, fee_term_id: str):
+async def validate_fee_term_exists(db: AsyncSession, fee_term_id: UUID):
     """Validate that fee term exists"""
     try:
         fee_term_uuid = UUID(fee_term_id)
@@ -164,7 +164,7 @@ async def create_fee_type(db: AsyncSession, fee_type_data: FeeTypeCreate):
             detail="An error occurred while creating fee type"
         )
 
-async def get_fee_type_by_id(db: AsyncSession, fee_type_id: str):
+async def get_fee_type_by_id(db: AsyncSession, fee_type_id: UUID):
     """Get a single fee type by ID with all relationships"""
     try:
         fee_type_uuid = UUID(fee_type_id)
@@ -262,7 +262,7 @@ async def get_fee_types_dropdown(db: AsyncSession, fee_category_id: Optional[str
             detail="An error occurred while retrieving fee types for dropdown"
         )
 
-async def update_fee_type(db: AsyncSession, fee_type_id: str, fee_type_data: FeeTypeUpdate):
+async def update_fee_type(db: AsyncSession, fee_type_id: UUID, fee_type_data: FeeTypeUpdate):
     """Update an existing fee type"""
     try:
         fee_type_uuid = UUID(fee_type_id)
@@ -375,7 +375,7 @@ async def update_fee_type(db: AsyncSession, fee_type_id: str, fee_type_data: Fee
             detail="An error occurred while updating fee type"
         )
 
-async def delete_fee_type(db: AsyncSession, fee_type_id: str):
+async def delete_fee_type(db: AsyncSession, fee_type_id: UUID):
     """Delete a fee type"""
     try:
         fee_type_uuid = UUID(fee_type_id)

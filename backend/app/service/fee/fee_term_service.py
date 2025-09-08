@@ -12,7 +12,7 @@ from uuid import UUID
 
 log = log.getLogger("fee.term_service")
 
-async def validate_academic_year_exists(db: AsyncSession, academic_year_id: int):
+async def validate_academic_year_exists(db: AsyncSession, academic_year_id: UUID):
     result = await db.execute(select(AcademicYear).where(AcademicYear.id == academic_year_id))
     academic_year = result.scalar_one_or_none()
     if not academic_year:
@@ -82,7 +82,7 @@ async def create_fee_term_with_dates(db: AsyncSession, fee_term_data: FeeTermCre
             detail="An error occurred while creating fee term with dates"
         )
 
-async def get_fee_term_with_dates(db: AsyncSession, fee_term_id: str):
+async def get_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
     try:
         fee_term_uuid = UUID(fee_term_id)
         result = await db.execute(
@@ -123,7 +123,7 @@ async def get_all_fee_terms(db: AsyncSession):
             detail="An error occurred while retrieving fee terms"
         )
 
-async def update_fee_term_with_dates(db: AsyncSession, fee_term_id: str, fee_term_data: FeeTermUpdate):
+async def update_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID, fee_term_data: FeeTermUpdate):
     try:
         fee_term_uuid = UUID(fee_term_id)
         
@@ -212,7 +212,7 @@ async def update_fee_term_with_dates(db: AsyncSession, fee_term_id: str, fee_ter
             detail="An error occurred while updating fee term"
         )
 
-async def delete_fee_term_date(db: AsyncSession, fee_term_date_id: str):
+async def delete_fee_term_date(db: AsyncSession, fee_term_date_id: UUID):
     try:
         fee_term_date_uuid = UUID(fee_term_date_id)
         
@@ -245,7 +245,7 @@ async def delete_fee_term_date(db: AsyncSession, fee_term_date_id: str):
             detail="An error occurred while deleting fee term date"
         )
 
-async def delete_fee_term_with_dates(db: AsyncSession, fee_term_id: str):
+async def delete_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
     try:
         fee_term_uuid = UUID(fee_term_id)
         

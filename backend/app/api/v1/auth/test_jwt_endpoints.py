@@ -61,3 +61,41 @@ async def get_student_token():
         "user": token_data,
         "instructions": "Use this token in Authorization header: Bearer <token>"
     }
+
+@router.get("/staff-token")
+async def get_staff_token():
+    """Get a test JWT token for Staff role"""
+    token_data = {
+        "sub": "550e8400-e29b-41d4-a716-446655440004",
+        "username": "staff@test.com",
+        "role": "Staff",
+        "client_name": "test_tenant"
+    }
+    
+    access_token = create_access_token(token_data)
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": token_data,
+        "instructions": "Use this token in Authorization header: Bearer <token>"
+    }
+
+@router.get("/parent-token")
+async def get_parent_token():
+    """Get a test JWT token for Parent role"""
+    token_data = {
+        "sub": "550e8400-e29b-41d4-a716-446655440005",
+        "username": "parent@test.com",
+        "role": "Parent",
+        "client_name": "test_tenant"
+    }
+    
+    access_token = create_access_token(token_data)
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": token_data,
+        "instructions": "Use this token in Authorization header: Bearer <token>"
+    }

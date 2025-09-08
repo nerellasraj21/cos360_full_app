@@ -19,13 +19,14 @@ from app.service.fee.fee_student_mapping_service import (
 )
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from typing import List, Optional
+from uuid import UUID
 
 router = APIRouter(prefix="/fee/student-mappings", tags=["Fee/Fee Student Mappings"])
 
 # Create Fee Student Mapping
 @router.post("/", response_model=FeeStudentMappingRead, status_code=status.HTTP_201_CREATED)
-async def create_fee_student_mapping_endpoint(
-    request: Request,
+async def create_fee_student_mapping_endpoint(request: Request, 
+
     mapping_data: FeeStudentMappingCreate, 
     db: AsyncSession = Depends(get_db)
 ):
@@ -40,13 +41,13 @@ async def create_fee_student_mapping_endpoint(
 
 # Get All Fee Student Mappings with filters
 @router.get("/", response_model=List[FeeStudentMappingList])
-async def get_all_fee_student_mappings_endpoint(
-    request: Request,
-    student_id: Optional[int] = Query(None, description="Filter by student ID"),
-    class_id: Optional[int] = Query(None, description="Filter by class ID"),
-    section_id: Optional[int] = Query(None, description="Filter by section ID"),
-    fee_type_id: Optional[str] = Query(None, description="Filter by fee type ID"),
-    academic_year_id: Optional[int] = Query(None, description="Filter by academic year ID"),
+async def get_all_fee_student_mappings_endpoint(request: Request, 
+
+    student_id: Optional[UUID] = Query(None, description="Filter by student ID"),
+    class_id: Optional[UUID] = Query(None, description="Filter by class ID"),
+    section_id: Optional[UUID] = Query(None, description="Filter by section ID"),
+    fee_type_id: Optional[UUID] = Query(None, description="Filter by fee type ID"),
+    academic_year_id: Optional[UUID] = Query(None, description="Filter by academic year ID"),
     db: AsyncSession = Depends(get_db)
 ):
     """Get all fee student mappings with optional filters and full student details"""
@@ -60,9 +61,9 @@ async def get_all_fee_student_mappings_endpoint(
 
 # Get Single Fee Student Mapping
 @router.get("/{mapping_id}", response_model=FeeStudentMappingRead)
-async def get_fee_student_mapping_endpoint(
-    request: Request,
-    mapping_id: str, 
+async def get_fee_student_mapping_endpoint(request: Request, 
+
+    mapping_id: UUID, 
     db: AsyncSession = Depends(get_db)
 ):
     """Get a specific fee student mapping with all related information including student details and term amounts"""
@@ -76,9 +77,9 @@ async def get_fee_student_mapping_endpoint(
 
 # Update Fee Student Mapping
 @router.put("/{mapping_id}", response_model=FeeStudentMappingRead)
-async def update_fee_student_mapping_endpoint(
-    request: Request,
-    mapping_id: str, 
+async def update_fee_student_mapping_endpoint(request: Request, 
+
+    mapping_id: UUID, 
     mapping_data: FeeStudentMappingUpdate, 
     db: AsyncSession = Depends(get_db)
 ):
@@ -93,9 +94,9 @@ async def update_fee_student_mapping_endpoint(
 
 # Delete Fee Student Mapping
 @router.delete("/{mapping_id}")
-async def delete_fee_student_mapping_endpoint(
-    request: Request,
-    mapping_id: str, 
+async def delete_fee_student_mapping_endpoint(request: Request, 
+
+    mapping_id: UUID, 
     db: AsyncSession = Depends(get_db)
 ):
     """Delete a fee student mapping and all associated term amounts"""
@@ -109,8 +110,8 @@ async def delete_fee_student_mapping_endpoint(
 
 # Create Bulk Fee Student Mappings
 @router.post("/bulk", response_model=FeeStudentMappingBulkResponse, status_code=status.HTTP_201_CREATED)
-async def create_bulk_fee_student_mappings_endpoint(
-    request: Request,
+async def create_bulk_fee_student_mappings_endpoint(request: Request, 
+
     bulk_data: FeeStudentMappingBulkCreate,
     db: AsyncSession = Depends(get_db)
 ):

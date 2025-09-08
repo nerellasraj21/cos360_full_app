@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session,joinedload,selectinload
 from sqlalchemy import select, delete
+from uuid import UUID
 from app.models.masters.class_model import Class as ClassModel
 from app.models.masters.sections_model import Section as SectionModel
 from app.models.student.student_model import Student
@@ -46,7 +47,7 @@ async def create_class_with_sections(db: AsyncSession, class_data: ClassCreate):
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"Error creating class with sections: {str(e)}")
 
-async def get_class_with_sections(db: AsyncSession, class_id: int):
+async def get_class_with_sections(db: AsyncSession, class_id: UUID):
     try:
         # db_class = db.query(ClassModel).filter(ClassModel.id == class_id).first()
         result = await db.execute(select(ClassModel).where(ClassModel.id == class_id))
@@ -62,7 +63,7 @@ async def get_class_with_sections(db: AsyncSession, class_id: int):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error fetching class with sections: {str(e)}")
 
-async def get_all_classes_with_sections(db: AsyncSession, academic_year_id: int = None):
+async def get_all_classes_with_sections(db: AsyncSession, academic_year_id: UUID = None):
     try:
         # classes = db.query(ClassModel).all()
         stmt = select(ClassModel)
@@ -84,7 +85,7 @@ async def get_all_classes_with_sections(db: AsyncSession, academic_year_id: int 
         raise HTTPException(status_code=400, detail=f"Error fetching classes with sections: {str(e)}")
     
 
-async def update_class_with_sections(db: AsyncSession, class_id: int, class_data: ClassUpdate):
+async def update_class_with_sections(db: AsyncSession, class_id: UUID, class_data: ClassUpdate):
     try:
         # existing_class = db.query(ClassModel).filter(ClassModel.id == class_id).first()
         result = await db.execute(select(ClassModel).where(ClassModel.id == class_id))
@@ -124,7 +125,7 @@ async def update_class_with_sections(db: AsyncSession, class_id: int, class_data
 
 
 
-async def delete_class_with_sections(db: AsyncSession, class_id: int):
+async def delete_class_with_sections(db: AsyncSession, class_id: UUID):
     try:
         # db_class = db.query(ClassModel).filter(ClassModel.id == class_id).first()
         result = await db.execute(select(ClassModel).where(ClassModel.id == class_id))
@@ -241,7 +242,7 @@ async def get_classes_dropdown(db: AsyncSession, active_only: bool = True):
         raise HTTPException(status_code=400, detail=f"Fetching classes dropdown failed: {str(e)}")
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes  
-async def get_sections_by_class_id(db: AsyncSession, class_id: int):
+async def get_sections_by_class_id(db: AsyncSession, class_id: UUID):
     """Get sections by class ID for dropdown - Cached"""
     try:
         result = await db.execute(

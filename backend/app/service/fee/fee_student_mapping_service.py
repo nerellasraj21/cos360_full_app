@@ -20,7 +20,7 @@ from decimal import Decimal
 
 log = log.getLogger("fee.student_mapping_service")
 
-async def validate_student_exists(db: AsyncSession, student_id: int):
+async def validate_student_exists(db: AsyncSession, student_id: UUID):
     """Validate that student exists"""
     result = await db.execute(select(Student).where(Student.id == student_id))
     student = result.scalar_one_or_none()
@@ -42,7 +42,7 @@ async def validate_admission_exists(db: AsyncSession, admission_number: str):
         )
     return admission
 
-async def validate_class_exists(db: AsyncSession, class_id: int):
+async def validate_class_exists(db: AsyncSession, class_id: UUID):
     """Validate that class exists"""
     result = await db.execute(select(Class).where(Class.id == class_id))
     class_obj = result.scalar_one_or_none()
@@ -53,7 +53,7 @@ async def validate_class_exists(db: AsyncSession, class_id: int):
         )
     return class_obj
 
-async def validate_section_exists(db: AsyncSession, section_id: int):
+async def validate_section_exists(db: AsyncSession, section_id: UUID):
     """Validate that section exists"""
     result = await db.execute(select(Section).where(Section.id == section_id))
     section = result.scalar_one_or_none()
@@ -64,11 +64,10 @@ async def validate_section_exists(db: AsyncSession, section_id: int):
         )
     return section
 
-async def validate_fee_type_exists(db: AsyncSession, fee_type_id: str):
+async def validate_fee_type_exists(db: AsyncSession, fee_type_id: UUID):
     """Validate that fee type exists"""
     try:
-        fee_type_uuid = UUID(fee_type_id)
-        result = await db.execute(select(FeeType).where(FeeType.id == fee_type_uuid))
+        result = await db.execute(select(FeeType).where(FeeType.id == fee_type_id))
         fee_type = result.scalar_one_or_none()
         if not fee_type:
             raise HTTPException(
@@ -82,7 +81,7 @@ async def validate_fee_type_exists(db: AsyncSession, fee_type_id: str):
             detail="Invalid fee type ID format"
         )
 
-async def validate_academic_year_exists(db: AsyncSession, academic_year_id: int):
+async def validate_academic_year_exists(db: AsyncSession, academic_year_id: UUID):
     """Validate that academic year exists"""
     result = await db.execute(select(AcademicYear).where(AcademicYear.id == academic_year_id))
     academic_year = result.scalar_one_or_none()
@@ -93,21 +92,19 @@ async def validate_academic_year_exists(db: AsyncSession, academic_year_id: int)
         )
     return academic_year
 
-async def check_mapping_unique(db: AsyncSession, student_id: int, fee_type_id: str, academic_year_id: int, exclude_id: Optional[str] = None):
+async def check_mapping_unique(db: AsyncSession, student_id: UUID, fee_type_id: UUID, academic_year_id: UUID, exclude_id: Optional[UUID] = None):
     """Check if mapping is unique for student, fee type, and academic year"""
     try:
-        fee_type_uuid = UUID(fee_type_id)
         query = select(FeeStudentMappingModel).where(
             and_(
                 FeeStudentMappingModel.student_id == student_id,
-                FeeStudentMappingModel.fee_type_id == fee_type_uuid,
+                FeeStudentMappingModel.fee_type_id == fee_type_id,
                 FeeStudentMappingModel.academic_year_id == academic_year_id
             )
         )
         
         if exclude_id:
-            exclude_uuid = UUID(exclude_id)
-            query = query.where(FeeStudentMappingModel.id != exclude_uuid)
+            query = query.where(FeeStudentMappingModel.id != exclude_id)
         
         result = await db.execute(query)
         existing_mapping = result.scalar_one_or_none()
@@ -123,12 +120,11 @@ async def check_mapping_unique(db: AsyncSession, student_id: int, fee_type_id: s
             detail="Invalid fee type ID format"
         )
 
-async def get_fee_terms_for_type(db: AsyncSession, fee_type_id: str):
+async def get_fee_terms_for_type(db: AsyncSession, fee_type_id: UUID):
     """Get fee terms specific to the fee type"""
     try:
-        fee_type_uuid = UUID(fee_type_id)
         result = await db.execute(
-            select(FeeType).options(selectinload(FeeType.fee_term)).where(FeeType.id == fee_type_uuid)
+            select(FeeType).options(selectinload(FeeType.fee_term)).where(FeeType.id == fee_type_id)
         )
         fee_type = result.scalar_one_or_none()
         if not fee_type or not fee_type.fee_term:
@@ -152,7 +148,7 @@ async def get_fee_terms_for_type(db: AsyncSession, fee_type_id: str):
             detail="Invalid fee type ID format"
         )
 
-async def create_term_amounts(db: AsyncSession, fee_student_mapping_id: str, total_fee: Decimal, fee_type_id: str):
+async def create_term_amounts(db: AsyncSession, fee_student_mapping_id: UUID, total_fee: Decimal, fee_type_id: UUID):
     """Create term amounts based on fee type terms"""
     fee_term = await get_fee_terms_for_type(db, fee_type_id)
     
@@ -172,7 +168,7 @@ async def create_term_amounts(db: AsyncSession, fee_student_mapping_id: str, tot
     
     return term_amounts
 
-async def get_student_details(db: AsyncSession, student_id: int, admission_number: str, class_id: int, section_id: int):
+async def get_student_details(db: AsyncSession, student_id: UUID, admission_number: str, class_id: UUID, section_id: UUID):
     """Get comprehensive student details"""
     # Get student
     result = await db.execute(select(Student).where(Student.id == student_id))
@@ -291,10 +287,9 @@ async def create_fee_student_mapping(db: AsyncSession, mapping_data: FeeStudentM
             detail="An error occurred while creating fee student mapping"
         )
 
-async def get_fee_student_mapping_by_id(db: AsyncSession, mapping_id: str):
+async def get_fee_student_mapping_by_id(db: AsyncSession, mapping_id: UUID):
     """Get a single fee student mapping by ID with all relationships"""
     try:
-        mapping_uuid = UUID(mapping_id)
         result = await db.execute(
             select(FeeStudentMappingModel)
             .options(
@@ -305,7 +300,7 @@ async def get_fee_student_mapping_by_id(db: AsyncSession, mapping_id: str):
                 selectinload(FeeStudentMappingModel.academic_year),
                 selectinload(FeeStudentMappingModel.term_amounts).selectinload(FeeStudentMapTermAmountModel.fee_term)
             )
-            .where(FeeStudentMappingModel.id == mapping_uuid)
+            .where(FeeStudentMappingModel.id == mapping_id)
         )
         mapping = result.scalar_one_or_none()
         
@@ -420,7 +415,7 @@ async def get_all_fee_student_mappings(
             detail="An error occurred while retrieving fee student mappings"
         )
 
-async def update_fee_student_mapping(db: AsyncSession, mapping_id: str, mapping_data: FeeStudentMappingUpdate):
+async def update_fee_student_mapping(db: AsyncSession, mapping_id: UUID, mapping_data: FeeStudentMappingUpdate):
     """Update an existing fee student mapping"""
     try:
         mapping_uuid = UUID(mapping_id)
@@ -531,7 +526,7 @@ async def update_fee_student_mapping(db: AsyncSession, mapping_id: str, mapping_
             detail="An error occurred while updating fee student mapping"
         )
 
-async def delete_fee_student_mapping(db: AsyncSession, mapping_id: str):
+async def delete_fee_student_mapping(db: AsyncSession, mapping_id: UUID):
     """Delete a fee student mapping"""
     try:
         mapping_uuid = UUID(mapping_id)

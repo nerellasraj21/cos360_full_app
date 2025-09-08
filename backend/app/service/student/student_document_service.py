@@ -1,4 +1,5 @@
 import os
+from uuid import UUID
 from fastapi import Depends, HTTPException, Form, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -23,7 +24,7 @@ ALLOWED_CONTENT_TYPES = {
 }
 
 async def upload_document(
-    student_id: int = Form(...),
+    student_id: UUID = Form(...),
     document_type: str = Form(...),
     document_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -66,7 +67,7 @@ async def upload_document(
 
 
 # Get all documents (optionally filter by student)
-async def get_documents_by_student(student_id: int, db: AsyncSession = Depends(get_db)):
+async def get_documents_by_student(student_id: UUID, db: AsyncSession = Depends(get_db)):
     try:
         # Check if the student exists
         student_result = await db.execute(
@@ -89,7 +90,7 @@ async def get_documents_by_student(student_id: int, db: AsyncSession = Depends(g
 
 
 # Get single document by ID
-async def get_document_by_id(document_id: int, db: AsyncSession = Depends(get_db)):
+async def get_document_by_id(document_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(StudentDocument).where(StudentDocument.id == document_id))
     doc = result.scalar_one_or_none()
     if not doc:
@@ -99,7 +100,7 @@ async def get_document_by_id(document_id: int, db: AsyncSession = Depends(get_db
 
 # Update document
 async def update_document_file(
-    document_id: int,
+    document_id: UUID,
     document_type: str = Form(...),
     document_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -156,7 +157,7 @@ async def update_document_file(
 
 
 # Delete document
-async def delete_document_file(document_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_document_file(document_id: UUID, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(StudentDocument).where(StudentDocument.id == document_id))
         doc = result.scalar_one_or_none()

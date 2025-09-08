@@ -6,7 +6,7 @@ from app.db.session import get_db
 from typing import List
 from app.service.student.admission_service import add_admission, update_partial_details_admission, get_admission_by_id,get_student_by_admission_id,search_students
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
-
+from uuid import UUID
 router = APIRouter(prefix="/students/admission", tags=["Student/Student Admission"])
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -22,7 +22,7 @@ async def create_admission(admission: StudentAdmissionCreate, request: Request, 
     return admission_respose
 
 @router.get("/id/{student_id}")
-async def get_admission(student_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_admission(student_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """Get admission by student ID - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -34,7 +34,7 @@ async def get_admission(student_id: int, request: Request, db: AsyncSession = De
     return admission_details
 
 @router.patch("/{student_id}")
-async def update_admission(student_id: int, data: StudentAdmissionUpdate, request: Request, db: AsyncSession = Depends(get_db)):
+async def update_admission(student_id: UUID, data: StudentAdmissionUpdate, request: Request, db: AsyncSession = Depends(get_db)):
     """Update student admission - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -47,7 +47,7 @@ async def update_admission(student_id: int, data: StudentAdmissionUpdate, reques
 
 # Get student by admission ID 
 @router.get("/by-admission/{admission_id}")
-async def fetch_student_by_admission(admission_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def fetch_student_by_admission(admission_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """Get student by admission ID - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')

@@ -18,10 +18,10 @@ from decimal import Decimal
 
 log = log.getLogger("fee.class_mapping_term_amount_service")
 
-async def validate_fee_class_mapping_exists(db: AsyncSession, fee_class_mapping_id: str):
+async def validate_fee_class_mapping_exists(db: AsyncSession, fee_class_mapping_id: UUID):
     """Validate that fee class mapping exists and get it with fee_type relationship"""
     try:
-        mapping_uuid = UUID(fee_class_mapping_id)
+        mapping_uuid = fee_class_mapping_id
         result = await db.execute(
             select(FeeClassMapping)
             .options(selectinload(FeeClassMapping.fee_type))
@@ -40,10 +40,10 @@ async def validate_fee_class_mapping_exists(db: AsyncSession, fee_class_mapping_
             detail="Invalid fee class mapping ID format"
         )
 
-async def validate_term_exists(db: AsyncSession, term_id: str):
+async def validate_term_exists(db: AsyncSession, term_id: UUID):
     """Validate that fee term exists"""
     try:
-        term_uuid = UUID(term_id)
+        term_uuid = term_id
         result = await db.execute(select(FeeTerm).where(FeeTerm.id == term_uuid))
         term = result.scalar_one_or_none()
         if not term:

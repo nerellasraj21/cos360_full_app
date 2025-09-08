@@ -6,6 +6,7 @@ from app.schemas.student.attendance_schema import (
     StudentAttendanceOut,
     StudentAttendanceUpdate
 )
+from uuid import UUID
 from app.service.student.student_attendance_service import add_attendance, get_attendance_by_id, get_attendances, delete_attendance_data, update_partial_details_attendance
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
@@ -41,7 +42,7 @@ async def get_all_attendance(request: Request, db: AsyncSession = Depends(get_db
 
 # Get Attendance by ID
 @router.get("/{attendance_id}", response_model=StudentAttendanceOut)
-async def get_attendance(attendance_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_attendance(attendance_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """Get attendance by ID - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -53,7 +54,7 @@ async def get_attendance(attendance_id: int, request: Request, db: AsyncSession 
 
 # Update Attendance (PATCH)
 @router.patch("/{attendance_id}", response_model=StudentAttendanceOut)
-async def update_attendance(attendance_id: int, update_data: StudentAttendanceUpdate, request: Request, db: AsyncSession = Depends(get_db)):
+async def update_attendance(attendance_id: UUID, update_data: StudentAttendanceUpdate, request: Request, db: AsyncSession = Depends(get_db)):
     """Update attendance - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -65,7 +66,7 @@ async def update_attendance(attendance_id: int, update_data: StudentAttendanceUp
 
 # Delete Attendance
 @router.delete("/{attendance_id}")
-async def delete_attendance(attendance_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def delete_attendance(attendance_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """Delete attendance - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')

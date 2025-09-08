@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-
+from uuid import UUID
 from app.schemas.masters.parent_schema import ParentCreate, ParentUpdate, ParentOut
 from app.service.masters.parent_service import (
     create_parent,
@@ -34,7 +34,7 @@ async def create_parent_profile(
 
 @router.get("/{parent_id}", response_model=ParentOut)
 async def read_parent(
-    parent_id: int,
+    parent_id: UUID,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -66,7 +66,7 @@ async def list_all_parents(request: Request, db: AsyncSession = Depends(get_db))
 
 @router.patch("/{parent_id}", response_model=ParentOut)
 async def update_parent_profile(
-    parent_id: int,
+    parent_id: UUID,
     parent_data: ParentUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -86,7 +86,7 @@ async def update_parent_profile(
 
 @router.delete("/{parent_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_parent_profile(
-    parent_id: int,
+    parent_id: UUID,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):

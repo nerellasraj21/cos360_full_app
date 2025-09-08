@@ -6,6 +6,7 @@ from app.schemas.student.student_document_schema import (
     StudentDocumentUpdate,
     StudentDocumentOut
 )
+from uuid import UUID
 
 from app.service.student.student_document_service import get_documents_by_student,delete_document_file,update_document_file,get_document_by_id,upload_document
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/students/documents", tags=["Student/Student Document
 # Create document
 @router.post("/", response_model=StudentDocumentOut, status_code=201)
 async def create_document(
-    student_id: int = Form(...),
+    student_id: UUID = Form(...),
     document_type: str = Form(...),
     document_file: UploadFile = File(...),
     request: Request = None,
@@ -38,7 +39,7 @@ async def create_document(
 
 # Get all documents (optionally filter by student)
 @router.get("/", response_model=list[StudentDocumentOut])
-async def get_documents(student_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_documents(student_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """Get all documents by student - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -51,7 +52,7 @@ async def get_documents(student_id: int, request: Request, db: AsyncSession = De
 
 # Get single document by ID
 @router.get("/{document_id}", response_model=StudentDocumentOut)
-async def get_document(document_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_document(document_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """Get document by ID - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -65,7 +66,7 @@ async def get_document(document_id: int, request: Request, db: AsyncSession = De
 # Update document
 @router.patch("/{document_id}", response_model=StudentDocumentOut)
 async def update_document(
-    document_id: int,
+    document_id: UUID,
     document_type: str = Form(...),
     document_file: UploadFile = File(...),
     request: Request = None,
@@ -83,7 +84,7 @@ async def update_document(
 
 # Delete document
 @router.delete("/{document_id}", status_code=204)
-async def delete_document(document_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def delete_document(document_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """Delete document - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')

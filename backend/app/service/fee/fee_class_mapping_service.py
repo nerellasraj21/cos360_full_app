@@ -14,7 +14,7 @@ from uuid import UUID
 
 log = log.getLogger("fee.class_mapping_service")
 
-async def validate_class_exists(db: AsyncSession, class_id: int):
+async def validate_class_exists(db: AsyncSession, class_id: UUID):
     """Validate that class exists"""
     result = await db.execute(select(Class).where(Class.id == class_id))
     class_obj = result.scalar_one_or_none()
@@ -25,11 +25,11 @@ async def validate_class_exists(db: AsyncSession, class_id: int):
         )
     return class_obj
 
-async def validate_fee_type_exists(db: AsyncSession, fee_type_id: str):
+async def validate_fee_type_exists(db: AsyncSession, fee_type_id: UUID):
     """Validate that fee type exists"""
     try:
-        fee_type_uuid = UUID(fee_type_id)
-        result = await db.execute(select(FeeType).where(FeeType.id == fee_type_uuid))
+        # Remove the redundant UUID conversion since fee_type_id is already UUID
+        result = await db.execute(select(FeeType).where(FeeType.id == fee_type_id))
         fee_type = result.scalar_one_or_none()
         if not fee_type:
             raise HTTPException(
@@ -43,7 +43,7 @@ async def validate_fee_type_exists(db: AsyncSession, fee_type_id: str):
             detail="Invalid fee type ID format"
         )
 
-async def validate_academic_year_exists(db: AsyncSession, academic_year_id: int):
+async def validate_academic_year_exists(db: AsyncSession, academic_year_id: UUID):
     """Validate that academic year exists"""
     result = await db.execute(select(AcademicYear).where(AcademicYear.id == academic_year_id))
     academic_year = result.scalar_one_or_none()
@@ -54,14 +54,13 @@ async def validate_academic_year_exists(db: AsyncSession, academic_year_id: int)
         )
     return academic_year
 
-async def check_mapping_unique(db: AsyncSession, class_id: int, fee_type_id: str, academic_year_id: int, exclude_id: Optional[str] = None):
+async def check_mapping_unique(db: AsyncSession, class_id: UUID, fee_type_id: UUID, academic_year_id: UUID, exclude_id: Optional[UUID] = None):
     """Check if mapping is unique for class, fee type, and academic year"""
     try:
-        fee_type_uuid = UUID(fee_type_id)
         query = select(FeeClassMappingModel).where(
             and_(
                 FeeClassMappingModel.class_id == class_id,
-                FeeClassMappingModel.fee_type_id == fee_type_uuid,
+                FeeClassMappingModel.fee_type_id == fee_type_id,
                 FeeClassMappingModel.academic_year_id == academic_year_id
             )
         )
@@ -165,10 +164,9 @@ async def create_fee_class_mapping(db: AsyncSession, mapping_data: FeeClassMappi
             detail="An error occurred while creating fee class mapping"
         )
 
-async def get_fee_class_mapping_by_id(db: AsyncSession, mapping_id: str):
+async def get_fee_class_mapping_by_id(db: AsyncSession, mapping_id: UUID):
     """Get a single fee class mapping by ID with all relationships"""
     try:
-        mapping_uuid = UUID(mapping_id)
         result = await db.execute(
             select(FeeClassMappingModel)
             .options(
@@ -177,7 +175,7 @@ async def get_fee_class_mapping_by_id(db: AsyncSession, mapping_id: str):
                 selectinload(FeeClassMappingModel.academic_year),
                 selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingModel.term_amounts.property.mapper.class_.fee_term)
             )
-            .where(FeeClassMappingModel.id == mapping_uuid)
+            .where(FeeClassMappingModel.id == mapping_id)
         )
         mapping = result.scalar_one_or_none()
         
@@ -274,10 +272,10 @@ async def get_all_fee_class_mappings(
             detail="An error occurred while retrieving fee class mappings"
         )
 
-async def update_fee_class_mapping(db: AsyncSession, mapping_id: str, mapping_data: FeeClassMappingUpdate):
+async def update_fee_class_mapping(db: AsyncSession, mapping_id: UUID, mapping_data: FeeClassMappingUpdate):
     """Update an existing fee class mapping"""
     try:
-        mapping_uuid = UUID(mapping_id)
+        mapping_uuid = mapping_id
         
         # Get existing mapping
         result = await db.execute(
@@ -387,10 +385,10 @@ async def update_fee_class_mapping(db: AsyncSession, mapping_id: str, mapping_da
             detail="An error occurred while updating fee class mapping"
         )
 
-async def delete_fee_class_mapping(db: AsyncSession, mapping_id: str):
+async def delete_fee_class_mapping(db: AsyncSession, mapping_id: UUID):
     """Delete a fee class mapping"""
     try:
-        mapping_uuid = UUID(mapping_id)
+        mapping_uuid = mapping_id
         
         result = await db.execute(select(FeeClassMappingModel).where(FeeClassMappingModel.id == mapping_uuid))
         db_mapping = result.scalar_one_or_none()

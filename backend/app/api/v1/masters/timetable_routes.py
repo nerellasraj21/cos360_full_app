@@ -8,6 +8,7 @@ from app.service.masters.timetable_service import update_all_details_timetable_s
 from app.db.session import get_db
 from typing import List
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
+from uuid import UUID
 
 router = APIRouter(prefix="/students/timetable", tags=["Student/Timetable"])
 
@@ -71,7 +72,7 @@ async def create_full_timetable(
 
 @router.get("/section/{section_id}", response_model=GroupedSectionTimetableOut)
 async def fetch_timetable_by_section(
-    section_id: int,
+    section_id: UUID,
     request: Request,
     db: AsyncSession = Depends(get_db)
 ):

@@ -21,9 +21,8 @@ from app.tools.simple_permissions import get_current_user_token, check_role_plan
 router = APIRouter(prefix="/auth/resource-permissions", tags=["Auth/Resource Permissions"])
 
 @router.post("/", response_model=ResourcePermissionRead, status_code=status.HTTP_201_CREATED)
-async def create_resource_permission(
-    permission_data: ResourcePermissionCreate, 
-    request: Request, 
+async def create_resource_permission(request: Request, 
+    permission_data: ResourcePermissionCreate,
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new resource permission - Admin only"""
@@ -37,8 +36,7 @@ async def create_resource_permission(
     return ResourcePermissionRead.from_orm(permission)
 
 @router.get("/", response_model=List[ResourcePermissionRead])
-async def get_all_resource_permissions(
-    request: Request,
+async def get_all_resource_permissions(request: Request,
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
     db: AsyncSession = Depends(get_db)
@@ -54,9 +52,8 @@ async def get_all_resource_permissions(
     return [ResourcePermissionRead.from_orm(p) for p in permissions]
 
 @router.get("/{permission_id}", response_model=ResourcePermissionRead)
-async def get_resource_permission(
+async def get_resource_permission(request: Request, 
     permission_id: UUID,
-    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Get a specific resource permission by ID - Admin only"""
@@ -70,11 +67,9 @@ async def get_resource_permission(
     return ResourcePermissionRead.from_orm(permission)
 
 @router.put("/{permission_id}", response_model=ResourcePermissionRead)
-async def update_resource_permission(
+async def update_resource_permission(request: Request, 
     permission_id: UUID,
-    permission_data: ResourcePermissionUpdate,
-    request: Request,
-    db: AsyncSession = Depends(get_db)
+    permission_data: ResourcePermissionUpdate,db: AsyncSession = Depends(get_db)
 ):
     """Update a resource permission - Admin only"""
     current_user = await get_current_user_token(request)
@@ -87,9 +82,8 @@ async def update_resource_permission(
     return ResourcePermissionRead.from_orm(permission)
 
 @router.delete("/{permission_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_resource_permission(
+async def delete_resource_permission(request: Request, 
     permission_id: UUID,
-    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Delete a resource permission - Admin only"""
@@ -102,9 +96,8 @@ async def delete_resource_permission(
     await ResourcePermissionService.delete_permission(db, permission_id)
 
 @router.get("/role/{role_id}", response_model=List[ResourcePermissionRead])
-async def get_permissions_by_role(
+async def get_permissions_by_role(request: Request, 
     role_id: UUID,
-    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Get all permissions for a specific role - Admin only"""
@@ -118,9 +111,8 @@ async def get_permissions_by_role(
     return [ResourcePermissionRead.from_orm(p) for p in permissions]
 
 @router.get("/resource/{resource}", response_model=List[ResourcePermissionWithRole])
-async def get_permissions_by_resource(
+async def get_permissions_by_resource(request: Request, 
     resource: str,
-    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Get all permissions for a specific resource - Admin only"""
@@ -143,9 +135,8 @@ async def get_permissions_by_resource(
     return result
 
 @router.post("/bulk", response_model=List[ResourcePermissionRead])
-async def bulk_create_resource_permissions(
+async def bulk_create_resource_permissions(request: Request, 
     bulk_data: ResourcePermissionBulkCreate,
-    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Bulk create resource permissions for a role - Admin only"""
@@ -159,9 +150,8 @@ async def bulk_create_resource_permissions(
     return [ResourcePermissionRead.from_orm(p) for p in permissions]
 
 @router.get("/role/{role_id}/summary", response_model=ResourcePermissionSummary)
-async def get_role_permission_summary(
+async def get_role_permission_summary(request: Request, 
     role_id: UUID,
-    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Get permission summary for a role - Admin only"""
@@ -174,8 +164,7 @@ async def get_role_permission_summary(
     return await ResourcePermissionService.get_role_permission_summary(db, role_id)
 
 @router.get("/matrix/all", response_model=List[RolePermissionMatrix])
-async def get_permission_matrix(
-    request: Request,
+async def get_permission_matrix(request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Get permission matrix for all roles - Admin only"""
@@ -188,9 +177,8 @@ async def get_permission_matrix(
     return await ResourcePermissionService.get_permission_matrix(db)
 
 @router.delete("/role/{role_id}/all", status_code=status.HTTP_200_OK)
-async def delete_all_permissions_for_role(
+async def delete_all_permissions_for_role(request: Request, 
     role_id: UUID,
-    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Delete all permissions for a role - Admin only"""
@@ -204,9 +192,8 @@ async def delete_all_permissions_for_role(
     return {"message": f"Deleted {deleted_count} permissions for role {role_id}"}
 
 @router.delete("/resource/{resource}/all", status_code=status.HTTP_200_OK)
-async def delete_all_permissions_for_resource(
+async def delete_all_permissions_for_resource(request: Request, 
     resource: str,
-    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Delete all permissions for a resource - Admin only"""
@@ -221,8 +208,7 @@ async def delete_all_permissions_for_resource(
 
 # Utility endpoints for frontend dropdowns
 @router.get("/dropdown/resources", response_model=List[ResourceDropdown])
-async def get_available_resources(
-    request: Request,
+async def get_available_resources(request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Get available resources for dropdown - Admin only"""
@@ -260,8 +246,7 @@ async def get_available_resources(
     ]
 
 @router.get("/dropdown/actions", response_model=List[ActionDropdown])
-async def get_available_actions(
-    request: Request,
+async def get_available_actions(request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Get available actions for dropdown - Admin only"""
@@ -295,11 +280,10 @@ async def get_available_actions(
     ]
 
 @router.get("/check/{role_id}/{resource}/{action}", response_model=dict)
-async def check_permission_exists(
+async def check_permission_exists(request: Request, 
     role_id: UUID,
     resource: str,
     action: str,
-    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Check if a specific permission exists and is granted - Admin only"""

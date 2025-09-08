@@ -18,14 +18,15 @@ from app.service.fee.fee_type_service import (
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from typing import List, Optional
+from uuid import UUID
 
 router = APIRouter(prefix="/fee/types", tags=["Fee/Fee Types"])
 
 # Create Fee Type
 @router.post("/", response_model=FeeTypeRead, status_code=status.HTTP_201_CREATED)
 @rate_limit_create("30 per minute")
-async def create_fee_type_endpoint(
-    request: Request, 
+async def create_fee_type_endpoint(request: Request, 
+
     fee_type_data: FeeTypeCreate, 
     db: AsyncSession = Depends(get_db)
 ):
@@ -40,8 +41,8 @@ async def create_fee_type_endpoint(
 
 # Get All Fee Types
 @router.get("/", response_model=List[FeeTypeRead])
-async def get_all_fee_types_endpoint(
-    request: Request,
+async def get_all_fee_types_endpoint(request: Request, 
+
     db: AsyncSession = Depends(get_db)
 ):
     """Get all fee types with their related information"""
@@ -56,9 +57,9 @@ async def get_all_fee_types_endpoint(
 # Get Fee Types for Dropdown
 @router.get("/dropdown", response_model=List[FeeTypeDropdown])
 @rate_limit_dropdown("100 per minute")
-async def get_fee_types_dropdown_endpoint(
-    request: Request,
-    fee_category_id: Optional[str] = Query(None, description="Filter by fee category ID"),
+async def get_fee_types_dropdown_endpoint(request: Request, 
+
+    fee_category_id: Optional[UUID] = Query(None, description="Filter by fee category ID"),
     db: AsyncSession = Depends(get_db)
 ):
     """Get fee types for dropdown (id + type_name only). Optionally filter by fee category. Rate limited to 100 requests per minute."""
@@ -72,9 +73,9 @@ async def get_fee_types_dropdown_endpoint(
 
 # Get Single Fee Type
 @router.get("/{fee_type_id}", response_model=FeeTypeRead)
-async def get_fee_type_endpoint(
-    request: Request,
-    fee_type_id: str, 
+async def get_fee_type_endpoint(request: Request, 
+
+    fee_type_id: UUID, 
     db: AsyncSession = Depends(get_db)
 ):
     """Get a specific fee type with all related information"""
@@ -88,9 +89,9 @@ async def get_fee_type_endpoint(
 
 # Update Fee Type
 @router.put("/{fee_type_id}", response_model=FeeTypeRead)
-async def update_fee_type_endpoint(
-    request: Request,
-    fee_type_id: str, 
+async def update_fee_type_endpoint(request: Request, 
+
+    fee_type_id: UUID, 
     fee_type_data: FeeTypeUpdate, 
     db: AsyncSession = Depends(get_db)
 ):
@@ -105,9 +106,9 @@ async def update_fee_type_endpoint(
 
 # Delete Fee Type
 @router.delete("/{fee_type_id}")
-async def delete_fee_type_endpoint(
-    request: Request,
-    fee_type_id: str, 
+async def delete_fee_type_endpoint(request: Request, 
+
+    fee_type_id: UUID, 
     db: AsyncSession = Depends(get_db)
 ):
     """Delete a fee type"""

@@ -17,6 +17,7 @@ from app.service.fee.fee_category_service import (
 )
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
 from typing import List, Optional
+from uuid import UUID
 
 # Import the new permission system
 from app.tools.permission_decorators import (
@@ -70,7 +71,7 @@ async def get_all_fee_categories_endpoint(
 # Get Fee Categories for Dropdown - Protected with read permission
 @router.get("/dropdown", response_model=List[FeeCategoryDropdown])
 async def get_fee_categories_dropdown_endpoint(
-    academic_year_id: Optional[int] = Query(None, description="Filter by academic year ID"),
+    academic_year_id: Optional[UUID] = Query(None, description="Filter by academic year ID"),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
     _permission_check: bool = Depends(RequireRead("fee_categories"))
@@ -90,7 +91,7 @@ async def get_fee_categories_dropdown_endpoint(
 # Get Single Fee Category - Protected with read permission
 @router.get("/{fee_category_id}", response_model=FeeCategoryRead)
 async def get_fee_category_endpoint(
-    fee_category_id: str,
+    fee_category_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
     _permission_check: bool = Depends(RequireRead("fee_categories"))
@@ -109,7 +110,7 @@ async def get_fee_category_endpoint(
 # Update Fee Category - Protected with update permission
 @router.put("/{fee_category_id}", response_model=FeeCategoryRead)
 async def update_fee_category_endpoint(
-    fee_category_id: str,
+    fee_category_id: UUID,
     fee_category_data: FeeCategoryUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -129,7 +130,7 @@ async def update_fee_category_endpoint(
 # Delete Fee Category - Protected with delete permission
 @router.delete("/{fee_category_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_fee_category_endpoint(
-    fee_category_id: str,
+    fee_category_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
     _permission_check: bool = Depends(RequireDelete("fee_categories"))

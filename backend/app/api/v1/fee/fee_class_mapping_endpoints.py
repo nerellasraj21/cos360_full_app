@@ -19,13 +19,14 @@ from app.service.fee.fee_class_mapping_service import (
 )
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from typing import List, Optional
+from uuid import UUID
 
 router = APIRouter(prefix="/fee/class-mappings", tags=["Fee/Fee Class Mappings"])
 
 # Create Fee Class Mapping
 @router.post("/", response_model=FeeClassMappingRead, status_code=status.HTTP_201_CREATED)
-async def create_fee_class_mapping_endpoint(
-    request: Request,
+async def create_fee_class_mapping_endpoint(request: Request, 
+
     mapping_data: FeeClassMappingCreate, 
     db: AsyncSession = Depends(get_db)
 ):
@@ -40,10 +41,10 @@ async def create_fee_class_mapping_endpoint(
 
 # Get All Fee Class Mappings with filters
 @router.get("/", response_model=List[FeeClassMappingList])
-async def get_all_fee_class_mappings_endpoint(
-    request: Request,
-    class_id: Optional[int] = Query(None, description="Filter by class ID"),
-    fee_type_id: Optional[str] = Query(None, description="Filter by fee type ID"),
+async def get_all_fee_class_mappings_endpoint(request: Request, 
+
+    class_id: Optional[UUID] = Query(None, description="Filter by class ID"),
+    fee_type_id: Optional[UUID] = Query(None, description="Filter by fee type ID"),
     all_by_default: Optional[bool] = Query(None, description="Filter by all_by_default flag"),
     db: AsyncSession = Depends(get_db)
 ):
@@ -58,9 +59,9 @@ async def get_all_fee_class_mappings_endpoint(
 
 # Get Single Fee Class Mapping
 @router.get("/{mapping_id}", response_model=FeeClassMappingRead)
-async def get_fee_class_mapping_endpoint(
-    request: Request,
-    mapping_id: str, 
+async def get_fee_class_mapping_endpoint(request: Request, 
+
+    mapping_id: UUID, 
     db: AsyncSession = Depends(get_db)
 ):
     """Get a specific fee class mapping with all related information"""
@@ -74,9 +75,9 @@ async def get_fee_class_mapping_endpoint(
 
 # Update Fee Class Mapping
 @router.put("/{mapping_id}", response_model=FeeClassMappingRead)
-async def update_fee_class_mapping_endpoint(
-    request: Request,
-    mapping_id: str, 
+async def update_fee_class_mapping_endpoint(request: Request, 
+
+    mapping_id: UUID, 
     mapping_data: FeeClassMappingUpdate, 
     db: AsyncSession = Depends(get_db)
 ):
@@ -91,9 +92,9 @@ async def update_fee_class_mapping_endpoint(
 
 # Delete Fee Class Mapping
 @router.delete("/{mapping_id}")
-async def delete_fee_class_mapping_endpoint(
-    request: Request,
-    mapping_id: str, 
+async def delete_fee_class_mapping_endpoint(request: Request, 
+
+    mapping_id: UUID, 
     db: AsyncSession = Depends(get_db)
 ):
     """Delete a fee class mapping"""
@@ -107,8 +108,8 @@ async def delete_fee_class_mapping_endpoint(
 
 # Create Bulk Fee Class Mappings
 @router.post("/bulk", response_model=FeeClassMappingBulkResponse, status_code=status.HTTP_201_CREATED)
-async def create_bulk_fee_class_mappings_endpoint(
-    request: Request,
+async def create_bulk_fee_class_mappings_endpoint(request: Request, 
+
     bulk_data: FeeClassMappingBulkCreate,
     db: AsyncSession = Depends(get_db)
 ):

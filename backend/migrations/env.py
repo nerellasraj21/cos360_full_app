@@ -81,7 +81,9 @@ def run_migrations_online() -> None:
         # Set the search_path for Alembic migrations
         @event.listens_for(connection, "begin")
         def set_search_path(conn):
-            conn.exec_driver_sql('SET search_path TO cos360_main')
+            import os
+            schema_name = os.getenv('SCHEMA_NAME', 'cos360_main')
+            conn.exec_driver_sql(f'SET search_path TO {schema_name}')
             
         context.configure(
             connection=connection, target_metadata=target_metadata, compare_type=True,  # Enable type comparison

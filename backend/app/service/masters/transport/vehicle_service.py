@@ -3,6 +3,7 @@ from app.models.masters.transport import Vehicle
 from app.schemas.masters.transport import VehicleCreate, VehicleUpdate
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 
 async def add_vehicle(data: VehicleCreate, db: AsyncSession):
     vehicle = Vehicle(**data.dict())
@@ -15,14 +16,14 @@ async def get_vehicles(db: AsyncSession):
     result = await db.execute(select(Vehicle).where(Vehicle.is_active == True))
     return result.scalars().all()
 
-async def get_individual_vehicle_by_id(vehicle_id: int, db: AsyncSession):
+async def get_individual_vehicle_by_id(vehicle_id: UUID, db: AsyncSession):
     result = await db.execute(select(Vehicle).where(Vehicle.id == vehicle_id))
     vehicle = result.scalar_one_or_none()
     if not vehicle:
         raise HTTPException(404, detail="Vehicle not found")
     return vehicle
 
-async def update_all_details_vehicle(vehicle_id: int, data: VehicleCreate, db: AsyncSession):
+async def update_all_details_vehicle(vehicle_id: UUID, data: VehicleCreate, db: AsyncSession):
     result = await db.execute(select(Vehicle).where(Vehicle.id == vehicle_id))
     vehicle = result.scalar_one_or_none()
     if not vehicle:
@@ -33,7 +34,7 @@ async def update_all_details_vehicle(vehicle_id: int, data: VehicleCreate, db: A
     await db.refresh(vehicle)
     return vehicle
 
-async def update_partial_details_vehicle(vehicle_id: int, data: VehicleUpdate, db: AsyncSession):
+async def update_partial_details_vehicle(vehicle_id: UUID, data: VehicleUpdate, db: AsyncSession):
     result = await db.execute(select(Vehicle).where(Vehicle.id == vehicle_id))
     vehicle = result.scalar_one_or_none()
     if not vehicle:
@@ -44,7 +45,7 @@ async def update_partial_details_vehicle(vehicle_id: int, data: VehicleUpdate, d
     await db.refresh(vehicle)
     return vehicle
 
-async def deactivate_vehicle(vehicle_id: int, db: AsyncSession):
+async def deactivate_vehicle(vehicle_id: UUID, db: AsyncSession):
     result = await db.execute(select(Vehicle).where(Vehicle.id == vehicle_id))
     vehicle = result.scalar_one_or_none()
     if not vehicle:

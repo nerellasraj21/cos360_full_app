@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
 from app.models.masters.holidays_model import Holiday as HolidayModel
 from app.schemas.masters.holidays_schema import HolidayCreate, HolidayUpdate
+from uuid import UUID
 from app.tools.cache_utils import cache_dropdown, invalidate_cache
 import logging as log
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +32,7 @@ async def create_holiday(db: AsyncSession, holiday_data: HolidayCreate):
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"Error creating holiday: {str(e)}")
     
-async def get_holiday_by_id(db: AsyncSession, holiday_id: int):
+async def get_holiday_by_id(db: AsyncSession, holiday_id: UUID):
     try:
         if not isinstance(holiday_id, int) or holiday_id <= 0:
             raise ValueError("Invalid holiday ID")
@@ -45,7 +46,7 @@ async def get_holiday_by_id(db: AsyncSession, holiday_id: int):
         log.error(f"Invalid holiday ID: {ve}")
         raise HTTPException(status_code=400, detail=str(ve))
 
-async def get_all_holidays(db: AsyncSession, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: int = None):
+async def get_all_holidays(db: AsyncSession, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: UUID = None):
     try:
         query = select(HolidayModel)
         if active_only:
@@ -58,7 +59,7 @@ async def get_all_holidays(db: AsyncSession, skip: int = 0, limit: int = 100, ac
         log.error(f"Error building query for holidays: {e}")
         raise HTTPException(status_code=400, detail="Invalid query parameters.")
 
-async def update_holiday(db: AsyncSession, holiday_id: int, holiday_data: HolidayUpdate):
+async def update_holiday(db: AsyncSession, holiday_id: UUID, holiday_data: HolidayUpdate):
     try:
         holiday = await get_holiday_by_id(db, holiday_id)
         if not holiday:
@@ -78,7 +79,7 @@ async def update_holiday(db: AsyncSession, holiday_id: int, holiday_data: Holida
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"Error updating holiday: {str(e)}")
 
-async def deactivate_holiday(db: AsyncSession, holiday_id: int):
+async def deactivate_holiday(db: AsyncSession, holiday_id: UUID):
     try:
         holiday = await get_holiday_by_id(db, holiday_id)
         if not holiday:
@@ -96,7 +97,7 @@ async def deactivate_holiday(db: AsyncSession, holiday_id: int):
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"Error deactivating holiday: {str(e)}")
 
-async def activate_holiday(db: AsyncSession, holiday_id: int):
+async def activate_holiday(db: AsyncSession, holiday_id: UUID):
     try:
         holiday = await get_holiday_by_id(db, holiday_id)
         if not holiday:

@@ -7,6 +7,7 @@ from app.models.masters.slot_time_model import SlotTime
 from app.models.masters.timetable_subject_option_model import TimetableSubjectOption
 from app.schemas.masters.timetable_schema import TimetableSlotCreate, TimetableSlotUpdate, TimetableSubjectOptionCreate, TimetableSubjectOptionUpdate, TimetableSlotPartialUpdate, FullTimetableCreate, SlotTimeCreate, GroupedSlotOut, GroupedSectionTimetableOut, TimetableSlotOut, TimetableSlotBulkUpdateRequest
 from fastapi import HTTPException
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 async def add_timetable_slot(slot: TimetableSlotCreate, db: AsyncSession):
@@ -40,7 +41,7 @@ async def get__all_timetable_slots(db: AsyncSession):
         raise HTTPException(status_code=500, detail=f"Error fetching slots: {str(e)}")
 
 
-async def get_timetable_slot_by_id(slot_id: int, db: AsyncSession):
+async def get_timetable_slot_by_id(slot_id: UUID, db: AsyncSession):
     try:
         result = await db.execute(select(TimetableSlot).where(TimetableSlot.id == slot_id))
         slot = result.scalar_one_or_none()
@@ -51,7 +52,7 @@ async def get_timetable_slot_by_id(slot_id: int, db: AsyncSession):
         raise HTTPException(status_code=500, detail=f"Error fetching slot: {str(e)}")
 
 
-async def update_all_details_timetable_slot(slot_id: int, slot_data: TimetableSlotUpdate, db: AsyncSession):
+async def update_all_details_timetable_slot(slot_id: UUID, slot_data: TimetableSlotUpdate, db: AsyncSession):
     try:
         result = await db.execute(select(TimetableSlot).where(TimetableSlot.id == slot_id))
         slot = result.scalar_one_or_none()
@@ -78,7 +79,7 @@ async def update_all_details_timetable_slot(slot_id: int, slot_data: TimetableSl
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error updating slot: {str(e)}")
     
-async def update_partial_details_timetable_slot(slot_id: int, slot_data: TimetableSlotPartialUpdate, db: AsyncSession):
+async def update_partial_details_timetable_slot(slot_id: UUID, slot_data: TimetableSlotPartialUpdate, db: AsyncSession):
     try:
         result = await db.execute(select(TimetableSlot).where(TimetableSlot.id == slot_id))
         slot = result.scalar_one_or_none()
@@ -106,7 +107,7 @@ async def update_partial_details_timetable_slot(slot_id: int, slot_data: Timetab
         raise HTTPException(status_code=500, detail=f"Error patching slot: {str(e)}")
 
 
-async def delete_timetable_slot_by_id(slot_id: int, db: AsyncSession):
+async def delete_timetable_slot_by_id(slot_id: UUID, db: AsyncSession):
     try:
         result = await db.execute(select(TimetableSlot).where(TimetableSlot.id == slot_id))
         slot = result.scalar_one_or_none()
@@ -139,7 +140,7 @@ async def get__all_subject_options(db: AsyncSession):
         raise HTTPException(status_code=500, detail=f"Error fetching subject options: {str(e)}")
 
 
-async def get_subject_option_by_id(option_id: int, db: AsyncSession):
+async def get_subject_option_by_id(option_id: UUID, db: AsyncSession):
     try:
         result = await db.execute(select(TimetableSubjectOption).where(TimetableSubjectOption.id == option_id))
         option = result.scalar_one_or_none()
@@ -150,7 +151,7 @@ async def get_subject_option_by_id(option_id: int, db: AsyncSession):
         raise HTTPException(status_code=500, detail=f"Error fetching subject option: {str(e)}")
 
 
-async def update_all_details_subject_option(option_id: int, update_data: TimetableSubjectOptionUpdate, db: AsyncSession):
+async def update_all_details_subject_option(option_id: UUID, update_data: TimetableSubjectOptionUpdate, db: AsyncSession):
     try:
         result = await db.execute(select(TimetableSubjectOption).where(TimetableSubjectOption.id == option_id))
         option = result.scalar_one_or_none()
@@ -166,7 +167,7 @@ async def update_all_details_subject_option(option_id: int, update_data: Timetab
         raise HTTPException(status_code=500, detail=f"Error updating subject option: {str(e)}")
 
 
-async def delete_subject_option_by_id(option_id: int, db: AsyncSession):
+async def delete_subject_option_by_id(option_id: UUID, db: AsyncSession):
     try:
         result = await db.execute(select(TimetableSubjectOption).where(TimetableSubjectOption.id == option_id))
         option = result.scalar_one_or_none()
@@ -213,7 +214,7 @@ async def add_slot_time(slot_time_data: SlotTimeCreate, db: AsyncSession) -> Slo
     return new_slot_time
 
 # Get all (optional filter by section)
-async def get_slot_times(section_id: int | None, db: AsyncSession) -> list[SlotTime]:
+async def get_slot_times(section_id: UUID | None, db: AsyncSession) -> list[SlotTime]:
     query = select(SlotTime)
     if section_id:
         query = query.where(SlotTime.section_id == section_id)
@@ -221,7 +222,7 @@ async def get_slot_times(section_id: int | None, db: AsyncSession) -> list[SlotT
     return result.scalars().all()
 
 # Get by ID
-async def get_slot_time(slot_time_id: int, db: AsyncSession) -> SlotTime:
+async def get_slot_time(slot_time_id: UUID, db: AsyncSession) -> SlotTime:
     result = await db.execute(select(SlotTime).where(SlotTime.id == slot_time_id))
     slot_time = result.scalar_one_or_none()
     if not slot_time:
@@ -229,7 +230,7 @@ async def get_slot_time(slot_time_id: int, db: AsyncSession) -> SlotTime:
     return slot_time
 
 # Update (PUT)
-async def update_slot_time(slot_time_id: int, updated_data: SlotTimeCreate, db: AsyncSession) -> SlotTime:
+async def update_slot_time(slot_time_id: UUID, updated_data: SlotTimeCreate, db: AsyncSession) -> SlotTime:
     slot_time = await get_slot_time(slot_time_id, db)
     for field, value in updated_data.dict().items():
         setattr(slot_time, field, value)
@@ -238,7 +239,7 @@ async def update_slot_time(slot_time_id: int, updated_data: SlotTimeCreate, db: 
     return slot_time
 
 # Patch
-async def patch_slot_time(slot_time_id: int, data: dict, db: AsyncSession) -> SlotTime:
+async def patch_slot_time(slot_time_id: UUID, data: dict, db: AsyncSession) -> SlotTime:
     slot_time = await get_slot_time(slot_time_id, db)
     for field, value in data.items():
         if hasattr(slot_time, field):
@@ -247,7 +248,7 @@ async def patch_slot_time(slot_time_id: int, data: dict, db: AsyncSession) -> Sl
     await db.refresh(slot_time)
     return slot_time
 
-async def get_timetable_by_section(section_id: int, db: AsyncSession):
+async def get_timetable_by_section(section_id: UUID, db: AsyncSession):
     # Step 1: Find the timetable for the section
     timetable_stmt = select(Timetable).where(Timetable.section_id == section_id)
     timetable_result = await db.execute(timetable_stmt)

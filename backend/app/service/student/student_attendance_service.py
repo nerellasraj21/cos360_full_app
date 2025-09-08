@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 from sqlalchemy.future import select
 from app.models.masters.attendance_model import StudentAttendance
 from app.schemas.student.attendance_schema import (
@@ -25,7 +26,7 @@ async def get_attendances(db: AsyncSession):
     return result.scalars().all()
 
 # Get Attendance by ID
-async def get_attendance_by_id(attendance_id: int, db: AsyncSession):
+async def get_attendance_by_id(attendance_id: UUID, db: AsyncSession):
     result = await db.execute(select(StudentAttendance).where(StudentAttendance.id == attendance_id))
     attendance = result.scalar_one_or_none()
     if not attendance:
@@ -33,7 +34,7 @@ async def get_attendance_by_id(attendance_id: int, db: AsyncSession):
     return attendance
 
 # Update Attendance (PATCH)
-async def update_partial_details_attendance(attendance_id: int, update_data: StudentAttendanceUpdate, db: AsyncSession):
+async def update_partial_details_attendance(attendance_id: UUID, update_data: StudentAttendanceUpdate, db: AsyncSession):
     result = await db.execute(select(StudentAttendance).where(StudentAttendance.id == attendance_id))
     attendance = result.scalar_one_or_none()
     if not attendance:
@@ -51,7 +52,7 @@ async def update_partial_details_attendance(attendance_id: int, update_data: Stu
         raise HTTPException(status_code=500, detail=f"Error updating attendance: {str(e)}")
 
 # Delete Attendance
-async def delete_attendance_data(attendance_id: int, db: AsyncSession):
+async def delete_attendance_data(attendance_id: UUID, db: AsyncSession):
     result = await db.execute(select(StudentAttendance).where(StudentAttendance.id == attendance_id))
     attendance = result.scalar_one_or_none()
     if not attendance:

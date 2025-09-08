@@ -7,6 +7,7 @@ from app.schemas.student.student_transport_schema import (
     StudentTransportUpdate,
     StudentTransportOut,
 )
+from uuid import UUID
 
 from app.service.student.student_transport_service import get_transport_assignments,get_transport_by_student_id,update_partial_details_transport_assignment,add_student_transport,unassign_transport
 
@@ -39,7 +40,7 @@ async def get_all_transport_assignments(request: Request, db: AsyncSession = Dep
 
 
 @router.get("/student/{student_id}", response_model=list[StudentTransportOut])
-async def get_transport_by_student(request: Request, student_id: int, db: AsyncSession = Depends(get_db)):
+async def get_transport_by_student(request: Request, student_id: UUID, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -52,7 +53,7 @@ async def get_transport_by_student(request: Request, student_id: int, db: AsyncS
 @router.patch("/{transport_id}", response_model=StudentTransportOut)
 async def update_transport_assignment(
     request: Request,
-    transport_id: int,
+    transport_id: UUID,
     updates: StudentTransportUpdate,
     db: AsyncSession = Depends(get_db)
 ):
@@ -66,7 +67,7 @@ async def update_transport_assignment(
 
 
 @router.delete("/{transport_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_transport_assignment(request: Request, transport_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_transport_assignment(request: Request, transport_id: UUID, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     

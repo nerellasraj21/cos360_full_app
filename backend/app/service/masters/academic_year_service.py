@@ -6,6 +6,7 @@ from app.tools.cache_utils import cache_dropdown, invalidate_cache
 import logging as log
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 
 log = log.getLogger("masters.academic_year_service")
 
@@ -41,7 +42,7 @@ async def create_academic_year(db: AsyncSession, academic_year: AcademicYearCrea
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Academic Year creation failed: {str(e)}")
         
-async def get_academic_year_by_id(db: AsyncSession, academic_year_id: int):
+async def get_academic_year_by_id(db: AsyncSession, academic_year_id: UUID):
     # db_academic_year = db.query(AcademicYear).filter(AcademicYear.id == academic_year_id).first()
     result = await db.execute(select(AcademicYear).where(AcademicYear.id == academic_year_id))
     db_academic_year = result.scalar_one_or_none()
@@ -68,7 +69,7 @@ async def get_all_academic_years(db: AsyncSession, skip: int = 0, limit: int = 1
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Fetching academic years failed: {str(e)}")
         
-async def update_academic_year(db: AsyncSession, academic_year_id: int, academic_year_update: AcademicYearUpdate):
+async def update_academic_year(db: AsyncSession, academic_year_id: UUID, academic_year_update: AcademicYearUpdate):
     try:
         db_academic_year = await get_academic_year_by_id(db, academic_year_id)
         if not db_academic_year:
@@ -95,7 +96,7 @@ async def update_academic_year(db: AsyncSession, academic_year_id: int, academic
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Academic Year update failed: {str(e)}")
         
-async def deactivate_academic_year(db: AsyncSession, academic_year_id: int):
+async def deactivate_academic_year(db: AsyncSession, academic_year_id: UUID):
     try:
         db_academic_year = await get_academic_year_by_id(db, academic_year_id)
         if not db_academic_year:
@@ -114,6 +115,27 @@ async def deactivate_academic_year(db: AsyncSession, academic_year_id: int):
         log.error(f"Error deactivating academic year: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Academic Year deactivation failed: {str(e)}")
+
+async def delete_academic_year(db: AsyncSession, academic_year_id: UUID):
+    """Permanently delete an academic year (for testing purposes)"""
+    try:
+        db_academic_year = await get_academic_year_by_id(db, academic_year_id)
+        if not db_academic_year:
+            log.warning(f"Academic Year with id {academic_year_id} not found for deletion")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail=f"Academic Year with id {academic_year_id} not found")
+        
+        await db.delete(db_academic_year)
+        await db.commit()
+        
+        # Invalidate cache after deleting academic year
+        invalidate_cache("dropdown", "academic_years")
+        
+        return {"message": f"Academic Year {db_academic_year.title} deleted successfully"}
+    except Exception as e:
+        log.error(f"Error deleting academic year: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Academic Year deletion failed: {str(e)}")
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes
 async def get_academic_years_dropdown(db: AsyncSession, active_only: bool = True):

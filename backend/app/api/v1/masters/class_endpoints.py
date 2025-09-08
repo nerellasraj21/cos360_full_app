@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from typing import List
+from uuid import UUID
 from app.service.masters.class_service import create_class_with_sections,get_all_classes_with_sections,update_class_with_sections,delete_class_with_sections,get_class_with_sections,get_class_section_list,get_all_classes_data,get_all_sections_data,get_sections_by_class_name,get_students_by_class_section,get_classes_dropdown,get_sections_by_class_id
 from app.schemas.masters.class_schema import ClassCreate, ClassRead, ClassUpdate,ClassOut,ClassDropdown
 from app.schemas.masters.sections_schema import ClassSectionInfo,SectionOut,SectionDropdown
@@ -25,7 +26,7 @@ async def create_class(request: Request, class_data: ClassCreate, db: AsyncSessi
 
 # Read Single Class with Sections
 @router.get("/by_class_id/{class_id}", response_model=ClassRead)
-async def get_class(request: Request, class_id: int, db: AsyncSession = Depends(get_db)):
+async def get_class(request: Request, class_id: UUID, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -50,7 +51,7 @@ async def get_classes_with_sections(request: Request, db: AsyncSession = Depends
 
 # Update Class and Replace Sections
 @router.put("/{class_id}", response_model=dict)
-async def update_class(request: Request, class_id: int, class_data: ClassUpdate, db: AsyncSession = Depends(get_db)):
+async def update_class(request: Request, class_id: UUID, class_data: ClassUpdate, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -64,7 +65,7 @@ async def update_class(request: Request, class_id: int, class_data: ClassUpdate,
 
 # Delete Class
 @router.delete("/{class_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_class(request: Request, class_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_class(request: Request, class_id: UUID, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -127,7 +128,7 @@ async def get_classes_dropdown_endpoint(request: Request, active_only: bool = Tr
 
 @router.get("/by_class_id/{class_id}/sections", response_model=List[SectionDropdown])
 @rate_limit_dropdown("100 per minute")
-async def get_sections_by_class_id_endpoint(request: Request, class_id: int, db: AsyncSession = Depends(get_db)):
+async def get_sections_by_class_id_endpoint(request: Request, class_id: UUID, db: AsyncSession = Depends(get_db)):
     """Get sections by class ID for dropdown (id + name only). Rate limited to 100 requests per minute."""
     return await get_sections_by_class_id(db, class_id)
 

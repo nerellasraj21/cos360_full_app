@@ -7,6 +7,7 @@ from app.models.masters.subject_model import Subject
 from app.schemas.masters.subject_schema import SubjectCreate, SubjectUpdate
 from app.tools.cache_utils import cache_dropdown, invalidate_cache
 import logging
+from uuid import UUID
 
 log = logging.getLogger("masters.subject_service")
 
@@ -26,7 +27,7 @@ async def create_subject(db: AsyncSession, subject_data: SubjectCreate) -> Subje
         log.error(f"Failed to create subject: {e}")
         raise HTTPException(status_code=400, detail="Subject creation failed.")
 
-async def get_subject_by_id(db: AsyncSession, subject_id: int):
+async def get_subject_by_id(db: AsyncSession, subject_id: UUID):
     try:
         if not isinstance(subject_id, int) or subject_id <= 0:
             raise ValueError("Invalid subject ID")
@@ -42,7 +43,7 @@ async def get_subject_by_id(db: AsyncSession, subject_id: int):
         raise HTTPException(status_code=404, detail="Subject not found")
     return subject
 
-async def get_all_subjects(db: AsyncSession, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: int = None):
+async def get_all_subjects(db: AsyncSession, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: UUID = None):
     try:
         query = select(Subject).options(selectinload(Subject.category))
         if active_only:
@@ -55,7 +56,7 @@ async def get_all_subjects(db: AsyncSession, skip: int = 0, limit: int = 100, ac
     result = await db.execute(query.offset(skip).limit(limit))
     return result.scalars().all()
 
-async def update_subject(db: AsyncSession, subject_id: int, subject_data: SubjectUpdate):
+async def update_subject(db: AsyncSession, subject_id: UUID, subject_data: SubjectUpdate):
     try:
         subject = await get_subject_by_id(db, subject_id)
         if not subject:
@@ -70,7 +71,7 @@ async def update_subject(db: AsyncSession, subject_id: int, subject_data: Subjec
         raise HTTPException(status_code=400, detail="Subject update failed.")
     return subject
 
-async def deactivate_subject(db: AsyncSession, subject_id: int):
+async def deactivate_subject(db: AsyncSession, subject_id: UUID):
     try:
         subject = await get_subject_by_id(db, subject_id)
         if not subject:
@@ -85,7 +86,7 @@ async def deactivate_subject(db: AsyncSession, subject_id: int):
     return subject
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes
-async def get_subjects_by_category_id(category_id: int, db: AsyncSession):
+async def get_subjects_by_category_id(category_id: UUID, db: AsyncSession):
     """Get subjects by category ID - Cached"""
     try:
         stmt = select(Subject).options(selectinload(Subject.category)).where(Subject.category_id == category_id, Subject.is_active == True)
@@ -115,7 +116,7 @@ async def get_subjects_dropdown(db: AsyncSession, active_only: bool = True):
         raise HTTPException(status_code=400, detail=f"Fetching subjects dropdown failed: {str(e)}")
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes
-async def get_subjects_by_category_id_dropdown(category_id: int, db: AsyncSession):
+async def get_subjects_by_category_id_dropdown(category_id: UUID, db: AsyncSession):
     """Get subjects by category ID for dropdown (id + name only) - Cached"""
     try:
         stmt = select(Subject.id, Subject.name).where(Subject.category_id == category_id, Subject.is_active == True).order_by(Subject.name)

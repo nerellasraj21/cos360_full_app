@@ -6,6 +6,7 @@ from app.tools.cache_utils import cache_dropdown, invalidate_cache
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging as log
+from uuid import UUID
 
 log = log.getLogger("masters.transport.routes_service")
 
@@ -24,14 +25,14 @@ async def get_all_routes(db: AsyncSession):
     result = await db.execute(select(Route).where(Route.is_active == True))
     return result.scalars().all()
 
-async def get_each_route_by_id(route_id: int, db: AsyncSession):
+async def get_each_route_by_id(route_id: UUID, db: AsyncSession):
     result = await db.execute(select(Route).where(Route.id == route_id))
     route = result.scalar_one_or_none()
     if not route:
         raise HTTPException(404, "Route not found")
     return route
 
-async def update__all_details_route(route_id: int, data: RouteCreate, db: AsyncSession):
+async def update__all_details_route(route_id: UUID, data: RouteCreate, db: AsyncSession):
     result = await db.execute(select(Route).where(Route.id == route_id))
     route = result.scalar_one_or_none()
     if not route:
@@ -42,7 +43,7 @@ async def update__all_details_route(route_id: int, data: RouteCreate, db: AsyncS
     await db.refresh(route)
     return route
 
-async def update_partial_details_route(route_id: int, data: RouteUpdate, db: AsyncSession):
+async def update_partial_details_route(route_id: UUID, data: RouteUpdate, db: AsyncSession):
     result = await db.execute(select(Route).where(Route.id == route_id))
     route = result.scalar_one_or_none()
     if not route:
@@ -53,7 +54,7 @@ async def update_partial_details_route(route_id: int, data: RouteUpdate, db: Asy
     await db.refresh(route)
     return route
 
-async def deactivate_route(route_id: int, db: AsyncSession):
+async def deactivate_route(route_id: UUID, db: AsyncSession):
     result = await db.execute(select(Route).where(Route.id == route_id))
     route = result.scalar_one_or_none()
     if not route:

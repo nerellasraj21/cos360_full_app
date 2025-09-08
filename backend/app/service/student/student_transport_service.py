@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 from sqlalchemy.future import select
 from app.models.student.student_transport_model import StudentTransportAssignment
 from app.schemas.student.student_transport_schema import (
@@ -22,7 +23,7 @@ async def get_transport_assignments(db: AsyncSession):
     result = await db.execute(select(StudentTransportAssignment))
     return result.scalars().all()
 
-async def get_transport_by_student_id(student_id: int, db: AsyncSession):
+async def get_transport_by_student_id(student_id: UUID, db: AsyncSession):
     result = await db.execute(
         select(StudentTransportAssignment).where(StudentTransportAssignment.student_id == student_id)
     )
@@ -32,7 +33,7 @@ async def get_transport_by_student_id(student_id: int, db: AsyncSession):
     return records
 
 async def update_partial_details_transport_assignment(
-    transport_id: int,
+    transport_id: UUID,
     updates: StudentTransportUpdate,
     db: AsyncSession
 ):
@@ -49,7 +50,7 @@ async def update_partial_details_transport_assignment(
     await db.refresh(assignment)
     return assignment
 
-async def unassign_transport(transport_id: int, db: AsyncSession):
+async def unassign_transport(transport_id: UUID, db: AsyncSession):
     result = await db.execute(select(StudentTransportAssignment).where(StudentTransportAssignment.id == transport_id))
     assignment = result.scalar_one_or_none()
 

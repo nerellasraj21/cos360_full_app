@@ -3,6 +3,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from typing import List, Optional
+from uuid import UUID
 
 from app.models.masters.parent_model import Parent
 from app.models.masters.student_parent_association_model import StudentParentLink
@@ -21,7 +22,7 @@ async def create_parent(parent_data: ParentCreate, db: AsyncSession) -> Parent:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating parent: {str(e)}")
 
-async def get_parent_by_id(parent_id: int, db: AsyncSession) -> Parent:
+async def get_parent_by_id(parent_id: UUID, db: AsyncSession) -> Parent:
     result = await db.execute(select(Parent).where(Parent.id == parent_id))
     parent = result.scalar_one_or_none()
     if not parent:
@@ -36,7 +37,7 @@ async def get_all_parents(db: AsyncSession):
     return result.scalars().all()
     
 
-async def update_parent(parent_id: int, parent_data: ParentUpdate, db: AsyncSession) -> Parent:
+async def update_parent(parent_id: UUID, parent_data: ParentUpdate, db: AsyncSession) -> Parent:
     result = await db.execute(select(Parent).where(Parent.id == parent_id))
     parent = result.scalar_one_or_none()
     if not parent:
@@ -51,7 +52,7 @@ async def update_parent(parent_id: int, parent_data: ParentUpdate, db: AsyncSess
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error updating parent: {str(e)}")
 
-async def delete_parent(parent_id: int, db: AsyncSession):
+async def delete_parent(parent_id: UUID, db: AsyncSession):
     result = await db.execute(select(Parent).where(Parent.id == parent_id))
     parent = result.scalar_one_or_none()
     if not parent:

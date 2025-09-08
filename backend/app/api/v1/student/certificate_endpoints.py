@@ -11,6 +11,7 @@ from app.schemas.student.certificate_schema import (
     CertificateIssueUpdate,
     CertificateFileResponse
 )
+from uuid import UUID
 from app.schemas.student.certificate_type_schema import CertificateTypeOut
 from app.service.student.student_certificate_service import list_all_certificates_of_student,download_certificate_file,get_all_certificates,upload_certificate,update_certificate_file,delete_certificate_file,get_certificate,get_all_certificate_types
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
@@ -22,8 +23,8 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/", status_code=201)
 async def create_certificate(
-    student_id: int = Form(...),
-    certificate_type_id: int = Form(...),
+    student_id: UUID = Form(...),
+    certificate_type_id: UUID = Form(...),
     issue_date: Optional[date] = Form(None),
     description: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
@@ -53,7 +54,7 @@ async def get_certificates(request: Request, db: AsyncSession = Depends(get_db))
 
 
 @router.get("/certificateid/{certificate_id}")
-async def get_certificate_by_id(certificate_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_certificate_by_id(certificate_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """Get certificate by ID - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -66,8 +67,8 @@ async def get_certificate_by_id(certificate_id: int, request: Request, db: Async
 
 @router.patch("/{certificate_id}")
 async def update_certificate(
-    certificate_id: int,
-    certificate_type_id: int = Form(...),
+    certificate_id: UUID,
+    certificate_type_id: UUID = Form(...),
     issue_date: Optional[date] = Form(None),
     remarks: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
@@ -85,7 +86,7 @@ async def update_certificate(
 
 
 @router.delete("/{certificate_id}")
-async def delete_certificate(certificate_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def delete_certificate(certificate_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """Delete certificate - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -96,7 +97,7 @@ async def delete_certificate(certificate_id: int, request: Request, db: AsyncSes
     return await delete_certificate_file(certificate_id,db)
 
 @router.get("/certificates/{certificate_id}/download", response_class=FileResponse)
-async def download_certificate(certificate_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def download_certificate(certificate_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """Download certificate file - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
@@ -108,7 +109,7 @@ async def download_certificate(certificate_id: int, request: Request, db: AsyncS
 
 
 @router.get("/student/{student_id}", response_model=List[CertificateFileResponse])
-async def list_certificates_for_student(student_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def list_certificates_for_student(student_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """List certificates for specific student - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')

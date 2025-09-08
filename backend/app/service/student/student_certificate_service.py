@@ -1,4 +1,5 @@
 import os
+from uuid import UUID
 from fastapi import UploadFile, File, Form, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -22,8 +23,8 @@ UPLOAD_DIR = "uploaded_certificates"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 async def upload_certificate(
-    student_id: int = Form(...),
-    certificate_type_id: int = Form(...),
+    student_id: UUID = Form(...),
+    certificate_type_id: UUID = Form(...),
     issue_date: Optional[date] = Form(None),
     remarks: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
@@ -71,7 +72,7 @@ async def get_all_certificates(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
-async def get_certificate(certificate_id: int, db: AsyncSession = Depends(get_db)):
+async def get_certificate(certificate_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))
     cert = result.scalar_one_or_none()
     if not cert:
@@ -80,7 +81,7 @@ async def get_certificate(certificate_id: int, db: AsyncSession = Depends(get_db
 
 
 async def update_certificate_file(
-    certificate_id: int,
+    certificate_id: UUID,
     certificate_type_id: Optional[int] = Form(None),
     issue_date: Optional[date] = Form(None),
     remarks: Optional[str] = Form(None),
@@ -119,7 +120,7 @@ async def update_certificate_file(
         raise HTTPException(status_code=500, detail=f"Error updating certificate: {str(e)}")
 
 
-async def delete_certificate_file(certificate_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_certificate_file(certificate_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))
     cert = result.scalar_one_or_none()
     if not cert:
@@ -129,7 +130,7 @@ async def delete_certificate_file(certificate_id: int, db: AsyncSession = Depend
     await db.commit()
     return {"detail": "Certificate deleted successfully"}
 
-async def download_certificate_file(certificate_id: int, db: AsyncSession = Depends(get_db)):
+async def download_certificate_file(certificate_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))
     certificate = result.scalar_one_or_none()
     
@@ -148,7 +149,7 @@ async def download_certificate_file(certificate_id: int, db: AsyncSession = Depe
     return FileResponse(path=file_path_str, filename=os.path.basename(file_path_str), media_type = 'application/pdf')# For Direct Download change media_type='application/octet-stream')
 
 
-async def list_all_certificates_of_student(student_id: int, db: AsyncSession = Depends(get_db)):
+async def list_all_certificates_of_student(student_id: UUID, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(
             select(CertificateIssue).where(CertificateIssue.student_id == student_id)

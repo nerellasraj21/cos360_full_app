@@ -12,13 +12,14 @@ from app.service.fee.fee_term_service import (
 )
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from typing import List
+from uuid import UUID
 
 router = APIRouter(prefix="/fee/terms", tags=["Fee/Fee Terms & Dates"])
 
 # Create Fee Term with Dates
 @router.post("/", response_model=FeeTermRead, status_code=status.HTTP_201_CREATED)
-async def create_fee_term(
-    request: Request,
+async def create_fee_term(request: Request, 
+
     fee_term_data: FeeTermCreate, 
     db: AsyncSession = Depends(get_db)
 ):
@@ -33,8 +34,8 @@ async def create_fee_term(
 
 # Get All Fee Terms
 @router.get("/", response_model=List[FeeTermRead])
-async def get_all_fee_terms_endpoint(
-    request: Request,
+async def get_all_fee_terms_endpoint(request: Request, 
+
     db: AsyncSession = Depends(get_db)
 ):
     """Get all fee terms with their associated dates"""
@@ -48,9 +49,9 @@ async def get_all_fee_terms_endpoint(
 
 # Get Single Fee Term with Dates
 @router.get("/{fee_term_id}", response_model=FeeTermRead)
-async def get_fee_term_endpoint(
-    request: Request,
-    fee_term_id: str, 
+async def get_fee_term_endpoint(request: Request, 
+
+    fee_term_id: UUID, 
     db: AsyncSession = Depends(get_db)
 ):
     """Get a specific fee term with its associated dates"""
@@ -64,9 +65,9 @@ async def get_fee_term_endpoint(
 
 # Update Fee Term with Dates
 @router.put("/{fee_term_id}", response_model=FeeTermRead)
-async def update_fee_term_endpoint(
-    request: Request,
-    fee_term_id: str, 
+async def update_fee_term_endpoint(request: Request, 
+
+    fee_term_id: UUID, 
     fee_term_data: FeeTermUpdate, 
     db: AsyncSession = Depends(get_db)
 ):
@@ -81,9 +82,9 @@ async def update_fee_term_endpoint(
 
 # Delete Fee Term with Dates
 @router.delete("/{fee_term_id}")
-async def delete_fee_term_endpoint(
-    request: Request,
-    fee_term_id: str, 
+async def delete_fee_term_endpoint(request: Request, 
+
+    fee_term_id: UUID, 
     db: AsyncSession = Depends(get_db)
 ):
     """Delete a fee term and all its associated dates"""
@@ -97,9 +98,9 @@ async def delete_fee_term_endpoint(
 
 # Delete Fee Term Date
 @router.delete("/dates/{fee_term_date_id}")
-async def delete_fee_term_date_endpoint(
-    request: Request,
-    fee_term_date_id: str, 
+async def delete_fee_term_date_endpoint(request: Request, 
+
+    fee_term_date_id: UUID, 
     db: AsyncSession = Depends(get_db)
 ):
     """Delete a specific fee term date"""

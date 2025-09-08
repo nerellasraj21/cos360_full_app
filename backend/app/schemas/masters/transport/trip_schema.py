@@ -1,25 +1,26 @@
 from pydantic import BaseModel
 from typing import Optional
+from uuid import UUID
 
 class TripBase(BaseModel):
-    vehicle_id: int
-    route_id: int
-    driver_id: int
-    trip_number: int
+    vehicle_id: UUID
+    route_id: UUID
+    driver_id: UUID
+    trip_number: UUID
 
 class TripCreate(TripBase):
     pass
 
 class TripUpdate(BaseModel):
-    vehicle_id: Optional[int] = None
-    route_id: Optional[int] = None
-    driver_id: Optional[int] = None
-    trip_number: Optional[int] = None
+    vehicle_id: Optional[UUID] = None
+    route_id: Optional[UUID] = None
+    driver_id: Optional[UUID] = None
+    trip_number: Optional[UUID] = None
 
     model_config = {"from_attributes": True}
 
 class TripOut(TripBase):
-    id: int
+    id: UUID
 
     class Config:
         from_attributes = True

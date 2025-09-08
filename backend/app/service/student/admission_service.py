@@ -8,6 +8,7 @@ from app.models.masters.student_parent_association_model import StudentParentLin
 from sqlalchemy.orm import selectinload
 from app.models.auth.user_model import User
 from sqlalchemy.future import select
+from uuid import UUID
 from sqlalchemy import or_, String
 from app.tools.password_util import hash_password
 
@@ -93,7 +94,7 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
 
     return admission_out
 
-async def get_admission_by_id(student_id: int, db: AsyncSession):
+async def get_admission_by_id(student_id: UUID, db: AsyncSession):
     result = await db.execute(select(Admission).options(
             selectinload(Admission.student)
             .selectinload(Student.parent_links)
@@ -104,7 +105,7 @@ async def get_admission_by_id(student_id: int, db: AsyncSession):
         raise HTTPException(status_code=404, detail="Admission not found")
     return admission
 
-async def update_partial_details_admission(student_id: int, data: StudentAdmissionUpdate, db: AsyncSession):
+async def update_partial_details_admission(student_id: UUID, data: StudentAdmissionUpdate, db: AsyncSession):
     result = await db.execute(select(Admission).where(Admission.student_id == student_id))
     admission = result.scalar_one_or_none()
     if not admission:
@@ -115,7 +116,7 @@ async def update_partial_details_admission(student_id: int, data: StudentAdmissi
     await db.refresh(admission)
     return admission
 
-async def get_student_by_admission_id(admission_id: int, db):
+async def get_student_by_admission_id(admission_id: UUID, db):
     stmt = (
         select(Admission)
         .where(Admission.id == admission_id)

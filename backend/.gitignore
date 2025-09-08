@@ -14,3 +14,4 @@ __pycache__/
 *.sqlite3
 .claude/settings.local.json
 .env
+TEST_ENVIRONMENT_SETUP.md

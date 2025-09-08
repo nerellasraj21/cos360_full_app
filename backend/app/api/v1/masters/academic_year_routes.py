@@ -97,8 +97,34 @@ async def get_dropdown(
         
     return await academic_year_service.get_academic_years_dropdown(db, active_only)
 
+@router.get("/active", response_model=List[AcademicYearRead])
+@rate_limit_dropdown("100 per minute")
+async def get_active(
+    request: Request, 
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get only active academic years.
+    
+    Requires:
+    - Authentication (valid JWT token)
+    - Plan-level access to Academic Years menu
+    - Role-level access to Academic Years menu with view permission
+    - Resource-level permission: academic_years:read
+    
+    Available to Admin, Teacher, Student, Parent, Staff roles.
+    Rate limited to 100 requests per minute.
+    """
+    # Multi-layer permission check: Role + Plan validation
+    role = current_user.get('role')
+    await check_role_plan_permission_with_error(db, request, role, 'academic_years', 'read')
+        
+    return await academic_year_service.get_all_academic_years(db, skip=0, limit=100, active_only=True)
+
 @router.get("/{academic_year_id}", response_model=AcademicYearRead)
 async def read(
+    request: Request,
     academic_year_id: UUID, 
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -125,6 +151,7 @@ async def read(
 
 @router.put("/{academic_year_id}", response_model=AcademicYearRead)
 async def update(
+    request: Request,
     academic_year_id: UUID, 
     academic_year_update: AcademicYearUpdate, 
     db: AsyncSession = Depends(get_db),
@@ -152,6 +179,7 @@ async def update(
 
 @router.delete("/{academic_year_id}", response_model=AcademicYearRead)
 async def deactivate(
+    request: Request,
     academic_year_id: UUID, 
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -175,3 +203,28 @@ async def deactivate(
     if not academic_year:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Academic Year not found")
     return academic_year
+
+@router.delete("/{academic_year_id}/permanent", status_code=status.HTTP_200_OK)
+async def delete_permanent(
+    request: Request,
+    academic_year_id: UUID, 
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Permanently delete an academic year (for testing purposes).
+    
+    Requires:
+    - Authentication (valid JWT token)
+    - Plan-level access to Academic Years menu
+    - Role-level access to Academic Years menu with edit permission
+    - Resource-level permission: academic_years:delete
+    
+    Only Admin role has delete permission.
+    """
+    # Multi-layer permission check: Role + Plan validation
+    role = current_user.get('role')
+    await check_role_plan_permission_with_error(db, request, role, 'academic_years', 'delete')
+        
+    result = await academic_year_service.delete_academic_year(db, academic_year_id)
+    return result

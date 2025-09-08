@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import date
 import enum
+from uuid import UUID
 
 from app.db.session import get_db
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
@@ -36,7 +37,7 @@ async def create_enrollment(request: Request, data: StaffEnrollmentCreate, db: A
     return await create_staff_enrollment(data, db)
 
 @router.patch("/enrollment/{staff_id}", response_model=StaffEnrollmentOut)
-async def update_enrollment(request: Request, staff_id: int, data: StaffEnrollmentUpdate, db: AsyncSession = Depends(get_db)):
+async def update_enrollment(request: Request, staff_id: UUID, data: StaffEnrollmentUpdate, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -56,7 +57,7 @@ async def list_enrollments(request: Request, db: AsyncSession = Depends(get_db))
     return await get_all_staff_enrollments(db)
 
 @router.get("/enrollment/{staff_id}", response_model=StaffEnrollmentOut)
-async def get_enrollment(request: Request, staff_id: int, db: AsyncSession = Depends(get_db)):
+async def get_enrollment(request: Request, staff_id: UUID, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -66,7 +67,7 @@ async def get_enrollment(request: Request, staff_id: int, db: AsyncSession = Dep
     return await get_staff_enrollment_by_id(staff_id, db)
 
 @router.delete("/enrollment/{staff_id}")
-async def remove_enrollment(request: Request, staff_id: int, db: AsyncSession = Depends(get_db)):
+async def remove_enrollment(request: Request, staff_id: UUID, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -82,7 +83,7 @@ async def create_attendance(data: StaffAttendanceCreate, db: AsyncSession = Depe
     return await create_staff_attendance(data, db)
 
 @router.patch("/attendance/{attendance_id}", response_model=StaffAttendanceOut)
-async def update_attendance(attendance_id: int, data: StaffAttendanceUpdate, db: AsyncSession = Depends(get_db)):
+async def update_attendance(attendance_id: UUID, data: StaffAttendanceUpdate, db: AsyncSession = Depends(get_db)):
     return await update_staff_attendance(attendance_id, data, db)
 
 @router.get("/attendance", response_model=List[StaffAttendanceOut])
@@ -90,18 +91,18 @@ async def list_attendance(db: AsyncSession = Depends(get_db)):
     return await get_all_staff_attendance(db)
 
 @router.get("/attendance/{attendance_id}", response_model=StaffAttendanceOut)
-async def get_attendance(attendance_id: int, db: AsyncSession = Depends(get_db)):
+async def get_attendance(attendance_id: UUID, db: AsyncSession = Depends(get_db)):
     return await get_attendance_for_staff(attendance_id, db)
 
 @router.delete("/attendance/{attendance_id}")
-async def remove_attendance(attendance_id: int, db: AsyncSession = Depends(get_db)):
+async def remove_attendance(attendance_id: UUID, db: AsyncSession = Depends(get_db)):
     return await delete_staff_attendance(attendance_id, db)
 
 # -------------------- Filter Staff Attendance by Date --------------------
 
 @router.get("/{staff_id}/attendance/filter", response_model=List[StaffAttendanceOut])
 async def filter_staff_attendance(
-    staff_id: int,
+    staff_id: UUID,
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_db)
@@ -125,7 +126,7 @@ async def get_staff_list(
 @router.get("/by-designation")
 async def get_staff_by_designation(
     request: Request,
-    designation_id: Optional[int] = Query(None, description="Filter staff by designation"),
+    designation_id: Optional[UUID] = Query(None, description="Filter staff by designation"),
     db: AsyncSession = Depends(get_db)
 ):
     current_user = await get_current_user_token(request)

@@ -11,6 +11,7 @@ from app.service.masters.transport import add_route, get_all_routes, get_each_ro
 from app.service.masters.transport.routes_service import get_stops_by_route_name, get_routes_dropdown
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_create
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
+from uuid import UUID
 
 router = APIRouter(prefix="/masters/routes", tags=["Masters/Routes"])
 
@@ -36,7 +37,7 @@ async def get_routes(request: Request, db: AsyncSession = Depends(get_db)):
     return await get_all_routes(db)
 
 @router.get("/routeid/{route_id}", response_model=RouteOut)
-async def get_route_by_id(request: Request, route_id: int, db: AsyncSession = Depends(get_db)):
+async def get_route_by_id(request: Request, route_id: UUID, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -46,7 +47,7 @@ async def get_route_by_id(request: Request, route_id: int, db: AsyncSession = De
     return await get_each_route_by_id(route_id,db)
 
 @router.put("/{route_id}", response_model=RouteOut)
-async def update_route(request: Request, route_id: int, data: RouteCreate, db: AsyncSession = Depends(get_db)):
+async def update_route(request: Request, route_id: UUID, data: RouteCreate, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -56,7 +57,7 @@ async def update_route(request: Request, route_id: int, data: RouteCreate, db: A
     return await update__all_details_route(route_id,data,db)
 
 @router.patch("/{route_id}", response_model=RouteOut)
-async def patch_route(request: Request, route_id: int, data: RouteUpdate, db: AsyncSession = Depends(get_db)):
+async def patch_route(request: Request, route_id: UUID, data: RouteUpdate, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     
@@ -66,7 +67,7 @@ async def patch_route(request: Request, route_id: int, data: RouteUpdate, db: As
     return await update_partial_details_route(route_id,data,db)
 
 @router.delete("/{route_id}")
-async def delete_route(request: Request, route_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_route(request: Request, route_id: UUID, db: AsyncSession = Depends(get_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     

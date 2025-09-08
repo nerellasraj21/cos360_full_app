@@ -18,14 +18,15 @@ from app.service.fee.fee_category_service import (
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from typing import List, Optional
+from uuid import UUID
 
 router = APIRouter(prefix="/fee/categories", tags=["Fee/Fee Categories"])
 
 # Create Fee Category
 @router.post("/", response_model=FeeCategoryRead, status_code=status.HTTP_201_CREATED)
 @rate_limit_create("30 per minute")
-async def create_fee_category_endpoint(
-    request: Request, 
+async def create_fee_category_endpoint(request: Request, 
+
     fee_category_data: FeeCategoryCreate, 
     db: AsyncSession = Depends(get_db)
 ):
@@ -40,8 +41,8 @@ async def create_fee_category_endpoint(
 
 # Get All Fee Categories
 @router.get("/", response_model=List[FeeCategoryRead])
-async def get_all_fee_categories_endpoint(
-    request: Request,
+async def get_all_fee_categories_endpoint(request: Request, 
+
     db: AsyncSession = Depends(get_db)
 ):
     """Get all fee categories with their academic year titles"""
@@ -55,9 +56,9 @@ async def get_all_fee_categories_endpoint(
 
 # Get Fee Categories for Dropdown
 @router.get("/dropdown", response_model=List[FeeCategoryDropdown])
-async def get_fee_categories_dropdown_endpoint(
-    request: Request,
-    academic_year_id: Optional[int] = Query(None, description="Filter by academic year ID"),
+async def get_fee_categories_dropdown_endpoint(request: Request, 
+
+    academic_year_id: Optional[UUID] = Query(None, description="Filter by academic year ID"),
     db: AsyncSession = Depends(get_db)
 ):
     """Get fee categories for dropdown (id + category_name only). Optionally filter by academic year. Rate limited to 100 requests per minute."""
@@ -71,9 +72,9 @@ async def get_fee_categories_dropdown_endpoint(
 
 # Get Single Fee Category
 @router.get("/{fee_category_id}", response_model=FeeCategoryRead)
-async def get_fee_category_endpoint(
-    request: Request,
-    fee_category_id: str, 
+async def get_fee_category_endpoint(request: Request, 
+
+    fee_category_id: UUID, 
     db: AsyncSession = Depends(get_db)
 ):
     """Get a specific fee category with its academic year title"""
@@ -87,9 +88,9 @@ async def get_fee_category_endpoint(
 
 # Update Fee Category
 @router.put("/{fee_category_id}", response_model=FeeCategoryRead)
-async def update_fee_category_endpoint(
-    request: Request,
-    fee_category_id: str, 
+async def update_fee_category_endpoint(request: Request, 
+
+    fee_category_id: UUID, 
     fee_category_data: FeeCategoryUpdate, 
     db: AsyncSession = Depends(get_db)
 ):
@@ -104,9 +105,9 @@ async def update_fee_category_endpoint(
 
 # Delete Fee Category
 @router.delete("/{fee_category_id}")
-async def delete_fee_category_endpoint(
-    request: Request,
-    fee_category_id: str, 
+async def delete_fee_category_endpoint(request: Request, 
+
+    fee_category_id: UUID, 
     db: AsyncSession = Depends(get_db)
 ):
     """Delete a fee category"""

@@ -13,7 +13,7 @@ from uuid import UUID
 
 log = log.getLogger("fee.category_service")
 
-async def validate_academic_year_exists(db: AsyncSession, academic_year_id: int):
+async def validate_academic_year_exists(db: AsyncSession, academic_year_id: UUID):
     """Validate that academic year exists"""
     result = await db.execute(select(AcademicYear).where(AcademicYear.id == academic_year_id))
     academic_year = result.scalar_one_or_none()
@@ -24,7 +24,7 @@ async def validate_academic_year_exists(db: AsyncSession, academic_year_id: int)
         )
     return academic_year
 
-async def check_category_name_unique(db: AsyncSession, category_name: str, academic_year_id: int, exclude_id: Optional[str] = None):
+async def check_category_name_unique(db: AsyncSession, category_name: str, academic_year_id: UUID, exclude_id: Optional[UUID] = None):
     """Check if category name is unique within academic year"""
     query = select(FeeCategoryModel).where(
         FeeCategoryModel.category_name == category_name,
@@ -107,10 +107,10 @@ async def create_fee_category(db: AsyncSession, fee_category_data: FeeCategoryCr
             detail="An error occurred while creating fee category"
         )
 
-async def get_fee_category_by_id(db: AsyncSession, fee_category_id: str):
+async def get_fee_category_by_id(db: AsyncSession, fee_category_id: UUID):
     """Get a single fee category by ID with academic year title"""
     try:
-        fee_category_uuid = UUID(fee_category_id)
+        fee_category_uuid = fee_category_id
         result = await db.execute(
             select(FeeCategoryModel)
             .options(selectinload(FeeCategoryModel.academic_year))
@@ -163,7 +163,7 @@ async def get_all_fee_categories(db: AsyncSession):
         )
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes
-async def get_fee_categories_dropdown(db: AsyncSession, academic_year_id: Optional[int] = None):
+async def get_fee_categories_dropdown(db: AsyncSession, academic_year_id: Optional[UUID] = None):
     """Get fee categories for dropdown (id + category_name only) - Cached"""
     try:
         query = select(FeeCategoryModel).order_by(FeeCategoryModel.category_name)
@@ -184,10 +184,10 @@ async def get_fee_categories_dropdown(db: AsyncSession, academic_year_id: Option
             detail="An error occurred while retrieving fee categories for dropdown"
         )
 
-async def update_fee_category(db: AsyncSession, fee_category_id: str, fee_category_data: FeeCategoryUpdate):
+async def update_fee_category(db: AsyncSession, fee_category_id: UUID, fee_category_data: FeeCategoryUpdate):
     """Update an existing fee category"""
     try:
-        fee_category_uuid = UUID(fee_category_id)
+        fee_category_uuid = fee_category_id
         
         # Get existing fee category
         result = await db.execute(
@@ -277,10 +277,10 @@ async def update_fee_category(db: AsyncSession, fee_category_id: str, fee_catego
             detail="An error occurred while updating fee category"
         )
 
-async def delete_fee_category(db: AsyncSession, fee_category_id: str):
+async def delete_fee_category(db: AsyncSession, fee_category_id: UUID):
     """Delete a fee category"""
     try:
-        fee_category_uuid = UUID(fee_category_id)
+        fee_category_uuid = fee_category_id
         
         result = await db.execute(select(FeeCategoryModel).where(FeeCategoryModel.id == fee_category_uuid))
         db_fee_category = result.scalar_one_or_none()
