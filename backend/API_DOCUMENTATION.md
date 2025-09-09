@@ -1482,14 +1482,22 @@ GET /api/v1/resource?skip=0&limit=10
 - `skip` (integer, optional): Number of records to skip. Default: 0, Min: 0
 - `limit` (integer, optional): Number of records to return. Default: 10, Min: 1, Max: 100
 
-**Pagination Response Format:**
+**Enhanced Pagination Response Format:**
 ```json
-[
-  { "id": "uuid-1", "name": "Item 1" },
-  { "id": "uuid-2", "name": "Item 2" }
-]
+{
+  "items": [
+    { "id": "uuid-1", "name": "Item 1" },
+    { "id": "uuid-2", "name": "Item 2" }
+  ],
+  "total_count": 25,
+  "has_next": true
+}
 ```
-> Note: Currently returns array directly. Total count is not included in response.
+
+**Response Fields:**
+- `items`: Array of requested records
+- `total_count`: Total number of records in the table/filtered results
+- `has_next`: Boolean flag indicating if more records are available after current page
 
 ### Pagination Examples
 
@@ -1506,6 +1514,58 @@ GET /api/v1/masters/academic_years?skip=10&limit=10
 **Get All (up to 100):**
 ```
 GET /api/v1/masters/academic_years?skip=0&limit=100
+```
+
+### Pagination Response Examples
+
+**Example 1: First page with more data available**
+```json
+{
+  "items": [
+    {
+      "id": "127e0439-06dc-46ac-a89a-fe291400f148",
+      "title": "Academic Year 2024-25",
+      "start_date": "2024-04-01",
+      "end_date": "2025-03-31",
+      "is_active": true
+    },
+    {
+      "id": "227e0439-06dc-46ac-a89a-fe291400f149",
+      "title": "Academic Year 2025-26", 
+      "start_date": "2025-04-01",
+      "end_date": "2026-03-31",
+      "is_active": false
+    }
+  ],
+  "total_count": 15,
+  "has_next": true
+}
+```
+
+**Example 2: Last page with no more data**
+```json
+{
+  "items": [
+    {
+      "id": "327e0439-06dc-46ac-a89a-fe291400f150",
+      "title": "Academic Year 2026-27",
+      "start_date": "2026-04-01",
+      "end_date": "2027-03-31",
+      "is_active": false
+    }
+  ],
+  "total_count": 15,
+  "has_next": false
+}
+```
+
+**Example 3: Empty result set**
+```json
+{
+  "items": [],
+  "total_count": 0,
+  "has_next": false
+}
 ```
 
 ### JavaScript Pagination Helper
@@ -2708,6 +2768,84 @@ Authorization: Bearer <admin_token>
 cschema: test_tenant
 ```
 
+### Get Fee Terms Dropdown
+```http
+GET /api/v1/fee/terms/dropdown
+```
+**Headers:**
+```
+Authorization: Bearer <token>
+cschema: test_tenant
+```
+**Response:**
+```json
+[
+  {
+    "id": "uuid",
+    "term_name": "Monthly Payment",
+    "number_of_terms": 12
+  },
+  {
+    "id": "uuid", 
+    "term_name": "Quarterly Payment",
+    "number_of_terms": 4
+  }
+]
+```
+**Permission Required:** fee_terms:list  
+**Plan Required:** Standard+ 💳  
+**Note:** Returns only active fee terms for dropdown selection
+
+### Get Fee Term Dates
+```http
+GET /api/v1/fee/terms/{fee_term_id}/dates
+```
+**Headers:**
+```
+Authorization: Bearer <token>
+cschema: test_tenant
+```
+**Response:**
+```json
+[
+  {
+    "id": "uuid",
+    "fee_term_date": "2024-04-15"
+  },
+  {
+    "id": "uuid",
+    "fee_term_date": "2024-07-15"
+  },
+  {
+    "id": "uuid",
+    "fee_term_date": "2024-10-15"
+  },
+  {
+    "id": "uuid",
+    "fee_term_date": "2025-01-15"
+  }
+]
+```
+**Permission Required:** fee_terms:read  
+**Plan Required:** Standard+ 💳  
+**Note:** Returns dates for a specific fee term, ordered chronologically. Used for cascading dropdown after fee term selection.
+
+---
+
+## Fee Categories
+
+Base path: `/api/v1/fee/categories`
+
+### Create Fee Category
+```http
+DELETE /api/v1/fee/terms/{id}
+```
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+cschema: test_tenant
+```
+
 ### Delete Fee Term Date
 ```http
 DELETE /api/v1/fee/terms/dates/{fee_term_date_id}
@@ -3198,6 +3336,26 @@ cschema: test_tenant
 ### Staff Attendance Endpoints
 All staff attendance endpoints follow similar patterns with appropriate permission checks.
 
+### Get Drivers List
+```http
+GET /api/v1/staff/drivers
+Authorization: Bearer <token>
+cschema: test_tenant
+```
+**Response:**
+```json
+[
+  {
+    "user_id": "uuid",
+    "name": "John Doe",
+    "designation": "Driver"
+  }
+]
+```
+**Permission Required:** staff:list  
+**Plan Required:** Standard+ 💳  
+**Note:** Returns all staff members with "Driver" designation
+
 ---
 
 ## Subjects
@@ -3471,6 +3629,69 @@ PATCH /api/v1/masters/vehicles/{vehicle_id}
 ```http
 DELETE /api/v1/masters/vehicles/{vehicle_id}
 ```
+
+### Get Vehicle Dropdown
+```http
+GET /api/v1/masters/vehicles/dropdown?active_only=true
+Authorization: Bearer <token>
+```
+**Response:**
+```json
+[
+  {
+    "id": "uuid",
+    "name": "School Bus 001"
+  }
+]
+```
+**Permission Required:** vehicles:list  
+**Plan Required:** Standard+ 💳
+
+### Get Vehicle Routes
+```http
+GET /api/v1/masters/vehicles/{vehicle_id}/routes
+Authorization: Bearer <token>
+```
+**Response:**
+```json
+[
+  {
+    "id": "uuid",
+    "route_name": "School to Mall Route"
+  }
+]
+```
+**Permission Required:** vehicles:read  
+**Plan Required:** Standard+ 💳  
+**Note:** Returns routes assigned to the vehicle via Trip junction table
+
+### Get Vehicle Route Stops
+```http
+GET /api/v1/masters/vehicles/{vehicle_id}/routes/{route_id}/stops
+Authorization: Bearer <token>
+```
+**Response:**
+```json
+[
+  {
+    "id": "uuid",
+    "name": "School Main Gate",
+    "number": 1,
+    "reaching_time": "07:00:00",
+    "fees": 0.0
+  },
+  {
+    "id": "uuid",
+    "name": "City Center",
+    "number": 2,
+    "reaching_time": "07:15:00",
+    "fees": 500.0
+  }
+]
+```
+**Permission Required:** vehicles:read  
+**Plan Required:** Standard+ 💳  
+**Note:** Returns stops for a specific vehicle-route combination, ordered by stop number
 
 ---
 

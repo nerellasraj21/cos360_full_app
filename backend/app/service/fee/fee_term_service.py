@@ -278,3 +278,51 @@ async def delete_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while deleting fee term"
         )
+
+async def get_fee_terms_dropdown(db: AsyncSession):
+    """Get fee terms for dropdown (id, name, number of terms only)"""
+    try:
+        result = await db.execute(
+            select(FeeTermModel.id, FeeTermModel.term_name, FeeTermModel.number_of_terms)
+            .where(FeeTermModel.term_status == 'active')
+            .order_by(FeeTermModel.term_name)
+        )
+        fee_terms = result.all()
+        return [{"id": term.id, "term_name": term.term_name, "number_of_terms": term.number_of_terms} for term in fee_terms]
+    except Exception as e:
+        log.error(f"Error fetching fee terms dropdown: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching fee terms dropdown: {str(e)}"
+        )
+
+async def get_fee_term_dates_only(db: AsyncSession, fee_term_id: UUID):
+    """Get only the dates for a specific fee term"""
+    try:
+        # First check if fee term exists
+        fee_term_result = await db.execute(
+            select(FeeTermModel).where(FeeTermModel.id == fee_term_id)
+        )
+        fee_term = fee_term_result.scalar_one_or_none()
+        if not fee_term:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Fee term with id {fee_term_id} not found"
+            )
+        
+        # Get the dates
+        result = await db.execute(
+            select(FeeTermDatesModel.id, FeeTermDatesModel.fee_term_date)
+            .where(FeeTermDatesModel.term_id == fee_term_id)
+            .order_by(FeeTermDatesModel.fee_term_date)
+        )
+        dates = result.all()
+        return [{"id": date.id, "fee_term_date": date.fee_term_date} for date in dates]
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"Error fetching fee term dates: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching fee term dates: {str(e)}"
+        )

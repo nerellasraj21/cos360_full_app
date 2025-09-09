@@ -16,6 +16,7 @@ from app.schemas.auth.resource_permission_schema import (
     ResourceDropdown,
     ActionDropdown
 )
+from app.schemas.common.pagination_schema import PaginatedResponse
 from app.tools.simple_permissions import get_current_user_token, check_role_plan_permission_with_error
 
 router = APIRouter(prefix="/auth/resource-permissions", tags=["Auth/Resource Permissions"])
@@ -35,7 +36,7 @@ async def create_resource_permission(request: Request,
     permission = await ResourcePermissionService.create_permission(db, permission_data)
     return ResourcePermissionRead.from_orm(permission)
 
-@router.get("/", response_model=List[ResourcePermissionRead])
+@router.get("/", response_model=PaginatedResponse[ResourcePermissionRead])
 async def get_all_resource_permissions(request: Request,
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
@@ -48,8 +49,10 @@ async def get_all_resource_permissions(request: Request,
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'resource_permission_management', 'list')
     
-    permissions = await ResourcePermissionService.get_all_permissions(db, skip, limit)
-    return [ResourcePermissionRead.from_orm(p) for p in permissions]
+    result = await ResourcePermissionService.get_all_permissions(db, skip, limit)
+    # Convert items to the expected format
+    result["items"] = [ResourcePermissionRead.from_orm(p) for p in result["items"]]
+    return result
 
 @router.get("/{permission_id}", response_model=ResourcePermissionRead)
 async def get_resource_permission(request: Request, 

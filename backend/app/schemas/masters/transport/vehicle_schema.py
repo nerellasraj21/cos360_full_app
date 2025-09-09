@@ -29,3 +29,8 @@ class VehicleOut(VehicleBase):
 
     class Config:
         from_attributes = True
+
+class VehicleDropdown(BaseModel):
+    id: UUID
+    name: str
+    model_config = {"from_attributes": True}

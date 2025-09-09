@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from app.models.masters.subject_model import Subject
@@ -45,16 +45,40 @@ async def get_subject_by_id(db: AsyncSession, subject_id: UUID):
 
 async def get_all_subjects(db: AsyncSession, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: UUID = None):
     try:
-        query = select(Subject).options(selectinload(Subject.category))
+        # Build base query with filters
+        base_query = select(Subject).options(selectinload(Subject.category))
         if active_only:
-            query = query.where(Subject.is_active == True)
+            base_query = base_query.where(Subject.is_active == True)
         if academic_year_id is not None:
-            query = query.where(Subject.academic_year_id == academic_year_id)
+            base_query = base_query.where(Subject.academic_year_id == academic_year_id)
+        
+        # Get total count
+        count_query = select(func.count(Subject.id))
+        if active_only:
+            count_query = count_query.where(Subject.is_active == True)
+        if academic_year_id is not None:
+            count_query = count_query.where(Subject.academic_year_id == academic_year_id)
+        total_count_result = await db.execute(count_query)
+        total_count = total_count_result.scalar()
+        
+        # Get paginated items
+        items_result = await db.execute(base_query.offset(skip).limit(limit))
+        items = items_result.scalars().all()
+        
+        # Calculate has_next
+        has_next = (skip + limit) < total_count
+        
+        result = {
+            "items": items,
+            "total_count": total_count,
+            "has_next": has_next
+        }
+        
+        log.debug(f"Retrieved {len(items)} subjects, total_count={total_count}, has_next={has_next}")
+        return result
     except Exception as e:
         log.error(f"Error building query for subjects: {e}")
-        raise HTTPException(status_code=400, detail="Invalid query parameters.")    
-    result = await db.execute(query.offset(skip).limit(limit))
-    return result.scalars().all()
+        raise HTTPException(status_code=400, detail="Invalid query parameters.")
 
 async def update_subject(db: AsyncSession, subject_id: UUID, subject_data: SubjectUpdate):
     try:

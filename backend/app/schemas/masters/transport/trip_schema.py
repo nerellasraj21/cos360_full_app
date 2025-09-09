@@ -6,7 +6,7 @@ class TripBase(BaseModel):
     vehicle_id: UUID
     route_id: UUID
     driver_id: UUID
-    trip_number: UUID
+    trip_number: int
 
 class TripCreate(TripBase):
     pass

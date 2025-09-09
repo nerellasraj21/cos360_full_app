@@ -6,6 +6,7 @@ from uuid import UUID
 
 from app.models.masters.academic_year_model import AcademicYear
 from app.schemas.masters.academic_year_schema import AcademicYearCreate, AcademicYearRead, AcademicYearUpdate, AcademicYearDropdown
+from app.schemas.common.pagination_schema import PaginatedResponse
 from app.service.masters import academic_year_service
 from app.db.tenant_session import get_tenant_db
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
@@ -44,7 +45,7 @@ async def create(
     
     return await academic_year_service.create_academic_year(db, academic_year)
 
-@router.get("/", response_model=List[AcademicYearRead])
+@router.get("/", response_model=PaginatedResponse[AcademicYearRead])
 @rate_limit_dropdown("100 per minute")
 async def list(
     request: Request, 

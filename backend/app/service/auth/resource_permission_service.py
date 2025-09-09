@@ -64,16 +64,33 @@ class ResourcePermissionService:
         return db_permission
     
     @staticmethod
-    async def get_all_permissions(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[ResourcePermission]:
-        """Get all resource permissions with role information"""
-        result = await db.execute(
-            select(ResourcePermission)
-            .options(selectinload(ResourcePermission.role))
+    async def get_all_permissions(db: AsyncSession, skip: int = 0, limit: int = 100):
+        """Get all resource permissions with role information and pagination metadata"""
+        # Build base query with filters
+        base_query = select(ResourcePermission).options(selectinload(ResourcePermission.role))
+        
+        # Get total count
+        count_query = select(func.count(ResourcePermission.id))
+        total_count_result = await db.execute(count_query)
+        total_count = total_count_result.scalar()
+        
+        # Get paginated items
+        items_result = await db.execute(
+            base_query
             .offset(skip)
             .limit(limit)
             .order_by(ResourcePermission.resource, ResourcePermission.action)
         )
-        return result.scalars().all()
+        items = items_result.scalars().all()
+        
+        # Calculate has_next
+        has_next = (skip + limit) < total_count
+        
+        return {
+            "items": items,
+            "total_count": total_count,
+            "has_next": has_next
+        }
     
     @staticmethod
     async def get_permission_by_id(db: AsyncSession, permission_id: UUID) -> ResourcePermission:

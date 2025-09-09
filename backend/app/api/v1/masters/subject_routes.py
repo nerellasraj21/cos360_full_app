@@ -4,6 +4,7 @@ from typing import List
 from app.db.tenant_session import get_tenant_db
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from app.schemas.masters.subject_schema import SubjectCreate, SubjectRead, SubjectUpdate, SubjectDropdown
+from app.schemas.common.pagination_schema import PaginatedResponse
 from app.service.masters.subject_service import create_subject,get_subject_by_id,get_all_subjects,update_subject,deactivate_subject,get_subjects_by_category_id,get_subjects_by_category_id_dropdown,get_subjects_dropdown
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_create
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +23,7 @@ async def create(request: Request, subject: SubjectCreate, db: AsyncSession = De
     
     return await create_subject(db, subject)
 
-@router.get("/", response_model=List[SubjectRead])
+@router.get("/", response_model=PaginatedResponse[SubjectRead])
 async def list(request: Request, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: UUID = None, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')

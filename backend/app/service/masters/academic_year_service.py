@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from app.models.masters import AcademicYear
 from app.schemas.masters import AcademicYearCreate, AcademicYearUpdate
 from app.tools.cache_utils import cache_dropdown, invalidate_cache
@@ -54,16 +54,35 @@ async def get_academic_year_by_id(db: AsyncSession, academic_year_id: UUID):
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes
 async def get_all_academic_years(db: AsyncSession, skip: int = 0, limit: int = 10, active_only: bool = True):
-    """Get all academic years for dropdown - Cached"""
+    """Get all academic years with pagination metadata - Cached"""
     try:
-        query = select(AcademicYear)
+        # Build base query with filters
+        base_query = select(AcademicYear)
         if active_only:
-            query = query.where(AcademicYear.is_active == True)
-        result = await db.execute(query.offset(skip).limit(limit))
-        academic_years = result.unique().scalars().all()
+            base_query = base_query.where(AcademicYear.is_active == True)
         
-        log.debug(f"Retrieved {len(academic_years)} academic years from database")
-        return academic_years
+        # Get total count
+        count_query = select(func.count(AcademicYear.id))
+        if active_only:
+            count_query = count_query.where(AcademicYear.is_active == True)
+        total_count_result = await db.execute(count_query)
+        total_count = total_count_result.scalar()
+        
+        # Get paginated items
+        items_result = await db.execute(base_query.offset(skip).limit(limit))
+        items = items_result.unique().scalars().all()
+        
+        # Calculate has_next
+        has_next = (skip + limit) < total_count
+        
+        result = {
+            "items": items,
+            "total_count": total_count,
+            "has_next": has_next
+        }
+        
+        log.debug(f"Retrieved {len(items)} academic years, total_count={total_count}, has_next={has_next}")
+        return result
     except Exception as e:
         log.error(f"Error fetching academic years: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,

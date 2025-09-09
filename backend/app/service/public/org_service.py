@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.public import Organization
 from app.schemas.public import OrganizationCreate, OrganizationUpdate
@@ -32,11 +32,33 @@ async def get_organization_by_id(db: AsyncSession, org_id: int):
 
 async def get_all_organizations(db: AsyncSession, skip: int = 0, limit: int = 100, active_only : bool = True):
     try:
-        query = select(Organization)
+        # Build base query with filters
+        base_query = select(Organization)
         if active_only:
-            query = query.filter(Organization.is_active == True)
-        result = await db.execute(query.offset(skip).limit(limit))
-        return result.scalars().all()
+            base_query = base_query.filter(Organization.is_active == True)
+        
+        # Get total count
+        count_query = select(func.count(Organization.id))
+        if active_only:
+            count_query = count_query.filter(Organization.is_active == True)
+        total_count_result = await db.execute(count_query)
+        total_count = total_count_result.scalar()
+        
+        # Get paginated items
+        items_result = await db.execute(base_query.offset(skip).limit(limit))
+        items = items_result.scalars().all()
+        
+        # Calculate has_next
+        has_next = (skip + limit) < total_count
+        
+        result = {
+            "items": items,
+            "total_count": total_count,
+            "has_next": has_next
+        }
+        
+        log.info(f"Pagination result: total_count={total_count}, items_count={len(items)}, has_next={has_next}")
+        return result
     except Exception as e:
         log.error(f"Error fetching organizations: {str(e)}")
         raise

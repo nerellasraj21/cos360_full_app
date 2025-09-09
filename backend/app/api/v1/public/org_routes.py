@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.schemas.public.org_schema import *
+from app.schemas.common.pagination_schema import PaginatedResponse
 from app.service.public import org_service as organization_service
 from app.db.tenant_session import get_public_db
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +22,7 @@ async def read_organization(org_id: int, db: AsyncSession = Depends(get_public_d
         raise HTTPException(status_code=404, detail="Organization not found")
     return org
 
-@router.get("/", response_model=list[OrganizationRead])
+@router.get("/", response_model=PaginatedResponse[OrganizationRead])
 async def list_organizations(skip: int = 0, limit: int = 10, db: AsyncSession = Depends(get_public_db)):
     return await organization_service.get_all_organizations(db, skip, limit)
 

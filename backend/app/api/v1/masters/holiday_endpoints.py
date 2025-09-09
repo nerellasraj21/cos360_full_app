@@ -4,6 +4,7 @@ from typing import List
 
 from app.models.masters.holidays_model import Holiday
 from app.schemas.masters.holidays_schema import HolidayCreate, HolidayRead, HolidayUpdate, HolidayDropdown
+from app.schemas.common.pagination_schema import PaginatedResponse
 from app.service.masters import holiday_service
 from app.service.masters.holiday_service import get_holidays_dropdown
 from app.db.tenant_session import get_tenant_db
@@ -26,7 +27,7 @@ async def create(request: Request, holiday: HolidayCreate, db: AsyncSession = De
     
     return await holiday_service.create_holiday(db, holiday)
 
-@router.get("/", response_model=List[HolidayRead])
+@router.get("/", response_model=PaginatedResponse[HolidayRead])
 async def list(request: Request, skip: int = 0, limit: int = 10, active_only: bool = True, academic_year_id: UUID = None, db: AsyncSession = Depends(get_tenant_db)):
     """List holidays - All authenticated users"""
     current_user = await get_current_user_token(request)

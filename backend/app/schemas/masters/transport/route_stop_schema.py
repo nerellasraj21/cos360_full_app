@@ -29,3 +29,12 @@ class RouteStopOut(RouteStopBase):
 
     class Config:
         from_attributes = True
+
+class RouteStopDropdown(BaseModel):
+    id: UUID
+    name: str
+    number: int
+    reaching_time: Optional[time] = None
+    fees: Optional[float] = None
+    
+    model_config = {"from_attributes": True}

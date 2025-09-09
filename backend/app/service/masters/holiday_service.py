@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from app.models.masters.holidays_model import Holiday as HolidayModel
 from app.schemas.masters.holidays_schema import HolidayCreate, HolidayUpdate
 from uuid import UUID
@@ -48,13 +48,37 @@ async def get_holiday_by_id(db: AsyncSession, holiday_id: UUID):
 
 async def get_all_holidays(db: AsyncSession, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: UUID = None):
     try:
-        query = select(HolidayModel)
+        # Build base query with filters
+        base_query = select(HolidayModel)
         if active_only:
-            query = query.where(HolidayModel.is_active == True)
+            base_query = base_query.where(HolidayModel.is_active == True)
         if academic_year_id is not None:
-            query = query.where(HolidayModel.academic_year_id == academic_year_id)
-        result = await db.execute(query.offset(skip).limit(limit))
-        return result.scalars().all()
+            base_query = base_query.where(HolidayModel.academic_year_id == academic_year_id)
+        
+        # Get total count
+        count_query = select(func.count(HolidayModel.id))
+        if active_only:
+            count_query = count_query.where(HolidayModel.is_active == True)
+        if academic_year_id is not None:
+            count_query = count_query.where(HolidayModel.academic_year_id == academic_year_id)
+        total_count_result = await db.execute(count_query)
+        total_count = total_count_result.scalar()
+        
+        # Get paginated items
+        items_result = await db.execute(base_query.offset(skip).limit(limit))
+        items = items_result.scalars().all()
+        
+        # Calculate has_next
+        has_next = (skip + limit) < total_count
+        
+        result = {
+            "items": items,
+            "total_count": total_count,
+            "has_next": has_next
+        }
+        
+        log.debug(f"Retrieved {len(items)} holidays, total_count={total_count}, has_next={has_next}")
+        return result
     except Exception as e:
         log.error(f"Error building query for holidays: {e}")
         raise HTTPException(status_code=400, detail="Invalid query parameters.")

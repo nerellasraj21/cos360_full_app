@@ -54,3 +54,9 @@ class FeeTermRead(FeeTermBase):
     id: UUID
     fee_term_dates: List[FeeTermDatesRead] = []
     model_config = {"from_attributes": True}
+
+class FeeTermDropdown(BaseModel):
+    id: UUID
+    term_name: str
+    number_of_terms: int
+    model_config = {"from_attributes": True}
