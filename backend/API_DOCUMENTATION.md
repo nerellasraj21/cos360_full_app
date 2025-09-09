@@ -26,8 +26,13 @@ Production: https://your-domain.com
 ```http
 Authorization: Bearer <your_jwt_token>
 Content-Type: application/json
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
+
+> **⚠️ CRITICAL: Tenant Header Change**  
+> The tenant header MUST be `cschema` (not `X-Client-Name`).  
+> Using the wrong header will result in HTTP 402 "Payment Required" errors  
+> because the system won't detect your tenant correctly.
 
 ### Tenant Configuration
 Available test tenants:
@@ -407,7 +412,7 @@ class COS360API {
       headers: {
         'Authorization': `Bearer ${this.authToken}`,
         'Content-Type': 'application/json',
-        'X-Client-Name': this.tenantName,
+        'cschema': this.tenantName,
         ...options.headers
       },
       ...options
@@ -624,6 +629,1623 @@ When a user's plan doesn't support a feature, endpoints return HTTP 402 with upg
 
 # 🔐 Authentication Endpoints
 
+## User Login (Multi-Tenant with Hierarchical Menu)
+
+### Login Endpoint
+```http
+POST /api/v1/auth/login/login
+```
+
+This endpoint authenticates users and returns their role-based hierarchical menu structure along with access tokens.
+
+**Headers:**
+```
+Content-Type: application/json
+cschema: test_tenant
+```
+> Note: The `cschema` header is optional if the client_name is provided in the request body.
+
+**Request Body:**
+```json
+{
+  "username": "admin",
+  "password": "admin123",
+  "client_name": "test_tenant"  // Optional if cschema header is provided
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "email": "admin@school.com",
+    "is_active": true
+  },
+  "role": {
+    "id": 1,
+    "name": "Admin",
+    "description": "System Administrator"
+  },
+  "menu": [
+    {
+      "id": 1,
+      "name": "Dashboard",
+      "path": "/dashboard",
+      "display_order": 1,
+      "children": [
+        {
+          "id": 11,
+          "name": "Analytics",
+          "path": "/dashboard/analytics",
+          "display_order": 1
+        },
+        {
+          "id": 12,
+          "name": "Reports",
+          "path": "/dashboard/reports",
+          "display_order": 2
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Academic",
+      "path": "/academic",
+      "display_order": 2,
+      "children": [
+        {
+          "id": 21,
+          "name": "Academic Years",
+          "path": "/academic/years",
+          "display_order": 1
+        },
+        {
+          "id": 22,
+          "name": "Classes",
+          "path": "/academic/classes",
+          "display_order": 2,
+          "children": [
+            {
+              "id": 221,
+              "name": "Sections",
+              "path": "/academic/classes/sections",
+              "display_order": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Fee Management",
+      "path": "/fees",
+      "display_order": 3
+    }
+  ],
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+**Error Responses:**
+
+**401 - Invalid Credentials:**
+```json
+{
+  "detail": "Invalid Credentials"
+}
+```
+
+**401 - Invalid Tenant:**
+```json
+{
+  "detail": "Invalid connection"
+}
+```
+
+**500 - Server Error:**
+```json
+{
+  "detail": "Authentication service unavailable"
+}
+```
+
+### Key Points:
+- **Token Expiry**: Access token expires in 24 hours, Refresh token expires in 7 days
+- **Menu Structure**: Hierarchical menu with up to 4 levels (L0, L1, L2, L3)
+- **Multi-Tenant**: Tenant detection via `cschema` header or `client_name` in body
+- **Role-Based Menu**: Menu items filtered based on user's role permissions
+- **Nested Children**: Menu items can have nested children for sub-menus
+
+### Refresh Token Endpoint
+```http
+POST /api/v1/auth/login/refresh
+```
+
+Use this endpoint to get new access and refresh tokens before the current access token expires.
+
+**Headers:**
+```
+Content-Type: application/json
+```
+> Note: No authentication header required, only the refresh token in body
+
+**Request Body:**
+```json
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+**Error Responses:**
+
+**401 - Invalid/Expired Refresh Token:**
+```json
+{
+  "detail": "Invalid refresh token"
+}
+```
+
+**401 - Invalid Tenant:**
+```json
+{
+  "detail": "Invalid connection"
+}
+```
+
+**500 - Server Error:**
+```json
+{
+  "detail": "Token refresh service unavailable"
+}
+```
+
+### Token Refresh Strategy
+1. **Store both tokens securely** on the client side (e.g., httpOnly cookies or secure storage)
+2. **Monitor access token expiry** - refresh when token has < 5 minutes remaining
+3. **Use refresh token** to get new token pair before access token expires
+4. **Both tokens are refreshed** - store the new refresh token as well
+5. **If refresh fails** - redirect user to login page
+
+### JavaScript Example:
+```javascript
+async function refreshAccessToken(currentRefreshToken) {
+  try {
+    const response = await fetch('http://localhost:8003/api/v1/auth/login/refresh', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        refresh_token: currentRefreshToken
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Token refresh failed');
+    }
+
+    const data = await response.json();
+    
+    // Store new tokens
+    localStorage.setItem('access_token', data.access_token);
+    localStorage.setItem('refresh_token', data.refresh_token);
+    
+    return data.access_token;
+  } catch (error) {
+    // Redirect to login on refresh failure
+    window.location.href = '/login';
+  }
+}
+
+// Auto-refresh logic
+function setupTokenRefresh() {
+  setInterval(async () => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      // Decode JWT to check expiry (you'll need a JWT decode library)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiryTime = payload.exp * 1000; // Convert to milliseconds
+      const currentTime = Date.now();
+      const timeUntilExpiry = expiryTime - currentTime;
+      
+      // Refresh if less than 5 minutes remaining
+      if (timeUntilExpiry < 5 * 60 * 1000) {
+        const refreshToken = localStorage.getItem('refresh_token');
+        await refreshAccessToken(refreshToken);
+      }
+    }
+  }, 60000); // Check every minute
+}
+```
+
+### Logout Endpoint
+```http
+POST /api/v1/auth/login/logout
+```
+
+Simple client-side logout that validates the token and instructs the client to clear all authentication data.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+cschema: test_tenant
+Content-Type: application/json
+```
+
+**Success Response (200):**
+```json
+{
+  "message": "Logout successful",
+  "instructions": {
+    "clear_tokens": true,
+    "clear_menu": true,
+    "redirect_to": "/login"
+  }
+}
+```
+
+**Error Responses:**
+
+**401 - Missing/Invalid Token:**
+```json
+{
+  "detail": "Authorization header missing or invalid"
+}
+```
+
+**401 - Expired Token:**
+```json
+{
+  "detail": "Invalid token"
+}
+```
+
+**500 - Server Error:**
+```json
+{
+  "detail": "Logout service unavailable"
+}
+```
+
+### Logout Implementation Example:
+```javascript
+async function logout() {
+  try {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      // No token, just clear everything and redirect
+      clearAuthData();
+      window.location.href = '/login';
+      return;
+    }
+
+    const response = await fetch('http://localhost:8003/api/v1/auth/login/logout', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'cschema': localStorage.getItem('tenant') || 'test_tenant',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    // Always clear auth data regardless of response
+    clearAuthData();
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Logout successful:', data.message);
+      
+      // Follow server instructions
+      if (data.instructions.redirect_to) {
+        window.location.href = data.instructions.redirect_to;
+      }
+    } else {
+      // Token might be expired, but we still cleared client-side
+      console.warn('Logout request failed, but client data cleared');
+      window.location.href = '/login';
+    }
+  } catch (error) {
+    // Network error or other issues - still clear client data
+    console.error('Logout error:', error);
+    clearAuthData();
+    window.location.href = '/login';
+  }
+}
+
+function clearAuthData() {
+  // Clear tokens
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  
+  // Clear menu and other cached data
+  localStorage.removeItem('userMenu');
+  localStorage.removeItem('userInfo');
+  localStorage.removeItem('tenant');
+  
+  // Clear any session storage
+  sessionStorage.clear();
+}
+
+// Usage
+document.getElementById('logout-btn').addEventListener('click', logout);
+```
+
+### Important Logout Notes:
+
+1. **Always Clear Client Data**: Even if the logout request fails, always clear tokens and cached data
+2. **Graceful Degradation**: Handle cases where token is already expired or invalid
+3. **Network Resilience**: Clear data even on network failures
+4. **Complete Cleanup**: Remove all authentication-related data from storage
+5. **Redirect Safely**: Always redirect to login page after logout
+6. **Token Validation**: Server validates token to prevent unauthorized logout calls
+
+## Menu Structure & Navigation Guide
+
+### Understanding the Hierarchical Menu System
+
+The COS360 system uses a 4-level hierarchical menu structure that is dynamically filtered based on user roles. Each menu item can have children, creating a nested navigation tree.
+
+### Menu Database Structure
+
+**Menu Table Fields:**
+- `id` (UUID): Unique identifier for the menu item
+- `name` (String): Display name of the menu item
+- `url/path` (String): Navigation path (nullable for parent items)
+- `level` (String): Menu level - L0 (root), L1, L2, L3 (deepest)
+- `parent_id` (UUID): Reference to parent menu item (null for root items)
+- `display_order` (Integer): Sort order within the same level
+
+**Permission Structure:**
+- Each role has specific menu permissions defined in `role_menu_permissions` table
+- `can_view`: Boolean indicating if the role can see this menu item
+- `can_edit`: Boolean for future edit permissions (currently unused)
+
+### Menu Levels Explained
+
+```
+L0 (Root Level)
+├── L1 (Main Sections)
+│   ├── L2 (Sub-sections)
+│   │   └── L3 (Specific Pages)
+```
+
+**Example Structure:**
+```json
+{
+  "id": "uuid-1",
+  "name": "Academic",           // L0 - Root menu
+  "path": null,                 // No direct path, just a container
+  "display_order": 1,
+  "children": [
+    {
+      "id": "uuid-11",
+      "name": "Academic Years",  // L1 - Section
+      "path": "/academic/years",
+      "display_order": 1
+    },
+    {
+      "id": "uuid-12", 
+      "name": "Classes",         // L1 - Section with children
+      "path": "/academic/classes",
+      "display_order": 2,
+      "children": [
+        {
+          "id": "uuid-121",
+          "name": "Sections",    // L2 - Sub-section
+          "path": "/academic/classes/sections",
+          "display_order": 1
+        },
+        {
+          "id": "uuid-122",
+          "name": "Subjects",    // L2 - Sub-section
+          "path": "/academic/classes/subjects",
+          "display_order": 2
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Role-Based Menu Filtering
+
+The menu returned in the login response is automatically filtered based on the user's role:
+
+**Admin Role Example:**
+- Sees all menu items including system settings, user management, and reports
+
+**Teacher Role Example:**
+- Sees academic management, student records, attendance
+- No access to fee management or system settings
+
+**Student Role Example:**
+- Limited to personal dashboard, assignments, and grades
+- No administrative functions
+
+**Parent Role Example:**
+- Access to child's information, fee payments, and communication
+
+### Important Menu Properties
+
+1. **Dynamic Loading**: Menu is loaded once during login, not on every page
+2. **Permission-Based**: Only shows items the user's role can access
+3. **Sorted Display**: Items are sorted by `display_order` at each level
+4. **Nested Structure**: Can have unlimited depth (but limited to L3 in practice)
+5. **Path Handling**: 
+   - Parent items may have `null` path (just containers)
+   - Leaf items always have a valid navigation path
+
+### Menu Item Types
+
+**Container Items** (usually L0, some L1):
+```json
+{
+  "name": "Fee Management",
+  "path": null,  // No direct navigation
+  "children": [...]  // Has sub-items
+}
+```
+
+**Navigable Items** (usually L1, L2, L3):
+```json
+{
+  "name": "Fee Categories",
+  "path": "/fees/categories",  // Direct navigation path
+  "children": []  // May or may not have children
+}
+```
+
+**Leaf Items** (usually L2, L3):
+```json
+{
+  "name": "Create New Fee",
+  "path": "/fees/categories/new"
+  // No children property or empty array
+}
+```
+
+### Frontend Implementation Tips
+
+1. **Cache the menu** from login response - don't fetch it repeatedly
+2. **Use recursive components** for rendering nested structures
+3. **Handle null paths** - these are just visual containers, not navigable
+4. **Respect display_order** - always sort by this field
+5. **Show/hide based on children** - use expand/collapse for items with children
+6. **Active state** - match current route with menu paths for highlighting
+
+## Menu Rendering Implementation Examples
+
+### React Component Example
+
+```jsx
+// MenuComponent.jsx
+import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+
+const MenuItem = ({ item, level = 0 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const location = useLocation();
+  const hasChildren = item.children && item.children.length > 0;
+  const isActive = location.pathname === item.path;
+  
+  const handleToggle = () => {
+    if (hasChildren) {
+      setIsExpanded(!isExpanded);
+    }
+  };
+
+  return (
+    <li className={`menu-item level-${level} ${isActive ? 'active' : ''}`}>
+      {item.path ? (
+        <Link 
+          to={item.path} 
+          className="menu-link"
+          onClick={handleToggle}
+        >
+          {hasChildren && (
+            <span className="menu-arrow">
+              {isExpanded ? '▼' : '▶'}
+            </span>
+          )}
+          <span className="menu-text">{item.name}</span>
+        </Link>
+      ) : (
+        <div 
+          className="menu-header" 
+          onClick={handleToggle}
+        >
+          {hasChildren && (
+            <span className="menu-arrow">
+              {isExpanded ? '▼' : '▶'}
+            </span>
+          )}
+          <span className="menu-text">{item.name}</span>
+        </div>
+      )}
+      
+      {hasChildren && isExpanded && (
+        <ul className="menu-children">
+          {item.children.map(child => (
+            <MenuItem 
+              key={child.id} 
+              item={child} 
+              level={level + 1}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+};
+
+const NavigationMenu = ({ menuData }) => {
+  // menuData comes from login response
+  return (
+    <nav className="navigation-menu">
+      <ul className="menu-root">
+        {menuData.map(item => (
+          <MenuItem key={item.id} item={item} />
+        ))}
+      </ul>
+    </nav>
+  );
+};
+
+// Usage in App component
+const App = () => {
+  const [menu, setMenu] = useState([]);
+
+  useEffect(() => {
+    // After successful login
+    const loginResponse = await login(username, password);
+    setMenu(loginResponse.menu);
+    localStorage.setItem('menu', JSON.stringify(loginResponse.menu));
+  }, []);
+
+  return <NavigationMenu menuData={menu} />;
+};
+```
+
+### Vue Component Example
+
+```vue
+<!-- MenuItem.vue -->
+<template>
+  <li :class="['menu-item', `level-${level}`, { active: isActive }]">
+    <router-link 
+      v-if="item.path"
+      :to="item.path"
+      class="menu-link"
+      @click="toggleExpand"
+    >
+      <span v-if="hasChildren" class="menu-arrow">
+        {{ isExpanded ? '▼' : '▶' }}
+      </span>
+      <span class="menu-text">{{ item.name }}</span>
+    </router-link>
+    
+    <div 
+      v-else
+      class="menu-header"
+      @click="toggleExpand"
+    >
+      <span v-if="hasChildren" class="menu-arrow">
+        {{ isExpanded ? '▼' : '▶' }}
+      </span>
+      <span class="menu-text">{{ item.name }}</span>
+    </div>
+    
+    <ul v-if="hasChildren && isExpanded" class="menu-children">
+      <menu-item
+        v-for="child in item.children"
+        :key="child.id"
+        :item="child"
+        :level="level + 1"
+      />
+    </ul>
+  </li>
+</template>
+
+<script>
+export default {
+  name: 'MenuItem',
+  props: {
+    item: {
+      type: Object,
+      required: true
+    },
+    level: {
+      type: Number,
+      default: 0
+    }
+  },
+  data() {
+    return {
+      isExpanded: false
+    };
+  },
+  computed: {
+    hasChildren() {
+      return this.item.children && this.item.children.length > 0;
+    },
+    isActive() {
+      return this.$route.path === this.item.path;
+    }
+  },
+  methods: {
+    toggleExpand() {
+      if (this.hasChildren) {
+        this.isExpanded = !this.isExpanded;
+      }
+    }
+  }
+};
+</script>
+
+<!-- NavigationMenu.vue -->
+<template>
+  <nav class="navigation-menu">
+    <ul class="menu-root">
+      <menu-item
+        v-for="item in menuData"
+        :key="item.id"
+        :item="item"
+      />
+    </ul>
+  </nav>
+</template>
+
+<script>
+import MenuItem from './MenuItem.vue';
+
+export default {
+  name: 'NavigationMenu',
+  components: {
+    MenuItem
+  },
+  props: {
+    menuData: {
+      type: Array,
+      required: true
+    }
+  }
+};
+</script>
+```
+
+### CSS Styling Example
+
+```css
+.navigation-menu {
+  width: 250px;
+  background: #2c3e50;
+  color: #ecf0f1;
+}
+
+.menu-root, .menu-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu-item {
+  position: relative;
+}
+
+.menu-link, .menu-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  text-decoration: none;
+  color: #ecf0f1;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.menu-link:hover, .menu-header:hover {
+  background: #34495e;
+}
+
+.menu-item.active > .menu-link {
+  background: #3498db;
+  color: #fff;
+}
+
+.menu-arrow {
+  margin-right: 8px;
+  font-size: 12px;
+}
+
+.menu-children {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* Indentation for nested levels */
+.level-1 .menu-link,
+.level-1 .menu-header {
+  padding-left: 32px;
+}
+
+.level-2 .menu-link,
+.level-2 .menu-header {
+  padding-left: 48px;
+}
+
+.level-3 .menu-link,
+.level-3 .menu-header {
+  padding-left: 64px;
+}
+```
+
+### Menu State Management
+
+```javascript
+// menuStore.js - Vuex/Redux/Context example
+const menuStore = {
+  state: {
+    menu: [],
+    expandedItems: [],
+    activeItem: null
+  },
+  
+  mutations: {
+    SET_MENU(state, menu) {
+      state.menu = menu;
+      // Persist to localStorage
+      localStorage.setItem('userMenu', JSON.stringify(menu));
+    },
+    
+    TOGGLE_ITEM(state, itemId) {
+      const index = state.expandedItems.indexOf(itemId);
+      if (index > -1) {
+        state.expandedItems.splice(index, 1);
+      } else {
+        state.expandedItems.push(itemId);
+      }
+    },
+    
+    SET_ACTIVE_ITEM(state, itemPath) {
+      state.activeItem = itemPath;
+    }
+  },
+  
+  actions: {
+    async login({ commit }, credentials) {
+      const response = await api.login(credentials);
+      commit('SET_MENU', response.menu);
+      return response;
+    },
+    
+    loadMenuFromStorage({ commit }) {
+      const storedMenu = localStorage.getItem('userMenu');
+      if (storedMenu) {
+        commit('SET_MENU', JSON.parse(storedMenu));
+      }
+    }
+  },
+  
+  getters: {
+    getMenuByPath: (state) => (path) => {
+      const findItem = (items, targetPath) => {
+        for (const item of items) {
+          if (item.path === targetPath) return item;
+          if (item.children) {
+            const found = findItem(item.children, targetPath);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      return findItem(state.menu, path);
+    }
+  }
+};
+```
+
+### Important Implementation Notes
+
+1. **Menu Persistence**: Store menu in localStorage/sessionStorage after login
+2. **Deep Linking**: Support direct navigation to nested menu items
+3. **Keyboard Navigation**: Add arrow key support for accessibility
+4. **Mobile Responsive**: Create hamburger menu for mobile devices
+5. **Permission Checks**: Menu already filtered by backend, no need for frontend permission logic
+6. **Lazy Loading**: For large menus, consider lazy-loading child items
+7. **Search**: Add menu search functionality for quick navigation
+
+---
+
+# 📐 API Standards & Conventions
+
+## Pagination
+
+All list endpoints support pagination using the following query parameters:
+
+### Standard Pagination Parameters
+```
+GET /api/v1/resource?skip=0&limit=10
+```
+
+**Parameters:**
+- `skip` (integer, optional): Number of records to skip. Default: 0, Min: 0
+- `limit` (integer, optional): Number of records to return. Default: 10, Min: 1, Max: 100
+
+**Pagination Response Format:**
+```json
+[
+  { "id": "uuid-1", "name": "Item 1" },
+  { "id": "uuid-2", "name": "Item 2" }
+]
+```
+> Note: Currently returns array directly. Total count is not included in response.
+
+### Pagination Examples
+
+**First Page (10 items):**
+```
+GET /api/v1/masters/academic_years?skip=0&limit=10
+```
+
+**Second Page:**
+```
+GET /api/v1/masters/academic_years?skip=10&limit=10
+```
+
+**Get All (up to 100):**
+```
+GET /api/v1/masters/academic_years?skip=0&limit=100
+```
+
+### JavaScript Pagination Helper
+```javascript
+class PaginationHelper {
+  constructor(baseUrl, limit = 10) {
+    this.baseUrl = baseUrl;
+    this.limit = limit;
+    this.currentPage = 1;
+  }
+
+  async fetchPage(page) {
+    const skip = (page - 1) * this.limit;
+    const response = await fetch(
+      `${this.baseUrl}?skip=${skip}&limit=${this.limit}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${getToken()}`,
+          'cschema': getTenant()
+        }
+      }
+    );
+    
+    const data = await response.json();
+    this.currentPage = page;
+    
+    // Since API doesn't return total, check if we got less than limit
+    const hasMore = data.length === this.limit;
+    
+    return {
+      data,
+      page,
+      hasMore,
+      isEmpty: data.length === 0
+    };
+  }
+
+  nextPage() {
+    return this.fetchPage(this.currentPage + 1);
+  }
+
+  previousPage() {
+    if (this.currentPage > 1) {
+      return this.fetchPage(this.currentPage - 1);
+    }
+    return this.fetchPage(1);
+  }
+}
+
+// Usage
+const paginator = new PaginationHelper('/api/v1/masters/academic_years');
+const firstPage = await paginator.fetchPage(1);
+```
+
+## Search & Filtering
+
+### Query Parameter Conventions
+
+Filters are passed as query parameters with the field name:
+
+```
+GET /api/v1/resource?field_name=value&other_field=value
+```
+
+### Common Filter Patterns
+
+**Filter by Foreign Key (UUID):**
+```
+GET /api/v1/fee/categories?academic_year_id=606ec4d2-f0e1-4262-bd06-9da9d1d8ee90
+```
+
+**Filter by Boolean:**
+```
+GET /api/v1/fee/class-mappings?all_by_default=true
+```
+
+**Filter by Status:**
+```
+GET /api/v1/masters/academic_years?active_only=true
+```
+
+**Multiple Filters (AND operation):**
+```
+GET /api/v1/fee/class-mappings?class_id=uuid-1&fee_type_id=uuid-2&all_by_default=false
+```
+
+### Available Filters by Module
+
+**Academic Years:**
+- `active_only` (boolean): Return only active years
+
+**Fee Categories:**
+- `academic_year_id` (UUID): Filter by academic year
+
+**Fee Class Mappings:**
+- `class_id` (UUID): Filter by class
+- `fee_type_id` (UUID): Filter by fee type
+- `all_by_default` (boolean): Filter by default assignment flag
+
+**Fee Student Mappings:**
+- `student_id` (UUID): Filter by student
+- `class_id` (UUID): Filter by class
+- `fee_type_id` (UUID): Filter by fee type
+
+### Filter Implementation Example
+```javascript
+class APIClient {
+  buildQueryString(filters) {
+    const params = new URLSearchParams();
+    
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== '') {
+        params.append(key, value);
+      }
+    });
+    
+    return params.toString();
+  }
+
+  async fetchWithFilters(endpoint, filters = {}) {
+    const queryString = this.buildQueryString(filters);
+    const url = queryString ? `${endpoint}?${queryString}` : endpoint;
+    
+    return fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'cschema': this.tenant
+      }
+    });
+  }
+}
+
+// Usage
+const client = new APIClient();
+const filters = {
+  academic_year_id: '606ec4d2-f0e1-4262-bd06-9da9d1d8ee90',
+  active_only: true,
+  skip: 0,
+  limit: 20
+};
+
+const response = await client.fetchWithFilters('/api/v1/fee/categories', filters);
+```
+
+## Date & Time Handling
+
+### Date Format Standards
+
+**Date Fields (without time):**
+- Format: `YYYY-MM-DD` (ISO 8601 date format)
+- Example: `"2025-04-01"`
+- Used for: `start_date`, `end_date`, `admission_date`, `date_of_birth`
+
+**Timestamp Fields (with time):**
+- Format: `YYYY-MM-DDTHH:mm:ss` (ISO 8601 datetime)
+- Example: `"2025-09-09T14:30:00"`
+- Timezone: Server timezone (timestamps stored without timezone)
+- Used for: `created_at`, `updated_at`
+
+### Date Field Examples
+
+**Request with Date:**
+```json
+{
+  "title": "Academic Year 2025-26",
+  "start_date": "2025-04-01",
+  "end_date": "2026-03-31",
+  "is_active": true
+}
+```
+
+**Response with Timestamps:**
+```json
+{
+  "id": "606ec4d2-f0e1-4262-bd06-9da9d1d8ee90",
+  "title": "Academic Year 2025-26",
+  "start_date": "2025-04-01",
+  "end_date": "2026-03-31",
+  "is_active": true,
+  "created_at": "2025-09-09T10:30:45",
+  "updated_at": "2025-09-09T10:30:45"
+}
+```
+
+### Date Handling in JavaScript
+
+```javascript
+// Parse date from API
+const parseAPIDate = (dateString) => {
+  // For date-only fields (YYYY-MM-DD)
+  if (dateString.length === 10) {
+    return new Date(dateString + 'T00:00:00');
+  }
+  // For timestamps
+  return new Date(dateString);
+};
+
+// Format date for API request
+const formatDateForAPI = (date) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Format timestamp for display
+const formatTimestamp = (timestamp) => {
+  const date = new Date(timestamp);
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+// Usage
+const academicYear = {
+  start_date: formatDateForAPI('2025-04-01'),
+  end_date: formatDateForAPI(new Date(2026, 2, 31))
+};
+
+// Display
+const created = formatTimestamp(response.created_at);
+// Output: "Sep 9, 2025, 10:30 AM"
+```
+
+### Important Date/Time Notes
+
+1. **No Timezone in Database**: Timestamps are stored without timezone
+2. **Server Timezone**: All times are in server's local timezone
+3. **Date Validation**: End date must be after start date
+4. **Auto Timestamps**: `created_at` and `updated_at` are automatically managed
+5. **Date-Only Fields**: Time component is ignored if sent
+6. **ISO 8601 Format**: Always use ISO format for consistency
+
+## Rate Limiting
+
+The API implements rate limiting on various endpoints:
+
+### Rate Limit Tiers
+
+**Create Operations:**
+- Limit: 30 requests per minute
+- Applies to: POST endpoints for creating resources
+
+**Dropdown/List Operations:**
+- Limit: 100 requests per minute
+- Applies to: GET endpoints for dropdowns and lists
+
+**Standard API Operations:**
+- Limit: 60 requests per minute
+- Applies to: General CRUD operations
+
+### Rate Limit Headers
+
+When rate limited, the API returns:
+```
+HTTP/1.1 429 Too Many Requests
+X-RateLimit-Limit: 30
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1694350140
+Retry-After: 60
+```
+
+### Handling Rate Limits in Frontend
+
+```javascript
+class RateLimitHandler {
+  async makeRequest(url, options) {
+    const response = await fetch(url, options);
+    
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After') || 60;
+      console.warn(`Rate limited. Retrying after ${retryAfter} seconds`);
+      
+      // Optional: Show user notification
+      showNotification(`Too many requests. Please wait ${retryAfter} seconds.`);
+      
+      // Wait and retry
+      await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+      return this.makeRequest(url, options);
+    }
+    
+    return response;
+  }
+}
+```
+
+---
+
+# 📁 File Operations
+
+## File Upload
+
+The COS360 system supports file uploads for student certificates and documents using multipart/form-data.
+
+### Supported File Types
+
+**Certificate Files:**
+- PDF files (recommended)
+- Image files (PNG, JPG, JPEG)
+- Document files (DOC, DOCX)
+
+**Document Files:**
+- All common document types
+- No explicit size limits documented
+
+### Upload Endpoints
+
+#### Upload Student Certificate
+```http
+POST /api/v1/student/certificates/
+```
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+cschema: test_tenant
+Content-Type: multipart/form-data
+```
+
+**Form Data:**
+```
+student_id: 550e8400-e29b-41d4-a716-446655441001  (required, UUID)
+certificate_type_id: 550e8400-e29b-41d4-a716-446655442001  (required, UUID)
+issue_date: 2025-09-01  (optional, YYYY-MM-DD format)
+description: Certificate description  (optional, string)
+certificate_file: [file]  (optional, file upload)
+```
+
+**Success Response (201):**
+```json
+{
+  "id": "certificate-uuid",
+  "student_id": "550e8400-e29b-41d4-a716-446655441001",
+  "certificate_type_id": "550e8400-e29b-41d4-a716-446655442001",
+  "issue_date": "2025-09-01",
+  "description": "Certificate description",
+  "certificate_file": "/uploaded_certificates/uuid-filename.pdf",
+  "student": {
+    "id": "550e8400-e29b-41d4-a716-446655441001",
+    "name": "John Doe",
+    "admission_number": "ADM001"
+  }
+}
+```
+
+#### Upload Student Document
+```http
+POST /api/v1/students/documents/
+```
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+cschema: test_tenant
+Content-Type: multipart/form-data
+```
+
+**Form Data:**
+```
+student_id: 550e8400-e29b-41d4-a716-446655441001  (required, UUID)
+document_type: ID_Card  (required, string)
+document_file: [file]  (required, file upload)
+```
+
+**Success Response (201):**
+```json
+{
+  "id": "document-uuid",
+  "student_id": "550e8400-e29b-41d4-a716-446655441001",
+  "document_type": "ID_Card",
+  "file_path": "/uploaded_documents/uuid-filename.pdf",
+  "upload_date": "2025-09-09T10:30:45"
+}
+```
+
+### JavaScript File Upload Examples
+
+#### Using Fetch API
+```javascript
+async function uploadCertificate(studentId, certificateTypeId, file, description = '') {
+  const formData = new FormData();
+  formData.append('student_id', studentId);
+  formData.append('certificate_type_id', certificateTypeId);
+  formData.append('issue_date', new Date().toISOString().split('T')[0]);
+  formData.append('description', description);
+  
+  if (file) {
+    formData.append('certificate_file', file);
+  }
+
+  try {
+    const response = await fetch('/api/v1/student/certificates/', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'cschema': getTenant()
+        // Note: Do NOT set Content-Type header - let browser set it with boundary
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Certificate upload failed:', error);
+    throw error;
+  }
+}
+
+// Usage
+const fileInput = document.getElementById('certificate-file');
+const file = fileInput.files[0];
+
+if (file) {
+  const result = await uploadCertificate(
+    'student-uuid', 
+    'certificate-type-uuid', 
+    file, 
+    'Bonafide Certificate'
+  );
+  console.log('Certificate uploaded:', result);
+}
+```
+
+#### Using Axios
+```javascript
+import axios from 'axios';
+
+async function uploadDocument(studentId, documentType, file) {
+  const formData = new FormData();
+  formData.append('student_id', studentId);
+  formData.append('document_type', documentType);
+  formData.append('document_file', file);
+
+  try {
+    const response = await axios.post('/api/v1/students/documents/', formData, {
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'cschema': getTenant(),
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: (progressEvent) => {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        console.log(`Upload progress: ${percentCompleted}%`);
+      }
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('Document upload failed:', error.response?.data || error.message);
+    throw error;
+  }
+}
+```
+
+#### React Upload Component Example
+```jsx
+import React, { useState } from 'react';
+
+const FileUploadComponent = ({ studentId, onUploadSuccess }) => {
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const handleFileSelect = (event) => {
+    const selectedFile = event.target.files[0];
+    setFile(selectedFile);
+  };
+
+  const handleUpload = async () => {
+    if (!file) return;
+
+    setUploading(true);
+    setProgress(0);
+
+    const formData = new FormData();
+    formData.append('student_id', studentId);
+    formData.append('document_type', 'General');
+    formData.append('document_file', file);
+
+    try {
+      const response = await fetch('/api/v1/students/documents/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'cschema': localStorage.getItem('tenant')
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        onUploadSuccess(result);
+        setFile(null);
+      } else {
+        throw new Error('Upload failed');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+      setProgress(0);
+    }
+  };
+
+  return (
+    <div className="upload-component">
+      <input
+        type="file"
+        onChange={handleFileSelect}
+        disabled={uploading}
+        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+      />
+      
+      {file && (
+        <div>
+          <p>Selected: {file.name} ({Math.round(file.size / 1024)}KB)</p>
+          <button onClick={handleUpload} disabled={uploading}>
+            {uploading ? `Uploading... ${progress}%` : 'Upload File'}
+          </button>
+        </div>
+      )}
+      
+      {uploading && (
+        <div className="progress-bar">
+          <div 
+            className="progress-fill" 
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+## File Download
+
+### Download Endpoints
+
+#### Download Certificate File
+```http
+GET /api/v1/student/certificates/{certificate_id}/download
+```
+
+**Headers:**
+```
+Authorization: Bearer <token>
+cschema: test_tenant
+```
+
+**Response:**
+- Content-Type: `application/pdf` (for direct viewing)
+- Content-Disposition: `attachment; filename="certificate.pdf"` (for download)
+- File binary data
+
+#### Download Implementation Examples
+
+```javascript
+// Download and save file
+async function downloadCertificate(certificateId, filename = 'certificate.pdf') {
+  try {
+    const response = await fetch(`/api/v1/student/certificates/${certificateId}/download`, {
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'cschema': getTenant()
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+
+    // Get file as blob
+    const blob = await response.blob();
+    
+    // Create download link
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    
+    // Cleanup
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    return blob;
+  } catch (error) {
+    console.error('Certificate download failed:', error);
+    throw error;
+  }
+}
+
+// Preview file in browser (for PDFs)
+async function previewCertificate(certificateId) {
+  try {
+    const response = await fetch(`/api/v1/student/certificates/${certificateId}/download`, {
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'cschema': getTenant()
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Preview failed: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    
+    // Open in new window for preview
+    window.open(url, '_blank');
+    
+    return url;
+  } catch (error) {
+    console.error('Certificate preview failed:', error);
+    throw error;
+  }
+}
+
+// Download with progress tracking
+async function downloadWithProgress(certificateId, onProgress) {
+  const response = await fetch(`/api/v1/student/certificates/${certificateId}/download`, {
+    headers: {
+      'Authorization': `Bearer ${getToken()}`,
+      'cschema': getTenant()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Download failed: ${response.status}`);
+  }
+
+  const contentLength = response.headers.get('content-length');
+  const total = parseInt(contentLength, 10);
+  let loaded = 0;
+
+  const reader = response.body.getReader();
+  const chunks = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    
+    if (done) break;
+    
+    chunks.push(value);
+    loaded += value.length;
+    
+    if (onProgress && total) {
+      const progress = Math.round((loaded / total) * 100);
+      onProgress(progress);
+    }
+  }
+
+  const blob = new Blob(chunks);
+  return blob;
+}
+
+// Usage with progress
+await downloadWithProgress('certificate-uuid', (progress) => {
+  console.log(`Download progress: ${progress}%`);
+});
+```
+
+### File Operation Error Handling
+
+```javascript
+class FileOperationError extends Error {
+  constructor(message, status, response) {
+    super(message);
+    this.status = status;
+    this.response = response;
+    this.name = 'FileOperationError';
+  }
+}
+
+async function safeFileOperation(operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof Response) {
+      const errorData = await error.json().catch(() => ({}));
+      
+      switch (error.status) {
+        case 401:
+          throw new FileOperationError('Authentication required', 401, errorData);
+        case 403:
+          throw new FileOperationError('Insufficient permissions', 403, errorData);
+        case 404:
+          throw new FileOperationError('File not found', 404, errorData);
+        case 413:
+          throw new FileOperationError('File too large', 413, errorData);
+        case 415:
+          throw new FileOperationError('Unsupported file type', 415, errorData);
+        default:
+          throw new FileOperationError('File operation failed', error.status, errorData);
+      }
+    }
+    throw error;
+  }
+}
+
+// Usage
+try {
+  const result = await safeFileOperation(() => 
+    uploadCertificate(studentId, certificateTypeId, file)
+  );
+  console.log('Upload successful:', result);
+} catch (error) {
+  if (error instanceof FileOperationError) {
+    console.error(`File operation failed (${error.status}):`, error.message);
+    // Show appropriate user message based on error type
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+### Important File Handling Notes
+
+1. **Security**: Only Admin role can upload files (certificates and documents)
+2. **File Storage**: Files are stored on server filesystem with UUID-generated names
+3. **File Extensions**: Original extensions are preserved during upload
+4. **Download Content-Type**: PDF files return `application/pdf`, others may vary
+5. **Error Handling**: Always handle 404 for missing files, 403 for permissions
+6. **File Validation**: Frontend should validate file types before upload
+7. **Progress Tracking**: Implement progress bars for large file uploads
+8. **Cleanup**: Always cleanup blob URLs to prevent memory leaks
+
 ## Get Test JWT Tokens
 For development purposes, you can get test tokens:
 
@@ -683,7 +2305,7 @@ POST /api/v1/masters/academic_years/
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -713,7 +2335,7 @@ GET /api/v1/masters/academic_years/
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 **Response (200):**
 ```json
@@ -735,7 +2357,7 @@ GET /api/v1/masters/academic_years/dropdown
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 **Response (200):**
 ```json
@@ -754,7 +2376,7 @@ GET /api/v1/masters/academic_years/{id}
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Update Academic Year
@@ -764,7 +2386,7 @@ PUT /api/v1/masters/academic_years/{id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -784,7 +2406,7 @@ DELETE /api/v1/masters/academic_years/{id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ---
@@ -838,7 +2460,7 @@ POST /api/v1/fee/categories/
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Permission Required:** Admin only ⚠️
@@ -869,7 +2491,7 @@ GET /api/v1/fee/categories/
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 **Plan Required:** Standard+ 💳
 **Response (200):**
@@ -892,7 +2514,7 @@ GET /api/v1/fee/categories/dropdown?academic_year_id={id}
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 **Plan Required:** Standard+ 💳
 **Query Parameters:**
@@ -920,7 +2542,7 @@ PUT /api/v1/fee/categories/{id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Permission Required:** Admin only ⚠️
@@ -933,7 +2555,7 @@ DELETE /api/v1/fee/categories/{id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 **Permission Required:** Admin only ⚠️
 **Plan Required:** Standard+ 💳
@@ -952,7 +2574,7 @@ POST /api/v1/fee/types/
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Permission Required:** Admin only ⚠️
@@ -975,7 +2597,7 @@ GET /api/v1/fee/types/
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Get Fee Types Dropdown
@@ -985,7 +2607,7 @@ GET /api/v1/fee/types/dropdown?fee_category_id={id}
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 **Query Parameters:**
 - `fee_category_id` (optional): Filter by fee category ID
@@ -1002,7 +2624,7 @@ PUT /api/v1/fee/types/{id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 
@@ -1013,7 +2635,7 @@ DELETE /api/v1/fee/types/{id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ---
@@ -1029,7 +2651,7 @@ POST /api/v1/fee/terms/
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -1057,7 +2679,7 @@ GET /api/v1/fee/terms/
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Get Single Fee Term
@@ -1072,7 +2694,7 @@ PUT /api/v1/fee/terms/{id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 
@@ -1083,7 +2705,7 @@ DELETE /api/v1/fee/terms/{id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Delete Fee Term Date
@@ -1093,7 +2715,7 @@ DELETE /api/v1/fee/terms/dates/{fee_term_date_id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ---
@@ -1109,7 +2731,7 @@ POST /api/v1/fee/class-mappings/
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -1129,7 +2751,7 @@ GET /api/v1/fee/class-mappings/?class_id={id}&fee_type_id={id}&all_by_default={b
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 **Query Parameters:**
 - `class_id` (optional): Filter by class ID
@@ -1148,7 +2770,7 @@ PUT /api/v1/fee/class-mappings/{id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 
@@ -1159,7 +2781,7 @@ DELETE /api/v1/fee/class-mappings/{id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ---
@@ -1175,7 +2797,7 @@ POST /api/v1/fee/student-mappings/
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -1197,7 +2819,7 @@ GET /api/v1/fee/student-mappings/?student_id={id}&class_id={id}&section_id={id}&
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 **Query Parameters:**
 - `student_id` (optional): Filter by student ID
@@ -1218,7 +2840,7 @@ PUT /api/v1/fee/student-mappings/{id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 
@@ -1229,7 +2851,7 @@ DELETE /api/v1/fee/student-mappings/{id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ---
@@ -1298,7 +2920,7 @@ const { access_token } = await response.json();
 ```javascript
 const headers = {
   'Authorization': `Bearer ${access_token}`,
-  'X-Client-Name': 'test_tenant',
+  'cschema': 'test_tenant',
   'Content-Type': 'application/json'
 };
 
@@ -1325,7 +2947,7 @@ async function makeRequest(url, options = {}) {
   const response = await fetch(url, {
     headers: {
       'Authorization': `Bearer ${token}`,
-      'X-Client-Name': 'test_tenant',
+      'cschema': 'test_tenant',
       ...options.headers
     },
     ...options
@@ -1403,7 +3025,7 @@ POST /api/v1/masters/class_sections/
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -1424,7 +3046,7 @@ GET /api/v1/masters/class_sections/read_all
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Get Classes Dropdown
@@ -1434,7 +3056,7 @@ GET /api/v1/masters/class_sections/dropdown?active_only=true
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Get Class by ID
@@ -1449,7 +3071,7 @@ PUT /api/v1/masters/class_sections/{class_id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 
@@ -1460,7 +3082,7 @@ DELETE /api/v1/masters/class_sections/{class_id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Get Class-Section List
@@ -1498,7 +3120,7 @@ POST /api/v1/staff/enrollment
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -1520,7 +3142,7 @@ GET /api/v1/staff/enrollments
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 #### Get Staff Enrollment by ID
@@ -1535,7 +3157,7 @@ PATCH /api/v1/staff/enrollment/{staff_id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 
@@ -1546,7 +3168,7 @@ DELETE /api/v1/staff/enrollment/{staff_id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Staff Lists
@@ -1558,7 +3180,7 @@ GET /api/v1/staff/?gender={gender}
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 **Query Parameters:**
 - `gender` (optional): male, female, other
@@ -1570,7 +3192,7 @@ GET /api/v1/staff/by-designation?designation_id={id}
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Staff Attendance Endpoints
@@ -1589,7 +3211,7 @@ POST /api/v1/masters/subjects/
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -1609,7 +3231,7 @@ GET /api/v1/masters/subjects/?skip=0&limit=100&active_only=true&academic_year_id
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 **Query Parameters:**
 - `skip` (optional): Number of records to skip
@@ -1624,7 +3246,7 @@ GET /api/v1/masters/subjects/dropdown?active_only=true
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Get Subject by ID
@@ -1639,7 +3261,7 @@ PUT /api/v1/masters/subjects/{subject_id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 
@@ -1650,7 +3272,7 @@ DELETE /api/v1/masters/subjects/{subject_id}
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Get Subjects by Category
@@ -1676,7 +3298,7 @@ POST /api/v1/masters/subject_categories/categories
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -1694,7 +3316,7 @@ GET /api/v1/masters/subject_categories/categories
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Get Subject Categories Dropdown
@@ -1704,7 +3326,7 @@ GET /api/v1/masters/subject_categories/categories/dropdown
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ---
@@ -1729,7 +3351,7 @@ POST /api/v1/masters/routes/
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -1754,7 +3376,7 @@ GET /api/v1/masters/routes/all_routes
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Get Routes Dropdown
@@ -1764,7 +3386,7 @@ GET /api/v1/masters/routes/dropdown?active_only=true
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Get Route by ID
@@ -1805,7 +3427,7 @@ POST /api/v1/masters/vehicles/
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -1827,7 +3449,7 @@ GET /api/v1/masters/vehicles/
 **Headers:**
 ```
 Authorization: Bearer <token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 ```
 
 ### Get Vehicle by ID
@@ -1863,7 +3485,7 @@ POST /api/v1/masters/route-stops/
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -1917,7 +3539,7 @@ POST /api/v1/students/student-transport/
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
-X-Client-Name: test_tenant
+cschema: test_tenant
 Content-Type: application/json
 ```
 **Body:**
@@ -2510,7 +4132,7 @@ Authorization: Bearer <admin_token>
 ```http
 POST /api/v1/auth/menus/
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 Content-Type: application/json
 
 {
@@ -2529,7 +4151,7 @@ Content-Type: application/json
 ```http
 GET /api/v1/auth/menus/
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 **Multi-Layer Security:**
 - ✅ JWT Authentication required
@@ -2545,7 +4167,7 @@ X-Client-Name: tenant_name
 ```http
 POST /api/v1/auth/permissions/
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 Content-Type: application/json
 
 {
@@ -2564,7 +4186,7 @@ Content-Type: application/json
 ```http
 GET /api/v1/auth/permissions/
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 **Multi-Layer Security:**
 - ✅ JWT Authentication required
@@ -2580,7 +4202,7 @@ X-Client-Name: tenant_name
 ```http
 POST /api/v1/auth/roles/roles/
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 Content-Type: application/json
 
 {
@@ -2597,7 +4219,7 @@ Content-Type: application/json
 ```http
 GET /api/v1/auth/roles/roles/
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 **Multi-Layer Security:**
 - ✅ JWT Authentication required
@@ -2613,7 +4235,7 @@ X-Client-Name: tenant_name
 ```http
 POST /api/v1/auth/resource-permissions/
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 Content-Type: application/json
 
 {
@@ -2632,28 +4254,28 @@ Content-Type: application/json
 ```http
 GET /api/v1/auth/resource-permissions/?skip=0&limit=100
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 
 ### Get Permissions by Role
 ```http
 GET /api/v1/auth/resource-permissions/role/{role_id}
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 
 ### Get Permissions by Resource
 ```http
 GET /api/v1/auth/resource-permissions/resource/fee_categories
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 
 ### Bulk Create Permissions
 ```http
 POST /api/v1/auth/resource-permissions/bulk
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 Content-Type: application/json
 
 {
@@ -2677,21 +4299,21 @@ Content-Type: application/json
 ```http
 GET /api/v1/auth/resource-permissions/role/{role_id}/summary
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 
 ### Get Permission Matrix
 ```http
 GET /api/v1/auth/resource-permissions/matrix/all
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 
 ### Update Resource Permission
 ```http
 PUT /api/v1/auth/resource-permissions/{permission_id}
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 Content-Type: application/json
 
 {
@@ -2703,35 +4325,35 @@ Content-Type: application/json
 ```http
 DELETE /api/v1/auth/resource-permissions/{permission_id}
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 
 ### Delete All Permissions for Role
 ```http
 DELETE /api/v1/auth/resource-permissions/role/{role_id}/all
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 
 ### Get Available Resources (Dropdown)
 ```http
 GET /api/v1/auth/resource-permissions/dropdown/resources
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 
 ### Get Available Actions (Dropdown)
 ```http
 GET /api/v1/auth/resource-permissions/dropdown/actions
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 
 ### Check Permission Exists
 ```http
 GET /api/v1/auth/resource-permissions/check/{role_id}/fee_categories/create
 Authorization: Bearer <admin_token>
-X-Client-Name: tenant_name
+cschema: tenant_name
 ```
 
 **Response:**
@@ -2757,7 +4379,7 @@ X-Client-Name: tenant_name
 POST /api/v1/fee/class-mappings/bulk
 Authorization: Bearer <admin_token>
 Content-Type: application/json
-X-Client-Name: tenant_name
+cschema: tenant_name
 
 {
   "class_ids": [
@@ -2825,7 +4447,7 @@ X-Client-Name: tenant_name
 POST /api/v1/fee/student-mappings/bulk
 Authorization: Bearer <admin_token>
 Content-Type: application/json
-X-Client-Name: tenant_name
+cschema: tenant_name
 
 {
   "student_ids": [
@@ -2915,7 +4537,7 @@ async function createBulkFeeClassMappings(authToken, tenantName, mappingData) {
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
-        'X-Client-Name': tenantName
+        'cschema': tenantName
       },
       body: JSON.stringify(mappingData)
     });
@@ -2962,7 +4584,7 @@ async function createBulkFeeStudentMappings(authToken, tenantName, mappingData) 
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
-        'X-Client-Name': tenantName
+        'cschema': tenantName
       },
       body: JSON.stringify(mappingData)
     });

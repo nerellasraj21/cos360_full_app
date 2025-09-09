@@ -7,11 +7,14 @@ from app.schemas.auth.login_schema import (
     LegacyLoginResponse,
     LoginErrorResponse,
     RefreshTokenRequest,
-    RefreshTokenResponse
+    RefreshTokenResponse,
+    LogoutResponse,
+    LogoutErrorResponse,
+    LogoutInstructions
 )
 from app.service.auth.auth_service import login_user
 from app.service.auth.multi_tenant_auth_service import MultiTenantAuthService
-from app.tools.jwt_utils import verify_refresh_token, create_access_token, create_refresh_token
+from app.tools.jwt_utils import verify_refresh_token, verify_access_token, create_access_token, create_refresh_token
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Union
 import logging
@@ -143,4 +146,57 @@ async def refresh_token(request: RefreshTokenRequest, fastapi_request: Request):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Token refresh service unavailable"
+        )
+
+@router.post("/logout",
+             response_model=LogoutResponse,
+             responses={
+                 401: {"model": LogoutErrorResponse, "description": "Invalid or expired token"},
+                 500: {"model": LogoutErrorResponse, "description": "Server error"}
+             })
+async def logout(request: Request):
+    """
+    Simple client-side logout endpoint.
+    
+    Validates the access token and instructs the client to clear tokens and redirect.
+    The token remains valid until natural expiry, but client should clear it immediately.
+    """
+    try:
+        # Extract token from Authorization header
+        authorization = request.headers.get("Authorization")
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization header missing or invalid",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+        
+        token = authorization.split(" ")[1]
+        
+        # Verify the access token (this will raise HTTPException if invalid)
+        payload = verify_access_token(token)
+        
+        username = payload.get("username", "unknown")
+        client_name = payload.get("client_name", "unknown")
+        
+        logger.info(f"User logout: {username} from tenant: {client_name}")
+        
+        # Return success response with client instructions
+        return LogoutResponse(
+            message="Logout successful",
+            instructions=LogoutInstructions(
+                clear_tokens=True,
+                clear_menu=True,
+                redirect_to="/login"
+            )
+        )
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (like invalid token)
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during logout: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Logout service unavailable"
         )

@@ -46,6 +46,19 @@ class RefreshTokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
 
+# Logout schemas
+class LogoutInstructions(BaseModel):
+    clear_tokens: bool = True
+    clear_menu: bool = True
+    redirect_to: str = "/login"
+
+class LogoutResponse(BaseModel):
+    message: str
+    instructions: LogoutInstructions
+
+class LogoutErrorResponse(BaseModel):
+    detail: str
+
 # Error response schemas
 class LoginErrorResponse(BaseModel):
     detail: str
