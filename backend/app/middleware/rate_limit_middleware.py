@@ -13,20 +13,21 @@ from starlette.responses import Response
 import redis
 from typing import Optional
 import logging
+from app.config import settings
 
 logger = logging.getLogger("rate_limit")
 
 # Initialize limiter with in-memory storage for development
 # For production, consider using Redis for distributed rate limiting
 try:
-    # Try to connect to Redis if available
-    redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
+    # Try to connect to Redis using settings
+    redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
     redis_client.ping()  # Test connection
     
     # Use Redis for production-ready distributed rate limiting
     limiter = Limiter(
         key_func=get_remote_address,
-        storage_uri="redis://localhost:6379",
+        storage_uri=settings.REDIS_URL,
         default_limits=["1000 per hour"]  # Global default limit
     )
     logger.info("Rate limiter initialized with Redis backend")

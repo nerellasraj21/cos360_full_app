@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ENVIRONMENT: str = "development"  # "development", "production", etc.
 
+    # Redis configuration
+    REDIS_URL: str = "redis://localhost:6379"  # Safe localhost default for development
+
     # Pagination defaults
     PAGE_SIZE: int = 20
 

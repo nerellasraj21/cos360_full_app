@@ -5,6 +5,7 @@ from fastapi import Depends, HTTPException, status, Request
 from typing import AsyncGenerator, Optional, Dict
 from app.models.public.tenant_model import Tenant
 from app.middleware.tenant_middleware import get_client_name_from_request
+from app.config import settings
 import logging
 import asyncio
 from functools import lru_cache
@@ -12,7 +13,7 @@ from functools import lru_cache
 logger = logging.getLogger("tenant_session")
 
 # Database configuration
-DATABASE_URL = "postgresql+asyncpg://postgres:Passw0rd!@localhost/postgres"
+DATABASE_URL = settings.DATABASE_URL
 
 # Optimized shared engine for all tenant connections
 engine = create_async_engine(

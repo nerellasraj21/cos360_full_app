@@ -16,11 +16,63 @@ uvicorn app.main:app --reload --port 8003
 alembic upgrade head
 ```
 
+### 🌐 Deployment Configuration
+
+#### Environment Variables Setup
+The application uses environment-based configuration for deployment flexibility:
+
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit with your configuration
+DATABASE_URL=postgresql+asyncpg://user:password@host:5432/database
+REDIS_URL=redis://redis-host:6379
+SECRET_KEY=your-secure-secret-key
+JWT_SECRET_KEY=your-jwt-secret-key
+```
+
+#### Required Environment Variables
+```bash
+# Database Configuration
+DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/postgres
+
+# Redis Configuration (for rate limiting)
+REDIS_URL=redis://localhost:6379
+
+# Security Keys (generate secure values for production)
+SECRET_KEY=your-super-secure-secret-key-here
+JWT_SECRET_KEY=your-jwt-secret-key-here
+
+# Application Settings
+DEBUG=false
+ENVIRONMENT=production
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+#### Production Deployment
+1. **Copy production template**: `cp .env.production .env`
+2. **Update database URL** with your production database server
+3. **Update Redis URL** with your production Redis server
+4. **Generate secure keys** for SECRET_KEY and JWT_SECRET_KEY (64+ characters)
+5. **Set DEBUG=false** and **ENVIRONMENT=production**
+6. **Configure hosting platform** environment variables
+
+#### Hosting Platform Compatibility
+- ✅ **Railway**: Set environment variables in dashboard
+- ✅ **Render**: Configure in environment variables section
+- ✅ **Heroku**: Use `heroku config:set` commands
+- ✅ **AWS/Google Cloud/Azure**: Configure in respective platforms
+- ✅ **Docker**: Pass via environment variables or `.env` file
+
 ### Base URL
 ```
 Development: http://localhost:8003
 Production: https://your-domain.com
 ```
+
+> **🚀 Deployment Ready**: The application is fully configured for production deployment with environment variable support, security templates, and hosting platform compatibility.
 
 ### Required Headers (ALL REQUESTS)
 ```http

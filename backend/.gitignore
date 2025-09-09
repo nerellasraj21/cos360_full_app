@@ -13,5 +13,12 @@ __pycache__/
 *.log
 *.sqlite3
 .claude/settings.local.json
+
+# Environment files (never commit actual environment variables)
 .env
+.env.local
+.env.production
+.env.staging
+.env.*.local
+
 TEST_ENVIRONMENT_SETUP.md

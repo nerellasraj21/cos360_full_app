@@ -1,8 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
+from app.config import settings
 
-DATABASE_URL = "postgresql+asyncpg://postgres:Passw0rd!@localhost/postgres"
+DATABASE_URL = settings.DATABASE_URL
 
 # Optimized connection pool configuration for high concurrency
 engine = create_async_engine(
