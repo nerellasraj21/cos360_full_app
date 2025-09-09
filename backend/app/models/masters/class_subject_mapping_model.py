@@ -10,6 +10,8 @@ class ClassSubjectMap(BaseOrg):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     class_id = Column(UUID(as_uuid=True), ForeignKey('classes.id'), nullable=False)
     subject_id = Column(UUID(as_uuid=True), ForeignKey('subjects.id'), nullable=False)
+    exclude_marks = Column(Boolean, default=False, nullable=False)
+    order = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())

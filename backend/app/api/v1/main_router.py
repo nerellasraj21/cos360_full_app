@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.masters.class_endpoints import router as class_router
+from app.api.v1.masters.class_subject_mapping_endpoints import router as class_subject_mapping_router
 from app.api.v1.auth.role_endpoints import router as role_router
 from app.api.v1.auth.login_endpoints import router as login_router
 from app.api.v1.auth.menu_endpoints import router as menu_router
@@ -38,6 +39,7 @@ from app.api.v1.auth.test_jwt_endpoints import router as test_jwt_router
 router = APIRouter()
 router.include_router(academic_year_router)
 router.include_router(class_router)
+router.include_router(class_subject_mapping_router)
 router.include_router(subject_router)
 router.include_router(holiday_router)
 router.include_router(role_router)

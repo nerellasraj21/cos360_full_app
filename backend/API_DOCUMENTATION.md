@@ -2523,6 +2523,457 @@ cschema: test_tenant
 
 ---
 
+# 🔗 Class Subject Mapping Module - WITH PLAN-BASED FILTERING ✅
+
+Base path: `/api/v1/masters/class-subject-mappings`
+
+## Multi-Layer Access Control
+All Class Subject Mapping endpoints enforce **plan-based filtering** in addition to role-based permissions:
+
+### Security Layers
+1. **JWT Authentication** - Valid bearer token required
+2. **Role-Based Permissions** - Role must have access to class_subject_mappings:action
+3. **Plan-Based Filtering** - Tenant's subscription plan must support feature
+
+### Role Permissions
+- **Admin**: Full CRUD access (Create, Read, Update, Delete, List)
+- **Teacher**: Read + List only
+- **Student**: Read + List only (for viewing their assigned subjects)
+
+### Plan-Based Feature Availability
+- **Basic Plan**: Read + List only (view existing mappings)
+- **Standard Plan**: Full CRUD access to class-subject mappings
+- **Premium Plan**: All Standard features + advanced bulk operations
+- **Enterprise Plan**: All features including bulk create/update operations
+
+## Business Logic
+Class Subject Mappings define which subjects are taught in which classes, with additional configuration:
+- **exclude_marks**: Boolean flag to exclude subjects from marking/grading
+- **order**: Integer to define subject display order within a class
+- **Bulk Operations**: Create/update multiple subject mappings for a class in one transaction
+
+## Data Model
+```javascript
+{
+  "id": "uuid",
+  "class_id": "uuid",           // Foreign key to classes table
+  "subject_id": "uuid",         // Foreign key to subjects table
+  "academic_year_id": "uuid",   // Foreign key to academic_years table
+  "exclude_marks": boolean,     // Default: false
+  "order": integer,             // Optional: display order
+  "is_active": boolean,         // Default: true
+  "created_at": "timestamp",
+  "updated_at": "timestamp",
+  
+  // Related data (populated in responses)
+  "class_name": "string",
+  "subject_name": "string", 
+  "academic_year_name": "string"
+}
+```
+
+## Endpoints
+
+### 1. Create Single Class-Subject Mapping
+```http
+POST /api/v1/masters/class-subject-mappings/
+```
+**Headers:**
+```
+Authorization: Bearer <token>
+cschema: test_tenant
+Content-Type: application/json
+```
+**Body:**
+```json
+{
+  "class_id": "550e8400-e29b-41d4-a716-446655440001",
+  "subject_id": "550e8400-e29b-41d4-a716-446655440002", 
+  "academic_year_id": "550e8400-e29b-41d4-a716-446655440003",
+  "exclude_marks": false,
+  "order": 1,
+  "is_active": true
+}
+```
+**Response (201):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440010",
+  "class_id": "550e8400-e29b-41d4-a716-446655440001",
+  "subject_id": "550e8400-e29b-41d4-a716-446655440002",
+  "academic_year_id": "550e8400-e29b-41d4-a716-446655440003",
+  "exclude_marks": false,
+  "order": 1,
+  "is_active": true,
+  "created_at": "2025-09-09T15:30:00Z",
+  "updated_at": "2025-09-09T15:30:00Z",
+  "class_name": "Class 10-A",
+  "subject_name": "Mathematics",
+  "academic_year_name": "2025-26"
+}
+```
+
+### 2. Bulk Create/Update Class-Subject Mappings ⭐
+```http
+POST /api/v1/masters/class-subject-mappings/bulk
+```
+**Use Case**: User selects a class, chooses multiple subjects, sets order and exclude_marks, submits all at once.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+cschema: test_tenant
+Content-Type: application/json
+```
+**Body:**
+```json
+{
+  "class_id": "550e8400-e29b-41d4-a716-446655440001",
+  "academic_year_id": "550e8400-e29b-41d4-a716-446655440003",
+  "subjects": [
+    {
+      "subject_id": "550e8400-e29b-41d4-a716-446655440002",
+      "exclude_marks": false,
+      "order": 1,
+      "is_active": true
+    },
+    {
+      "subject_id": "550e8400-e29b-41d4-a716-446655440004", 
+      "exclude_marks": true,
+      "order": 2,
+      "is_active": true
+    },
+    {
+      "subject_id": "550e8400-e29b-41d4-a716-446655440005",
+      "exclude_marks": false,
+      "order": 3,
+      "is_active": true
+    }
+  ]
+}
+```
+**Response (201):**
+```json
+{
+  "success": true,
+  "message": "Successfully created 3 class-subject mappings",
+  "created_count": 3,
+  "mappings": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440010",
+      "class_id": "550e8400-e29b-41d4-a716-446655440001",
+      "subject_id": "550e8400-e29b-41d4-a716-446655440002",
+      "academic_year_id": "550e8400-e29b-41d4-a716-446655440003",
+      "exclude_marks": false,
+      "order": 1,
+      "is_active": true,
+      "created_at": "2025-09-09T15:30:00Z",
+      "updated_at": "2025-09-09T15:30:00Z",
+      "class_name": "Class 10-A",
+      "subject_name": "Mathematics",
+      "academic_year_name": "2025-26"
+    }
+    // ... additional mappings
+  ]
+}
+```
+
+### 3. Get All Class-Subject Mappings (Paginated)
+```http
+GET /api/v1/masters/class-subject-mappings/?skip=0&limit=100&active_only=true&academic_year_id=uuid
+```
+**Headers:**
+```
+Authorization: Bearer <token>
+cschema: test_tenant
+```
+**Query Parameters:**
+- `skip` (int, optional): Number of records to skip (default: 0)
+- `limit` (int, optional): Max records to return (default: 100, max: 1000)
+- `active_only` (bool, optional): Filter active mappings only (default: true)
+- `academic_year_id` (uuid, optional): Filter by academic year
+
+**Response (200):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440010",
+    "class_id": "550e8400-e29b-41d4-a716-446655440001",
+    "subject_id": "550e8400-e29b-41d4-a716-446655440002",
+    "academic_year_id": "550e8400-e29b-41d4-a716-446655440003",
+    "exclude_marks": false,
+    "order": 1,
+    "is_active": true,
+    "created_at": "2025-09-09T15:30:00Z",
+    "updated_at": "2025-09-09T15:30:00Z",
+    "class_name": "Class 10-A",
+    "subject_name": "Mathematics",
+    "academic_year_name": "2025-26"
+  }
+]
+```
+
+### 4. Get Mappings by Class
+```http
+GET /api/v1/masters/class-subject-mappings/by-class/{class_id}?academic_year_id=uuid&active_only=true
+```
+**Headers:**
+```
+Authorization: Bearer <token>
+cschema: test_tenant
+```
+**Path Parameters:**
+- `class_id` (uuid): Class UUID
+
+**Query Parameters:**
+- `academic_year_id` (uuid, optional): Filter by academic year
+- `active_only` (bool, optional): Filter active mappings only (default: true)
+
+**Response (200):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440010",
+    "class_id": "550e8400-e29b-41d4-a716-446655440001",
+    "subject_id": "550e8400-e29b-41d4-a716-446655440002", 
+    "academic_year_id": "550e8400-e29b-41d4-a716-446655440003",
+    "exclude_marks": false,
+    "order": 1,
+    "is_active": true,
+    "created_at": "2025-09-09T15:30:00Z",
+    "updated_at": "2025-09-09T15:30:00Z",
+    "class_name": "Class 10-A",
+    "subject_name": "Mathematics",
+    "academic_year_name": "2025-26"
+  }
+]
+```
+
+### 5. Get Class-Subject Mappings Dropdown
+```http
+GET /api/v1/masters/class-subject-mappings/dropdown?class_id=uuid&academic_year_id=uuid
+```
+**Headers:**
+```
+Authorization: Bearer <token>
+cschema: test_tenant
+```
+**Query Parameters:**
+- `class_id` (uuid, optional): Filter by class
+- `academic_year_id` (uuid, optional): Filter by academic year
+
+**Response (200):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440010",
+    "class_name": "Class 10-A",
+    "subject_name": "Mathematics",
+    "exclude_marks": false,
+    "order": 1
+  }
+]
+```
+
+### 6. Get Single Class-Subject Mapping
+```http
+GET /api/v1/masters/class-subject-mappings/{mapping_id}
+```
+**Headers:**
+```
+Authorization: Bearer <token>
+cschema: test_tenant
+```
+**Path Parameters:**
+- `mapping_id` (uuid): Mapping UUID
+
+**Response (200):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440010",
+  "class_id": "550e8400-e29b-41d4-a716-446655440001",
+  "subject_id": "550e8400-e29b-41d4-a716-446655440002",
+  "academic_year_id": "550e8400-e29b-41d4-a716-446655440003",
+  "exclude_marks": false,
+  "order": 1,
+  "is_active": true,
+  "created_at": "2025-09-09T15:30:00Z",
+  "updated_at": "2025-09-09T15:30:00Z",
+  "class_name": "Class 10-A", 
+  "subject_name": "Mathematics",
+  "academic_year_name": "2025-26"
+}
+```
+
+### 7. Update Class-Subject Mapping
+```http
+PUT /api/v1/masters/class-subject-mappings/{mapping_id}
+```
+**Headers:**
+```
+Authorization: Bearer <token>
+cschema: test_tenant
+Content-Type: application/json
+```
+**Path Parameters:**
+- `mapping_id` (uuid): Mapping UUID
+
+**Body:**
+```json
+{
+  "exclude_marks": true,
+  "order": 5,
+  "is_active": false
+}
+```
+**Response (200):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440010",
+  "class_id": "550e8400-e29b-41d4-a716-446655440001",
+  "subject_id": "550e8400-e29b-41d4-a716-446655440002",
+  "academic_year_id": "550e8400-e29b-41d4-a716-446655440003",
+  "exclude_marks": true,
+  "order": 5,
+  "is_active": false,
+  "created_at": "2025-09-09T15:30:00Z",
+  "updated_at": "2025-09-09T15:35:00Z",
+  "class_name": "Class 10-A",
+  "subject_name": "Mathematics", 
+  "academic_year_name": "2025-26"
+}
+```
+
+### 8. Delete Class-Subject Mapping
+```http
+DELETE /api/v1/masters/class-subject-mappings/{mapping_id}
+```
+**Headers:**
+```
+Authorization: Bearer <token>
+cschema: test_tenant
+```
+**Path Parameters:**
+- `mapping_id` (uuid): Mapping UUID
+
+**Response (204):**
+```
+No content - mapping deleted successfully
+```
+
+## Error Responses
+
+### Plan Limitation (402)
+```json
+{
+  "detail": "Feature requires plan upgrade. Current: Basic Plan. Required: Standard Plan or higher. Contact support to upgrade your subscription."
+}
+```
+
+### Permission Denied (403)
+```json
+{
+  "detail": "Access forbidden: Insufficient permissions for class_subject_mappings:create"
+}
+```
+
+### Validation Error (400)
+```json
+{
+  "detail": "Class not found"
+}
+```
+
+### Not Found (404)
+```json
+{
+  "detail": "Class-subject mapping not found"
+}
+```
+
+## Usage Examples
+
+### Frontend Integration - Bulk Subject Assignment
+```javascript
+// 1. User selects a class and academic year
+const classId = "550e8400-e29b-41d4-a716-446655440001";
+const academicYearId = "550e8400-e29b-41d4-a716-446655440003";
+
+// 2. Fetch available subjects for dropdown
+const subjects = await fetchSubjects();
+
+// 3. User selects multiple subjects with configuration
+const selectedSubjects = [
+  { subjectId: "subject1", excludeMarks: false, order: 1 },
+  { subjectId: "subject2", excludeMarks: true, order: 2 },
+  { subjectId: "subject3", excludeMarks: false, order: 3 }
+];
+
+// 4. Submit bulk request
+const bulkRequest = {
+  class_id: classId,
+  academic_year_id: academicYearId,
+  subjects: selectedSubjects.map(s => ({
+    subject_id: s.subjectId,
+    exclude_marks: s.excludeMarks,
+    order: s.order,
+    is_active: true
+  }))
+};
+
+const response = await fetch('/api/v1/masters/class-subject-mappings/bulk', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'cschema': 'test_tenant',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(bulkRequest)
+});
+
+const result = await response.json();
+console.log(`Created ${result.created_count} mappings`);
+```
+
+### React Component Example
+```jsx
+const ClassSubjectMapping = () => {
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSubjects, setSelectedSubjects] = useState([]);
+  
+  const handleBulkSubmit = async () => {
+    const bulkData = {
+      class_id: selectedClass,
+      academic_year_id: currentAcademicYear,
+      subjects: selectedSubjects.map((subject, index) => ({
+        subject_id: subject.id,
+        exclude_marks: subject.excludeMarks || false,
+        order: index + 1,
+        is_active: true
+      }))
+    };
+    
+    const result = await classSubjectService.bulkCreate(bulkData);
+    toast.success(`Successfully assigned ${result.created_count} subjects`);
+  };
+  
+  return (
+    <div>
+      <ClassSelector value={selectedClass} onChange={setSelectedClass} />
+      <SubjectMultiSelect 
+        value={selectedSubjects} 
+        onChange={setSelectedSubjects}
+        excludeMarksOption={true}
+        orderingEnabled={true}
+      />
+      <Button onClick={handleBulkSubmit}>Assign Subjects</Button>
+    </div>
+  );
+};
+```
+
+---
+
 # 💰 Fee Management Module - WITH PLAN-BASED FILTERING ✅
 
 ## Multi-Layer Access Control (UPDATED 2025-09-07)
