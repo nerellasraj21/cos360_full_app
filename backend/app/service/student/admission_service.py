@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.models.auth.user_model import User
 from sqlalchemy.future import select
 from uuid import UUID
-from sqlalchemy import or_, String
+from sqlalchemy import or_, String, func
 from app.tools.password_util import hash_password
 
 async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
@@ -142,3 +142,91 @@ async def search_students(query: str, db):
     )
     result = await db.execute(stmt)
     return result.scalars().all()
+
+async def get_all_admissions(db: AsyncSession, skip: int = 0, limit: int = 10):
+    """Get all admissions with pagination"""
+    # Count total records
+    count_stmt = select(func.count(Admission.id))
+    count_result = await db.execute(count_stmt)
+    total_count = count_result.scalar()
+    
+    # Get paginated admissions
+    stmt = (
+        select(Admission)
+        .options(
+            selectinload(Admission.student)
+            .selectinload(Student.parent_links)
+            .selectinload(StudentParentLink.parent)
+        )
+        .offset(skip)
+        .limit(limit)
+        .order_by(Admission.admission_date.desc())
+    )
+    
+    result = await db.execute(stmt)
+    admissions = result.scalars().all()
+    
+    has_next = (skip + limit) < total_count
+    
+    return {
+        "items": admissions,
+        "total_count": total_count,
+        "has_next": has_next
+    }
+
+async def delete_admission(admission_id: UUID, db: AsyncSession):
+    """Delete admission and related student data"""
+    # Get admission with relationships
+    stmt = (
+        select(Admission)
+        .options(selectinload(Admission.student))
+        .where(Admission.id == admission_id)
+    )
+    result = await db.execute(stmt)
+    admission = result.scalar_one_or_none()
+    
+    if not admission:
+        raise HTTPException(status_code=404, detail="Admission not found")
+    
+    student = admission.student
+    
+    # Delete parent links
+    parent_links_stmt = select(StudentParentLink).where(StudentParentLink.student_id == student.id)
+    parent_links_result = await db.execute(parent_links_stmt)
+    parent_links = parent_links_result.scalars().all()
+    
+    for link in parent_links:
+        await db.delete(link)
+    
+    # Delete parents (if they exist)
+    for link in parent_links:
+        parent_stmt = select(Parent).where(Parent.id == link.parent_id)
+        parent_result = await db.execute(parent_stmt)
+        parent = parent_result.scalar_one_or_none()
+        if parent:
+            # Delete parent user
+            if parent.user_id:
+                user_stmt = select(User).where(User.id == parent.user_id)
+                user_result = await db.execute(user_stmt)
+                user = user_result.scalar_one_or_none()
+                if user:
+                    await db.delete(user)
+            await db.delete(parent)
+    
+    # Delete student user
+    if student.user_id:
+        user_stmt = select(User).where(User.id == student.user_id)
+        user_result = await db.execute(user_stmt)
+        user = user_result.scalar_one_or_none()
+        if user:
+            await db.delete(user)
+    
+    # Delete student
+    await db.delete(student)
+    
+    # Delete admission
+    await db.delete(admission)
+    
+    await db.commit()
+    
+    return {"message": "Admission and related data deleted successfully"}

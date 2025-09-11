@@ -19,8 +19,8 @@ class FeeTerm(BaseOrg):
     academic_year = relationship("AcademicYear", back_populates="fee_terms")
     fee_term_dates = relationship("FeeTermDates", back_populates="fee_term", cascade="all, delete-orphan")
     fee_types = relationship("FeeType", back_populates="fee_term", cascade="all, delete-orphan")
-    fee_class_mapping_term_amounts = relationship("FeeClassMappingTermAmount", back_populates="fee_term")
-    fee_student_map_term_amounts = relationship("FeeStudentMapTermAmount", back_populates="fee_term")
+    fee_class_mapping_term_amounts = relationship("FeeClassMappingTermAmount", back_populates="fee_term", lazy="select")
+    fee_student_map_term_amounts = relationship("FeeStudentMapTermAmount", back_populates="fee_term", lazy="select")
     
     def __repr__(self):
         return f"<FeeTerm(id={self.id}, term_name='{self.term_name}', number_of_terms={self.number_of_terms})>"

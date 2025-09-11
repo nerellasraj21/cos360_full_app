@@ -12,7 +12,7 @@ from app.schemas.student.certificate_schema import (
     CertificateFileResponse
 )
 from uuid import UUID
-from app.schemas.student.certificate_type_schema import CertificateTypeOut
+from app.schemas.student.certificate_type_schema import CertificateTypeRead
 from app.service.student.student_certificate_service import list_all_certificates_of_student,download_certificate_file,get_all_certificates,upload_certificate,update_certificate_file,delete_certificate_file,get_certificate,get_all_certificate_types
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 
@@ -119,7 +119,7 @@ async def list_certificates_for_student(student_id: UUID, request: Request, db: 
     
     return await list_all_certificates_of_student(student_id,db)
 
-@router.get("/certificate-types", response_model=List[CertificateTypeOut])
+@router.get("/certificate-types", response_model=List[CertificateTypeRead])
 async def list_certificate_types(request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """List certificate types - All authenticated users"""
     current_user = await get_current_user_token(request)

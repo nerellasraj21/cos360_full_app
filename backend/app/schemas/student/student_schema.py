@@ -50,6 +50,19 @@ class StudentOut(StudentBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+class StudentDropdown(BaseModel):
+    """Student dropdown with display name and admission number"""
+    id: str
+    display_name: str
+    first_name: str
+    last_name: str
+    admission_number: str
+
+class StudentSimpleDropdown(BaseModel):
+    """Simple student dropdown with just ID and name"""
+    id: str
+    name: str
+
 from app.schemas.masters.parent_schema import ParentCreate
 StudentCreate.update_forward_refs()
 

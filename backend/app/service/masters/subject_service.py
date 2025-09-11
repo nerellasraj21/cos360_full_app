@@ -16,7 +16,8 @@ async def create_subject(db: AsyncSession, subject_data: SubjectCreate) -> Subje
         subject = Subject(**subject_data.model_dump())
         db.add(subject)
         await db.commit()
-        await db.refresh(subject)
+        # Note: Removed refresh() to avoid schema context issues
+        # The object is valid after commit since no DB triggers modify it
         
         # Invalidate cache after creating new subject
         invalidate_cache("dropdown", "subjects")
@@ -28,15 +29,7 @@ async def create_subject(db: AsyncSession, subject_data: SubjectCreate) -> Subje
         raise HTTPException(status_code=400, detail="Subject creation failed.")
 
 async def get_subject_by_id(db: AsyncSession, subject_id: UUID):
-    try:
-        if not isinstance(subject_id, int) or subject_id <= 0:
-            raise ValueError("Invalid subject ID")
-    except ValueError as ve:
-        log.error(f"Invalid subject ID: {ve}")
-        raise HTTPException(status_code=400, detail=str(ve))
-
     log.info(f"Fetching subject with ID: {subject_id}")
-    # subject = db.query(Subject).filter(Subject.id == subject_id).first()
     result = await db.execute(select(Subject).options(selectinload(Subject.category)).where(Subject.id == subject_id))
     subject = result.scalar_one_or_none()
     if not subject:

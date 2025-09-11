@@ -1,16 +1,23 @@
-# schemas/certificate_type.py
-
 from pydantic import BaseModel
+from typing import Optional
 from uuid import UUID
 
-class CertificateTypeCreate(BaseModel):
+class CertificateTypeBase(BaseModel):
     name: str
-    description: str | None = None
+    description: Optional[str] = None
 
-class CertificateTypeOut(BaseModel):
+class CertificateTypeCreate(CertificateTypeBase):
+    pass
+
+class CertificateTypeUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+class CertificateTypeRead(CertificateTypeBase):
+    id: UUID
+    model_config = {"from_attributes": True}
+
+class CertificateTypeDropdown(BaseModel):
     id: UUID
     name: str
-    description: str | None = None
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

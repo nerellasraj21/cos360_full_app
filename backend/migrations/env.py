@@ -11,6 +11,8 @@ from alembic import context
 from app.db.base import Base
 from app.models.auth import User, Role, Menu, RoleMenuPermission
 from app.models.masters import Class, Section
+from app.models.masters.academic_year_model import AcademicYear
+from app.models.masters.subject_model import Subject
 from app.models.fee.fee_category_model import FeeCategory
 from app.models.fee.fee_term_model import FeeTerm
 from app.models.fee.fee_term_dates_model import FeeTermDates

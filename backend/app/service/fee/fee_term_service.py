@@ -61,13 +61,15 @@ async def create_fee_term_with_dates(db: AsyncSession, fee_term_data: FeeTermCre
             db.add(db_fee_term_date)
         
         await db.commit()
-        await db.refresh(db_fee_term)
         
-        # Load the fee term with dates for response
+        # Get the created ID before losing session context
+        created_id = db_fee_term.id
+        
+        # Load the fee term with dates for response using a fresh query (don't use refresh to avoid loading problematic relationships)
         result = await db.execute(
             select(FeeTermModel)
             .options(selectinload(FeeTermModel.fee_term_dates))
-            .where(FeeTermModel.id == db_fee_term.id)
+            .where(FeeTermModel.id == created_id)
         )
         return result.scalar_one()
         
@@ -84,11 +86,10 @@ async def create_fee_term_with_dates(db: AsyncSession, fee_term_data: FeeTermCre
 
 async def get_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
     try:
-        fee_term_uuid = UUID(fee_term_id)
         result = await db.execute(
             select(FeeTermModel)
             .options(selectinload(FeeTermModel.fee_term_dates))
-            .where(FeeTermModel.id == fee_term_uuid)
+            .where(FeeTermModel.id == fee_term_id)
         )
         fee_term = result.scalar_one_or_none()
         if not fee_term:
@@ -97,16 +98,11 @@ async def get_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
                 detail=f"Fee term with id {fee_term_id} not found"
             )
         return fee_term
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid fee term ID format"
-        )
     except Exception as e:
         log.error(f"Error getting fee term with dates: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while retrieving fee term"
+            detail=f"An error occurred while retrieving fee term: {str(e)}"
         )
 
 async def get_all_fee_terms(db: AsyncSession):
@@ -125,13 +121,11 @@ async def get_all_fee_terms(db: AsyncSession):
 
 async def update_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID, fee_term_data: FeeTermUpdate):
     try:
-        fee_term_uuid = UUID(fee_term_id)
-        
         # Get existing fee term
         result = await db.execute(
             select(FeeTermModel)
             .options(selectinload(FeeTermModel.fee_term_dates))
-            .where(FeeTermModel.id == fee_term_uuid)
+            .where(FeeTermModel.id == fee_term_id)
         )
         db_fee_term = result.scalar_one_or_none()
         if not db_fee_term:
@@ -174,7 +168,7 @@ async def update_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID, fee_te
                 )
             
             # Delete existing fee term dates (cascade will handle this, but being explicit)
-            await db.execute(delete(FeeTermDatesModel).where(FeeTermDatesModel.term_id == fee_term_uuid))
+            await db.execute(delete(FeeTermDatesModel).where(FeeTermDatesModel.term_id == fee_term_id))
             
             # Create new fee term dates
             for fee_date in fee_term_data.fee_term_dates:
@@ -185,9 +179,8 @@ async def update_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID, fee_te
                 db.add(db_fee_term_date)
         
         await db.commit()
-        await db.refresh(db_fee_term)
         
-        # Load the updated fee term with dates for response
+        # Load the updated fee term with dates for response (don't use refresh to avoid loading problematic relationships)
         result = await db.execute(
             select(FeeTermModel)
             .options(selectinload(FeeTermModel.fee_term_dates))
@@ -214,9 +207,7 @@ async def update_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID, fee_te
 
 async def delete_fee_term_date(db: AsyncSession, fee_term_date_id: UUID):
     try:
-        fee_term_date_uuid = UUID(fee_term_date_id)
-        
-        result = await db.execute(select(FeeTermDatesModel).where(FeeTermDatesModel.id == fee_term_date_uuid))
+        result = await db.execute(select(FeeTermDatesModel).where(FeeTermDatesModel.id == fee_term_date_id))
         db_fee_term_date = result.scalar_one_or_none()
         if not db_fee_term_date:
             raise HTTPException(
@@ -231,12 +222,6 @@ async def delete_fee_term_date(db: AsyncSession, fee_term_date_id: UUID):
     except HTTPException:
         await db.rollback()
         raise
-    except ValueError:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid fee term date ID format"
-        )
     except Exception as e:
         await db.rollback()
         log.error(f"Error deleting fee term date: {str(e)}")
@@ -247,9 +232,7 @@ async def delete_fee_term_date(db: AsyncSession, fee_term_date_id: UUID):
 
 async def delete_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
     try:
-        fee_term_uuid = UUID(fee_term_id)
-        
-        result = await db.execute(select(FeeTermModel).where(FeeTermModel.id == fee_term_uuid))
+        result = await db.execute(select(FeeTermModel).where(FeeTermModel.id == fee_term_id))
         db_fee_term = result.scalar_one_or_none()
         if not db_fee_term:
             raise HTTPException(
@@ -265,12 +248,6 @@ async def delete_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
     except HTTPException:
         await db.rollback()
         raise
-    except ValueError:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid fee term ID format"
-        )
     except Exception as e:
         await db.rollback()
         log.error(f"Error deleting fee term: {str(e)}")

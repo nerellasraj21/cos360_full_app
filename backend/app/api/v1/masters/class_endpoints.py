@@ -112,6 +112,12 @@ async def get_all_sections(request: Request, db: AsyncSession = Depends(get_tena
 @router.get("/sections-by-class-name", response_model=List[SectionOut])
 @rate_limit_dropdown("100 per minute")
 async def fetch_sections_by_class_name(request: Request, class_name: str = Query(..., description="Name of the class"), db: AsyncSession = Depends(get_tenant_db)):
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'list')
+    
     return await get_sections_by_class_name(db, class_name)
 
 @router.get("/dropdown", response_model=List[ClassDropdown])
@@ -130,12 +136,25 @@ async def get_classes_dropdown_endpoint(request: Request, active_only: bool = Tr
 @rate_limit_dropdown("100 per minute")
 async def get_sections_by_class_id_endpoint(request: Request, class_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     """Get sections by class ID for dropdown (id + name only). Rate limited to 100 requests per minute."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'list')
+    
     return await get_sections_by_class_id(db, class_id)
 
 @router.get("/by-class-section")
 async def list_students_by_class_section(
+    request: Request,
     class_name: str = Query(..., description="Class name (e.g., 'UKG')"),
     section_name: str = Query(..., description="Section name (e.g., 'A')"),
     db: AsyncSession = Depends(get_tenant_db)
 ):
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'list')
+    
     return await get_students_by_class_section(class_name, section_name, db)

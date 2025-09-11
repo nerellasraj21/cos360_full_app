@@ -110,10 +110,16 @@ ROLE_PERMISSIONS = {
         "student_transport": ["create", "read", "update", "delete", "list"],
         
         # Student Management - Full access
+        "students": ["create", "read", "update", "delete", "list"],
         "student_admissions": ["create", "read", "update", "delete", "list"],
         "student_attendance": ["create", "read", "update", "delete", "list"],
         "student_certificates": ["create", "read", "update", "delete", "list"],
         "student_documents": ["create", "read", "update", "delete", "list"],
+        
+        # Staff Management - Full access
+        "staff": ["create", "read", "update", "delete", "list"],
+        "staff_attendance": ["create", "read", "update", "delete", "list"],
+        "designations": ["create", "read", "update", "delete", "list"],
         
         # Administrative - Full access
         "parents": ["create", "read", "update", "delete", "list"],
@@ -135,6 +141,7 @@ ROLE_PERMISSIONS = {
         "subject_categories": ["read", "list"],
         
         # Student Academic Management - Full access
+        "students": ["read", "list"],
         "student_attendance": ["create", "read", "update", "delete", "list"],
         "student_certificates": ["create", "read", "update", "delete", "list"],
         "student_admissions": ["read", "list"],
@@ -154,6 +161,11 @@ ROLE_PERMISSIONS = {
         "route_stops": ["read", "list"],
         "transport_trips": ["read", "list"],
         "student_transport": ["read", "list"],
+        
+        # Staff Information - Read access for coordination
+        "staff": ["read", "list"],
+        "staff_attendance": ["read", "list"],
+        "designations": ["read", "list"],
         
         # Administrative Information - Read access
         "parents": ["read", "list"],
@@ -244,6 +256,11 @@ ROLE_PERMISSIONS = {
         "transport_trips": ["create", "read", "update", "delete", "list"],
         "student_transport": ["create", "read", "update", "delete", "list"],
         
+        # Staff Management - Full CRUD access
+        "staff": ["create", "read", "update", "delete", "list"],
+        "staff_attendance": ["create", "read", "update", "delete", "list"],
+        "designations": ["create", "read", "update", "delete", "list"],
+        
         # Administrative Functions - Full CRUD access
         "parents": ["create", "read", "update", "delete", "list"],
         "holidays": ["create", "read", "update", "delete", "list"],
@@ -257,6 +274,7 @@ ROLE_PERMISSIONS = {
         "timetables": ["read", "list"],
         
         # Student Information - Read access for administrative support
+        "students": ["read", "list"],
         "student_admissions": ["read", "list"],
         "student_attendance": ["read", "list"],
         "student_certificates": ["read", "list"],

@@ -23,8 +23,21 @@ async def create(request: Request, subject: SubjectCreate, db: AsyncSession = De
     
     return await create_subject(db, subject)
 
-@router.get("/", response_model=PaginatedResponse[SubjectRead])
-async def list(request: Request, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: UUID = None, db: AsyncSession = Depends(get_tenant_db)):
+@router.get("/", response_model=List[SubjectRead])
+async def list_all(request: Request, active_only: bool = True, academic_year_id: UUID = None, db: AsyncSession = Depends(get_tenant_db)):
+    """Get all subjects as a simple array (non-paginated)"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'subjects', 'list')
+    
+    result = await get_all_subjects(db, 0, 1000, active_only, academic_year_id)
+    return result['items']
+
+@router.get("/paginated", response_model=PaginatedResponse[SubjectRead])
+async def list_paginated(request: Request, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: UUID = None, db: AsyncSession = Depends(get_tenant_db)):
+    """Get subjects with pagination"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
     

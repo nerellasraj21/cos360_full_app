@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -15,11 +15,11 @@ class FeeTermBase(BaseModel):
 class FeeTermCreate(FeeTermBase):
     fee_term_dates: List[FeeTermDatesCreate] = []
     
-    @field_validator('fee_term_dates')
-    def validate_fee_term_dates_count(cls, v, values):
-        if 'number_of_terms' in values and len(v) != values['number_of_terms']:
-            raise ValueError(f'Number of fee term dates ({len(v)}) must match number_of_terms ({values["number_of_terms"]})')
-        return v
+    @model_validator(mode='after')
+    def validate_fee_term_dates_count(self):
+        if len(self.fee_term_dates) != self.number_of_terms:
+            raise ValueError(f'Number of fee term dates ({len(self.fee_term_dates)}) must match number_of_terms ({self.number_of_terms})')
+        return self
     
     @field_validator('fee_term_dates')
     def validate_no_duplicate_dates(cls, v):
@@ -35,12 +35,12 @@ class FeeTermUpdate(BaseModel):
     academic_year_id: Optional[UUID] = None
     fee_term_dates: Optional[List[FeeTermDatesCreate]] = None
     
-    @field_validator('fee_term_dates')
-    def validate_fee_term_dates_count(cls, v, values):
-        if v is not None and 'number_of_terms' in values and values['number_of_terms'] is not None:
-            if len(v) != values['number_of_terms']:
-                raise ValueError(f'Number of fee term dates ({len(v)}) must match number_of_terms ({values["number_of_terms"]})')
-        return v
+    @model_validator(mode='after')
+    def validate_fee_term_dates_count(self):
+        if self.fee_term_dates is not None and self.number_of_terms is not None:
+            if len(self.fee_term_dates) != self.number_of_terms:
+                raise ValueError(f'Number of fee term dates ({len(self.fee_term_dates)}) must match number_of_terms ({self.number_of_terms})')
+        return self
     
     @field_validator('fee_term_dates')
     def validate_no_duplicate_dates(cls, v):

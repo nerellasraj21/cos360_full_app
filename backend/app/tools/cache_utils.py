@@ -12,6 +12,8 @@ from typing import Any, Optional, Union, Dict
 from functools import wraps
 import asyncio
 import logging
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 
 logger = logging.getLogger("cache_utils")
 
@@ -19,6 +21,18 @@ logger = logging.getLogger("cache_utils")
 dropdown_cache = TTLCache(maxsize=1000, ttl=300)  # 5 minutes for dropdowns
 query_cache = TTLCache(maxsize=500, ttl=180)      # 3 minutes for query results
 tenant_cache = TTLCache(maxsize=100, ttl=600)     # 10 minutes for tenant data
+
+async def get_tenant_context(db_session: AsyncSession) -> str:
+    """
+    Extract tenant context from database session
+    """
+    try:
+        result = await db_session.execute(text("SELECT current_schema()"))
+        schema_name = result.scalar()
+        return schema_name or "default"
+    except Exception:
+        # Fallback to default if we can't get schema
+        return "default"
 
 def create_cache_key(prefix: str, *args, **kwargs) -> str:
     """
@@ -33,9 +47,27 @@ def create_cache_key(prefix: str, *args, **kwargs) -> str:
     key_hash = hashlib.md5(key_string.encode()).hexdigest()[:12]
     return f"{prefix}:{key_hash}"
 
+async def create_tenant_cache_key(prefix: str, db_session: AsyncSession, *args, **kwargs) -> str:
+    """
+    Create a tenant-aware cache key including schema context
+    """
+    tenant_context = await get_tenant_context(db_session)
+    
+    # Filter out the db session from args for key generation
+    filtered_args = [arg for arg in args if not isinstance(arg, AsyncSession)]
+    
+    key_data = {
+        'tenant': tenant_context,
+        'args': filtered_args,
+        'kwargs': sorted(kwargs.items())
+    }
+    key_string = json.dumps(key_data, sort_keys=True, default=str)
+    key_hash = hashlib.md5(key_string.encode()).hexdigest()[:12]
+    return f"{prefix}:{tenant_context}:{key_hash}"
+
 def cache_dropdown(ttl: int = 300):
     """
-    Decorator for caching dropdown endpoint results
+    Decorator for caching dropdown endpoint results with tenant awareness
     
     Args:
         ttl: Time to live in seconds (default: 5 minutes)
@@ -43,8 +75,19 @@ def cache_dropdown(ttl: int = 300):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # Create cache key
-            cache_key = create_cache_key(f"dropdown_{func.__name__}", *args, **kwargs)
+            # Find db session in args (usually first argument)
+            db_session = None
+            for arg in args:
+                if isinstance(arg, AsyncSession):
+                    db_session = arg
+                    break
+            
+            if db_session is None:
+                # Fallback to old behavior if no db session found
+                cache_key = create_cache_key(f"dropdown_{func.__name__}", *args, **kwargs)
+            else:
+                # Create tenant-aware cache key
+                cache_key = await create_tenant_cache_key(f"dropdown_{func.__name__}", db_session, *args, **kwargs)
             
             # Try to get from cache
             cached_result = dropdown_cache.get(cache_key)
@@ -129,13 +172,14 @@ def cache_tenant_data(ttl: int = 600):
         return wrapper
     return decorator
 
-def invalidate_cache(cache_type: str = "all", pattern: str = None):
+def invalidate_cache(cache_type: str = "all", pattern: str = None, tenant: str = None):
     """
-    Invalidate cache entries
+    Invalidate cache entries with optional tenant filtering
     
     Args:
         cache_type: Type of cache to invalidate ('dropdown', 'query', 'tenant', 'all')
         pattern: Pattern to match for selective invalidation
+        tenant: Tenant schema name for tenant-specific invalidation
     """
     caches = {
         'dropdown': dropdown_cache,
@@ -144,19 +188,38 @@ def invalidate_cache(cache_type: str = "all", pattern: str = None):
     }
     
     if cache_type == "all":
-        for cache in caches.values():
-            cache.clear()
-        logger.info("All caches cleared")
-    elif cache_type in caches:
-        if pattern:
-            # Remove keys matching pattern
-            keys_to_remove = [k for k in caches[cache_type].keys() if pattern in k]
-            for key in keys_to_remove:
-                del caches[cache_type][key]
-            logger.info(f"Cleared {len(keys_to_remove)} keys from {cache_type} cache matching pattern: {pattern}")
+        if tenant:
+            # Clear only tenant-specific entries
+            total_removed = 0
+            for cache in caches.values():
+                keys_to_remove = [k for k in cache.keys() if f":{tenant}:" in k]
+                for key in keys_to_remove:
+                    del cache[key]
+                total_removed += len(keys_to_remove)
+            logger.info(f"Cleared {total_removed} tenant-specific cache entries for tenant: {tenant}")
         else:
+            for cache in caches.values():
+                cache.clear()
+            logger.info("All caches cleared")
+    elif cache_type in caches:
+        if tenant and pattern:
+            # Remove keys matching both tenant and pattern
+            keys_to_remove = [k for k in caches[cache_type].keys() if f":{tenant}:" in k and pattern in k]
+        elif tenant:
+            # Remove keys matching tenant only
+            keys_to_remove = [k for k in caches[cache_type].keys() if f":{tenant}:" in k]
+        elif pattern:
+            # Remove keys matching pattern only
+            keys_to_remove = [k for k in caches[cache_type].keys() if pattern in k]
+        else:
+            # Clear entire cache
             caches[cache_type].clear()
             logger.info(f"Cleared {cache_type} cache")
+            return
+            
+        for key in keys_to_remove:
+            del caches[cache_type][key]
+        logger.info(f"Cleared {len(keys_to_remove)} keys from {cache_type} cache (tenant: {tenant}, pattern: {pattern})")
     else:
         logger.warning(f"Unknown cache type: {cache_type}")
 

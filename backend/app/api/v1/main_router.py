@@ -20,6 +20,7 @@ from app.api.v1.masters.timetable_routes import router as timetable_router
 from app.api.v1.student.admission_endpoints import router as admission_router
 from app.api.v1.student.attendance_endpoints import router as attendance_router
 from app.api.v1.student.certificate_endpoints import router as certificate_router
+from app.api.v1.student.certificate_type_endpoints import router as certificate_type_router
 from app.api.v1.masters.parent_endpoints import router as parent_router
 from app.api.v1.masters.staff_endpoints import router as staff_router
 from app.api.v1.student.student_document_endpoints import router as student_document_router
@@ -56,6 +57,7 @@ router.include_router(vehicle_router)
 router.include_router(timetable_router)
 router.include_router(admission_router)
 router.include_router(certificate_router)
+router.include_router(certificate_type_router)
 router.include_router(parent_router)
 router.include_router(staff_router)
 router.include_router(student_document_router)
