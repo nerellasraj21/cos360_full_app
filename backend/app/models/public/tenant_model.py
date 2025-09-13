@@ -1,12 +1,13 @@
-from sqlalchemy import Column, Integer, String, Boolean, TIMESTAMP, func
+from sqlalchemy import Column, Integer, String, Boolean, TIMESTAMP, func, ForeignKey
 from app.db.base import BasePublic
 
 class Tenant(BasePublic):
     __tablename__ = 'tenants'
-    
+
     id = Column(Integer, primary_key=True, index=True)
     client_name = Column(String(100), unique=True, nullable=False, index=True)
     schema_name = Column(String(100), unique=True, nullable=False, index=True)
+    plan_id = Column(Integer, ForeignKey('plans.id'), nullable=True, index=True)
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())

@@ -48,3 +48,17 @@ SESSION_CONTEXT*.yaml
 *.context.yml
 *.context.yaml
 TESTING_STRUCTURE_RECOMMENDATIONS.yml
+
+# Temporary files and test artifacts
+*.tmp
+*.bak
+temp_*.py
+
+# Keep organized script structure - allow versioned scripts
+scripts/README.md
+scripts/database/
+scripts/development/
+scripts/testing/
+
+# Keep organized docs structure
+docs/testing/

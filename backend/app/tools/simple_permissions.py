@@ -7,6 +7,7 @@ from app.tools.jwt_utils import verify_access_token
 from app.service.auth.permission_service import PermissionService
 from app.service.auth.plan_service import PlanService
 from app.middleware.tenant_middleware import get_client_name_from_request
+from app.db.session import get_public_db
 
 logger = logging.getLogger("simple_permissions")
 
@@ -502,3 +503,59 @@ def RequireList(resource: str):
             )
         return has_perm
     return permission_check
+
+# Super Admin Authentication Functions
+async def get_current_super_admin(request: Request) -> dict:
+    """
+    Get current Super Admin from JWT token (public schema access)
+    
+    Returns Super Admin token payload for system-wide operations
+    """
+    try:
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization header missing or invalid",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        token = auth_header.split(" ")[1]
+        payload = verify_access_token(token)
+        
+        # Verify this is a Super Admin token
+        user_type = payload.get("user_type")
+        if user_type != "super_admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Super Admin access required"
+            )
+        
+        # Verify required Super Admin permissions
+        permissions = payload.get("permissions", [])
+        required_permissions = ["system_admin", "tenant_management", "plan_management"]
+        if not all(perm in permissions for perm in required_permissions):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient Super Admin permissions"
+            )
+        
+        return payload
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Super Admin token verification error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Super Admin authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+async def require_super_admin(request: Request) -> dict:
+    """
+    Dependency to require Super Admin authentication
+    
+    Can be used as FastAPI dependency for Super Admin-only endpoints
+    """
+    return await get_current_super_admin(request)

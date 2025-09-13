@@ -6,6 +6,7 @@ from .tenant_model import Tenant
 from .role_template_model import RoleTemplate
 from .permission_template_model import PermissionTemplate
 from .menu_action_model import MenuAction
+from .super_admin_model import SuperAdmin, SuperAdminAudit
 
 __all__ = [
     "Menu",
@@ -16,4 +17,6 @@ __all__ = [
     "RoleTemplate",
     "PermissionTemplate",
     "MenuAction",
+    "SuperAdmin",
+    "SuperAdminAudit",
 ]

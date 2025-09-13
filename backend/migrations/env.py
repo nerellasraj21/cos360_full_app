@@ -8,7 +8,7 @@ from sqlalchemy import event
 from alembic import context
 
 # Import your Base and models here
-from app.db.base import Base
+from app.db.base import Base, BasePublic
 from app.models.auth import User, Role, Menu, RoleMenuPermission
 from app.models.masters import Class, Section
 from app.models.masters.academic_year_model import AcademicYear
@@ -19,6 +19,10 @@ from app.models.fee.fee_term_dates_model import FeeTermDates
 from app.models.fee.fee_type_model import FeeType
 from app.models.fee.fee_class_mapping_model import FeeClassMapping
 from app.models.fee.fee_class_map_term_amount_model import FeeClassMappingTermAmount
+# Import public schema models
+from app.models.public.super_admin_model import SuperAdmin, SuperAdminAudit
+from app.models.public.tenant_model import Tenant
+from app.models.public.plan_model import Plan
 
 
 
@@ -33,9 +37,18 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = Base.metadata
+# Combine metadata from both public and tenant schemas
+from sqlalchemy import MetaData
+combined_metadata = MetaData()
+
+# Copy tables from both schemas
+for table in Base.metadata.tables.values():
+    table.tometadata(combined_metadata)
+
+for table in BasePublic.metadata.tables.values():
+    table.tometadata(combined_metadata)
+
+target_metadata = combined_metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

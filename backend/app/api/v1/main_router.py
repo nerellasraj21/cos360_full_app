@@ -39,6 +39,11 @@ from app.api.v1.fee.fee_refund_endpoints import router as fee_refund_router
 from app.api.v1.auth.seed_endpoints import router as seed_router
 from app.api.v1.auth.test_setup_endpoints import router as test_setup_router
 from app.api.v1.auth.test_jwt_endpoints import router as test_jwt_router
+from app.api.v1.super_admin.auth_endpoints import router as super_admin_auth_router
+from app.api.v1.super_admin.setup_endpoints import router as super_admin_setup_router
+from app.api.v1.super_admin.system_endpoints import router as super_admin_system_router
+from app.api.v1.super_admin.plan_endpoints import router as super_admin_plan_router
+from app.api.v1.admin.permission_endpoints import router as admin_permission_router
 
 router = APIRouter()
 router.include_router(academic_year_router)
@@ -80,3 +85,8 @@ router.include_router(fee_refund_router)
 router.include_router(seed_router)
 router.include_router(test_setup_router)
 router.include_router(test_jwt_router)
+router.include_router(super_admin_auth_router)
+router.include_router(super_admin_setup_router)
+router.include_router(super_admin_system_router)
+router.include_router(super_admin_plan_router)
+router.include_router(admin_permission_router)
