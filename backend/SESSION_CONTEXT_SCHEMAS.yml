@@ -1,0 +1,743 @@
+# COS360 Schema Definitions - Data Contracts
+# Version: 2025-09-13  
+# Purpose: Comprehensive schema definitions for all API contracts with validation rules
+
+schema_version: 1.0
+
+# Common/Shared Schemas
+common_schemas:
+  DeleteResponse:
+    description: "Standard delete operation response"
+    fields:
+      success: {type: boolean}
+      message: {type: string}
+    examples:
+      success:
+        success: true
+        message: "Record deleted successfully"
+
+  BulkOperationResult:
+    description: "Generic bulk operation result summary"
+    fields:
+      success_count: {type: integer}
+      failure_count: {type: integer}
+      failures: {type: list[object], desc: "List of {index, error_message}"}
+    validation_rules:
+      - "success_count + failure_count should equal total operations"
+    examples:
+      partial_success:
+        success_count: 8
+        failure_count: 2
+        failures: [
+          {index: 3, error_message: "Subject already assigned to class"},
+          {index: 7, error_message: "Invalid subject ID"}
+        ]
+
+  PaginationQuery:
+    description: "Standard pagination parameters"
+    fields:
+      skip: {type: integer, required: false, default: 0, min: 0}
+      limit: {type: integer, required: false, default: 10, min: 1, max: 100}
+
+# Masters Module Schemas
+masters_schemas:
+  # Academic Year Schemas
+  AcademicYearCreate:
+    description: "Payload to create an academic year"
+    fields:
+      name: {type: string, required: true, max_length: 50, desc: "Display name, e.g., '2024-2025'"}
+      start_date: {type: date, required: true}
+      end_date: {type: date, required: true}
+      is_active: {type: boolean, required: false, default: true}
+    validation_rules:
+      - "end_date must be after start_date"
+      - "name must be unique per tenant"
+      - "date range cannot overlap with existing active academic years"
+    examples:
+      valid:
+        name: "2024-2025"
+        start_date: "2024-04-01"
+        end_date: "2025-03-31"
+        is_active: true
+
+  AcademicYearRead:
+    description: "Academic year returned in responses"
+    fields:
+      id: {type: uuid}
+      name: {type: string}
+      start_date: {type: date}
+      end_date: {type: date}
+      is_active: {type: boolean}
+      created_at: {type: datetime}
+      updated_at: {type: datetime}
+
+  AcademicYearUpdate:
+    description: "Payload to update academic year"
+    fields:
+      name: {type: string, required: false, max_length: 50}
+      start_date: {type: date, required: false}
+      end_date: {type: date, required: false}
+      is_active: {type: boolean, required: false}
+    validation_rules:
+      - "if start_date or end_date provided, end_date must be after start_date"
+      - "name must be unique per tenant if provided"
+
+  AcademicYearListQuery:
+    description: "Query parameters for academic year list"
+    fields:
+      skip: {type: integer, required: false, default: 0, min: 0}
+      limit: {type: integer, required: false, default: 10, min: 1, max: 100}
+      active_only: {type: boolean, required: false, default: false}
+      search: {type: string, required: false, max_length: 100}
+
+  PaginatedAcademicYearRead:
+    description: "Paginated response for academic years"
+    fields:
+      items: {type: list[AcademicYearRead]}
+      total_count: {type: integer}
+      has_next: {type: boolean}
+
+  AcademicYearDropdown:
+    description: "Compact record for dropdowns"
+    fields:
+      id: {type: uuid}
+      name: {type: string}
+
+  # Class and Section Schemas
+  ClassCreate:
+    description: "Create a class (grade/standard)"
+    fields:
+      name: {type: string, required: true, max_length: 50}
+      short_code: {type: string, required: false, max_length: 10}
+      is_active: {type: boolean, required: false, default: true}
+    validation_rules:
+      - "name must be unique per tenant"
+      - "short_code must be unique per tenant if provided"
+    examples:
+      valid:
+        name: "Grade 10"
+        short_code: "10"
+        is_active: true
+
+  ClassRead:
+    description: "Class read response"
+    fields:
+      id: {type: uuid}
+      name: {type: string}
+      short_code: {type: string}
+      is_active: {type: boolean}
+      created_at: {type: datetime}
+      updated_at: {type: datetime}
+
+  ClassUpdate:
+    description: "Update class information"
+    fields:
+      name: {type: string, required: false, max_length: 50}
+      short_code: {type: string, required: false, max_length: 10}
+      is_active: {type: boolean, required: false}
+    validation_rules:
+      - "name must be unique per tenant if provided"
+      - "short_code must be unique per tenant if provided"
+
+  ClassListQuery:
+    description: "Query parameters for class list"
+    fields:
+      skip: {type: integer, required: false, default: 0, min: 0}
+      limit: {type: integer, required: false, default: 10, min: 1, max: 100}
+      active_only: {type: boolean, required: false, default: false}
+      search: {type: string, required: false, max_length: 100}
+
+  PaginatedClassRead:
+    description: "Paginated class response"
+    fields:
+      items: {type: list[ClassRead]}
+      total_count: {type: integer}
+      has_next: {type: boolean}
+
+  ClassDropdown:
+    description: "Class dropdown"
+    fields:
+      id: {type: uuid}
+      name: {type: string}
+
+  ClassNameQuery:
+    description: "Query by class name"
+    fields:
+      class_name: {type: string, required: true, max_length: 50}
+
+  SectionsByClassResponse:
+    description: "Sections for a specific class"
+    fields:
+      class_id: {type: uuid}
+      class_name: {type: string}
+      sections: {type: list[SectionRead]}
+
+  ClassesWithSectionsResponse:
+    description: "All classes with their sections"
+    fields:
+      classes: {type: list[object], desc: "List of {class_id, class_name, sections}"}
+
+  ClassNamesResponse:
+    description: "List of class names"
+    fields:
+      class_names: {type: list[string]}
+
+  SectionRead:
+    description: "Section response"
+    fields:
+      id: {type: uuid}
+      section_name: {type: string}
+      class_id: {type: uuid}
+      capacity: {type: integer}
+      created_at: {type: datetime}
+
+  # Subject Schemas
+  SubjectCreate:
+    description: "Create a subject"
+    fields:
+      name: {type: string, required: true, max_length: 100}
+      short_code: {type: string, required: false, max_length: 10}
+      category_id: {type: uuid, required: false}
+      is_active: {type: boolean, required: false, default: true}
+    validation_rules:
+      - "name must be unique per tenant"
+      - "short_code must be unique per tenant if provided"
+      - "category_id must exist if provided"
+    examples:
+      valid:
+        name: "Mathematics"
+        short_code: "MATH"
+        category_id: "550e8400-e29b-41d4-a716-446655440000"
+        is_active: true
+
+  SubjectRead:
+    description: "Subject response"
+    fields:
+      id: {type: uuid}
+      name: {type: string}
+      short_code: {type: string}
+      category_id: {type: uuid}
+      category_name: {type: string}
+      is_active: {type: boolean}
+      created_at: {type: datetime}
+      updated_at: {type: datetime}
+
+  SubjectUpdate:
+    description: "Update subject information"
+    fields:
+      name: {type: string, required: false, max_length: 100}
+      short_code: {type: string, required: false, max_length: 10}
+      category_id: {type: uuid, required: false}
+      is_active: {type: boolean, required: false}
+    validation_rules:
+      - "name must be unique per tenant if provided"
+      - "short_code must be unique per tenant if provided"
+      - "category_id must exist if provided"
+
+  SubjectListQuery:
+    description: "Query parameters for subject list"
+    fields:
+      skip: {type: integer, required: false, default: 0, min: 0}
+      limit: {type: integer, required: false, default: 10, min: 1, max: 100}
+      active_only: {type: boolean, required: false, default: false}
+      category_id: {type: uuid, required: false}
+      search: {type: string, required: false, max_length: 100}
+
+  PaginatedSubjectRead:
+    description: "Paginated subject response"
+    fields:
+      items: {type: list[SubjectRead]}
+      total_count: {type: integer}
+      has_next: {type: boolean}
+
+  SubjectDropdown:
+    description: "Subject dropdown"
+    fields:
+      id: {type: uuid}
+      name: {type: string}
+
+  # Class-Subject Mapping Schemas
+  ClassSubjectMappingCreate:
+    description: "Assign subject to a class (single mapping)"
+    fields:
+      class_id: {type: uuid, required: true}
+      subject_id: {type: uuid, required: true}
+      order: {type: integer, required: false, min: 1}
+      exclude_marks: {type: boolean, required: false, default: false}
+      academic_year_id: {type: uuid, required: true}
+    validation_rules:
+      - "class_id must exist"
+      - "subject_id must exist"
+      - "academic_year_id must exist"
+      - "combination of class_id, subject_id, academic_year_id must be unique"
+    examples:
+      valid:
+        class_id: "550e8400-e29b-41d4-a716-446655440001"
+        subject_id: "550e8400-e29b-41d4-a716-446655440002"
+        order: 1
+        exclude_marks: false
+        academic_year_id: "550e8400-e29b-41d4-a716-446655440003"
+
+  ClassSubjectMappingRead:
+    description: "Mapping read response"
+    fields:
+      id: {type: uuid}
+      class_id: {type: uuid}
+      class_name: {type: string}
+      subject_id: {type: uuid}
+      subject_name: {type: string}
+      order: {type: integer}
+      exclude_marks: {type: boolean}
+      academic_year_id: {type: uuid}
+      academic_year_name: {type: string}
+      is_active: {type: boolean}
+      created_at: {type: datetime}
+
+  ClassSubjectMappingUpdate:
+    description: "Update mapping information"
+    fields:
+      order: {type: integer, required: false, min: 1}
+      exclude_marks: {type: boolean, required: false}
+      is_active: {type: boolean, required: false}
+
+  ClassSubjectMappingBulkCreate:
+    description: "Bulk create/update mappings for a class"
+    fields:
+      class_id: {type: uuid, required: true}
+      academic_year_id: {type: uuid, required: true}
+      subjects: {type: list[object], required: true, desc: "List of {subject_id, order, exclude_marks}"}
+    validation_rules:
+      - "class_id must exist"
+      - "academic_year_id must exist"
+      - "all subject_ids in subjects list must exist"
+      - "order values must be unique within subjects list if provided"
+    examples:
+      valid:
+        class_id: "550e8400-e29b-41d4-a716-446655440001"
+        academic_year_id: "550e8400-e29b-41d4-a716-446655440003"
+        subjects: [
+          {subject_id: "550e8400-e29b-41d4-a716-446655440002", order: 1, exclude_marks: false},
+          {subject_id: "550e8400-e29b-41d4-a716-446655440004", order: 2, exclude_marks: true}
+        ]
+
+  ClassSubjectMappingListQuery:
+    description: "Query parameters for mapping list"
+    fields:
+      skip: {type: integer, required: false, default: 0, min: 0}
+      limit: {type: integer, required: false, default: 10, min: 1, max: 100}
+      class_id: {type: uuid, required: false}
+      subject_id: {type: uuid, required: false}
+      academic_year_id: {type: uuid, required: false}
+      active_only: {type: boolean, required: false, default: false}
+
+  PaginatedClassSubjectMappingRead:
+    description: "Paginated mapping response"
+    fields:
+      items: {type: list[ClassSubjectMappingRead]}
+      total_count: {type: integer}
+      has_next: {type: boolean}
+
+  ClassSubjectMappingListResponse:
+    description: "List of mappings for specific class"
+    fields:
+      class_id: {type: uuid}
+      class_name: {type: string}
+      mappings: {type: list[ClassSubjectMappingRead]}
+
+  ClassSubjectMappingDropdown:
+    description: "Mapping dropdown data"
+    fields:
+      id: {type: uuid}
+      display_name: {type: string, desc: "Format: 'Class Name - Subject Name'"}
+
+  # Holiday Schemas
+  HolidayCreate:
+    description: "Create holiday"
+    fields:
+      name: {type: string, required: true, max_length: 100}
+      date: {type: date, required: true}
+      description: {type: string, required: false, max_length: 500}
+    validation_rules:
+      - "name must be unique per tenant per date"
+      - "date cannot be in the past"
+    examples:
+      valid:
+        name: "Independence Day"
+        date: "2024-08-15"
+        description: "National holiday celebrating independence"
+
+  HolidayRead:
+    description: "Holiday read response"
+    fields:
+      id: {type: uuid}
+      name: {type: string}
+      date: {type: date}
+      description: {type: string}
+      created_at: {type: datetime}
+      updated_at: {type: datetime}
+
+  HolidayUpdate:
+    description: "Update holiday information"
+    fields:
+      name: {type: string, required: false, max_length: 100}
+      date: {type: date, required: false}
+      description: {type: string, required: false, max_length: 500}
+    validation_rules:
+      - "name must be unique per tenant per date if provided"
+
+  HolidayListQuery:
+    description: "Query parameters for holiday list"
+    fields:
+      skip: {type: integer, required: false, default: 0, min: 0}
+      limit: {type: integer, required: false, default: 10, min: 1, max: 100}
+      year: {type: integer, required: false}
+      month: {type: integer, required: false, min: 1, max: 12}
+      search: {type: string, required: false, max_length: 100}
+
+  PaginatedHolidayRead:
+    description: "Paginated holiday response"
+    fields:
+      items: {type: list[HolidayRead]}
+      total_count: {type: integer}
+      has_next: {type: boolean}
+
+  HolidayDropdown:
+    description: "Holiday dropdown"
+    fields:
+      id: {type: uuid}
+      name: {type: string}
+      date: {type: date}
+
+  # Staff Schemas
+  StaffCreate:
+    description: "Create staff member"
+    fields:
+      first_name: {type: string, required: true, max_length: 50}
+      last_name: {type: string, required: true, max_length: 50}
+      email: {type: email, required: true}
+      phone: {type: string, required: false, max_length: 15}
+      designation_id: {type: uuid, required: true}
+      hire_date: {type: date, required: true}
+      is_active: {type: boolean, required: false, default: true}
+    validation_rules:
+      - "email must be unique per tenant"
+      - "designation_id must exist"
+      - "hire_date cannot be in the future"
+    examples:
+      valid:
+        first_name: "John"
+        last_name: "Doe"
+        email: "john.doe@school.com"
+        phone: "+1234567890"
+        designation_id: "550e8400-e29b-41d4-a716-446655440001"
+        hire_date: "2024-01-15"
+        is_active: true
+
+  StaffRead:
+    description: "Staff read response"
+    fields:
+      id: {type: uuid}
+      first_name: {type: string}
+      last_name: {type: string}
+      full_name: {type: string}
+      email: {type: string}
+      phone: {type: string}
+      designation_id: {type: uuid}
+      designation_title: {type: string}
+      hire_date: {type: date}
+      is_active: {type: boolean}
+      created_at: {type: datetime}
+      updated_at: {type: datetime}
+
+  StaffUpdate:
+    description: "Update staff information"
+    fields:
+      first_name: {type: string, required: false, max_length: 50}
+      last_name: {type: string, required: false, max_length: 50}
+      email: {type: email, required: false}
+      phone: {type: string, required: false, max_length: 15}
+      designation_id: {type: uuid, required: false}
+      hire_date: {type: date, required: false}
+      is_active: {type: boolean, required: false}
+    validation_rules:
+      - "email must be unique per tenant if provided"
+      - "designation_id must exist if provided"
+
+  StaffListQuery:
+    description: "Query parameters for staff list"
+    fields:
+      skip: {type: integer, required: false, default: 0, min: 0}
+      limit: {type: integer, required: false, default: 10, min: 1, max: 100}
+      active_only: {type: boolean, required: false, default: false}
+      designation_id: {type: uuid, required: false}
+      search: {type: string, required: false, max_length: 100}
+
+  PaginatedStaffRead:
+    description: "Paginated staff response"
+    fields:
+      items: {type: list[StaffRead]}
+      total_count: {type: integer}
+      has_next: {type: boolean}
+
+  StaffDropdown:
+    description: "Staff dropdown"
+    fields:
+      id: {type: uuid}
+      name: {type: string}
+      designation: {type: string}
+
+  DriverNamesResponse:
+    description: "Driver names for transport"
+    fields:
+      drivers: {type: list[object], desc: "List of {user_id, name, designation}"}
+
+  # Designation Schemas
+  DesignationCreate:
+    description: "Create staff designation"
+    fields:
+      title: {type: string, required: true, max_length: 100}
+    validation_rules:
+      - "title must be unique per tenant"
+    examples:
+      valid:
+        title: "Principal"
+
+  DesignationRead:
+    description: "Designation read response"
+    fields:
+      id: {type: uuid}
+      title: {type: string}
+      created_at: {type: datetime}
+      updated_at: {type: datetime}
+
+  DesignationUpdate:
+    description: "Update designation information"
+    fields:
+      title: {type: string, required: false, max_length: 100}
+    validation_rules:
+      - "title must be unique per tenant if provided"
+
+  DesignationListQuery:
+    description: "Query parameters for designation list"
+    fields:
+      skip: {type: integer, required: false, default: 0, min: 0}
+      limit: {type: integer, required: false, default: 10, min: 1, max: 100}
+      search: {type: string, required: false, max_length: 100}
+
+  PaginatedDesignationRead:
+    description: "Paginated designation response"
+    fields:
+      items: {type: list[DesignationRead]}
+      total_count: {type: integer}
+      has_next: {type: boolean}
+
+  DesignationDropdown:
+    description: "Designation dropdown"
+    fields:
+      id: {type: uuid}
+      title: {type: string}
+
+  # Parent Schemas
+  ParentCreate:
+    description: "Create parent"
+    fields:
+      first_name: {type: string, required: true, max_length: 50}
+      last_name: {type: string, required: true, max_length: 50}
+      email: {type: email, required: false}
+      phone: {type: string, required: true, max_length: 15}
+      address: {type: string, required: false, max_length: 500}
+      occupation: {type: string, required: false, max_length: 100}
+    validation_rules:
+      - "email must be unique per tenant if provided"
+      - "at least one contact method (email or phone) must be provided"
+    examples:
+      valid:
+        first_name: "Jane"
+        last_name: "Smith"
+        email: "jane.smith@email.com"
+        phone: "+1234567890"
+        address: "123 Main St, City"
+        occupation: "Engineer"
+
+  ParentRead:
+    description: "Parent read response"
+    fields:
+      id: {type: uuid}
+      first_name: {type: string}
+      last_name: {type: string}
+      full_name: {type: string}
+      email: {type: string}
+      phone: {type: string}
+      address: {type: string}
+      occupation: {type: string}
+      created_at: {type: datetime}
+      updated_at: {type: datetime}
+
+  ParentUpdate:
+    description: "Update parent information"
+    fields:
+      first_name: {type: string, required: false, max_length: 50}
+      last_name: {type: string, required: false, max_length: 50}
+      email: {type: email, required: false}
+      phone: {type: string, required: false, max_length: 15}
+      address: {type: string, required: false, max_length: 500}
+      occupation: {type: string, required: false, max_length: 100}
+    validation_rules:
+      - "email must be unique per tenant if provided"
+
+  ParentListQuery:
+    description: "Query parameters for parent list"
+    fields:
+      skip: {type: integer, required: false, default: 0, min: 0}
+      limit: {type: integer, required: false, default: 10, min: 1, max: 100}
+      search: {type: string, required: false, max_length: 100}
+
+  PaginatedParentRead:
+    description: "Paginated parent response"
+    fields:
+      items: {type: list[ParentRead]}
+      total_count: {type: integer}
+      has_next: {type: boolean}
+
+  ParentDropdown:
+    description: "Parent dropdown"
+    fields:
+      id: {type: uuid}
+      name: {type: string}
+
+  # Timetable Schemas
+  TimetableCreate:
+    description: "Create timetable"
+    fields:
+      name: {type: string, required: true, max_length: 100}
+      academic_year_id: {type: uuid, required: true}
+      class_id: {type: uuid, required: true}
+      effective_from: {type: date, required: true}
+      effective_to: {type: date, required: false}
+      is_active: {type: boolean, required: false, default: true}
+    validation_rules:
+      - "name must be unique per tenant per academic year"
+      - "academic_year_id must exist"
+      - "class_id must exist"
+      - "effective_to must be after effective_from if provided"
+    examples:
+      valid:
+        name: "Grade 10 Timetable - Semester 1"
+        academic_year_id: "550e8400-e29b-41d4-a716-446655440001"
+        class_id: "550e8400-e29b-41d4-a716-446655440002"
+        effective_from: "2024-04-01"
+        effective_to: "2024-09-30"
+        is_active: true
+
+  TimetableRead:
+    description: "Timetable read response"
+    fields:
+      id: {type: uuid}
+      name: {type: string}
+      academic_year_id: {type: uuid}
+      academic_year_name: {type: string}
+      class_id: {type: uuid}
+      class_name: {type: string}
+      effective_from: {type: date}
+      effective_to: {type: date}
+      is_active: {type: boolean}
+      created_at: {type: datetime}
+      updated_at: {type: datetime}
+
+  TimetableUpdate:
+    description: "Update timetable information"
+    fields:
+      name: {type: string, required: false, max_length: 100}
+      effective_from: {type: date, required: false}
+      effective_to: {type: date, required: false}
+      is_active: {type: boolean, required: false}
+    validation_rules:
+      - "name must be unique per tenant per academic year if provided"
+      - "effective_to must be after effective_from if both provided"
+
+  TimetableListQuery:
+    description: "Query parameters for timetable list"
+    fields:
+      skip: {type: integer, required: false, default: 0, min: 0}
+      limit: {type: integer, required: false, default: 10, min: 1, max: 100}
+      academic_year_id: {type: uuid, required: false}
+      class_id: {type: uuid, required: false}
+      active_only: {type: boolean, required: false, default: false}
+      search: {type: string, required: false, max_length: 100}
+
+  PaginatedTimetableRead:
+    description: "Paginated timetable response"
+    fields:
+      items: {type: list[TimetableRead]}
+      total_count: {type: integer}
+      has_next: {type: boolean}
+
+# Schema Cross-Reference Mapping
+schema_usage:
+  AcademicYearCreate:
+    used_in_features: ["academic-year-v1"]
+    used_in_endpoints: ["POST /api/v1/masters/academic_years/"]
+  
+  AcademicYearRead:
+    used_in_features: ["academic-year-v1"]
+    used_in_endpoints: [
+      "GET /api/v1/masters/academic_years/",
+      "GET /api/v1/masters/academic_years/{id}",
+      "PUT /api/v1/masters/academic_years/{id}"
+    ]
+    
+  ClassSubjectMappingBulkCreate:
+    used_in_features: ["class-subject-mapping-v1"]
+    used_in_endpoints: ["POST /api/v1/masters/class-subject-mappings/bulk"]
+    complexity: high
+    business_impact: high
+    
+  BulkOperationResult:
+    used_in_features: ["class-subject-mapping-v1"]
+    used_in_endpoints: ["POST /api/v1/masters/class-subject-mappings/bulk"]
+    reusable: true
+
+# Validation Rules Summary
+validation_patterns:
+  unique_per_tenant:
+    description: "Field must be unique within tenant scope"
+    applies_to: ["academic_year.name", "class.name", "subject.name", "staff.email", "designation.title"]
+    
+  date_range_validation:
+    description: "End date must be after start date"
+    applies_to: ["academic_year", "timetable"]
+    
+  foreign_key_validation:
+    description: "Referenced entity must exist"
+    applies_to: ["subject.category_id", "staff.designation_id", "mapping.class_id", "mapping.subject_id"]
+    
+  pagination_limits:
+    description: "Standard pagination constraints"
+    skip_min: 0
+    limit_min: 1
+    limit_max: 100
+    limit_default: 10
+
+# Common Field Types and Constraints
+field_types:
+  uuid:
+    format: "UUID v4"
+    example: "550e8400-e29b-41d4-a716-446655440000"
+    
+  email:
+    format: "Valid email address"
+    max_length: 254
+    example: "user@example.com"
+    
+  phone:
+    format: "E.164 or national format"
+    max_length: 15
+    example: "+1234567890"
+    
+  date:
+    format: "ISO 8601 date (YYYY-MM-DD)"
+    example: "2024-09-13"
+    
+  datetime:
+    format: "ISO 8601 datetime with timezone"
+    example: "2024-09-13T10:30:00Z"

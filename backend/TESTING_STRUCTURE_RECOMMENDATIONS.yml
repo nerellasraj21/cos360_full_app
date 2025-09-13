@@ -1,0 +1,253 @@
+# TESTING_STRUCTURE_RECOMMENDATIONS.yml
+# Improved structure for future testing file standardization
+
+schema_version: 1.1
+
+# Quick Recommendations (Human & Agent Readable)
+recommendations:
+  - "FINALIZED: Use kebab-case for all keys: `academic-year-v1-testing` (matches feature_id format)"
+  - "Create SESSION_CONTEXT_SCHEMAS.yml and validate all schema references exist in codebase"
+  - "Use direct feature_id mapping: `${feature_id}-testing` for predictable agent lookup"
+  - "Cross-check every schema name (AcademicYearRead, etc.) against actual model definitions"
+  - "Maintain global config at root level for cross-cutting concerns (environment, execution order)"
+
+# Naming Convention Decision
+naming_convention:
+  finalized_standard: "kebab-case"
+  rationale: "Matches feature_id format from SESSION_CONTEXT_STRUCTURED.yml"
+  examples:
+    correct: "academic-year-v1-testing"
+    incorrect: "academic_year_testing"
+  migration_needed: "Update existing snake_case testing sections to kebab-case"
+
+# Agent Instructions (Step-by-Step Rules)
+agent_instructions:
+  - "Read feature definitions from SESSION_CONTEXT_STRUCTURED.yml->modules->{module_name}->feature_id only"
+  - "Write testing instructions using pattern: `{feature_id}-testing` as top-level key (kebab-case)"
+  - "Always include required fields: meta.feature_id, meta.test_owner, preconditions, test_data, test_steps, negative_tests"
+  - "Reference schemas by exact name from models (e.g. AcademicYearRead) - validate against SESSION_CONTEXT_SCHEMAS.yml"
+  - "For development notes write to SESSION_CONTEXT_NOTES_{module}.yml under notes.{feature_id}.development_summary"
+  - "Archive old testing versions to archive/ directory with timestamp suffix"
+  - "Use global_environment for shared config, feature sections for specific test logic"
+
+# Structure Examples (Agent-Usable YAML Objects)
+structure_examples:
+  feature_block_example:
+    meta:
+      feature_id: "academic-year-v1"
+      feature_name: "Academic Year CRUD & Dropdowns"
+      test_owner: "qa_lead@cos360.com"
+      related_development_summary_ref: "SESSION_CONTEXT_STRUCTURED.yml:academic-year-v1"
+      environment:
+        tenant: "test_tenant"
+        base_url: "http://localhost:8003"
+        headers:
+          cschema: "test_tenant"
+          Authorization: "Bearer <admin_token>"
+    preconditions:
+      - "Database tenant schema exists and is migrated"
+      - "Admin user has academic_years permissions"
+      - "Service is running and health checks pass"
+    test_data:
+      - id: "ay-2025-26"
+        payload:
+          name: "2025-2026"
+          start_date: "2025-04-01"
+          end_date: "2026-03-31"
+          is_active: true
+    test_steps:
+      - id: "step-1-create"
+        description: "POST /api/v1/masters/academic_years/ with test data"
+        request:
+          method: POST
+          path: "/api/v1/masters/academic_years/"
+          body_ref: "test_data[0].payload"
+        expected:
+          status_code: 201
+          response_schema: AcademicYearRead
+          checks:
+            - "id present and is uuid"
+            - "name matches payload"
+    negative_tests:
+      - id: "neg-1-invalid-dates"
+        description: "POST with end_date earlier than start_date"
+        request:
+          method: POST
+          path: "/api/v1/masters/academic_years/"
+          body:
+            name: "Invalid Year"
+            start_date: "2026-04-01"
+            end_date: "2025-03-31"
+        expected:
+          status_code: 400
+          message_contains: "end_date must be after start_date"
+    automation:
+      automation_possible: true
+      artifacts:
+        - "postman_collection: Academic_Years.postman_collection"
+        - "pytest_file: tests/integration/test_academic_years.py"
+
+  endpoint_example:
+    meta:
+      feature_id: "academic-year-v1"
+      endpoint: "/api/v1/masters/academic_years/"
+      method: POST
+      test_owner: "qa_lead@cos360.com"
+      related_development_summary_ref: "SESSION_CONTEXT_STRUCTURED.yml:academic-year-v1"
+    preconditions:
+      - "Admin user logged in with valid token"
+      - "Tenant schema exists and is current"
+      - "No existing academic year with same name"
+    test_data:
+      - id: "test-year-data"
+        payload:
+          name: "2025-2026"
+          start_date: "2025-04-01"
+          end_date: "2026-03-31"
+          is_active: true
+    test_steps:
+      - id: "step-create-academic-year"
+        description: "Create academic year via POST API"
+        request:
+          method: POST
+          path: "/api/v1/masters/academic_years/"
+          headers:
+            Authorization: "Bearer <admin_token>"
+            cschema: "test_tenant"
+          body_ref: "test_data[0].payload"
+        expected:
+          status_code: 201
+          response_schema: AcademicYearRead
+          checks:
+            - "response.id is uuid format"
+            - "response.name == '2025-2026'"
+            - "response.is_active == true"
+            - "response.start_date == '2025-04-01'"
+    negative_tests:
+      - id: "neg-duplicate-name"
+        description: "Attempt to create duplicate academic year"
+        request:
+          method: POST
+          path: "/api/v1/masters/academic_years/"
+          body:
+            name: "2025-2026"
+            start_date: "2025-04-01"
+            end_date: "2026-03-31"
+        expected:
+          status_code: 400
+          message_contains: "academic year already exists"
+    automation:
+      automation_possible: true
+      artifacts:
+        - "postman_request: Academic_Year_Create.postman_request"
+        - "pytest_test: test_academic_year_create.py"
+
+recommended_structure:
+
+# Option 1: Direct feature_id mapping (Recommended)
+testing_instructions:
+  academic-year-v1:
+    meta:
+      feature_id: "academic-year-v1"
+      feature_name: "Academic Year CRUD & Dropdowns"
+      test_owner: "qa_lead@cos360.com"
+    preconditions: [...]
+    test_data: [...]
+    test_steps: [...]
+    # ... rest of structure
+
+  fee-transactions-v1:
+    meta:
+      feature_id: "fee-transactions-v1"
+      feature_name: "Phase 1 Fee Collection System"
+      test_owner: "qa_lead@cos360.com"
+    preconditions: [...]
+    # ... rest of structure
+
+# Global configuration remains at root level
+global_config:
+  environment:
+    base_url: "http://localhost:8003"
+    tenant: "test_tenant"
+    
+  execution:
+    order: ["academic-year-v1", "class-section-v1", "student-admission-v1"]
+    
+  automation:
+    postman_base_path: "tests/postman/"
+    pytest_base_path: "tests/integration/"
+
+# Agent Instructions for Current File
+agent_usage_notes:
+  current_file_pattern:
+    - "Feature sections use suffix '_testing'"
+    - "Section names are snake_case, feature_ids are kebab-case"
+    - "Global config at root level"
+    
+  lookup_pattern: |
+    # Python example for agent
+    feature_id = "academic-year-v1"
+    section_name = feature_id.replace("-", "_") + "_testing"
+    # Results in: "academic_year_testing"
+    
+  schema_validation:
+    required_action: "Cross-check all schema references against SESSION_CONTEXT_SCHEMAS.yml"
+    missing_schemas_handling: "Create or update schemas file with missing definitions"
+
+# Schema Reference Validation
+schema_validation:
+  schemas_referenced_in_testing:
+    - AcademicYearRead
+    - PaginatedAcademicYearRead
+    - AcademicYearDropdown
+    - FeeTransactionRead
+    - FeeReceiptRead
+    - FeeRefundRead
+    - StudentOutstandingFeesResponse
+    - ClassRead
+    - SectionsByClassResponse
+    - ClassesWithSectionsResponse
+    - StudentAdmissionRead
+    - PaginatedStudentAdmissionRead
+    - RouteRead
+    - RouteDropdown
+    - LoginResponse
+    - PermissionListResponse
+  
+  validation_status: "REQUIRED"
+  missing_schemas_note: "Must verify all above schemas exist in app/schemas/ files before agent automation"
+  validation_command: "python -c 'import app.schemas; print([schema for schema in dir(app.schemas) if \"Read\" in schema])'"
+
+# Immediate Action Items
+action_items:
+  priority_1:
+    - task: "Create SESSION_CONTEXT_SCHEMAS.yml with all referenced schemas"
+      owner: "dev-team"
+      deadline: "before agent automation"
+      
+  priority_2:
+    - task: "Standardize naming convention (recommend kebab-case)"
+      owner: "dev-team"
+      impact: "improves agent parsing and consistency"
+      
+  priority_3:
+    - task: "Validate all schema references against actual codebase"
+      owner: "qa-team"
+      method: "automated schema extraction from models"
+
+# Benefits of Standardization
+standardization_benefits:
+  agent_automation:
+    - "Predictable section lookup patterns"
+    - "Direct feature_id to test mapping"
+    - "Consistent error handling"
+    
+  maintainability:
+    - "Single naming convention across all docs"
+    - "Clear mapping between features and tests"
+    - "Easier cross-reference validation"
+    
+  scalability:
+    - "Easy addition of new features"
+    - "Consistent structure for all modules"
+    - "Automated validation possible"
