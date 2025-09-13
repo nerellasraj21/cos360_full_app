@@ -47,3 +47,4 @@ SESSION_CONTEXT*.yml
 SESSION_CONTEXT*.yaml
 *.context.yml
 *.context.yaml
+TESTING_STRUCTURE_RECOMMENDATIONS.yml
