@@ -1,5 +1,16 @@
-# TESTING_STRUCTURE_RECOMMENDATIONS.yml
-# Improved structure for future testing file standardization
+# TESTING_STRUCTURE_RECOMMENDATIONS.yml  
+# TESTING STANDARDS AND PATTERNS for COS360 feature testing automation
+#
+# PURPOSE: Standardized testing structure, agent instructions, and automation patterns
+# USAGE: Guide for creating feature-scoped testing instructions and automation
+# AGENT RULE: Use kebab-case for all testing section names (${feature_id}-testing)
+#
+# Version: 2025-09-13
+# Last Updated: 2025-09-13
+# Owner: COS360 Development Team
+# Naming Convention: FINALIZED kebab-case
+#
+# CRITICAL: Follow structure_examples for consistent agent automation
 
 schema_version: 1.1
 

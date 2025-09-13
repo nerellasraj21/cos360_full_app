@@ -1,12 +1,30 @@
-# COS360 Feature Implementation Tracking - Structured Format
+# SESSION_CONTEXT_STRUCTURED.yml
+# CANONICAL SOURCE OF TRUTH for COS360 feature implementation tracking
+# 
+# PURPOSE: Machine-readable feature definitions, endpoints, dependencies, and status
+# USAGE: Primary reference for agents, testing automation, and development planning
+# AGENT RULE: Read feature status as string only (design|in_progress|done|deprecated)
+# 
 # Version: 2025-09-13
-# Purpose: Feature-centric implementation tracking with comprehensive metadata
+# Last Updated: 2025-09-13
+# Owner: COS360 Development Team
+# 
+# CRITICAL: This file drives all automation - maintain accuracy and completeness
 
 schema_version: 1.0
 project_context:
   name: "COS360"
   version: "Phase 1 Complete + Masters Module"
   last_updated: "2025-09-13"
+
+# Agent Instructions: Status Field Format
+status_format:
+  canonical_status: "string value only (design|in_progress|done|deprecated)"
+  status_metadata: "optional object with detailed breakdown"
+  agent_rule: "Always read 'status' field first, ignore nested objects"
+  examples:
+    correct: 'status: "done"'
+    incorrect: 'status: { phase: "complete", implementation_status: "complete" }'
   
 environments:
   development:
@@ -26,7 +44,8 @@ modules:
     - feature_id: academic-year-v1
       module: masters
       feature_name: Academic Year CRUD & Dropdowns
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -120,7 +139,8 @@ modules:
     - feature_id: class-section-v1
       module: masters
       feature_name: Class & Section Management
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -243,7 +263,8 @@ modules:
     - feature_id: subject-v1
       module: masters
       feature_name: Subject CRUD & Categories
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -341,7 +362,8 @@ modules:
     - feature_id: class-subject-mapping-v1
       module: masters
       feature_name: Class-Subject Mapping CRUD & Bulk Operations
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -455,7 +477,8 @@ modules:
     - feature_id: holiday-v1
       module: masters
       feature_name: Holiday CRUD & Calendar Management
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -548,7 +571,8 @@ modules:
     - feature_id: staff-designation-v1
       module: masters
       feature_name: Staff Management & Designations CRUD
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -712,7 +736,8 @@ modules:
     - feature_id: parent-v1
       module: masters
       feature_name: Parent Management & Student Associations
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -806,7 +831,8 @@ modules:
     - feature_id: timetable-v1
       module: masters
       feature_name: Timetable Management & Slot Configuration
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -894,7 +920,8 @@ modules:
     - feature_id: fee-transactions-v1
       module: fee
       feature_name: Phase 1 Fee Collection System
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1290,7 +1317,8 @@ modules:
     - feature_id: fee-terms-v1
       module: fee
       feature_name: Fee Terms & Date Management
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1392,7 +1420,8 @@ modules:
     - feature_id: fee-mappings-v1
       module: fee
       feature_name: Fee Class & Student Mappings with Bulk Operations
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1582,7 +1611,8 @@ modules:
     - feature_id: student-admission-v1
       module: student
       feature_name: Student Admission & Management
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1607,7 +1637,8 @@ modules:
     - feature_id: student-documents-v1
       module: student
       feature_name: Student Document Management
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1631,7 +1662,8 @@ modules:
     - feature_id: student-certificates-v1
       module: student
       feature_name: Student Certificate Management
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1657,7 +1689,8 @@ modules:
     - feature_id: student-attendance-v1
       module: student
       feature_name: Student Attendance Tracking
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1681,7 +1714,8 @@ modules:
     - feature_id: student-transport-v1
       module: student
       feature_name: Student Transport Assignment
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1706,7 +1740,8 @@ modules:
     - feature_id: transport-routes-v1
       module: transport
       feature_name: Transport Route Management
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1731,7 +1766,8 @@ modules:
     - feature_id: transport-vehicles-v1
       module: transport
       feature_name: Vehicle Management
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1756,7 +1792,8 @@ modules:
     - feature_id: transport-trips-v1
       module: transport
       feature_name: Transport Trip Management
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1782,7 +1819,8 @@ modules:
     - feature_id: transport-route-stops-v1
       module: transport
       feature_name: Route Stop Management
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1807,7 +1845,8 @@ modules:
     - feature_id: auth-core-v1
       module: auth
       feature_name: Authentication & Authorization System
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1834,7 +1873,8 @@ modules:
     - feature_id: auth-development-v1
       module: auth
       feature_name: Development & Testing Authentication Tools
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1861,7 +1901,8 @@ modules:
     - feature_id: public-tenants-v1
       module: public
       feature_name: Multi-Tenant Management
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"
@@ -1884,7 +1925,8 @@ modules:
     - feature_id: public-plans-v1
       module: public
       feature_name: Subscription Plan Management
-      status:
+      status: "done"
+      status_metadata:
         phase: "complete"
         implementation_status: "complete"
         testing_status: "passed"

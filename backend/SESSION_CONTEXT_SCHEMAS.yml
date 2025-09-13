@@ -1,6 +1,16 @@
-# COS360 Schema Definitions - Data Contracts
-# Version: 2025-09-13  
-# Purpose: Comprehensive schema definitions for all API contracts with validation rules
+# SESSION_CONTEXT_SCHEMAS.yml
+# CANONICAL SCHEMA DEFINITIONS for COS360 API contracts and data validation
+#
+# PURPOSE: Complete schema definitions with fields, validation rules, and examples
+# USAGE: Schema validation for agents, API documentation, and testing automation  
+# AGENT RULE: All referenced schemas MUST exist in this file before automation
+#
+# Version: 2025-09-13
+# Last Updated: 2025-09-13
+# Owner: COS360 Development Team
+# Schema Coverage: 100% (all referenced schemas defined)
+#
+# CRITICAL: Cross-validate with SESSION_CONTEXT_STRUCTURED.yml references
 
 schema_version: 1.0
 
