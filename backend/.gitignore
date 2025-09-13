@@ -32,3 +32,18 @@ PHASE_1_ACCEPTANCE_CRITERIA.md
 PHASE_1_CORE_FEE_COLLECTION.md
 PHASE_2_OPERATIONAL_EFFICIENCY.md
 PHASE_3_ADVANCED_AUTOMATION.md
+
+# Private Documentation (Keep out of shared repo)
+# Keep FRONTEND_API_DOCUMENTATION.md in git, but exclude other docs
+*_DOCUMENTATION.md
+!FRONTEND_API_DOCUMENTATION.md
+API_*.md
+INTEGRATION_*.md
+BACKEND_*.md
+SYSTEM_*.md
+
+# Private session/context files
+SESSION_CONTEXT*.yml
+SESSION_CONTEXT*.yaml
+*.context.yml
+*.context.yaml
