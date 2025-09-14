@@ -29,6 +29,11 @@ async def startup():
 # Register Routers
 app.include_router(api_v1_router, prefix="/api/v1")
 
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
 # Configure Logging
 configure_logging(log_file="cos360_errors.log")
 
