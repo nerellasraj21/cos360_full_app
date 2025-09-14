@@ -21,9 +21,9 @@ import logging
 
 logger = logging.getLogger("login_endpoints")
 
-router = APIRouter(prefix="/auth/login", tags=["Auth/Login"])
+router = APIRouter(prefix="/auth", tags=["Auth/Login"])
 
-@router.post("/login", 
+@router.post("/login",
              response_model=Union[LoginResponse, LegacyLoginResponse],
              responses={
                  401: {"model": LoginErrorResponse, "description": "Invalid connection or credentials"},
@@ -41,11 +41,14 @@ async def login(request: LoginRequest, fastapi_request: Request, db: AsyncSessio
     For legacy clients (without client_name), returns only access_token for backward compatibility.
     """
     try:
-        logger.info(f"Login request for user: {request.username}")
-        
+        logger.info(f"DEBUG LOGIN 1: Login request for user: {request.username}")
+
         # Determine if this is a multi-tenant request
         client_name_from_request = getattr(fastapi_request.state, 'client_name', None)
         client_name_from_body = request.client_name
+
+        logger.info(f"DEBUG LOGIN 2: client_name_from_request: {client_name_from_request}")
+        logger.info(f"DEBUG LOGIN 3: client_name_from_body: {client_name_from_body}")
         
         # Check if this is a multi-tenant request
         is_multi_tenant_request = bool(client_name_from_request or client_name_from_body)

@@ -156,7 +156,7 @@ async def get_tenant_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             # Set search path for this session
-            await session.execute(text(f"SET search_path TO {schema_name}"))
+            await session.execute(text(f'SET search_path TO "{schema_name}"'))
             
             logger.debug(f"Database session created for tenant '{client_name}' using schema '{schema_name}'")
             
@@ -201,7 +201,7 @@ async def get_tenant_db_by_client_name(client_name: str) -> AsyncGenerator[Async
     async with AsyncSessionLocal() as session:
         try:
             # Set search path for this session
-            await session.execute(text(f"SET search_path TO {schema_name}"))
+            await session.execute(text(f'SET search_path TO "{schema_name}"'))
             
             logger.debug(f"Database session created for client '{client_name}' using schema '{schema_name}'")
             

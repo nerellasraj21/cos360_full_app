@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+from uuid import UUID
 
 class LoginRequest(BaseModel):
     username: str = Field(..., description="User's username")
@@ -7,18 +8,18 @@ class LoginRequest(BaseModel):
     client_name: Optional[str] = Field(None, description="Client name (optional, can be detected from headers/subdomain)")
 
 class UserInfo(BaseModel):
-    id: int
+    id: UUID
     username: str
     email: Optional[str] = None
     is_active: bool
 
 class RoleInfo(BaseModel):
-    id: int
+    id: UUID
     name: str
     description: Optional[str] = None
 
 class MenuItemResponse(BaseModel):
-    id: int
+    id: UUID
     name: str
     path: Optional[str] = None
     display_order: int

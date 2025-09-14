@@ -34,13 +34,22 @@ class MultiTenantAuthService:
             HTTPException: If credentials are invalid
         """
         try:
-            # Query user with role relationship
+            # Query user first (without problematic selectinload)
             result = await db.execute(
-                select(User)
-                .options(selectinload(User.role))
-                .where(User.username == username)
+                select(User).where(User.username == username)
             )
             user = result.scalar_one_or_none()
+
+            if user:
+                # Query role separately and manually attach it
+                from app.models.auth.role_model import Role
+                role_result = await db.execute(
+                    select(Role).where(Role.id == user.role_id)
+                )
+                role = role_result.scalar_one_or_none()
+
+                # Manually set the role relationship to maintain compatibility
+                user.role = role
             
             if not user:
                 logger.warning(f"User not found: {username}")
@@ -90,17 +99,23 @@ class MultiTenantAuthService:
         """
         try:
             # Get all menus that the role can access
-            result = await db.execute(
-                select(Menu, RoleMenuPermission.can_view)
-                .join(RoleMenuPermission, Menu.id == RoleMenuPermission.menu_id)
-                .where(
-                    RoleMenuPermission.role_id == role_id,
-                    RoleMenuPermission.can_view == True
+            logger.info(f"DEBUG MENU 1: Starting menu query for role_id: {role_id}")
+            try:
+                result = await db.execute(
+                    select(Menu, RoleMenuPermission.can_view)
+                    .join(RoleMenuPermission, Menu.id == RoleMenuPermission.menu_id)
+                    .where(
+                        RoleMenuPermission.role_id == role_id,
+                        RoleMenuPermission.can_view == True
+                    )
+                    .order_by(Menu.display_order, Menu.id)
                 )
-                .order_by(Menu.display_order, Menu.id)
-            )
-            
-            accessible_menus = result.fetchall()
+                accessible_menus = result.fetchall()
+                logger.info(f"DEBUG MENU 2: Menu query successful, found {len(accessible_menus)} accessible menus")
+            except Exception as db_error:
+                logger.warning(f"DEBUG MENU 2: Menu query failed (tables may not exist): {str(db_error)}")
+                logger.info("DEBUG MENU 3: Returning empty menu for tenant without menu setup")
+                return []
             
             if not accessible_menus:
                 logger.warning(f"No accessible menus found for role_id: {role_id}")
@@ -169,16 +184,16 @@ class MultiTenantAuthService:
     async def login_user(request: Request, username: str, password: str, client_name: Optional[str] = None) -> Dict[str, Any]:
         """
         Complete multi-tenant login process.
-        
+
         Args:
             request: FastAPI request object
             username: User's username
             password: User's password
             client_name: Optional client name override
-            
+
         Returns:
             Dict: Complete login response with user, role, menu, and tokens
-            
+
         Raises:
             HTTPException: For various error conditions
         """
@@ -187,29 +202,38 @@ class MultiTenantAuthService:
             final_client_name = client_name
         else:
             final_client_name = get_client_name_from_request(request)
-        
-        logger.info(f"Login attempt for user '{username}' on tenant '{final_client_name}'")
-        
+
+        logger.info(f"DEBUG 1: Login attempt for user '{username}' on tenant '{final_client_name}'")
+
         # Validate tenant exists and is active
+        logger.info(f"DEBUG 2: Getting tenant schema for '{final_client_name}'")
         schema_name = await TenantService.get_tenant_schema(final_client_name)
         if not schema_name:
             if final_client_name == "default":
                 schema_name = "cos360_main"  # Backward compatibility
+                logger.info(f"DEBUG 3: Using default schema: {schema_name}")
             else:
-                logger.warning(f"Tenant not found or inactive: {final_client_name}")
+                logger.warning(f"DEBUG 3: Tenant not found or inactive: {final_client_name}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid connection"
                 )
+        else:
+            logger.info(f"DEBUG 3: Found tenant schema: {schema_name}")
         
         # Get tenant database session
+        logger.info(f"DEBUG 4: Getting tenant database session")
         async for db in get_tenant_db(request):
             try:
+                logger.info(f"DEBUG 5: Starting user authentication")
                 # Authenticate user
                 user = await MultiTenantAuthService.authenticate_user(db, username, password)
-                
+                logger.info(f"DEBUG 6: User authenticated successfully, role_id: {user.role_id}")
+
                 # Build hierarchical menu
+                logger.info(f"DEBUG 7: Building hierarchical menu for role_id: {user.role_id}")
                 menu = await MultiTenantAuthService.build_hierarchical_menu(db, user.role_id)
+                logger.info(f"DEBUG 8: Menu built successfully, menu count: {len(menu)}")
                 
                 # Create access token and refresh token with client information
                 token_data = {

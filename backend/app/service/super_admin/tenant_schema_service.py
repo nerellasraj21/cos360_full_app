@@ -261,6 +261,22 @@ class TenantSchemaService:
                     })
                     permissions_assigned += 1
 
+            # CRITICAL: Add role_management permissions to Admin role
+            # These are essential for tenant admin functionality
+            role_management_actions = ['create', 'read', 'update', 'delete', 'list']
+            for action in role_management_actions:
+                await db.execute(text(f'''
+                    INSERT INTO "{schema_name}".resource_permissions
+                    (role_id, resource_name, action_name, is_granted)
+                    SELECT r.id, 'role_management', :action_name, true
+                    FROM "{schema_name}".roles r
+                    WHERE r.name = 'Admin'
+                    ON CONFLICT (role_id, resource_name, action_name) DO UPDATE SET is_granted = true
+                '''), {"action_name": action})
+                permissions_assigned += 1
+
+            logger.info(f"Added role_management permissions to Admin role in {schema_name}")
+
             return {
                 "roles_created": roles_created,
                 "permissions_assigned": permissions_assigned
