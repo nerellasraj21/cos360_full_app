@@ -1,4 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.responses import HTMLResponse
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from app.api.v1.main_router import router as api_v1_router
 from app.db.base import BasePublic
 from app.db.session import engine
@@ -8,7 +11,20 @@ from app.middleware.tenant_middleware import TenantMiddleware
 from app.middleware.rate_limit_middleware import limiter, rate_limit_handler, RateLimitExceeded
 from app.config import settings
 
-app = FastAPI()
+app = FastAPI(docs_url=None, redoc_url=None)  
+
+security = HTTPBasic()
+
+def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = "root"
+    correct_password = "Passw0rd!"
+    if credentials.username != correct_username or credentials.password != correct_password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 # Add rate limiting state and error handler
 app.state.limiter = limiter
@@ -28,6 +44,21 @@ async def startup():
 
 # Register Routers
 app.include_router(api_v1_router, prefix="/api/v1")
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+# Protected Swagger UI
+@app.get("/docs", response_class=HTMLResponse, dependencies=[Depends(authenticate)])
+async def get_docs():
+    return get_swagger_ui_html(openapi_url="/openapi.json", title="API Docs")
+
+# Protected ReDoc
+@app.get("/redoc", response_class=HTMLResponse, dependencies=[Depends(authenticate)])
+async def get_redoc():
+    return get_redoc_html(openapi_url="/openapi.json", title="API Docs")
 
 # Configure Logging
 configure_logging(log_file="cos360_errors.log")

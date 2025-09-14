@@ -63,3 +63,5 @@ scripts/testing/
 
 # Keep organized docs structure
 docs/testing/
+
+.venv/
