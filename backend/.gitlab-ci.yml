@@ -30,7 +30,7 @@ deploy:
     - echo "HOST=$SERVER_HOST PORT=$SERVER_PORT"
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
-    - ssh-keyscan -H $SERVER_HOST -p $SERVER_PORT >> ~/.ssh/known_hosts
+    - ssh-keyscan -p $SERVER_PORT $SERVER_HOST >> ~/.ssh/known_hosts
   script:
     - ssh -p $SERVER_PORT $SERVER_USER@$SERVER_HOST "
         export CI_REGISTRY_IMAGE=$CI_REGISTRY_IMAGE \
