@@ -1,6 +1,10 @@
 # ignore virtual environment
 venv/
 
+# ignore claude.md
+claude.md
+SESSION_CONTEXT.md
+
 # Ignore python compiled files
 *.pyc
 __pycache__/
@@ -8,3 +12,53 @@ __pycache__/
 .vscode/
 *.log
 *.sqlite3
+.claude/settings.local.json
+
+# Environment files (never commit actual environment variables)
+.env
+.env.local
+.env.production
+.env.staging
+.env.*.local
+
+TEST_ENVIRONMENT_SETUP.md
+FEE_TRANSACTIONS_IMPLEMENTATION_PLAN.md
+SUPER_ADMIN_IMPLEMENTATION_PLAN.md
+
+# Fee & Transactions Implementation Phase Documents - Delete Once done
+IMPLEMENTATION_PHASE_SEQUENCE.md
+PHASE_1_5_ESSENTIAL_BUSINESS_OPERATIONS.md
+PHASE_1_ACCEPTANCE_CRITERIA.md
+PHASE_1_CORE_FEE_COLLECTION.md
+PHASE_2_OPERATIONAL_EFFICIENCY.md
+PHASE_3_ADVANCED_AUTOMATION.md
+
+# Private Documentation (Keep out of shared repo)
+# Keep FRONTEND_API_DOCUMENTATION.md in git, but exclude other docs
+*_DOCUMENTATION.md
+!FRONTEND_API_DOCUMENTATION.md
+API_*.md
+INTEGRATION_*.md
+BACKEND_*.md
+SYSTEM_*.md
+
+# Private session/context files
+SESSION_CONTEXT*.yml
+SESSION_CONTEXT*.yaml
+*.context.yml
+*.context.yaml
+TESTING_STRUCTURE_RECOMMENDATIONS.yml
+
+# Temporary files and test artifacts
+*.tmp
+*.bak
+temp_*.py
+
+# Keep organized script structure - allow versioned scripts
+scripts/README.md
+scripts/database/
+scripts/development/
+scripts/testing/
+
+# Keep organized docs structure
+docs/testing/

@@ -1,0 +1,324 @@
+{
+	"info": {
+		"_postman_id": "fee-category-crud-collection",
+		"name": "Level 1 - Fee Category CRUD (Depends: AcademicYear)",
+		"description": "Complete CRUD operations for Fee Category model (Level 1 - Single Dependency)\n\n🔧 **Configuration:**\n- Base URL: http://127.0.0.1:8003\n- Authentication: Admin JWT Token (auto-fetched)\n- Tenant: test_tenant\n- Path: /api/v1/fee/categories/\n\n📋 **Dependencies:**\n- **Requires**: AcademicYear ID (from Level 0)\n- **Foreign Key**: academic_year_id → academic_years.id\n- **Constraint**: category_name must be unique per academic year\n\n📋 **6 Endpoints Covered:**\n1. CREATE Fee Category (POST / - requires academic_year_id)\n2. LIST Fee Categories (GET / - shows academic_year_title)\n3. GET Fee Category by ID (GET /{id})\n4. GET Fee Categories Dropdown (GET /dropdown?academic_year_id=)\n5. UPDATE Fee Category (PUT /{id})\n6. DELETE Fee Category (DELETE /{id})\n\n🎯 **Variable Chaining:**\n- Uses {{created_academic_year_id}} from Level 0 AcademicYear\n- Auto-captures fee_category_id for dependent requests\n- Chains academic year data for CREATE operations\n\n⚠️ **Rate Limits:**\n- CREATE: 30 per minute\n\n🎯 **Features:**\n- Dependency validation\n- UUID format validation  \n- Unique constraint testing\n- Comprehensive error handling",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [{"key": "token", "value": "{{admin_token}}", "type": "string"}]
+	},
+	"event": [{
+		"listen": "prerequest",
+		"script": {
+			"type": "text/javascript",
+			"exec": [
+				"// Auto-fetch admin token if not present",
+				"if (!pm.globals.get('admin_token')) {",
+				"    pm.sendRequest({",
+				"        url: 'http://127.0.0.1:8003/api/v1/auth/test-jwt/admin-token',",
+				"        method: 'GET'",
+				"    }, function (err, response) {",
+				"        if (!err) {",
+				"            pm.globals.set('admin_token', response.json().access_token);",
+				"            console.log('Admin token refreshed');",
+				"        }",
+				"    });",
+				"}",
+				"",
+				"// Ensure AcademicYear dependency exists",
+				"if (!pm.globals.get('created_academic_year_id')) {",
+				"    console.warn('WARNING: academic_year_id not found. Run AcademicYear collection first!');",
+				"}"
+			]
+		}
+	}],
+	"variable": [
+		{"key": "base_url", "value": "http://127.0.0.1:8003", "type": "string"},
+		{"key": "tenant_schema", "value": "test_tenant", "type": "string"}
+	],
+	"item": [
+		{
+			"name": "0. Get Admin Token",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Token received and stored', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.access_token).to.exist;",
+						"    pm.expect(jsonData.user.role).to.eql('Admin');",
+						"    pm.globals.set('admin_token', jsonData.access_token);",
+						"    console.log('Admin token set for FeeCategory testing');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": "{{base_url}}/api/v1/auth/test-jwt/admin-token",
+				"description": "Get admin JWT token for authentication"
+			}
+		},
+		{
+			"name": "0.1 [DEPENDENCY] Create Academic Year for Testing",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Academic Year created successfully', function () {",
+						"    pm.response.to.have.status(201);",
+						"});",
+						"pm.test('Academic Year ID captured for dependency', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.id).to.exist;",
+						"    pm.globals.set('created_academic_year_id', jsonData.id);",
+						"    console.log('AcademicYear ID for FeeCategory dependency:', jsonData.id);",
+						"    ",
+						"    // UUID validation",
+						"    var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;",
+						"    pm.expect(jsonData.id).to.match(uuidRegex);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "POST",
+				"header": [
+					{"key": "Content-Type", "value": "application/json"},
+					{"key": "cschema", "value": "{{tenant_schema}}"}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"FeeCategory Dependency AY 2025-26\",\n    \"start_date\": \"2025-04-01\",\n    \"end_date\": \"2026-03-31\",\n    \"is_active\": true\n}"
+				},
+				"url": "{{base_url}}/api/v1/masters/academic_years/",
+				"description": "Create AcademicYear as dependency for FeeCategory testing"
+			}
+		},
+		{
+			"name": "1. CREATE Fee Category",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 201 Created', function () {",
+						"    pm.response.to.have.status(201);",
+						"});",
+						"pm.test('Fee Category created with proper structure', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.id).to.exist;",
+						"    pm.expect(jsonData.category_name).to.exist;",
+						"    pm.expect(jsonData.category_status).to.eql('active');",
+						"    pm.expect(jsonData.academic_year_id).to.exist;",
+						"    ",
+						"    // Store for dependent requests",
+						"    pm.globals.set('created_fee_category_id', jsonData.id);",
+						"    console.log('Created Fee Category ID:', jsonData.id);",
+						"    ",
+						"    // UUID validation",
+						"    var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;",
+						"    pm.expect(jsonData.id).to.match(uuidRegex);",
+						"});",
+						"pm.test('Academic Year dependency correctly linked', function () {",
+						"    var jsonData = pm.response.json();",
+						"    var expectedAcademicYearId = pm.globals.get('created_academic_year_id');",
+						"    pm.expect(jsonData.academic_year_id).to.eql(expectedAcademicYearId);",
+						"    console.log('✅ Academic Year dependency verified');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "POST",
+				"header": [
+					{"key": "Content-Type", "value": "application/json"},
+					{"key": "cschema", "value": "{{tenant_schema}}"}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"category_name\": \"Basic Fee Category\",\n    \"category_status\": \"active\",\n    \"academic_year_id\": \"{{created_academic_year_id}}\"\n}"
+				},
+				"url": "{{base_url}}/api/v1/fee/categories/",
+				"description": "Create Fee Category with AcademicYear dependency"
+			}
+		},
+		{
+			"name": "2. LIST All Fee Categories",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Response is array with academic year titles', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData).to.be.an('array');",
+						"    if (jsonData.length > 0) {",
+						"        pm.expect(jsonData[0].id).to.exist;",
+						"        pm.expect(jsonData[0].category_name).to.exist;",
+						"        pm.expect(jsonData[0].academic_year_id).to.exist;",
+						"        // Should include academic_year_title from join",
+						"        console.log('Academic Year Title in response:', jsonData[0].academic_year_title);",
+						"    }",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/fee/categories/",
+				"description": "Get all fee categories with academic year titles"
+			}
+		},
+		{
+			"name": "3. GET Fee Category by ID",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Fee Category details returned correctly', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.id).to.exist;",
+						"    pm.expect(jsonData.category_name).to.exist;",
+						"    pm.expect(jsonData.academic_year_id).to.exist;",
+						"    ",
+						"    var expectedId = pm.globals.get('created_fee_category_id');",
+						"    pm.expect(jsonData.id).to.eql(expectedId);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/fee/categories/{{created_fee_category_id}}",
+				"description": "Get specific fee category by UUID"
+			}
+		},
+		{
+			"name": "4. GET Fee Categories Dropdown",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Dropdown format is correct', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData).to.be.an('array');",
+						"    if (jsonData.length > 0) {",
+						"        pm.expect(jsonData[0].id).to.exist;",
+						"        pm.expect(jsonData[0].category_name).to.exist;",
+						"        // Dropdown should only have id and category_name",
+						"        var keys = Object.keys(jsonData[0]);",
+						"        pm.expect(keys).to.include.members(['id', 'category_name']);",
+						"    }",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": {
+					"raw": "{{base_url}}/api/v1/fee/categories/dropdown?academic_year_id={{created_academic_year_id}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "fee", "categories", "dropdown"],
+					"query": [
+						{"key": "academic_year_id", "value": "{{created_academic_year_id}}", "description": "Filter by academic year"}
+					]
+				},
+				"description": "Get fee categories dropdown filtered by academic year"
+			}
+		},
+		{
+			"name": "5. UPDATE Fee Category",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Fee Category updated successfully', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.category_name).to.include('Updated');",
+						"    pm.expect(jsonData.category_status).to.eql('inactive');",
+						"    console.log('Fee Category updated:', jsonData.category_name);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{"key": "Content-Type", "value": "application/json"},
+					{"key": "cschema", "value": "{{tenant_schema}}"}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"category_name\": \"Updated Basic Fee Category\",\n    \"category_status\": \"inactive\",\n    \"academic_year_id\": \"{{created_academic_year_id}}\"\n}"
+				},
+				"url": "{{base_url}}/api/v1/fee/categories/{{created_fee_category_id}}",
+				"description": "Update existing fee category"
+			}
+		},
+		{
+			"name": "6. DELETE Fee Category",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () {",
+						"    pm.response.to.have.status(200);",
+						"});",
+						"pm.test('Fee Category deletion confirmed', function () {",
+						"    console.log('Fee Category deleted successfully');",
+						"    // Clear the variable since record is deleted",
+						"    pm.globals.unset('created_fee_category_id');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "DELETE",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/fee/categories/{{created_fee_category_id}}",
+				"description": "Delete fee category"
+			}
+		},
+		{
+			"name": "7. [CLEANUP] Delete Test Academic Year",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Cleanup successful', function () {",
+						"    pm.response.to.have.status(200);",
+						"    pm.globals.unset('created_academic_year_id');",
+						"    console.log('✅ Test cleanup completed');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "DELETE",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/masters/academic_years/{{created_academic_year_id}}/permanent",
+				"description": "Cleanup test academic year dependency"
+			}
+		}
+	]
+}

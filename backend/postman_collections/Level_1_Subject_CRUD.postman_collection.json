@@ -1,0 +1,772 @@
+{
+	"info": {
+		"_postman_id": "subject-crud-collection-uuid",
+		"name": "Level 1: Subject CRUD Operations",
+		"description": "Comprehensive CRUD operations for Subject model with dependencies on SubjectCategory and AcademicYear.\n\nDependencies:\n- SubjectCategory (category_id) - Level 0\n- AcademicYear (academic_year_id) - Level 0\n\nEndpoints tested:\n1. POST /masters/subjects - Create Subject\n2. GET /masters/subjects - List All Subjects\n3. GET /masters/subjects/{id} - Get Subject by ID\n4. PUT /masters/subjects/{id} - Update Subject\n5. DELETE /masters/subjects/{id} - Delete/Deactivate Subject\n6. GET /masters/subjects/dropdown - Subject Dropdown\n7. GET /masters/subjects/categories - Subject Categories\n8. GET /masters/subjects/by-academic-year/{year_id} - Subjects by Academic Year\n9. GET /masters/subjects/categories/{category_id}/subjects/dropdown - Subjects by Category Dropdown",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{adminToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"exec": [
+					"// Auto-refresh admin token if needed",
+					"if (!pm.globals.get('adminToken') || !pm.globals.get('tokenExpiry') || ",
+					"    Date.now() > parseInt(pm.globals.get('tokenExpiry'))) {",
+					"    ",
+					"    const loginRequest = {",
+					"        url: pm.environment.get('baseUrl') + '/auth/tenant-login',",
+					"        method: 'POST',",
+					"        header: {",
+					"            'Content-Type': 'application/json',",
+					"            'X-Client-Name': pm.environment.get('tenantName')",
+					"        },",
+					"        body: {",
+					"            mode: 'raw',",
+					"            raw: JSON.stringify({",
+					"                username: pm.environment.get('adminUsername'),",
+					"                password: pm.environment.get('adminPassword')",
+					"            })",
+					"        }",
+					"    };",
+					"    ",
+					"    pm.sendRequest(loginRequest, function(err, response) {",
+					"        if (err) {",
+					"            console.log('Login request failed:', err);",
+					"        } else if (response.code === 200) {",
+					"            const jsonData = response.json();",
+					"            pm.globals.set('adminToken', jsonData.access_token);",
+					"            pm.globals.set('tokenExpiry', Date.now() + (55 * 60 * 1000)); // 55 mins",
+					"            console.log('Admin token refreshed successfully');",
+					"        } else {",
+					"            console.log('Login failed with status:', response.code);",
+					"        }",
+					"    });",
+					"}"
+				],
+				"type": "text/javascript"
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "subjectId",
+			"value": "",
+			"type": "string",
+			"description": "ID of the created subject"
+		},
+		{
+			"key": "subjectCategoryId",
+			"value": "",
+			"type": "string",
+			"description": "ID of the subject category dependency"
+		},
+		{
+			"key": "academicYearId",
+			"value": "",
+			"type": "string",
+			"description": "ID of the academic year dependency"
+		}
+	],
+	"item": [
+		{
+			"name": "DEPENDENCIES - Get SubjectCategory for Reference",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response has subject categories array', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"    pm.expect(jsonData.length).to.be.greaterThan(0);",
+							"});",
+							"",
+							"// Store first subject category ID for dependency",
+							"if (pm.response.code === 200) {",
+							"    const categories = pm.response.json();",
+							"    if (categories.length > 0) {",
+							"        pm.collectionVariables.set('subjectCategoryId', categories[0].id);",
+							"        console.log('Set subjectCategoryId:', categories[0].id);",
+							"    }",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/masters/subject-categories/dropdown",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"subject-categories",
+						"dropdown"
+					]
+				},
+				"description": "Get available subject categories for dependency resolution"
+			}
+		},
+		{
+			"name": "DEPENDENCIES - Get AcademicYear for Reference",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response has academic years array', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"    pm.expect(jsonData.length).to.be.greaterThan(0);",
+							"});",
+							"",
+							"// Store first academic year ID for dependency",
+							"if (pm.response.code === 200) {",
+							"    const years = pm.response.json();",
+							"    if (years.length > 0) {",
+							"        pm.collectionVariables.set('academicYearId', years[0].id);",
+							"        console.log('Set academicYearId:', years[0].id);",
+							"    }",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/masters/academic-years/dropdown",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"academic-years",
+						"dropdown"
+					]
+				},
+				"description": "Get available academic years for dependency resolution"
+			}
+		},
+		{
+			"name": "CREATE - Create Subject",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response has required subject fields', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('id');",
+							"    pm.expect(jsonData).to.have.property('name');",
+							"    pm.expect(jsonData).to.have.property('category_id');",
+							"    pm.expect(jsonData).to.have.property('academic_year_id');",
+							"    pm.expect(jsonData).to.have.property('is_active');",
+							"});",
+							"",
+							"pm.test('UUID format validation', function () {",
+							"    const jsonData = pm.response.json();",
+							"    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+							"    pm.expect(jsonData.id).to.match(uuidRegex);",
+							"    pm.expect(jsonData.category_id).to.match(uuidRegex);",
+							"    pm.expect(jsonData.academic_year_id).to.match(uuidRegex);",
+							"});",
+							"",
+							"pm.test('Created subject has correct data', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.name).to.eql('Mathematics');",
+							"    pm.expect(jsonData.short_code).to.eql('MATH');",
+							"    pm.expect(jsonData.is_active).to.be.true;",
+							"    pm.expect(jsonData.category_id).to.eql(pm.collectionVariables.get('subjectCategoryId'));",
+							"    pm.expect(jsonData.academic_year_id).to.eql(pm.collectionVariables.get('academicYearId'));",
+							"});",
+							"",
+							"// Store subject ID for subsequent requests",
+							"if (pm.response.code === 200) {",
+							"    const jsonData = pm.response.json();",
+							"    pm.collectionVariables.set('subjectId', jsonData.id);",
+							"    console.log('Created Subject ID:', jsonData.id);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Mathematics\",\n  \"category_id\": \"{{subjectCategoryId}}\",\n  \"short_code\": \"MATH\",\n  \"is_active\": true,\n  \"academic_year_id\": \"{{academicYearId}}\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/masters/subjects/",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"subjects",
+						""
+					]
+				},
+				"description": "Create a new subject with dependencies on SubjectCategory and AcademicYear"
+			}
+		},
+		{
+			"name": "READ - Get All Subjects",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response is an array', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"});",
+							"",
+							"pm.test('Array contains our created subject', function () {",
+							"    const jsonData = pm.response.json();",
+							"    const createdSubjectId = pm.collectionVariables.get('subjectId');",
+							"    const foundSubject = jsonData.find(subject => subject.id === createdSubjectId);",
+							"    pm.expect(foundSubject).to.not.be.undefined;",
+							"    pm.expect(foundSubject.name).to.eql('Mathematics');",
+							"});",
+							"",
+							"pm.test('Each subject has required fields', function () {",
+							"    const jsonData = pm.response.json();",
+							"    if (jsonData.length > 0) {",
+							"        const subject = jsonData[0];",
+							"        pm.expect(subject).to.have.property('id');",
+							"        pm.expect(subject).to.have.property('name');",
+							"        pm.expect(subject).to.have.property('category_id');",
+							"        pm.expect(subject).to.have.property('academic_year_id');",
+							"        pm.expect(subject).to.have.property('category');",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/masters/subjects/?active_only=true",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"subjects",
+						""
+					],
+					"query": [
+						{
+							"key": "active_only",
+							"value": "true"
+						},
+						{
+							"key": "skip",
+							"value": "0",
+							"disabled": true
+						},
+						{
+							"key": "limit",
+							"value": "100",
+							"disabled": true
+						},
+						{
+							"key": "academic_year_id",
+							"value": "{{academicYearId}}",
+							"disabled": true,
+							"description": "Filter by academic year - disabled by default"
+						}
+					]
+				},
+				"description": "Get all subjects with optional filtering"
+			}
+		},
+		{
+			"name": "READ - Get Subject by ID",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response has correct subject data', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.id).to.eql(pm.collectionVariables.get('subjectId'));",
+							"    pm.expect(jsonData.name).to.eql('Mathematics');",
+							"    pm.expect(jsonData.short_code).to.eql('MATH');",
+							"    pm.expect(jsonData.is_active).to.be.true;",
+							"});",
+							"",
+							"pm.test('Response includes category relationship', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('category');",
+							"    pm.expect(jsonData.category).to.have.property('id');",
+							"    pm.expect(jsonData.category).to.have.property('name');",
+							"});",
+							"",
+							"pm.test('UUID fields are valid format', function () {",
+							"    const jsonData = pm.response.json();",
+							"    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+							"    pm.expect(jsonData.id).to.match(uuidRegex);",
+							"    pm.expect(jsonData.category_id).to.match(uuidRegex);",
+							"    pm.expect(jsonData.academic_year_id).to.match(uuidRegex);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/masters/subjects/{{subjectId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"subjects",
+						"{{subjectId}}"
+					]
+				},
+				"description": "Get a specific subject by ID with full details including category relationship"
+			}
+		},
+		{
+			"name": "UPDATE - Update Subject",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response shows updated data', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.name).to.eql('Advanced Mathematics');",
+							"    pm.expect(jsonData.short_code).to.eql('AMATH');",
+							"    pm.expect(jsonData.id).to.eql(pm.collectionVariables.get('subjectId'));",
+							"});",
+							"",
+							"pm.test('Updated subject maintains relationships', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.category_id).to.eql(pm.collectionVariables.get('subjectCategoryId'));",
+							"    pm.expect(jsonData.academic_year_id).to.eql(pm.collectionVariables.get('academicYearId'));",
+							"});",
+							"",
+							"pm.test('Response includes category relationship', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('category');",
+							"    pm.expect(jsonData.category).to.have.property('id');",
+							"    pm.expect(jsonData.category).to.have.property('name');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Advanced Mathematics\",\n  \"short_code\": \"AMATH\",\n  \"is_active\": true\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/masters/subjects/{{subjectId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"subjects",
+						"{{subjectId}}"
+					]
+				},
+				"description": "Update the created subject with new information"
+			}
+		},
+		{
+			"name": "DROPDOWN - Subject Dropdown",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response is an array', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"});",
+							"",
+							"pm.test('Contains our created subject', function () {",
+							"    const jsonData = pm.response.json();",
+							"    const createdSubjectId = pm.collectionVariables.get('subjectId');",
+							"    const foundSubject = jsonData.find(subject => subject.id === createdSubjectId);",
+							"    pm.expect(foundSubject).to.not.be.undefined;",
+							"    pm.expect(foundSubject.name).to.eql('Advanced Mathematics');",
+							"});",
+							"",
+							"pm.test('Each dropdown item has correct structure', function () {",
+							"    const jsonData = pm.response.json();",
+							"    if (jsonData.length > 0) {",
+							"        const subject = jsonData[0];",
+							"        pm.expect(subject).to.have.property('id');",
+							"        pm.expect(subject).to.have.property('name');",
+							"        pm.expect(Object.keys(subject).length).to.eql(2);",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/masters/subjects/dropdown?active_only=true",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"subjects",
+						"dropdown"
+					],
+					"query": [
+						{
+							"key": "active_only",
+							"value": "true"
+						}
+					]
+				},
+				"description": "Get subjects dropdown data (id + name only) for UI components"
+			}
+		},
+		{
+			"name": "LIST - Subject Categories",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response is an array', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"});",
+							"",
+							"pm.test('Contains subject categories', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.length).to.be.greaterThan(0);",
+							"});",
+							"",
+							"pm.test('Each category has required fields', function () {",
+							"    const jsonData = pm.response.json();",
+							"    if (jsonData.length > 0) {",
+							"        const category = jsonData[0];",
+							"        pm.expect(category).to.have.property('id');",
+							"        pm.expect(category).to.have.property('name');",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/masters/subjects/categories",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"subjects",
+						"categories"
+					]
+				},
+				"description": "Get all subject categories for reference"
+			}
+		},
+		{
+			"name": "LIST - Subjects by Academic Year",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response is an array', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"});",
+							"",
+							"pm.test('Contains our subject for the academic year', function () {",
+							"    const jsonData = pm.response.json();",
+							"    const createdSubjectId = pm.collectionVariables.get('subjectId');",
+							"    const foundSubject = jsonData.find(subject => subject.id === createdSubjectId);",
+							"    pm.expect(foundSubject).to.not.be.undefined;",
+							"    pm.expect(foundSubject.academic_year_id).to.eql(pm.collectionVariables.get('academicYearId'));",
+							"});",
+							"",
+							"pm.test('All subjects belong to the specified academic year', function () {",
+							"    const jsonData = pm.response.json();",
+							"    const targetAcademicYearId = pm.collectionVariables.get('academicYearId');",
+							"    jsonData.forEach(subject => {",
+							"        pm.expect(subject.academic_year_id).to.eql(targetAcademicYearId);",
+							"    });",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/masters/subjects/by-academic-year/{{academicYearId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"subjects",
+						"by-academic-year",
+						"{{academicYearId}}"
+					]
+				},
+				"description": "Get subjects filtered by academic year ID"
+			}
+		},
+		{
+			"name": "LIST - Subjects by Category Dropdown",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response is an array', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"});",
+							"",
+							"pm.test('Contains our subject for the category', function () {",
+							"    const jsonData = pm.response.json();",
+							"    const createdSubjectId = pm.collectionVariables.get('subjectId');",
+							"    const foundSubject = jsonData.find(subject => subject.id === createdSubjectId);",
+							"    pm.expect(foundSubject).to.not.be.undefined;",
+							"    pm.expect(foundSubject.name).to.eql('Advanced Mathematics');",
+							"});",
+							"",
+							"pm.test('Each dropdown item has correct structure', function () {",
+							"    const jsonData = pm.response.json();",
+							"    if (jsonData.length > 0) {",
+							"        const subject = jsonData[0];",
+							"        pm.expect(subject).to.have.property('id');",
+							"        pm.expect(subject).to.have.property('name');",
+							"        pm.expect(Object.keys(subject).length).to.eql(2);",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/masters/subjects/categories/{{subjectCategoryId}}/subjects/dropdown",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"subjects",
+						"categories",
+						"{{subjectCategoryId}}",
+						"subjects",
+						"dropdown"
+					]
+				},
+				"description": "Get subjects dropdown filtered by category ID"
+			}
+		},
+		{
+			"name": "DELETE - Delete/Deactivate Subject",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 204', function () {",
+							"    pm.response.to.have.status(204);",
+							"});",
+							"",
+							"pm.test('Response body is empty', function () {",
+							"    pm.expect(pm.response.text()).to.eql('');",
+							"});",
+							"",
+							"console.log('Subject successfully deleted/deactivated: ' + pm.collectionVariables.get('subjectId'));"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/masters/subjects/{{subjectId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"subjects",
+						"{{subjectId}}"
+					]
+				},
+				"description": "Delete/deactivate the created subject - cleanup operation"
+			}
+		}
+	]
+}

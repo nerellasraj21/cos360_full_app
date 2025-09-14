@@ -1,7 +1,7 @@
-from app.db.base import Base
+from app.db.base import BasePublic
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 
-class PlanMenuAccess(Base):
+class PlanMenuAccess(BasePublic):
     __tablename__ = 'plan_menu_access'
     __table_args__ = {'schema': 'public'}
 

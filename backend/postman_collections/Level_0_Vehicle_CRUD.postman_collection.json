@@ -1,0 +1,170 @@
+{
+	"info": {
+		"_postman_id": "vehicle-crud-collection",
+		"name": "Level 0 - Vehicle CRUD (Enhanced - Fixed Endpoints)",
+		"description": "Complete CRUD operations for Vehicle model (Level 0 - No Dependencies)\n\n🔧 **Configuration:**\n- Base URL: http://127.0.0.1:8003\n- Authentication: Admin JWT Token (auto-fetched)\n- Tenant: test_tenant\n- Path: /api/v1/masters/vehicles/\n\n📋 **5 Endpoints Covered:**\n1. CREATE Vehicle (POST /)\n2. LIST All Vehicles (GET /)\n3. GET Vehicle by ID (GET /{vehicle_id})\n4. UPDATE Vehicle (PUT /{vehicle_id})\n5. DELETE Vehicle (DELETE /{vehicle_id})\n\n⚠️ **Note:** No dropdown endpoint found in actual code\n\n🎯 **Features:**\n- Auto token refresh\n- Variable chaining\n- UUID validation\n- Comprehensive testing",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [{"key": "token", "value": "{{admin_token}}", "type": "string"}]
+	},
+	"event": [{
+		"listen": "prerequest",
+		"script": {
+			"type": "text/javascript",
+			"exec": [
+				"if (!pm.globals.get('admin_token')) {",
+				"    pm.sendRequest({",
+				"        url: 'http://127.0.0.1:8003/api/v1/auth/test-jwt/admin-token',",
+				"        method: 'GET'",
+				"    }, function (err, response) {",
+				"        if (!err) {",
+				"            pm.globals.set('admin_token', response.json().access_token);",
+				"        }",
+				"    });",
+				"}"
+			]
+		}
+	}],
+	"variable": [
+		{"key": "base_url", "value": "http://127.0.0.1:8003"},
+		{"key": "tenant_schema", "value": "test_tenant"}
+	],
+	"item": [
+		{
+			"name": "0. Get Admin Token",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+						"pm.test('Token received', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.access_token).to.exist;",
+						"    pm.globals.set('admin_token', jsonData.access_token);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": "{{base_url}}/api/v1/auth/test-jwt/admin-token"
+			}
+		},
+		{
+			"name": "1. CREATE Vehicle",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+						"pm.test('Vehicle created with UUID', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.id).to.exist;",
+						"    pm.expect(jsonData.name).to.exist;",
+						"    pm.globals.set('vehicle_id', jsonData.id);",
+						"    var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;",
+						"    pm.expect(jsonData.id).to.match(uuidRegex);",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "POST",
+				"header": [
+					{"key": "Content-Type", "value": "application/json"},
+					{"key": "cschema", "value": "{{tenant_schema}}"}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"Test Bus 001\",\n    \"registration_number\": \"TEST001\",\n    \"capacity\": 50,\n    \"is_active\": true\n}"
+				},
+				"url": "{{base_url}}/api/v1/masters/vehicles/"
+			}
+		},
+		{
+			"name": "2. LIST All Vehicles",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+						"pm.test('Response is array', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData).to.be.an('array');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/masters/vehicles/"
+			}
+		},
+		{
+			"name": "3. GET Vehicle by ID",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+						"pm.test('Vehicle details returned', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.id).to.exist;",
+						"    pm.expect(jsonData.name).to.exist;",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "GET",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/masters/vehicles/{{vehicle_id}}"
+			}
+		},
+		{
+			"name": "4. UPDATE Vehicle",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": [
+						"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+						"pm.test('Vehicle updated', function () {",
+						"    var jsonData = pm.response.json();",
+						"    pm.expect(jsonData.name).to.include('Updated');",
+						"});"
+					]
+				}
+			}],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{"key": "Content-Type", "value": "application/json"},
+					{"key": "cschema", "value": "{{tenant_schema}}"}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"Updated Test Bus 001\",\n    \"registration_number\": \"TEST001-UPD\",\n    \"capacity\": 60,\n    \"is_active\": true\n}"
+				},
+				"url": "{{base_url}}/api/v1/masters/vehicles/{{vehicle_id}}"
+			}
+		},
+		{
+			"name": "5. DELETE Vehicle",
+			"event": [{
+				"listen": "test",
+				"script": {
+					"exec": ["pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"]
+				}
+			}],
+			"request": {
+				"method": "DELETE",
+				"header": [{"key": "cschema", "value": "{{tenant_schema}}"}],
+				"url": "{{base_url}}/api/v1/masters/vehicles/{{vehicle_id}}"
+			}
+		}
+	]
+}

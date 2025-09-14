@@ -1,4 +1,5 @@
 from logging.config import fileConfig
+import os
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -7,9 +8,21 @@ from sqlalchemy import event
 from alembic import context
 
 # Import your Base and models here
-from app.db.base import Base
+from app.db.base import Base, BasePublic
 from app.models.auth import User, Role, Menu, RoleMenuPermission
 from app.models.masters import Class, Section
+from app.models.masters.academic_year_model import AcademicYear
+from app.models.masters.subject_model import Subject
+from app.models.fee.fee_category_model import FeeCategory
+from app.models.fee.fee_term_model import FeeTerm
+from app.models.fee.fee_term_dates_model import FeeTermDates
+from app.models.fee.fee_type_model import FeeType
+from app.models.fee.fee_class_mapping_model import FeeClassMapping
+from app.models.fee.fee_class_map_term_amount_model import FeeClassMappingTermAmount
+# Import public schema models
+from app.models.public.super_admin_model import SuperAdmin, SuperAdminAudit
+from app.models.public.tenant_model import Tenant
+from app.models.public.plan_model import Plan
 
 
 
@@ -24,9 +37,18 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = Base.metadata
+# Combine metadata from both public and tenant schemas
+from sqlalchemy import MetaData
+combined_metadata = MetaData()
+
+# Copy tables from both schemas
+for table in Base.metadata.tables.values():
+    table.tometadata(combined_metadata)
+
+for table in BasePublic.metadata.tables.values():
+    table.tometadata(combined_metadata)
+
+target_metadata = combined_metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -46,7 +68,11 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    # Use DATABASE_URL from environment if available, fallback to config
+    url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    # Convert asyncpg to psycopg2 for alembic compatibility
+    if url and url.startswith("postgresql+asyncpg://"):
+        url = url.replace("postgresql+asyncpg://", "postgresql://")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -65,8 +91,17 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    # Override database URL from environment if available
+    config_section = config.get_section(config.config_ini_section, {})
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        # Convert asyncpg to psycopg2 for alembic compatibility
+        if database_url.startswith("postgresql+asyncpg://"):
+            database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
+        config_section["sqlalchemy.url"] = database_url
+    
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        config_section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
@@ -75,7 +110,9 @@ def run_migrations_online() -> None:
         # Set the search_path for Alembic migrations
         @event.listens_for(connection, "begin")
         def set_search_path(conn):
-            conn.exec_driver_sql('SET search_path TO cos360_main')
+            import os
+            schema_name = os.getenv('SCHEMA_NAME', 'cos360_main')
+            conn.exec_driver_sql(f'SET search_path TO {schema_name}')
             
         context.configure(
             connection=connection, target_metadata=target_metadata, compare_type=True,  # Enable type comparison

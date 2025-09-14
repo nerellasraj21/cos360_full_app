@@ -1,15 +1,15 @@
 from pydantic import BaseModel
+from uuid import UUID
 
 class UserBase(BaseModel):
     username: str
     is_active: bool = True
-    role_id: int
+    role_id: UUID
 
 class UserCreate(UserBase):
     password: str
 
 class UserRead(UserBase):
-    id: int
+    id: UUID
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}

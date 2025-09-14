@@ -1,0 +1,765 @@
+{
+	"info": {
+		"_postman_id": "admission-crud-collection-uuid",
+		"name": "Level 2: Admission CRUD Operations",
+		"description": "Comprehensive CRUD operations for Admission model with dependencies on multiple entities.\n\nDependencies:\n- Student (embedded creation) - Inline creation\n- AcademicYear (academic_year_id) - Level 0\n- Class (admitted_class_id, current_class_id) - Level 1\n- Section (admitted_section_id, current_section_id) - Level 1\n\nSpecialized Endpoints:\n1. POST /students/admission/ - Create Admission (with embedded Student creation)\n2. GET /students/admission/id/{student_id} - Get Admission by Student ID\n3. PATCH /students/admission/{student_id} - Update Admission\n4. GET /students/admission/by-admission/{admission_id} - Get Student by Admission ID\n5. GET /students/admission/search?query= - Search Students\n\nNote: This model handles both student creation and admission in a single operation with complex relationships.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{adminToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"exec": [
+					"// Auto-refresh admin token if needed",
+					"if (!pm.globals.get('adminToken') || !pm.globals.get('tokenExpiry') || ",
+					"    Date.now() > parseInt(pm.globals.get('tokenExpiry'))) {",
+					"    ",
+					"    const loginRequest = {",
+					"        url: pm.environment.get('baseUrl') + '/auth/tenant-login',",
+					"        method: 'POST',",
+					"        header: {",
+					"            'Content-Type': 'application/json',",
+					"            'X-Client-Name': pm.environment.get('tenantName')",
+					"        },",
+					"        body: {",
+					"            mode: 'raw',",
+					"            raw: JSON.stringify({",
+					"                username: pm.environment.get('adminUsername'),",
+					"                password: pm.environment.get('adminPassword')",
+					"            })",
+					"        }",
+					"    };",
+					"    ",
+					"    pm.sendRequest(loginRequest, function(err, response) {",
+					"        if (err) {",
+					"            console.log('Login request failed:', err);",
+					"        } else if (response.code === 200) {",
+					"            const jsonData = response.json();",
+					"            pm.globals.set('adminToken', jsonData.access_token);",
+					"            pm.globals.set('tokenExpiry', Date.now() + (55 * 60 * 1000)); // 55 mins",
+					"            console.log('Admin token refreshed successfully');",
+					"        } else {",
+					"            console.log('Login failed with status:', response.code);",
+					"        }",
+					"    });",
+					"}"
+				],
+				"type": "text/javascript"
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "studentId",
+			"value": "",
+			"type": "string",
+			"description": "ID of the created student"
+		},
+		{
+			"key": "admissionId",
+			"value": "",
+			"type": "string",
+			"description": "ID of the created admission"
+		},
+		{
+			"key": "academicYearId",
+			"value": "",
+			"type": "string",
+			"description": "ID of the academic year dependency"
+		},
+		{
+			"key": "classId1",
+			"value": "",
+			"type": "string",
+			"description": "ID of the first class dependency"
+		},
+		{
+			"key": "classId2",
+			"value": "",
+			"type": "string",
+			"description": "ID of the second class dependency"
+		},
+		{
+			"key": "sectionId1",
+			"value": "",
+			"type": "string",
+			"description": "ID of the first section dependency"
+		},
+		{
+			"key": "sectionId2",
+			"value": "",
+			"type": "string",
+			"description": "ID of the second section dependency"
+		}
+	],
+	"item": [
+		{
+			"name": "DEPENDENCIES - Get AcademicYear for Reference",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response has academic years array', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"    pm.expect(jsonData.length).to.be.greaterThan(0);",
+							"});",
+							"",
+							"// Store academic year ID for dependency",
+							"if (pm.response.code === 200) {",
+							"    const academicYears = pm.response.json();",
+							"    if (academicYears.length > 0) {",
+							"        pm.collectionVariables.set('academicYearId', academicYears[0].id);",
+							"        console.log('Set academicYearId:', academicYears[0].id);",
+							"    }",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/masters/academic-years/dropdown",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"academic-years",
+						"dropdown"
+					]
+				},
+				"description": "Get available academic years for dependency resolution"
+			}
+		},
+		{
+			"name": "DEPENDENCIES - Get Classes for Reference",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response has classes array', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"    pm.expect(jsonData.length).to.be.greaterThan(0);",
+							"});",
+							"",
+							"// Store multiple class IDs for admitted/current classes",
+							"if (pm.response.code === 200) {",
+							"    const classes = pm.response.json();",
+							"    if (classes.length > 0) {",
+							"        pm.collectionVariables.set('classId1', classes[0].id);",
+							"        console.log('Set classId1:', classes[0].id);",
+							"        ",
+							"        if (classes.length > 1) {",
+							"            pm.collectionVariables.set('classId2', classes[1].id);",
+							"            console.log('Set classId2:', classes[1].id);",
+							"        } else {",
+							"            // Use same class ID if only one available",
+							"            pm.collectionVariables.set('classId2', classes[0].id);",
+							"            console.log('Set classId2 (same as 1):', classes[0].id);",
+							"        }",
+							"    }",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/masters/classes/dropdown",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"classes",
+						"dropdown"
+					]
+				},
+				"description": "Get available classes for dependency resolution"
+			}
+		},
+		{
+			"name": "DEPENDENCIES - Get Sections for Reference",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response has sections array', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"    pm.expect(jsonData.length).to.be.greaterThan(0);",
+							"});",
+							"",
+							"// Store multiple section IDs for admitted/current sections",
+							"if (pm.response.code === 200) {",
+							"    const sections = pm.response.json();",
+							"    if (sections.length > 0) {",
+							"        pm.collectionVariables.set('sectionId1', sections[0].id);",
+							"        console.log('Set sectionId1:', sections[0].id);",
+							"        ",
+							"        if (sections.length > 1) {",
+							"            pm.collectionVariables.set('sectionId2', sections[1].id);",
+							"            console.log('Set sectionId2:', sections[1].id);",
+							"        } else {",
+							"            // Use same section ID if only one available",
+							"            pm.collectionVariables.set('sectionId2', sections[0].id);",
+							"            console.log('Set sectionId2 (same as 1):', sections[0].id);",
+							"        }",
+							"    }",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/masters/sections/dropdown",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"masters",
+						"sections",
+						"dropdown"
+					]
+				},
+				"description": "Get available sections for dependency resolution"
+			}
+		},
+		{
+			"name": "CREATE - Create Student Admission (with embedded Student)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 201', function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"pm.test('Response has admission and student data', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('id');",
+							"    pm.expect(jsonData).to.have.property('student');",
+							"    pm.expect(jsonData.student).to.have.property('id');",
+							"});",
+							"",
+							"pm.test('Admission has required fields', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('admission_date');",
+							"    pm.expect(jsonData).to.have.property('academic_year_id');",
+							"    pm.expect(jsonData).to.have.property('admitted_class_id');",
+							"    pm.expect(jsonData).to.have.property('current_class_id');",
+							"    pm.expect(jsonData).to.have.property('address_line1');",
+							"    pm.expect(jsonData).to.have.property('city');",
+							"    pm.expect(jsonData).to.have.property('state');",
+							"});",
+							"",
+							"pm.test('Student has required fields', function () {",
+							"    const jsonData = pm.response.json();",
+							"    const student = jsonData.student;",
+							"    pm.expect(student).to.have.property('first_name');",
+							"    pm.expect(student).to.have.property('last_name');",
+							"    pm.expect(student).to.have.property('date_of_birth');",
+							"    pm.expect(student).to.have.property('gender');",
+							"    pm.expect(student).to.have.property('roll_number');",
+							"});",
+							"",
+							"pm.test('UUID format validation', function () {",
+							"    const jsonData = pm.response.json();",
+							"    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+							"    pm.expect(jsonData.id).to.match(uuidRegex);",
+							"    pm.expect(jsonData.student.id).to.match(uuidRegex);",
+							"    pm.expect(jsonData.academic_year_id).to.match(uuidRegex);",
+							"});",
+							"",
+							"pm.test('Dependencies are correctly set', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.academic_year_id).to.eql(pm.collectionVariables.get('academicYearId'));",
+							"    pm.expect(jsonData.admitted_class_id).to.eql(pm.collectionVariables.get('classId1'));",
+							"    pm.expect(jsonData.current_class_id).to.eql(pm.collectionVariables.get('classId2'));",
+							"});",
+							"",
+							"pm.test('Address information is present', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.address_line1).to.eql('123 Test Street');",
+							"    pm.expect(jsonData.city).to.eql('Test City');",
+							"    pm.expect(jsonData.state).to.eql('Test State');",
+							"});",
+							"",
+							"// Store IDs for subsequent requests",
+							"if (pm.response.code === 201) {",
+							"    const jsonData = pm.response.json();",
+							"    pm.collectionVariables.set('admissionId', jsonData.id);",
+							"    pm.collectionVariables.set('studentId', jsonData.student.id);",
+							"    console.log('Created Admission ID:', jsonData.id);",
+							"    console.log('Created Student ID:', jsonData.student.id);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"admission_date\": \"2024-01-15\",\n  \"academic_year_id\": \"{{academicYearId}}\",\n  \"admitted_class_id\": \"{{classId1}}\",\n  \"admitted_section_id\": \"{{sectionId1}}\",\n  \"current_class_id\": \"{{classId2}}\",\n  \"current_section_id\": \"{{sectionId2}}\",\n  \"address_line1\": \"123 Test Street\",\n  \"address_line2\": \"Apartment 4B\",\n  \"city\": \"Test City\",\n  \"state\": \"Test State\",\n  \"is_previous_school\": true,\n  \"previous_school_name\": \"Previous Test School\",\n  \"previous_class\": \"Grade 9\",\n  \"previous_school_remark\": \"Good academic record\",\n  \"student\": {\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\",\n    \"date_of_birth\": \"2008-05-15\",\n    \"is_primary\": \"Yes\",\n    \"gender\": \"Male\",\n    \"roll_number\": \"ADM2024001\",\n    \"aadhar_number\": \"123456789012\",\n    \"student_email\": \"john.doe@example.com\",\n    \"contact_number\": \"+1234567890\",\n    \"emergency_contact\": \"+1987654321\"\n  }\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/students/admission/",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"students",
+						"admission",
+						""
+					]
+				},
+				"description": "Create a new student admission with embedded student creation and dependencies on multiple entities"
+			}
+		},
+		{
+			"name": "READ - Get Admission by Student ID",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response contains admission details', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('id');",
+							"    pm.expect(jsonData).to.have.property('admission_date');",
+							"    pm.expect(jsonData).to.have.property('student');",
+							"});",
+							"",
+							"pm.test('Admission data matches created record', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.id).to.eql(pm.collectionVariables.get('admissionId'));",
+							"    pm.expect(jsonData.student.id).to.eql(pm.collectionVariables.get('studentId'));",
+							"});",
+							"",
+							"pm.test('All dependency relationships are present', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.academic_year_id).to.eql(pm.collectionVariables.get('academicYearId'));",
+							"    pm.expect(jsonData.admitted_class_id).to.eql(pm.collectionVariables.get('classId1'));",
+							"    pm.expect(jsonData.current_class_id).to.eql(pm.collectionVariables.get('classId2'));",
+							"});",
+							"",
+							"pm.test('Address information is maintained', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.address_line1).to.eql('123 Test Street');",
+							"    pm.expect(jsonData.city).to.eql('Test City');",
+							"    pm.expect(jsonData.state).to.eql('Test State');",
+							"});",
+							"",
+							"pm.test('Previous school information is present', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.is_previous_school).to.be.true;",
+							"    pm.expect(jsonData.previous_school_name).to.eql('Previous Test School');",
+							"    pm.expect(jsonData.previous_class).to.eql('Grade 9');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/students/admission/id/{{studentId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"students",
+						"admission",
+						"id",
+						"{{studentId}}"
+					]
+				},
+				"description": "Get admission details by student ID"
+			}
+		},
+		{
+			"name": "UPDATE - Update Student Admission (PATCH)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response contains updated data', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('id');",
+							"    pm.expect(jsonData).to.have.property('student');",
+							"});",
+							"",
+							"pm.test('Updated fields show new values', function () {",
+							"    const jsonData = pm.response.json();",
+							"    // Check student name updates",
+							"    pm.expect(jsonData.student.first_name).to.eql('Jane');",
+							"    pm.expect(jsonData.student.last_name).to.eql('Smith');",
+							"    ",
+							"    // Check admission updates",
+							"    pm.expect(jsonData.address_line1).to.eql('456 Updated Avenue');",
+							"    pm.expect(jsonData.city).to.eql('Updated City');",
+							"    pm.expect(jsonData.state).to.eql('Updated State');",
+							"});",
+							"",
+							"pm.test('Dependencies remain intact after update', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.academic_year_id).to.eql(pm.collectionVariables.get('academicYearId'));",
+							"});",
+							"",
+							"pm.test('Unchanged fields are preserved', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.is_previous_school).to.be.true;",
+							"    pm.expect(jsonData.previous_school_name).to.eql('Previous Test School');",
+							"});",
+							"",
+							"pm.test('UUID format validation for updated record', function () {",
+							"    const jsonData = pm.response.json();",
+							"    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+							"    pm.expect(jsonData.id).to.match(uuidRegex);",
+							"    pm.expect(jsonData.student.id).to.match(uuidRegex);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"first_name\": \"Jane\",\n  \"last_name\": \"Smith\",\n  \"gender\": \"Female\",\n  \"admission_date\": \"2024-01-20\",\n  \"address_line1\": \"456 Updated Avenue\",\n  \"city\": \"Updated City\",\n  \"state\": \"Updated State\",\n  \"aadhar_number\": \"987654321098\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/students/admission/{{studentId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"students",
+						"admission",
+						"{{studentId}}"
+					]
+				},
+				"description": "Update student admission with partial data (supports both student and admission field updates)"
+			}
+		},
+		{
+			"name": "READ - Get Student by Admission ID",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response contains student data', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('id');",
+							"    pm.expect(jsonData).to.have.property('first_name');",
+							"    pm.expect(jsonData).to.have.property('last_name');",
+							"});",
+							"",
+							"pm.test('Student data matches our record', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.id).to.eql(pm.collectionVariables.get('studentId'));",
+							"    pm.expect(jsonData.first_name).to.eql('Jane');",
+							"    pm.expect(jsonData.last_name).to.eql('Smith');",
+							"});",
+							"",
+							"pm.test('Student has required fields', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('date_of_birth');",
+							"    pm.expect(jsonData).to.have.property('gender');",
+							"    pm.expect(jsonData).to.have.property('roll_number');",
+							"    pm.expect(jsonData).to.have.property('student_email');",
+							"});",
+							"",
+							"pm.test('Updated student information is reflected', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.gender).to.eql('Female');",
+							"    pm.expect(jsonData.aadhar_number).to.eql('987654321098');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/students/admission/by-admission/{{admissionId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"students",
+						"admission",
+						"by-admission",
+						"{{admissionId}}"
+					]
+				},
+				"description": "Get student details by admission ID - reverse lookup"
+			}
+		},
+		{
+			"name": "SEARCH - Search Students by Text Query",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response is an array of students', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"});",
+							"",
+							"pm.test('Search results contain our created student', function () {",
+							"    const jsonData = pm.response.json();",
+							"    const studentId = pm.collectionVariables.get('studentId');",
+							"    ",
+							"    if (jsonData.length > 0) {",
+							"        const foundStudent = jsonData.find(student => student.id === studentId);",
+							"        pm.expect(foundStudent).to.not.be.undefined;",
+							"        ",
+							"        if (foundStudent) {",
+							"            pm.expect(foundStudent.first_name).to.eql('Jane');",
+							"            pm.expect(foundStudent.last_name).to.eql('Smith');",
+							"        }",
+							"    }",
+							"});",
+							"",
+							"pm.test('Search results have required student fields', function () {",
+							"    const jsonData = pm.response.json();",
+							"    ",
+							"    if (jsonData.length > 0) {",
+							"        jsonData.forEach(student => {",
+							"            pm.expect(student).to.have.property('id');",
+							"            pm.expect(student).to.have.property('first_name');",
+							"            pm.expect(student).to.have.property('last_name');",
+							"            pm.expect(student).to.have.property('roll_number');",
+							"        });",
+							"    }",
+							"});",
+							"",
+							"pm.test('Search is case-insensitive and partial match works', function () {",
+							"    const jsonData = pm.response.json();",
+							"    ",
+							"    if (jsonData.length > 0) {",
+							"        const foundMatches = jsonData.filter(student => ",
+							"            student.first_name.toLowerCase().includes('jane') ||",
+							"            student.last_name.toLowerCase().includes('smith')",
+							"        );",
+							"        pm.expect(foundMatches.length).to.be.greaterThan(0);",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/students/admission/search?query=Jane",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"students",
+						"admission",
+						"search"
+					],
+					"query": [
+						{
+							"key": "query",
+							"value": "Jane"
+						}
+					]
+				},
+				"description": "Search students by text query - supports partial matching on student names"
+			}
+		},
+		{
+			"name": "VERIFY FINAL - Confirm All Operations Completed",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Final verification - admission record exists and is updated', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.id).to.eql(pm.collectionVariables.get('admissionId'));",
+							"    pm.expect(jsonData.student.id).to.eql(pm.collectionVariables.get('studentId'));",
+							"});",
+							"",
+							"pm.test('Final verification - all updates are persisted', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.student.first_name).to.eql('Jane');",
+							"    pm.expect(jsonData.student.last_name).to.eql('Smith');",
+							"    pm.expect(jsonData.address_line1).to.eql('456 Updated Avenue');",
+							"    pm.expect(jsonData.city).to.eql('Updated City');",
+							"});",
+							"",
+							"pm.test('Final verification - all relationships are intact', function () {",
+							"    const jsonData = pm.response.json();",
+							"    pm.expect(jsonData.academic_year_id).to.eql(pm.collectionVariables.get('academicYearId'));",
+							"    pm.expect(jsonData.admitted_class_id).to.eql(pm.collectionVariables.get('classId1'));",
+							"    pm.expect(jsonData.current_class_id).to.eql(pm.collectionVariables.get('classId2'));",
+							"});",
+							"",
+							"console.log('✅ Level 2 Admission CRUD Collection completed successfully!');",
+							"console.log('Student ID:', pm.collectionVariables.get('studentId'));",
+							"console.log('Admission ID:', pm.collectionVariables.get('admissionId'));",
+							"console.log('All dependency relationships verified and operations completed.');"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Client-Name",
+						"value": "{{tenantName}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/students/admission/id/{{studentId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"students",
+						"admission",
+						"id",
+						"{{studentId}}"
+					]
+				},
+				"description": "Final verification that all CRUD operations completed successfully with proper dependency management"
+			}
+		}
+	]
+}

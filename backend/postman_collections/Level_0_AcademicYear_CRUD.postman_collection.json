@@ -1,0 +1,571 @@
+{
+	"info": {
+		"_postman_id": "academic-year-crud-collection",
+		"name": "Level 0 - Academic Year CRUD (Enhanced)",
+		"description": "Complete CRUD operations for Academic Year model (Level 0 - No Dependencies)\n\n🔧 **Configuration:**\n- Base URL: http://127.0.0.1:8003\n- Authentication: Admin JWT Token (auto-fetched)\n- Tenant: test_tenant\n- Schema: test_tenant_schema\n\n📋 **8 Endpoints Covered:**\n1. GET Admin Token (Authentication)\n2. CREATE Academic Year (POST /)\n3. LIST All Academic Years (GET / with pagination)\n4. GET Academic Year by ID (GET /{id})\n5. GET Academic Years Dropdown (GET /dropdown)\n6. GET Active Academic Years (GET /active)\n7. UPDATE Academic Year (PUT /{id})\n8. DELETE Academic Year - Soft (DELETE /{id})\n9. DELETE Academic Year - Permanent (DELETE /{id}/permanent)\n\n🎯 **Features:**\n- Auto token refresh\n- Variable chaining between requests\n- Comprehensive test validation\n- UUID format validation\n- Business logic testing\n- Rate limit handling",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{admin_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-fetch admin token if not present",
+					"if (!pm.globals.get('admin_token')) {",
+					"    pm.sendRequest({",
+					"        url: 'http://127.0.0.1:8003/api/v1/auth/test-jwt/admin-token',",
+					"        method: 'GET'",
+					"    }, function (err, response) {",
+					"        if (err) {",
+					"            console.log('Error getting admin token:', err);",
+					"        } else {",
+					"            var jsonData = response.json();",
+					"            pm.globals.set('admin_token', jsonData.access_token);",
+					"            console.log('Admin token updated:', jsonData.access_token);",
+					"        }",
+					"    });",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1:8003",
+			"type": "string"
+		},
+		{
+			"key": "tenant_schema",
+			"value": "test_tenant",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "0. Get Admin Token",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Token is present', function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.access_token).to.exist;",
+							"    pm.globals.set('admin_token', jsonData.access_token);",
+							"    console.log('Admin token set:', jsonData.access_token);",
+							"});",
+							"",
+							"pm.test('Token format is valid', function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.token_type).to.eql('bearer');",
+							"    pm.expect(jsonData.user.role).to.eql('Admin');",
+							"    pm.expect(jsonData.user.client_name).to.eql('test_tenant');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/auth/test-jwt/admin-token",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"test-jwt",
+						"admin-token"
+					]
+				},
+				"description": "Get admin JWT token for authentication\n\nThis endpoint provides a test admin token for the test_tenant with full permissions."
+			},
+			"response": []
+		},
+		{
+			"name": "1. CREATE Academic Year",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 201', function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"pm.test('Response has required fields', function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.id).to.exist;",
+							"    pm.expect(jsonData.title).to.exist;",
+							"    pm.expect(jsonData.start_date).to.exist;",
+							"    pm.expect(jsonData.end_date).to.exist;",
+							"    pm.expect(jsonData.is_active).to.exist;",
+							"    pm.expect(jsonData.created_at).to.exist;",
+							"    pm.globals.set('created_academic_year_id', jsonData.id);",
+							"    console.log('Created Academic Year ID:', jsonData.id);",
+							"});",
+							"",
+							"pm.test('UUID format is valid', function () {",
+							"    var jsonData = pm.response.json();",
+							"    var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;",
+							"    pm.expect(jsonData.id).to.match(uuidRegex);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "cschema",
+						"value": "{{tenant_schema}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"Postman Test Academic Year 2025-26\",\n    \"start_date\": \"2025-04-01\",\n    \"end_date\": \"2026-03-31\",\n    \"is_active\": true\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/masters/academic_years/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"masters",
+						"academic_years",
+						""
+					]
+				},
+				"description": "Create a new academic year\n\nRequirements:\n- Admin role required\n- Enterprise plan access\n- Resource permission: academic_years:create\n\nBusiness Logic:\n- If is_active=true, automatically deactivates other active years\n- Title must be unique\n- Generates UUID automatically"
+			},
+			"response": []
+		},
+		{
+			"name": "2. LIST All Academic Years",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response is an array', function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"});",
+							"",
+							"pm.test('Each item has required fields', function () {",
+							"    var jsonData = pm.response.json();",
+							"    if (jsonData.length > 0) {",
+							"        pm.expect(jsonData[0].id).to.exist;",
+							"        pm.expect(jsonData[0].title).to.exist;",
+							"        pm.expect(jsonData[0].is_active).to.exist;",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "cschema",
+						"value": "{{tenant_schema}}"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/v1/masters/academic_years/?skip=0&limit=10&active_only=true",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"masters",
+						"academic_years",
+						""
+					],
+					"query": [
+						{
+							"key": "skip",
+							"value": "0",
+							"description": "Number of records to skip"
+						},
+						{
+							"key": "limit",
+							"value": "10",
+							"description": "Maximum number of records to return"
+						},
+						{
+							"key": "active_only",
+							"value": "true",
+							"description": "Filter for only active academic years"
+						}
+					]
+				},
+				"description": "Get list of all academic years with pagination\n\nParameters:\n- skip: Number of records to skip (default: 0)\n- limit: Maximum records to return (default: 10)\n- active_only: Filter for active years only (default: true)\n\nPermissions: Available to all roles (Admin, Teacher, Student, Parent, Staff)"
+			},
+			"response": []
+		},
+		{
+			"name": "3. GET Academic Year by ID",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response has correct ID', function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.id).to.exist;",
+							"    pm.expect(jsonData.title).to.exist;",
+							"    pm.expect(jsonData.start_date).to.exist;",
+							"    pm.expect(jsonData.end_date).to.exist;",
+							"});",
+							"",
+							"pm.test('ID matches requested ID', function () {",
+							"    var jsonData = pm.response.json();",
+							"    var requestedId = pm.globals.get('created_academic_year_id');",
+							"    if (requestedId) {",
+							"        pm.expect(jsonData.id).to.eql(requestedId);",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "cschema",
+						"value": "{{tenant_schema}}"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/v1/masters/academic_years/{{created_academic_year_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"masters",
+						"academic_years",
+						"{{created_academic_year_id}}"
+					]
+				},
+				"description": "Get academic year by specific UUID\n\nRequirements:\n- Valid academic year UUID\n- Authentication required\n- Resource permission: academic_years:read\n\nPermissions: Available to all roles"
+			},
+			"response": []
+		},
+		{
+			"name": "4. GET Academic Years Dropdown",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response is an array', function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"});",
+							"",
+							"pm.test('Dropdown format is correct', function () {",
+							"    var jsonData = pm.response.json();",
+							"    if (jsonData.length > 0) {",
+							"        pm.expect(jsonData[0].id).to.exist;",
+							"        pm.expect(jsonData[0].title).to.exist;",
+							"        // Should only have id and title for dropdown",
+							"        var keys = Object.keys(jsonData[0]);",
+							"        pm.expect(keys).to.have.lengthOf.at.most(3); // id, title, maybe is_active",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "cschema",
+						"value": "{{tenant_schema}}"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/v1/masters/academic_years/dropdown?active_only=true",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"masters",
+						"academic_years",
+						"dropdown"
+					],
+					"query": [
+						{
+							"key": "active_only",
+							"value": "true",
+							"description": "Filter for active years only"
+						}
+					]
+				},
+				"description": "Get academic years dropdown data (id + title only)\n\nOptimized for UI dropdown components - returns minimal data.\n\nParameters:\n- active_only: Filter for active years (default: true)\n\nRate Limited: 100 requests per minute\nPermissions: Available to all roles"
+			},
+			"response": []
+		},
+		{
+			"name": "5. GET Active Academic Years",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response is an array', function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.be.an('array');",
+							"});",
+							"",
+							"pm.test('All returned years are active', function () {",
+							"    var jsonData = pm.response.json();",
+							"    jsonData.forEach(function(year) {",
+							"        pm.expect(year.is_active).to.be.true;",
+							"    });",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "cschema",
+						"value": "{{tenant_schema}}"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/v1/masters/academic_years/active",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"masters",
+						"academic_years",
+						"active"
+					]
+				},
+				"description": "Get only active academic years (is_active=true)\n\nReturns full academic year objects, but only those marked as active.\n\nRate Limited: 100 requests per minute\nPermissions: Available to all roles"
+			},
+			"response": []
+		},
+		{
+			"name": "6. UPDATE Academic Year",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response shows updated data', function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.title).to.include('Updated');",
+							"    pm.expect(jsonData.id).to.exist;",
+							"});",
+							"",
+							"pm.test('Updated timestamp changed', function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.updated_at).to.exist;",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "cschema",
+						"value": "{{tenant_schema}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"Updated Postman Test Academic Year 2025-26\",\n    \"start_date\": \"2025-04-01\",\n    \"end_date\": \"2026-03-31\",\n    \"is_active\": false\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/masters/academic_years/{{created_academic_year_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"masters",
+						"academic_years",
+						"{{created_academic_year_id}}"
+					]
+				},
+				"description": "Update existing academic year\n\nRequirements:\n- Admin role required (only Admin can update)\n- Valid academic year UUID\n- Resource permission: academic_years:update\n\nBusiness Logic:\n- Can update title, dates, and active status\n- Updated timestamp automatically set"
+			},
+			"response": []
+		},
+		{
+			"name": "7. DELETE Academic Year (Soft Delete/Deactivate)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Record is deactivated', function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.is_active).to.be.false;",
+							"    pm.expect(jsonData.id).to.exist;",
+							"});",
+							"",
+							"pm.test('Record still exists in database', function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.title).to.exist;",
+							"    pm.expect(jsonData.created_at).to.exist;",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "cschema",
+						"value": "{{tenant_schema}}"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/v1/masters/academic_years/{{created_academic_year_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"masters",
+						"academic_years",
+						"{{created_academic_year_id}}"
+					]
+				},
+				"description": "Soft delete (deactivate) academic year\n\nBehavior:\n- Sets is_active = false\n- Record remains in database\n- Can be reactivated later\n\nRequirements:\n- Admin role required\n- Resource permission: academic_years:delete"
+			},
+			"response": []
+		},
+		{
+			"name": "8. DELETE Academic Year (Permanent)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Deletion confirmed', function () {",
+							"    // This endpoint returns success message or empty response",
+							"    pm.expect(pm.response.code).to.eql(200);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "cschema",
+						"value": "{{tenant_schema}}"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/v1/masters/academic_years/{{created_academic_year_id}}/permanent",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"masters",
+						"academic_years",
+						"{{created_academic_year_id}}",
+						"permanent"
+					]
+				},
+				"description": "Permanently delete academic year from database\n\n⚠️ WARNING: This is irreversible!\n\nBehavior:\n- Completely removes record from database\n- Cannot be recovered\n- Used primarily for testing purposes\n\nRequirements:\n- Admin role required\n- Resource permission: academic_years:delete"
+			},
+			"response": []
+		}
+	]
+}

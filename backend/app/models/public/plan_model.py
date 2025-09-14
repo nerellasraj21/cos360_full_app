@@ -1,7 +1,7 @@
-from app.db.base import Base
+from app.db.base import BasePublic
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 
-class Plan(Base):
+class Plan(BasePublic):
     __tablename__ = 'plans'
     __table_args__ = {'schema': 'public'}
     
