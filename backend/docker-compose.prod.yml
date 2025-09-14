@@ -9,7 +9,7 @@ services:
       DB_HOST: localhost
       DB_PORT: 5432
       PYTHONPATH: /app
-      DATABASE_URL: postgresql://postgres:Passw0rd!@localhost:5432/postgres
+      DATABASE_URL: postgresql+asyncpg://postgres:Passw0rd!@localhost:5432/postgres
     ports:
       - "8000:8000"
     healthcheck:
