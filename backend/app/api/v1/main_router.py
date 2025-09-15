@@ -44,6 +44,13 @@ from app.api.v1.super_admin.setup_endpoints import router as super_admin_setup_r
 from app.api.v1.super_admin.system_endpoints import router as super_admin_system_router
 from app.api.v1.super_admin.plan_endpoints import router as super_admin_plan_router
 from app.api.v1.admin.permission_endpoints import router as admin_permission_router
+from app.api.v1.expense.expense_category_endpoints import router as expense_category_router
+from app.api.v1.expense.expense_type_endpoints import router as expense_type_router
+from app.api.v1.expense.expense_transaction_endpoints import router as expense_transaction_router
+from app.api.v1.expense.expense_reporting_endpoints import router as expense_reporting_router
+from app.api.v1.expense.expense_settings_endpoints import router as expense_settings_router
+from app.api.v1.expense.expense_audit_endpoints import router as expense_audit_router
+from app.api.v1.expense.expense_attachment_endpoints import router as expense_attachment_router
 
 router = APIRouter()
 router.include_router(academic_year_router)
@@ -90,3 +97,10 @@ router.include_router(super_admin_auth_router)
 router.include_router(super_admin_setup_router)
 router.include_router(super_admin_system_router)
 router.include_router(super_admin_plan_router)
+router.include_router(expense_category_router)
+router.include_router(expense_type_router)
+router.include_router(expense_transaction_router)
+router.include_router(expense_reporting_router)
+router.include_router(expense_settings_router)
+router.include_router(expense_audit_router)
+router.include_router(expense_attachment_router)
