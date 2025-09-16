@@ -141,20 +141,31 @@ async def delete_subject_category(db: AsyncSession, category_id: UUID):
     try:
         # Get existing category
         category = await get_subject_category_by_id(db, category_id)
-        
+
         # Check if category is in use by subjects
-        # You might want to add this check based on business requirements
-        # For now, we'll allow deletion - add foreign key checks if needed
-        
+        from app.models.masters.subject_model import Subject
+        from sqlalchemy import select, func
+
+        subjects_count = await db.execute(
+            select(func.count(Subject.id)).where(Subject.category_id == category_id)
+        )
+        count = subjects_count.scalar()
+
+        if count > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete category '{category.name}' because it is being used by {count} subject(s). Please reassign or delete the subjects first."
+            )
+
         await db.delete(category)
         await db.commit()
-        
+
         # Invalidate cache
         invalidate_cache("dropdown", "subject_categories")
-        
+
         log.info(f"Subject category deleted successfully: {category_id}")
         return {"message": "Subject category deleted successfully"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
