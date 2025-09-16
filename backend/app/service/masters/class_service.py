@@ -132,21 +132,112 @@ async def delete_class_with_sections(db: AsyncSession, class_id: UUID):
         db_class = result.scalar_one_or_none()
         if not db_class:
             raise HTTPException(status_code=404, detail="Class not found")
-        
-        # Delete all sections associated with the class
+
+        # Check if class is in use by student admissions
+        from app.models.masters.admission_model import Admission
+        from sqlalchemy import func, or_
+        admissions_count = await db.execute(
+            select(func.count(Admission.id)).where(
+                or_(
+                    Admission.admitted_class_id == class_id,
+                    Admission.current_class_id == class_id
+                )
+            )
+        )
+        admission_dependencies = admissions_count.scalar()
+
+        # Check if class is in use by fee class mappings
+        from app.models.fee.fee_class_mapping_model import FeeClassMapping
+        fee_class_count = await db.execute(
+            select(func.count(FeeClassMapping.id)).where(FeeClassMapping.class_id == class_id)
+        )
+        fee_class_dependencies = fee_class_count.scalar()
+
+        # Check if class is in use by fee student mappings
+        from app.models.fee.fee_student_mapping_model import FeeStudentMapping
+        fee_student_count = await db.execute(
+            select(func.count(FeeStudentMapping.id)).where(FeeStudentMapping.class_id == class_id)
+        )
+        fee_student_dependencies = fee_student_count.scalar()
+
+        # Check if class is in use by class-subject mappings
+        from app.models.masters.class_subject_mapping_model import ClassSubjectMap
+        subject_mappings_count = await db.execute(
+            select(func.count(ClassSubjectMap.id)).where(ClassSubjectMap.class_id == class_id)
+        )
+        subject_mapping_dependencies = subject_mappings_count.scalar()
+
+        # Check sections for dependencies before deleting class
+        sections_result = await db.execute(select(SectionModel.id).where(SectionModel.class_id == class_id))
+        section_ids = [row[0] for row in sections_result.all()]
+
+        total_section_dependencies = 0
+        if section_ids:
+            # Check sections in student admissions
+            section_admissions_count = await db.execute(
+                select(func.count(Admission.id)).where(
+                    or_(
+                        Admission.admitted_section_id.in_(section_ids),
+                        Admission.current_section_id.in_(section_ids)
+                    )
+                )
+            )
+            section_admission_deps = section_admissions_count.scalar()
+
+            # Check sections in fee student mappings
+            section_fee_count = await db.execute(
+                select(func.count(FeeStudentMapping.id)).where(FeeStudentMapping.section_id.in_(section_ids))
+            )
+            section_fee_deps = section_fee_count.scalar()
+
+            # Check sections in timetables
+            from app.models.masters.timetable_model import Timetable
+            timetable_count = await db.execute(
+                select(func.count(Timetable.id)).where(Timetable.section_id.in_(section_ids))
+            )
+            timetable_deps = timetable_count.scalar()
+
+            total_section_dependencies = section_admission_deps + section_fee_deps + timetable_deps
+
+        # Calculate total dependencies
+        total_dependencies = (admission_dependencies + fee_class_dependencies +
+                            fee_student_dependencies + subject_mapping_dependencies +
+                            total_section_dependencies)
+
+        if total_dependencies > 0:
+            dependency_details = []
+            if admission_dependencies > 0:
+                dependency_details.append(f"{admission_dependencies} student admission(s)")
+            if fee_class_dependencies > 0:
+                dependency_details.append(f"{fee_class_dependencies} fee class mapping(s)")
+            if fee_student_dependencies > 0:
+                dependency_details.append(f"{fee_student_dependencies} fee student mapping(s)")
+            if subject_mapping_dependencies > 0:
+                dependency_details.append(f"{subject_mapping_dependencies} subject mapping(s)")
+            if total_section_dependencies > 0:
+                dependency_details.append(f"{total_section_dependencies} section-related record(s)")
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot delete class '{db_class.name}' because it is being used by {total_dependencies} record(s): {', '.join(dependency_details)}. Please reassign or delete the dependent records first."
+            )
+
+        # Delete all sections associated with the class (safe since we checked dependencies)
         # db.query(SectionModel).filter(SectionModel.class_id == class_id).delete()
         await db.execute(delete(SectionModel).where(SectionModel.class_id == class_id))
-        
+
         # Delete the class itself
         # db.delete(db_class)
         await db.delete(db_class)
         await db.commit()
-        
+
         # Invalidate cache after deleting class/section
         invalidate_cache("dropdown", "classes")
         invalidate_cache("dropdown", "sections")
-        
+
         return {"detail": "Class and associated sections deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"Error deleting class with sections: {str(e)}")
