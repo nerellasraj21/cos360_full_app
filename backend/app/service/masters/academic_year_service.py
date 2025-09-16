@@ -143,14 +143,80 @@ async def delete_academic_year(db: AsyncSession, academic_year_id: UUID):
             log.warning(f"Academic Year with id {academic_year_id} not found for deletion")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                                 detail=f"Academic Year with id {academic_year_id} not found")
-        
+
+        # Check if academic year is in use by student admissions
+        from app.models.masters.admission_model import Admission
+        from sqlalchemy import func, or_
+        admissions_count = await db.execute(
+            select(func.count(Admission.id)).where(
+                or_(
+                    Admission.academic_year_id == academic_year_id,
+                    Admission.admitted_academic_year_id == academic_year_id
+                )
+            )
+        )
+        admission_dependencies = admissions_count.scalar()
+
+        # Check if academic year is in use by fee class mappings
+        from app.models.fee.fee_class_mapping_model import FeeClassMapping
+        fee_class_count = await db.execute(
+            select(func.count(FeeClassMapping.id)).where(FeeClassMapping.academic_year_id == academic_year_id)
+        )
+        fee_class_dependencies = fee_class_count.scalar()
+
+        # Check if academic year is in use by fee student mappings
+        from app.models.fee.fee_student_mapping_model import FeeStudentMapping
+        fee_student_count = await db.execute(
+            select(func.count(FeeStudentMapping.id)).where(FeeStudentMapping.academic_year_id == academic_year_id)
+        )
+        fee_student_dependencies = fee_student_count.scalar()
+
+        # Check if academic year is in use by fee types
+        from app.models.fee.fee_type_model import FeeType
+        fee_types_count = await db.execute(
+            select(func.count(FeeType.id)).where(FeeType.academic_year_id == academic_year_id)
+        )
+        fee_type_dependencies = fee_types_count.scalar()
+
+        # Check if academic year is in use by class subject mappings
+        from app.models.masters.class_subject_mapping_model import ClassSubjectMap
+        class_subject_count = await db.execute(
+            select(func.count(ClassSubjectMap.id)).where(ClassSubjectMap.academic_year_id == academic_year_id)
+        )
+        class_subject_dependencies = class_subject_count.scalar()
+
+        # Calculate total dependencies
+        total_dependencies = (admission_dependencies + fee_class_dependencies +
+                            fee_student_dependencies + fee_type_dependencies +
+                            class_subject_dependencies)
+
+        if total_dependencies > 0:
+            dependency_details = []
+            if admission_dependencies > 0:
+                dependency_details.append(f"{admission_dependencies} student admission(s)")
+            if fee_class_dependencies > 0:
+                dependency_details.append(f"{fee_class_dependencies} fee class mapping(s)")
+            if fee_student_dependencies > 0:
+                dependency_details.append(f"{fee_student_dependencies} fee student mapping(s)")
+            if fee_type_dependencies > 0:
+                dependency_details.append(f"{fee_type_dependencies} fee type(s)")
+            if class_subject_dependencies > 0:
+                dependency_details.append(f"{class_subject_dependencies} class subject mapping(s)")
+
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete academic year '{db_academic_year.title}' because it is being used by {total_dependencies} record(s): {', '.join(dependency_details)}. Please reassign or delete the dependent records first."
+            )
+
         await db.delete(db_academic_year)
         await db.commit()
-        
+
         # Invalidate cache after deleting academic year
         invalidate_cache("dropdown", "academic_years")
-        
+
         return {"message": f"Academic Year {db_academic_year.title} deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         log.error(f"Error deleting academic year: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,

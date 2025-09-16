@@ -280,24 +280,38 @@ async def delete_fee_category(db: AsyncSession, fee_category_id: UUID):
     """Delete a fee category"""
     try:
         fee_category_uuid = fee_category_id
-        
+
         result = await db.execute(select(FeeCategoryModel).where(FeeCategoryModel.id == fee_category_uuid))
         db_fee_category = result.scalar_one_or_none()
-        
+
         if not db_fee_category:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Fee category with id {fee_category_id} not found"
             )
-        
+
+        # Check if fee category is in use by fee types
+        from app.models.fee.fee_type_model import FeeType
+        from sqlalchemy import func
+        fee_types_count = await db.execute(
+            select(func.count(FeeType.id)).where(FeeType.fee_category_id == fee_category_uuid)
+        )
+        fee_type_dependencies = fee_types_count.scalar()
+
+        if fee_type_dependencies > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete fee category '{db_fee_category.name}' because it is being used by {fee_type_dependencies} fee type(s). Please reassign or delete the fee types first."
+            )
+
         await db.delete(db_fee_category)
         await db.commit()
-        
+
         # Invalidate cache after deleting category
         invalidate_cache("dropdown", "fee_categories")
-        
+
         return {"message": "Fee category deleted successfully"}
-        
+
     except HTTPException:
         await db.rollback()
         raise

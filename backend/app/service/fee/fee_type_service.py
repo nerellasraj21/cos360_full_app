@@ -379,24 +379,54 @@ async def delete_fee_type(db: AsyncSession, fee_type_id: UUID):
     """Delete a fee type"""
     try:
         fee_type_uuid = UUID(fee_type_id)
-        
+
         result = await db.execute(select(FeeTypeModel).where(FeeTypeModel.id == fee_type_uuid))
         db_fee_type = result.scalar_one_or_none()
-        
+
         if not db_fee_type:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Fee type with id {fee_type_id} not found"
             )
-        
+
+        # Check if fee type is in use by fee class mappings
+        from app.models.fee.fee_class_mapping_model import FeeClassMapping
+        from sqlalchemy import func
+        fee_class_count = await db.execute(
+            select(func.count(FeeClassMapping.id)).where(FeeClassMapping.fee_type_id == fee_type_uuid)
+        )
+        fee_class_dependencies = fee_class_count.scalar()
+
+        # Check if fee type is in use by fee student mappings
+        from app.models.fee.fee_student_mapping_model import FeeStudentMapping
+        fee_student_count = await db.execute(
+            select(func.count(FeeStudentMapping.id)).where(FeeStudentMapping.fee_type_id == fee_type_uuid)
+        )
+        fee_student_dependencies = fee_student_count.scalar()
+
+        # Calculate total dependencies
+        total_dependencies = fee_class_dependencies + fee_student_dependencies
+
+        if total_dependencies > 0:
+            dependency_details = []
+            if fee_class_dependencies > 0:
+                dependency_details.append(f"{fee_class_dependencies} fee class mapping(s)")
+            if fee_student_dependencies > 0:
+                dependency_details.append(f"{fee_student_dependencies} fee student mapping(s)")
+
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete fee type '{db_fee_type.type_name}' because it is being used by {total_dependencies} record(s): {', '.join(dependency_details)}. Please reassign or delete the dependent records first."
+            )
+
         await db.delete(db_fee_type)
         await db.commit()
-        
+
         # Invalidate cache after deleting fee type
         invalidate_cache("dropdown", "fee_types")
-        
+
         return {"message": "Fee type deleted successfully"}
-        
+
     except HTTPException:
         await db.rollback()
         raise

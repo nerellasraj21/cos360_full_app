@@ -239,12 +239,26 @@ async def delete_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Fee term with id {fee_term_id} not found"
             )
-        
+
+        # Check if fee term is in use by fee types
+        from app.models.fee.fee_type_model import FeeType
+        from sqlalchemy import func
+        fee_types_count = await db.execute(
+            select(func.count(FeeType.id)).where(FeeType.fee_term_id == fee_term_id)
+        )
+        fee_type_dependencies = fee_types_count.scalar()
+
+        if fee_type_dependencies > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete fee term '{db_fee_term.term_name}' because it is being used by {fee_type_dependencies} fee type(s). Please reassign or delete the fee types first."
+            )
+
         # Delete fee term (cascade will delete associated dates)
         await db.delete(db_fee_term)
         await db.commit()
         return {"message": "Fee term and associated dates deleted successfully"}
-        
+
     except HTTPException:
         await db.rollback()
         raise
