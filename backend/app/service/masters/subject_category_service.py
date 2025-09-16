@@ -31,15 +31,14 @@ async def create_subject_category(db: AsyncSession, data: SubjectCategoryCreate)
         log.error(f"Error creating subject category: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Subject category creation failed: {str(e)}")
 
-@cache_dropdown(ttl=300)  # Cache for 5 minutes
 async def get_all_subject_categories(db: AsyncSession):
-    """Get all subject categories - Cached"""
+    """Get all subject categories - No cache to avoid serialization issues"""
     try:
-        result = await db.execute(select(SubjectCategory).order_by(SubjectCategory.name))
-        categories = result.scalars().all()
-        
+        result = await db.execute(select(SubjectCategory.id, SubjectCategory.name).order_by(SubjectCategory.name))
+        categories = result.all()
+
         log.debug(f"Retrieved {len(categories)} subject categories from database")
-        return categories
+        return [{"id": cat.id, "name": cat.name} for cat in categories]
     except Exception as e:
         log.error(f"Error fetching subject categories: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Fetching subject categories failed: {str(e)}")

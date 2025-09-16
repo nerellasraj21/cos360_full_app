@@ -16,12 +16,16 @@ async def create_subject(db: AsyncSession, subject_data: SubjectCreate) -> Subje
         subject = Subject(**subject_data.model_dump())
         db.add(subject)
         await db.commit()
-        # Note: Removed refresh() to avoid schema context issues
-        # The object is valid after commit since no DB triggers modify it
-        
+        # Refresh with relationships loaded
+        await db.refresh(subject)
+        result = await db.execute(
+            select(Subject).options(selectinload(Subject.category)).where(Subject.id == subject.id)
+        )
+        subject = result.scalar_one()
+
         # Invalidate cache after creating new subject
         invalidate_cache("dropdown", "subjects")
-        
+
         return subject
     except Exception as e:
         await db.rollback()
@@ -44,7 +48,7 @@ async def get_all_subjects(db: AsyncSession, skip: int = 0, limit: int = 100, ac
             base_query = base_query.where(Subject.is_active == True)
         if academic_year_id is not None:
             base_query = base_query.where(Subject.academic_year_id == academic_year_id)
-        
+
         # Get total count
         count_query = select(func.count(Subject.id))
         if active_only:
@@ -53,20 +57,20 @@ async def get_all_subjects(db: AsyncSession, skip: int = 0, limit: int = 100, ac
             count_query = count_query.where(Subject.academic_year_id == academic_year_id)
         total_count_result = await db.execute(count_query)
         total_count = total_count_result.scalar()
-        
+
         # Get paginated items
         items_result = await db.execute(base_query.offset(skip).limit(limit))
         items = items_result.scalars().all()
-        
+
         # Calculate has_next
         has_next = (skip + limit) < total_count
-        
+
         result = {
             "items": items,
             "total_count": total_count,
             "has_next": has_next
         }
-        
+
         log.debug(f"Retrieved {len(items)} subjects, total_count={total_count}, has_next={has_next}")
         return result
     except Exception as e:
@@ -81,7 +85,11 @@ async def update_subject(db: AsyncSession, subject_id: UUID, subject_data: Subje
         for var, value in subject_data.model_dump(exclude_unset=True).items():
             setattr(subject, var, value)
         await db.commit()
-        await db.refresh(subject)
+        # Refresh with relationships loaded
+        result = await db.execute(
+            select(Subject).options(selectinload(Subject.category)).where(Subject.id == subject_id)
+        )
+        subject = result.scalar_one()
     except Exception as e:
         await db.rollback()
         log.error(f"Failed to update subject: {e}")
@@ -95,7 +103,11 @@ async def deactivate_subject(db: AsyncSession, subject_id: UUID):
             raise HTTPException(status_code=404, detail="Subject not found")
         subject.is_active = False
         await db.commit()
-        await db.refresh(subject)
+        # Refresh with relationships loaded
+        result = await db.execute(
+            select(Subject).options(selectinload(Subject.category)).where(Subject.id == subject_id)
+        )
+        subject = result.scalar_one()
     except Exception as e:
         await db.rollback()
         log.error(f"Failed to deactivate subject: {e}")

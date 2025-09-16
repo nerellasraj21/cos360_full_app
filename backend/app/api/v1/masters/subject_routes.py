@@ -63,10 +63,10 @@ async def get_categories(request: Request, db: AsyncSession = Depends(get_tenant
     """Get all subject categories"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'subjects', 'list')
-    
+
     # Import here to avoid circular import
     from app.service.masters.subject_category_service import get_all_subject_categories
     return await get_all_subject_categories(db)
