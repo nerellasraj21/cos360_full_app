@@ -5,6 +5,7 @@ from app.models.auth.user_model import User
 from app.models.auth.role_model import Role
 from app.models.auth.menu_model import Menu
 from app.models.auth.permissions_model import RoleMenuPermission
+from app.models.auth.resource_permission_model import ResourcePermission
 from app.tools.jwt_utils import create_access_token, create_refresh_token
 from app.tools.password_util import verify_password
 from app.db.tenant_session import get_tenant_db, TenantService
@@ -175,10 +176,63 @@ class MultiTenantAuthService:
             
             logger.info(f"Built hierarchical menu with {len(root_menus)} root items for role_id: {role_id}")
             return root_menus
-            
+
         except Exception as e:
             logger.error(f"Error building hierarchical menu for role_id {role_id}: {str(e)}")
             return []
+
+    @staticmethod
+    async def get_user_permissions(db: AsyncSession, role_id: int) -> Dict[str, List[str]]:
+        """
+        Fetch user's resource permissions grouped by resource.
+
+        Args:
+            db: Database session (already configured for tenant schema)
+            role_id: User's role ID
+
+        Returns:
+            Dict[str, List[str]]: Resource permissions grouped by resource
+            Example: {
+                "fee_categories": ["create", "read", "update", "delete", "list"],
+                "students": ["read", "list"],
+                "academic_years": ["create", "read", "update", "list"]
+            }
+        """
+        try:
+            logger.info(f"Fetching permissions for role_id: {role_id}")
+
+            # Query resource permissions for the role
+            result = await db.execute(
+                select(ResourcePermission.resource, ResourcePermission.action)
+                .where(
+                    ResourcePermission.role_id == role_id,
+                    ResourcePermission.is_granted == True
+                )
+                .order_by(ResourcePermission.resource, ResourcePermission.action)
+            )
+            permissions = result.fetchall()
+
+            if not permissions:
+                logger.warning(f"No permissions found for role_id: {role_id}")
+                return {}
+
+            # Group permissions by resource
+            grouped_permissions = {}
+            for resource, action in permissions:
+                if resource not in grouped_permissions:
+                    grouped_permissions[resource] = []
+                grouped_permissions[resource].append(action)
+
+            # Sort actions within each resource for consistency
+            for resource in grouped_permissions:
+                grouped_permissions[resource].sort()
+
+            logger.info(f"Found permissions for {len(grouped_permissions)} resources for role_id: {role_id}")
+            return grouped_permissions
+
+        except Exception as e:
+            logger.error(f"Error fetching permissions for role_id {role_id}: {str(e)}")
+            return {}
     
     @staticmethod
     async def login_user(request: Request, username: str, password: str, client_name: Optional[str] = None) -> Dict[str, Any]:
@@ -234,6 +288,11 @@ class MultiTenantAuthService:
                 logger.info(f"DEBUG 7: Building hierarchical menu for role_id: {user.role_id}")
                 menu = await MultiTenantAuthService.build_hierarchical_menu(db, user.role_id)
                 logger.info(f"DEBUG 8: Menu built successfully, menu count: {len(menu)}")
+
+                # Get user permissions
+                logger.info(f"DEBUG 9: Fetching user permissions for role_id: {user.role_id}")
+                permissions = await MultiTenantAuthService.get_user_permissions(db, user.role_id)
+                logger.info(f"DEBUG 10: Permissions fetched successfully, resource count: {len(permissions)}")
                 
                 # Create access token and refresh token with client information
                 token_data = {
@@ -260,6 +319,7 @@ class MultiTenantAuthService:
                         "description": user.role.description
                     },
                     "menu": menu,
+                    "permissions": permissions,
                     "access_token": access_token,
                     "refresh_token": refresh_token,
                     "token_type": "bearer"

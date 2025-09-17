@@ -29,6 +29,7 @@ class LoginResponse(BaseModel):
     user: UserInfo
     role: RoleInfo
     menu: List[MenuItemResponse]
+    permissions: Dict[str, List[str]] = Field(default_factory=dict, description="User's resource permissions grouped by resource")
     access_token: str
     refresh_token: str
     token_type: str = "bearer"

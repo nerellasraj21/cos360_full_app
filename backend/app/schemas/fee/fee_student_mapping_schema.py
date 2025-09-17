@@ -48,13 +48,13 @@ class FeeStudentMappingCreate(FeeStudentMappingBase):
     pass
 
 class FeeStudentMappingUpdate(BaseModel):
-    student_id: Optional[int] = None
+    student_id: Optional[UUID] = None
     student_admission_num: Optional[str] = None
-    class_id: Optional[int] = None
-    section_id: Optional[int] = None
+    class_id: Optional[UUID] = None
+    section_id: Optional[UUID] = None
     fee_type_id: Optional[UUID] = None
     total_fee: Optional[Decimal] = None
-    academic_year_id: Optional[int] = None
+    academic_year_id: Optional[UUID] = None
     
     @field_validator('total_fee')
     def validate_total_fee(cls, v):

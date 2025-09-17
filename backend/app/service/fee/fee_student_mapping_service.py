@@ -159,7 +159,7 @@ async def create_term_amounts(db: AsyncSession, fee_student_mapping_id: UUID, to
     term_amounts = []
     for i in range(fee_term.number_of_terms):
         term_amount = FeeStudentMapTermAmountModel(
-            fee_student_map_id=UUID(fee_student_mapping_id),
+            fee_student_map_id=fee_student_mapping_id,
             term_amount=amount_per_term,
             term_id=fee_term.id
         )
@@ -215,7 +215,7 @@ async def create_fee_student_mapping(db: AsyncSession, mapping_data: FeeStudentM
             student_admission_num=mapping_data.student_admission_num,
             class_id=mapping_data.class_id,
             section_id=mapping_data.section_id,
-            fee_type_id=UUID(mapping_data.fee_type_id),
+            fee_type_id=mapping_data.fee_type_id,
             total_fee=mapping_data.total_fee,
             academic_year_id=mapping_data.academic_year_id
         )
@@ -224,7 +224,7 @@ async def create_fee_student_mapping(db: AsyncSession, mapping_data: FeeStudentM
         await db.flush()  # Get the ID for term amounts
         
         # Create term amounts
-        await create_term_amounts(db, str(db_mapping.id), mapping_data.total_fee, mapping_data.fee_type_id)
+        await create_term_amounts(db, db_mapping.id, mapping_data.total_fee, mapping_data.fee_type_id)
         
         await db.commit()
         await db.refresh(db_mapping)
@@ -342,12 +342,12 @@ async def get_fee_student_mapping_by_id(db: AsyncSession, mapping_id: UUID):
         )
 
 async def get_all_fee_student_mappings(
-    db: AsyncSession, 
-    student_id: Optional[int] = None,
-    class_id: Optional[int] = None,
-    section_id: Optional[int] = None,
-    fee_type_id: Optional[str] = None,
-    academic_year_id: Optional[int] = None
+    db: AsyncSession,
+    student_id: Optional[UUID] = None,
+    class_id: Optional[UUID] = None,
+    section_id: Optional[UUID] = None,
+    fee_type_id: Optional[UUID] = None,
+    academic_year_id: Optional[UUID] = None
 ):
     """Get all fee student mappings with optional filters"""
     try:
@@ -371,14 +371,7 @@ async def get_all_fee_student_mappings(
             query = query.where(FeeStudentMappingModel.section_id == section_id)
         
         if fee_type_id is not None:
-            try:
-                fee_type_uuid = UUID(fee_type_id)
-                query = query.where(FeeStudentMappingModel.fee_type_id == fee_type_uuid)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid fee type ID format"
-                )
+            query = query.where(FeeStudentMappingModel.fee_type_id == fee_type_id)
         
         if academic_year_id is not None:
             query = query.where(FeeStudentMappingModel.academic_year_id == academic_year_id)
@@ -418,13 +411,11 @@ async def get_all_fee_student_mappings(
 async def update_fee_student_mapping(db: AsyncSession, mapping_id: UUID, mapping_data: FeeStudentMappingUpdate):
     """Update an existing fee student mapping"""
     try:
-        mapping_uuid = UUID(mapping_id)
-        
         # Get existing mapping
         result = await db.execute(
             select(FeeStudentMappingModel)
             .options(selectinload(FeeStudentMappingModel.term_amounts))
-            .where(FeeStudentMappingModel.id == mapping_uuid)
+            .where(FeeStudentMappingModel.id == mapping_id)
         )
         db_mapping = result.scalar_one_or_none()
         
@@ -454,7 +445,7 @@ async def update_fee_student_mapping(db: AsyncSession, mapping_id: UUID, mapping
             mapping_data.academic_year_id is not None):
             
             new_student_id = mapping_data.student_id or db_mapping.student_id
-            new_fee_type_id = mapping_data.fee_type_id or str(db_mapping.fee_type_id)
+            new_fee_type_id = mapping_data.fee_type_id or db_mapping.fee_type_id
             new_academic_year_id = mapping_data.academic_year_id or db_mapping.academic_year_id
             
             await check_mapping_unique(
@@ -475,7 +466,7 @@ async def update_fee_student_mapping(db: AsyncSession, mapping_id: UUID, mapping
         if mapping_data.section_id is not None:
             db_mapping.section_id = mapping_data.section_id
         if mapping_data.fee_type_id is not None:
-            db_mapping.fee_type_id = UUID(mapping_data.fee_type_id)
+            db_mapping.fee_type_id = mapping_data.fee_type_id
         if mapping_data.total_fee is not None:
             db_mapping.total_fee = mapping_data.total_fee
             
@@ -484,8 +475,8 @@ async def update_fee_student_mapping(db: AsyncSession, mapping_id: UUID, mapping
                 await db.delete(term_amount)
             
             # Create new term amounts
-            new_fee_type_id = mapping_data.fee_type_id or str(db_mapping.fee_type_id)
-            await create_term_amounts(db, str(db_mapping.id), mapping_data.total_fee, new_fee_type_id)
+            new_fee_type_id = mapping_data.fee_type_id or db_mapping.fee_type_id
+            await create_term_amounts(db, db_mapping.id, mapping_data.total_fee, new_fee_type_id)
             
         if mapping_data.academic_year_id is not None:
             db_mapping.academic_year_id = mapping_data.academic_year_id
@@ -529,9 +520,7 @@ async def update_fee_student_mapping(db: AsyncSession, mapping_id: UUID, mapping
 async def delete_fee_student_mapping(db: AsyncSession, mapping_id: UUID):
     """Delete a fee student mapping"""
     try:
-        mapping_uuid = UUID(mapping_id)
-        
-        result = await db.execute(select(FeeStudentMappingModel).where(FeeStudentMappingModel.id == mapping_uuid))
+        result = await db.execute(select(FeeStudentMappingModel).where(FeeStudentMappingModel.id == mapping_id))
         db_mapping = result.scalar_one_or_none()
         
         if not db_mapping:
@@ -567,7 +556,7 @@ async def create_bulk_fee_student_mappings(db: AsyncSession, bulk_data: FeeStude
         # Validate common data once (class, section, fee_type, academic_year)
         await validate_class_exists(db, bulk_data.class_id)
         await validate_section_exists(db, bulk_data.section_id)
-        await validate_fee_type_exists(db, str(bulk_data.fee_type_id))
+        await validate_fee_type_exists(db, bulk_data.fee_type_id)
         await validate_academic_year_exists(db, bulk_data.academic_year_id)
         
         created_mappings = []
@@ -600,7 +589,7 @@ async def create_bulk_fee_student_mappings(db: AsyncSession, bulk_data: FeeStude
                 await check_mapping_unique(
                     db,
                     student_id,
-                    str(bulk_data.fee_type_id),
+                    bulk_data.fee_type_id,
                     bulk_data.academic_year_id
                 )
                 

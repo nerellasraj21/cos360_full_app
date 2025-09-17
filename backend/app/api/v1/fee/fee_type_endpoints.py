@@ -36,7 +36,7 @@ async def create_fee_type_endpoint(request: Request,
     
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'fee_types', 'create')
-    
+
     return await create_fee_type(db, fee_type_data)
 
 # Get All Fee Types
