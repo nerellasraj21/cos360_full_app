@@ -7,92 +7,167 @@ from app.models.masters.parent_model import Parent
 from app.models.masters.student_parent_association_model import StudentParentLink
 from sqlalchemy.orm import selectinload
 from app.models.auth.user_model import User
+from app.models.auth.role_model import Role
 from sqlalchemy.future import select
 from uuid import UUID
-from sqlalchemy import or_, String, func
+from sqlalchemy import or_, String, func, extract
 from app.tools.password_util import hash_password
+from datetime import datetime
+
+async def generate_admission_number(db: AsyncSession, admission_date) -> str:
+    """Generate admission number in format: ADM{YEAR}{SEQUENCE}"""
+    year = admission_date.year
+
+    # Get the count of admissions for the current year
+    count_stmt = select(func.count(Admission.id)).where(
+        extract('year', Admission.admission_date) == year
+    )
+    result = await db.execute(count_stmt)
+    count = result.scalar() or 0
+
+    # Generate next sequence number (padded to 3 digits)
+    sequence = count + 1
+    admission_number = f"ADM{year}{sequence:03d}"
+
+    # Check if admission number already exists (for safety)
+    existing_stmt = select(Admission).where(Admission.admission_number == admission_number)
+    existing_result = await db.execute(existing_stmt)
+    existing = existing_result.scalar_one_or_none()
+
+    if existing:
+        # If exists, increment until we find a unique one
+        while existing:
+            sequence += 1
+            admission_number = f"ADM{year}{sequence:03d}"
+            existing_stmt = select(Admission).where(Admission.admission_number == admission_number)
+            existing_result = await db.execute(existing_stmt)
+            existing = existing_result.scalar_one_or_none()
+
+    return admission_number
+
+async def get_role_by_name(db: AsyncSession, role_name: str) -> UUID:
+    """Get role ID by role name"""
+    result = await db.execute(select(Role).where(Role.name == role_name))
+    role = result.scalar_one_or_none()
+    if not role:
+        raise HTTPException(status_code=404, detail=f"Role '{role_name}' not found")
+    return role.id
 
 async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
+    try:
+        # Get role IDs dynamically
+        student_role_id = await get_role_by_name(db, "Student")
+        parent_role_id = await get_role_by_name(db, "Parent")
 
-    admission_dict = admission.dict(exclude={"student"})
+        # Generate admission number
+        admission_number = await generate_admission_number(db, admission.admission_date)
 
-    # Convert student fields, excluding the nested ones
-    student_data = admission.student.dict(exclude={"father", "mother"})
-    
-    student_dict = Student(**student_data)
-    student_user_data = User(
-        username = student_dict.first_name,
-        password_hash = hash_password("student@123"),
-        is_active = True,
-        role_id= 3 #static value
-    )
+        admission_dict = admission.dict(exclude={"student"})
+        admission_dict["admission_number"] = admission_number
 
-    db.add(student_user_data)
-    await db.flush()
+        # Check for duplicate emails
+        father_email = admission.student.father.email
+        mother_email = admission.student.mother.email
 
-    student_dict.user_id=student_user_data.id
-    db.add(student_dict)
-    await db.flush()
+        if father_email == mother_email:
+            raise HTTPException(status_code=400, detail="Father and mother cannot have the same email address")
 
-    # Convert nested models directly
-    father_dict = Parent(**admission.student.father.dict())
-    father_user_data = User(
-        username = father_dict.name,
-        email = father_dict.email,
-        password_hash = hash_password("parent@123"),
-        is_active = True,
-        role_id= 6 #static value
-    )
-    db.add(father_user_data)
-    await db.flush()
-
-    mother_dict = Parent(**admission.student.mother.dict())
-    mother_user_data = User(
-        username = mother_dict.name,
-        email = mother_dict.email,
-        password_hash = hash_password("parent@123"),
-        is_active = True,
-        role_id= 6 #static value
-    )
-    db.add(mother_user_data)
-    await db.flush()
-
-    father_dict.user_id=father_user_data.id
-    db.add(father_dict)
-    await db.flush()
-
-    mother_dict.user_id=mother_user_data.id
-    db.add(mother_dict)
-    await db.flush()
-
-    student_parent_link= StudentParentLink(student_id = student_dict.id, parent_id = father_dict.id)
-    db.add(student_parent_link)
-    await db.flush()
-
-    student_parent_link= StudentParentLink(student_id = student_dict.id, parent_id = mother_dict.id)
-    db.add(student_parent_link)
-    await db.flush()
-
-    new_admission = Admission(
-        student_id=student_dict.id,
-        **admission_dict
-    )
-    
-    db.add(new_admission)
-    await db.commit()
-
-    result = await db.execute(
-        select(Admission)
-        .options(
-            selectinload(Admission.student)
-            .selectinload(Student.parent_links)
-            .selectinload(StudentParentLink.parent)
+        # Check if emails already exist
+        existing_users = await db.execute(
+            select(User).where(User.email.in_([father_email, mother_email]))
         )
-        .where(Admission.id == new_admission.id)
-    )
-    admission_out = result.scalar_one()
+        existing_emails = {user.email for user in existing_users.scalars().all()}
 
-    return admission_out
+        if father_email in existing_emails:
+            raise HTTPException(status_code=400, detail=f"Email {father_email} already exists")
+        if mother_email in existing_emails:
+            raise HTTPException(status_code=400, detail=f"Email {mother_email} already exists")
+
+        # Convert student fields, excluding the nested ones
+        student_data = admission.student.dict(exclude={"father", "mother"})
+
+        student_dict = Student(**student_data)
+        student_user_data = User(
+            username = student_dict.first_name,
+            password_hash = hash_password("student@123"),
+            is_active = True,
+            role_id= student_role_id
+        )
+
+        db.add(student_user_data)
+        await db.flush()
+
+        student_dict.user_id=student_user_data.id
+        db.add(student_dict)
+        await db.flush()
+
+        # Convert nested models directly
+        father_dict = Parent(**admission.student.father.dict())
+        father_user_data = User(
+            username = father_dict.name,
+            email = father_dict.email,
+            password_hash = hash_password("parent@123"),
+            is_active = True,
+            role_id= parent_role_id
+        )
+        db.add(father_user_data)
+        await db.flush()
+
+        mother_dict = Parent(**admission.student.mother.dict())
+        mother_user_data = User(
+            username = mother_dict.name,
+            email = mother_dict.email,
+            password_hash = hash_password("parent@123"),
+            is_active = True,
+            role_id= parent_role_id
+        )
+        db.add(mother_user_data)
+        await db.flush()
+
+        father_dict.user_id=father_user_data.id
+        db.add(father_dict)
+        await db.flush()
+
+        mother_dict.user_id=mother_user_data.id
+        db.add(mother_dict)
+        await db.flush()
+
+        student_parent_link_father = StudentParentLink(student_id = student_dict.id, parent_id = father_dict.id)
+        db.add(student_parent_link_father)
+        await db.flush()
+
+        student_parent_link_mother = StudentParentLink(student_id = student_dict.id, parent_id = mother_dict.id)
+        db.add(student_parent_link_mother)
+        await db.flush()
+
+        new_admission = Admission(
+            student_id=student_dict.id,
+            **admission_dict
+        )
+
+        db.add(new_admission)
+        await db.flush()
+
+        # Fetch the created admission with all relationships before commit
+        result = await db.execute(
+            select(Admission)
+            .options(
+                selectinload(Admission.student)
+                .selectinload(Student.parent_links)
+                .selectinload(StudentParentLink.parent)
+            )
+            .where(Admission.id == new_admission.id)
+        )
+        admission_out = result.scalar_one()
+
+        await db.commit()
+        return admission_out
+
+    except Exception as e:
+        await db.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Failed to create admission: {str(e)}")
 
 async def get_admission_by_id(student_id: UUID, db: AsyncSession):
     result = await db.execute(select(Admission).options(
@@ -106,15 +181,39 @@ async def get_admission_by_id(student_id: UUID, db: AsyncSession):
     return admission
 
 async def update_partial_details_admission(student_id: UUID, data: StudentAdmissionUpdate, db: AsyncSession):
-    result = await db.execute(select(Admission).where(Admission.student_id == student_id))
-    admission = result.scalar_one_or_none()
-    if not admission:
-        raise HTTPException(status_code=404, detail="Admission not found")
-    for field, value in data.dict(exclude_unset=True).items():
-        setattr(admission, field, value)
-    await db.commit()
-    await db.refresh(admission)
-    return admission
+    """Update admission details for a student"""
+    try:
+        result = await db.execute(select(Admission).where(Admission.student_id == student_id))
+        admission = result.scalar_one_or_none()
+        if not admission:
+            raise HTTPException(status_code=404, detail="Admission not found")
+
+        # Update only the fields that are provided
+        update_data = data.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            if hasattr(admission, field):
+                setattr(admission, field, value)
+
+        await db.commit()
+        await db.refresh(admission)
+
+        # Return admission with relationships
+        result = await db.execute(
+            select(Admission)
+            .options(
+                selectinload(Admission.student)
+                .selectinload(Student.parent_links)
+                .selectinload(StudentParentLink.parent)
+            )
+            .where(Admission.id == admission.id)
+        )
+        return result.scalar_one()
+
+    except Exception as e:
+        await db.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Failed to update admission: {str(e)}")
 
 async def get_student_by_admission_id(admission_id: UUID, db):
     stmt = (

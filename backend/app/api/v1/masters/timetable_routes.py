@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, Path, Query, Request, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.masters.timetable_schema import (
-    TimetableSlotCreate, TimetableSlotUpdate, TimetableSlotOut, TimetableSlotPartialUpdate,FullTimetableCreate, SlotTimeOut, SlotTimeCreate,SlotTimeUpdate,SlotTimePartialUpdate, GroupedSectionTimetableOut, TimetableSlotBulkUpdateRequest
+    TimetableSlotCreate, TimetableSlotUpdate, TimetableSlotOut, TimetableSlotPartialUpdate,FullTimetableCreate, SlotTimeOut, SlotTimeCreate,SlotTimeUpdate,SlotTimePartialUpdate, GroupedSectionTimetableOut, TimetableSlotBulkUpdateRequest, FrontendTimetableCreate, FrontendTimetableResponse
 )
-from app.service.masters.timetable_service import update_all_details_timetable_slot, get__all_timetable_slots, delete_timetable_slot_by_id, get_timetable_slot_by_id, add_timetable_slot, update_partial_details_timetable_slot, add_full_timetable, add_slot_time, get_slot_times,get_slot_time,patch_slot_time,update_slot_time, get_timetable_by_section, bulk_update_timetable_slots
+from app.service.masters.timetable_service import update_all_details_timetable_slot, get__all_timetable_slots, delete_timetable_slot_by_id, get_timetable_slot_by_id, add_timetable_slot, update_partial_details_timetable_slot, add_full_timetable, add_slot_time, get_slot_times,get_slot_time,patch_slot_time,update_slot_time, get_timetable_by_section, bulk_update_timetable_slots, create_frontend_timetable
 
 from app.db.tenant_session import get_tenant_db
 from typing import List
@@ -25,11 +25,33 @@ async def create_full_timetable(
     """Create full timetable - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'timetable_management', 'create')
-    
+
     return await add_full_timetable(data, db)
+
+
+@router.post("/frontend", response_model=FrontendTimetableResponse)
+async def create_frontend_timetable_endpoint(
+    data: FrontendTimetableCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Create timetable from frontend payload - Admin only"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'timetable_management', 'create')
+
+    return await create_frontend_timetable(data, db)
+
+
+@router.get("/test")
+async def test_endpoint():
+    """Simple test endpoint"""
+    return {"message": "Test endpoint working"}
 
 
 # @router.get("/slots", response_model=List[TimetableSlotOut])
@@ -117,3 +139,4 @@ async def bulk_patch_slots(
     await check_role_plan_permission_with_error(db, request, role, 'timetable_management', 'update')
     
     return await bulk_update_timetable_slots(data, db)
+

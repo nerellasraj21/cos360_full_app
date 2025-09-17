@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from app.models.masters.class_subject_mapping_model import ClassSubjectMap
@@ -159,27 +159,48 @@ async def get_all_class_subject_mappings(
     limit: int = 100,
     academic_year_id: Optional[UUID] = None,
     active_only: bool = True
-) -> List[ClassSubjectMap]:
-    """Get all class-subject mappings with pagination"""
-    query = select(ClassSubjectMap).options(
+):
+    """Get all class-subject mappings with pagination metadata"""
+    # Build base query with filters
+    base_query = select(ClassSubjectMap).options(
         selectinload(ClassSubjectMap.class_),
         selectinload(ClassSubjectMap.subject),
         selectinload(ClassSubjectMap.academic_year)
     )
-    
+
     if academic_year_id:
-        query = query.where(ClassSubjectMap.academic_year_id == academic_year_id)
-    
+        base_query = base_query.where(ClassSubjectMap.academic_year_id == academic_year_id)
+
     if active_only:
-        query = query.where(ClassSubjectMap.is_active == True)
-    
-    query = query.order_by(
+        base_query = base_query.where(ClassSubjectMap.is_active == True)
+
+    # Get total count
+    count_query = select(func.count(ClassSubjectMap.id))
+    if academic_year_id:
+        count_query = count_query.where(ClassSubjectMap.academic_year_id == academic_year_id)
+    if active_only:
+        count_query = count_query.where(ClassSubjectMap.is_active == True)
+
+    total_count_result = await db.execute(count_query)
+    total_count = total_count_result.scalar()
+
+    # Get paginated items
+    items_query = base_query.order_by(
         ClassSubjectMap.class_id,
         ClassSubjectMap.order.asc().nullsfirst()
     ).offset(skip).limit(limit)
-    
-    result = await db.execute(query)
-    return result.scalars().all()
+
+    items_result = await db.execute(items_query)
+    items = items_result.unique().scalars().all()
+
+    # Calculate has_next
+    has_next = (skip + limit) < total_count
+
+    return {
+        "items": items,
+        "total_count": total_count,
+        "has_next": has_next
+    }
 
 async def update_class_subject_mapping(
     db: AsyncSession,

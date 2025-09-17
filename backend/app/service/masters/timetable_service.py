@@ -5,7 +5,7 @@ from app.models.masters.timetable_model import Timetable
 from collections import defaultdict
 from app.models.masters.slot_time_model import SlotTime
 from app.models.masters.timetable_subject_option_model import TimetableSubjectOption
-from app.schemas.masters.timetable_schema import TimetableSlotCreate, TimetableSlotUpdate, TimetableSubjectOptionCreate, TimetableSubjectOptionUpdate, TimetableSlotPartialUpdate, FullTimetableCreate, SlotTimeCreate, GroupedSlotOut, GroupedSectionTimetableOut, TimetableSlotOut, TimetableSlotBulkUpdateRequest
+from app.schemas.masters.timetable_schema import TimetableSlotCreate, TimetableSlotUpdate, TimetableSubjectOptionCreate, TimetableSubjectOptionUpdate, TimetableSlotPartialUpdate, FullTimetableCreate, SlotTimeCreate, GroupedSlotOut, GroupedSectionTimetableOut, TimetableSlotOut, TimetableSlotBulkUpdateRequest, FrontendTimetableCreate, FrontendTimetableResponse
 from fastapi import HTTPException
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -330,3 +330,88 @@ async def bulk_update_timetable_slots(
     for slot in updated_slots:
         await db.refresh(slot)
     return updated_slots
+
+async def create_frontend_timetable(
+    data: FrontendTimetableCreate,
+    db: AsyncSession
+) -> FrontendTimetableResponse:
+    """
+    Transform frontend payload to database structure and create timetable
+    """
+    try:
+        # Create the main timetable record
+        new_timetable = Timetable(section_id=data.section_id)
+        db.add(new_timetable)
+        await db.flush()
+
+        created_slot_times = 0
+        created_slots = 0
+        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+
+        for slot_data in data.timetable_data:
+            # Parse time strings to time objects
+            from datetime import datetime
+            from_time = datetime.strptime(slot_data.time.from_time, "%H:%M").time()
+            to_time = datetime.strptime(slot_data.time.to, "%H:%M").time()
+
+            # Create SlotTime record
+            slot_time = SlotTime(
+                section_id=data.section_id,
+                label=f"{slot_data.time.from_time}-{slot_data.time.to}",
+                start_time=from_time,
+                end_time=to_time
+            )
+            db.add(slot_time)
+            await db.flush()
+            created_slot_times += 1
+
+            if slot_data.type == "special":
+                # Create a break slot for all days
+                for day in days:
+                    timetable_slot = TimetableSlot(
+                        timetable_id=new_timetable.id,
+                        day=day,
+                        slot_time_id=slot_time.id,
+                        is_break=True,
+                        break_label=slot_data.label
+                    )
+                    db.add(timetable_slot)
+                    created_slots += 1
+
+            elif slot_data.type == "subject":
+                # Create subject slots for specified days
+                for day, subject_id in slot_data.subjects.items():
+                    if day in days:  # Validate day name
+                        timetable_slot = TimetableSlot(
+                            timetable_id=new_timetable.id,
+                            day=day,
+                            slot_time_id=slot_time.id,
+                            is_break=False
+                        )
+                        db.add(timetable_slot)
+                        await db.flush()
+
+                        # Add subject option
+                        subject_option = TimetableSubjectOption(
+                            slot_id=timetable_slot.id,
+                            subject_id=subject_id
+                        )
+                        db.add(subject_option)
+                        created_slots += 1
+
+        await db.commit()
+        await db.refresh(new_timetable)
+
+        return FrontendTimetableResponse(
+            message="Timetable created successfully",
+            timetable_id=new_timetable.id,
+            created_slots=created_slots,
+            created_slot_times=created_slot_times
+        )
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating timetable from frontend data: {str(e)}"
+        )

@@ -161,3 +161,50 @@ class TimetableSlotBulkUpdateItem(BaseModel):
 
 class TimetableSlotBulkUpdateRequest(BaseModel):
     slots: List[TimetableSlotBulkUpdateItem]
+
+
+# ----------------------------
+# Frontend-Compatible Schemas
+# ----------------------------
+
+class FrontendTimeRange(BaseModel):
+    from_time: str = Field(..., alias="from", description="Start time in HH:MM format")
+    to: str = Field(..., description="End time in HH:MM format")
+
+    class Config:
+        populate_by_name = True
+
+
+class FrontendTimetableSlot(BaseModel):
+    time: FrontendTimeRange
+    type: str = Field(..., description="Either 'subject' or 'special'")
+    subjects: Optional[dict[str, UUID]] = Field(None, description="Day-wise subject mapping (Monday: subject_id)")
+    label: Optional[str] = Field(None, description="Label for special periods like 'SNACKS', 'LUNCH'")
+
+    @model_validator(mode="after")
+    def validate_slot_type(cls, values):
+        if values.type == "subject":
+            if not values.subjects:
+                raise ValueError("subjects field is required when type is 'subject'")
+            if values.label:
+                raise ValueError("label field should not be provided when type is 'subject'")
+        elif values.type == "special":
+            if not values.label:
+                raise ValueError("label field is required when type is 'special'")
+            if values.subjects:
+                raise ValueError("subjects field should not be provided when type is 'special'")
+        else:
+            raise ValueError("type must be either 'subject' or 'special'")
+        return values
+
+
+class FrontendTimetableCreate(BaseModel):
+    section_id: UUID
+    timetable_data: List[FrontendTimetableSlot]
+
+
+class FrontendTimetableResponse(BaseModel):
+    message: str
+    timetable_id: UUID
+    created_slots: int
+    created_slot_times: int
