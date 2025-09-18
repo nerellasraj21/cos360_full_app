@@ -1,13 +1,15 @@
-from sqlalchemy import Column, Integer, String, Boolean, TIMESTAMP, func, ForeignKey
+from sqlalchemy import Column, String, Boolean, TIMESTAMP, func, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import BasePublic
+import uuid
 
 class Tenant(BasePublic):
     __tablename__ = 'tenants'
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     client_name = Column(String(100), unique=True, nullable=False, index=True)
     schema_name = Column(String(100), unique=True, nullable=False, index=True)
-    plan_id = Column(Integer, ForeignKey('plans.id'), nullable=True, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey('plans.id'), nullable=True, index=True)
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())

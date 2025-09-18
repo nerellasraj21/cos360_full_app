@@ -120,7 +120,7 @@ async def create_tenant(
     current_super_admin: dict = Depends(get_current_super_admin),
     client_name: str = Query(..., description="Tenant client name"),
     schema_name: str = Query(..., description="Database schema name"),
-    plan_id: Optional[int] = Query(None, description="Optional plan to assign immediately")
+    plan_id: Optional[UUID] = Query(None, description="Optional plan to assign immediately")
 ):
     """
     Super Admin: Create new tenant + initialize schema
@@ -318,7 +318,7 @@ async def create_tenant(
 
 @router.put("/tenants/{tenant_id}/activate")
 async def activate_tenant(
-    tenant_id: int,
+    tenant_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin)
 ):
@@ -390,10 +390,10 @@ async def activate_tenant(
 
 @router.put("/tenants/{tenant_id}/plan")
 async def assign_plan_to_tenant(
-    tenant_id: int,
+    tenant_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
-    plan_id: int = Query(..., description="Plan ID to assign to tenant")
+    plan_id: UUID = Query(..., description="Plan ID to assign to tenant")
 ):
     """
     Super Admin: Assign plan to tenant + auto-populate tenant menus

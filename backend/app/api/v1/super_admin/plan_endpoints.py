@@ -192,7 +192,7 @@ async def create_plan(
 
 @router.get("/{plan_id}")
 async def get_single_plan(
-    plan_id: int,
+    plan_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
     include_resources: bool = Query(False, description="Include plan resource permissions")
@@ -279,7 +279,7 @@ async def get_single_plan(
 
 @router.put("/{plan_id}", status_code=status.HTTP_200_OK)
 async def update_plan(
-    plan_id: int,
+    plan_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
     name: Optional[str] = Query(None, description="Plan name"),
@@ -389,7 +389,7 @@ async def update_plan(
 
 @router.get("/{plan_id}/resources")
 async def get_plan_resources(
-    plan_id: int,
+    plan_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin)
 ):
@@ -466,7 +466,7 @@ async def get_plan_resources(
 
 @router.post("/{plan_id}/resources", status_code=status.HTTP_201_CREATED)
 async def add_plan_resource(
-    plan_id: int,
+    plan_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
     resource_name: str = Query(..., description="Resource name"),
@@ -591,7 +591,7 @@ async def add_plan_resource(
 
 @router.delete("/{plan_id}/resources", status_code=status.HTTP_200_OK)
 async def remove_plan_resource(
-    plan_id: int,
+    plan_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
     resource_name: str = Query(..., description="Resource name"),

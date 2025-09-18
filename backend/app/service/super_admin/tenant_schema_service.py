@@ -25,7 +25,7 @@ class TenantSchemaService:
     @staticmethod
     async def initialize_complete_tenant_schema(
         schema_name: str,
-        plan_id: int,
+        plan_id: UUID,
         client_name: str,
         super_admin_id: UUID
     ) -> Dict[str, Any]:
@@ -155,7 +155,7 @@ class TenantSchemaService:
             }
 
     @staticmethod
-    async def _setup_plan_menus(db: AsyncSession, schema_name: str, plan_id: int) -> Dict[str, Any]:
+    async def _setup_plan_menus(db: AsyncSession, schema_name: str, plan_id: UUID) -> Dict[str, Any]:
         """
         Set up plan-based menus in tenant schema
         """
@@ -207,7 +207,7 @@ class TenantSchemaService:
     async def _setup_roles_and_permissions(
         db: AsyncSession,
         schema_name: str,
-        plan_id: int,
+        plan_id: UUID,
         plan_name: str
     ) -> Dict[str, Any]:
         """

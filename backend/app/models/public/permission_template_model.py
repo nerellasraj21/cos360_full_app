@@ -1,6 +1,8 @@
 from app.db.base import BasePublic
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import Column, String, Boolean, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+import uuid
 
 class PermissionTemplate(BasePublic):
     """
@@ -8,10 +10,10 @@ class PermissionTemplate(BasePublic):
     """
     __tablename__ = 'permission_templates'
     __table_args__ = {'schema': 'public'}
-    
-    id = Column(Integer, primary_key=True, index=True)
-    role_template_id = Column(Integer, ForeignKey('public.role_templates.id'), nullable=False)
-    menu_id = Column(Integer, ForeignKey('public.menus.id'), nullable=False)
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    role_template_id = Column(UUID(as_uuid=True), ForeignKey('public.role_templates.id'), nullable=False)
+    menu_id = Column(UUID(as_uuid=True), ForeignKey('public.menus.id'), nullable=False)
     can_view = Column(Boolean, default=True)
     can_edit = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)

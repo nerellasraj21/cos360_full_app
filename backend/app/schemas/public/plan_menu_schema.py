@@ -1,20 +1,21 @@
 from pydantic import BaseModel
+from uuid import UUID
 
 class PlanMenuBase(BaseModel):
-    plan_id: int
-    menu_id: int
+    plan_id: UUID
+    menu_id: UUID
     is_active: bool = True
     
 class PlanMenuCreate(PlanMenuBase):
     pass
 
 class PlanMenuUpdate(PlanMenuBase):
-    id: int
-    plan_id: int
-    menu_id: int
+    id: UUID
+    plan_id: UUID
+    menu_id: UUID
     is_active: bool = True
     
 class PlanMenuRead(PlanMenuBase):
-    id: int
+    id: UUID
     
     model_config = {"from_attributes": True}

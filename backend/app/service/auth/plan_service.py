@@ -2,6 +2,7 @@
 Plan-based access control service for multi-tenant subscription management.
 """
 from typing import Optional, List, Dict, Any
+from uuid import UUID
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
@@ -177,7 +178,7 @@ class PlanService:
             return []
 
     @staticmethod
-    async def assign_plan_to_tenant(client_name: str, plan_id: int) -> bool:
+    async def assign_plan_to_tenant(client_name: str, plan_id: UUID) -> bool:
         """
         Assign a subscription plan to a tenant.
         
