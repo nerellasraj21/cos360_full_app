@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, Path, Query, Request, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.masters.timetable_schema import (
-    TimetableSlotCreate, TimetableSlotUpdate, TimetableSlotOut, TimetableSlotPartialUpdate,FullTimetableCreate, SlotTimeOut, SlotTimeCreate,SlotTimeUpdate,SlotTimePartialUpdate, GroupedSectionTimetableOut, TimetableSlotBulkUpdateRequest, FrontendTimetableCreate, FrontendTimetableResponse
+    TimetableSlotCreate, TimetableSlotUpdate, TimetableSlotOut, TimetableSlotPartialUpdate,FullTimetableCreate, SlotTimeOut, SlotTimeCreate,SlotTimeUpdate,SlotTimePartialUpdate, GroupedSectionTimetableOut, TimetableSlotBulkUpdateRequest, FrontendTimetableCreate, FrontendTimetableResponse, FrontendTimetableRead
 )
-from app.service.masters.timetable_service import update_all_details_timetable_slot, get__all_timetable_slots, delete_timetable_slot_by_id, get_timetable_slot_by_id, add_timetable_slot, update_partial_details_timetable_slot, add_full_timetable, add_slot_time, get_slot_times,get_slot_time,patch_slot_time,update_slot_time, get_timetable_by_section, bulk_update_timetable_slots, create_frontend_timetable
+from app.service.masters.timetable_service import update_all_details_timetable_slot, get__all_timetable_slots, delete_timetable_slot_by_id, get_timetable_slot_by_id, add_timetable_slot, update_partial_details_timetable_slot, add_full_timetable, add_slot_time, get_slot_times,get_slot_time,patch_slot_time,update_slot_time, get_timetable_by_section, bulk_update_timetable_slots, create_frontend_timetable, get_frontend_timetable_by_section, update_frontend_timetable, delete_frontend_timetable
 
 from app.db.tenant_session import get_tenant_db
 from typing import List
@@ -46,6 +46,58 @@ async def create_frontend_timetable_endpoint(
     await check_role_plan_permission_with_error(db, request, role, 'timetable_management', 'create')
 
     return await create_frontend_timetable(data, db)
+
+
+@router.get("/frontend/{section_id}", response_model=FrontendTimetableRead)
+async def get_frontend_timetable_endpoint(
+    section_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db)
+):
+    """Get timetable in frontend format - Read permission"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    await check_role_plan_permission_with_error(
+        db, request, role, 'timetable_management', 'read'
+    )
+
+    return await get_frontend_timetable_by_section(section_id, db)
+
+
+@router.put("/frontend/{section_id}", response_model=FrontendTimetableResponse)
+async def update_frontend_timetable_endpoint(
+    section_id: UUID,
+    data: FrontendTimetableCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db)
+):
+    """Update timetable in frontend format - Update permission"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    await check_role_plan_permission_with_error(
+        db, request, role, 'timetable_management', 'update'
+    )
+
+    return await update_frontend_timetable(section_id, data, db)
+
+
+@router.delete("/frontend/{section_id}")
+async def delete_frontend_timetable_endpoint(
+    section_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db)
+):
+    """Delete timetable for section - Delete permission"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    await check_role_plan_permission_with_error(
+        db, request, role, 'timetable_management', 'delete'
+    )
+
+    return await delete_frontend_timetable(section_id, db)
 
 
 @router.get("/test")

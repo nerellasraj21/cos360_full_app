@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError, OperationalError
 from app.schemas.student.admission_schema import StudentAdmissionCreate, StudentAdmissionUpdate
 from app.models.masters.admission_model import Admission
 from app.models.student.student_model import Student
@@ -211,6 +212,12 @@ async def update_partial_details_admission(student_id: UUID, data: StudentAdmiss
         await db.commit()
         return admission_out
 
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Data integrity violation - check for duplicate values or invalid references")
+    except OperationalError as e:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail="Database operation failed - please try again")
     except Exception as e:
         await db.rollback()
         if isinstance(e, HTTPException):

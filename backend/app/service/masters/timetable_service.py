@@ -5,7 +5,7 @@ from app.models.masters.timetable_model import Timetable
 from collections import defaultdict
 from app.models.masters.slot_time_model import SlotTime
 from app.models.masters.timetable_subject_option_model import TimetableSubjectOption
-from app.schemas.masters.timetable_schema import TimetableSlotCreate, TimetableSlotUpdate, TimetableSubjectOptionCreate, TimetableSubjectOptionUpdate, TimetableSlotPartialUpdate, FullTimetableCreate, SlotTimeCreate, GroupedSlotOut, GroupedSectionTimetableOut, TimetableSlotOut, TimetableSlotBulkUpdateRequest, FrontendTimetableCreate, FrontendTimetableResponse
+from app.schemas.masters.timetable_schema import TimetableSlotCreate, TimetableSlotUpdate, TimetableSubjectOptionCreate, TimetableSubjectOptionUpdate, TimetableSlotPartialUpdate, FullTimetableCreate, SlotTimeCreate, GroupedSlotOut, GroupedSectionTimetableOut, TimetableSlotOut, TimetableSlotBulkUpdateRequest, FrontendTimetableCreate, FrontendTimetableResponse, FrontendTimetableRead, FrontendTimetableSlot, FrontendTimeRange
 from fastapi import HTTPException
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -399,12 +399,19 @@ async def create_frontend_timetable(
                         db.add(subject_option)
                         created_slots += 1
 
+        await db.flush()
+
+        # Load with relationships before commit
+        result = await db.execute(
+            select(Timetable).where(Timetable.id == new_timetable.id)
+        )
+        created_timetable = result.scalar_one()
+
         await db.commit()
-        await db.refresh(new_timetable)
 
         return FrontendTimetableResponse(
             message="Timetable created successfully",
-            timetable_id=new_timetable.id,
+            timetable_id=created_timetable.id,
             created_slots=created_slots,
             created_slot_times=created_slot_times
         )
@@ -414,4 +421,266 @@ async def create_frontend_timetable(
         raise HTTPException(
             status_code=500,
             detail=f"Error creating timetable from frontend data: {str(e)}"
+        )
+
+
+async def get_frontend_timetable_by_section(section_id: UUID, db: AsyncSession) -> FrontendTimetableRead:
+    """
+    Get timetable in frontend-compatible format
+    Transform database structure back to frontend payload format
+    """
+    try:
+        # Step 1: Get timetable
+        timetable_stmt = select(Timetable).where(Timetable.section_id == section_id)
+        timetable_result = await db.execute(timetable_stmt)
+        timetable = timetable_result.scalar_one_or_none()
+
+        if not timetable:
+            raise HTTPException(status_code=404, detail="Timetable not found for section")
+
+        # Step 2: Get slots with slot_times and subject_options
+        slots_stmt = (
+            select(TimetableSlot)
+            .options(
+                selectinload(TimetableSlot.slot_time),
+                selectinload(TimetableSlot.subject_options)
+            )
+            .where(TimetableSlot.timetable_id == timetable.id)
+            .order_by(TimetableSlot.slot_time_id, TimetableSlot.day)
+        )
+        slots_result = await db.execute(slots_stmt)
+        all_slots = slots_result.scalars().all()
+
+        # Step 3: Group by slot_time_id and transform
+        time_groups = defaultdict(list)
+        for slot in all_slots:
+            time_groups[slot.slot_time_id].append(slot)
+
+        # Step 4: Transform to frontend format
+        frontend_slots = []
+        for slot_time_id, slots in time_groups.items():
+            frontend_slot = transform_slots_to_frontend_format(slots)
+            frontend_slots.append(frontend_slot)
+
+        return FrontendTimetableRead(
+            section_id=section_id,
+            timetable_data=frontend_slots
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving frontend timetable: {str(e)}"
+        )
+
+
+def transform_slots_to_frontend_format(slots: list) -> FrontendTimetableSlot:
+    """
+    Transform a list of slots (same time range) to frontend format
+    """
+    if not slots:
+        raise ValueError("Empty slots list provided")
+
+    # Get time range from first slot (all should be the same)
+    slot_time = slots[0].slot_time
+    time_range = FrontendTimeRange(
+        from_time=slot_time.start_time.strftime("%H:%M"),
+        to=slot_time.end_time.strftime("%H:%M")
+    )
+
+    # Check if all slots are breaks
+    all_breaks = all(slot.is_break for slot in slots)
+
+    if all_breaks:
+        # Special period (break/lunch/snacks)
+        break_label = slots[0].break_label
+        return FrontendTimetableSlot(
+            time=time_range,
+            type="special",
+            label=break_label
+        )
+    else:
+        # Subject period - build day-subject mapping
+        subjects_dict = {}
+        for slot in slots:
+            if not slot.is_break and slot.subject_options:
+                # Assuming one subject per slot (based on existing structure)
+                subject_id = slot.subject_options[0].subject_id
+                subjects_dict[slot.day] = subject_id
+
+        return FrontendTimetableSlot(
+            time=time_range,
+            type="subject",
+            subjects=subjects_dict
+        )
+
+
+async def update_frontend_timetable(section_id: UUID, data: FrontendTimetableCreate, db: AsyncSession) -> FrontendTimetableResponse:
+    """
+    Update timetable with frontend-compatible format
+    This replaces the entire timetable for the given section
+    """
+    try:
+        # Step 1: Check if timetable exists
+        existing_timetable_stmt = select(Timetable).where(Timetable.section_id == section_id)
+        existing_timetable_result = await db.execute(existing_timetable_stmt)
+        existing_timetable = existing_timetable_result.scalar_one_or_none()
+
+        if not existing_timetable:
+            raise HTTPException(status_code=404, detail="Timetable not found for section")
+
+        # Step 2: Delete all existing related data
+        # Delete subject options first (foreign key dependency)
+        existing_slots_stmt = select(TimetableSlot).where(TimetableSlot.timetable_id == existing_timetable.id)
+        existing_slots_result = await db.execute(existing_slots_stmt)
+        existing_slots = existing_slots_result.scalars().all()
+
+        for slot in existing_slots:
+            # Delete subject options for this slot
+            delete_subject_options_stmt = delete(TimetableSubjectOption).where(TimetableSubjectOption.slot_id == slot.id)
+            await db.execute(delete_subject_options_stmt)
+
+        # Delete slots
+        delete_slots_stmt = delete(TimetableSlot).where(TimetableSlot.timetable_id == existing_timetable.id)
+        await db.execute(delete_slots_stmt)
+
+        # Delete slot times for this section (if not used by other timetables)
+        delete_slot_times_stmt = delete(SlotTime).where(SlotTime.section_id == section_id)
+        await db.execute(delete_slot_times_stmt)
+
+        await db.flush()
+
+        # Step 3: Recreate with new data (reuse logic from create_frontend_timetable)
+        created_slots = 0
+        created_slot_times = 0
+        slot_time_cache = {}
+
+        for slot_data in data.timetable_data:
+            time_key = f"{slot_data.time.from_time}-{slot_data.time.to}"
+
+            if time_key not in slot_time_cache:
+                # Create new slot time
+                slot_time = SlotTime(
+                    section_id=section_id,
+                    label=f"{slot_data.time.from_time}-{slot_data.time.to}",
+                    start_time=slot_data.time.from_time,
+                    end_time=slot_data.time.to
+                )
+                db.add(slot_time)
+                await db.flush()
+                slot_time_cache[time_key] = slot_time.id
+                created_slot_times += 1
+
+            slot_time_id = slot_time_cache[time_key]
+
+            if slot_data.type == "special":
+                # Create break slots for all days
+                days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+                for day in days:
+                    timetable_slot = TimetableSlot(
+                        timetable_id=existing_timetable.id,
+                        slot_time_id=slot_time_id,
+                        day=day,
+                        is_break=True,
+                        break_label=slot_data.label
+                    )
+                    db.add(timetable_slot)
+                    created_slots += 1
+
+            elif slot_data.type == "subject" and slot_data.subjects:
+                # Create subject slots for specified days
+                for day, subject_id in slot_data.subjects.items():
+                    timetable_slot = TimetableSlot(
+                        timetable_id=existing_timetable.id,
+                        slot_time_id=slot_time_id,
+                        day=day,
+                        is_break=False
+                    )
+                    db.add(timetable_slot)
+                    await db.flush()
+
+                    if subject_id:
+                        subject_option = TimetableSubjectOption(
+                            slot_id=timetable_slot.id,
+                            subject_id=subject_id
+                        )
+                        db.add(subject_option)
+                        created_slots += 1
+
+        await db.flush()
+
+        # Load with relationships before commit
+        result = await db.execute(
+            select(Timetable).where(Timetable.id == existing_timetable.id)
+        )
+        updated_timetable = result.scalar_one()
+
+        await db.commit()
+
+        return FrontendTimetableResponse(
+            message="Timetable updated successfully",
+            timetable_id=updated_timetable.id,
+            created_slots=created_slots,
+            created_slot_times=created_slot_times
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating timetable: {str(e)}"
+        )
+
+
+async def delete_frontend_timetable(section_id: UUID, db: AsyncSession):
+    """
+    Delete timetable for a given section
+    """
+    try:
+        # Step 1: Get timetable
+        timetable_stmt = select(Timetable).where(Timetable.section_id == section_id)
+        timetable_result = await db.execute(timetable_stmt)
+        timetable = timetable_result.scalar_one_or_none()
+
+        if not timetable:
+            raise HTTPException(status_code=404, detail="Timetable not found for section")
+
+        # Step 2: Delete all related data in correct order (foreign key constraints)
+        # Get all slots first
+        slots_stmt = select(TimetableSlot).where(TimetableSlot.timetable_id == timetable.id)
+        slots_result = await db.execute(slots_stmt)
+        slots = slots_result.scalars().all()
+
+        # Delete subject options first
+        for slot in slots:
+            delete_subject_options_stmt = delete(TimetableSubjectOption).where(TimetableSubjectOption.slot_id == slot.id)
+            await db.execute(delete_subject_options_stmt)
+
+        # Delete slots
+        delete_slots_stmt = delete(TimetableSlot).where(TimetableSlot.timetable_id == timetable.id)
+        await db.execute(delete_slots_stmt)
+
+        # Delete slot times for this section
+        delete_slot_times_stmt = delete(SlotTime).where(SlotTime.section_id == section_id)
+        await db.execute(delete_slot_times_stmt)
+
+        # Delete timetable itself
+        delete_timetable_stmt = delete(Timetable).where(Timetable.id == timetable.id)
+        await db.execute(delete_timetable_stmt)
+
+        await db.commit()
+
+        return {"message": f"Timetable deleted successfully for section {section_id}"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting timetable: {str(e)}"
         )

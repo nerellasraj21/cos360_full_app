@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError, OperationalError
 from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
@@ -23,9 +23,9 @@ from app.schemas.masters.staff_attendance_schema import StaffAttendanceCreate, S
 # -------------------- Staff Enrollment --------------------
 
 class GenderEnum(enum.Enum):
-    male = "male"
-    female = "female"
-    other = "other"
+    Male = "Male"
+    Female = "Female"
+    Other = "Other"
 
 async def create_staff_enrollment(data: StaffEnrollmentCreate, db: AsyncSession):
     try:
@@ -96,29 +96,42 @@ async def get_staff_enrollment_by_id(staff_id: UUID, db: AsyncSession):
 
 
 async def update_staff_enrollment(staff_id: UUID, data: StaffEnrollmentUpdate, db: AsyncSession):
-    result = await db.execute(select(Staff).where(Staff.id == staff_id))
-    staff = result.scalar_one_or_none()
-    if not staff:
-        raise HTTPException(status_code=404, detail="Staff not found")
+    try:
+        result = await db.execute(select(Staff).where(Staff.id == staff_id))
+        staff = result.scalar_one_or_none()
+        if not staff:
+            raise HTTPException(status_code=404, detail="Staff not found")
 
-    for field, value in data.dict(exclude_unset=True).items():
-        setattr(staff, field, value)
+        for field, value in data.dict(exclude_unset=True).items():
+            setattr(staff, field, value)
 
-    await db.flush()
+        await db.flush()
 
-    # Fetch the updated staff with all relationships before commit
-    result = await db.execute(
-        select(Staff)
-        .options(
-            selectinload(Staff.designation_obj),
-            selectinload(Staff.user)
+        # Fetch the updated staff with all relationships before commit
+        result = await db.execute(
+            select(Staff)
+            .options(
+                selectinload(Staff.designation_obj),
+                selectinload(Staff.user)
+            )
+            .where(Staff.id == staff.id)
         )
-        .where(Staff.id == staff.id)
-    )
-    staff_out = result.scalar_one()
+        staff_out = result.scalar_one()
 
-    await db.commit()
-    return staff_out
+        await db.commit()
+        return staff_out
+
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Data integrity violation - check for duplicate values or invalid references")
+    except OperationalError as e:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail="Database operation failed - please try again")
+    except Exception as e:
+        await db.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Failed to update staff: {str(e)}")
 
 
 async def delete_staff_enrollment(staff_id: UUID, db: AsyncSession):

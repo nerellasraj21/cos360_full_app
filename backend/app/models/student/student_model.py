@@ -1,10 +1,14 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date, TIMESTAMP, func
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date, TIMESTAMP, func, Enum
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import ENUM, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import BaseOrg
+import enum
 import uuid
 
-gender_enum = ENUM('M', 'F', 'O', name='gender_enum', create_type=False)
+class GenderEnum(enum.Enum):
+    Male = "Male"
+    Female = "Female"
+    Other = "Other"
 
 class Student(BaseOrg):
     __tablename__ = "students"

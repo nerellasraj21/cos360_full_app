@@ -7,6 +7,7 @@ from app.api.v1.auth.login_endpoints import router as login_router
 from app.api.v1.auth.menu_endpoints import router as menu_router
 from app.api.v1.auth.permissions_endpoints import router as permissions_router
 from app.api.v1.auth.resource_permission_endpoints import router as resource_permission_router
+from app.api.v1.auth.access_validation_endpoints import router as access_validation_router
 from app.api.v1.public.org_routes import router as org_router
 from app.api.v1.masters.academic_year_routes import router as academic_year_router
 from app.api.v1.masters.subject_routes import router as subject_router
@@ -64,6 +65,7 @@ router.include_router(login_router)
 router.include_router(menu_router)
 router.include_router(permissions_router)
 router.include_router(resource_permission_router)
+router.include_router(access_validation_router)
 router.include_router(org_router)
 router.include_router(routes_router)
 router.include_router(route_stop_router)

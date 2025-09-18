@@ -208,3 +208,8 @@ class FrontendTimetableResponse(BaseModel):
     timetable_id: UUID
     created_slots: int
     created_slot_times: int
+
+
+class FrontendTimetableRead(BaseModel):
+    section_id: UUID
+    timetable_data: List[FrontendTimetableSlot]
