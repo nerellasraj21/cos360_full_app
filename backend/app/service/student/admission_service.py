@@ -194,10 +194,9 @@ async def update_partial_details_admission(student_id: UUID, data: StudentAdmiss
             if hasattr(admission, field):
                 setattr(admission, field, value)
 
-        await db.commit()
-        await db.refresh(admission)
+        await db.flush()
 
-        # Return admission with relationships
+        # Fetch the updated admission with all relationships before commit
         result = await db.execute(
             select(Admission)
             .options(
@@ -207,7 +206,10 @@ async def update_partial_details_admission(student_id: UUID, data: StudentAdmiss
             )
             .where(Admission.id == admission.id)
         )
-        return result.scalar_one()
+        admission_out = result.scalar_one()
+
+        await db.commit()
+        return admission_out
 
     except Exception as e:
         await db.rollback()

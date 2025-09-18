@@ -115,13 +115,9 @@ async def create_fee_type(db: AsyncSession, fee_type_data: FeeTypeCreate):
         )
         
         db.add(db_fee_type)
-        await db.commit()
-        await db.refresh(db_fee_type)
-        
-        # Invalidate cache after creating new fee type
-        invalidate_cache("dropdown", "fee_types")
-        
-        # Load with all relationships for response
+        await db.flush()
+
+        # Load with all relationships for response before commit
         result = await db.execute(
             select(FeeTypeModel)
             .options(
@@ -132,13 +128,18 @@ async def create_fee_type(db: AsyncSession, fee_type_data: FeeTypeCreate):
             .where(FeeTypeModel.id == db_fee_type.id)
         )
         fee_type = result.scalar_one()
-        
+
+        await db.commit()
+
+        # Invalidate cache after creating new fee type
+        invalidate_cache("dropdown", "fee_types")
+
         # Add relationship names to response
         fee_type.fee_category_name = fee_type.fee_category.category_name if fee_type.fee_category else None
         fee_type.fee_term_name = fee_type.fee_term.term_name if fee_type.fee_term else None
         fee_type.academic_year_name = fee_type.academic_year.title if fee_type.academic_year else None
         fee_type.fee_term_dates = fee_type.fee_term.fee_term_dates if fee_type.fee_term else []
-        
+
         return fee_type
         
     except HTTPException:
@@ -317,13 +318,9 @@ async def update_fee_type(db: AsyncSession, fee_type_id: UUID, fee_type_data: Fe
         if fee_type_data.academic_year_id is not None:
             db_fee_type.academic_year_id = fee_type_data.academic_year_id
 
-        await db.commit()
-        await db.refresh(db_fee_type)
+        await db.flush()
 
-        # Invalidate cache after updating fee type
-        invalidate_cache("dropdown", "fee_types")
-
-        # Load updated fee type with all relationships
+        # Load updated fee type with all relationships before commit
         result = await db.execute(
             select(FeeTypeModel)
             .options(
@@ -334,6 +331,11 @@ async def update_fee_type(db: AsyncSession, fee_type_id: UUID, fee_type_data: Fe
             .where(FeeTypeModel.id == db_fee_type.id)
         )
         updated_type = result.scalar_one()
+
+        await db.commit()
+
+        # Invalidate cache after updating fee type
+        invalidate_cache("dropdown", "fee_types")
 
         # Add relationship names to response
         updated_type.fee_category_name = updated_type.fee_category.category_name if updated_type.fee_category else None

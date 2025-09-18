@@ -12,9 +12,16 @@ async def create_organization(db: AsyncSession, org: OrganizationCreate):
     try:
         db_org = Organization(**org.model_dump())
         db.add(db_org)
+        await db.flush()
+
+        # Get the created organization before commit
+        result = await db.execute(
+            select(Organization).where(Organization.id == db_org.id)
+        )
+        created_org = result.scalar_one()
+
         await db.commit()
-        await db.refresh(db_org)
-        return db_org
+        return created_org
     except Exception as e:        
         log.error(f"Error creating organization: {str(e)}")
         raise HTTPException (status_code = status.HTTP_400_BAD_REQUEST,
@@ -74,9 +81,16 @@ async def update_organization(db: AsyncSession, org_id: int, org_update: Organiz
         update_data = org_update.model_dump(exclude_unset=True)
         for var, value in update_data.items():
             setattr(db_org, var, value)
+        await db.flush()
+
+        # Get the updated organization before commit
+        result = await db.execute(
+            select(Organization).where(Organization.id == org_id)
+        )
+        updated_org = result.scalar_one()
+
         await db.commit()
-        await db.refresh(db_org)
-        return db_org
+        return updated_org
     except Exception as e:
         log.error(f"Error updating organization: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -91,9 +105,16 @@ async def deactivate_organization(db: AsyncSession, org_id: int):
             log.warning(f"Organization with id {org_id} not found for deactivation")
             return None
         db_org.is_active = False
+        await db.flush()
+
+        # Get the deactivated organization before commit
+        result = await db.execute(
+            select(Organization).where(Organization.id == org_id)
+        )
+        deactivated_org = result.scalar_one()
+
         await db.commit()
-        await db.refresh(db_org)
-        return db_org
+        return deactivated_org
     except Exception as e:
         log.error(f"Error deactivating organization: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,

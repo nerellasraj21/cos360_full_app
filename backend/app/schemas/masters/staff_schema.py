@@ -26,19 +26,20 @@ class StaffEnrollmentBase(BaseModel):
 
 
 class StaffEnrollmentCreate(StaffEnrollmentBase):
-    pass
+    role_id: Optional[UUID] = Field(None, description="Role ID for the staff user account")
 
 class StaffEnrollmentUpdate(BaseModel):
-    email: Optional[EmailStr]
-    phone: Optional[str]
-    gender: Optional[Literal["male", "female", "other"]]
-    date_of_birth: Optional[date]
-    joining_date: Optional[date]
-    qualification: Optional[str]
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    gender: Optional[Literal["male", "female", "other"]] = None
+    date_of_birth: Optional[date] = None
+    joining_date: Optional[date] = None
+    qualification: Optional[str] = None
     designation_id: Optional[UUID] = Field(None, description="ID from the designations table")
-    experience_years: Optional[int]
-    address: Optional[str]
-    is_active: Optional[bool]
+    experience_years: Optional[int] = None
+    address: Optional[str] = None
+    department: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 class StaffEnrollmentOut(StaffEnrollmentBase):

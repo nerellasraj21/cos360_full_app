@@ -29,36 +29,66 @@ class GenderEnum(enum.Enum):
 
 async def create_staff_enrollment(data: StaffEnrollmentCreate, db: AsyncSession):
     try:
+        # If no role_id provided, find 'Staff' role as default
+        role_id = data.role_id
+        if not role_id:
+            staff_role_result = await db.execute(select(Role).where(Role.name == "Staff"))
+            staff_role = staff_role_result.scalar_one_or_none()
+            if not staff_role:
+                raise HTTPException(status_code=400, detail="Default 'Staff' role not found. Please provide a role_id.")
+            role_id = staff_role.id
 
         new_user = User(
             username = data.first_name,
             email = data.email,
             password_hash = hash_password("staff@123"),
             is_active = True,
-            role_id = data.role_id
+            role_id = role_id
         )
 
-        
+
         db.add(new_user)
         await db.flush()
 
         new_staff = Staff(**data.dict(exclude={"role_id"}),user_id=new_user.id)
         db.add(new_staff)
+        await db.flush()
+
+        # Fetch the created staff with all relationships before commit
+        result = await db.execute(
+            select(Staff)
+            .options(
+                selectinload(Staff.designation_obj),
+                selectinload(Staff.user)
+            )
+            .where(Staff.id == new_staff.id)
+        )
+        staff_out = result.scalar_one()
+
         await db.commit()
-        await db.refresh(new_staff)
-        return new_staff
+        return staff_out
     except SQLAlchemyError as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating staff enrollment: {str(e)}")
 
 
 async def get_all_staff_enrollments(db: AsyncSession):
-    result = await db.execute(select(Staff))
+    result = await db.execute(
+        select(Staff).options(
+            selectinload(Staff.designation_obj),
+            selectinload(Staff.user)
+        )
+    )
     return result.scalars().all()
 
 
 async def get_staff_enrollment_by_id(staff_id: UUID, db: AsyncSession):
-    result = await db.execute(select(Staff).where(Staff.id == staff_id))
+    result = await db.execute(
+        select(Staff).options(
+            selectinload(Staff.designation_obj),
+            selectinload(Staff.user)
+        ).where(Staff.id == staff_id)
+    )
     staff = result.scalar_one_or_none()
     if not staff:
         raise HTTPException(status_code=404, detail="Staff not found")
@@ -74,9 +104,21 @@ async def update_staff_enrollment(staff_id: UUID, data: StaffEnrollmentUpdate, d
     for field, value in data.dict(exclude_unset=True).items():
         setattr(staff, field, value)
 
+    await db.flush()
+
+    # Fetch the updated staff with all relationships before commit
+    result = await db.execute(
+        select(Staff)
+        .options(
+            selectinload(Staff.designation_obj),
+            selectinload(Staff.user)
+        )
+        .where(Staff.id == staff.id)
+    )
+    staff_out = result.scalar_one()
+
     await db.commit()
-    await db.refresh(staff)
-    return staff
+    return staff_out
 
 
 async def delete_staff_enrollment(staff_id: UUID, db: AsyncSession):
@@ -121,7 +163,7 @@ async def get_all_staff_attendance(
             )
 
         if name:
-            stmt = stmt.join(Staff).where(Staff.name.ilike(f"%{name}%"))
+            stmt = stmt.join(Staff).where(Staff.first_name.ilike(f"%{name}%"))
 
         result = await db.execute(stmt)
         return [StaffAttendanceOut.from_orm(record) for record in result.scalars().all()]
@@ -139,13 +181,13 @@ async def get_attendance_for_staff(
 
     if start_date and end_date:
         query = query.where(and_(
-            StaffAttendance.date >= start_date,
-            StaffAttendance.date <= end_date
+            StaffAttendance.attendance_date >= start_date,
+            StaffAttendance.attendance_date <= end_date
         ))
     elif start_date:
-        query = query.where(StaffAttendance.date >= start_date)
+        query = query.where(StaffAttendance.attendance_date >= start_date)
     elif end_date:
-        query = query.where(StaffAttendance.date <= end_date)
+        query = query.where(StaffAttendance.attendance_date <= end_date)
 
     result = await db.execute(query)
     return result.scalars().all()

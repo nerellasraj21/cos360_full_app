@@ -59,9 +59,16 @@ class ResourcePermissionService:
         )
         
         db.add(db_permission)
+        await db.flush()
+
+        # Get the created permission before commit
+        result = await db.execute(
+            select(ResourcePermission).where(ResourcePermission.id == db_permission.id)
+        )
+        created_permission = result.scalar_one()
+
         await db.commit()
-        await db.refresh(db_permission)
-        return db_permission
+        return created_permission
     
     @staticmethod
     async def get_all_permissions(db: AsyncSession, skip: int = 0, limit: int = 100):
@@ -137,10 +144,17 @@ class ResourcePermissionService:
         # Update fields if provided
         if permission_data.is_granted is not None:
             permission.is_granted = permission_data.is_granted
-        
+
+        await db.flush()
+
+        # Get the updated permission before commit
+        result = await db.execute(
+            select(ResourcePermission).where(ResourcePermission.id == permission_id)
+        )
+        updated_permission = result.scalar_one()
+
         await db.commit()
-        await db.refresh(permission)
-        return permission
+        return updated_permission
     
     @staticmethod
     async def delete_permission(db: AsyncSession, permission_id: UUID) -> bool:

@@ -30,13 +30,20 @@ async def create_academic_year(db: AsyncSession, academic_year: AcademicYearCrea
             is_active=academic_year.is_active
         )
         db.add(new_year)
+        await db.flush()
+
+        # Get the created academic year with relationships before commit
+        result = await db.execute(
+            select(AcademicYear).where(AcademicYear.id == new_year.id)
+        )
+        created_year = result.scalar_one()
+
         await db.commit()
-        await db.refresh(new_year)
-        
+
         # Invalidate cache after creating new academic year
         invalidate_cache("dropdown", "academic_years")
-        
-        return new_year
+
+        return created_year
     except Exception as e:        
         log.error(f"Error creating academic year: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -103,13 +110,21 @@ async def update_academic_year(db: AsyncSession, academic_year_id: UUID, academi
         # If trying to activate this academic year, deactivate others first
         if update_data.get("is_active") == True:
             await db.execute(update(AcademicYear).where(AcademicYear.id != academic_year_id).values(is_active=False))
+
+        await db.flush()
+
+        # Get the updated academic year before commit
+        result = await db.execute(
+            select(AcademicYear).where(AcademicYear.id == academic_year_id)
+        )
+        updated_year = result.scalar_one()
+
         await db.commit()
-        await db.refresh(db_academic_year)
-        
+
         # Invalidate cache after updating academic year
         invalidate_cache("dropdown", "academic_years")
-        
-        return db_academic_year
+
+        return updated_year
     except Exception as e:
         log.error(f"Error updating academic year: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -123,13 +138,20 @@ async def deactivate_academic_year(db: AsyncSession, academic_year_id: UUID):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                                 detail=f"Academic Year with id {academic_year_id} not found")
         db_academic_year.is_active = False
+        await db.flush()
+
+        # Get the deactivated academic year before commit
+        result = await db.execute(
+            select(AcademicYear).where(AcademicYear.id == academic_year_id)
+        )
+        deactivated_year = result.scalar_one()
+
         await db.commit()
-        await db.refresh(db_academic_year)
-        
+
         # Invalidate cache after deactivating academic year
         invalidate_cache("dropdown", "academic_years")
-        
-        return db_academic_year
+
+        return deactivated_year
     except Exception as e:
         log.error(f"Error deactivating academic year: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
