@@ -303,7 +303,7 @@ async def delete_fee_category(db: AsyncSession, fee_category_id: UUID):
         if fee_type_dependencies > 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot delete fee category '{db_fee_category.name}' because it is being used by {fee_type_dependencies} fee type(s). Please reassign or delete the fee types first."
+                detail=f"Cannot delete fee category '{db_fee_category.category_name}' because it is being used by {fee_type_dependencies} fee type(s). Please reassign or delete the fee types first."
             )
 
         await db.delete(db_fee_category)
