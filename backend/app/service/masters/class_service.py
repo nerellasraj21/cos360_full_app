@@ -346,4 +346,67 @@ async def get_sections_by_class_id(db: AsyncSession, class_id: UUID):
     except Exception as e:
         log.error(f"Error fetching sections by class ID: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Fetching sections by class ID failed: {str(e)}")
+
+async def update_section(db: AsyncSession, section_id: UUID, section_data: dict):
+    try:
+        result = await db.execute(select(SectionModel).where(SectionModel.id == section_id))
+        section = result.scalar_one_or_none()
+
+        if not section:
+            raise HTTPException(status_code=404, detail="Section not found")
+
+        for key, value in section_data.items():
+            if hasattr(section, key) and value is not None:
+                setattr(section, key, value)
+
+        await db.flush()
+
+        result = await db.execute(
+            select(SectionModel).where(SectionModel.id == section_id)
+        )
+        updated_section = result.scalar_one()
+
+        await db.commit()
+        return updated_section
+
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error updating section: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating section: {str(e)}")
+
+async def delete_section(db: AsyncSession, section_id: UUID):
+    try:
+        result = await db.execute(select(SectionModel).where(SectionModel.id == section_id))
+        section = result.scalar_one_or_none()
+
+        if not section:
+            raise HTTPException(status_code=404, detail="Section not found")
+
+        await db.execute(delete(SectionModel).where(SectionModel.id == section_id))
+        await db.commit()
+
+        return {"message": "Section deleted successfully"}
+
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error deleting section: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error deleting section: {str(e)}")
+
+async def get_section_by_id(db: AsyncSession, section_id: UUID):
+    try:
+        result = await db.execute(
+            select(SectionModel)
+            .options(selectinload(SectionModel.class_))
+            .where(SectionModel.id == section_id)
+        )
+        section = result.scalar_one_or_none()
+
+        if not section:
+            raise HTTPException(status_code=404, detail="Section not found")
+
+        return section
+
+    except Exception as e:
+        log.error(f"Error retrieving section: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving section: {str(e)}")
     
