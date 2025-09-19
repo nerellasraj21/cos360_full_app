@@ -5,9 +5,9 @@ from uuid import UUID
 import enum
 
 class GenderEnum(enum.Enum):
-    male = "male"
-    female = "female"
-    other = "other"
+    Male = "Male"
+    Female = "Female"
+    Other = "Other"
 
 class StaffEnrollmentBase(BaseModel):
     first_name: str = Field(..., description="Jane")
@@ -31,7 +31,7 @@ class StaffEnrollmentCreate(StaffEnrollmentBase):
 class StaffEnrollmentUpdate(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
-    gender: Optional[Literal["male", "female", "other"]] = None
+    gender: Optional[Literal["Male", "Female", "Other"]] = None
     date_of_birth: Optional[date] = None
     joining_date: Optional[date] = None
     qualification: Optional[str] = None

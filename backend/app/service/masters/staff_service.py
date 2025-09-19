@@ -11,7 +11,7 @@ from app.tools.password_util import hash_password
 import enum
 
 
-from app.models.masters.staff_model import Staff
+from app.models.masters.staff_model import Staff, GenderEnum
 from app.models.auth.user_model import User
 from app.models.auth.role_model import Role
 from app.models.masters.staff_attendance_model import StaffAttendance
@@ -21,11 +21,6 @@ from app.schemas.masters.staff_attendance_schema import StaffAttendanceCreate, S
 
 
 # -------------------- Staff Enrollment --------------------
-
-class GenderEnum(enum.Enum):
-    Male = "Male"
-    Female = "Female"
-    Other = "Other"
 
 async def create_staff_enrollment(data: StaffEnrollmentCreate, db: AsyncSession):
     try:
@@ -50,7 +45,28 @@ async def create_staff_enrollment(data: StaffEnrollmentCreate, db: AsyncSession)
         db.add(new_user)
         await db.flush()
 
-        new_staff = Staff(**data.dict(exclude={"role_id"}),user_id=new_user.id)
+        staff_data = data.dict(exclude={"role_id"})
+
+        # Handle gender enum conversion if provided
+        if staff_data.get("gender"):
+            gender_value = staff_data["gender"]
+            if isinstance(gender_value, str):
+                # Convert string to proper enum value (handle case variations)
+                gender_lower = gender_value.lower()
+                if gender_lower == "male":
+                    staff_data["gender"] = GenderEnum.Male
+                elif gender_lower == "female":
+                    staff_data["gender"] = GenderEnum.Female
+                elif gender_lower == "other":
+                    staff_data["gender"] = GenderEnum.Other
+                else:
+                    # Try direct enum value lookup
+                    try:
+                        staff_data["gender"] = GenderEnum(gender_value)
+                    except ValueError:
+                        raise HTTPException(status_code=400, detail=f"Invalid gender value: {gender_value}. Must be 'Male', 'Female', or 'Other'")
+
+        new_staff = Staff(**staff_data, user_id=new_user.id)
         db.add(new_staff)
         await db.flush()
 

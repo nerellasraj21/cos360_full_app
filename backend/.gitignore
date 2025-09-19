@@ -66,5 +66,6 @@ scripts/testing/
 # Keep organized docs structure
 docs/
 .claude
-
+/scripts
 .venv/
+.env

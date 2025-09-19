@@ -36,9 +36,9 @@ from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit
 router = APIRouter(prefix="/staff", tags=["Staff"])
 
 class GenderEnum(enum.Enum):
-    male = "male"
-    female = "female"
-    other = "other"
+    Male = "Male"
+    Female = "Female"
+    Other = "Other"
 
 # -------------------- Staff Enrollment Endpoints --------------------
 
