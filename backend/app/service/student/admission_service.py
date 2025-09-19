@@ -14,6 +14,9 @@ from uuid import UUID
 from sqlalchemy import or_, String, func, extract
 from app.tools.password_util import hash_password
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def generate_admission_number(db: AsyncSession, admission_date) -> str:
     """Generate admission number in format: ADM{YEAR}{SEQUENCE}"""
@@ -114,10 +117,18 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
         if father_email in existing_emails:
             father_user_data = existing_emails[father_email]
             # Get existing parent record
+            logger.info(f"Looking for existing father with user_id: {father_user_data.id}")
             existing_father_result = await db.execute(
                 select(Parent).where(Parent.user_id == father_user_data.id)
             )
-            father_dict = existing_father_result.scalar_one()
+            father_dict = existing_father_result.scalar_one_or_none()
+
+            if not father_dict:
+                logger.error(f"No parent record found for existing father user_id: {father_user_data.id}")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Parent record not found for existing father user {father_email}"
+                )
         else:
             # Create new father user and parent
             father_dict = Parent(**admission.student.father.dict())
@@ -139,10 +150,18 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
         if mother_email in existing_emails:
             mother_user_data = existing_emails[mother_email]
             # Get existing parent record
+            logger.info(f"Looking for existing mother with user_id: {mother_user_data.id}")
             existing_mother_result = await db.execute(
                 select(Parent).where(Parent.user_id == mother_user_data.id)
             )
-            mother_dict = existing_mother_result.scalar_one()
+            mother_dict = existing_mother_result.scalar_one_or_none()
+
+            if not mother_dict:
+                logger.error(f"No parent record found for existing mother user_id: {mother_user_data.id}")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Parent record not found for existing mother user {mother_email}"
+                )
         else:
             # Create new mother user and parent
             mother_dict = Parent(**admission.student.mother.dict())
@@ -193,6 +212,7 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
         await db.flush()
 
         # Fetch the created admission with all relationships before commit
+        logger.info(f"Fetching created admission with id: {new_admission.id}")
         result = await db.execute(
             select(Admission)
             .options(
@@ -202,7 +222,14 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
             )
             .where(Admission.id == new_admission.id)
         )
-        admission_out = result.scalar_one()
+        admission_out = result.scalar_one_or_none()
+
+        if not admission_out:
+            logger.error(f"Failed to fetch created admission with id: {new_admission.id}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to retrieve created admission record"
+            )
 
         await db.commit()
         return admission_out
