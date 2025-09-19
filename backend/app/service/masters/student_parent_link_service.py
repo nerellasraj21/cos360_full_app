@@ -89,10 +89,37 @@ async def get_students_for_parent(parent_id: UUID, db: AsyncSession) -> List[Stu
     try:
         result = await db.execute(
             select(Student)
+            .options(
+                selectinload(Student.parent_links)
+                .selectinload(StudentParentLink.parent)
+            )
             .join(StudentParentLink, Student.id == StudentParentLink.student_id)
             .where(StudentParentLink.parent_id == parent_id)
         )
-        return result.scalars().all()
+        students = result.scalars().all()
+
+        # Process father/mother relationships for each student
+        for student in students:
+            if student.parent_links:
+                father = None
+                mother = None
+
+                for link in student.parent_links:
+                    if link.parent and link.parent.relation_to_student:
+                        if link.parent.relation_to_student.lower() == "father":
+                            father = link.parent
+                        elif link.parent.relation_to_student.lower() == "mother":
+                            mother = link.parent
+
+                # Set father and mother attributes on student
+                student.father = father
+                student.mother = mother
+            else:
+                # Set default None values if no parents
+                student.father = None
+                student.mother = None
+
+        return students
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching students for parent: {str(e)}")
 

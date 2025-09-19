@@ -249,6 +249,28 @@ async def get_admission_by_id(student_id: UUID, db: AsyncSession):
     admission = result.scalar_one_or_none()
     if not admission:
         raise HTTPException(status_code=404, detail="Admission not found")
+
+    # Process father/mother relationships
+    if admission.student and admission.student.parent_links:
+        father = None
+        mother = None
+
+        for link in admission.student.parent_links:
+            if link.parent and link.parent.relation_to_student:
+                if link.parent.relation_to_student.lower() == "father":
+                    father = link.parent
+                elif link.parent.relation_to_student.lower() == "mother":
+                    mother = link.parent
+
+        # Set father and mother attributes on student
+        admission.student.father = father
+        admission.student.mother = mother
+    else:
+        # Set default None values if no parents
+        if admission.student:
+            admission.student.father = None
+            admission.student.mother = None
+
     return admission
 
 async def update_partial_details_admission(student_id: UUID, data: StudentAdmissionUpdate, db: AsyncSession):
@@ -327,7 +349,7 @@ async def get_all_admissions(db: AsyncSession, skip: int = 0, limit: int = 10):
     count_stmt = select(func.count(Admission.id))
     count_result = await db.execute(count_stmt)
     total_count = count_result.scalar()
-    
+
     # Get paginated admissions
     stmt = (
         select(Admission)
@@ -340,12 +362,34 @@ async def get_all_admissions(db: AsyncSession, skip: int = 0, limit: int = 10):
         .limit(limit)
         .order_by(Admission.admission_date.desc())
     )
-    
+
     result = await db.execute(stmt)
     admissions = result.scalars().all()
-    
+
+    # Process father/mother relationships for each admission
+    for admission in admissions:
+        if admission.student and admission.student.parent_links:
+            father = None
+            mother = None
+
+            for link in admission.student.parent_links:
+                if link.parent and link.parent.relation_to_student:
+                    if link.parent.relation_to_student.lower() == "father":
+                        father = link.parent
+                    elif link.parent.relation_to_student.lower() == "mother":
+                        mother = link.parent
+
+            # Set father and mother attributes on student
+            admission.student.father = father
+            admission.student.mother = mother
+        else:
+            # Set default None values if no parents
+            if admission.student:
+                admission.student.father = None
+                admission.student.mother = None
+
     has_next = (skip + limit) < total_count
-    
+
     return {
         "items": admissions,
         "total_count": total_count,
