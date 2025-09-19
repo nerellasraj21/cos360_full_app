@@ -14,6 +14,7 @@ class ExpenseCategory(BaseOrg):
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
+    org_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
     # Relationships
     expense_types = relationship("ExpenseType", back_populates="category", cascade="all, delete-orphan")

@@ -26,7 +26,8 @@ class ExpenseCategoryService(BaseExpenseService):
         category_data: ExpenseCategoryCreate,
         user_id: UUID,
         user_role: str,
-        user_username: str
+        user_username: str,
+        org_id: UUID
     ) -> ExpenseCategoryRead:
         """Create a new expense category"""
 
@@ -43,8 +44,11 @@ class ExpenseCategoryService(BaseExpenseService):
                 f"Category with name '{category_data.name}' already exists"
             )
 
-        # Create the category
-        db_category = ExpenseCategory(**category_data.model_dump())
+        # Create the category with org_id
+        db_category = ExpenseCategory(
+            org_id=org_id,
+            **category_data.model_dump()
+        )
         self.db.add(db_category)
         await self.db.flush()
         await self.db.refresh(db_category)

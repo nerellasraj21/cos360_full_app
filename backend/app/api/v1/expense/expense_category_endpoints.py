@@ -5,15 +5,36 @@ from app.schemas.expense.expense_category_schema import (
     ExpenseCategoryUpdate,
     ExpenseCategoryDropdown
 )
-from app.db.tenant_session import get_tenant_db
+from app.db.tenant_session import get_tenant_db, get_public_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.expense.expense_category_service import ExpenseCategoryService
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
+from app.middleware.tenant_middleware import get_client_name_from_request
+from sqlalchemy import select, text
+from app.models.public.tenant_model import Tenant
 from typing import List, Optional
 from uuid import UUID
 
 router = APIRouter(prefix="/expense/categories", tags=["Expense/Expense Categories"])
+
+async def get_current_tenant_org_id(request: Request) -> UUID:
+    """Get the current tenant's org_id from the public schema"""
+    client_name = get_client_name_from_request(request)
+
+    async for public_db in get_public_db():
+        result = await public_db.execute(
+            select(Tenant.id).where(Tenant.client_name == client_name)
+        )
+        tenant = result.scalar_one_or_none()
+
+        if not tenant:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid tenant"
+            )
+
+        return tenant
 
 # Create Expense Category
 @router.post("/", response_model=ExpenseCategoryRead, status_code=status.HTTP_201_CREATED)
@@ -32,8 +53,11 @@ async def create_expense_category_endpoint(
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'expense_categories', 'create')
 
+    # Get the current tenant's org_id
+    org_id = await get_current_tenant_org_id(request)
+
     service = ExpenseCategoryService(db)
-    return await service.create_category(expense_category_data, user_id, role, username)
+    return await service.create_category(expense_category_data, user_id, role, username, org_id)
 
 # Get All Expense Categories
 @router.get("/", response_model=List[ExpenseCategoryRead])
