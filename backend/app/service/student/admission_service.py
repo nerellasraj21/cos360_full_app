@@ -73,16 +73,24 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
         if father_email == mother_email:
             raise HTTPException(status_code=400, detail="Father and mother cannot have the same email address")
 
-        # Check if emails already exist
-        existing_users = await db.execute(
-            select(User).where(User.email.in_([father_email, mother_email]))
+        # Check if emails already exist and get existing parent users
+        existing_users_result = await db.execute(
+            select(User).options(selectinload(User.role)).where(User.email.in_([father_email, mother_email]))
         )
-        existing_emails = {user.email for user in existing_users.scalars().all()}
+        existing_users = existing_users_result.scalars().all()
 
-        if father_email in existing_emails:
-            raise HTTPException(status_code=400, detail=f"Email {father_email} already exists")
-        if mother_email in existing_emails:
-            raise HTTPException(status_code=400, detail=f"Email {mother_email} already exists")
+        # Create dictionaries for easy lookup
+        existing_emails = {user.email: user for user in existing_users}
+
+        # Allow reuse of parent emails, but prevent conflicts with non-parent users
+        for email in [father_email, mother_email]:
+            if email in existing_emails:
+                user = existing_emails[email]
+                if user.role.name != "Parent":
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Email {email} is already registered to a {user.role.name}, not a parent"
+                    )
 
         # Convert student fields, excluding the nested ones
         student_data = admission.student.dict(exclude={"father", "mother"})
@@ -102,44 +110,79 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
         db.add(student_dict)
         await db.flush()
 
-        # Convert nested models directly
-        father_dict = Parent(**admission.student.father.dict())
-        father_user_data = User(
-            username = father_dict.name,
-            email = father_dict.email,
-            password_hash = hash_password("parent@123"),
-            is_active = True,
-            role_id= parent_role_id
+        # Handle father - reuse existing user if email exists, create new if not
+        if father_email in existing_emails:
+            father_user_data = existing_emails[father_email]
+            # Get existing parent record
+            existing_father_result = await db.execute(
+                select(Parent).where(Parent.user_id == father_user_data.id)
+            )
+            father_dict = existing_father_result.scalar_one()
+        else:
+            # Create new father user and parent
+            father_dict = Parent(**admission.student.father.dict())
+            father_user_data = User(
+                username = father_dict.name,
+                email = father_dict.email,
+                password_hash = hash_password("parent@123"),
+                is_active = True,
+                role_id= parent_role_id
+            )
+            db.add(father_user_data)
+            await db.flush()
+
+            father_dict.user_id = father_user_data.id
+            db.add(father_dict)
+            await db.flush()
+
+        # Handle mother - reuse existing user if email exists, create new if not
+        if mother_email in existing_emails:
+            mother_user_data = existing_emails[mother_email]
+            # Get existing parent record
+            existing_mother_result = await db.execute(
+                select(Parent).where(Parent.user_id == mother_user_data.id)
+            )
+            mother_dict = existing_mother_result.scalar_one()
+        else:
+            # Create new mother user and parent
+            mother_dict = Parent(**admission.student.mother.dict())
+            mother_user_data = User(
+                username = mother_dict.name,
+                email = mother_dict.email,
+                password_hash = hash_password("parent@123"),
+                is_active = True,
+                role_id= parent_role_id
+            )
+            db.add(mother_user_data)
+            await db.flush()
+
+            mother_dict.user_id = mother_user_data.id
+            db.add(mother_dict)
+            await db.flush()
+
+        # Check if father-student link already exists
+        existing_father_link = await db.execute(
+            select(StudentParentLink).where(
+                StudentParentLink.student_id == student_dict.id,
+                StudentParentLink.parent_id == father_dict.id
+            )
         )
-        db.add(father_user_data)
-        await db.flush()
+        if not existing_father_link.scalar_one_or_none():
+            student_parent_link_father = StudentParentLink(student_id = student_dict.id, parent_id = father_dict.id)
+            db.add(student_parent_link_father)
+            await db.flush()
 
-        mother_dict = Parent(**admission.student.mother.dict())
-        mother_user_data = User(
-            username = mother_dict.name,
-            email = mother_dict.email,
-            password_hash = hash_password("parent@123"),
-            is_active = True,
-            role_id= parent_role_id
+        # Check if mother-student link already exists
+        existing_mother_link = await db.execute(
+            select(StudentParentLink).where(
+                StudentParentLink.student_id == student_dict.id,
+                StudentParentLink.parent_id == mother_dict.id
+            )
         )
-        db.add(mother_user_data)
-        await db.flush()
-
-        father_dict.user_id=father_user_data.id
-        db.add(father_dict)
-        await db.flush()
-
-        mother_dict.user_id=mother_user_data.id
-        db.add(mother_dict)
-        await db.flush()
-
-        student_parent_link_father = StudentParentLink(student_id = student_dict.id, parent_id = father_dict.id)
-        db.add(student_parent_link_father)
-        await db.flush()
-
-        student_parent_link_mother = StudentParentLink(student_id = student_dict.id, parent_id = mother_dict.id)
-        db.add(student_parent_link_mother)
-        await db.flush()
+        if not existing_mother_link.scalar_one_or_none():
+            student_parent_link_mother = StudentParentLink(student_id = student_dict.id, parent_id = mother_dict.id)
+            db.add(student_parent_link_mother)
+            await db.flush()
 
         new_admission = Admission(
             student_id=student_dict.id,

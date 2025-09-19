@@ -27,6 +27,7 @@ from app.api.v1.masters.staff_endpoints import router as staff_router
 from app.api.v1.student.student_document_endpoints import router as student_document_router
 # from app.api.v1.masters.student_homework_endpoints import router as student_homework_router
 from app.api.v1.student.student_transport_endpoints import router as student_transport_router
+from app.api.v1.student.student_parent_endpoints import router as student_parent_link_router
 from app.api.v1.masters.subject_category_endpoints import router as subject_category_router
 from app.api.v1.fee.fee_term_endpoints import router as fee_term_router
 from app.api.v1.fee.fee_category_endpoints import router as fee_category_router
@@ -81,6 +82,7 @@ router.include_router(staff_router)
 router.include_router(student_document_router)
 # router.include_router(student_homework_router)
 router.include_router(student_transport_router)
+router.include_router(student_parent_link_router)
 router.include_router(attendance_router)
 router.include_router(subject_category_router)
 router.include_router(fee_term_router)
