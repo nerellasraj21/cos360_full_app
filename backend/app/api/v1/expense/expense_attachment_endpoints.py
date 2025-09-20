@@ -11,6 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.expense.expense_attachment_service import ExpenseAttachmentService
 from app.middleware.rate_limit_middleware import rate_limit_api, rate_limit_create
 from app.tools.simple_permissions import get_current_user_token, check_role_plan_permission_with_error
+from app.middleware.tenant_middleware import get_client_name_from_request
+from app.db.tenant_session import get_public_db
+from app.models.public.tenant_model import Tenant
+from sqlalchemy import select
 from typing import List
 from uuid import UUID
 import io
@@ -36,6 +40,21 @@ async def upload_attachment_endpoint(
 
     # Multi-layer permission check
     await check_role_plan_permission_with_error(db, request, role, 'expense_attachments', 'create')
+
+    # Get org_id from tenant
+    client_name = get_client_name_from_request(request)
+    async for public_db in get_public_db():
+        result = await public_db.execute(
+            select(Tenant.id).where(Tenant.client_name == client_name)
+        )
+        tenant = result.scalar_one_or_none()
+        if not tenant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tenant not found"
+            )
+        org_id = tenant
+        break
 
     # Validate file
     if not file.filename:
@@ -70,7 +89,7 @@ async def upload_attachment_endpoint(
     )
 
     service = ExpenseAttachmentService(db)
-    return await service.create_attachment(attachment_data, user_id, role, username)
+    return await service.create_attachment(attachment_data, user_id, role, username, org_id)
 
 # Get Attachment
 @router.get("/{attachment_id}", response_model=ExpenseAttachmentRead)
@@ -105,9 +124,8 @@ async def get_transaction_attachments_endpoint(
     # Multi-layer permission check
     await check_role_plan_permission_with_error(db, request, role, 'expense_attachments', 'read')
 
-    # TODO: Implement get_transaction_attachments method in service
-    # For now, return empty list
-    return []
+    service = ExpenseAttachmentService(db)
+    return await service.get_attachments_by_transaction(transaction_id)
 
 # Download Attachment
 @router.get("/{attachment_id}/download")
@@ -122,7 +140,7 @@ async def download_attachment_endpoint(
     role = current_user.get('role')
 
     # Multi-layer permission check
-    await check_role_plan_permission_with_error(db, request, role, 'expense_attachments', 'download')
+    await check_role_plan_permission_with_error(db, request, role, 'expense_attachments', 'read')
 
     service = ExpenseAttachmentService(db)
     attachment = await service.get_attachment(attachment_id)
@@ -152,13 +170,14 @@ async def update_attachment_endpoint(
     """Update attachment metadata. Rate limited to 30 updates per minute."""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
+    user_id = UUID(current_user.get('sub'))
+    username = current_user.get('username')
 
     # Multi-layer permission check
     await check_role_plan_permission_with_error(db, request, role, 'expense_attachments', 'update')
 
-    # TODO: Implement update functionality
     service = ExpenseAttachmentService(db)
-    return await service.get_attachment(attachment_id)
+    return await service.update_attachment(attachment_id, attachment_data, user_id, role, username)
 
 # Delete Attachment
 @router.delete("/{attachment_id}")
@@ -171,9 +190,11 @@ async def delete_attachment_endpoint(
     """Delete an attachment. Rate limited to 20 deletes per minute."""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
+    user_id = UUID(current_user.get('sub'))
+    username = current_user.get('username')
 
     # Multi-layer permission check
     await check_role_plan_permission_with_error(db, request, role, 'expense_attachments', 'delete')
 
-    # TODO: Implement delete functionality
-    return {"message": "Attachment deleted successfully", "attachment_id": attachment_id}
+    service = ExpenseAttachmentService(db)
+    return await service.delete_attachment(attachment_id, user_id, role, username)

@@ -10,6 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.expense.expense_settings_service import ExpenseSettingsService
 from app.middleware.rate_limit_middleware import rate_limit_api, rate_limit_create
 from app.tools.simple_permissions import get_current_user_token, check_role_plan_permission_with_error
+from app.middleware.tenant_middleware import get_client_name_from_request
+from app.db.tenant_session import get_public_db
+from app.models.public.tenant_model import Tenant
+from sqlalchemy import select
 from typing import List, Optional
 from uuid import UUID
 
@@ -39,8 +43,23 @@ async def create_expense_setting_endpoint(
             detail="Only administrators can create expense settings"
         )
 
+    # Get org_id from tenant
+    client_name = get_client_name_from_request(request)
+    async for public_db in get_public_db():
+        result = await public_db.execute(
+            select(Tenant.id).where(Tenant.client_name == client_name)
+        )
+        tenant = result.scalar_one_or_none()
+        if not tenant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tenant not found"
+            )
+        org_id = tenant
+        break
+
     service = ExpenseSettingsService(db)
-    return await service.create_setting(setting_data, user_id, role, username)
+    return await service.create_setting(setting_data, user_id, role, username, org_id)
 
 # Get All Expense Settings
 @router.get("/", response_model=List[ExpenseSettingsRead])
@@ -59,10 +78,7 @@ async def get_all_expense_settings_endpoint(
     await check_role_plan_permission_with_error(db, request, role, 'expense_settings', 'list')
 
     service = ExpenseSettingsService(db)
-
-    # TODO: Implement get_settings method in service
-    # For now, return empty list
-    return []
+    return await service.get_settings(category=category, active_only=active_only)
 
 # Get Single Expense Setting
 @router.get("/{setting_id}", response_model=ExpenseSettingsRead)
@@ -127,10 +143,34 @@ async def update_expense_setting_endpoint(
     await check_role_plan_permission_with_error(db, request, role, 'expense_settings', 'update')
 
     service = ExpenseSettingsService(db)
+    return await service.update_setting(setting_id, setting_data, user_id, role, username)
 
-    # TODO: Implement update_setting method in service
-    # For now, just get the existing setting
-    return await service.get_setting(setting_id)
+# Delete Expense Setting
+@router.delete("/{setting_id}")
+@rate_limit_api("10 per minute")
+async def delete_expense_setting_endpoint(
+    request: Request,
+    setting_id: UUID,
+    db: AsyncSession = Depends(get_tenant_db)
+):
+    """Delete an expense setting (soft delete). Admin only."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+    user_id = UUID(current_user.get('sub'))
+    username = current_user.get('username')
+
+    # Multi-layer permission check
+    await check_role_plan_permission_with_error(db, request, role, 'expense_settings', 'delete')
+
+    # Additional check - only admin roles can delete settings
+    if role.lower() not in ['admin', 'tenant_admin', 'super_admin']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can delete expense settings"
+        )
+
+    service = ExpenseSettingsService(db)
+    return await service.delete_setting(setting_id, user_id, role, username)
 
 # Get Common Settings for UI
 @router.get("/ui/common")

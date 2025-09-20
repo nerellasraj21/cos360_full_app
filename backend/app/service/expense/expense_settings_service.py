@@ -25,7 +25,8 @@ class ExpenseSettingsService(BaseExpenseService):
         setting_data: ExpenseSettingsCreate,
         user_id: UUID,
         user_role: str,
-        user_username: str
+        user_username: str,
+        org_id: UUID
     ) -> ExpenseSettingsRead:
         """Create a new expense setting"""
 
@@ -45,6 +46,7 @@ class ExpenseSettingsService(BaseExpenseService):
         # Create setting
         setting_dict = setting_data.model_dump()
         setting_dict.update({
+            'org_id': org_id,
             'created_by_user_id': user_id,
             'created_by_role': user_role
         })
@@ -52,10 +54,15 @@ class ExpenseSettingsService(BaseExpenseService):
         db_setting = ExpenseSettings(**setting_dict)
         self.db.add(db_setting)
         await self.db.flush()
-        await self.db.refresh(db_setting)
+
+        # Get the created setting with relationships
+        result = await self.db.execute(
+            select(ExpenseSettings).where(ExpenseSettings.id == db_setting.id)
+        )
+        setting_out = result.scalar_one()
 
         await self.db.commit()
-        return ExpenseSettingsRead.model_validate(db_setting)
+        return ExpenseSettingsRead.model_validate(setting_out)
 
     async def get_setting(self, setting_id: UUID) -> ExpenseSettingsRead:
         """Get a specific expense setting"""
@@ -106,3 +113,91 @@ class ExpenseSettingsService(BaseExpenseService):
             value=value,
             value_type=value_type
         )
+
+    async def get_settings(
+        self,
+        category: Optional[str] = None,
+        active_only: bool = True
+    ) -> List[ExpenseSettingsRead]:
+        """Get all expense settings with optional filtering"""
+
+        query = select(ExpenseSettings)
+
+        if active_only:
+            query = query.where(ExpenseSettings.is_active == True)
+
+        if category:
+            query = query.where(ExpenseSettings.setting_category == category)
+
+        query = query.order_by(ExpenseSettings.setting_category, ExpenseSettings.setting_key)
+
+        result = await self.db.execute(query)
+        settings = result.scalars().all()
+
+        return [ExpenseSettingsRead.model_validate(setting) for setting in settings]
+
+    async def update_setting(
+        self,
+        setting_id: UUID,
+        setting_data: ExpenseSettingsUpdate,
+        user_id: UUID,
+        user_role: str,
+        user_username: str
+    ) -> ExpenseSettingsRead:
+        """Update an expense setting"""
+
+        # Get existing setting
+        setting = await self.check_record_exists(
+            ExpenseSettings,
+            setting_id,
+            "Expense setting not found"
+        )
+
+        # Update fields
+        update_data = setting_data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(setting, field, value)
+
+        # Update audit fields
+        setting.last_modified_by_user_id = user_id
+        setting.last_modified_by_role = user_role
+
+        await self.db.flush()
+
+        # Get the updated setting with relationships
+        result = await self.db.execute(
+            select(ExpenseSettings).where(ExpenseSettings.id == setting.id)
+        )
+        setting_out = result.scalar_one()
+
+        await self.db.commit()
+        return ExpenseSettingsRead.model_validate(setting_out)
+
+    async def delete_setting(
+        self,
+        setting_id: UUID,
+        user_id: UUID,
+        user_role: str,
+        user_username: str
+    ) -> Dict[str, Any]:
+        """Delete an expense setting (soft delete)"""
+
+        # Get existing setting
+        setting = await self.check_record_exists(
+            ExpenseSettings,
+            setting_id,
+            "Expense setting not found"
+        )
+
+        # Soft delete by setting is_active=False
+        setting.is_active = False
+        setting.last_modified_by_user_id = user_id
+        setting.last_modified_by_role = user_role
+
+        await self.db.flush()
+        await self.db.commit()
+
+        return {
+            "message": "Expense setting deleted successfully",
+            "setting_id": setting_id
+        }

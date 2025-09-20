@@ -14,6 +14,7 @@ class ExpenseTransaction(BaseOrg):
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
+    org_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     expense_type_id = Column(UUID(as_uuid=True), ForeignKey("expense_types.id"), nullable=False, index=True)
 
     # Transaction Details

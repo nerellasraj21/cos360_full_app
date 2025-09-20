@@ -10,6 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.expense.expense_transaction_service import ExpenseTransactionService
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
+from app.middleware.tenant_middleware import get_client_name_from_request
+from app.db.tenant_session import get_public_db
+from app.models.public.tenant_model import Tenant
+from sqlalchemy import select
 from typing import List, Optional
 from uuid import UUID
 
@@ -33,9 +37,24 @@ async def create_expense_transaction_endpoint(
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'expense_transactions', 'create')
 
+    # Get org_id from tenant
+    client_name = get_client_name_from_request(request)
+    async for public_db in get_public_db():
+        result = await public_db.execute(
+            select(Tenant.id).where(Tenant.client_name == client_name)
+        )
+        tenant = result.scalar_one_or_none()
+        if not tenant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tenant not found"
+            )
+        org_id = tenant
+        break
+
     service = ExpenseTransactionService(db)
     return await service.create_transaction(
-        transaction_data, user_id, role, username,
+        transaction_data, user_id, role, username, org_id,
         user_department_id=UUID(user_department_id) if user_department_id else None
     )
 
@@ -64,10 +83,7 @@ async def get_all_expense_transactions_endpoint(
         skip=skip,
         limit=limit,
         status_filter=status_filter,
-        expense_type_id=expense_type_id,
-        department_id=department_id,
-        user_department_id=UUID(user_department_id) if user_department_id else None,
-        user_role=role
+        expense_type_id=expense_type_id
     )
 
 # Get Single Expense Transaction
@@ -87,11 +103,7 @@ async def get_expense_transaction_endpoint(
     await check_role_plan_permission_with_error(db, request, role, 'expense_transactions', 'read')
 
     service = ExpenseTransactionService(db)
-    return await service.get_transaction(
-        transaction_id,
-        user_department_id=UUID(user_department_id) if user_department_id else None,
-        user_role=role
-    )
+    return await service.get_transaction(transaction_id)
 
 # Update Expense Transaction
 @router.put("/{transaction_id}", response_model=ExpenseTransactionRead)
@@ -114,8 +126,7 @@ async def update_expense_transaction_endpoint(
 
     service = ExpenseTransactionService(db)
     return await service.update_transaction(
-        transaction_id, transaction_data, user_id, role, username,
-        user_department_id=UUID(user_department_id) if user_department_id else None
+        transaction_id, transaction_data, user_id, role, username
     )
 
 # Approve/Reject Expense Transaction
@@ -139,8 +150,7 @@ async def approve_expense_transaction_endpoint(
 
     service = ExpenseTransactionService(db)
     return await service.approve_transaction(
-        transaction_id, approval_data, user_id, role, username,
-        user_department_id=UUID(user_department_id) if user_department_id else None
+        transaction_id, approval_data, user_id, role, username
     )
 
 # Get Transactions Pending Approval
@@ -161,10 +171,4 @@ async def get_pending_approval_transactions_endpoint(
     await check_role_plan_permission_with_error(db, request, role, 'expense_transactions', 'list')
 
     service = ExpenseTransactionService(db)
-    return await service.get_transactions(
-        skip=skip,
-        limit=limit,
-        status_filter="pending",
-        user_department_id=UUID(user_department_id) if user_department_id else None,
-        user_role=role
-    )
+    return await service.get_pending_approval_transactions()

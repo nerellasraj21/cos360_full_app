@@ -10,6 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.expense.expense_type_service import ExpenseTypeService
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
+from app.middleware.tenant_middleware import get_client_name_from_request
+from app.db.tenant_session import get_public_db
+from app.models.public.tenant_model import Tenant
+from sqlalchemy import select
 from typing import List, Optional
 from uuid import UUID
 
@@ -32,8 +36,23 @@ async def create_expense_type_endpoint(
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'expense_types', 'create')
 
+    # Get org_id from tenant
+    client_name = get_client_name_from_request(request)
+    async for public_db in get_public_db():
+        result = await public_db.execute(
+            select(Tenant.id).where(Tenant.client_name == client_name)
+        )
+        tenant = result.scalar_one_or_none()
+        if not tenant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tenant not found"
+            )
+        org_id = tenant
+        break
+
     service = ExpenseTypeService(db)
-    return await service.create_type(expense_type_data, user_id, role, username)
+    return await service.create_type(expense_type_data, user_id, role, username, org_id)
 
 # Get All Expense Types
 @router.get("/", response_model=List[ExpenseTypeRead])

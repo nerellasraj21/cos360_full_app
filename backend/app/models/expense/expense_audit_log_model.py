@@ -10,6 +10,7 @@ class ExpenseAuditLog(BaseOrg):
 
     # Primary Key - Immutable once created
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
+    org_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
     # Reference to the transaction being audited
     transaction_id = Column(UUID(as_uuid=True), ForeignKey("expense_transactions.id"), nullable=False, index=True)

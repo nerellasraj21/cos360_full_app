@@ -13,6 +13,7 @@ class ExpenseSettings(BaseOrg):
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
+    org_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
     # Setting Identification
     setting_key = Column(String(100), nullable=False, index=True)  # auto_approval_limit, require_receipts, etc.

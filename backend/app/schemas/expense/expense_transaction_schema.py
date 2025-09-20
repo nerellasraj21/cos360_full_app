@@ -44,9 +44,10 @@ class ExpenseTransactionApproval(BaseModel):
 class ExpenseTransactionRead(ExpenseTransactionBase):
     """Schema for reading ExpenseTransaction"""
     id: UUID = Field(..., description="Unique identifier")
+    org_id: UUID = Field(..., description="Organization identifier")
     idempotency_key: str = Field(..., description="Idempotency key")
     status: str = Field(..., description="Transaction status")
-    requires_approval: bool = Field(..., description="Whether transaction requires approval")
+    requires_approval: Optional[bool] = Field(None, description="Whether transaction requires approval")
     requires_approval_override: Optional[bool] = Field(None, description="Approval requirement override")
 
     # Approval fields

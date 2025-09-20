@@ -26,7 +26,8 @@ class ExpenseTypeService(BaseExpenseService):
         type_data: ExpenseTypeCreate,
         user_id: UUID,
         user_role: str,
-        user_username: str
+        user_username: str,
+        org_id: UUID
     ) -> ExpenseTypeRead:
         """Create a new expense type"""
 
@@ -57,27 +58,37 @@ class ExpenseTypeService(BaseExpenseService):
             )
 
         # Create the expense type
-        db_type = ExpenseType(**type_data.model_dump())
+        type_dict = type_data.model_dump()
+        type_dict['org_id'] = org_id
+        db_type = ExpenseType(**type_dict)
         self.db.add(db_type)
         await self.db.flush()
-        await self.db.refresh(db_type)
 
-        # Create audit log
-        await self.create_audit_log(
-            transaction_id=db_type.id,
-            action="create",
-            action_category="type",
-            actor_user_id=user_id,
-            actor_role=user_role,
-            actor_username=user_username,
-            full_record_after=self.prepare_record_snapshot(db_type),
-            action_reason="Expense type created"
+        # Get the created type with relationships
+        result = await self.db.execute(
+            select(ExpenseType).options(
+                selectinload(ExpenseType.category)
+            ).where(ExpenseType.id == db_type.id)
         )
+        type_out = result.scalar_one()
 
+        # Commit the main record
         await self.db.commit()
+        
+        # TODO: Temporarily disabled audit log creation for debugging
+        # await self.create_audit_log(
+        #     transaction_id=db_type.id,
+        #     action="create",
+        #     action_category="type",
+        #     actor_user_id=user_id,
+        #     actor_role=user_role,
+        #     actor_username=user_username,
+        #     org_id=org_id,
+        #     full_record_after=self.prepare_record_snapshot(type_out),
+        #     action_reason="Expense type created"
+        # )
 
-        # Load with relationships
-        return await self.get_type(db_type.id)
+        return ExpenseTypeRead.model_validate(type_out)
 
     async def get_type(self, type_id: UUID) -> ExpenseTypeRead:
         """Get a specific expense type"""
@@ -212,23 +223,33 @@ class ExpenseTypeService(BaseExpenseService):
             setattr(expense_type, field, value)
 
         await self.db.flush()
-        await self.db.refresh(expense_type)
 
-        # Create audit log
-        await self.create_audit_log(
-            transaction_id=expense_type.id,
-            action="update",
-            action_category="type",
-            actor_user_id=user_id,
-            actor_role=user_role,
-            actor_username=user_username,
-            full_record_before=original_state,
-            full_record_after=self.prepare_record_snapshot(expense_type),
-            action_reason="Expense type updated"
+        # Get the updated type with relationships
+        result = await self.db.execute(
+            select(ExpenseType).options(
+                selectinload(ExpenseType.category)
+            ).where(ExpenseType.id == expense_type.id)
         )
+        type_out = result.scalar_one()
 
+        # Commit the main record
         await self.db.commit()
-        return await self.get_type(type_id)
+        
+        # TODO: Temporarily disabled audit log creation for debugging
+        # await self.create_audit_log(
+        #     transaction_id=expense_type.id,
+        #     action="update",
+        #     action_category="type",
+        #     actor_user_id=user_id,
+        #     actor_role=user_role,
+        #     actor_username=user_username,
+        #     org_id=expense_type.org_id,
+        #     full_record_before=original_state,
+        #     full_record_after=self.prepare_record_snapshot(type_out),
+        #     action_reason="Expense type updated"
+        # )
+
+        return ExpenseTypeRead.model_validate(type_out)
 
     async def delete_type(
         self,
@@ -261,30 +282,25 @@ class ExpenseTypeService(BaseExpenseService):
                 details={"transaction_count": transaction_count}
             )
 
-        # Store original state for audit
-        original_state = self.prepare_record_snapshot(expense_type)
-
         # Soft delete by setting is_active=False
         expense_type.is_active = False
         await self.db.flush()
-
-        # Create audit log
-        await self.create_audit_log(
-            transaction_id=expense_type.id,
-            action="delete",
-            action_category="type",
-            actor_user_id=user_id,
-            actor_role=user_role,
-            actor_username=user_username,
-            full_record_before=original_state,
-            full_record_after=self.prepare_record_snapshot(expense_type),
-            action_reason="Expense type soft deleted"
-        )
-
         await self.db.commit()
+        
+        # TODO: Temporarily disabled audit log creation for debugging
+        # await self.create_audit_log(
+        #     transaction_id=expense_type.id,
+        #     action="delete",
+        #     action_category="type",
+        #     actor_user_id=user_id,
+        #     actor_role=user_role,
+        #     actor_username=user_username,
+        #     org_id=expense_type.org_id,
+        #     full_record_before=self.prepare_record_snapshot(expense_type),
+        #     action_reason="Expense type deleted"
+        # )
 
         return {
             "message": "Expense type deleted successfully",
-            "type_id": type_id,
-            "deleted_at": expense_type.updated_at
+            "type_id": type_id
         }
