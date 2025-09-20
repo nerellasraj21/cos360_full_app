@@ -2,13 +2,14 @@ from pydantic import BaseModel, Field
 from datetime import date
 from typing import Optional
 from uuid import UUID
+from app.schemas.common.attendance_status_enum import AttendanceStatusEnum
 
 
 class StudentAttendanceBase(BaseModel):
     student_id : UUID
     date : date
-    status : str = Field(..., description="Present, Absent")
-    remarks : str
+    status : AttendanceStatusEnum = Field(..., description="Present, Absent, or Late")
+    remarks : Optional[str] = Field(None, description="Optional remarks for attendance")
 
 
 class StudentAttendanceCreate(StudentAttendanceBase):
@@ -16,7 +17,8 @@ class StudentAttendanceCreate(StudentAttendanceBase):
 
 
 class StudentAttendanceUpdate(BaseModel):
-    status: Optional[str] = Field(None, description="Present, Absent")
+    status: Optional[AttendanceStatusEnum] = Field(None, description="Present, Absent, or Late")
+    remarks: Optional[str] = Field(None, description="Optional remarks for attendance")
 
 
 class StudentAttendanceOut(StudentAttendanceBase):

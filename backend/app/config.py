@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
 
+    # Tenant middleware configuration
+    TENANT_STRICT_MODE: bool = True  # Require cschema header
+    TENANT_ALLOW_DEFAULT_FALLBACK: bool = False  # Allow default fallback
+    TENANT_DEVELOPMENT_MODE: bool = False  # Relaxed validation for dev
+
     class Config:
         env_file = ".env"
         populate_by_name = True  # Enables Field(alias=...) to work

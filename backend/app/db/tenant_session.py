@@ -146,11 +146,12 @@ async def get_tenant_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
         # Check if it's the default client for backward compatibility
         if client_name == "default":
             schema_name = "cos360_main"
+            logger.warning(f"Using default tenant fallback: {client_name} -> {schema_name}")
         else:
             logger.warning(f"Tenant not found or inactive: {client_name}")
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid connection"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tenant '{client_name}' not found or inactive"
             )
     
     async with AsyncSessionLocal() as session:
@@ -191,11 +192,12 @@ async def get_tenant_db_by_client_name(client_name: str) -> AsyncGenerator[Async
         # Check if it's the default client for backward compatibility
         if client_name == "default":
             schema_name = "cos360_main"
+            logger.warning(f"Using default tenant fallback: {client_name} -> {schema_name}")
         else:
             logger.warning(f"Tenant not found or inactive: {client_name}")
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid connection"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tenant '{client_name}' not found or inactive"
             )
     
     async with AsyncSessionLocal() as session:

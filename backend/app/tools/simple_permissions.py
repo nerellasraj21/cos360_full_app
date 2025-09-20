@@ -85,237 +85,22 @@ async def check_role_permission_db(db: AsyncSession, role: str, resource: str, a
         logger.error(f"Error checking permission: {str(e)}")
         return False
 
-# Fallback hardcoded permissions for when database is not available or for testing
-ROLE_PERMISSIONS = {
-    "Admin": {
-        # Academic Management - Full access
-        "academic_years": ["create", "read", "update", "delete", "list"],
-        "classes": ["create", "read", "update", "delete", "list"],
-        "sections": ["create", "read", "update", "delete", "list"],
-        "subjects": ["create", "read", "update", "delete", "list"],
-        "subject_categories": ["create", "read", "update", "delete", "list"],
-        
-        # Fee Management - Full access
-        "fee_categories": ["create", "read", "update", "delete", "list"],
-        "fee_types": ["create", "read", "update", "delete", "list"],
-        "fee_terms": ["create", "read", "update", "delete", "list"],
-        "fee_class_mappings": ["create", "read", "update", "delete", "list"],
-        "fee_student_mappings": ["create", "read", "update", "delete", "list"],
-        "fee_term_amounts": ["create", "read", "update", "delete", "list"],
-        
-        # Transport Management - Full access
-        "transport_routes": ["create", "read", "update", "delete", "list"],
-        "transport_vehicles": ["create", "read", "update", "delete", "list"],
-        "route_stops": ["create", "read", "update", "delete", "list"],
-        "transport_trips": ["create", "read", "update", "delete", "list"],
-        "student_transport": ["create", "read", "update", "delete", "list"],
-        
-        # Student Management - Full access
-        "students": ["create", "read", "update", "delete", "list"],
-        "student_admissions": ["create", "read", "update", "delete", "list"],
-        "student_attendance": ["create", "read", "update", "delete", "list"],
-        "student_certificates": ["create", "read", "update", "delete", "list"],
-        "student_documents": ["create", "read", "update", "delete", "list"],
-        
-        # Staff Management - Full access
-        "staff": ["create", "read", "update", "delete", "list"],
-        "staff_attendance": ["create", "read", "update", "delete", "list"],
-        "designations": ["create", "read", "update", "delete", "list"],
-        
-        # Administrative - Full access
-        "parents": ["create", "read", "update", "delete", "list"],
-        "holidays": ["create", "read", "update", "delete", "list"],
-        "timetables": ["create", "read", "update", "delete", "list"],
-        
-        # System Management - Full access
-        "role_management": ["create", "read", "update", "delete", "list"],
-        "permission_management": ["create", "read", "update", "delete", "list"],
-        "menu_management": ["create", "read", "update", "delete", "list"],
-    },
-    
-    "Teacher": {
-        # Academic Management - Enhanced access for teaching
-        "academic_years": ["read", "list"],
-        "classes": ["create", "read", "update", "delete", "list"],
-        "sections": ["create", "read", "update", "delete", "list"],
-        "subjects": ["create", "read", "update", "delete", "list"],
-        "subject_categories": ["read", "list"],
-        
-        # Student Academic Management - Full access
-        "students": ["read", "list"],
-        "student_attendance": ["create", "read", "update", "delete", "list"],
-        "student_certificates": ["create", "read", "update", "delete", "list"],
-        "student_admissions": ["read", "list"],
-        "student_documents": ["read", "list"],
-        
-        # Fee Information - Read access only
-        "fee_categories": ["read", "list"],
-        "fee_types": ["read", "list"],
-        "fee_terms": ["read", "list"],
-        "fee_class_mappings": ["read", "list"],
-        "fee_student_mappings": ["read", "list"],
-        "fee_term_amounts": ["read", "list"],
-        
-        # Transport Information - Read access only
-        "transport_routes": ["read", "list"],
-        "transport_vehicles": ["read", "list"],
-        "route_stops": ["read", "list"],
-        "transport_trips": ["read", "list"],
-        "student_transport": ["read", "list"],
-        
-        # Staff Information - Read access for coordination
-        "staff": ["read", "list"],
-        "staff_attendance": ["read", "list"],
-        "designations": ["read", "list"],
-        
-        # Administrative Information - Read access
-        "parents": ["read", "list"],
-        "holidays": ["read", "list"],
-        "timetables": ["read", "list"],
-    },
-    
-    "Student": {
-        # Academic Information - Read access only
-        "academic_years": ["read", "list"],
-        "classes": ["read", "list"],
-        "sections": ["read", "list"],
-        "subjects": ["read", "list"],
-        "subject_categories": ["read", "list"],
-        
-        # Own Academic Records - Read access
-        "student_attendance": ["read", "list"],
-        "student_certificates": ["read", "list"],
-        "student_documents": ["read", "list"],
-        
-        # Fee Information - Read access only
-        "fee_categories": ["read", "list"],
-        "fee_types": ["read", "list"],
-        "fee_terms": ["read", "list"],
-        "fee_class_mappings": ["read", "list"],
-        "fee_student_mappings": ["read", "list"],
-        "fee_term_amounts": ["read", "list"],
-        
-        # Transport Information - Read access only
-        "transport_routes": ["read", "list"],
-        "transport_vehicles": ["read", "list"],
-        "route_stops": ["read", "list"],
-        "transport_trips": ["read", "list"],
-        "student_transport": ["read", "list"],
-        
-        # School Information - Read access
-        "holidays": ["read", "list"],
-        "timetables": ["read", "list"],
-    },
-    
-    "Parent": {
-        # Academic Information - Read access for child's education
-        "academic_years": ["read", "list"],
-        "classes": ["read", "list"],
-        "sections": ["read", "list"],
-        "subjects": ["read", "list"],
-        "subject_categories": ["read", "list"],
-        
-        # Child's Academic Records - Read access
-        "student_attendance": ["read", "list"],
-        "student_certificates": ["read", "list"],
-        "student_admissions": ["read", "list"],
-        "student_documents": ["read", "list"],
-        
-        # Fee Information - Read access for payment purposes
-        "fee_categories": ["read", "list"],
-        "fee_types": ["read", "list"],
-        "fee_terms": ["read", "list"],
-        "fee_class_mappings": ["read", "list"],
-        "fee_student_mappings": ["read", "list"],
-        "fee_term_amounts": ["read", "list"],
-        
-        # Transport Information - Read access for child's transport
-        "transport_routes": ["read", "list"],
-        "transport_vehicles": ["read", "list"],
-        "route_stops": ["read", "list"],
-        "transport_trips": ["read", "list"],
-        "student_transport": ["read", "list"],
-        
-        # School Information - Read access
-        "holidays": ["read", "list"],
-        "timetables": ["read", "list"],
-    },
-    
-    "Staff": {
-        # Administrative Operations - Full CRUD access
-        "fee_categories": ["create", "read", "update", "delete", "list"],
-        "fee_types": ["create", "read", "update", "delete", "list"],
-        "fee_terms": ["create", "read", "update", "delete", "list"],
-        "fee_class_mappings": ["create", "read", "update", "delete", "list"],
-        "fee_student_mappings": ["create", "read", "update", "delete", "list"],
-        "fee_term_amounts": ["create", "read", "update", "delete", "list"],
-        
-        # Transport Management - Full CRUD access
-        "transport_routes": ["create", "read", "update", "delete", "list"],
-        "transport_vehicles": ["create", "read", "update", "delete", "list"],
-        "route_stops": ["create", "read", "update", "delete", "list"],
-        "transport_trips": ["create", "read", "update", "delete", "list"],
-        "student_transport": ["create", "read", "update", "delete", "list"],
-        
-        # Staff Management - Full CRUD access
-        "staff": ["create", "read", "update", "delete", "list"],
-        "staff_attendance": ["create", "read", "update", "delete", "list"],
-        "designations": ["create", "read", "update", "delete", "list"],
-        
-        # Administrative Functions - Full CRUD access
-        "parents": ["create", "read", "update", "delete", "list"],
-        "holidays": ["create", "read", "update", "delete", "list"],
-        
-        # Academic Information - Read access for administrative support
-        "academic_years": ["read", "list"],
-        "classes": ["read", "list"],
-        "sections": ["read", "list"],
-        "subjects": ["read", "list"],
-        "subject_categories": ["read", "list"],
-        "timetables": ["read", "list"],
-        
-        # Student Information - Read access for administrative support
-        "students": ["read", "list"],
-        "student_admissions": ["read", "list"],
-        "student_attendance": ["read", "list"],
-        "student_certificates": ["read", "list"],
-        "student_documents": ["read", "list"],
-    }
-}
 
-def check_role_permission_fallback(role: str, resource: str, action: str) -> bool:
-    """Fallback check if a role has permission for a resource:action (hardcoded)"""
-    if not role or role not in ROLE_PERMISSIONS:
-        logger.warning(f"Unknown role: {role}")
-        return False
-    
-    role_perms = ROLE_PERMISSIONS.get(role, {})
-    resource_perms = role_perms.get(resource, [])
-    
-    has_permission = action in resource_perms
-    logger.info(f"Fallback Permission check: {role} -> {resource}:{action} = {has_permission}")
-    return has_permission
 
 async def check_role_permission(db: AsyncSession, role: str, resource: str, action: str) -> bool:
     """
-    Check if a role has permission with database-first approach and fallback.
-    
-    1. Try database first
-    2. If database fails or returns no permission, try fallback
+    Check if a role has permission from database only.
+
+    Returns False if permission not found in database.
     """
     try:
-        # First try database
         has_db_permission = await check_role_permission_db(db, role, resource, action)
-        if has_db_permission:
-            return True
-        
-        # If no database permission found, try fallback
-        logger.info(f"No database permission found for {role} -> {resource}:{action}, trying fallback")
-        return check_role_permission_fallback(role, resource, action)
-        
+        logger.info(f"Database-only permission check: {role} -> {resource}:{action} = {has_db_permission}")
+        return has_db_permission
+
     except Exception as e:
-        logger.error(f"Error in permission checking, using fallback: {str(e)}")
-        return check_role_permission_fallback(role, resource, action)
+        logger.error(f"Error in database permission checking: {str(e)}")
+        return False
 
 async def check_role_plan_permission(db: AsyncSession, client_name: str, role: str, resource: str, action: str) -> bool:
     """
@@ -353,8 +138,7 @@ async def check_role_plan_permission(db: AsyncSession, client_name: str, role: s
         
     except Exception as e:
         logger.error(f"Error in multi-layer permission checking: {str(e)}")
-        # Fallback to role-only permission for safety
-        return await check_role_permission(db, role, resource, action)
+        return False
 
 async def check_role_plan_permission_with_error(db: AsyncSession, request: Request, role: str, resource: str, action: str) -> bool:
     """
@@ -383,26 +167,12 @@ async def check_role_plan_permission_with_error(db: AsyncSession, request: Reque
         if not role_has_permission:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions: {role} cannot {action} {resource}"
+                detail=f"Permission not found in database: {role} cannot {action} {resource}. Contact administrator to configure permissions."
             )
         
         # Layer 2: Plan permission check
         logger.info(f"Checking plan permission for client_name: {client_name}, resource: {resource}, action: {action}")
         plan_allows_access = await PlanService.check_plan_permission(client_name, resource, action)
-        
-        # TEMPORARY: For testing, if plan check fails, try with common test tenant names
-        if not plan_allows_access:
-            logger.warning(f"Plan permission failed for {client_name}, trying fallback tenants for testing")
-            
-            # Try common test client names as fallback
-            fallback_clients = ['test_tenant', 'default']
-            for fallback_client in fallback_clients:
-                if fallback_client != client_name:
-                    fallback_access = await PlanService.check_plan_permission(fallback_client, resource, action)
-                    if fallback_access:
-                        logger.info(f"Using fallback client '{fallback_client}' for testing - plan access granted")
-                        plan_allows_access = True
-                        break
         
         if not plan_allows_access:
             # Get detailed plan limitation info for user-friendly error
@@ -428,78 +198,89 @@ async def check_role_plan_permission_with_error(db: AsyncSession, request: Reque
         raise
     except Exception as e:
         logger.error(f"Error in multi-layer permission checking: {str(e)}")
-        # Fallback to role-only permission
-        role_has_permission = await check_role_permission(db, role, resource, action)
-        if not role_has_permission:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions: {role} cannot {action} {resource}"
-            )
-        return True
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Permission check failed - ensure permissions are configured in database"
+        )
 
 # Permission check functions with role-based logic
 def RequireCreate(resource: str):
     """Require create permission for resource"""
-    async def permission_check(current_user: dict = Depends(get_current_user)) -> bool:
+    async def permission_check(
+        current_user: dict = Depends(get_current_user),
+        db: AsyncSession = Depends(get_tenant_db)
+    ) -> bool:
         role = current_user.get('role')
-        has_perm = check_role_permission(role, resource, 'create')
+        has_perm = await check_role_permission(db, role, resource, 'create')
         if not has_perm:
             logger.warning(f"Access denied: {role} cannot create {resource}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions: {role} cannot create {resource}"
+                detail=f"Permission not found in database: {role} cannot create {resource}. Contact administrator to configure permissions."
             )
         return has_perm
     return permission_check
 
 def RequireRead(resource: str):
     """Require read permission for resource"""
-    async def permission_check(current_user: dict = Depends(get_current_user)) -> bool:
+    async def permission_check(
+        current_user: dict = Depends(get_current_user),
+        db: AsyncSession = Depends(get_tenant_db)
+    ) -> bool:
         role = current_user.get('role')
-        has_perm = check_role_permission(role, resource, 'read')
+        has_perm = await check_role_permission(db, role, resource, 'read')
         if not has_perm:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions: {role} cannot read {resource}"
+                detail=f"Permission not found in database: {role} cannot read {resource}. Contact administrator to configure permissions."
             )
         return has_perm
     return permission_check
 
 def RequireUpdate(resource: str):
     """Require update permission for resource"""
-    async def permission_check(current_user: dict = Depends(get_current_user)) -> bool:
+    async def permission_check(
+        current_user: dict = Depends(get_current_user),
+        db: AsyncSession = Depends(get_tenant_db)
+    ) -> bool:
         role = current_user.get('role')
-        has_perm = check_role_permission(role, resource, 'update')
+        has_perm = await check_role_permission(db, role, resource, 'update')
         if not has_perm:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions: {role} cannot update {resource}"
+                detail=f"Permission not found in database: {role} cannot update {resource}. Contact administrator to configure permissions."
             )
         return has_perm
     return permission_check
 
 def RequireDelete(resource: str):
     """Require delete permission for resource"""
-    async def permission_check(current_user: dict = Depends(get_current_user)) -> bool:
+    async def permission_check(
+        current_user: dict = Depends(get_current_user),
+        db: AsyncSession = Depends(get_tenant_db)
+    ) -> bool:
         role = current_user.get('role')
-        has_perm = check_role_permission(role, resource, 'delete')
+        has_perm = await check_role_permission(db, role, resource, 'delete')
         if not has_perm:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions: {role} cannot delete {resource}"
+                detail=f"Permission not found in database: {role} cannot delete {resource}. Contact administrator to configure permissions."
             )
         return has_perm
     return permission_check
 
 def RequireList(resource: str):
     """Require list permission for resource"""
-    async def permission_check(current_user: dict = Depends(get_current_user)) -> bool:
+    async def permission_check(
+        current_user: dict = Depends(get_current_user),
+        db: AsyncSession = Depends(get_tenant_db)
+    ) -> bool:
         role = current_user.get('role')
-        has_perm = check_role_permission(role, resource, 'list')
+        has_perm = await check_role_permission(db, role, resource, 'list')
         if not has_perm:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions: {role} cannot list {resource}"
+                detail=f"Permission not found in database: {role} cannot list {resource}. Contact administrator to configure permissions."
             )
         return has_perm
     return permission_check
