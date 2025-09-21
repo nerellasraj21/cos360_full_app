@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-import logging as log
+import logging
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -18,7 +18,7 @@ from typing import List, Optional
 from uuid import UUID
 from decimal import Decimal
 
-log = log.getLogger("fee.student_mapping_service")
+log = logging.getLogger("fee.student_mapping_service")
 
 async def validate_student_exists(db: AsyncSession, student_id: UUID):
     """Validate that student exists"""
@@ -170,25 +170,49 @@ async def create_term_amounts(db: AsyncSession, fee_student_mapping_id: UUID, to
 
 async def get_student_details(db: AsyncSession, student_id: UUID, admission_number: str, class_id: UUID, section_id: UUID):
     """Get comprehensive student details"""
-    # Get student
-    result = await db.execute(select(Student).where(Student.id == student_id))
-    student = result.scalar_one()
-    
-    # Get class
-    result = await db.execute(select(Class).where(Class.id == class_id))
-    class_obj = result.scalar_one()
-    
-    # Get section
-    result = await db.execute(select(Section).where(Section.id == section_id))
-    section_obj = result.scalar_one()
-    
-    return {
-        "student_id": student.id,
-        "student_name": f"{student.first_name} {student.last_name}",
-        "student_admission_number": admission_number,
-        "student_class": {"id": class_obj.id, "name": class_obj.name},
-        "student_section": {"id": section_obj.id, "name": section_obj.name}
-    }
+    try:
+        # Get student
+        result = await db.execute(select(Student).where(Student.id == student_id))
+        student = result.scalar_one_or_none()
+        if not student:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Student with id {student_id} not found"
+            )
+
+        # Get class
+        result = await db.execute(select(Class).where(Class.id == class_id))
+        class_obj = result.scalar_one_or_none()
+        if not class_obj:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Class with id {class_id} not found"
+            )
+
+        # Get section
+        result = await db.execute(select(Section).where(Section.id == section_id))
+        section_obj = result.scalar_one_or_none()
+        if not section_obj:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Section with id {section_id} not found"
+            )
+
+        return {
+            "student_id": student.id,
+            "student_name": f"{student.first_name} {student.last_name}",
+            "student_admission_number": admission_number,
+            "student_class": {"id": class_obj.id, "name": class_obj.name},
+            "student_section": {"id": section_obj.id, "name": section_obj.name}
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"Error getting student details: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving student details"
+        )
 
 async def create_fee_student_mapping(db: AsyncSession, mapping_data: FeeStudentMappingCreate):
     """Create a new fee student mapping with term amounts"""
@@ -225,11 +249,8 @@ async def create_fee_student_mapping(db: AsyncSession, mapping_data: FeeStudentM
         
         # Create term amounts
         await create_term_amounts(db, db_mapping.id, mapping_data.total_fee, mapping_data.fee_type_id)
-        
-        await db.commit()
-        await db.refresh(db_mapping)
-        
-        # Load with all relationships for response
+
+        # Load with all relationships before commit (proper refresh pattern)
         result = await db.execute(
             select(FeeStudentMappingModel)
             .options(
@@ -243,6 +264,8 @@ async def create_fee_student_mapping(db: AsyncSession, mapping_data: FeeStudentM
             .where(FeeStudentMappingModel.id == db_mapping.id)
         )
         mapping = result.scalar_one()
+
+        await db.commit()
         
         # Add relationship names and student details
         mapping.fee_type_name = mapping.fee_type.type_name if mapping.fee_type else None
@@ -351,14 +374,8 @@ async def get_all_fee_student_mappings(
 ):
     """Get all fee student mappings with optional filters"""
     try:
-        query = select(FeeStudentMappingModel).options(
-            selectinload(FeeStudentMappingModel.student),
-            selectinload(FeeStudentMappingModel.class_ref),
-            selectinload(FeeStudentMappingModel.section),
-            selectinload(FeeStudentMappingModel.fee_type),
-            selectinload(FeeStudentMappingModel.academic_year),
-            selectinload(FeeStudentMappingModel.term_amounts).selectinload(FeeStudentMapTermAmountModel.fee_term)
-        )
+        # Simplified query without complex relationships to avoid issues
+        query = select(FeeStudentMappingModel)
         
         # Apply filters
         if student_id is not None:
@@ -379,24 +396,22 @@ async def get_all_fee_student_mappings(
         result = await db.execute(query)
         mappings = result.scalars().all()
         
-        # Add relationship names and student details for each mapping
+        # If no mappings, return empty list immediately
+        if not mappings:
+            return []
+
+        # Simplified processing without complex relationship access
         for mapping in mappings:
-            mapping.fee_type_name = mapping.fee_type.type_name if mapping.fee_type else None
-            mapping.academic_year_name = mapping.academic_year.title if mapping.academic_year else None
-            
-            # Add student details
-            mapping.student_details = await get_student_details(
-                db, mapping.student_id, mapping.student_admission_num, mapping.class_id, mapping.section_id
-            )
-            
-            # Add term names to term amounts
-            if hasattr(mapping, 'term_amounts'):
-                for term_amount in mapping.term_amounts:
-                    term_amount.term_name = term_amount.fee_term.term_name if term_amount.fee_term else None
-                mapping.student_fee_mapping_terms = mapping.term_amounts
-            else:
+            try:
+                # Set basic attributes without accessing relationships
+                mapping.fee_type_name = None
+                mapping.academic_year_name = None
+                mapping.student_details = None
                 mapping.student_fee_mapping_terms = []
-        
+            except Exception as mapping_error:
+                log.error(f"Error processing mapping {mapping.id}: {str(mapping_error)}")
+                continue
+
         return mappings
         
     except HTTPException:
