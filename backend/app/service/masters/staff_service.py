@@ -186,8 +186,8 @@ async def get_all_staff_attendance(
         if start_date and end_date:
             stmt = stmt.where(
                 and_(
-                    StaffAttendance.attendance_date >= start_date,
-                    StaffAttendance.attendance_date <= end_date
+                    StaffAttendance.date >= start_date,
+                    StaffAttendance.date <= end_date
                 )
             )
 
@@ -210,13 +210,13 @@ async def get_attendance_for_staff(
 
     if start_date and end_date:
         query = query.where(and_(
-            StaffAttendance.attendance_date >= start_date,
-            StaffAttendance.attendance_date <= end_date
+            StaffAttendance.date >= start_date,
+            StaffAttendance.date <= end_date
         ))
     elif start_date:
-        query = query.where(StaffAttendance.attendance_date >= start_date)
+        query = query.where(StaffAttendance.date >= start_date)
     elif end_date:
-        query = query.where(StaffAttendance.attendance_date <= end_date)
+        query = query.where(StaffAttendance.date <= end_date)
 
     result = await db.execute(query)
     return result.scalars().all()
