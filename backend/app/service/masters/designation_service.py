@@ -114,13 +114,10 @@ async def get_all_designations(db: AsyncSession, skip: int = 0, limit: int = 100
             detail=f"Error fetching designations: {str(e)}"
         )
 
+@cache_dropdown(ttl=300)
 async def get_designations_dropdown(db: AsyncSession):
     """Get designations for dropdown - cached"""
-    return await cache_dropdown(
-        cache_key="designations_dropdown",
-        fetch_function=_fetch_designations_dropdown,
-        db=db
-    )
+    return await _fetch_designations_dropdown(db)
 
 async def _fetch_designations_dropdown(db: AsyncSession):
     """Internal function to fetch designations for dropdown"""

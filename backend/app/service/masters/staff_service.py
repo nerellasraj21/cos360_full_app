@@ -248,14 +248,20 @@ async def delete_staff_attendance(attendance_id: UUID, db: AsyncSession):
 
 async def get_staff_list_by_gender(
     gender: Optional[GenderEnum],db: AsyncSession):
-    stmt = select(Staff)
+    stmt = select(Staff).options(
+        selectinload(Staff.designation_obj),
+        selectinload(Staff.user)
+    )
     if gender:
         stmt = stmt.where(Staff.gender == gender)
     result = await db.execute(stmt)
     return result.scalars().all()
 
-async def get_staff_details_by_designation(designation_id: Optional[int],db: AsyncSession):
-    stmt = select(Staff)
+async def get_staff_details_by_designation(designation_id: Optional[UUID],db: AsyncSession):
+    stmt = select(Staff).options(
+        selectinload(Staff.designation_obj),
+        selectinload(Staff.user)
+    )
     if designation_id:
         stmt = stmt.where(Staff.designation_id == designation_id)
     result = await db.execute(stmt)

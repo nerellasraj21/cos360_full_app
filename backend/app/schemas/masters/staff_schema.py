@@ -2,12 +2,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Literal
 from datetime import date
 from uuid import UUID
-import enum
-
-class GenderEnum(enum.Enum):
-    Male = "Male"
-    Female = "Female"
-    Other = "Other"
+from app.models.masters.staff_model import GenderEnum
 
 class StaffEnrollmentBase(BaseModel):
     first_name: str = Field(..., description="Jane")
@@ -69,7 +64,7 @@ class StaffOut(BaseModel):
     qualification: Optional[str]
     experience_years: Optional[int]
     address: Optional[str]
-    designation: Optional[DesignationOut]
+    designation_obj: Optional[DesignationOut]
     department: Optional[str]
     is_active: bool
     user_id: UUID
