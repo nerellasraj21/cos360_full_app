@@ -102,7 +102,7 @@ async def create_fee_class_mapping(db: AsyncSession, mapping_data: FeeClassMappi
         # Create fee class mapping
         db_mapping = FeeClassMappingModel(
             class_id=mapping_data.class_id,
-            fee_type_id=UUID(mapping_data.fee_type_id),
+            fee_type_id=mapping_data.fee_type_id,
             total_fee=mapping_data.total_fee,
             academic_year_id=mapping_data.academic_year_id,
             all_by_default=mapping_data.all_by_default
@@ -118,7 +118,7 @@ async def create_fee_class_mapping(db: AsyncSession, mapping_data: FeeClassMappi
                 selectinload(FeeClassMappingModel.class_ref),
                 selectinload(FeeClassMappingModel.fee_type),
                 selectinload(FeeClassMappingModel.academic_year),
-                selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingModel.term_amounts.property.mapper.class_.fee_term)
+                selectinload(FeeClassMappingModel.term_amounts)
             )
             .where(FeeClassMappingModel.id == db_mapping.id)
         )
@@ -160,9 +160,12 @@ async def create_fee_class_mapping(db: AsyncSession, mapping_data: FeeClassMappi
     except Exception as e:
         await db.rollback()
         log.error(f"Error creating fee class mapping: {str(e)}")
+        log.error(f"Exception type: {type(e).__name__}")
+        import traceback
+        log.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while creating fee class mapping"
+            detail=f"An error occurred while creating fee class mapping: {str(e)}"
         )
 
 async def get_fee_class_mapping_by_id(db: AsyncSession, mapping_id: UUID):
@@ -174,7 +177,7 @@ async def get_fee_class_mapping_by_id(db: AsyncSession, mapping_id: UUID):
                 selectinload(FeeClassMappingModel.class_ref),
                 selectinload(FeeClassMappingModel.fee_type),
                 selectinload(FeeClassMappingModel.academic_year),
-                selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingModel.term_amounts.property.mapper.class_.fee_term)
+                selectinload(FeeClassMappingModel.term_amounts)
             )
             .where(FeeClassMappingModel.id == mapping_id)
         )
@@ -342,7 +345,7 @@ async def update_fee_class_mapping(db: AsyncSession, mapping_id: UUID, mapping_d
                 selectinload(FeeClassMappingModel.class_ref),
                 selectinload(FeeClassMappingModel.fee_type),
                 selectinload(FeeClassMappingModel.academic_year),
-                selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingModel.term_amounts.property.mapper.class_.fee_term)
+                selectinload(FeeClassMappingModel.term_amounts)
             )
             .where(FeeClassMappingModel.id == db_mapping.id)
         )
@@ -465,7 +468,7 @@ async def create_bulk_fee_class_mappings(db: AsyncSession, bulk_data: FeeClassMa
                         selectinload(FeeClassMappingModel.class_ref),
                         selectinload(FeeClassMappingModel.fee_type),
                         selectinload(FeeClassMappingModel.academic_year),
-                        selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingModel.term_amounts.property.mapper.class_.fee_term)
+                        selectinload(FeeClassMappingModel.term_amounts)
                     )
                     .where(FeeClassMappingModel.id == db_mapping.id)
                 )

@@ -12,6 +12,11 @@ from app.schemas.fee import FeeReceiptRead, ReceiptContent
 
 router = APIRouter(prefix="/fee/receipts", tags=["Fee/Fee Receipts"])
 
+@router.get("/health", status_code=status.HTTP_200_OK)
+async def receipt_health_check():
+    """Health check for fee receipt endpoints"""
+    return {"status": "healthy", "module": "fee_receipts", "timestamp": datetime.now()}
+
 @router.post("/generate/{transaction_id}", response_model=FeeReceiptRead, status_code=status.HTTP_201_CREATED)
 async def generate_fee_receipt(
     transaction_id: UUID,
@@ -195,9 +200,3 @@ async def search_fee_receipts(
         limit=limit,
         offset=offset
     )
-
-# Health check endpoint for receipt module
-@router.get("/health", status_code=status.HTTP_200_OK)
-async def receipt_health_check():
-    """Health check for fee receipt endpoints"""
-    return {"status": "healthy", "module": "fee_receipts", "timestamp": datetime.now()}

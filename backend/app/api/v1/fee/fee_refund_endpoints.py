@@ -14,6 +14,11 @@ from app.schemas.fee import (
 
 router = APIRouter(prefix="/fee/refunds", tags=["Fee/Fee Refunds"])
 
+@router.get("/health", status_code=status.HTTP_200_OK)
+async def refund_health_check():
+    """Health check for fee refund endpoints"""
+    return {"status": "healthy", "module": "fee_refunds", "timestamp": datetime.now()}
+
 @router.post("/", response_model=FeeRefundRead, status_code=status.HTTP_201_CREATED)
 async def create_refund_request(
     refund_data: FeeRefundCreate,
@@ -220,9 +225,3 @@ async def get_refund_summary_for_transaction(
     await check_role_plan_permission_with_error(db, request, role, 'fee_refunds', 'read')
     
     return await FeeRefundService.get_refund_summary_by_transaction(db, transaction_id)
-
-# Health check endpoint for refund module
-@router.get("/health", status_code=status.HTTP_200_OK)
-async def refund_health_check():
-    """Health check for fee refund endpoints"""
-    return {"status": "healthy", "module": "fee_refunds", "timestamp": datetime.now()}

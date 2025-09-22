@@ -82,11 +82,7 @@ class FeeTransactionService:
             # Get student fee mapping
             result = await db.execute(
                 select(FeeStudentMapping)
-                .options(
-                    selectinload(FeeStudentMapping.term_amounts.and_(
-                        FeeStudentMapTermAmount.fee_term_id == fee_term_id
-                    ))
-                )
+                .options(selectinload(FeeStudentMapping.term_amounts))
                 .where(
                     and_(
                         FeeStudentMapping.student_id == student_id,
@@ -104,7 +100,7 @@ class FeeTransactionService:
                 )
             
             # Get term amount
-            term_amount = next((ta for ta in fee_mapping.term_amounts if ta.fee_term_id == fee_term_id), None)
+            term_amount = next((ta for ta in fee_mapping.term_amounts if ta.term_id == fee_term_id), None)
             if not term_amount:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -115,7 +111,7 @@ class FeeTransactionService:
             already_paid = await FeeTransactionService.get_student_payments_for_fee_term(
                 db, student_id, fee_type_id, fee_term_id, academic_year_id
             )
-            outstanding = term_amount.amount - already_paid
+            outstanding = term_amount.term_amount - already_paid
             
             if amount_paid > outstanding:
                 raise HTTPException(
@@ -126,7 +122,7 @@ class FeeTransactionService:
             validated_items.append({
                 'fee_type_id': fee_type_id,
                 'fee_term_id': fee_term_id,
-                'amount_due': term_amount.amount,
+                'amount_due': term_amount.term_amount,
                 'amount_paid': amount_paid,
                 'description': item.get('description')
             })
@@ -219,11 +215,20 @@ class FeeTransactionService:
                 )
                 db.add(db_item)
             
+            await db.flush()  # Get the transaction ID
+            
+            # Load with all relationships before commit (proper refresh pattern)
+            result = await db.execute(
+                select(FeeTransaction)
+                .options(selectinload(FeeTransaction.transaction_items))
+                .where(FeeTransaction.id == db_transaction.id)
+            )
+            db_transaction = result.scalar_one()
+            
             await db.commit()
-            await db.refresh(db_transaction)
             
             # Return complete transaction with items
-            return await FeeTransactionService.get_transaction_by_id(db, db_transaction.id)
+            return db_transaction
             
         except HTTPException:
             await db.rollback()
@@ -231,9 +236,12 @@ class FeeTransactionService:
         except Exception as e:
             await db.rollback()
             log.error(f"Error creating fee transaction: {str(e)}")
+            log.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            log.error(f"Traceback: {traceback.format_exc()}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="An error occurred while creating fee transaction"
+                detail=f"An error occurred while creating fee transaction: {str(e)}"
             )
 
     @staticmethod
