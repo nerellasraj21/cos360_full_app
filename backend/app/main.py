@@ -9,6 +9,8 @@ from app.tools.logging import configure_logging
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.tenant_middleware import TenantMiddleware
 from app.middleware.rate_limit_middleware import limiter, rate_limit_handler, RateLimitExceeded
+from app.middleware.error_middleware import GlobalErrorMiddleware
+from app.middleware.request_context_middleware import RequestContextMiddleware
 from app.config import settings
 
 app = FastAPI(docs_url=None, redoc_url=None)  
@@ -62,6 +64,12 @@ async def get_redoc():
 
 # Configure Logging
 configure_logging(log_file="cos360_errors.log")
+
+# Global error handling middleware (must be added first to catch all errors)
+app.add_middleware(GlobalErrorMiddleware)
+
+# Request context middleware (for correlation IDs and tenant context)
+app.add_middleware(RequestContextMiddleware)
 
 # Tenant detection middleware (must be added before other middlewares)
 app.add_middleware(TenantMiddleware)

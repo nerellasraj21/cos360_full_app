@@ -48,7 +48,7 @@ async def create_fee_transaction(
     collected_by_user_id = UUID(current_user.get('sub'))
     
     # Create transaction via service
-    return await FeeTransactionService.create_transaction(db, transaction_data, collected_by_user_id)
+    return await FeeTransactionService.create_transaction(db, transaction_data, collected_by_user_id, request)
 
 @router.get("/{transaction_id}", response_model=FeeTransactionRead)
 async def get_fee_transaction(
@@ -68,7 +68,7 @@ async def get_fee_transaction(
     # Permission check
     await check_role_plan_permission_with_error(db, request, role, 'fee_transactions', 'read')
     
-    return await FeeTransactionService.get_transaction_by_id(db, transaction_id)
+    return await FeeTransactionService.get_transaction_by_id(db, transaction_id, request)
 
 @router.put("/{transaction_id}", response_model=FeeTransactionRead)
 async def update_fee_transaction_status(

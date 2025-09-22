@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError, OperationalError
 from app.schemas.student.admission_schema import StudentAdmissionCreate, StudentAdmissionUpdate
@@ -11,10 +11,22 @@ from app.models.auth.user_model import User
 from app.models.auth.role_model import Role
 from sqlalchemy.future import select
 from uuid import UUID
-from sqlalchemy import or_, String, func, extract
+from sqlalchemy import or_, String, func, extract, and_
 from app.tools.password_util import hash_password
 from datetime import datetime
+from typing import Optional, List, Dict, Any
 import logging
+
+from app.tools.error_handler import (
+    create_error_response,
+    create_validation_error,
+    create_not_found_error,
+    create_business_rule_error,
+    create_database_error,
+    handle_database_exception,
+    ErrorCategory
+)
+from app.tools.database_error_mapper import map_database_error
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +69,47 @@ async def get_role_by_name(db: AsyncSession, role_name: str) -> UUID:
         raise HTTPException(status_code=404, detail=f"Role '{role_name}' not found")
     return role.id
 
-async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
+async def add_admission(
+    admission: StudentAdmissionCreate, 
+    db: AsyncSession,
+    request: Optional[Request] = None
+):
+    """
+    Create a new student admission with comprehensive error handling
+    
+    Args:
+        admission: Admission data including student and parent information
+        db: Database session
+        request: FastAPI request object for context
+        
+    Returns:
+        Created admission with all relationships
+        
+    Raises:
+        HTTPException: For validation, business rule, or database errors
+    """
     try:
-        # Get role IDs dynamically
-        student_role_id = await get_role_by_name(db, "Student")
-        parent_role_id = await get_role_by_name(db, "Parent")
+        # Validate admission date
+        if admission.admission_date > datetime.now().date():
+            raise create_validation_error(
+                message="Admission date cannot be in the future",
+                field="admission_date",
+                value=str(admission.admission_date),
+                request=request
+            )
+        
+        # Get role IDs dynamically with error handling
+        try:
+            student_role_id = await get_role_by_name(db, "Student")
+            parent_role_id = await get_role_by_name(db, "Parent")
+        except HTTPException as e:
+            if e.status_code == 404:
+                raise create_business_rule_error(
+                    message="Required roles (Student/Parent) not found in system",
+                    rule="role_validation",
+                    request=request
+                )
+            raise
 
         # Generate admission number
         admission_number = await generate_admission_number(db, admission.admission_date)
@@ -69,12 +117,60 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
         admission_dict = admission.dict(exclude={"student"})
         admission_dict["admission_number"] = admission_number
 
+        # Validate student data
+        if not admission.student.first_name or not admission.student.first_name.strip():
+            raise create_validation_error(
+                message="Student first name is required",
+                field="student.first_name",
+                request=request
+            )
+        
+        if not admission.student.last_name or not admission.student.last_name.strip():
+            raise create_validation_error(
+                message="Student last name is required",
+                field="student.last_name",
+                request=request
+            )
+        
+        if not admission.student.date_of_birth:
+            raise create_validation_error(
+                message="Student date of birth is required",
+                field="student.date_of_birth",
+                request=request
+            )
+        
+        # Validate parent data
+        if not admission.student.father or not admission.student.mother:
+            raise create_validation_error(
+                message="Both father and mother information are required",
+                field="student.parents",
+                request=request
+            )
+
         # Check for duplicate emails
         father_email = admission.student.father.email
         mother_email = admission.student.mother.email
 
+        if not father_email or not father_email.strip():
+            raise create_validation_error(
+                message="Father email is required",
+                field="student.father.email",
+                request=request
+            )
+        
+        if not mother_email or not mother_email.strip():
+            raise create_validation_error(
+                message="Mother email is required",
+                field="student.mother.email",
+                request=request
+            )
+
         if father_email == mother_email:
-            raise HTTPException(status_code=400, detail="Father and mother cannot have the same email address")
+            raise create_validation_error(
+                message="Father and mother cannot have the same email address",
+                field="student.parents.email",
+                request=request
+            )
 
         # Check if emails already exist and get existing parent users
         existing_users_result = await db.execute(
@@ -90,199 +186,406 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession):
             if email in existing_emails:
                 user = existing_emails[email]
                 if user.role.name != "Parent":
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Email {email} is already registered to a {user.role.name}, not a parent"
+                    raise create_business_rule_error(
+                        message=f"Email {email} is already registered to a {user.role.name}, not a parent",
+                        rule="email_role_conflict",
+                        request=request
                     )
 
         # Convert student fields, excluding the nested ones
         student_data = admission.student.dict(exclude={"father", "mother"})
 
-        student_dict = Student(**student_data)
-        student_user_data = User(
-            username = student_dict.first_name,
-            password_hash = hash_password("student@123"),
-            is_active = True,
-            role_id= student_role_id
-        )
+        # Validate student data before creating objects
+        try:
+            student_dict = Student(**student_data)
+        except Exception as e:
+            raise create_validation_error(
+                message=f"Invalid student data: {str(e)}",
+                field="student",
+                request=request
+            )
+
+        # Create student user
+        try:
+            student_user_data = User(
+                username=student_dict.first_name,
+                password_hash=hash_password("student@123"),
+                is_active=True,
+                role_id=student_role_id
+            )
+        except Exception as e:
+            raise create_error_response(
+                error_code=ErrorCategory.SYSTEM_ERROR,
+                message="Failed to create student user account",
+                status_code=500,
+                request=request
+            )
 
         db.add(student_user_data)
         await db.flush()
 
-        student_dict.user_id=student_user_data.id
+        student_dict.user_id = student_user_data.id
         db.add(student_dict)
         await db.flush()
 
         # Handle father - reuse existing user if email exists, create new if not
-        if father_email in existing_emails:
-            father_user_data = existing_emails[father_email]
-            # Get existing parent record
-            logger.info(f"Looking for existing father with user_id: {father_user_data.id}")
-            existing_father_result = await db.execute(
-                select(Parent).where(Parent.user_id == father_user_data.id)
-            )
-            father_dict = existing_father_result.scalar_one_or_none()
-
-            if not father_dict:
-                logger.error(f"No parent record found for existing father user_id: {father_user_data.id}")
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Parent record not found for existing father user {father_email}"
+        try:
+            if father_email in existing_emails:
+                father_user_data = existing_emails[father_email]
+                # Get existing parent record
+                logger.info(f"Looking for existing father with user_id: {father_user_data.id}")
+                existing_father_result = await db.execute(
+                    select(Parent).where(Parent.user_id == father_user_data.id)
                 )
-        else:
-            # Create new father user and parent
-            father_dict = Parent(**admission.student.father.dict())
-            father_user_data = User(
-                username = father_dict.name,
-                email = father_dict.email,
-                password_hash = hash_password("parent@123"),
-                is_active = True,
-                role_id= parent_role_id
-            )
-            db.add(father_user_data)
-            await db.flush()
+                father_dict = existing_father_result.scalar_one_or_none()
 
-            father_dict.user_id = father_user_data.id
-            db.add(father_dict)
-            await db.flush()
+                if not father_dict:
+                    logger.error(f"No parent record found for existing father user_id: {father_user_data.id}")
+                    raise create_not_found_error(
+                        message=f"Parent record not found for existing father user {father_email}",
+                        resource_type="parent",
+                        resource_id=str(father_user_data.id),
+                        request=request
+                    )
+            else:
+                # Create new father user and parent
+                try:
+                    father_dict = Parent(**admission.student.father.dict())
+                except Exception as e:
+                    raise create_validation_error(
+                        message=f"Invalid father data: {str(e)}",
+                        field="student.father",
+                        request=request
+                    )
+                
+                father_user_data = User(
+                    username=father_dict.name,
+                    email=father_dict.email,
+                    password_hash=hash_password("parent@123"),
+                    is_active=True,
+                    role_id=parent_role_id
+                )
+                db.add(father_user_data)
+                await db.flush()
+
+                father_dict.user_id = father_user_data.id
+                db.add(father_dict)
+                await db.flush()
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error handling father data: {str(e)}")
+            raise create_error_response(
+                error_code=ErrorCategory.SYSTEM_ERROR,
+                message="Failed to process father information",
+                status_code=500,
+                request=request
+            )
 
         # Handle mother - reuse existing user if email exists, create new if not
-        if mother_email in existing_emails:
-            mother_user_data = existing_emails[mother_email]
-            # Get existing parent record
-            logger.info(f"Looking for existing mother with user_id: {mother_user_data.id}")
-            existing_mother_result = await db.execute(
-                select(Parent).where(Parent.user_id == mother_user_data.id)
-            )
-            mother_dict = existing_mother_result.scalar_one_or_none()
-
-            if not mother_dict:
-                logger.error(f"No parent record found for existing mother user_id: {mother_user_data.id}")
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Parent record not found for existing mother user {mother_email}"
+        try:
+            if mother_email in existing_emails:
+                mother_user_data = existing_emails[mother_email]
+                # Get existing parent record
+                logger.info(f"Looking for existing mother with user_id: {mother_user_data.id}")
+                existing_mother_result = await db.execute(
+                    select(Parent).where(Parent.user_id == mother_user_data.id)
                 )
-        else:
-            # Create new mother user and parent
-            mother_dict = Parent(**admission.student.mother.dict())
-            mother_user_data = User(
-                username = mother_dict.name,
-                email = mother_dict.email,
-                password_hash = hash_password("parent@123"),
-                is_active = True,
-                role_id= parent_role_id
-            )
-            db.add(mother_user_data)
-            await db.flush()
+                mother_dict = existing_mother_result.scalar_one_or_none()
 
-            mother_dict.user_id = mother_user_data.id
-            db.add(mother_dict)
-            await db.flush()
+                if not mother_dict:
+                    logger.error(f"No parent record found for existing mother user_id: {mother_user_data.id}")
+                    raise create_not_found_error(
+                        message=f"Parent record not found for existing mother user {mother_email}",
+                        resource_type="parent",
+                        resource_id=str(mother_user_data.id),
+                        request=request
+                    )
+            else:
+                # Create new mother user and parent
+                try:
+                    mother_dict = Parent(**admission.student.mother.dict())
+                except Exception as e:
+                    raise create_validation_error(
+                        message=f"Invalid mother data: {str(e)}",
+                        field="student.mother",
+                        request=request
+                    )
+                
+                mother_user_data = User(
+                    username=mother_dict.name,
+                    email=mother_dict.email,
+                    password_hash=hash_password("parent@123"),
+                    is_active=True,
+                    role_id=parent_role_id
+                )
+                db.add(mother_user_data)
+                await db.flush()
+
+                mother_dict.user_id = mother_user_data.id
+                db.add(mother_dict)
+                await db.flush()
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error handling mother data: {str(e)}")
+            raise create_error_response(
+                error_code=ErrorCategory.SYSTEM_ERROR,
+                message="Failed to process mother information",
+                status_code=500,
+                request=request
+            )
 
         # Check if father-student link already exists
-        existing_father_link = await db.execute(
-            select(StudentParentLink).where(
-                StudentParentLink.student_id == student_dict.id,
-                StudentParentLink.parent_id == father_dict.id
+        try:
+            existing_father_link = await db.execute(
+                select(StudentParentLink).where(
+                    and_(
+                        StudentParentLink.student_id == student_dict.id,
+                        StudentParentLink.parent_id == father_dict.id
+                    )
+                )
             )
-        )
-        if not existing_father_link.scalar_one_or_none():
-            student_parent_link_father = StudentParentLink(student_id = student_dict.id, parent_id = father_dict.id)
-            db.add(student_parent_link_father)
-            await db.flush()
+            if not existing_father_link.scalar_one_or_none():
+                student_parent_link_father = StudentParentLink(
+                    student_id=student_dict.id, 
+                    parent_id=father_dict.id
+                )
+                db.add(student_parent_link_father)
+                await db.flush()
+        except Exception as e:
+            logger.error(f"Error creating father-student link: {str(e)}")
+            raise create_error_response(
+                error_code=ErrorCategory.SYSTEM_ERROR,
+                message="Failed to create father-student relationship",
+                status_code=500,
+                request=request
+            )
 
         # Check if mother-student link already exists
-        existing_mother_link = await db.execute(
-            select(StudentParentLink).where(
-                StudentParentLink.student_id == student_dict.id,
-                StudentParentLink.parent_id == mother_dict.id
+        try:
+            existing_mother_link = await db.execute(
+                select(StudentParentLink).where(
+                    and_(
+                        StudentParentLink.student_id == student_dict.id,
+                        StudentParentLink.parent_id == mother_dict.id
+                    )
+                )
             )
-        )
-        if not existing_mother_link.scalar_one_or_none():
-            student_parent_link_mother = StudentParentLink(student_id = student_dict.id, parent_id = mother_dict.id)
-            db.add(student_parent_link_mother)
+            if not existing_mother_link.scalar_one_or_none():
+                student_parent_link_mother = StudentParentLink(
+                    student_id=student_dict.id, 
+                    parent_id=mother_dict.id
+                )
+                db.add(student_parent_link_mother)
+                await db.flush()
+        except Exception as e:
+            logger.error(f"Error creating mother-student link: {str(e)}")
+            raise create_error_response(
+                error_code=ErrorCategory.SYSTEM_ERROR,
+                message="Failed to create mother-student relationship",
+                status_code=500,
+                request=request
+            )
+
+        # Create admission record
+        try:
+            new_admission = Admission(
+                student_id=student_dict.id,
+                **admission_dict
+            )
+            db.add(new_admission)
             await db.flush()
-
-        new_admission = Admission(
-            student_id=student_dict.id,
-            **admission_dict
-        )
-
-        db.add(new_admission)
-        await db.flush()
+        except Exception as e:
+            logger.error(f"Error creating admission record: {str(e)}")
+            raise create_error_response(
+                error_code=ErrorCategory.SYSTEM_ERROR,
+                message="Failed to create admission record",
+                status_code=500,
+                request=request
+            )
 
         # Fetch the created admission with all relationships before commit
-        logger.info(f"Fetching created admission with id: {new_admission.id}")
+        try:
+            logger.info(f"Fetching created admission with id: {new_admission.id}")
+            result = await db.execute(
+                select(Admission)
+                .options(
+                    selectinload(Admission.student)
+                    .selectinload(Student.parent_links)
+                    .selectinload(StudentParentLink.parent)
+                )
+                .where(Admission.id == new_admission.id)
+            )
+            admission_out = result.scalar_one_or_none()
+
+            if not admission_out:
+                logger.error(f"Failed to fetch created admission with id: {new_admission.id}")
+                raise create_error_response(
+                    error_code=ErrorCategory.SYSTEM_ERROR,
+                    message="Failed to retrieve created admission record",
+                    status_code=500,
+                    request=request
+                )
+
+            await db.commit()
+            return admission_out
+
+        except HTTPException:
+            await db.rollback()
+            raise
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error fetching admission after creation: {str(e)}")
+            raise create_error_response(
+                error_code=ErrorCategory.SYSTEM_ERROR,
+                message="Failed to retrieve created admission record",
+                status_code=500,
+                request=request
+            )
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Unexpected error in add_admission: {str(e)}")
+        
+        # Handle database-specific errors
+        if "constraint" in str(e).lower() or "duplicate" in str(e).lower():
+            error_code, message, details = map_database_error(e)
+            raise create_database_error(
+                message=message,
+                constraint=details.get("constraint"),
+                request=request
+            )
+        
+        # Generic system error
+        raise create_error_response(
+            error_code=ErrorCategory.SYSTEM_ERROR,
+            message="Failed to create admission",
+            status_code=500,
+            request=request
+        )
+
+async def get_admission_by_id(
+    student_id: UUID, 
+    db: AsyncSession,
+    request: Optional[Request] = None
+):
+    """
+    Get admission by student ID with comprehensive error handling
+    
+    Args:
+        student_id: Student ID
+        db: Database session
+        request: FastAPI request object for context
+        
+    Returns:
+        Admission record with relationships
+        
+    Raises:
+        HTTPException: For not found or database errors
+    """
+    try:
         result = await db.execute(
-            select(Admission)
-            .options(
+            select(Admission).options(
                 selectinload(Admission.student)
                 .selectinload(Student.parent_links)
                 .selectinload(StudentParentLink.parent)
-            )
-            .where(Admission.id == new_admission.id)
+            ).where(Admission.student_id == student_id)
         )
-        admission_out = result.scalar_one_or_none()
-
-        if not admission_out:
-            logger.error(f"Failed to fetch created admission with id: {new_admission.id}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to retrieve created admission record"
+        admission = result.scalar_one_or_none()
+        
+        if not admission:
+            raise create_not_found_error(
+                message="Admission not found",
+                resource_type="admission",
+                resource_id=str(student_id),
+                request=request
             )
 
-        await db.commit()
-        return admission_out
+        # Process father/mother relationships
+        if admission.student and admission.student.parent_links:
+            father = None
+            mother = None
 
+            for link in admission.student.parent_links:
+                if link.parent and link.parent.relation_to_student:
+                    if link.parent.relation_to_student.lower() == "father":
+                        father = link.parent
+                    elif link.parent.relation_to_student.lower() == "mother":
+                        mother = link.parent
+
+            # Set father and mother attributes on student
+            admission.student.father = father
+            admission.student.mother = mother
+        else:
+            # Set default None values if no parents
+            if admission.student:
+                admission.student.father = None
+                admission.student.mother = None
+
+        return admission
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        await db.rollback()
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=f"Failed to create admission: {str(e)}")
+        logger.error(f"Error fetching admission for student {student_id}: {str(e)}")
+        raise create_error_response(
+            error_code=ErrorCategory.SYSTEM_ERROR,
+            message="Failed to fetch admission record",
+            status_code=500,
+            request=request
+        )
 
-async def get_admission_by_id(student_id: UUID, db: AsyncSession):
-    result = await db.execute(select(Admission).options(
-            selectinload(Admission.student)
-            .selectinload(Student.parent_links)
-            .selectinload(StudentParentLink.parent)
-        ).where(Admission.student_id == student_id))
-    admission = result.scalar_one_or_none()
-    if not admission:
-        raise HTTPException(status_code=404, detail="Admission not found")
-
-    # Process father/mother relationships
-    if admission.student and admission.student.parent_links:
-        father = None
-        mother = None
-
-        for link in admission.student.parent_links:
-            if link.parent and link.parent.relation_to_student:
-                if link.parent.relation_to_student.lower() == "father":
-                    father = link.parent
-                elif link.parent.relation_to_student.lower() == "mother":
-                    mother = link.parent
-
-        # Set father and mother attributes on student
-        admission.student.father = father
-        admission.student.mother = mother
-    else:
-        # Set default None values if no parents
-        if admission.student:
-            admission.student.father = None
-            admission.student.mother = None
-
-    return admission
-
-async def update_partial_details_admission(student_id: UUID, data: StudentAdmissionUpdate, db: AsyncSession):
-    """Update admission details for a student"""
+async def update_partial_details_admission(
+    student_id: UUID, 
+    data: StudentAdmissionUpdate, 
+    db: AsyncSession,
+    request: Optional[Request] = None
+):
+    """
+    Update admission details for a student with comprehensive error handling
+    
+    Args:
+        student_id: Student ID
+        data: Update data
+        db: Database session
+        request: FastAPI request object for context
+        
+    Returns:
+        Updated admission record
+        
+    Raises:
+        HTTPException: For not found, validation, or database errors
+    """
     try:
         result = await db.execute(select(Admission).where(Admission.student_id == student_id))
         admission = result.scalar_one_or_none()
+        
         if not admission:
-            raise HTTPException(status_code=404, detail="Admission not found")
+            raise create_not_found_error(
+                message="Admission not found",
+                resource_type="admission",
+                resource_id=str(student_id),
+                request=request
+            )
+
+        # Validate update data
+        update_data = data.dict(exclude_unset=True)
+        
+        # Validate admission date if being updated
+        if "admission_date" in update_data:
+            if update_data["admission_date"] > datetime.now().date():
+                raise create_validation_error(
+                    message="Admission date cannot be in the future",
+                    field="admission_date",
+                    value=str(update_data["admission_date"]),
+                    request=request
+                )
 
         # Update only the fields that are provided
-        update_data = data.dict(exclude_unset=True)
         for field, value in update_data.items():
             if hasattr(admission, field):
                 setattr(admission, field, value)
@@ -304,44 +607,137 @@ async def update_partial_details_admission(student_id: UUID, data: StudentAdmiss
         await db.commit()
         return admission_out
 
+    except HTTPException:
+        await db.rollback()
+        raise
     except IntegrityError as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail="Data integrity violation - check for duplicate values or invalid references")
+        logger.error(f"Integrity error updating admission {student_id}: {str(e)}")
+        error_code, message, details = map_database_error(e)
+        raise create_database_error(
+            message=message,
+            constraint=details.get("constraint"),
+            request=request
+        )
     except OperationalError as e:
         await db.rollback()
-        raise HTTPException(status_code=503, detail="Database operation failed - please try again")
+        logger.error(f"Operational error updating admission {student_id}: {str(e)}")
+        raise create_error_response(
+            error_code=ErrorCategory.SYSTEM_ERROR,
+            message="Database operation failed - please try again",
+            status_code=503,
+            request=request
+        )
     except Exception as e:
         await db.rollback()
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=f"Failed to update admission: {str(e)}")
+        logger.error(f"Unexpected error updating admission {student_id}: {str(e)}")
+        raise create_error_response(
+            error_code=ErrorCategory.SYSTEM_ERROR,
+            message="Failed to update admission",
+            status_code=500,
+            request=request
+        )
 
-async def get_student_by_admission_id(admission_id: UUID, db):
-    stmt = (
-        select(Admission)
-        .where(Admission.id == admission_id)
-        .options(selectinload(Admission.student))
-    )
-    result = await db.execute(stmt)
-    admission = result.scalars().first()
-    if not admission:
-        raise HTTPException(status_code=404, detail="Admission ID not found")
-    return admission.student
+async def get_student_by_admission_id(
+    admission_id: UUID, 
+    db: AsyncSession,
+    request: Optional[Request] = None
+):
+    """
+    Get student by admission ID with comprehensive error handling
+    
+    Args:
+        admission_id: Admission ID
+        db: Database session
+        request: FastAPI request object for context
+        
+    Returns:
+        Student record
+        
+    Raises:
+        HTTPException: For not found or database errors
+    """
+    try:
+        stmt = (
+            select(Admission)
+            .where(Admission.id == admission_id)
+            .options(selectinload(Admission.student))
+        )
+        result = await db.execute(stmt)
+        admission = result.scalars().first()
+        
+        if not admission:
+            raise create_not_found_error(
+                message="Admission ID not found",
+                resource_type="admission",
+                resource_id=str(admission_id),
+                request=request
+            )
+        
+        return admission.student
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching student by admission ID {admission_id}: {str(e)}")
+        raise create_error_response(
+            error_code=ErrorCategory.SYSTEM_ERROR,
+            message="Failed to fetch student record",
+            status_code=500,
+            request=request
+        )
 
-async def search_students(query: str, db):
-    stmt = (
-        select(Student)
-        .join(Admission, Student.id == Admission.student_id)
-        .where(
-            or_(
-                Admission.id.cast(String).ilike(f"%{query}%"),
-                Student.first_name.ilike(f"%{query}%"),
-                Student.last_name.ilike(f"%{query}%")
+async def search_students(
+    query: str, 
+    db: AsyncSession,
+    request: Optional[Request] = None
+):
+    """
+    Search students with comprehensive error handling
+    
+    Args:
+        query: Search query
+        db: Database session
+        request: FastAPI request object for context
+        
+    Returns:
+        List of matching students
+        
+    Raises:
+        HTTPException: For database errors
+    """
+    try:
+        if not query or not query.strip():
+            raise create_validation_error(
+                message="Search query cannot be empty",
+                field="query",
+                request=request
+            )
+        
+        stmt = (
+            select(Student)
+            .join(Admission, Student.id == Admission.student_id)
+            .where(
+                or_(
+                    Admission.id.cast(String).ilike(f"%{query}%"),
+                    Student.first_name.ilike(f"%{query}%"),
+                    Student.last_name.ilike(f"%{query}%")
+                )
             )
         )
-    )
-    result = await db.execute(stmt)
-    return result.scalars().all()
+        result = await db.execute(stmt)
+        return result.scalars().all()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error searching students with query '{query}': {str(e)}")
+        raise create_error_response(
+            error_code=ErrorCategory.SYSTEM_ERROR,
+            message="Failed to search students",
+            status_code=500,
+            request=request
+        )
 
 async def get_all_admissions(db: AsyncSession, skip: int = 0, limit: int = 10):
     """Get all admissions with pagination"""

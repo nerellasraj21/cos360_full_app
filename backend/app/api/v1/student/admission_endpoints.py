@@ -20,8 +20,8 @@ async def create_admission(admission: StudentAdmissionCreate, request: Request, 
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_admissions', 'create')
     
-    admission_respose = await add_admission(admission,db)
-    return admission_respose
+    admission_response = await add_admission(admission, db, request)
+    return admission_response
 
 @router.get("/id/{student_id}")
 async def get_admission(student_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
@@ -32,7 +32,7 @@ async def get_admission(student_id: UUID, request: Request, db: AsyncSession = D
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_admissions', 'read')
     
-    admission_details = await get_admission_by_id(student_id,db)
+    admission_details = await get_admission_by_id(student_id, db, request)
     return admission_details
 
 @router.patch("/{student_id}")
@@ -44,7 +44,7 @@ async def update_admission(student_id: UUID, data: StudentAdmissionUpdate, reque
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_admissions', 'update')
     
-    updated_data = await update_partial_details_admission(student_id,data,db)
+    updated_data = await update_partial_details_admission(student_id, data, db, request)
     return updated_data
 
 # Get student by admission ID 
@@ -57,7 +57,7 @@ async def fetch_student_by_admission(admission_id: UUID, request: Request, db: A
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_admissions', 'read')
     
-    return await get_student_by_admission_id(admission_id, db)
+    return await get_student_by_admission_id(admission_id, db, request)
 
 # Search (get while typing)
 @router.get("/search")
@@ -69,7 +69,7 @@ async def search_student_by_text(request: Request, db: AsyncSession = Depends(ge
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_admissions', 'list')
     
-    return await search_students(query, db)
+    return await search_students(query, db, request)
 
 @router.get("/", response_model=PaginatedResponse[StudentAdmissionResponse], status_code=status.HTTP_200_OK)
 async def list_admissions(
