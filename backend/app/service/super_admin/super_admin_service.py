@@ -142,11 +142,14 @@ class SuperAdminService:
             await db.commit()
             await db.refresh(super_admin)
             
-            # Generate tokens
+            # Generate tokens with ultimate access claims
             token_data = {
                 "sub": str(super_admin.id),
                 "username": super_admin.username,
                 "user_type": "super_admin",
+                "is_superadmin": True,
+                "bypass_permissions": True,
+                "ultimate_access": True,
                 "permissions": ["system_admin", "tenant_management", "plan_management"]
             }
             

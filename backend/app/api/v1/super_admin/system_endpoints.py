@@ -7,7 +7,7 @@ from uuid import UUID
 import logging
 
 from app.db.session import get_public_db
-from app.tools.simple_permissions import get_current_super_admin
+from app.tools.simple_permissions import get_current_super_admin, super_admin_only
 from app.service.super_admin.super_admin_service import SuperAdminService
 from app.schemas.public.super_admin_schema import SystemHealthCheck
 from app.models.public.tenant_model import Tenant
@@ -20,6 +20,7 @@ router = APIRouter(prefix="/super_admin/system", tags=["Super Admin/System Manag
 logger = logging.getLogger("super_admin.system")
 
 @router.get("/health", response_model=SystemHealthCheck)
+@super_admin_only
 async def get_system_health(
     current_super_admin: dict = Depends(get_current_super_admin)
 ):
@@ -38,6 +39,7 @@ async def get_system_health(
         return await SuperAdminService.get_system_health(db)
 
 @router.get("/tenants/")
+@super_admin_only
 async def get_all_tenants(
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
@@ -115,6 +117,7 @@ async def get_all_tenants(
         )
 
 @router.post("/tenants/", status_code=status.HTTP_201_CREATED)
+@super_admin_only
 async def create_tenant(
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
@@ -317,6 +320,7 @@ async def create_tenant(
         )
 
 @router.put("/tenants/{tenant_id}/activate")
+@super_admin_only
 async def activate_tenant(
     tenant_id: UUID,
     request: Request,
@@ -389,6 +393,7 @@ async def activate_tenant(
         )
 
 @router.put("/tenants/{tenant_id}/plan")
+@super_admin_only
 async def assign_plan_to_tenant(
     tenant_id: UUID,
     request: Request,
@@ -624,6 +629,7 @@ async def assign_plan_to_tenant(
         )
 
 @router.get("/usage-stats")
+@super_admin_only
 async def get_usage_statistics(
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin)

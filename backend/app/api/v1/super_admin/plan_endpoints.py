@@ -8,7 +8,7 @@ import logging
 import json
 
 from app.db.session import get_public_db
-from app.tools.simple_permissions import get_current_super_admin
+from app.tools.simple_permissions import get_current_super_admin, super_admin_only
 from app.service.super_admin.super_admin_service import SuperAdminService
 
 router = APIRouter(prefix="/super_admin/plans", tags=["Super Admin/Plan Management"])
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/super_admin/plans", tags=["Super Admin/Plan Manageme
 logger = logging.getLogger("super_admin.plans")
 
 @router.get("/")
+@super_admin_only
 async def get_all_plans(
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
@@ -101,6 +102,7 @@ async def get_all_plans(
         )
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
+@super_admin_only
 async def create_plan(
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
@@ -191,6 +193,7 @@ async def create_plan(
         )
 
 @router.get("/{plan_id}")
+@super_admin_only
 async def get_single_plan(
     plan_id: UUID,
     request: Request,
@@ -278,6 +281,7 @@ async def get_single_plan(
         )
 
 @router.put("/{plan_id}", status_code=status.HTTP_200_OK)
+@super_admin_only
 async def update_plan(
     plan_id: UUID,
     request: Request,
@@ -388,6 +392,7 @@ async def update_plan(
         )
 
 @router.get("/{plan_id}/resources")
+@super_admin_only
 async def get_plan_resources(
     plan_id: UUID,
     request: Request,
@@ -465,6 +470,7 @@ async def get_plan_resources(
         )
 
 @router.post("/{plan_id}/resources", status_code=status.HTTP_201_CREATED)
+@super_admin_only
 async def add_plan_resource(
     plan_id: UUID,
     request: Request,
@@ -590,6 +596,7 @@ async def add_plan_resource(
         )
 
 @router.delete("/{plan_id}/resources", status_code=status.HTTP_200_OK)
+@super_admin_only
 async def remove_plan_resource(
     plan_id: UUID,
     request: Request,
