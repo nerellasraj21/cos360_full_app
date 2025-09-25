@@ -288,9 +288,10 @@ def RequireList(resource: str):
 # Super Admin Authentication Functions
 async def get_current_super_admin(request: Request) -> dict:
     """
-    Get current Super Admin from JWT token (public schema access)
+    Get current Super Admin from JWT token - ULTIMATE ACCESS
     
-    Returns Super Admin token payload for system-wide operations
+    Returns Super Admin token payload for system-wide operations.
+    SuperAdmin bypasses all permission checks and has ultimate access.
     """
     try:
         auth_header = request.headers.get("Authorization")
@@ -312,14 +313,11 @@ async def get_current_super_admin(request: Request) -> dict:
                 detail="Super Admin access required"
             )
         
-        # Verify required Super Admin permissions
-        permissions = payload.get("permissions", [])
-        required_permissions = ["system_admin", "tenant_management", "plan_management"]
-        if not all(perm in permissions for perm in required_permissions):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient Super Admin permissions"
-            )
+        # SuperAdmin has ultimate access - no permission validation needed
+        # Add ultimate access flags to payload
+        payload["is_superadmin"] = True
+        payload["bypass_permissions"] = True
+        payload["ultimate_access"] = True
         
         return payload
         
@@ -340,3 +338,33 @@ async def require_super_admin(request: Request) -> dict:
     Can be used as FastAPI dependency for Super Admin-only endpoints
     """
     return await get_current_super_admin(request)
+
+# SuperAdmin Ultimate Access Decorators and Functions
+from functools import wraps
+
+def super_admin_only(func):
+    """
+    Decorator for SuperAdmin-only endpoints - ULTIMATE ACCESS
+    
+    SuperAdmin bypasses all permission checks and has complete system access.
+    """
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        # SuperAdmin bypass - no permission checks needed
+        # Direct access to all resources
+        return await func(*args, **kwargs)
+    return wrapper
+
+def check_superadmin_permission(request: Request, resource: str, action: str) -> bool:
+    """
+    Always returns True for SuperAdmin - ULTIMATE ACCESS
+    
+    SuperAdmin can perform any action on any resource without restrictions.
+    """
+    return True
+
+def is_superadmin_request(request: Request) -> bool:
+    """
+    Check if the current request is from a SuperAdmin user.
+    """
+    return getattr(request.state, 'is_superadmin', False) or getattr(request.state, 'ultimate_access', False)

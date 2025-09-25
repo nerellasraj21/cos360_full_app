@@ -7,8 +7,8 @@ from sqlalchemy import and_
 from typing import List, Optional
 from app.models.student.student_transport_model import StudentTransportAssignment
 from app.models.student.student_model import Student
-from app.models.masters.trip_model import Trip
-from app.models.masters.route_stop_model import RouteStop
+from app.models.masters.transport.trip_model import Trip
+from app.models.masters.transport.route_stop_model import RouteStop
 from app.schemas.student.student_transport_schema import (
     StudentTransportCreate,
     StudentTransportUpdate,

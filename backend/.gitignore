@@ -69,3 +69,5 @@ docs/
 /scripts
 .venv/
 .env
+/tests
+/archive

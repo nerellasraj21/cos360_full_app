@@ -28,6 +28,10 @@ from app.tools.error_handler import (
 )
 from app.tools.database_error_mapper import map_database_error
 
+# Import user context components
+from app.schemas.auth.user_context_schema import UserContext
+from app.service.base.user_scoped_service import UserScopedService
+
 logger = logging.getLogger(__name__)
 
 async def generate_admission_number(db: AsyncSession, admission_date) -> str:
@@ -527,7 +531,7 @@ async def get_admission_by_id(
                 admission.student.mother = None
 
         return admission
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -535,6 +539,163 @@ async def get_admission_by_id(
         raise create_error_response(
             error_code=ErrorCategory.SYSTEM_ERROR,
             message="Failed to fetch admission record",
+            status_code=500,
+            request=request
+        )
+
+async def get_admission_by_id_with_context(
+    student_id: UUID,
+    db: AsyncSession,
+    user_context: UserContext,
+    request: Optional[Request] = None
+):
+    """
+    Get admission by student ID with user-specific access validation
+
+    Args:
+        student_id: Student ID
+        db: Database session
+        user_context: User context with access scope
+        request: FastAPI request object for context
+
+    Returns:
+        Admission record with relationships if user has access
+
+    Raises:
+        HTTPException: For access denied, not found, or database errors
+    """
+    try:
+        # Initialize user-scoped service for access validation
+        scoped_service = UserScopedService(db)
+
+        # Pre-validate access to specific student for "own" and "related" scopes
+        if user_context.access_scope == "own":
+            if user_context.student_id != student_id:
+                raise create_not_found_error(
+                    message="Student admission not found",
+                    resource_type="admission",
+                    resource_id=str(student_id),
+                    request=request
+                )
+        elif user_context.access_scope == "related":
+            if student_id not in (user_context.allowed_entity_ids or []):
+                raise create_not_found_error(
+                    message="Student admission not found",
+                    resource_type="admission",
+                    resource_id=str(student_id),
+                    request=request
+                )
+
+        # Query admission with relationships
+        result = await db.execute(
+            select(Admission).options(
+                selectinload(Admission.student)
+                .selectinload(Student.parent_links)
+                .selectinload(StudentParentLink.parent)
+            ).where(Admission.student_id == student_id)
+        )
+        admission = result.scalar_one_or_none()
+
+        if not admission:
+            raise create_not_found_error(
+                message="Student admission not found",
+                resource_type="admission",
+                resource_id=str(student_id),
+                request=request
+            )
+
+        # Process father/mother relationships (existing logic)
+        if admission.student and admission.student.parent_links:
+            father = None
+            mother = None
+
+            for link in admission.student.parent_links:
+                if link.parent and link.parent.relation_to_student:
+                    if link.parent.relation_to_student.lower() == "father":
+                        father = link.parent
+                    elif link.parent.relation_to_student.lower() == "mother":
+                        mother = link.parent
+
+            admission.student.father = father
+            admission.student.mother = mother
+        else:
+            if admission.student:
+                admission.student.father = None
+                admission.student.mother = None
+
+        logger.info(f"User {user_context.username} accessed admission for student {student_id} (scope: {user_context.access_scope})")
+        return admission
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching admission for student {student_id}: {str(e)}")
+        raise create_error_response(
+            error_code=ErrorCategory.SYSTEM_ERROR,
+            message="Failed to fetch admission record",
+            status_code=500,
+            request=request
+        )
+
+async def search_students_with_context(
+    query: str,
+    db: AsyncSession,
+    user_context: UserContext,
+    request: Optional[Request] = None
+):
+    """
+    Search students with user-specific filtering applied
+
+    Args:
+        query: Search query string
+        db: Database session
+        user_context: User context with access scope
+        request: FastAPI request object for context
+
+    Returns:
+        List of students that match query and user access scope
+    """
+    try:
+        # Initialize user-scoped service
+        scoped_service = UserScopedService(db)
+
+        # Base search query
+        base_stmt = select(Student).where(
+            or_(
+                Student.first_name.ilike(f"%{query}%"),
+                Student.last_name.ilike(f"%{query}%"),
+                func.concat(Student.first_name, ' ', Student.last_name).ilike(f"%{query}%")
+            )
+        )
+
+        # Apply user scoping
+        filtered_stmt = await scoped_service.get_user_scoped_query(
+            base_stmt, user_context, Student, "list"
+        )
+
+        # Limit search results and order
+        stmt = filtered_stmt.limit(10).order_by(Student.first_name, Student.last_name)
+
+        result = await db.execute(stmt)
+        students = result.scalars().all()
+
+        logger.info(f"User {user_context.username} searched '{query}' and found {len(students)} students (scope: {user_context.access_scope})")
+
+        return [
+            {
+                "id": str(student.id),
+                "name": f"{student.first_name} {student.last_name}",
+                "first_name": student.first_name,
+                "last_name": student.last_name
+            }
+            for student in students
+        ]
+
+    except Exception as e:
+        logger.error(f"Error searching students with query '{query}': {str(e)}")
+        raise create_error_response(
+            error_code=ErrorCategory.SYSTEM_ERROR,
+            message="Failed to search students",
             status_code=500,
             request=request
         )
@@ -740,7 +901,7 @@ async def search_students(
         )
 
 async def get_all_admissions(db: AsyncSession, skip: int = 0, limit: int = 10):
-    """Get all admissions with pagination"""
+    """Get all admissions with pagination (legacy function - use get_all_admissions_with_context for user filtering)"""
     # Count total records
     count_stmt = select(func.count(Admission.id))
     count_result = await db.execute(count_stmt)
@@ -790,6 +951,94 @@ async def get_all_admissions(db: AsyncSession, skip: int = 0, limit: int = 10):
         "items": admissions,
         "total_count": total_count,
         "has_next": has_next
+    }
+
+async def get_all_admissions_with_context(
+    db: AsyncSession,
+    user_context: UserContext,
+    skip: int = 0,
+    limit: int = 10
+):
+    """
+    Get admissions with user-specific filtering applied
+
+    Args:
+        db: Database session
+        user_context: User context with access scope
+        skip: Number of records to skip (pagination)
+        limit: Number of records to return
+
+    Returns:
+        Dict with filtered admissions, count, and pagination info
+    """
+
+    # Initialize user-scoped service
+    scoped_service = UserScopedService(db)
+
+    # Count total records with user filtering
+    count_stmt = select(func.count(Admission.id))
+
+    # Apply user scoping to count query
+    filtered_count_stmt = await scoped_service.get_user_scoped_query(
+        count_stmt, user_context, Admission, "list"
+    )
+
+    count_result = await db.execute(filtered_count_stmt)
+    total_count = count_result.scalar() or 0
+
+    # Base query with relationships
+    base_stmt = select(Admission).options(
+        selectinload(Admission.student)
+        .selectinload(Student.parent_links)
+        .selectinload(StudentParentLink.parent)
+    )
+
+    # Apply user scoping to main query
+    filtered_stmt = await scoped_service.get_user_scoped_query(
+        base_stmt, user_context, Admission, "list"
+    )
+
+    # Apply pagination and ordering
+    stmt = (
+        filtered_stmt
+        .offset(skip)
+        .limit(limit)
+        .order_by(Admission.admission_date.desc())
+    )
+
+    result = await db.execute(stmt)
+    admissions = result.scalars().all()
+
+    # Process father/mother relationships for each admission (existing logic)
+    for admission in admissions:
+        if admission.student and admission.student.parent_links:
+            father = None
+            mother = None
+
+            for link in admission.student.parent_links:
+                if link.parent and link.parent.relation_to_student:
+                    if link.parent.relation_to_student.lower() == "father":
+                        father = link.parent
+                    elif link.parent.relation_to_student.lower() == "mother":
+                        mother = link.parent
+
+            admission.student.father = father
+            admission.student.mother = mother
+        else:
+            if admission.student:
+                admission.student.father = None
+                admission.student.mother = None
+
+    has_next = (skip + limit) < total_count
+
+    logger.info(f"User {user_context.username} accessed {len(admissions)} admissions (scope: {user_context.access_scope})")
+
+    return {
+        "items": admissions,
+        "total_count": total_count,
+        "has_next": has_next,
+        "access_scope": user_context.access_scope,
+        "user_role": user_context.role
     }
 
 async def delete_admission(admission_id: UUID, db: AsyncSession):

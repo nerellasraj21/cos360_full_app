@@ -25,6 +25,9 @@ class Settings(BaseSettings):
 
     # Redis configuration
     REDIS_URL: str = "redis://localhost:6379"  # Safe localhost default for development
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
 
     # Pagination defaults
     PAGE_SIZE: int = 20

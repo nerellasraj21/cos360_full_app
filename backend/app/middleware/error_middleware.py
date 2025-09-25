@@ -21,8 +21,7 @@ from pydantic import ValidationError
 from app.tools.error_handler import (
     create_error_response,
     ErrorCategory,
-    get_request_id,
-    get_tenant_context
+    get_request_id
 )
 from app.tools.database_error_mapper import map_database_error
 from app.config import settings

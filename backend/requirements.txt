@@ -11,6 +11,8 @@ dnspython==2.7.0
 ecdsa==0.19.1
 email-validator==2.3.0
 fastapi==0.115.12
+openpyxl==3.1.2
+reportlab==4.0.4
 greenlet==3.2.2
 h11==0.16.0
 idna==3.10
@@ -30,6 +32,7 @@ python-dotenv==1.1.0
 python-jose==3.5.0
 python-multipart==0.0.20
 redis==6.4.0
+celery==5.3.4
 rsa==4.9.1
 six==1.17.0
 slowapi==0.1.9

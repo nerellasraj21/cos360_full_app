@@ -36,6 +36,10 @@ from app.tools.error_handler import (
 )
 from app.tools.database_error_mapper import map_database_error
 
+# Import user context components
+from app.schemas.auth.user_context_schema import UserContext
+from app.service.base.user_scoped_service import UserScopedService
+
 log = log.getLogger("fee.transaction_service")
 
 class FeeTransactionService:
@@ -882,10 +886,249 @@ class FeeTransactionService:
             transactions = result.scalars().all()
             
             return transactions
-            
+
         except Exception as e:
             log.error(f"Error searching transactions: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="An error occurred while searching transactions"
+            )
+
+    # User-Context Aware Methods for User-Specific Permissions
+
+    @staticmethod
+    async def get_student_fee_transactions_with_context(
+        db: AsyncSession,
+        student_id: UUID,
+        user_context: UserContext,
+        skip: int = 0,
+        limit: int = 10
+    ) -> Dict[str, Any]:
+        """
+        Get fee transactions for a specific student with user access control
+
+        Args:
+            db: Database session
+            student_id: Student ID to get transactions for
+            user_context: User context with access scope
+            skip: Number of records to skip (pagination)
+            limit: Number of records to return
+
+        Returns:
+            Dict with student's fee transactions and pagination info
+
+        Raises:
+            HTTPException: If user doesn't have access to student's fee data
+        """
+        try:
+            # Validate user access to this student's fee data
+            if user_context.access_scope == "own":
+                if user_context.student_id != student_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Cannot access other students' fee data"
+                    )
+            elif user_context.access_scope == "related":
+                if student_id not in (user_context.allowed_entity_ids or []):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Cannot access unrelated student's fee data"
+                    )
+            # "all" access scope - no additional validation needed
+
+            # Count total transactions for this student
+            count_query = select(func.count(FeeTransaction.id)).where(
+                FeeTransaction.student_id == student_id
+            )
+            count_result = await db.execute(count_query)
+            total_count = count_result.scalar() or 0
+
+            # Query fee transactions for the student with relationships
+            query = (
+                select(FeeTransaction)
+                .options(
+                    selectinload(FeeTransaction.transaction_items),
+                    selectinload(FeeTransaction.academic_year),
+                    selectinload(FeeTransaction.fee_receipts)
+                )
+                .where(FeeTransaction.student_id == student_id)
+                .offset(skip)
+                .limit(limit)
+                .order_by(FeeTransaction.created_at.desc())
+            )
+
+            result = await db.execute(query)
+            transactions = result.scalars().all()
+
+            has_next = (skip + limit) < total_count
+
+            log.info(f"User {user_context.username} accessed {len(transactions)} fee transactions for student {student_id} (scope: {user_context.access_scope})")
+
+            return {
+                "items": transactions,
+                "student_id": str(student_id),
+                "total_count": total_count,
+                "has_next": has_next,
+                "access_scope": user_context.access_scope,
+                "user_role": user_context.role
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            log.error(f"Error fetching fee transactions for student {student_id}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to fetch fee transactions"
+            )
+
+    @staticmethod
+    async def get_user_accessible_fee_transactions(
+        db: AsyncSession,
+        user_context: UserContext,
+        skip: int = 0,
+        limit: int = 10,
+        academic_year_id: Optional[UUID] = None,
+        transaction_status: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get fee transactions that user has access to based on their context
+
+        Args:
+            db: Database session
+            user_context: User context with access scope
+            skip: Number of records to skip
+            limit: Number of records to return
+            academic_year_id: Filter by academic year (optional)
+            transaction_status: Filter by transaction status (optional)
+
+        Returns:
+            Dict with accessible fee transactions and pagination info
+        """
+        try:
+            # Initialize user-scoped service
+            scoped_service = UserScopedService(db)
+
+            # Build base query with filters
+            base_conditions = []
+            if academic_year_id:
+                base_conditions.append(FeeTransaction.academic_year_id == academic_year_id)
+            if transaction_status:
+                base_conditions.append(FeeTransaction.status == transaction_status)
+
+            # Count query with filters
+            count_stmt = select(func.count(FeeTransaction.id))
+            if base_conditions:
+                count_stmt = count_stmt.where(and_(*base_conditions))
+
+            # Apply user scoping to count query
+            filtered_count_stmt = await scoped_service.get_user_scoped_query(
+                count_stmt, user_context, FeeTransaction, "list"
+            )
+
+            count_result = await db.execute(filtered_count_stmt)
+            total_count = count_result.scalar() or 0
+
+            # Main query with relationships
+            base_stmt = select(FeeTransaction).options(
+                selectinload(FeeTransaction.transaction_items),
+                selectinload(FeeTransaction.academic_year),
+                selectinload(FeeTransaction.fee_receipts)
+            )
+
+            # Apply filters
+            if base_conditions:
+                base_stmt = base_stmt.where(and_(*base_conditions))
+
+            # Apply user scoping
+            filtered_stmt = await scoped_service.get_user_scoped_query(
+                base_stmt, user_context, FeeTransaction, "list"
+            )
+
+            # Apply pagination and ordering
+            stmt = (
+                filtered_stmt
+                .offset(skip)
+                .limit(limit)
+                .order_by(FeeTransaction.created_at.desc())
+            )
+
+            result = await db.execute(stmt)
+            transactions = result.scalars().all()
+
+            has_next = (skip + limit) < total_count
+
+            log.info(f"User {user_context.username} accessed {len(transactions)} fee transactions (scope: {user_context.access_scope})")
+
+            return {
+                "items": transactions,
+                "total_count": total_count,
+                "has_next": has_next,
+                "filters_applied": {
+                    "academic_year_id": str(academic_year_id) if academic_year_id else None,
+                    "transaction_status": transaction_status
+                },
+                "access_scope": user_context.access_scope,
+                "user_role": user_context.role
+            }
+
+        except Exception as e:
+            log.error(f"Error fetching user accessible fee transactions: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to fetch fee transactions"
+            )
+
+    @staticmethod
+    async def get_outstanding_fees_with_context(
+        db: AsyncSession,
+        student_id: UUID,
+        user_context: UserContext
+    ) -> OutstandingFeeSummary:
+        """
+        Calculate outstanding fees for a student with user access control
+
+        Args:
+            db: Database session
+            student_id: Student ID to calculate outstanding fees for
+            user_context: User context with access scope
+
+        Returns:
+            OutstandingFeeSummary with student's outstanding fee details
+
+        Raises:
+            HTTPException: If user doesn't have access to student's fee data
+        """
+        try:
+            # Validate user access to this student's fee data
+            if user_context.access_scope == "own":
+                if user_context.student_id != student_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Cannot access other students' fee data"
+                    )
+            elif user_context.access_scope == "related":
+                if student_id not in (user_context.allowed_entity_ids or []):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Cannot access unrelated student's fee data"
+                    )
+            # "all" access scope - no additional validation needed
+
+            # Use existing calculate_outstanding_fees method
+            outstanding_fees = await FeeTransactionService.calculate_outstanding_fees(
+                db, student_id
+            )
+
+            log.info(f"User {user_context.username} accessed outstanding fees for student {student_id} (scope: {user_context.access_scope})")
+
+            return outstanding_fees
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            log.error(f"Error calculating outstanding fees for student {student_id}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to calculate outstanding fees"
             )

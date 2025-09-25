@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from sqlalchemy.orm import selectinload
 
-from app.db.tenant_session import get_public_db
+from app.db.session import get_public_db
 
 logger = logging.getLogger("plan_service")
 
@@ -27,7 +27,7 @@ class PlanService:
             Dict containing plan information or None if not found
         """
         try:
-            async for db in get_public_db():
+            async with get_public_db() as db:
                 result = await db.execute(text("""
                     SELECT p.id, p.name, p.description, p.is_active
                     FROM public.tenants t
@@ -46,7 +46,6 @@ class PlanService:
                 
                 logger.warning(f"No plan found for tenant: {client_name}")
                 return None
-                break
                 
         except Exception as e:
             logger.error(f"Error fetching tenant plan for '{client_name}': {str(e)}")
@@ -66,7 +65,7 @@ class PlanService:
             bool: True if plan allows access, False otherwise
         """
         try:
-            async for db in get_public_db():
+            async with get_public_db() as db:
                 result = await db.execute(text("""
                     SELECT pra.actions
                     FROM public.tenants t
@@ -94,7 +93,6 @@ class PlanService:
                 
                 logger.warning(f"No plan permissions found for {client_name} -> {resource}")
                 return False
-                break
                 
         except Exception as e:
             logger.error(f"Error checking plan permission: {str(e)}")

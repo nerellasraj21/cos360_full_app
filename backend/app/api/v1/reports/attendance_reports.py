@@ -1,0 +1,406 @@
+"""
+API endpoints for attendance-related reports
+"""
+import logging
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+from typing import Optional
+from datetime import date
+
+from app.db.tenant_session import get_tenant_db, TenantService
+from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user
+from app.service.reports.attendance_report_service import AttendanceReportService
+from app.schemas.reports.attendance_report_schemas import (
+    StudentAttendanceFilter, StudentAttendanceData, StudentAttendanceSummary,
+    StaffAttendanceFilter, StaffAttendanceData, StaffAttendanceSummary
+)
+from app.schemas.reports.report_schemas import ExportRequest, ReportResponse
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+
+@router.get("/students", response_model=ReportResponse)
+async def get_student_attendance_report(
+    request: Request,
+    academic_year_id: Optional[UUID] = Query(None),
+    class_id: Optional[UUID] = Query(None),
+    section_id: Optional[UUID] = Query(None),
+    student_id: Optional[UUID] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    attendance_status: Optional[str] = Query(None),
+    month: Optional[int] = Query(None, ge=1, le=12),
+    year: Optional[int] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=1000),
+    sort_by: Optional[str] = Query(None),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
+    db: AsyncSession = Depends(get_tenant_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get student attendance report with filters and pagination"""
+    try:
+        # Check permissions - handle SuperAdmin users
+        if current_user.get('is_superadmin'):
+            # SuperAdmin bypasses permission checks
+            pass
+        else:
+            role = current_user.get('role')
+            await check_role_plan_permission_with_error(db, request, role, 'attendance_reports', 'read')
+
+        # Get user info
+        user_id_str = current_user.get('sub')
+        client_name = getattr(request.state, 'client_name', None)
+        tenant_id = await TenantService.get_tenant_schema(client_name)
+
+        # Convert user_id to UUID
+        from uuid import UUID as UUIDImport
+        user_id = UUIDImport(user_id_str)
+
+        # Create service
+        service = AttendanceReportService(db, user_id, tenant_id)
+
+        # Create filters
+        filters = StudentAttendanceFilter(
+            academic_year_id=academic_year_id,
+            class_id=class_id,
+            section_id=section_id,
+            student_id=student_id,
+            date_from=date_from,
+            date_to=date_to,
+            attendance_status=attendance_status,
+            month=month,
+            year=year,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_order=sort_order
+        )
+
+        # Get data
+        data, total_count = await service.get_student_attendance_report(filters)
+
+        # Calculate pagination
+        total_pages = (total_count + page_size - 1) // page_size
+
+        return ReportResponse(
+            data=data,
+            total_count=total_count,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in student attendance report: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/students/stats", response_model=StudentAttendanceSummary)
+async def get_student_attendance_stats(
+    request: Request,
+    academic_year_id: Optional[UUID] = Query(None),
+    class_id: Optional[UUID] = Query(None),
+    section_id: Optional[UUID] = Query(None),
+    student_id: Optional[UUID] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    attendance_status: Optional[str] = Query(None),
+    month: Optional[int] = Query(None, ge=1, le=12),
+    year: Optional[int] = Query(None),
+    db: AsyncSession = Depends(get_tenant_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get student attendance statistics"""
+    try:
+        # Check permissions - handle SuperAdmin users
+        if current_user.get('is_superadmin'):
+            # SuperAdmin bypasses permission checks
+            pass
+        else:
+            role = current_user.get('role')
+            await check_role_plan_permission_with_error(db, request, role, 'attendance_reports', 'read')
+
+        # Get user info
+        user_id_str = current_user.get('sub')
+        client_name = getattr(request.state, 'client_name', None)
+        tenant_id = await TenantService.get_tenant_schema(client_name)
+
+        # Convert user_id to UUID
+        from uuid import UUID as UUIDImport
+        user_id = UUIDImport(user_id_str)
+
+        # Create service
+        service = AttendanceReportService(db, user_id, tenant_id)
+
+        # Create filters
+        filters = StudentAttendanceFilter(
+            academic_year_id=academic_year_id,
+            class_id=class_id,
+            section_id=section_id,
+            student_id=student_id,
+            date_from=date_from,
+            date_to=date_to,
+            attendance_status=attendance_status,
+            month=month,
+            year=year
+        )
+
+        # Get statistics
+        stats = await service.get_student_attendance_summary_stats(filters)
+
+        return stats
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in student attendance stats: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/staff", response_model=ReportResponse)
+async def get_staff_attendance_report(
+    request: Request,
+    staff_id: Optional[UUID] = Query(None),
+    department: Optional[str] = Query(None),
+    designation_id: Optional[UUID] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    attendance_status: Optional[str] = Query(None),
+    month: Optional[int] = Query(None, ge=1, le=12),
+    year: Optional[int] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=1000),
+    sort_by: Optional[str] = Query(None),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
+    db: AsyncSession = Depends(get_tenant_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get staff attendance report with filters and pagination"""
+    try:
+        # Check permissions - handle SuperAdmin users
+        if current_user.get('is_superadmin'):
+            # SuperAdmin bypasses permission checks
+            pass
+        else:
+            role = current_user.get('role')
+            await check_role_plan_permission_with_error(db, request, role, 'attendance_reports', 'read')
+
+        # Get user info
+        user_id_str = current_user.get('sub')
+        client_name = getattr(request.state, 'client_name', None)
+        tenant_id = await TenantService.get_tenant_schema(client_name)
+
+        # Convert user_id to UUID
+        from uuid import UUID as UUIDImport
+        user_id = UUIDImport(user_id_str)
+
+        # Create service
+        service = AttendanceReportService(db, user_id, tenant_id)
+
+        # Create filters
+        filters = StaffAttendanceFilter(
+            staff_id=staff_id,
+            department=department,
+            designation_id=designation_id,
+            date_from=date_from,
+            date_to=date_to,
+            attendance_status=attendance_status,
+            month=month,
+            year=year,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_order=sort_order
+        )
+
+        # Get data
+        data, total_count = await service.get_staff_attendance_report(filters)
+
+        # Calculate pagination
+        total_pages = (total_count + page_size - 1) // page_size
+
+        return ReportResponse(
+            data=data,
+            total_count=total_count,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in staff attendance report: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/staff/stats", response_model=StaffAttendanceSummary)
+async def get_staff_attendance_stats(
+    request: Request,
+    staff_id: Optional[UUID] = Query(None),
+    department: Optional[str] = Query(None),
+    designation_id: Optional[UUID] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    attendance_status: Optional[str] = Query(None),
+    month: Optional[int] = Query(None, ge=1, le=12),
+    year: Optional[int] = Query(None),
+    db: AsyncSession = Depends(get_tenant_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get staff attendance statistics"""
+    try:
+        # Check permissions - handle SuperAdmin users
+        if current_user.get('is_superadmin'):
+            # SuperAdmin bypasses permission checks
+            pass
+        else:
+            role = current_user.get('role')
+            await check_role_plan_permission_with_error(db, request, role, 'attendance_reports', 'read')
+
+        # Get user info
+        user_id_str = current_user.get('sub')
+        client_name = getattr(request.state, 'client_name', None)
+        tenant_id = await TenantService.get_tenant_schema(client_name)
+
+        # Convert user_id to UUID
+        from uuid import UUID as UUIDImport
+        user_id = UUIDImport(user_id_str)
+
+        # Create service
+        service = AttendanceReportService(db, user_id, tenant_id)
+
+        # Create filters
+        filters = StaffAttendanceFilter(
+            staff_id=staff_id,
+            department=department,
+            designation_id=designation_id,
+            date_from=date_from,
+            date_to=date_to,
+            attendance_status=attendance_status,
+            month=month,
+            year=year
+        )
+
+        # Get statistics
+        stats = await service.get_staff_attendance_summary_stats(filters)
+
+        return stats
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in staff attendance stats: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/export")
+async def export_attendance_report(
+    export_request: ExportRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Export attendance report in specified format"""
+    try:
+        # Check permissions
+        role = current_user.get('role')
+        await check_role_plan_permission_with_error(db, request, role, 'attendance_reports', 'export')
+
+        # Get user info
+        user_id_str = current_user.get('sub')
+        client_name = getattr(request.state, 'client_name', None)
+        tenant_id = await TenantService.get_tenant_schema(client_name)
+
+        # Convert user_id to UUID
+        from uuid import UUID as UUIDImport
+        user_id = UUIDImport(user_id_str)
+
+        # Create service
+        service = AttendanceReportService(db, user_id, tenant_id)
+
+        # Support CSV, Excel, and PDF export
+        if export_request.format not in ["csv", "xlsx", "pdf"]:
+            raise HTTPException(status_code=400, detail="Only CSV, Excel (.xlsx), and PDF export are currently supported")
+
+        # Get data based on report type
+        data = []
+        total_count = 0
+
+        if export_request.report_type == "student_attendance":
+            filters = StudentAttendanceFilter(**export_request.filters)
+            data, total_count = await service.get_student_attendance_report(filters)
+        elif export_request.report_type == "staff_attendance":
+            filters = StaffAttendanceFilter(**export_request.filters)
+            data, total_count = await service.get_staff_attendance_report(filters)
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported attendance report type")
+
+        # Check if we should use background job
+        if service.should_use_background_job(total_count, export_request.format):
+            # Use background job for large exports
+            base_filename = export_request.filename or f"attendance_{export_request.report_type}_{tenant_id}"
+
+            job_id, audit_id = await service.create_background_export_job(
+                report_type=export_request.report_type,
+                filters=export_request.filters,
+                export_format=export_request.format,
+                filename=base_filename,
+                user_id=user_id,
+                tenant_id=tenant_id
+            )
+
+            return {
+                "message": "Export job started",
+                "job_id": job_id,
+                "audit_id": audit_id,
+                "is_background": True,
+                "estimated_completion": "5-10 minutes",
+                "status_endpoint": f"/api/v1/reports/export-status/{audit_id}"
+            }
+
+        # Generate export based on format (synchronous for small datasets)
+        base_filename = export_request.filename or f"attendance_{export_request.report_type}_{tenant_id}"
+
+        if export_request.format == "csv":
+            export_content, filename = await service.generate_csv_export(data, base_filename)
+            content_type = "text/csv"
+        elif export_request.format == "xlsx":
+            export_content, filename = await service.generate_excel_export(
+                data,
+                base_filename,
+                sheet_name=f"Attendance {export_request.report_type.replace('_', ' ').title()}"
+            )
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        elif export_request.format == "pdf":
+            export_content, filename = await service.generate_pdf_export(
+                data,
+                base_filename,
+                title=f"Attendance {export_request.report_type.replace('_', ' ').title()}",
+                subtitle=f"Report Type: {export_request.report_type.replace('_', ' ').title()}"
+            )
+            content_type = "application/pdf"
+
+        # Return file download response
+        from fastapi.responses import Response
+
+        return Response(
+            content=export_content,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(len(export_content))
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in attendance report export: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")

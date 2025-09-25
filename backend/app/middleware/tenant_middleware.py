@@ -33,6 +33,10 @@ class TenantMiddleware(BaseHTTPMiddleware):
                 response = await call_next(request)
                 return response
             
+            # SuperAdmin routes - special handling (both underscore and dash variants)
+            if request.url.path.startswith("/api/v1/super_admin/") or request.url.path.startswith("/api/v1/super-admin/"):
+                return await self.handle_superadmin_request(request, call_next)
+            
             client_name = self.extract_client_name(request)
             
             # Store client_name in request state for downstream use
@@ -185,6 +189,38 @@ class TenantMiddleware(BaseHTTPMiddleware):
             return None
         
         return client_name
+
+    async def handle_superadmin_request(self, request: Request, call_next) -> Response:
+        """
+        Handle SuperAdmin requests with special tenant targeting capabilities.
+        
+        SuperAdmin can access:
+        - Public schema (no special headers needed)
+        - Any tenant schema (using X-SuperAdmin-Target-Tenant header)
+        """
+        # Check for SuperAdmin target tenant header
+        target_tenant = request.headers.get("X-SuperAdmin-Target-Tenant")
+        
+        if target_tenant:
+            # SuperAdmin accessing specific tenant schema
+            request.state.client_name = target_tenant
+            request.state.is_superadmin = True
+            request.state.target_schema = target_tenant
+            request.state.bypass_permissions = True
+            request.state.tenant_detection_method = "superadmin_target_tenant"
+            
+            logger.info(f"SuperAdmin accessing tenant: {target_tenant} | URL: {request.url} | Method: {request.method}")
+        else:
+            # SuperAdmin accessing public schema only
+            request.state.client_name = None
+            request.state.is_superadmin = True
+            request.state.target_schema = "public"
+            request.state.bypass_permissions = True
+            request.state.tenant_detection_method = "superadmin_public"
+            
+            logger.info(f"SuperAdmin accessing public schema | URL: {request.url} | Method: {request.method}")
+        
+        return await call_next(request)
 
 
 def get_client_name_from_request(request: Request) -> str:

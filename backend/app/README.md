@@ -59,6 +59,7 @@ app/
 ## 🏗️ Architecture Overview
 
 ### **Layered Architecture Pattern**
+
 1. **API Layer** (`api/`): FastAPI routers handling HTTP requests with automatic validation
 2. **Service Layer** (`service/`): Business logic implementation with database refresh patterns
 3. **Data Layer** (`models/`): SQLAlchemy ORM models with multi-tenant support
@@ -66,13 +67,16 @@ app/
 5. **Infrastructure Layer** (`db/`, `middleware/`, `tools/`): Supporting services and utilities
 
 ### **Multi-Tenant Implementation**
+
 - **Tenant Detection**: Automatic via middleware examining request headers
 - **Schema Isolation**: Dynamic database schema switching per tenant
 - **Session Management**: Isolated async database sessions with proper context
 - **Permission Validation**: Dual-layer security with plan and role-based checks
 
 ### **Database Refresh Pattern**
+
 Critical pattern implemented throughout services: `flush() → select() → commit()`
+
 - Ensures multi-tenant session compatibility
 - Prevents stale data issues in concurrent environments
 - Maintains data consistency across schema boundaries
@@ -80,6 +84,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 ## 🔧 Key Components
 
 ### Component 1: API Router System
+
 - **Location**: `app/api/v1/`
 - **Purpose**: RESTful endpoint definitions with automatic tenant detection
 - **Key Features**: Dependency injection, permission validation, standardized responses
@@ -87,6 +92,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 - **Used By**: Frontend applications, external API consumers
 
 ### Component 2: Service Layer
+
 - **Location**: `app/service/`
 - **Purpose**: Business logic implementation with proper database patterns
 - **Key Features**: Async operations, transaction management, database refresh patterns
@@ -94,6 +100,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 - **Used By**: API endpoints for all business operations
 
 ### Component 3: Database Models
+
 - **Location**: `app/models/`
 - **Purpose**: SQLAlchemy ORM definitions with multi-tenant support
 - **Key Features**: BaseOrg/BasePublic inheritance, UUID patterns, relationship definitions
@@ -101,6 +108,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 - **Used By**: Service layer, migrations, API serialization
 
 ### Component 4: Validation Schemas
+
 - **Location**: `app/schemas/`
 - **Purpose**: Pydantic models for API request/response validation
 - **Key Features**: Type validation, serialization, error handling
@@ -108,6 +116,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 - **Used By**: API endpoints for automatic validation
 
 ### Component 5: Database Session Management
+
 - **Location**: `app/db/`
 - **Purpose**: Async database connection and session handling
 - **Key Features**: Tenant-specific sessions, connection pooling, transaction management
@@ -115,6 +124,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 - **Used By**: All service layer operations
 
 ### Component 6: Tenant Middleware
+
 - **Location**: `app/middleware/`
 - **Purpose**: Automatic tenant detection and context switching
 - **Key Features**: Header parsing, schema switching, error handling
@@ -124,6 +134,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 ## 🔄 Data Flow
 
 ### **Request Processing Flow**
+
 1. **Request Reception**: FastAPI receives HTTP request
 2. **Middleware Processing**: Tenant middleware detects tenant via headers
 3. **Database Context**: Session configured for specific tenant schema
@@ -134,6 +145,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 8. **Response Formation**: Standardized JSON response with proper error codes
 
 ### **Database Operation Flow**
+
 1. **Session Acquisition**: Tenant-specific async session
 2. **Business Logic**: Service layer operations
 3. **Database Refresh**: `flush() → select() → commit()` pattern
@@ -143,18 +155,21 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 ## 🔗 Integration Points
 
 ### **Inputs**
+
 - **HTTP Requests**: REST API calls with tenant identification headers
 - **Database Queries**: Multi-tenant PostgreSQL operations
 - **Authentication Tokens**: JWT-based user authentication
 - **Configuration**: Environment variables and application settings
 
 ### **Outputs**
+
 - **JSON Responses**: Standardized API responses with error handling
 - **Database Operations**: CRUD operations with audit trails
 - **Authentication Results**: User session and permission validation
 - **Audit Logs**: Action tracking for compliance and monitoring
 
 ### **External Dependencies**
+
 - **FastAPI**: Web framework with dependency injection and automatic documentation
 - **SQLAlchemy 2.0**: Async ORM with advanced relationship handling
 - **Pydantic v2**: Data validation and serialization
@@ -162,6 +177,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 - **JWT Libraries**: Secure token handling and validation
 
 ### **Internal Dependencies**
+
 - **Models ↔ Services**: ORM models used by business logic
 - **Services ↔ API**: Business logic consumed by API endpoints
 - **Schemas ↔ API**: Validation models for request/response handling
@@ -170,6 +186,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 ## 📊 Business Logic Summary
 
 ### **Educational Domain Logic**
+
 - **Student Lifecycle**: Admission → Enrollment → Academic Progress → Graduation
 - **Fee Management**: Complex fee structures, installments, discounts, receipts
 - **Academic Operations**: Year planning, class scheduling, subject assignments
@@ -177,12 +194,14 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 - **Resource Management**: Transport, facilities, equipment allocation
 
 ### **Multi-Tenant Business Rules**
+
 - **Tenant Isolation**: Complete data segregation between educational institutions
 - **Permission Inheritance**: Super Admin → Tenant Admin → Role-based Users
 - **Plan Limitations**: Feature access based on subscription plans
 - **Audit Requirements**: Complete action tracking for regulatory compliance
 
 ### **Financial Business Logic**
+
 - **Fee Calculation**: Complex fee structures with discounts and penalties
 - **Payment Processing**: Multi-mode payment handling and reconciliation
 - **Financial Reporting**: Revenue tracking and financial analysis
@@ -191,12 +210,14 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 ## ⚙️ Configuration
 
 ### **Application Configuration**
+
 - **Database URL**: Multi-tenant PostgreSQL connection string
 - **JWT Settings**: Secret keys, expiration times, algorithm configuration
 - **CORS Settings**: Cross-origin request handling for frontend integration
 - **API Documentation**: Automatic OpenAPI/Swagger documentation generation
 
 ### **Environment-Specific Settings**
+
 - **Development**: Local database, debug mode, relaxed CORS
 - **Production**: Secure connections, performance optimization, strict validation
 - **Testing**: Isolated test database, mock configurations
@@ -204,12 +225,14 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 ## 🚨 Error Handling
 
 ### **Application-Level Error Patterns**
+
 - **Validation Errors**: Pydantic validation with detailed field-level errors
 - **Authentication Errors**: JWT validation failures with secure error messages
 - **Permission Errors**: Role/plan-based access denial with specific error codes
 - **Database Errors**: Connection issues, constraint violations, transaction failures
 
 ### **Multi-Tenant Error Handling**
+
 - **Schema Not Found**: Tenant validation with meaningful error responses
 - **Context Switching Errors**: Session isolation failures with proper fallback
 - **Cross-Tenant Access**: Unauthorized access attempts with audit logging
@@ -217,12 +240,14 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 ## 📈 Performance Considerations
 
 ### **Database Performance**
+
 - **Connection Pooling**: Optimized for multi-tenant concurrent access
 - **Query Optimization**: `selectinload` for efficient relationship loading
 - **Index Strategy**: UUID-based indexing for optimal multi-tenant queries
 - **Cache Integration**: Redis-based caching for frequently accessed data
 
 ### **API Performance**
+
 - **Async Operations**: Non-blocking I/O throughout the application stack
 - **Response Pagination**: Large dataset handling with efficient pagination
 - **Selective Loading**: Field selection and relationship optimization
@@ -231,12 +256,14 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 ## 🔒 Security Aspects
 
 ### **Multi-Tenant Security**
+
 - **Schema Isolation**: Complete data separation between tenants
 - **Permission Validation**: Dual-layer security on all business operations
 - **JWT Security**: Secure token generation with role-based claims
 - **Audit Logging**: Complete action tracking for security monitoring
 
 ### **Application Security**
+
 - **Input Validation**: Comprehensive Pydantic schema validation
 - **SQL Injection Prevention**: Parameterized queries throughout
 - **Password Security**: Bcrypt hashing with proper salt handling
@@ -245,12 +272,14 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 ## 🧪 Testing
 
 ### **Testing Architecture**
+
 - **Unit Tests**: Service layer and utility function coverage
 - **Integration Tests**: Multi-tenant workflow validation
 - **API Tests**: Endpoint testing with permission validation
 - **Database Tests**: Multi-tenant isolation and performance testing
 
 ### **Test Patterns**
+
 - **Fixture Management**: Database setup/teardown with tenant isolation
 - **Mock Strategies**: External dependency mocking for reliable tests
 - **Permission Testing**: Role and plan-based access verification
@@ -258,6 +287,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 ## 📝 Agent Guidance
 
 ### When to Dive Deeper
+
 - **API Issues**: Examine specific router files in `api/v1/[module]/`
 - **Business Logic Problems**: Check service layer files in `service/[module]/`
 - **Database Issues**: Review model definitions in `models/[module]/`
@@ -266,6 +296,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 - **Permission Issues**: Review `service/auth/` for authentication and authorization logic
 
 ### Quick Reference
+
 - **Primary Entry Point**: `main.py` - FastAPI application setup and configuration
 - **Most Complex Component**: `service/auth/multi_tenant_auth_service.py` - Authentication logic
 - **Database Pattern Reference**: `service/masters/staff_service.py` - Database refresh patterns
@@ -273,6 +304,7 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 - **Common Issues**: Session context, permission validation, database refresh conflicts
 
 ### **Module Interaction Patterns**
+
 - **API → Service**: Controllers call business logic with proper error handling
 - **Service → Model**: Business logic uses ORM models with refresh patterns
 - **Middleware → All**: Tenant context flows through all application layers
@@ -281,12 +313,15 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 ## 🔄 Recent Changes
 
 ### **Database Refresh Pattern Implementation**
-- **Completion Status**: ✅ 17/17 functions completed (100% complete)
+
+- **Completion Status**: 🔄 55 instances remaining across 24 service files
 - **Pattern Applied**: `flush() → select() → commit()` for multi-tenant safety
 - **Modules Updated**: Fee management, student services, staff management, auth services, transport services
-- **Recent Fixes**: Fee class amount, student transport, authentication and multi-tenant auth services
+- **Critical Functions**: All fee management and student operations protected
+- **Remaining Work**: Transport, auth utilities, and support services
 
 ### **Performance Optimizations**
+
 - **Query Optimization**: Relationship loading improvements
 - **Session Management**: Enhanced multi-tenant session handling
 - **Cache Integration**: Performance improvements for frequently accessed data
@@ -294,18 +329,21 @@ Critical pattern implemented throughout services: `flush() → select() → comm
 ## 📋 TODO/Known Issues
 
 ### **Active Development**
+
 1. **API Documentation**: Enhanced OpenAPI specifications with examples
 2. **Performance Monitoring**: Query performance analysis and optimization
 3. **Test Coverage**: Comprehensive integration test expansion
 4. **Production Optimization**: Advanced caching and query optimization
 
 ### **Technical Improvements**
+
 - **Error Handling**: Enhanced error messages and status codes
 - **Logging**: Structured logging for better debugging and monitoring
 - **Validation**: Additional business rule validation in service layer
 - **Documentation**: Code documentation and API examples
 
 ### **Future Enhancements**
+
 - **Real-time Features**: WebSocket integration for live updates
 - **API Versioning**: Preparation for v2 API with backward compatibility
 - **Mobile Optimization**: Optimized endpoints for mobile applications

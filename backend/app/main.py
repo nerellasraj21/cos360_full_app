@@ -8,6 +8,7 @@ from app.db.session import engine
 from app.tools.logging import configure_logging
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.tenant_middleware import TenantMiddleware
+from app.middleware.super_admin_middleware import SuperAdminMiddleware
 from app.middleware.rate_limit_middleware import limiter, rate_limit_handler, RateLimitExceeded
 from app.middleware.error_middleware import GlobalErrorMiddleware
 from app.middleware.request_context_middleware import RequestContextMiddleware
@@ -70,6 +71,9 @@ app.add_middleware(GlobalErrorMiddleware)
 
 # Request context middleware (for correlation IDs and tenant context)
 app.add_middleware(RequestContextMiddleware)
+
+# SuperAdmin middleware (for ultimate access context)
+app.add_middleware(SuperAdminMiddleware)
 
 # Tenant detection middleware (must be added before other middlewares)
 app.add_middleware(TenantMiddleware)
