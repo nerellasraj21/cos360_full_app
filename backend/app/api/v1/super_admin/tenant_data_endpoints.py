@@ -402,3 +402,209 @@ async def get_available_tenant_schemas(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get available tenant schemas: {str(e)}"
         )
+
+@router.get("/{tenant_schema}/roles/")
+@super_admin_only
+async def get_tenant_roles(
+    tenant_schema: str,
+    request: Request,
+    current_super_admin: dict = Depends(get_current_super_admin)
+):
+    """
+    SuperAdmin: Get all roles in a tenant schema
+
+    **Capabilities**:
+    - List all roles in tenant
+    - View role permissions
+    - Role management support
+    """
+    try:
+        if not await SuperAdminDatabaseService.validate_tenant_schema(tenant_schema):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tenant schema '{tenant_schema}' not found"
+            )
+
+        request.state.target_schema = tenant_schema
+
+        async with SuperAdminDatabaseService.get_dynamic_tenant_db(tenant_schema) as db:
+            result = await db.execute(text(f"""
+                SELECT r.id, r.name, r.description, COUNT(rp.id) as permission_count
+                FROM {tenant_schema}.roles r
+                LEFT JOIN {tenant_schema}.resource_permissions rp ON r.id = rp.role_id
+                GROUP BY r.id, r.name, r.description
+                ORDER BY r.name
+            """))
+
+            roles = result.fetchall()
+
+            return {
+                "tenant_schema": tenant_schema,
+                "roles": [
+                    {
+                        "id": role[0],
+                        "name": role[1],
+                        "description": role[2],
+                        "permission_count": role[3]
+                    } for role in roles
+                ],
+                "total_roles": len(roles)
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting tenant roles: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get tenant roles: {str(e)}"
+        )
+
+@router.get("/{tenant_schema}/roles/{role_id}/permissions/")
+@super_admin_only
+async def get_role_permissions(
+    tenant_schema: str,
+    role_id: UUID,
+    request: Request,
+    current_super_admin: dict = Depends(get_current_super_admin)
+):
+    """
+    SuperAdmin: Get permissions for a specific role
+    """
+    try:
+        if not await SuperAdminDatabaseService.validate_tenant_schema(tenant_schema):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tenant schema '{tenant_schema}' not found"
+            )
+
+        request.state.target_schema = tenant_schema
+
+        async with SuperAdminDatabaseService.get_dynamic_tenant_db(tenant_schema) as db:
+            role_result = await db.execute(text(f"""
+                SELECT id, name, description FROM {tenant_schema}.roles WHERE id = :role_id
+            """), {"role_id": role_id})
+
+            role = role_result.fetchone()
+            if not role:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Role {role_id} not found in {tenant_schema}"
+                )
+
+            perms_result = await db.execute(text(f"""
+                SELECT resource_name, actions FROM {tenant_schema}.resource_permissions
+                WHERE role_id = :role_id
+                ORDER BY resource_name
+            """), {"role_id": role_id})
+
+            permissions = perms_result.fetchall()
+
+            return {
+                "tenant_schema": tenant_schema,
+                "role": {
+                    "id": role[0],
+                    "name": role[1],
+                    "description": role[2]
+                },
+                "permissions": [
+                    {
+                        "resource": perm[0],
+                        "actions": perm[1]
+                    } for perm in permissions
+                ],
+                "total_permissions": len(permissions)
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting role permissions: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get role permissions: {str(e)}"
+        )
+
+@router.post("/{tenant_schema}/roles/{role_id}/permissions/", status_code=status.HTTP_201_CREATED)
+@super_admin_only
+async def add_role_permission(
+    tenant_schema: str,
+    role_id: UUID,
+    request: Request,
+    current_super_admin: dict = Depends(get_current_super_admin),
+    resource_name: str = Query(..., description="Resource name"),
+    actions: str = Query(..., description="Actions (comma-separated: read,write,create,update,delete)")
+):
+    """
+    SuperAdmin: Add permission to a tenant role
+
+    **Critical Function**: Enables role-based permission management
+
+    **Impact**: Immediately affects all users with this role in the tenant
+    """
+    try:
+        if not await SuperAdminDatabaseService.validate_tenant_schema(tenant_schema):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tenant schema '{tenant_schema}' not found"
+            )
+
+        request.state.target_schema = tenant_schema
+        actions_array = [action.strip() for action in actions.split(",")]
+
+        async with SuperAdminDatabaseService.get_dynamic_tenant_db(tenant_schema) as db:
+            role_result = await db.execute(text(f"""
+                SELECT id, name FROM {tenant_schema}.roles WHERE id = :role_id
+            """), {"role_id": role_id})
+
+            role = role_result.fetchone()
+            if not role:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Role {role_id} not found in {tenant_schema}"
+                )
+
+            existing_result = await db.execute(text(f"""
+                SELECT id FROM {tenant_schema}.resource_permissions
+                WHERE role_id = :role_id AND resource_name = :resource_name
+            """), {"role_id": role_id, "resource_name": resource_name})
+
+            if existing_result.fetchone():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Permission for resource '{resource_name}' already exists for this role"
+                )
+
+            await db.execute(text(f"""
+                INSERT INTO {tenant_schema}.resource_permissions (role_id, resource_name, actions, is_active)
+                VALUES (:role_id, :resource_name, :actions, true)
+            """), {
+                "role_id": role_id,
+                "resource_name": resource_name,
+                "actions": actions_array
+            })
+
+            await db.commit()
+
+            return {
+                "message": "Permission added to role successfully",
+                "tenant_schema": tenant_schema,
+                "role": {
+                    "id": role[0],
+                    "name": role[1]
+                },
+                "added_permission": {
+                    "resource": resource_name,
+                    "actions": actions_array
+                },
+                "impact": "All users with this role now have this permission"
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding role permission: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add role permission: {str(e)}"
+        )

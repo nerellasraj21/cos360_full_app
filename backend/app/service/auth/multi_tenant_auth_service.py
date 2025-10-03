@@ -184,7 +184,10 @@ class MultiTenantAuthService:
     @staticmethod
     async def get_user_permissions(db: AsyncSession, role_id: int) -> Dict[str, List[str]]:
         """
-        Fetch user's resource permissions grouped by resource.
+        Fetch user's resource permissions from tenant schema only.
+
+        Note: The dual-layer permission system (Plan ∩ Role) is only used during
+        tenant onboarding. At runtime, users validate against tenant schema only.
 
         Args:
             db: Database session (already configured for tenant schema)
@@ -199,9 +202,9 @@ class MultiTenantAuthService:
             }
         """
         try:
-            logger.info(f"Fetching permissions for role_id: {role_id}")
+            logger.info(f"Fetching tenant permissions for role_id: {role_id}")
 
-            # Query resource permissions for the role
+            # Query resource permissions for the role from tenant schema
             result = await db.execute(
                 select(ResourcePermission.resource, ResourcePermission.action)
                 .where(
