@@ -1,5 +1,6 @@
 import os
 import logging
+from pathlib import Path
 from uuid import UUID
 from fastapi import UploadFile, File, Form, HTTPException, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,8 +70,8 @@ async def upload_certificate(
     Raises:
         HTTPException: For validation, security, or database errors
     """
-    filepath = None
     try:
+        filepath = None
         # Validate student exists
         student_result = await db.execute(
             select(Student).where(Student.id == student_id)
@@ -384,12 +385,14 @@ async def update_certificate_file(
         await db.commit()
 
         # Clean up old file after successful commit
-        if old_file_path and os.path.exists(old_file_path):
-            try:
-                os.remove(old_file_path)
-                logger.info(f"Cleaned up old certificate file: {old_file_path}")
-            except Exception as cleanup_error:
-                logger.warning(f"Failed to clean up old file {old_file_path}: {str(cleanup_error)}")
+        if old_file_path:
+            old_path = Path(old_file_path)
+            if old_path.exists():
+                try:
+                    old_path.unlink()
+                    logger.info(f"Cleaned up old certificate file: {old_file_path}")
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to clean up old file {old_file_path}: {str(cleanup_error)}")
 
         logger.info(f"Successfully updated certificate {certificate_id}")
         return updated_cert
@@ -439,12 +442,14 @@ async def delete_certificate_file(
         await db.commit()
 
         # Clean up file after successful database deletion
-        if file_path and os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-                logger.info(f"Successfully deleted certificate file: {file_path}")
-            except Exception as cleanup_error:
-                logger.warning(f"Failed to delete file {file_path}: {str(cleanup_error)}")
+        if file_path:
+            file_obj = Path(file_path)
+            if file_obj.exists():
+                try:
+                    file_obj.unlink()
+                    logger.info(f"Successfully deleted certificate file: {file_path}")
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to delete file {file_path}: {str(cleanup_error)}")
 
         logger.info(f"Successfully deleted certificate {certificate_id}")
         return {"detail": "Certificate deleted successfully"}

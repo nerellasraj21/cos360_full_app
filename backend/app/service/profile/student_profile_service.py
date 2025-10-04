@@ -1,0 +1,211 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
+from fastapi import HTTPException, status, Request
+from uuid import UUID
+from typing import Optional
+from app.models.student.student_model import Student
+from app.models.masters.admission_model import Admission
+from app.models.masters.class_model import Class
+from app.models.masters.sections_model import Section
+from app.models.masters.attendance_model import StudentAttendance
+from app.models.student.student_certificate_model import CertificateIssue
+from app.models.student.student_document_model import StudentDocument
+from app.schemas.profile.student_profile_schema import StudentProfileOut, StudentProfileUpdate
+from app.service.profile.profile_audit_service import ProfileAuditService
+
+class StudentProfileService:
+    """Service for student profile operations"""
+
+    @staticmethod
+    async def get_profile(
+        db: AsyncSession,
+        user_id: UUID,
+        actor_user_id: UUID,
+        actor_role: str,
+        actor_username: str,
+        request: Optional[Request] = None
+    ) -> StudentProfileOut:
+        """
+        Get student profile by user_id
+
+        Args:
+            db: Database session
+            user_id: UUID of the user
+
+        Returns:
+            StudentProfileOut schema
+
+        Raises:
+            HTTPException: If student not found
+        """
+        # Get student with related data
+        result = await db.execute(
+            select(Student)
+            .options(
+                selectinload(Student.user),
+                selectinload(Student.admissions),
+                selectinload(Student.attendances),
+                selectinload(Student.certificates),
+                selectinload(Student.documents)
+            )
+            .where(Student.user_id == user_id)
+        )
+        student = result.scalar_one_or_none()
+
+        if not student:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Student profile not found"
+            )
+
+        # Get admission details
+        admission = student.admissions
+        class_name = None
+        section_name = None
+        admission_number = None
+        academic_year = None
+        roll_number = None
+
+        if admission:
+            admission_number = admission.admission_number
+            academic_year = admission.academic_year
+            roll_number = admission.roll_number
+
+            # Get class name
+            if admission.class_id:
+                class_result = await db.execute(
+                    select(Class).where(Class.id == admission.class_id)
+                )
+                class_obj = class_result.scalar_one_or_none()
+                if class_obj:
+                    class_name = class_obj.class_name
+
+            # Get section name
+            if admission.section_id:
+                section_result = await db.execute(
+                    select(Section).where(Section.id == admission.section_id)
+                )
+                section_obj = section_result.scalar_one_or_none()
+                if section_obj:
+                    section_name = section_obj.section_name
+
+        # Calculate attendance percentage
+        attendance_percentage = None
+        total_attendance = len(student.attendances)
+        if total_attendance > 0:
+            present_count = sum(1 for att in student.attendances if att.status == "Present")
+            attendance_percentage = round((present_count / total_attendance) * 100, 2)
+
+        # Count certificates and documents
+        total_certificates = len(student.certificates)
+        total_documents = len(student.documents)
+
+        # Log profile view
+        await ProfileAuditService.log_profile_view(
+            db=db,
+            user_id=user_id,
+            profile_type="student",
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            actor_username=actor_username,
+            request=request,
+            org_id=user_id  # Using user_id as org_id for now
+        )
+
+        # Build response
+        return StudentProfileOut(
+            student_id=student.id,
+            user_id=student.user_id,
+            first_name=student.first_name,
+            last_name=student.last_name,
+            date_of_birth=student.date_of_birth,
+            gender=student.gender,
+            email=student.user.email if student.user else None,
+            admission_number=admission_number,
+            class_name=class_name,
+            section_name=section_name,
+            academic_year=academic_year,
+            roll_number=roll_number,
+            is_active=student.user.is_active if student.user else False,
+            profile_photo_url=None,  # TODO: Implement photo upload
+            attendance_percentage=attendance_percentage,
+            total_certificates=total_certificates,
+            total_documents=total_documents
+        )
+
+    @staticmethod
+    async def update_profile(
+        db: AsyncSession,
+        user_id: UUID,
+        update_data: StudentProfileUpdate,
+        actor_user_id: UUID,
+        actor_role: str,
+        actor_username: str,
+        request: Optional[Request] = None
+    ) -> StudentProfileOut:
+        """
+        Update student profile
+
+        Args:
+            db: Database session
+            user_id: UUID of the user
+            update_data: StudentProfileUpdate schema
+
+        Returns:
+            Updated StudentProfileOut schema
+
+        Raises:
+            HTTPException: If student not found
+        """
+        # Get student
+        result = await db.execute(
+            select(Student)
+            .options(selectinload(Student.user))
+            .where(Student.user_id == user_id)
+        )
+        student = result.scalar_one_or_none()
+
+        if not student:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Student profile not found"
+            )
+
+        # Track changes for audit log
+        changes = {}
+
+        # Update email in user table
+        if update_data.email is not None:
+            old_email = student.user.email
+            student.user.email = update_data.email
+            changes["email"] = (old_email, update_data.email)
+
+        await db.flush()
+
+        # Log profile updates
+        if changes:
+            await ProfileAuditService.log_bulk_update(
+                db=db,
+                user_id=user_id,
+                profile_type="student",
+                changes=changes,
+                actor_user_id=actor_user_id,
+                actor_role=actor_role,
+                actor_username=actor_username,
+                request=request,
+                org_id=user_id
+            )
+
+        await db.commit()
+        await db.refresh(student)
+
+        # Return updated profile
+        return await StudentProfileService.get_profile(
+            db=db,
+            user_id=user_id,
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            actor_username=actor_username,
+            request=request
+        )

@@ -61,6 +61,7 @@ from app.api.v1.reports.fee_reports import router as fee_reports_router
 from app.api.v1.reports.attendance_reports import router as attendance_reports_router
 from app.api.v1.reports.financial_reports import router as financial_reports_router
 from app.api.v1.reports.reports import router as reports_router
+from app.api.v1.profile import router as profile_router
 
 router = APIRouter()
 router.include_router(academic_year_router)
@@ -124,4 +125,5 @@ router.include_router(fee_reports_router, prefix="/reports/fees", tags=["Fee Rep
 router.include_router(attendance_reports_router, prefix="/reports/attendance", tags=["Attendance Reports"])
 router.include_router(financial_reports_router, prefix="/reports/financial", tags=["Financial Reports"])
 router.include_router(reports_router, prefix="/reports", tags=["Reports"])
+router.include_router(profile_router)
 
