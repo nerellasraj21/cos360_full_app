@@ -47,6 +47,7 @@ from app.api.v1.super_admin.system_endpoints import router as super_admin_system
 from app.api.v1.super_admin.plan_endpoints import router as super_admin_plan_router
 from app.api.v1.super_admin.tenant_data_endpoints import router as super_admin_tenant_data_router
 from app.api.v1.admin.permission_endpoints import router as admin_permission_router
+from app.api.v1.admin.user_management_endpoints import router as admin_user_management_router
 from app.api.v1.expense.expense_category_endpoints import router as expense_category_router
 from app.api.v1.expense.expense_type_endpoints import router as expense_type_router
 from app.api.v1.expense.expense_transaction_endpoints import router as expense_transaction_router
@@ -68,6 +69,7 @@ router.include_router(class_subject_mapping_router)
 router.include_router(subject_router)
 router.include_router(holiday_router)
 router.include_router(admin_permission_router)
+router.include_router(admin_user_management_router)
 router.include_router(role_router)
 router.include_router(login_router)
 router.include_router(menu_router)
