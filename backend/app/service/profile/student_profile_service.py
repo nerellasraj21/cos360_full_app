@@ -107,8 +107,9 @@ class StudentProfileService:
             actor_role=actor_role,
             actor_username=actor_username,
             request=request,
-            org_id=user_id  # Using user_id as org_id for now
+            org_id=user_id
         )
+        await db.commit()
 
         # Build response
         return StudentProfileOut(

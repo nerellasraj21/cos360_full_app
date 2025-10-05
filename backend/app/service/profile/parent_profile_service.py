@@ -133,6 +133,7 @@ class ParentProfileService:
             request=request,
             org_id=user_id
         )
+        await db.commit()
 
         # Build response
         return ParentProfileOut(
