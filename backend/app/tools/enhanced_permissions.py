@@ -73,13 +73,19 @@ async def check_user_resource_access(
 
         # Step 4: Plan permission check (existing validation from simple_permissions)
         client_name = get_client_name_from_request(request)
-        base_action = action.split('_')[0]  # Convert 'read_own' to 'read' for plan check
 
-        plan_allows = await PlanService.check_plan_permission(client_name, resource, base_action)
+        # For profile and similar resources, check the full action (e.g., 'read_own')
+        # Otherwise use base action (e.g., 'read' from 'read_own')
+        if action.endswith('_own') or action.endswith('_related'):
+            plan_action = action
+        else:
+            plan_action = action.split('_')[0]
+
+        plan_allows = await PlanService.check_plan_permission(client_name, resource, plan_action)
 
         if not plan_allows:
-            limitation_info = await PlanService.get_plan_limitation_info(client_name, resource, base_action)
-            logger.warning(f"Plan limitation: {client_name} -> {resource}:{base_action}")
+            limitation_info = await PlanService.get_plan_limitation_info(client_name, resource, plan_action)
+            logger.warning(f"Plan limitation: {client_name} -> {resource}:{plan_action}")
 
             raise HTTPException(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
@@ -89,7 +95,7 @@ async def check_user_resource_access(
                     "current_plan": limitation_info.get("current_plan"),
                     "required_plan": limitation_info.get("required_plan"),
                     "resource": resource,
-                    "action": base_action,
+                    "action": plan_action,
                     "upgrade_available": limitation_info.get("upgrade_available", True)
                 }
             )

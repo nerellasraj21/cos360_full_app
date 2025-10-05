@@ -44,11 +44,11 @@ async def change_password(
     # Change password
     result = await BaseProfileService.change_password(
         db=db,
-        user_id=UUID(user_context.user_id),
+        user_id=user_context.user_id,
         current_password=password_data.current_password,
         new_password=password_data.new_password,
         confirm_password=password_data.confirm_password,
-        actor_user_id=UUID(user_context.user_id),
+        actor_user_id=user_context.user_id,
         actor_role=user_context.role,
         actor_username=user_context.username,
         profile_type=profile_type,

@@ -83,23 +83,23 @@ class ParentProfileService:
             if admission:
                 admission_number = admission.admission_number
 
-                # Get class name
-                if admission.class_id:
+                # Get class name from current_class_id
+                if admission.current_class_id:
                     class_result = await db.execute(
-                        select(Class).where(Class.id == admission.class_id)
+                        select(Class).where(Class.id == admission.current_class_id)
                     )
                     class_obj = class_result.scalar_one_or_none()
                     if class_obj:
-                        class_name = class_obj.class_name
+                        class_name = class_obj.name
 
-                # Get section name
-                if admission.section_id:
+                # Get section name from current_section_id
+                if admission.current_section_id:
                     section_result = await db.execute(
-                        select(Section).where(Section.id == admission.section_id)
+                        select(Section).where(Section.id == admission.current_section_id)
                     )
                     section_obj = section_result.scalar_one_or_none()
                     if section_obj:
-                        section_name = section_obj.section_name
+                        section_name = section_obj.name
 
             # Get student user to check is_active
             student_user_result = await db.execute(

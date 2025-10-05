@@ -64,31 +64,28 @@ class StudentProfileService:
         class_name = None
         section_name = None
         admission_number = None
-        academic_year = None
         roll_number = None
 
         if admission:
             admission_number = admission.admission_number
-            academic_year = admission.academic_year
-            roll_number = admission.roll_number
 
-            # Get class name
-            if admission.class_id:
+            # Get class name from current_class_id
+            if admission.current_class_id:
                 class_result = await db.execute(
-                    select(Class).where(Class.id == admission.class_id)
+                    select(Class).where(Class.id == admission.current_class_id)
                 )
                 class_obj = class_result.scalar_one_or_none()
                 if class_obj:
-                    class_name = class_obj.class_name
+                    class_name = class_obj.name
 
-            # Get section name
-            if admission.section_id:
+            # Get section name from current_section_id
+            if admission.current_section_id:
                 section_result = await db.execute(
-                    select(Section).where(Section.id == admission.section_id)
+                    select(Section).where(Section.id == admission.current_section_id)
                 )
                 section_obj = section_result.scalar_one_or_none()
                 if section_obj:
-                    section_name = section_obj.section_name
+                    section_name = section_obj.name
 
         # Calculate attendance percentage
         attendance_percentage = None
@@ -125,10 +122,8 @@ class StudentProfileService:
             admission_number=admission_number,
             class_name=class_name,
             section_name=section_name,
-            academic_year=academic_year,
-            roll_number=roll_number,
             is_active=student.user.is_active if student.user else False,
-            profile_photo_url=None,  # TODO: Implement photo upload
+            profile_photo_url=None,
             attendance_percentage=attendance_percentage,
             total_certificates=total_certificates,
             total_documents=total_documents

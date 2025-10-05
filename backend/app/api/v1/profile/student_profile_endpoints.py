@@ -36,8 +36,8 @@ async def get_my_student_profile(
     # Get profile
     return await StudentProfileService.get_profile(
         db=db,
-        user_id=UUID(user_context.user_id),
-        actor_user_id=UUID(user_context.user_id),
+        user_id=user_context.user_id,
+        actor_user_id=user_context.user_id,
         actor_role=user_context.role,
         actor_username=user_context.username,
         request=request
@@ -66,9 +66,9 @@ async def update_my_student_profile(
     # Update profile
     return await StudentProfileService.update_profile(
         db=db,
-        user_id=UUID(user_context.user_id),
+        user_id=user_context.user_id,
         update_data=update_data,
-        actor_user_id=UUID(user_context.user_id),
+        actor_user_id=user_context.user_id,
         actor_role=user_context.role,
         actor_username=user_context.username,
         request=request

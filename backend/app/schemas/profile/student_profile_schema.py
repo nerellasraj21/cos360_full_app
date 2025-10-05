@@ -11,11 +11,9 @@ class StudentProfileOut(BaseModel):
     date_of_birth: date
     gender: Optional[str]
     email: Optional[str]
-    admission_number: Optional[str]
-    class_name: Optional[str]
-    section_name: Optional[str]
-    academic_year: Optional[str]
-    roll_number: Optional[int]
+    admission_number: Optional[str] = None
+    class_name: Optional[str] = None
+    section_name: Optional[str] = None
     is_active: bool
     profile_photo_url: Optional[str] = None
 
