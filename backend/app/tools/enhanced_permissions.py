@@ -13,8 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.tools.simple_permissions import get_current_user_token
 from app.service.auth.user_context_service import UserContextService
-from app.service.auth.plan_service import PlanService
-from app.middleware.tenant_middleware import get_client_name_from_request
 from app.schemas.auth.user_context_schema import UserContext
 
 logger = logging.getLogger("enhanced_permissions")
@@ -31,7 +29,12 @@ async def check_user_resource_access(
     Enhanced permission check that returns user context with access scope
 
     This is the primary function for user-specific permission checking.
-    It integrates role permissions, plan limitations, and user context resolution.
+    It checks role permissions from the tenant schema and resolves user context.
+
+    NOTE: Plan permissions are checked ONLY during tenant onboarding when permissions
+    are copied from public.plan_resource_access to {tenant_schema}.resource_permissions.
+    Runtime checks ONLY query the tenant schema - this is by design per the dual-layer
+    permission architecture.
 
     Args:
         db: Database session
@@ -44,7 +47,7 @@ async def check_user_resource_access(
         UserContext with resolved permissions and access scope
 
     Raises:
-        HTTPException: If access is denied (401, 403, 402)
+        HTTPException: If access is denied (401, 403)
     """
 
     try:
@@ -71,40 +74,11 @@ async def check_user_resource_access(
                 }
             )
 
-        # Step 4: Plan permission check (existing validation from simple_permissions)
-        client_name = get_client_name_from_request(request)
-
-        # For profile and similar resources, check the full action (e.g., 'read_own')
-        # Otherwise use base action (e.g., 'read' from 'read_own')
-        if action.endswith('_own') or action.endswith('_related'):
-            plan_action = action
-        else:
-            plan_action = action.split('_')[0]
-
-        plan_allows = await PlanService.check_plan_permission(client_name, resource, plan_action)
-
-        if not plan_allows:
-            limitation_info = await PlanService.get_plan_limitation_info(client_name, resource, plan_action)
-            logger.warning(f"Plan limitation: {client_name} -> {resource}:{plan_action}")
-
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail={
-                    "error": "plan_limitation",
-                    "message": limitation_info.get("message", "This feature requires a plan upgrade"),
-                    "current_plan": limitation_info.get("current_plan"),
-                    "required_plan": limitation_info.get("required_plan"),
-                    "resource": resource,
-                    "action": plan_action,
-                    "upgrade_available": limitation_info.get("upgrade_available", True)
-                }
-            )
-
-        # Step 5: Entity-specific validation for targeted operations
+        # Step 4: Entity-specific validation for targeted operations
         if target_entity_id and user_context.access_scope in ["own", "related"]:
             await _validate_entity_access(user_context, resource, target_entity_id)
 
-        # Step 6: Set additional context info
+        # Step 5: Set additional context info
         user_context.tenant_schema = getattr(request.state, 'schema_name', None)
 
         logger.info(f"Access granted: {user_context.username} ({user_context.role}) -> {resource}:{action} [{user_context.access_scope}]")
