@@ -5,9 +5,6 @@ import logging
 from app.db.tenant_session import get_tenant_db
 from app.tools.jwt_utils import verify_access_token
 from app.service.auth.permission_service import PermissionService
-from app.service.auth.plan_service import PlanService
-from app.middleware.tenant_middleware import get_client_name_from_request
-from app.db.session import get_public_db
 
 logger = logging.getLogger("simple_permissions")
 
@@ -104,100 +101,72 @@ async def check_role_permission(db: AsyncSession, role: str, resource: str, acti
 
 async def check_role_plan_permission(db: AsyncSession, client_name: str, role: str, resource: str, action: str) -> bool:
     """
-    Multi-layer permission checking: Role + Plan validation.
-    
-    1. Check role has permission for resource:action
-    2. Check tenant's plan allows access to resource:action
-    3. Return True only if both layers allow access
-    
+    Role permission checking for tenant schema.
+
+    NOTE: Plan validation happens during tenant onboarding when permissions are copied
+    from public.plan_resource_access to {tenant_schema}.resource_permissions.
+    Runtime checks ONLY query tenant schema - this is by design.
+
     Args:
         db: Database session
-        client_name: Tenant identifier
+        client_name: Tenant identifier (kept for backward compatibility, not used)
         role: User role
         resource: Resource name
         action: Action name
-        
+
     Returns:
-        bool: True if both role and plan allow access
+        bool: True if role has permission in tenant schema
     """
     try:
-        # Layer 1: Role permission check (existing)
+        # Check role permission from tenant schema
         role_has_permission = await check_role_permission(db, role, resource, action)
         if not role_has_permission:
             logger.info(f"Role permission denied: {role} -> {resource}:{action}")
             return False
-        
-        # Layer 2: Plan permission check (new)
-        plan_allows_access = await PlanService.check_plan_permission(client_name, resource, action)
-        if not plan_allows_access:
-            logger.info(f"Plan permission denied: {client_name} -> {resource}:{action}")
-            return False
-        
-        logger.info(f"Multi-layer permission granted: {role}@{client_name} -> {resource}:{action}")
+
+        logger.info(f"Permission granted: {role}@{client_name} -> {resource}:{action}")
         return True
-        
+
     except Exception as e:
-        logger.error(f"Error in multi-layer permission checking: {str(e)}")
+        logger.error(f"Error in permission checking: {str(e)}")
         return False
 
 async def check_role_plan_permission_with_error(db: AsyncSession, request: Request, role: str, resource: str, action: str) -> bool:
     """
-    Multi-layer permission checking with plan-specific error handling.
-    
-    Raises appropriate HTTPExceptions with plan upgrade information.
-    
+    Role permission checking with error handling.
+
+    NOTE: Plan validation happens during tenant onboarding when permissions are copied
+    from public.plan_resource_access to {tenant_schema}.resource_permissions.
+    Runtime checks ONLY query tenant schema - this is by design.
+
     Args:
         db: Database session
-        request: FastAPI request object
+        request: FastAPI request object (kept for backward compatibility)
         role: User role
         resource: Resource name
         action: Action name
-        
+
     Returns:
         bool: True if access granted
-        
+
     Raises:
-        HTTPException: With appropriate error code and plan information
+        HTTPException: 403 if permission denied
     """
     try:
-        client_name = get_client_name_from_request(request)
-        
-        # Layer 1: Role permission check
+        # Check role permission from tenant schema
         role_has_permission = await check_role_permission(db, role, resource, action)
         if not role_has_permission:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Permission not found in database: {role} cannot {action} {resource}. Contact administrator to configure permissions."
             )
-        
-        # Layer 2: Plan permission check
-        logger.info(f"Checking plan permission for client_name: {client_name}, resource: {resource}, action: {action}")
-        plan_allows_access = await PlanService.check_plan_permission(client_name, resource, action)
-        
-        if not plan_allows_access:
-            # Get detailed plan limitation info for user-friendly error
-            limitation_info = await PlanService.get_plan_limitation_info(client_name, resource, action)
-            
-            logger.error(f"Plan permission denied for {client_name} -> {resource}:{action}")
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail={
-                    "error": "plan_limitation",
-                    "message": limitation_info.get("message", "This feature requires a plan upgrade"),
-                    "current_plan": limitation_info.get("current_plan"),
-                    "required_plan": limitation_info.get("required_plan"),
-                    "resource": resource,
-                    "action": action,
-                    "upgrade_available": limitation_info.get("upgrade_available", True)
-                }
-            )
-        
+
         return True
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in multi-layer permission checking: {str(e)}")
+        logger.error(f"Error in permission checking: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Permission check failed - ensure permissions are configured in database"

@@ -29,7 +29,7 @@ async def create_student_parent_link(
     role = current_user.get('role')
 
     await check_role_plan_permission_with_error(
-        db, request, role, 'student_parent_links', 'create'
+        db, request, role, 'parent_management', 'create'
     )
 
     return await link_student_to_parent(link_data.student_id, link_data.parent_id, db)
@@ -46,13 +46,13 @@ async def remove_student_parent_link(
     role = current_user.get('role')
 
     await check_role_plan_permission_with_error(
-        db, request, role, 'student_parent_links', 'delete'
+        db, request, role, 'parent_management', 'delete'
     )
 
     await unlink_student_from_parent(student_id, parent_id, db)
 
 @router.get("/student/{student_id}/parents", response_model=List[ParentOut])
-async def get_student_parents(
+async def get_student_parents( 
     student_id: UUID,
     request: Request,
     db: AsyncSession = Depends(get_tenant_db)
@@ -62,7 +62,7 @@ async def get_student_parents(
     role = current_user.get('role')
 
     await check_role_plan_permission_with_error(
-        db, request, role, 'student_parent_links', 'read'
+        db, request, role, 'parent_management', 'read'
     )
 
     return await get_parents_for_student(student_id, db)
@@ -78,7 +78,7 @@ async def get_parent_students(
     role = current_user.get('role')
 
     await check_role_plan_permission_with_error(
-        db, request, role, 'student_parent_links', 'read'
+        db, request, role, 'parent_management', 'read'
     )
 
     return await get_students_for_parent(parent_id, db)
@@ -93,7 +93,7 @@ async def list_all_student_parent_links(
     role = current_user.get('role')
 
     await check_role_plan_permission_with_error(
-        db, request, role, 'student_parent_links', 'list'
+        db, request, role, 'parent_management', 'list'
     )
 
     return await get_all_student_parent_links(db)

@@ -87,6 +87,25 @@ async def get_parents_for_student(student_id: UUID, db: AsyncSession) -> List[Pa
 
 async def get_students_for_parent(parent_id: UUID, db: AsyncSession) -> List[Student]:
     try:
+        import logging
+        logger = logging.getLogger("student_parent_service")
+        logger.error(f"DEBUG: get_students_for_parent called with parent_id={parent_id}")
+
+        # Check current schema
+        from sqlalchemy import text
+        schema_result = await db.execute(text("SELECT current_schema()"))
+        current_schema = schema_result.scalar()
+        logger.error(f"DEBUG: Current schema = {current_schema}")
+
+        # First, let's check if the link exists
+        link_check = await db.execute(
+            select(StudentParentLink).where(StudentParentLink.parent_id == parent_id)
+        )
+        links = link_check.scalars().all()
+        logger.error(f"DEBUG: Found {len(links)} links for parent")
+        for link in links:
+            logger.error(f"DEBUG: Link - student_id={link.student_id}, parent_id={link.parent_id}")
+
         result = await db.execute(
             select(Student)
             .options(
@@ -97,6 +116,9 @@ async def get_students_for_parent(parent_id: UUID, db: AsyncSession) -> List[Stu
             .where(StudentParentLink.parent_id == parent_id)
         )
         students = result.scalars().all()
+        print(f"DEBUG: Found {len(students)} students")
+        for student in students:
+            print(f"DEBUG: Student {student.id}, first_name={student.first_name}")
 
         # Process father/mother relationships for each student
         for student in students:
