@@ -2,6 +2,7 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from typing import AsyncGenerator, Optional, Dict, Any
+from contextlib import asynccontextmanager
 import logging
 
 from app.db.session import get_public_db
@@ -126,10 +127,10 @@ class SuperAdminDatabaseService:
     async def validate_tenant_schema(schema_name: str) -> bool:
         """
         Validate that a tenant schema exists and is accessible.
-        
+
         Args:
             schema_name: Name of the tenant schema to validate
-            
+
         Returns:
             True if schema exists and is accessible, False otherwise
         """
@@ -137,15 +138,47 @@ class SuperAdminDatabaseService:
             async with AsyncSessionLocal() as session:
                 # Try to set search path to the schema
                 await session.execute(text(f'SET search_path TO "{schema_name}"'))
-                
+
                 # Test query to verify schema is accessible
                 await session.execute(text("SELECT 1"))
-                
+
                 logger.debug(f"Tenant schema '{schema_name}' validated successfully")
                 return True
-                
+
         except Exception as e:
             logger.warning(f"Tenant schema '{schema_name}' validation failed: {str(e)}")
             return False
         finally:
             await session.close()
+
+    @staticmethod
+    @asynccontextmanager
+    async def get_dynamic_tenant_db(schema_name: str) -> AsyncGenerator[AsyncSession, None]:
+        """
+        Get database session for a specific tenant schema with proper context management.
+
+        This method sets the search_path to the target schema and ensures proper
+        cleanup even during exceptions.
+
+        Args:
+            schema_name: Name of the tenant schema to connect to
+
+        Yields:
+            AsyncSession: Database session configured for the target schema
+
+        Example:
+            async with SuperAdminDatabaseService.get_dynamic_tenant_db("tenant_schema") as db:
+                result = await db.execute(text("SELECT * FROM roles"))
+        """
+        async with AsyncSessionLocal() as session:
+            try:
+                # Set search path to target tenant schema
+                await session.execute(text(f'SET search_path TO "{schema_name}"'))
+                logger.debug(f"Dynamic tenant session created for schema: {schema_name}")
+                yield session
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"Error in dynamic tenant session for '{schema_name}': {str(e)}")
+                raise
+            finally:
+                await session.close()

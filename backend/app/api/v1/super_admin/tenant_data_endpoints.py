@@ -428,10 +428,11 @@ async def get_tenant_roles(
         request.state.target_schema = tenant_schema
 
         async with SuperAdminDatabaseService.get_dynamic_tenant_db(tenant_schema) as db:
-            result = await db.execute(text(f"""
+            # Using SET search_path in get_dynamic_tenant_db, no need for schema prefix
+            result = await db.execute(text("""
                 SELECT r.id, r.name, r.description, COUNT(rp.id) as permission_count
-                FROM {tenant_schema}.roles r
-                LEFT JOIN {tenant_schema}.resource_permissions rp ON r.id = rp.role_id
+                FROM roles r
+                LEFT JOIN resource_permissions rp ON r.id = rp.role_id
                 GROUP BY r.id, r.name, r.description
                 ORDER BY r.name
             """))
@@ -481,8 +482,9 @@ async def get_role_permissions(
         request.state.target_schema = tenant_schema
 
         async with SuperAdminDatabaseService.get_dynamic_tenant_db(tenant_schema) as db:
-            role_result = await db.execute(text(f"""
-                SELECT id, name, description FROM {tenant_schema}.roles WHERE id = :role_id
+            # Using SET search_path in get_dynamic_tenant_db, no need for schema prefix
+            role_result = await db.execute(text("""
+                SELECT id, name, description FROM roles WHERE id = :role_id
             """), {"role_id": role_id})
 
             role = role_result.fetchone()
@@ -492,13 +494,20 @@ async def get_role_permissions(
                     detail=f"Role {role_id} not found in {tenant_schema}"
                 )
 
-            perms_result = await db.execute(text(f"""
-                SELECT resource_name, actions FROM {tenant_schema}.resource_permissions
-                WHERE role_id = :role_id
-                ORDER BY resource_name
+            perms_result = await db.execute(text("""
+                SELECT resource, action FROM resource_permissions
+                WHERE role_id = :role_id AND is_granted = true
+                ORDER BY resource, action
             """), {"role_id": role_id})
 
             permissions = perms_result.fetchall()
+
+            # Group permissions by resource (resource:action format)
+            grouped_permissions = {}
+            for resource, action in permissions:
+                if resource not in grouped_permissions:
+                    grouped_permissions[resource] = []
+                grouped_permissions[resource].append(action)
 
             return {
                 "tenant_schema": tenant_schema,
@@ -509,9 +518,9 @@ async def get_role_permissions(
                 },
                 "permissions": [
                     {
-                        "resource": perm[0],
-                        "actions": perm[1]
-                    } for perm in permissions
+                        "resource": resource,
+                        "actions": actions
+                    } for resource, actions in grouped_permissions.items()
                 ],
                 "total_permissions": len(permissions)
             }
@@ -550,11 +559,12 @@ async def add_role_permission(
             )
 
         request.state.target_schema = tenant_schema
-        actions_array = [action.strip() for action in actions.split(",")]
+        actions_list = [action.strip() for action in actions.split(",")]
 
         async with SuperAdminDatabaseService.get_dynamic_tenant_db(tenant_schema) as db:
-            role_result = await db.execute(text(f"""
-                SELECT id, name FROM {tenant_schema}.roles WHERE id = :role_id
+            # Using SET search_path in get_dynamic_tenant_db, no need for schema prefix
+            role_result = await db.execute(text("""
+                SELECT id, name FROM roles WHERE id = :role_id
             """), {"role_id": role_id})
 
             role = role_result.fetchone()
@@ -564,40 +574,48 @@ async def add_role_permission(
                     detail=f"Role {role_id} not found in {tenant_schema}"
                 )
 
-            existing_result = await db.execute(text(f"""
-                SELECT id FROM {tenant_schema}.resource_permissions
-                WHERE role_id = :role_id AND resource_name = :resource_name
-            """), {"role_id": role_id, "resource_name": resource_name})
+            # Insert each action as a separate permission (resource:action model)
+            added_permissions = []
+            for action in actions_list:
+                # Check if permission already exists
+                existing_result = await db.execute(text("""
+                    SELECT id FROM resource_permissions
+                    WHERE role_id = :role_id AND resource = :resource AND action = :action
+                """), {"role_id": role_id, "resource": resource_name, "action": action})
 
-            if existing_result.fetchone():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Permission for resource '{resource_name}' already exists for this role"
-                )
-
-            await db.execute(text(f"""
-                INSERT INTO {tenant_schema}.resource_permissions (role_id, resource_name, actions, is_active)
-                VALUES (:role_id, :resource_name, :actions, true)
-            """), {
-                "role_id": role_id,
-                "resource_name": resource_name,
-                "actions": actions_array
-            })
+                if not existing_result.fetchone():
+                    # Insert new permission
+                    await db.execute(text("""
+                        INSERT INTO resource_permissions (role_id, resource, action, is_granted)
+                        VALUES (:role_id, :resource, :action, true)
+                    """), {
+                        "role_id": role_id,
+                        "resource": resource_name,
+                        "action": action
+                    })
+                    added_permissions.append(action)
 
             await db.commit()
 
+            if not added_permissions:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"All permissions for resource '{resource_name}' already exist for this role"
+                )
+
             return {
-                "message": "Permission added to role successfully",
+                "message": "Permissions added to role successfully",
                 "tenant_schema": tenant_schema,
                 "role": {
                     "id": role[0],
                     "name": role[1]
                 },
-                "added_permission": {
+                "added_permissions": {
                     "resource": resource_name,
-                    "actions": actions_array
+                    "actions": added_permissions
                 },
-                "impact": "All users with this role now have this permission"
+                "skipped": len(actions_list) - len(added_permissions),
+                "impact": "All users with this role now have these permissions"
             }
 
     except HTTPException:
