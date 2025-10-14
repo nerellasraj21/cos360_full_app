@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session,joinedload,selectinload
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, and_
 from uuid import UUID
 from app.models.masters.class_model import Class as ClassModel
 from app.models.masters.sections_model import Section as SectionModel
@@ -296,7 +296,12 @@ async def get_students_by_class_section(class_name: str, section_name: str, db):
 
     # Fetch section
     section_result = await db.execute(
-        select(SectionModel).where(SectionModel.name == section_name, SectionModel.class_id == class_obj.id)
+        select(SectionModel).where(
+            and_(
+                SectionModel.name == section_name,
+                SectionModel.class_id == class_obj.id
+            )
+        )
     )
     section_obj = section_result.scalars().first()
     if not section_obj:
@@ -307,8 +312,10 @@ async def get_students_by_class_section(class_name: str, section_name: str, db):
         select(Student)
         .join(Admission)
         .where(
-            Admission.current_class_id == class_obj.id,
-            Admission.current_section_id == section_obj.id
+            and_(
+                Admission.current_class_id == class_obj.id,
+                Admission.current_section_id == section_obj.id
+            )
         )
         .options(selectinload(Student.admissions))
     )
@@ -337,7 +344,12 @@ async def get_sections_by_class_id(db: AsyncSession, class_id: UUID):
     """Get sections by class ID for dropdown - Cached"""
     try:
         result = await db.execute(
-            select(SectionModel.id, SectionModel.name).where(SectionModel.class_id == class_id, SectionModel.is_active == True).order_by(SectionModel.name)
+            select(SectionModel.id, SectionModel.name).where(
+                and_(
+                    SectionModel.class_id == class_id,
+                    SectionModel.is_active == True
+                )
+            ).order_by(SectionModel.name)
         )
         sections = result.all()
         

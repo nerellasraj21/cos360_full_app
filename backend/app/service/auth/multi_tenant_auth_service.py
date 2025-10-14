@@ -296,7 +296,49 @@ class MultiTenantAuthService:
                 logger.info(f"DEBUG 9: Fetching user permissions for role_id: {user.role_id}")
                 permissions = await MultiTenantAuthService.get_user_permissions(db, user.role_id)
                 logger.info(f"DEBUG 10: Permissions fetched successfully, resource count: {len(permissions)}")
-                
+
+                # Determine entity_id based on role
+                entity_id = None
+                role_name = user.role.name
+                logger.info(f"DEBUG 11: Determining entity_id for role: {role_name}")
+
+                try:
+                    if role_name == "Student":
+                        # Query student entity
+                        from app.models.student.student_model import Student
+                        student_result = await db.execute(
+                            select(Student).where(Student.user_id == user.id)
+                        )
+                        student = student_result.scalar_one_or_none()
+                        if student:
+                            entity_id = str(student.id)
+                            logger.info(f"DEBUG 12: Student entity_id found: {entity_id}")
+                    elif role_name == "Parent":
+                        # Query parent entity
+                        from app.models.masters.parent_model import Parent
+                        parent_result = await db.execute(
+                            select(Parent).where(Parent.user_id == user.id)
+                        )
+                        parent = parent_result.scalar_one_or_none()
+                        if parent:
+                            entity_id = str(parent.id)
+                            logger.info(f"DEBUG 12: Parent entity_id found: {entity_id}")
+                    elif role_name == "Staff":
+                        # Query staff entity
+                        from app.models.masters.staff_model import Staff
+                        staff_result = await db.execute(
+                            select(Staff).where(Staff.user_id == user.id)
+                        )
+                        staff = staff_result.scalar_one_or_none()
+                        if staff:
+                            entity_id = str(staff.id)
+                            logger.info(f"DEBUG 12: Staff entity_id found: {entity_id}")
+                    else:
+                        logger.info(f"DEBUG 12: Role '{role_name}' does not have an associated entity")
+                except Exception as entity_error:
+                    logger.warning(f"DEBUG 12: Error fetching entity_id for role {role_name}: {str(entity_error)}")
+                    # Continue without entity_id rather than failing login
+
                 # Create access token and refresh token with client information
                 token_data = {
                     "sub": str(user.id),
@@ -323,6 +365,7 @@ class MultiTenantAuthService:
                     },
                     "menu": menu,
                     "permissions": permissions,
+                    "entity_id": entity_id,
                     "access_token": access_token,
                     "refresh_token": refresh_token,
                     "token_type": "bearer"
