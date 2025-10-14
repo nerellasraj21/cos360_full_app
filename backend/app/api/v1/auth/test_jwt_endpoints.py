@@ -90,9 +90,28 @@ async def get_parent_token():
         "role": "Parent",
         "client_name": "test_tenant"
     }
-    
+
     access_token = create_access_token(token_data)
-    
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": token_data,
+        "instructions": "Use this token in Authorization header: Bearer <token>"
+    }
+
+@router.get("/super-admin-token")
+async def get_super_admin_token():
+    """Get a test JWT token for Super Admin role"""
+    token_data = {
+        "sub": "24e31bfd-39ac-4255-b19f-b991e1576416",
+        "username": "superadmin",
+        "user_type": "super_admin",
+        "permissions": ["system_admin", "tenant_management", "plan_management"]
+    }
+
+    access_token = create_access_token(token_data)
+
     return {
         "access_token": access_token,
         "token_type": "bearer",

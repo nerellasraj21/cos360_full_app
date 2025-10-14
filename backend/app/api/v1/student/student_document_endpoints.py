@@ -34,6 +34,7 @@ async def create_document(
         document_type=document_type,
         document_file=document_file,
         db=db,
+        request=request,
     )
 
 
@@ -47,7 +48,7 @@ async def get_documents(student_id: UUID, request: Request, db: AsyncSession = D
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_documents', 'list')
     
-    return await get_documents_by_student(student_id,db)
+    return await get_documents_by_student(student_id, db, request)
 
 
 # Get single document by ID
@@ -60,7 +61,7 @@ async def get_document(document_id: UUID, request: Request, db: AsyncSession = D
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_documents', 'read')
     
-    return await get_document_by_id(document_id,db)
+    return await get_document_by_id(document_id, db, request)
 
 
 # Update document
@@ -79,7 +80,7 @@ async def update_document(
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_documents', 'update')
     
-    return await update_document_file(document_id, document_type, document_file, db)
+    return await update_document_file(document_id, document_type, document_file, db, request)
 
 
 # Delete document
@@ -92,4 +93,4 @@ async def delete_document(document_id: UUID, request: Request, db: AsyncSession 
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_documents', 'delete')
     
-    return await delete_document_file(document_id,db)
+    return await delete_document_file(document_id, db, request)

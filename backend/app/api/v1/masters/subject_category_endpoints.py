@@ -88,16 +88,16 @@ async def update_category(request: Request,
     return await update_subject_category(db, category_id, category_update)
 
 # Delete Subject Category
-@router.delete("/categories/{category_id}")
-async def delete_category(request: Request, 
-    category_id: UUID, 
+@router.delete("/categories/{category_id}", status_code=status.HTTP_200_OK)
+async def delete_category(request: Request,
+    category_id: UUID,
     db: AsyncSession = Depends(get_tenant_db)
 ):
     """Delete a subject category"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'subject_categories', 'delete')
-    
+
     return await delete_subject_category(db, category_id)

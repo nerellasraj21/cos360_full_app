@@ -6,9 +6,9 @@ import enum
 import uuid
 
 class GenderEnum(enum.Enum):
-    male = "male"
-    female = "female"
-    other = "other"
+    Male = "Male"
+    Female = "Female"
+    Other = "Other"
 
 class Staff(BaseOrg):
     __tablename__ = "staff"
@@ -18,7 +18,7 @@ class Staff(BaseOrg):
     last_name = Column(String(100), nullable=True)
     email = Column(String(100), nullable=True, unique=True)
     phone = Column(String(15), nullable=True)
-    gender = Column(Enum(GenderEnum), nullable=True)
+    gender = Column(Enum(GenderEnum, name='genderenum', create_type=False), nullable=True)
     date_of_birth = Column(Date, nullable=True)
     joining_date = Column(Date, nullable=False)
     qualification = Column(String(100), nullable=True)

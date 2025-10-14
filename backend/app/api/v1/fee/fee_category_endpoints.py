@@ -56,6 +56,7 @@ async def get_all_fee_categories_endpoint(request: Request,
 
 # Get Fee Categories for Dropdown
 @router.get("/dropdown", response_model=List[FeeCategoryDropdown])
+@rate_limit_dropdown("100 per minute")
 async def get_fee_categories_dropdown_endpoint(request: Request, 
 
     academic_year_id: Optional[UUID] = Query(None, description="Filter by academic year ID"),

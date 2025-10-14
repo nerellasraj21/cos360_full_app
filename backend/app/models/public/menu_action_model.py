@@ -1,6 +1,8 @@
 from app.db.base import BasePublic
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+import uuid
 
 class MenuAction(BasePublic):
     """
@@ -11,9 +13,9 @@ class MenuAction(BasePublic):
         UniqueConstraint('menu_id', 'action_name', name='unique_menu_action'),
         {'schema': 'public'}
     )
-    
-    id = Column(Integer, primary_key=True, index=True)
-    menu_id = Column(Integer, ForeignKey('public.menus.id'), nullable=False)
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    menu_id = Column(UUID(as_uuid=True), ForeignKey('public.menus.id'), nullable=False)
     action_name = Column(String(30), nullable=False)  # create, update, delete, export, approve, etc.
     resource_name = Column(String(50), nullable=False)  # fee_categories, students, etc.
     description = Column(String(200))

@@ -14,6 +14,7 @@ from app.schemas.masters.class_subject_mapping_schema import (
     ClassSubjectMapBulkResponse,
     SubjectMappingItem
 )
+from app.schemas.common.pagination_schema import PaginatedResponse
 from app.service.masters.class_subject_mapping_service import (
     create_class_subject_mapping,
     bulk_create_or_update_class_subject_mappings,
@@ -124,7 +125,7 @@ async def bulk_create_or_update_mappings(
         "mappings": mappings_read
     }
 
-@router.get("/", response_model=List[ClassSubjectMapRead])
+@router.get("/", response_model=PaginatedResponse[ClassSubjectMapRead])
 async def get_all_mappings(
     request: Request,
     skip: int = Query(0, ge=0),
@@ -136,15 +137,15 @@ async def get_all_mappings(
     """Get all class-subject mappings with pagination"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check
     await check_role_plan_permission_with_error(db, request, role, 'class_subject_mappings', 'list')
-    
-    mappings = await get_all_class_subject_mappings(db, skip, limit, academic_year_id, active_only)
-    
-    # Convert to read schema
-    result = []
-    for mapping in mappings:
+
+    result = await get_all_class_subject_mappings(db, skip, limit, academic_year_id, active_only)
+
+    # Convert items to read schema
+    items = []
+    for mapping in result["items"]:
         mapping_dict = {
             "id": mapping.id,
             "class_id": mapping.class_id,
@@ -159,9 +160,13 @@ async def get_all_mappings(
             "subject_name": mapping.subject.name if mapping.subject else None,
             "academic_year_name": mapping.academic_year.name if mapping.academic_year else None
         }
-        result.append(ClassSubjectMapRead(**mapping_dict))
-    
-    return result
+        items.append(ClassSubjectMapRead(**mapping_dict))
+
+    return PaginatedResponse[ClassSubjectMapRead](
+        items=items,
+        total_count=result["total_count"],
+        has_next=result["has_next"]
+    )
 
 @router.get("/by-class/{class_id}", response_model=List[ClassSubjectMapRead])
 async def get_mappings_by_class(

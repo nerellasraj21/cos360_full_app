@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+from uuid import UUID
 
 class LoginRequest(BaseModel):
     username: str = Field(..., description="User's username")
@@ -7,18 +8,18 @@ class LoginRequest(BaseModel):
     client_name: Optional[str] = Field(None, description="Client name (optional, can be detected from headers/subdomain)")
 
 class UserInfo(BaseModel):
-    id: int
+    id: UUID
     username: str
     email: Optional[str] = None
     is_active: bool
 
 class RoleInfo(BaseModel):
-    id: int
+    id: UUID
     name: str
     description: Optional[str] = None
 
 class MenuItemResponse(BaseModel):
-    id: int
+    id: UUID
     name: str
     path: Optional[str] = None
     display_order: int
@@ -28,6 +29,8 @@ class LoginResponse(BaseModel):
     user: UserInfo
     role: RoleInfo
     menu: List[MenuItemResponse]
+    permissions: Dict[str, List[str]] = Field(default_factory=dict, description="User's resource permissions grouped by resource")
+    entity_id: Optional[str] = Field(None, description="Entity ID (student_id, parent_id, or staff_id) based on role")
     access_token: str
     refresh_token: str
     token_type: str = "bearer"

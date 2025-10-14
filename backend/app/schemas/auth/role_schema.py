@@ -11,5 +11,7 @@ class RoleCreate(RoleBase):
 
 class RoleRead(RoleBase):
     id: UUID
+    is_system_role: Optional[bool] = None
+    is_custom_role: Optional[bool] = None
 
     model_config = {"from_attributes": True}

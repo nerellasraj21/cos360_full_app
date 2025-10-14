@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session,joinedload,selectinload
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, and_
 from uuid import UUID
 from app.models.masters.class_model import Class as ClassModel
 from app.models.masters.sections_model import Section as SectionModel
@@ -132,21 +132,112 @@ async def delete_class_with_sections(db: AsyncSession, class_id: UUID):
         db_class = result.scalar_one_or_none()
         if not db_class:
             raise HTTPException(status_code=404, detail="Class not found")
-        
-        # Delete all sections associated with the class
+
+        # Check if class is in use by student admissions
+        from app.models.masters.admission_model import Admission
+        from sqlalchemy import func, or_
+        admissions_count = await db.execute(
+            select(func.count(Admission.id)).where(
+                or_(
+                    Admission.admitted_class_id == class_id,
+                    Admission.current_class_id == class_id
+                )
+            )
+        )
+        admission_dependencies = admissions_count.scalar()
+
+        # Check if class is in use by fee class mappings
+        from app.models.fee.fee_class_mapping_model import FeeClassMapping
+        fee_class_count = await db.execute(
+            select(func.count(FeeClassMapping.id)).where(FeeClassMapping.class_id == class_id)
+        )
+        fee_class_dependencies = fee_class_count.scalar()
+
+        # Check if class is in use by fee student mappings
+        from app.models.fee.fee_student_mapping_model import FeeStudentMapping
+        fee_student_count = await db.execute(
+            select(func.count(FeeStudentMapping.id)).where(FeeStudentMapping.class_id == class_id)
+        )
+        fee_student_dependencies = fee_student_count.scalar()
+
+        # Check if class is in use by class-subject mappings
+        from app.models.masters.class_subject_mapping_model import ClassSubjectMap
+        subject_mappings_count = await db.execute(
+            select(func.count(ClassSubjectMap.id)).where(ClassSubjectMap.class_id == class_id)
+        )
+        subject_mapping_dependencies = subject_mappings_count.scalar()
+
+        # Check sections for dependencies before deleting class
+        sections_result = await db.execute(select(SectionModel.id).where(SectionModel.class_id == class_id))
+        section_ids = [row[0] for row in sections_result.all()]
+
+        total_section_dependencies = 0
+        if section_ids:
+            # Check sections in student admissions
+            section_admissions_count = await db.execute(
+                select(func.count(Admission.id)).where(
+                    or_(
+                        Admission.admitted_section_id.in_(section_ids),
+                        Admission.current_section_id.in_(section_ids)
+                    )
+                )
+            )
+            section_admission_deps = section_admissions_count.scalar()
+
+            # Check sections in fee student mappings
+            section_fee_count = await db.execute(
+                select(func.count(FeeStudentMapping.id)).where(FeeStudentMapping.section_id.in_(section_ids))
+            )
+            section_fee_deps = section_fee_count.scalar()
+
+            # Check sections in timetables
+            from app.models.masters.timetable_model import Timetable
+            timetable_count = await db.execute(
+                select(func.count(Timetable.id)).where(Timetable.section_id.in_(section_ids))
+            )
+            timetable_deps = timetable_count.scalar()
+
+            total_section_dependencies = section_admission_deps + section_fee_deps + timetable_deps
+
+        # Calculate total dependencies
+        total_dependencies = (admission_dependencies + fee_class_dependencies +
+                            fee_student_dependencies + subject_mapping_dependencies +
+                            total_section_dependencies)
+
+        if total_dependencies > 0:
+            dependency_details = []
+            if admission_dependencies > 0:
+                dependency_details.append(f"{admission_dependencies} student admission(s)")
+            if fee_class_dependencies > 0:
+                dependency_details.append(f"{fee_class_dependencies} fee class mapping(s)")
+            if fee_student_dependencies > 0:
+                dependency_details.append(f"{fee_student_dependencies} fee student mapping(s)")
+            if subject_mapping_dependencies > 0:
+                dependency_details.append(f"{subject_mapping_dependencies} subject mapping(s)")
+            if total_section_dependencies > 0:
+                dependency_details.append(f"{total_section_dependencies} section-related record(s)")
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot delete class '{db_class.name}' because it is being used by {total_dependencies} record(s): {', '.join(dependency_details)}. Please reassign or delete the dependent records first."
+            )
+
+        # Delete all sections associated with the class (safe since we checked dependencies)
         # db.query(SectionModel).filter(SectionModel.class_id == class_id).delete()
         await db.execute(delete(SectionModel).where(SectionModel.class_id == class_id))
-        
+
         # Delete the class itself
         # db.delete(db_class)
         await db.delete(db_class)
         await db.commit()
-        
+
         # Invalidate cache after deleting class/section
         invalidate_cache("dropdown", "classes")
         invalidate_cache("dropdown", "sections")
-        
+
         return {"detail": "Class and associated sections deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"Error deleting class with sections: {str(e)}")
@@ -205,7 +296,12 @@ async def get_students_by_class_section(class_name: str, section_name: str, db):
 
     # Fetch section
     section_result = await db.execute(
-        select(SectionModel).where(SectionModel.name == section_name, SectionModel.class_id == class_obj.id)
+        select(SectionModel).where(
+            and_(
+                SectionModel.name == section_name,
+                SectionModel.class_id == class_obj.id
+            )
+        )
     )
     section_obj = section_result.scalars().first()
     if not section_obj:
@@ -216,8 +312,10 @@ async def get_students_by_class_section(class_name: str, section_name: str, db):
         select(Student)
         .join(Admission)
         .where(
-            Admission.current_class_id == class_obj.id,
-            Admission.current_section_id == section_obj.id
+            and_(
+                Admission.current_class_id == class_obj.id,
+                Admission.current_section_id == section_obj.id
+            )
         )
         .options(selectinload(Student.admissions))
     )
@@ -246,7 +344,12 @@ async def get_sections_by_class_id(db: AsyncSession, class_id: UUID):
     """Get sections by class ID for dropdown - Cached"""
     try:
         result = await db.execute(
-            select(SectionModel.id, SectionModel.name).where(SectionModel.class_id == class_id, SectionModel.is_active == True).order_by(SectionModel.name)
+            select(SectionModel.id, SectionModel.name).where(
+                and_(
+                    SectionModel.class_id == class_id,
+                    SectionModel.is_active == True
+                )
+            ).order_by(SectionModel.name)
         )
         sections = result.all()
         
@@ -255,4 +358,67 @@ async def get_sections_by_class_id(db: AsyncSession, class_id: UUID):
     except Exception as e:
         log.error(f"Error fetching sections by class ID: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Fetching sections by class ID failed: {str(e)}")
+
+async def update_section(db: AsyncSession, section_id: UUID, section_data: dict):
+    try:
+        result = await db.execute(select(SectionModel).where(SectionModel.id == section_id))
+        section = result.scalar_one_or_none()
+
+        if not section:
+            raise HTTPException(status_code=404, detail="Section not found")
+
+        for key, value in section_data.items():
+            if hasattr(section, key) and value is not None:
+                setattr(section, key, value)
+
+        await db.flush()
+
+        result = await db.execute(
+            select(SectionModel).where(SectionModel.id == section_id)
+        )
+        updated_section = result.scalar_one()
+
+        await db.commit()
+        return updated_section
+
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error updating section: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating section: {str(e)}")
+
+async def delete_section(db: AsyncSession, section_id: UUID):
+    try:
+        result = await db.execute(select(SectionModel).where(SectionModel.id == section_id))
+        section = result.scalar_one_or_none()
+
+        if not section:
+            raise HTTPException(status_code=404, detail="Section not found")
+
+        await db.execute(delete(SectionModel).where(SectionModel.id == section_id))
+        await db.commit()
+
+        return {"message": "Section deleted successfully"}
+
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error deleting section: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error deleting section: {str(e)}")
+
+async def get_section_by_id(db: AsyncSession, section_id: UUID):
+    try:
+        result = await db.execute(
+            select(SectionModel)
+            .options(selectinload(SectionModel.class_))
+            .where(SectionModel.id == section_id)
+        )
+        section = result.scalar_one_or_none()
+
+        if not section:
+            raise HTTPException(status_code=404, detail="Section not found")
+
+        return section
+
+    except Exception as e:
+        log.error(f"Error retrieving section: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving section: {str(e)}")
     

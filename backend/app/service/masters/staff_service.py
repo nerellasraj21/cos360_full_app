@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError, OperationalError
 from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
@@ -11,7 +11,7 @@ from app.tools.password_util import hash_password
 import enum
 
 
-from app.models.masters.staff_model import Staff
+from app.models.masters.staff_model import Staff, GenderEnum
 from app.models.auth.user_model import User
 from app.models.auth.role_model import Role
 from app.models.masters.staff_attendance_model import StaffAttendance
@@ -22,43 +22,89 @@ from app.schemas.masters.staff_attendance_schema import StaffAttendanceCreate, S
 
 # -------------------- Staff Enrollment --------------------
 
-class GenderEnum(enum.Enum):
-    male = "male"
-    female = "female"
-    other = "other"
-
 async def create_staff_enrollment(data: StaffEnrollmentCreate, db: AsyncSession):
     try:
+        # If no role_id provided, find 'Staff' role as default
+        role_id = data.role_id
+        if not role_id:
+            staff_role_result = await db.execute(select(Role).where(Role.name == "Staff"))
+            staff_role = staff_role_result.scalar_one_or_none()
+            if not staff_role:
+                raise HTTPException(status_code=400, detail="Default 'Staff' role not found. Please provide a role_id.")
+            role_id = staff_role.id
 
         new_user = User(
             username = data.first_name,
             email = data.email,
             password_hash = hash_password("staff@123"),
             is_active = True,
-            role_id = data.role_id
+            role_id = role_id
         )
 
-        
+
         db.add(new_user)
         await db.flush()
 
-        new_staff = Staff(**data.dict(exclude={"role_id"}),user_id=new_user.id)
+        staff_data = data.dict(exclude={"role_id"})
+
+        # Handle gender enum conversion if provided
+        if staff_data.get("gender"):
+            gender_value = staff_data["gender"]
+            if isinstance(gender_value, str):
+                # Convert string to proper enum value (handle case variations)
+                gender_lower = gender_value.lower()
+                if gender_lower == "male":
+                    staff_data["gender"] = GenderEnum.Male
+                elif gender_lower == "female":
+                    staff_data["gender"] = GenderEnum.Female
+                elif gender_lower == "other":
+                    staff_data["gender"] = GenderEnum.Other
+                else:
+                    # Try direct enum value lookup
+                    try:
+                        staff_data["gender"] = GenderEnum(gender_value)
+                    except ValueError:
+                        raise HTTPException(status_code=400, detail=f"Invalid gender value: {gender_value}. Must be 'Male', 'Female', or 'Other'")
+
+        new_staff = Staff(**staff_data, user_id=new_user.id)
         db.add(new_staff)
+        await db.flush()
+
+        # Fetch the created staff with all relationships before commit
+        result = await db.execute(
+            select(Staff)
+            .options(
+                selectinload(Staff.designation_obj),
+                selectinload(Staff.user)
+            )
+            .where(Staff.id == new_staff.id)
+        )
+        staff_out = result.scalar_one()
+
         await db.commit()
-        await db.refresh(new_staff)
-        return new_staff
+        return staff_out
     except SQLAlchemyError as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating staff enrollment: {str(e)}")
 
 
 async def get_all_staff_enrollments(db: AsyncSession):
-    result = await db.execute(select(Staff))
+    result = await db.execute(
+        select(Staff).options(
+            selectinload(Staff.designation_obj),
+            selectinload(Staff.user)
+        )
+    )
     return result.scalars().all()
 
 
 async def get_staff_enrollment_by_id(staff_id: UUID, db: AsyncSession):
-    result = await db.execute(select(Staff).where(Staff.id == staff_id))
+    result = await db.execute(
+        select(Staff).options(
+            selectinload(Staff.designation_obj),
+            selectinload(Staff.user)
+        ).where(Staff.id == staff_id)
+    )
     staff = result.scalar_one_or_none()
     if not staff:
         raise HTTPException(status_code=404, detail="Staff not found")
@@ -66,17 +112,42 @@ async def get_staff_enrollment_by_id(staff_id: UUID, db: AsyncSession):
 
 
 async def update_staff_enrollment(staff_id: UUID, data: StaffEnrollmentUpdate, db: AsyncSession):
-    result = await db.execute(select(Staff).where(Staff.id == staff_id))
-    staff = result.scalar_one_or_none()
-    if not staff:
-        raise HTTPException(status_code=404, detail="Staff not found")
+    try:
+        result = await db.execute(select(Staff).where(Staff.id == staff_id))
+        staff = result.scalar_one_or_none()
+        if not staff:
+            raise HTTPException(status_code=404, detail="Staff not found")
 
-    for field, value in data.dict(exclude_unset=True).items():
-        setattr(staff, field, value)
+        for field, value in data.dict(exclude_unset=True).items():
+            setattr(staff, field, value)
 
-    await db.commit()
-    await db.refresh(staff)
-    return staff
+        await db.flush()
+
+        # Fetch the updated staff with all relationships before commit
+        result = await db.execute(
+            select(Staff)
+            .options(
+                selectinload(Staff.designation_obj),
+                selectinload(Staff.user)
+            )
+            .where(Staff.id == staff.id)
+        )
+        staff_out = result.scalar_one()
+
+        await db.commit()
+        return staff_out
+
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Data integrity violation - check for duplicate values or invalid references")
+    except OperationalError as e:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail="Database operation failed - please try again")
+    except Exception as e:
+        await db.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Failed to update staff: {str(e)}")
 
 
 async def delete_staff_enrollment(staff_id: UUID, db: AsyncSession):
@@ -115,13 +186,13 @@ async def get_all_staff_attendance(
         if start_date and end_date:
             stmt = stmt.where(
                 and_(
-                    StaffAttendance.attendance_date >= start_date,
-                    StaffAttendance.attendance_date <= end_date
+                    StaffAttendance.date >= start_date,
+                    StaffAttendance.date <= end_date
                 )
             )
 
         if name:
-            stmt = stmt.join(Staff).where(Staff.name.ilike(f"%{name}%"))
+            stmt = stmt.join(Staff).where(Staff.first_name.ilike(f"%{name}%"))
 
         result = await db.execute(stmt)
         return [StaffAttendanceOut.from_orm(record) for record in result.scalars().all()]
@@ -177,14 +248,20 @@ async def delete_staff_attendance(attendance_id: UUID, db: AsyncSession):
 
 async def get_staff_list_by_gender(
     gender: Optional[GenderEnum],db: AsyncSession):
-    stmt = select(Staff)
+    stmt = select(Staff).options(
+        selectinload(Staff.designation_obj),
+        selectinload(Staff.user)
+    )
     if gender:
         stmt = stmt.where(Staff.gender == gender)
     result = await db.execute(stmt)
     return result.scalars().all()
 
-async def get_staff_details_by_designation(designation_id: Optional[int],db: AsyncSession):
-    stmt = select(Staff)
+async def get_staff_details_by_designation(designation_id: Optional[UUID],db: AsyncSession):
+    stmt = select(Staff).options(
+        selectinload(Staff.designation_obj),
+        selectinload(Staff.user)
+    )
     if designation_id:
         stmt = stmt.where(Staff.designation_id == designation_id)
     result = await db.execute(stmt)

@@ -13,7 +13,7 @@ class Admission(BaseOrg):
 
     admission_date = Column(Date, nullable=False)
     academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"))
-    admitted_academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id")) # Add this in migrations.
+    admitted_academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"))
     admitted_class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"))
     admitted_section_id = Column(UUID(as_uuid=True), ForeignKey("sections.id"))
     current_class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"))

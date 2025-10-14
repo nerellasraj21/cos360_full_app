@@ -5,6 +5,7 @@ from app.models.auth.user_model import User
 from app.models.auth.role_model import Role
 from app.models.auth.menu_model import Menu
 from app.models.auth.permissions_model import RoleMenuPermission
+from app.models.auth.resource_permission_model import ResourcePermission
 from app.tools.jwt_utils import create_access_token, create_refresh_token
 from app.tools.password_util import verify_password
 from app.db.tenant_session import get_tenant_db, TenantService
@@ -34,13 +35,22 @@ class MultiTenantAuthService:
             HTTPException: If credentials are invalid
         """
         try:
-            # Query user with role relationship
+            # Query user first (without problematic selectinload)
             result = await db.execute(
-                select(User)
-                .options(selectinload(User.role))
-                .where(User.username == username)
+                select(User).where(User.username == username)
             )
             user = result.scalar_one_or_none()
+
+            if user:
+                # Query role separately and manually attach it
+                from app.models.auth.role_model import Role
+                role_result = await db.execute(
+                    select(Role).where(Role.id == user.role_id)
+                )
+                role = role_result.scalar_one_or_none()
+
+                # Manually set the role relationship to maintain compatibility
+                user.role = role
             
             if not user:
                 logger.warning(f"User not found: {username}")
@@ -90,17 +100,23 @@ class MultiTenantAuthService:
         """
         try:
             # Get all menus that the role can access
-            result = await db.execute(
-                select(Menu, RoleMenuPermission.can_view)
-                .join(RoleMenuPermission, Menu.id == RoleMenuPermission.menu_id)
-                .where(
-                    RoleMenuPermission.role_id == role_id,
-                    RoleMenuPermission.can_view == True
+            logger.info(f"DEBUG MENU 1: Starting menu query for role_id: {role_id}")
+            try:
+                result = await db.execute(
+                    select(Menu, RoleMenuPermission.can_view)
+                    .join(RoleMenuPermission, Menu.id == RoleMenuPermission.menu_id)
+                    .where(
+                        RoleMenuPermission.role_id == role_id,
+                        RoleMenuPermission.can_view == True
+                    )
+                    .order_by(Menu.display_order, Menu.id)
                 )
-                .order_by(Menu.display_order, Menu.id)
-            )
-            
-            accessible_menus = result.fetchall()
+                accessible_menus = result.fetchall()
+                logger.info(f"DEBUG MENU 2: Menu query successful, found {len(accessible_menus)} accessible menus")
+            except Exception as db_error:
+                logger.warning(f"DEBUG MENU 2: Menu query failed (tables may not exist): {str(db_error)}")
+                logger.info("DEBUG MENU 3: Returning empty menu for tenant without menu setup")
+                return []
             
             if not accessible_menus:
                 logger.warning(f"No accessible menus found for role_id: {role_id}")
@@ -160,25 +176,81 @@ class MultiTenantAuthService:
             
             logger.info(f"Built hierarchical menu with {len(root_menus)} root items for role_id: {role_id}")
             return root_menus
-            
+
         except Exception as e:
             logger.error(f"Error building hierarchical menu for role_id {role_id}: {str(e)}")
             return []
+
+    @staticmethod
+    async def get_user_permissions(db: AsyncSession, role_id: int) -> Dict[str, List[str]]:
+        """
+        Fetch user's resource permissions from tenant schema only.
+
+        Note: The dual-layer permission system (Plan ∩ Role) is only used during
+        tenant onboarding. At runtime, users validate against tenant schema only.
+
+        Args:
+            db: Database session (already configured for tenant schema)
+            role_id: User's role ID
+
+        Returns:
+            Dict[str, List[str]]: Resource permissions grouped by resource
+            Example: {
+                "fee_categories": ["create", "read", "update", "delete", "list"],
+                "students": ["read", "list"],
+                "academic_years": ["create", "read", "update", "list"]
+            }
+        """
+        try:
+            logger.info(f"Fetching tenant permissions for role_id: {role_id}")
+
+            # Query resource permissions for the role from tenant schema
+            result = await db.execute(
+                select(ResourcePermission.resource, ResourcePermission.action)
+                .where(
+                    ResourcePermission.role_id == role_id,
+                    ResourcePermission.is_granted == True
+                )
+                .order_by(ResourcePermission.resource, ResourcePermission.action)
+            )
+            permissions = result.fetchall()
+
+            if not permissions:
+                logger.warning(f"No permissions found for role_id: {role_id}")
+                return {}
+
+            # Group permissions by resource
+            grouped_permissions = {}
+            for resource, action in permissions:
+                if resource not in grouped_permissions:
+                    grouped_permissions[resource] = []
+                grouped_permissions[resource].append(action)
+
+            # Sort actions within each resource for consistency
+            for resource in grouped_permissions:
+                grouped_permissions[resource].sort()
+
+            logger.info(f"Found permissions for {len(grouped_permissions)} resources for role_id: {role_id}")
+            return grouped_permissions
+
+        except Exception as e:
+            logger.error(f"Error fetching permissions for role_id {role_id}: {str(e)}")
+            return {}
     
     @staticmethod
     async def login_user(request: Request, username: str, password: str, client_name: Optional[str] = None) -> Dict[str, Any]:
         """
         Complete multi-tenant login process.
-        
+
         Args:
             request: FastAPI request object
             username: User's username
             password: User's password
             client_name: Optional client name override
-            
+
         Returns:
             Dict: Complete login response with user, role, menu, and tokens
-            
+
         Raises:
             HTTPException: For various error conditions
         """
@@ -187,30 +259,86 @@ class MultiTenantAuthService:
             final_client_name = client_name
         else:
             final_client_name = get_client_name_from_request(request)
-        
-        logger.info(f"Login attempt for user '{username}' on tenant '{final_client_name}'")
-        
+
+        logger.info(f"DEBUG 1: Login attempt for user '{username}' on tenant '{final_client_name}'")
+
         # Validate tenant exists and is active
+        logger.info(f"DEBUG 2: Getting tenant schema for '{final_client_name}'")
         schema_name = await TenantService.get_tenant_schema(final_client_name)
         if not schema_name:
             if final_client_name == "default":
                 schema_name = "cos360_main"  # Backward compatibility
+                logger.info(f"DEBUG 3: Using default schema: {schema_name}")
             else:
-                logger.warning(f"Tenant not found or inactive: {final_client_name}")
+                logger.warning(f"DEBUG 3: Tenant not found or inactive: {final_client_name}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid connection"
                 )
+        else:
+            logger.info(f"DEBUG 3: Found tenant schema: {schema_name}")
         
         # Get tenant database session
+        logger.info(f"DEBUG 4: Getting tenant database session")
         async for db in get_tenant_db(request):
             try:
+                logger.info(f"DEBUG 5: Starting user authentication")
                 # Authenticate user
                 user = await MultiTenantAuthService.authenticate_user(db, username, password)
-                
+                logger.info(f"DEBUG 6: User authenticated successfully, role_id: {user.role_id}")
+
                 # Build hierarchical menu
+                logger.info(f"DEBUG 7: Building hierarchical menu for role_id: {user.role_id}")
                 menu = await MultiTenantAuthService.build_hierarchical_menu(db, user.role_id)
-                
+                logger.info(f"DEBUG 8: Menu built successfully, menu count: {len(menu)}")
+
+                # Get user permissions
+                logger.info(f"DEBUG 9: Fetching user permissions for role_id: {user.role_id}")
+                permissions = await MultiTenantAuthService.get_user_permissions(db, user.role_id)
+                logger.info(f"DEBUG 10: Permissions fetched successfully, resource count: {len(permissions)}")
+
+                # Determine entity_id based on role
+                entity_id = None
+                role_name = user.role.name
+                logger.info(f"DEBUG 11: Determining entity_id for role: {role_name}")
+
+                try:
+                    if role_name == "Student":
+                        # Query student entity
+                        from app.models.student.student_model import Student
+                        student_result = await db.execute(
+                            select(Student).where(Student.user_id == user.id)
+                        )
+                        student = student_result.scalar_one_or_none()
+                        if student:
+                            entity_id = str(student.id)
+                            logger.info(f"DEBUG 12: Student entity_id found: {entity_id}")
+                    elif role_name == "Parent":
+                        # Query parent entity
+                        from app.models.masters.parent_model import Parent
+                        parent_result = await db.execute(
+                            select(Parent).where(Parent.user_id == user.id)
+                        )
+                        parent = parent_result.scalar_one_or_none()
+                        if parent:
+                            entity_id = str(parent.id)
+                            logger.info(f"DEBUG 12: Parent entity_id found: {entity_id}")
+                    elif role_name == "Staff":
+                        # Query staff entity
+                        from app.models.masters.staff_model import Staff
+                        staff_result = await db.execute(
+                            select(Staff).where(Staff.user_id == user.id)
+                        )
+                        staff = staff_result.scalar_one_or_none()
+                        if staff:
+                            entity_id = str(staff.id)
+                            logger.info(f"DEBUG 12: Staff entity_id found: {entity_id}")
+                    else:
+                        logger.info(f"DEBUG 12: Role '{role_name}' does not have an associated entity")
+                except Exception as entity_error:
+                    logger.warning(f"DEBUG 12: Error fetching entity_id for role {role_name}: {str(entity_error)}")
+                    # Continue without entity_id rather than failing login
+
                 # Create access token and refresh token with client information
                 token_data = {
                     "sub": str(user.id),
@@ -236,6 +364,8 @@ class MultiTenantAuthService:
                         "description": user.role.description
                     },
                     "menu": menu,
+                    "permissions": permissions,
+                    "entity_id": entity_id,
                     "access_token": access_token,
                     "refresh_token": refresh_token,
                     "token_type": "bearer"

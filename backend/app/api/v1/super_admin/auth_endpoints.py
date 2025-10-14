@@ -10,7 +10,7 @@ from app.schemas.public.super_admin_schema import (
     SuperAdminLogin, SuperAdminToken, SuperAdminCreate, SuperAdminRead,
     SuperAdminUpdate, SuperAdminPasswordChange, SystemHealthCheck
 )
-from app.tools.simple_permissions import get_current_super_admin
+from app.tools.simple_permissions import get_current_super_admin, super_admin_only
 
 router = APIRouter(prefix="/super_admin/auth", tags=["Super Admin/Authentication"])
 
@@ -49,6 +49,7 @@ async def super_admin_login(
     return SuperAdminToken(**tokens)
 
 @router.post("/register", response_model=SuperAdminRead, status_code=status.HTTP_201_CREATED)
+@super_admin_only
 async def create_super_admin(
     super_admin_data: SuperAdminCreate,
     request: Request,
@@ -83,6 +84,7 @@ async def create_super_admin(
     return new_super_admin
 
 @router.get("/profile", response_model=SuperAdminRead)
+@super_admin_only
 async def get_super_admin_profile(
     current_super_admin: dict = Depends(get_current_super_admin)
 ):
@@ -96,6 +98,7 @@ async def get_super_admin_profile(
         return await SuperAdminService.get_super_admin_by_id(db, super_admin_id)
 
 @router.put("/profile", response_model=SuperAdminRead)
+@super_admin_only
 async def update_super_admin_profile(
     update_data: SuperAdminUpdate,
     request: Request,
@@ -122,6 +125,7 @@ async def update_super_admin_profile(
     return updated_super_admin
 
 @router.post("/change-password")
+@super_admin_only
 async def change_super_admin_password(
     password_data: SuperAdminPasswordChange,
     request: Request,
@@ -151,6 +155,7 @@ async def change_super_admin_password(
     )
 
 @router.get("/health", response_model=SystemHealthCheck)
+@super_admin_only
 async def system_health_check(
     current_super_admin: dict = Depends(get_current_super_admin)
 ):

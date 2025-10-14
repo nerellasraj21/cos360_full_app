@@ -26,7 +26,7 @@ async def create_certificate(
     student_id: UUID = Form(...),
     certificate_type_id: UUID = Form(...),
     issue_date: Optional[date] = Form(None),
-    description: Optional[str] = Form(None),
+    remarks: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
     request: Request = None,
     db: AsyncSession = Depends(get_tenant_db),
@@ -34,11 +34,11 @@ async def create_certificate(
     """Create student certificate - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_certificates', 'create')
-    
-    return await upload_certificate(student_id,certificate_type_id,issue_date,description,certificate_file,db)
+
+    return await upload_certificate(student_id,certificate_type_id,issue_date,remarks,certificate_file,db,request)
 
 
 @router.get("/")
@@ -78,11 +78,11 @@ async def update_certificate(
     """Update certificate - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_certificates', 'update')
-    
-    return await update_certificate_file(certificate_id,certificate_type_id,issue_date,remarks,certificate_file,db)
+
+    return await update_certificate_file(certificate_id,certificate_type_id,issue_date,remarks,certificate_file,db,request)
 
 
 @router.delete("/{certificate_id}")
@@ -90,11 +90,11 @@ async def delete_certificate(certificate_id: UUID, request: Request, db: AsyncSe
     """Delete certificate - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_certificates', 'delete')
-    
-    return await delete_certificate_file(certificate_id,db)
+
+    return await delete_certificate_file(certificate_id,db,request)
 
 @router.get("/certificates/{certificate_id}/download", response_class=FileResponse)
 async def download_certificate(certificate_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):

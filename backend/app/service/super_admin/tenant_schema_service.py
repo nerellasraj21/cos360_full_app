@@ -25,7 +25,7 @@ class TenantSchemaService:
     @staticmethod
     async def initialize_complete_tenant_schema(
         schema_name: str,
-        plan_id: int,
+        plan_id: UUID,
         client_name: str,
         super_admin_id: UUID
     ) -> Dict[str, Any]:
@@ -155,7 +155,7 @@ class TenantSchemaService:
             }
 
     @staticmethod
-    async def _setup_plan_menus(db: AsyncSession, schema_name: str, plan_id: int) -> Dict[str, Any]:
+    async def _setup_plan_menus(db: AsyncSession, schema_name: str, plan_id: UUID) -> Dict[str, Any]:
         """
         Set up plan-based menus in tenant schema
         """
@@ -207,7 +207,7 @@ class TenantSchemaService:
     async def _setup_roles_and_permissions(
         db: AsyncSession,
         schema_name: str,
-        plan_id: int,
+        plan_id: UUID,
         plan_name: str
     ) -> Dict[str, Any]:
         """
@@ -260,6 +260,22 @@ class TenantSchemaService:
                         "action_name": action
                     })
                     permissions_assigned += 1
+
+            # CRITICAL: Add role_management permissions to Admin role
+            # These are essential for tenant admin functionality
+            role_management_actions = ['create', 'read', 'update', 'delete', 'list']
+            for action in role_management_actions:
+                await db.execute(text(f'''
+                    INSERT INTO "{schema_name}".resource_permissions
+                    (role_id, resource_name, action_name, is_granted)
+                    SELECT r.id, 'role_management', :action_name, true
+                    FROM "{schema_name}".roles r
+                    WHERE r.name = 'Admin'
+                    ON CONFLICT (role_id, resource_name, action_name) DO UPDATE SET is_granted = true
+                '''), {"action_name": action})
+                permissions_assigned += 1
+
+            logger.info(f"Added role_management permissions to Admin role in {schema_name}")
 
             return {
                 "roles_created": roles_created,

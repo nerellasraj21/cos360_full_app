@@ -183,19 +183,30 @@ async def delete_certificate_type(db: AsyncSession, certificate_type_id: UUID):
     try:
         # Get existing certificate type
         certificate_type = await get_certificate_type_by_id(db, certificate_type_id)
-        
-        # Check if certificate type is in use (you might want to check student_certificates table)
-        # For now, we'll allow deletion - add foreign key checks if needed
-        
+
+        # Check if certificate type is in use by student certificates
+        from app.models.student.student_certificate_model import StudentCertificate
+        from sqlalchemy import func
+        certificate_count = await db.execute(
+            select(func.count(StudentCertificate.id)).where(StudentCertificate.certificate_type_id == certificate_type_id)
+        )
+        certificate_dependencies = certificate_count.scalar()
+
+        if certificate_dependencies > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete certificate type '{certificate_type.type_name}' because it is being used by {certificate_dependencies} student certificate(s). Please reassign or delete the certificates first."
+            )
+
         await db.delete(certificate_type)
         await db.commit()
-        
+
         # Invalidate cache
         invalidate_cache("certificate_types_dropdown")
-        
+
         log.info(f"Certificate type deleted successfully: {certificate_type_id}")
         return {"message": "Certificate type deleted successfully"}
-        
+
     except HTTPException:
         raise
     except Exception as e:

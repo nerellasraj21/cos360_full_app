@@ -21,30 +21,33 @@ async def create_holiday(db: AsyncSession, holiday_data: HolidayCreate):
             academic_year_id=holiday_data.academic_year_id
         )
         db.add(db_query)
+        await db.flush()
+
+        result = await db.execute(
+            select(HolidayModel).where(HolidayModel.id == db_query.id)
+        )
+        created_holiday = result.scalar_one()
+
         await db.commit()
-        await db.refresh(db_query)
-        
+
         # Invalidate cache after creating new holiday
         invalidate_cache("dropdown", "holidays")
-        
-        return db_query
+
+        return created_holiday
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"Error creating holiday: {str(e)}")
     
 async def get_holiday_by_id(db: AsyncSession, holiday_id: UUID):
     try:
-        if not isinstance(holiday_id, int) or holiday_id <= 0:
-            raise ValueError("Invalid holiday ID")
-        
         result = await db.execute(select(HolidayModel).where(HolidayModel.id == holiday_id))
         holiday = result.scalar_one_or_none()
         if not holiday:
             raise HTTPException(status_code=404, detail="Holiday not found")
         return holiday
-    except ValueError as ve:
-        log.error(f"Invalid holiday ID: {ve}")
-        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        log.error(f"Database error retrieving holiday: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database error retrieving holiday")
 
 async def get_all_holidays(db: AsyncSession, skip: int = 0, limit: int = 100, active_only: bool = True, academic_year_id: UUID = None):
     try:
@@ -91,14 +94,20 @@ async def update_holiday(db: AsyncSession, holiday_id: UUID, holiday_data: Holid
         
         for var, value in holiday_data.model_dump(exclude_unset=True).items():
             setattr(holiday, var, value)
-        
+
+        await db.flush()
+
+        result = await db.execute(
+            select(HolidayModel).where(HolidayModel.id == holiday_id)
+        )
+        updated_holiday = result.scalar_one()
+
         await db.commit()
-        await db.refresh(holiday)
-        
+
         # Invalidate cache after updating holiday
         invalidate_cache("dropdown", "holidays")
-        
-        return holiday
+
+        return updated_holiday
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"Error updating holiday: {str(e)}")
@@ -110,13 +119,19 @@ async def deactivate_holiday(db: AsyncSession, holiday_id: UUID):
             raise HTTPException(status_code=404, detail="Holiday not found")
         
         holiday.is_active = False
+        await db.flush()
+
+        result = await db.execute(
+            select(HolidayModel).where(HolidayModel.id == holiday_id)
+        )
+        updated_holiday = result.scalar_one()
+
         await db.commit()
-        await db.refresh(holiday)
-        
+
         # Invalidate cache after deactivating holiday
         invalidate_cache("dropdown", "holidays")
-        
-        return holiday
+
+        return updated_holiday
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"Error deactivating holiday: {str(e)}")
@@ -128,13 +143,19 @@ async def activate_holiday(db: AsyncSession, holiday_id: UUID):
             raise HTTPException(status_code=404, detail="Holiday not found")
         
         holiday.is_active = True
+        await db.flush()
+
+        result = await db.execute(
+            select(HolidayModel).where(HolidayModel.id == holiday_id)
+        )
+        updated_holiday = result.scalar_one()
+
         await db.commit()
-        await db.refresh(holiday)
-        
+
         # Invalidate cache after activating holiday
         invalidate_cache("dropdown", "holidays")
-        
-        return holiday
+
+        return updated_holiday
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"Error activating holiday: {str(e)}")

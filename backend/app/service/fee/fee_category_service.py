@@ -64,20 +64,21 @@ async def create_fee_category(db: AsyncSession, fee_category_data: FeeCategoryCr
         )
         
         db.add(db_fee_category)
-        await db.commit()
-        await db.refresh(db_fee_category)
-        
-        # Invalidate cache after creating new category
-        invalidate_cache("dropdown", "fee_categories")
-        
-        # Load with academic year for response
+        await db.flush()
+
+        # Load with academic year for response before commit
         result = await db.execute(
             select(FeeCategoryModel)
             .options(selectinload(FeeCategoryModel.academic_year))
             .where(FeeCategoryModel.id == db_fee_category.id)
         )
         fee_category = result.scalar_one()
-        
+
+        await db.commit()
+
+        # Invalidate cache after creating new category
+        invalidate_cache("dropdown", "fee_categories")
+
         # Add academic year title to response
         fee_category.academic_year_title = fee_category.academic_year.title if fee_category.academic_year else None
         return fee_category
@@ -227,21 +228,22 @@ async def update_fee_category(db: AsyncSession, fee_category_id: UUID, fee_categ
             db_fee_category.category_status = fee_category_data.category_status
         if fee_category_data.academic_year_id is not None:
             db_fee_category.academic_year_id = fee_category_data.academic_year_id
-        
-        await db.commit()
-        await db.refresh(db_fee_category)
-        
-        # Invalidate cache after updating category
-        invalidate_cache("dropdown", "fee_categories")
-        
-        # Load updated fee category with academic year
+
+        await db.flush()
+
+        # Load updated fee category with academic year before commit
         result = await db.execute(
             select(FeeCategoryModel)
             .options(selectinload(FeeCategoryModel.academic_year))
             .where(FeeCategoryModel.id == db_fee_category.id)
         )
         updated_category = result.scalar_one()
-        
+
+        await db.commit()
+
+        # Invalidate cache after updating category
+        invalidate_cache("dropdown", "fee_categories")
+
         # Add academic year title to response
         updated_category.academic_year_title = updated_category.academic_year.title if updated_category.academic_year else None
         return updated_category
@@ -280,24 +282,38 @@ async def delete_fee_category(db: AsyncSession, fee_category_id: UUID):
     """Delete a fee category"""
     try:
         fee_category_uuid = fee_category_id
-        
+
         result = await db.execute(select(FeeCategoryModel).where(FeeCategoryModel.id == fee_category_uuid))
         db_fee_category = result.scalar_one_or_none()
-        
+
         if not db_fee_category:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Fee category with id {fee_category_id} not found"
             )
-        
+
+        # Check if fee category is in use by fee types
+        from app.models.fee.fee_type_model import FeeType
+        from sqlalchemy import func
+        fee_types_count = await db.execute(
+            select(func.count(FeeType.id)).where(FeeType.fee_category_id == fee_category_uuid)
+        )
+        fee_type_dependencies = fee_types_count.scalar()
+
+        if fee_type_dependencies > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete fee category '{db_fee_category.category_name}' because it is being used by {fee_type_dependencies} fee type(s). Please reassign or delete the fee types first."
+            )
+
         await db.delete(db_fee_category)
         await db.commit()
-        
+
         # Invalidate cache after deleting category
         invalidate_cache("dropdown", "fee_categories")
-        
+
         return {"message": "Fee category deleted successfully"}
-        
+
     except HTTPException:
         await db.rollback()
         raise

@@ -1,16 +1,18 @@
 from app.db.base import BasePublic
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import Column, String, Boolean, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+import uuid
 
 
 class Menu(BasePublic):
     __tablename__ = 'menus'
-    
-    id = Column(Integer, primary_key=True, index=True)
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String(50), nullable=False)
     url = Column(String(100), nullable=True)
     level = Column(String(2), nullable=False)  # L0, L1, L2
-    parent_id = Column(Integer, ForeignKey('menus.id'), nullable=True)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey('menus.id'), nullable=True)
 
     children = relationship("Menu", backref="parent", remote_side=[id])
     

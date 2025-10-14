@@ -1,6 +1,8 @@
 import os
+import logging
+from pathlib import Path
 from uuid import UUID
-from fastapi import UploadFile, File, Form, HTTPException, Depends
+from fastapi import UploadFile, File, Form, HTTPException, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -18,9 +20,28 @@ from app.schemas.student.certificate_schema import (
     CertificateIssueOut,
     CertificateFileResponse
 )
+from app.tools.error_handler import (
+    create_error_response,
+    create_validation_error,
+    create_not_found_error,
+    create_database_error,
+    ErrorCategory
+)
+from app.tools.database_error_mapper import map_database_error
+
+logger = logging.getLogger(__name__)
 
 UPLOAD_DIR = "uploaded_certificates"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+MAX_FILE_SIZE = 5 * 1024 * 1024
+ALLOWED_CONTENT_TYPES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".docx"}
 
 async def upload_certificate(
     student_id: UUID = Form(...),
@@ -29,16 +50,142 @@ async def upload_certificate(
     remarks: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_tenant_db),
+    request: Optional[Request] = None,
 ):
+    """
+    Upload a student certificate with comprehensive security and error handling
+
+    Args:
+        student_id: Student ID
+        certificate_type_id: Certificate type ID
+        issue_date: Date of issue (defaults to today)
+        remarks: Optional remarks
+        certificate_file: Uploaded certificate file
+        db: Database session
+        request: FastAPI request object for context
+
+    Returns:
+        Created certificate record
+
+    Raises:
+        HTTPException: For validation, security, or database errors
+    """
     try:
-        filename = None
+        filepath = None
+        # Validate student exists
+        student_result = await db.execute(
+            select(Student).where(Student.id == student_id)
+        )
+        student = student_result.scalar_one_or_none()
+        if not student:
+            raise create_not_found_error(
+                message="Student not found",
+                resource_type="student",
+                resource_id=str(student_id),
+                request=request
+            )
+
+        # Validate certificate type exists
+        cert_type_result = await db.execute(
+            select(CertificateType).where(CertificateType.id == certificate_type_id)
+        )
+        cert_type = cert_type_result.scalar_one_or_none()
+        if not cert_type:
+            raise create_not_found_error(
+                message="Certificate type not found",
+                resource_type="certificate_type",
+                resource_id=str(certificate_type_id),
+                request=request
+            )
+
         if certificate_file:
-            filename_str = str(certificate_file.filename)
-            extension = os.path.splitext(filename_str)[-1]
-            filename = f"{uuid4()}{extension}"
-            filepath = os.path.join(UPLOAD_DIR, filename)
-            with open(filepath, "wb") as buffer:
-                buffer.write(await certificate_file.read())
+            # Validate file is provided with filename
+            if not certificate_file.filename:
+                raise create_validation_error(
+                    message="No file provided",
+                    field="certificate_file",
+                    request=request
+                )
+
+            # Security: Validate filename
+            filename_str = str(certificate_file.filename).strip()
+            if not filename_str or len(filename_str) > 255:
+                raise create_validation_error(
+                    message="Invalid filename",
+                    field="filename",
+                    value=filename_str,
+                    request=request
+                )
+
+            # Security: Check for path traversal attempts
+            if ".." in filename_str or "/" in filename_str or "\\" in filename_str:
+                raise create_validation_error(
+                    message="Invalid filename - path traversal not allowed",
+                    field="filename",
+                    value=filename_str,
+                    request=request
+                )
+
+            # Security: Validate file extension
+            file_extension = os.path.splitext(filename_str)[1].lower()
+            if file_extension not in ALLOWED_EXTENSIONS:
+                raise create_validation_error(
+                    message=f"Invalid file extension. Allowed: {', '.join(ALLOWED_EXTENSIONS)}",
+                    field="file_extension",
+                    value=file_extension,
+                    request=request
+                )
+
+            # Security: Validate content type
+            if not certificate_file.content_type or certificate_file.content_type not in ALLOWED_CONTENT_TYPES:
+                raise create_validation_error(
+                    message="Invalid file type. Allowed: PDF, JPG, PNG, DOCX",
+                    field="content_type",
+                    value=certificate_file.content_type,
+                    request=request
+                )
+
+            # Security: Read and validate file size
+            file_contents = await certificate_file.read()
+            if len(file_contents) == 0:
+                raise create_validation_error(
+                    message="Empty file not allowed",
+                    field="file_size",
+                    request=request
+                )
+
+            if len(file_contents) > MAX_FILE_SIZE:
+                raise create_validation_error(
+                    message=f"File too large. Maximum allowed size is {MAX_FILE_SIZE // (1024*1024)} MB",
+                    field="file_size",
+                    value=f"{len(file_contents) // (1024*1024)} MB",
+                    request=request
+                )
+
+            # Security: Additional file content validation for PDFs
+            if file_extension == ".pdf" and not file_contents.startswith(b'%PDF'):
+                raise create_validation_error(
+                    message="Invalid PDF file format",
+                    field="file_content",
+                    request=request
+                )
+
+            # Generate secure filename
+            secure_filename = f"{uuid4()}{file_extension}"
+            filepath = os.path.join(UPLOAD_DIR, secure_filename)
+
+            # Save file securely
+            try:
+                with open(filepath, "wb") as buffer:
+                    buffer.write(file_contents)
+            except Exception as e:
+                logger.error(f"Failed to save certificate file {secure_filename}: {str(e)}")
+                raise create_error_response(
+                    error_code=ErrorCategory.SYSTEM_ERROR,
+                    message="Failed to save certificate file",
+                    status_code=500,
+                    request=request
+                )
 
         cert = CertificateIssue(
             student_id=student_id,
@@ -49,22 +196,44 @@ async def upload_certificate(
         )
 
         db.add(cert)
-        await db.commit()
-        await db.refresh(cert)
+        await db.flush()
+
+        # Load with relationships before commit
         result = await db.execute(
-            select(CertificateIssue, Student)
-            .join(Student, CertificateIssue.student_id == Student.id)
+            select(CertificateIssue)
+            .options(selectinload(CertificateIssue.certificate_type))
             .where(CertificateIssue.id == cert.id)
         )
-        cert, student = result.one_or_none()
-        cert.student = student
+        cert_with_relations = result.scalar_one()
 
-        # cert_with_student = result.scalar_one()
-        return cert
+        await db.commit()
 
+        logger.info(f"Successfully uploaded certificate for student {student_id}")
+        return cert_with_relations
+
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error creating certificate: {str(e)}")
+        logger.error(f"Error creating certificate: {str(e)}", exc_info=True)
+
+        # Handle database-specific errors
+        if "constraint" in str(e).lower() or "duplicate" in str(e).lower():
+            result = map_database_error(e)
+            if result:
+                error_code, message, details = result
+                raise create_database_error(
+                    message=message,
+                    constraint=details.get("constraint"),
+                    request=request
+                )
+
+        # Generic system error
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create certificate: {str(e)}"
+        )
 
 
 async def get_all_certificates(db: AsyncSession = Depends(get_tenant_db)):
@@ -87,21 +256,113 @@ async def update_certificate_file(
     remarks: Optional[str] = Form(None),
     certificate_file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_tenant_db),
+    request: Optional[Request] = None,
 ):
-    result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))
-    cert = result.scalar_one_or_none()
-    if not cert:
-        raise HTTPException(status_code=404, detail="Certificate not found")
-
     try:
+        result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))
+        cert = result.scalar_one_or_none()
+        if not cert:
+            raise create_not_found_error(
+                message="Certificate not found",
+                resource_type="certificate",
+                resource_id=str(certificate_id),
+                request=request
+            )
+
+        old_file_path = None
+
         # If new file uploaded, save it and update path
         if certificate_file:
-            filename_str = str(certificate_file.filename)
-            extension = os.path.splitext(filename_str)[-1]
-            filename = f"{uuid4()}{extension}"
-            filepath = os.path.join(UPLOAD_DIR, filename)
-            with open(filepath, "wb") as buffer:
-                buffer.write(await certificate_file.read())
+            old_file_path = cert.file_path
+
+            # Validate file is provided with filename
+            if not certificate_file.filename:
+                raise create_validation_error(
+                    message="No file provided",
+                    field="certificate_file",
+                    request=request
+                )
+
+            # Security: Validate filename
+            filename_str = str(certificate_file.filename).strip()
+            if not filename_str or len(filename_str) > 255:
+                raise create_validation_error(
+                    message="Invalid filename",
+                    field="filename",
+                    value=filename_str,
+                    request=request
+                )
+
+            # Security: Check for path traversal attempts
+            if ".." in filename_str or "/" in filename_str or "\\" in filename_str:
+                raise create_validation_error(
+                    message="Invalid filename - path traversal not allowed",
+                    field="filename",
+                    value=filename_str,
+                    request=request
+                )
+
+            # Security: Validate file extension
+            file_extension = os.path.splitext(filename_str)[1].lower()
+            if file_extension not in ALLOWED_EXTENSIONS:
+                raise create_validation_error(
+                    message=f"Invalid file extension. Allowed: {', '.join(ALLOWED_EXTENSIONS)}",
+                    field="file_extension",
+                    value=file_extension,
+                    request=request
+                )
+
+            # Security: Validate content type
+            if not certificate_file.content_type or certificate_file.content_type not in ALLOWED_CONTENT_TYPES:
+                raise create_validation_error(
+                    message="Invalid file type. Allowed: PDF, JPG, PNG, DOCX",
+                    field="content_type",
+                    value=certificate_file.content_type,
+                    request=request
+                )
+
+            # Security: Read and validate file size
+            file_contents = await certificate_file.read()
+            if len(file_contents) == 0:
+                raise create_validation_error(
+                    message="Empty file not allowed",
+                    field="file_size",
+                    request=request
+                )
+
+            if len(file_contents) > MAX_FILE_SIZE:
+                raise create_validation_error(
+                    message=f"File too large. Maximum allowed size is {MAX_FILE_SIZE // (1024*1024)} MB",
+                    field="file_size",
+                    value=f"{len(file_contents) // (1024*1024)} MB",
+                    request=request
+                )
+
+            # Security: Additional file content validation for PDFs
+            if file_extension == ".pdf" and not file_contents.startswith(b'%PDF'):
+                raise create_validation_error(
+                    message="Invalid PDF file format",
+                    field="file_content",
+                    request=request
+                )
+
+            # Generate secure filename
+            secure_filename = f"{uuid4()}{file_extension}"
+            filepath = os.path.join(UPLOAD_DIR, secure_filename)
+
+            # Save file securely
+            try:
+                with open(filepath, "wb") as buffer:
+                    buffer.write(file_contents)
+            except Exception as file_error:
+                logger.error(f"Failed to save certificate file {secure_filename}: {str(file_error)}")
+                raise create_error_response(
+                    error_code=ErrorCategory.SYSTEM_ERROR,
+                    message="Failed to save certificate file",
+                    status_code=500,
+                    request=request
+                )
+
             cert.file_path = filepath
 
         if certificate_type_id is not None:
@@ -111,24 +372,100 @@ async def update_certificate_file(
         if remarks is not None:
             cert.remarks = remarks
 
-        await db.commit()
-        await db.refresh(cert)
-        return cert
+        await db.flush()
 
+        # Fetch with relationships before commit to avoid schema context loss
+        result = await db.execute(
+            select(CertificateIssue)
+            .options(selectinload(CertificateIssue.certificate_type))
+            .where(CertificateIssue.id == certificate_id)
+        )
+        updated_cert = result.scalar_one()
+
+        await db.commit()
+
+        # Clean up old file after successful commit
+        if old_file_path:
+            old_path = Path(old_file_path)
+            if old_path.exists():
+                try:
+                    old_path.unlink()
+                    logger.info(f"Cleaned up old certificate file: {old_file_path}")
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to clean up old file {old_file_path}: {str(cleanup_error)}")
+
+        logger.info(f"Successfully updated certificate {certificate_id}")
+        return updated_cert
+
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error updating certificate: {str(e)}")
+        logger.error(f"Error updating certificate {certificate_id}: {str(e)}")
+
+        if "constraint" in str(e).lower() or "duplicate" in str(e).lower():
+            error_code, message, details = map_database_error(e)
+            raise create_database_error(
+                message=message,
+                constraint=details.get("constraint"),
+                request=request
+            )
+
+        raise create_error_response(
+            error_code=ErrorCategory.SYSTEM_ERROR,
+            message="Failed to update certificate",
+            status_code=500,
+            request=request
+        )
 
 
-async def delete_certificate_file(certificate_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
-    result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))
-    cert = result.scalar_one_or_none()
-    if not cert:
-        raise HTTPException(status_code=404, detail="Certificate not found")
+async def delete_certificate_file(
+    certificate_id: UUID,
+    db: AsyncSession = Depends(get_tenant_db),
+    request: Optional[Request] = None
+):
+    try:
+        result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))
+        cert = result.scalar_one_or_none()
+        if not cert:
+            raise create_not_found_error(
+                message="Certificate not found",
+                resource_type="certificate",
+                resource_id=str(certificate_id),
+                request=request
+            )
 
-    await db.delete(cert)
-    await db.commit()
-    return {"detail": "Certificate deleted successfully"}
+        file_path = cert.file_path
+
+        await db.delete(cert)
+        await db.commit()
+
+        # Clean up file after successful database deletion
+        if file_path:
+            file_obj = Path(file_path)
+            if file_obj.exists():
+                try:
+                    file_obj.unlink()
+                    logger.info(f"Successfully deleted certificate file: {file_path}")
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to delete file {file_path}: {str(cleanup_error)}")
+
+        logger.info(f"Successfully deleted certificate {certificate_id}")
+        return {"detail": "Certificate deleted successfully"}
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error deleting certificate {certificate_id}: {str(e)}")
+        raise create_error_response(
+            error_code=ErrorCategory.SYSTEM_ERROR,
+            message="Failed to delete certificate",
+            status_code=500,
+            request=request
+        )
 
 async def download_certificate_file(certificate_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     result = await db.execute(select(CertificateIssue).where(CertificateIssue.id == certificate_id))

@@ -21,7 +21,7 @@ async def create(request: Request, subject: SubjectCreate, db: AsyncSession = De
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'subjects', 'create')
     
-    return await create_subject(db, subject)
+    return await create_subject(db, subject, request)
 
 @router.get("/", response_model=List[SubjectRead])
 async def list_all(request: Request, active_only: bool = True, academic_year_id: UUID = None, db: AsyncSession = Depends(get_tenant_db)):
@@ -32,7 +32,7 @@ async def list_all(request: Request, active_only: bool = True, academic_year_id:
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'subjects', 'list')
     
-    result = await get_all_subjects(db, 0, 1000, active_only, academic_year_id)
+    result = await get_all_subjects(db, 0, 1000, active_only, academic_year_id, request)
     return result['items']
 
 @router.get("/paginated", response_model=PaginatedResponse[SubjectRead])
@@ -44,7 +44,7 @@ async def list_paginated(request: Request, skip: int = 0, limit: int = 100, acti
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'subjects', 'list')
     
-    return await get_all_subjects(db, skip, limit, active_only, academic_year_id)
+    return await get_all_subjects(db, skip, limit, active_only, academic_year_id, request)
 
 @router.get("/dropdown", response_model=List[SubjectDropdown])
 @rate_limit_dropdown("100 per minute")
@@ -63,10 +63,10 @@ async def get_categories(request: Request, db: AsyncSession = Depends(get_tenant
     """Get all subject categories"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'subjects', 'list')
-    
+
     # Import here to avoid circular import
     from app.service.masters.subject_category_service import get_all_subject_categories
     return await get_all_subject_categories(db)

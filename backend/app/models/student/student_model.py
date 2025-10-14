@@ -1,10 +1,14 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date, TIMESTAMP, func
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date, TIMESTAMP, func, Enum
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import ENUM, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import BaseOrg
+import enum
 import uuid
 
-gender_enum = ENUM('M', 'F', 'O', name='gender_enum', create_type=False)
+class GenderEnum(enum.Enum):
+    Male = "Male"
+    Female = "Female"
+    Other = "Other"
 
 class Student(BaseOrg):
     __tablename__ = "students"
@@ -34,3 +38,23 @@ class Student(BaseOrg):
     certificates = relationship("CertificateIssue", back_populates="student", cascade="all, delete-orphan")
     documents = relationship("StudentDocument", back_populates="student", cascade="all, delete-orphan")
     fee_student_mappings = relationship("FeeStudentMapping", back_populates="student", cascade="all, delete-orphan")
+
+    @property
+    def father(self):
+        if hasattr(self, '_father'):
+            return self._father
+        return None
+
+    @father.setter
+    def father(self, value):
+        self._father = value
+
+    @property
+    def mother(self):
+        if hasattr(self, '_mother'):
+            return self._mother
+        return None
+
+    @mother.setter
+    def mother(self, value):
+        self._mother = value

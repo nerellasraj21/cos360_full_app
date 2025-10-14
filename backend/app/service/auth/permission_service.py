@@ -177,11 +177,18 @@ class PermissionService:
             )
             
             db.add(permission)
+            await db.flush()
+
+            # Get the created permission before commit
+            result = await db.execute(
+                select(ResourcePermission).where(ResourcePermission.id == permission.id)
+            )
+            created_permission = result.scalar_one()
+
             await db.commit()
-            await db.refresh(permission)
-            
+
             logger.info(f"Created permission: {role_id} -> {resource}:{action} = {is_granted}")
-            return permission
+            return created_permission
             
         except Exception as e:
             await db.rollback()

@@ -36,4 +36,4 @@ class AcademicYear(BaseOrg):
     fee_student_mappings = relationship("FeeStudentMapping", back_populates="academic_year")
 
     def __repr__(self):
-        return f"name='{self.title}')"
+        return f"AcademicYear(id='{self.id}')"

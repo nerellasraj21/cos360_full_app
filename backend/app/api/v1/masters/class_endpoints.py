@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from typing import List
 from uuid import UUID
-from app.service.masters.class_service import create_class_with_sections,get_all_classes_with_sections,update_class_with_sections,delete_class_with_sections,get_class_with_sections,get_class_section_list,get_all_classes_data,get_all_sections_data,get_sections_by_class_name,get_students_by_class_section,get_classes_dropdown,get_sections_by_class_id
+from app.service.masters.class_service import create_class_with_sections,get_all_classes_with_sections,update_class_with_sections,delete_class_with_sections,get_class_with_sections,get_class_section_list,get_all_classes_data,get_all_sections_data,get_sections_by_class_name,get_students_by_class_section,get_classes_dropdown,get_sections_by_class_id,update_section,delete_section,get_section_by_id
 from app.schemas.masters.class_schema import ClassCreate, ClassRead, ClassUpdate,ClassOut,ClassDropdown
-from app.schemas.masters.sections_schema import ClassSectionInfo,SectionOut,SectionDropdown
+from app.schemas.masters.sections_schema import ClassSectionInfo,SectionOut,SectionDropdown,SectionUpdate
 from app.schemas.student.student_schema import StudentOut
 from app.db.tenant_session import get_tenant_db
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_api, rate_limit_create
@@ -158,3 +158,49 @@ async def list_students_by_class_section(
     await check_role_plan_permission_with_error(db, request, role, 'classes', 'list')
     
     return await get_students_by_class_section(class_name, section_name, db)
+
+# Get Individual Section
+@router.get("/sections/{section_id}", response_model=SectionOut)
+async def get_section(request: Request, section_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
+    """Get section by ID"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'read')
+
+    return await get_section_by_id(db, section_id)
+
+# Update Individual Section
+@router.put("/sections/{section_id}", response_model=SectionOut)
+async def update_section_endpoint(request: Request, section_id: UUID, section_data: SectionUpdate, db: AsyncSession = Depends(get_tenant_db)):
+    """Update individual section"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'update')
+
+    section_dict = section_data.model_dump(exclude_unset=True)
+    if 'id' in section_dict:
+        del section_dict['id']
+
+    updated_section = await update_section(db, section_id, section_dict)
+    if not updated_section:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+    return updated_section
+
+# Delete Individual Section
+@router.delete("/sections/{section_id}", status_code=status.HTTP_200_OK)
+async def delete_section_endpoint(request: Request, section_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
+    """Delete individual section"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'classes', 'delete')
+
+    result = await delete_section(db, section_id)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+    return result

@@ -1,66 +1,137 @@
-# ignore virtual environment
-venv/
-
-# ignore claude.md
-claude.md
-SESSION_CONTEXT.md
-
-# Ignore python compiled files
-*.pyc
+# =============================================================================
+# Python
+# =============================================================================
+# Byte-compiled / optimized / DLL files
 __pycache__/
+*.py[cod]
+*$py.class
+*.pyc
 
-.vscode/
-*.log
-*.sqlite3
-.claude/settings.local.json
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+virtualenv/
 
-# Environment files (never commit actual environment variables)
+# =============================================================================
+# Environment & Configuration
+# =============================================================================
+# Environment files (NEVER commit credentials)
 .env
 .env.local
 .env.production
 .env.staging
 .env.*.local
 
-TEST_ENVIRONMENT_SETUP.md
-FEE_TRANSACTIONS_IMPLEMENTATION_PLAN.md
-SUPER_ADMIN_IMPLEMENTATION_PLAN.md
+# =============================================================================
+# IDE & Editor
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Fee & Transactions Implementation Phase Documents - Delete Once done
-IMPLEMENTATION_PHASE_SEQUENCE.md
-PHASE_1_5_ESSENTIAL_BUSINESS_OPERATIONS.md
-PHASE_1_ACCEPTANCE_CRITERIA.md
-PHASE_1_CORE_FEE_COLLECTION.md
-PHASE_2_OPERATIONAL_EFFICIENCY.md
-PHASE_3_ADVANCED_AUTOMATION.md
+# Claude Code
+.claude/settings.local.json
 
-# Private Documentation (Keep out of shared repo)
-# Keep FRONTEND_API_DOCUMENTATION.md in git, but exclude other docs
+# =============================================================================
+# Logs & Databases
+# =============================================================================
+*.log
+*.sqlite3
+*.db
+
+# =============================================================================
+# Temporary & Backup Files
+# =============================================================================
+*.tmp
+*.bak
+temp_*
+*~
+.DS_Store
+
+# =============================================================================
+# Project-Specific: Investigation & Debug Files
+# =============================================================================
+# Temporary investigation scripts (not part of core codebase)
+
+
+# Investigation results
+
+
+# Test tokens (if containing sensitive data)
+
+
+# Accidentally created files
+
+
+# =============================================================================
+# Project-Specific: Session & Context Files
+# =============================================================================
+claude.md
+SESSION_CONTEXT.md
+SESSION_CONTEXT*.yml
+SESSION_CONTEXT*.yaml
+*.context.yml
+*.context.yaml
+TESTING_STRUCTURE_RECOMMENDATIONS.yml
+.claude
+
+# Context guide (keep this if it's a valuable reference)
+# context_guide.json
+
+# =============================================================================
+# Project-Specific: Backup & Archive
+# =============================================================================
+system_backup_*
+/archive/
+
+# =============================================================================
+# Project-Specific: Documentation (Selective)
+# =============================================================================
+# Temporary/obsolete implementation plans (delete once complete)
+
+
+# Private documentation patterns
 *_DOCUMENTATION.md
 !FRONTEND_API_DOCUMENTATION.md
 API_*.md
 INTEGRATION_*.md
 BACKEND_*.md
 SYSTEM_*.md
+docs/
 
-# Private session/context files
-SESSION_CONTEXT*.yml
-SESSION_CONTEXT*.yaml
-*.context.yml
-*.context.yaml
-TESTING_STRUCTURE_RECOMMENDATIONS.yml
+# =============================================================================
+# Keep These Directories in Git (DO NOT IGNORE)
+# =============================================================================
+# Note: The following are explicitly tracked
+# - docs/ (project documentation)
+# - scripts/ (versioned utility scripts)
+# - tests/ (test suite)
 
-# Temporary files and test artifacts
-*.tmp
-*.bak
-temp_*.py
+# =============================================================================
+# Build & Distribution
+# =============================================================================
+build/
+dist/
+*.egg-info/
+.eggs/
 
-# Keep organized script structure - allow versioned scripts
-scripts/README.md
-scripts/database/
-scripts/development/
-scripts/testing/
+# =============================================================================
+# Testing
+# =============================================================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+/scripts
+/tests
 
-# Keep organized docs structure
-docs/testing/
-
-.venv/
+# =============================================================================
+# OS-Specific
+# =============================================================================
+Thumbs.db
+.DS_Store
+desktop.ini

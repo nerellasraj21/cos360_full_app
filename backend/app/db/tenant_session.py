@@ -146,17 +146,18 @@ async def get_tenant_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
         # Check if it's the default client for backward compatibility
         if client_name == "default":
             schema_name = "cos360_main"
+            logger.warning(f"Using default tenant fallback: {client_name} -> {schema_name}")
         else:
             logger.warning(f"Tenant not found or inactive: {client_name}")
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid connection"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tenant '{client_name}' not found or inactive"
             )
     
     async with AsyncSessionLocal() as session:
         try:
             # Set search path for this session
-            await session.execute(text(f"SET search_path TO {schema_name}"))
+            await session.execute(text(f'SET search_path TO "{schema_name}"'))
             
             logger.debug(f"Database session created for tenant '{client_name}' using schema '{schema_name}'")
             
@@ -191,17 +192,18 @@ async def get_tenant_db_by_client_name(client_name: str) -> AsyncGenerator[Async
         # Check if it's the default client for backward compatibility
         if client_name == "default":
             schema_name = "cos360_main"
+            logger.warning(f"Using default tenant fallback: {client_name} -> {schema_name}")
         else:
             logger.warning(f"Tenant not found or inactive: {client_name}")
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid connection"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tenant '{client_name}' not found or inactive"
             )
     
     async with AsyncSessionLocal() as session:
         try:
             # Set search path for this session
-            await session.execute(text(f"SET search_path TO {schema_name}"))
+            await session.execute(text(f'SET search_path TO "{schema_name}"'))
             
             logger.debug(f"Database session created for client '{client_name}' using schema '{schema_name}'")
             
@@ -211,5 +213,41 @@ async def get_tenant_db_by_client_name(client_name: str) -> AsyncGenerator[Async
             await session.rollback()
             logger.error(f"Error in tenant database session for '{client_name}': {str(e)}")
             raise
+        finally:
+            await session.close()
+
+
+async def get_tenant_db_by_schema(schema_name: str) -> AsyncGenerator[AsyncSession, None]:
+    """
+    Get database session for specific schema (SuperAdmin use).
+    
+    This function allows SuperAdmin to access any tenant schema directly
+    without going through normal tenant validation.
+    
+    Args:
+        schema_name: The target schema name
+        
+    Yields:
+        AsyncSession: Database session configured for the specified schema
+        
+    Raises:
+        HTTPException: If schema is not accessible
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            # Set search path for the specified schema
+            await session.execute(text(f'SET search_path TO "{schema_name}"'))
+            
+            logger.debug(f"Database session created for schema '{schema_name}' (SuperAdmin access)")
+            
+            yield session
+            
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error in database session for schema '{schema_name}': {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to access schema '{schema_name}': {str(e)}"
+            )
         finally:
             await session.close()

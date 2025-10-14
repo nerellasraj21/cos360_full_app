@@ -7,7 +7,7 @@ from uuid import UUID
 import logging
 
 from app.db.session import get_public_db
-from app.tools.simple_permissions import get_current_super_admin
+from app.tools.simple_permissions import get_current_super_admin, super_admin_only
 from app.service.super_admin.super_admin_service import SuperAdminService
 from app.schemas.public.super_admin_schema import SystemHealthCheck
 from app.models.public.tenant_model import Tenant
@@ -20,6 +20,7 @@ router = APIRouter(prefix="/super_admin/system", tags=["Super Admin/System Manag
 logger = logging.getLogger("super_admin.system")
 
 @router.get("/health", response_model=SystemHealthCheck)
+@super_admin_only
 async def get_system_health(
     current_super_admin: dict = Depends(get_current_super_admin)
 ):
@@ -38,6 +39,7 @@ async def get_system_health(
         return await SuperAdminService.get_system_health(db)
 
 @router.get("/tenants/")
+@super_admin_only
 async def get_all_tenants(
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
@@ -115,12 +117,13 @@ async def get_all_tenants(
         )
 
 @router.post("/tenants/", status_code=status.HTTP_201_CREATED)
+@super_admin_only
 async def create_tenant(
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
     client_name: str = Query(..., description="Tenant client name"),
     schema_name: str = Query(..., description="Database schema name"),
-    plan_id: Optional[int] = Query(None, description="Optional plan to assign immediately")
+    plan_id: Optional[UUID] = Query(None, description="Optional plan to assign immediately")
 ):
     """
     Super Admin: Create new tenant + initialize schema
@@ -241,8 +244,8 @@ async def create_tenant(
                     # Insert menus from plan
                     for menu in public_menus:
                         await db.execute(text(f'''
-                            INSERT INTO "{schema_name}".menus (name, url, level, display_order)
-                            VALUES (:name, :url, :level, :display_order)
+                            INSERT INTO "{schema_name}".menus (id, name, url, level, display_order)
+                            VALUES (gen_random_uuid(), :name, :url, :level, :display_order)
                         '''), {
                             "name": menu.name,
                             "url": menu.url,
@@ -317,8 +320,9 @@ async def create_tenant(
         )
 
 @router.put("/tenants/{tenant_id}/activate")
+@super_admin_only
 async def activate_tenant(
-    tenant_id: int,
+    tenant_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin)
 ):
@@ -389,11 +393,12 @@ async def activate_tenant(
         )
 
 @router.put("/tenants/{tenant_id}/plan")
+@super_admin_only
 async def assign_plan_to_tenant(
-    tenant_id: int,
+    tenant_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
-    plan_id: int = Query(..., description="Plan ID to assign to tenant")
+    plan_id: UUID = Query(..., description="Plan ID to assign to tenant")
 ):
     """
     Super Admin: Assign plan to tenant + auto-populate tenant menus
@@ -511,8 +516,8 @@ async def assign_plan_to_tenant(
             # Insert menus from plan (simplified - assuming no complex hierarchy for now)
             for menu in public_menus:
                 await db.execute(text(f'''
-                    INSERT INTO "{schema_name}".menus (name, url, level, display_order)
-                    VALUES (:name, :url, :level, :display_order)
+                    INSERT INTO "{schema_name}".menus (id, name, url, level, display_order)
+                    VALUES (gen_random_uuid(), :name, :url, :level, :display_order)
                 '''), {
                     "name": menu.name,
                     "url": menu.url,
@@ -520,6 +525,52 @@ async def assign_plan_to_tenant(
                     "display_order": menus_synced
                 })
                 menus_synced += 1
+
+            # Create role_menu_permissions table if it doesn't exist
+            await db.execute(text(f'''
+                CREATE TABLE IF NOT EXISTS "{schema_name}".role_menu_permissions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    role_id UUID REFERENCES "{schema_name}".roles(id) NOT NULL,
+                    menu_id UUID REFERENCES "{schema_name}".menus(id) NOT NULL,
+                    can_view BOOLEAN DEFAULT true,
+                    can_edit BOOLEAN DEFAULT false,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                );
+            '''))
+
+            # Clear existing role menu permissions for Admin role
+            await db.execute(text(f'''
+                DELETE FROM "{schema_name}".role_menu_permissions
+                WHERE role_id = (
+                    SELECT id FROM "{schema_name}".roles WHERE name = 'Admin'
+                )
+            '''))
+
+            # Get Admin role ID
+            admin_role_result = await db.execute(text(f'''
+                SELECT id FROM "{schema_name}".roles WHERE name = 'Admin'
+            '''))
+            admin_role_id = admin_role_result.scalar_one_or_none()
+
+            # Create role_menu_permissions for Admin role (full access to all synced menus)
+            permissions_created = 0
+            if admin_role_id:
+                menu_ids_result = await db.execute(text(f'''
+                    SELECT id FROM "{schema_name}".menus
+                '''))
+                menu_ids = [row.id for row in menu_ids_result.fetchall()]
+
+                for menu_id in menu_ids:
+                    await db.execute(text(f'''
+                        INSERT INTO "{schema_name}".role_menu_permissions
+                        (id, role_id, menu_id, can_view, can_edit)
+                        VALUES (gen_random_uuid(), :role_id, :menu_id, true, true)
+                    '''), {
+                        "role_id": admin_role_id,
+                        "menu_id": menu_id
+                    })
+                    permissions_created += 1
 
             await db.commit()
             await db.refresh(tenant)
@@ -537,6 +588,7 @@ async def assign_plan_to_tenant(
                     "new_plan_id": plan_id,
                     "plan_name": plan.name,
                     "menus_synced": menus_synced,
+                    "permissions_created": permissions_created,
                     "allowed_menu_ids": allowed_menu_ids
                 },
                 ip_address=request.client.host if request.client else None
@@ -557,10 +609,11 @@ async def assign_plan_to_tenant(
                     "description": plan.description
                 },
                 "menus_synced": menus_synced,
+                "permissions_created": permissions_created,
                 "next_steps": [
-                    "1. Tenant Admin can now assign role permissions to the synced menus",
-                    "2. Users will only see menus allowed by their plan",
-                    "3. Menu actions depend on role permissions assigned by Tenant Admin"
+                    "1. Admin role now has full access to all synced menus",
+                    "2. Users will only see menus allowed by their plan and role",
+                    "3. Tenant authentication should now work with complete menu structure"
                 ]
             }
 
@@ -576,6 +629,7 @@ async def assign_plan_to_tenant(
         )
 
 @router.get("/usage-stats")
+@super_admin_only
 async def get_usage_statistics(
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin)

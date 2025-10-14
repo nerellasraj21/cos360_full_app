@@ -26,7 +26,7 @@ async def create_student_transport(
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_transport', 'create')
     
-    return await add_student_transport(data,db)
+    return await add_student_transport(data, db, request)
 
 @router.get("/", response_model=list[StudentTransportOut])
 async def get_all_transport_assignments(request: Request, db: AsyncSession = Depends(get_tenant_db)):
@@ -36,7 +36,7 @@ async def get_all_transport_assignments(request: Request, db: AsyncSession = Dep
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_transport', 'list')
     
-    return await get_transport_assignments(db)
+    return await get_transport_assignments(db, request)
 
 
 @router.get("/student/{student_id}", response_model=list[StudentTransportOut])
@@ -47,7 +47,7 @@ async def get_transport_by_student(request: Request, student_id: UUID, db: Async
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_transport', 'read')
     
-    return await get_transport_by_student_id(student_id,db)
+    return await get_transport_by_student_id(student_id, db, request)
 
 
 @router.patch("/{transport_id}", response_model=StudentTransportOut)
@@ -63,7 +63,7 @@ async def update_transport_assignment(
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_transport', 'update')
     
-    return await update_partial_details_transport_assignment(transport_id,updates,db)
+    return await update_partial_details_transport_assignment(transport_id, updates, db, request)
 
 
 @router.delete("/{transport_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -74,4 +74,4 @@ async def delete_transport_assignment(request: Request, transport_id: UUID, db: 
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_transport', 'delete')
     
-    return await unassign_transport(transport_id,db)
+    await unassign_transport(transport_id, db, request)

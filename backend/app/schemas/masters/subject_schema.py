@@ -16,7 +16,7 @@ class SubjectCreate(SubjectBase):
 
 class SubjectUpdate(BaseModel):
     name: Optional[str] = None
-    category: Optional[str] = None
+    category_id: Optional[UUID] = None
     short_code: Optional[str] = None
     is_active: Optional[bool] = None
     academic_year_id: Optional[UUID] = None

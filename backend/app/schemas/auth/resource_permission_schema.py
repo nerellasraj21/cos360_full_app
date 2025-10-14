@@ -36,9 +36,7 @@ class ResourcePermissionRead(ResourcePermissionBase):
     """Schema for reading ResourcePermission data"""
     id: UUID = Field(..., description="Unique permission ID")
     role_id: UUID = Field(..., description="UUID of the role this permission belongs to")
-    created_at: datetime = Field(..., description="When the permission was created")
-    updated_at: datetime = Field(..., description="When the permission was last updated")
-    
+
     class Config:
         from_attributes = True
 

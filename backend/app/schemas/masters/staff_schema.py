@@ -2,43 +2,39 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Literal
 from datetime import date
 from uuid import UUID
-import enum
-
-class GenderEnum(enum.Enum):
-    male = "male"
-    female = "female"
-    other = "other"
+from app.models.masters.staff_model import GenderEnum
 
 class StaffEnrollmentBase(BaseModel):
     first_name: str = Field(..., description="Jane")
     last_name: Optional[str] = Field(None, description="Doe")
-    email: Optional[EmailStr]
-    phone: Optional[str]
-    gender: Optional[str]
-    date_of_birth: Optional[date]
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    gender: Optional[str] = None
+    date_of_birth: Optional[date] = None
     joining_date: date
-    qualification: Optional[str]
-    experience_years: Optional[int]
-    address: Optional[str]
+    qualification: Optional[str] = None
+    experience_years: Optional[int] = None
+    address: Optional[str] = None
     designation_id: Optional[UUID] = Field(None, description="ID from the designations table")
-    department: Optional[str]
+    department: Optional[str] = None
     is_active: bool = True
 
 
 class StaffEnrollmentCreate(StaffEnrollmentBase):
-    pass
+    role_id: Optional[UUID] = Field(None, description="Role ID for the staff user account")
 
 class StaffEnrollmentUpdate(BaseModel):
-    email: Optional[EmailStr]
-    phone: Optional[str]
-    gender: Optional[Literal["male", "female", "other"]]
-    date_of_birth: Optional[date]
-    joining_date: Optional[date]
-    qualification: Optional[str]
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    gender: Optional[Literal["Male", "Female", "Other"]] = None
+    date_of_birth: Optional[date] = None
+    joining_date: Optional[date] = None
+    qualification: Optional[str] = None
     designation_id: Optional[UUID] = Field(None, description="ID from the designations table")
-    experience_years: Optional[int]
-    address: Optional[str]
-    is_active: Optional[bool]
+    experience_years: Optional[int] = None
+    address: Optional[str] = None
+    department: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 class StaffEnrollmentOut(StaffEnrollmentBase):
@@ -68,7 +64,7 @@ class StaffOut(BaseModel):
     qualification: Optional[str]
     experience_years: Optional[int]
     address: Optional[str]
-    designation: Optional[DesignationOut]
+    designation_obj: Optional[DesignationOut]
     department: Optional[str]
     is_active: bool
     user_id: UUID

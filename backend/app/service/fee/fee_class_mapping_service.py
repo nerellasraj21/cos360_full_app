@@ -102,34 +102,35 @@ async def create_fee_class_mapping(db: AsyncSession, mapping_data: FeeClassMappi
         # Create fee class mapping
         db_mapping = FeeClassMappingModel(
             class_id=mapping_data.class_id,
-            fee_type_id=UUID(mapping_data.fee_type_id),
+            fee_type_id=mapping_data.fee_type_id,
             total_fee=mapping_data.total_fee,
             academic_year_id=mapping_data.academic_year_id,
             all_by_default=mapping_data.all_by_default
         )
         
         db.add(db_mapping)
-        await db.commit()
-        await db.refresh(db_mapping)
-        
-        # Load with all relationships for response
+        await db.flush()
+
+        # Load with all relationships for response before commit
         result = await db.execute(
             select(FeeClassMappingModel)
             .options(
                 selectinload(FeeClassMappingModel.class_ref),
                 selectinload(FeeClassMappingModel.fee_type),
                 selectinload(FeeClassMappingModel.academic_year),
-                selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingModel.term_amounts.property.mapper.class_.fee_term)
+                selectinload(FeeClassMappingModel.term_amounts)
             )
             .where(FeeClassMappingModel.id == db_mapping.id)
         )
         mapping = result.scalar_one()
-        
+
+        await db.commit()
+
         # Add relationship names to response
         mapping.class_name = mapping.class_ref.name if mapping.class_ref else None
         mapping.fee_type_name = mapping.fee_type.type_name if mapping.fee_type else None
         mapping.academic_year_name = mapping.academic_year.title if mapping.academic_year else None
-        
+
         # Add term names to term amounts
         if hasattr(mapping, 'term_amounts'):
             for term_amount in mapping.term_amounts:
@@ -137,7 +138,7 @@ async def create_fee_class_mapping(db: AsyncSession, mapping_data: FeeClassMappi
             mapping.class_fee_mapping_terms = mapping.term_amounts
         else:
             mapping.class_fee_mapping_terms = []
-        
+
         return mapping
         
     except HTTPException:
@@ -159,9 +160,12 @@ async def create_fee_class_mapping(db: AsyncSession, mapping_data: FeeClassMappi
     except Exception as e:
         await db.rollback()
         log.error(f"Error creating fee class mapping: {str(e)}")
+        log.error(f"Exception type: {type(e).__name__}")
+        import traceback
+        log.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while creating fee class mapping"
+            detail=f"An error occurred while creating fee class mapping: {str(e)}"
         )
 
 async def get_fee_class_mapping_by_id(db: AsyncSession, mapping_id: UUID):
@@ -173,7 +177,7 @@ async def get_fee_class_mapping_by_id(db: AsyncSession, mapping_id: UUID):
                 selectinload(FeeClassMappingModel.class_ref),
                 selectinload(FeeClassMappingModel.fee_type),
                 selectinload(FeeClassMappingModel.academic_year),
-                selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingModel.term_amounts.property.mapper.class_.fee_term)
+                selectinload(FeeClassMappingModel.term_amounts)
             )
             .where(FeeClassMappingModel.id == mapping_id)
         )
@@ -331,28 +335,29 @@ async def update_fee_class_mapping(db: AsyncSession, mapping_id: UUID, mapping_d
             db_mapping.academic_year_id = mapping_data.academic_year_id
         if mapping_data.all_by_default is not None:
             db_mapping.all_by_default = mapping_data.all_by_default
-        
-        await db.commit()
-        await db.refresh(db_mapping)
-        
-        # Load updated mapping with all relationships
+
+        await db.flush()
+
+        # Load updated mapping with all relationships before commit
         result = await db.execute(
             select(FeeClassMappingModel)
             .options(
                 selectinload(FeeClassMappingModel.class_ref),
                 selectinload(FeeClassMappingModel.fee_type),
                 selectinload(FeeClassMappingModel.academic_year),
-                selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingModel.term_amounts.property.mapper.class_.fee_term)
+                selectinload(FeeClassMappingModel.term_amounts)
             )
             .where(FeeClassMappingModel.id == db_mapping.id)
         )
         updated_mapping = result.scalar_one()
-        
+
+        await db.commit()
+
         # Add relationship names to response
         updated_mapping.class_name = updated_mapping.class_ref.name if updated_mapping.class_ref else None
         updated_mapping.fee_type_name = updated_mapping.fee_type.type_name if updated_mapping.fee_type else None
         updated_mapping.academic_year_name = updated_mapping.academic_year.title if updated_mapping.academic_year else None
-        
+
         return updated_mapping
         
     except HTTPException:
@@ -463,7 +468,7 @@ async def create_bulk_fee_class_mappings(db: AsyncSession, bulk_data: FeeClassMa
                         selectinload(FeeClassMappingModel.class_ref),
                         selectinload(FeeClassMappingModel.fee_type),
                         selectinload(FeeClassMappingModel.academic_year),
-                        selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingModel.term_amounts.property.mapper.class_.fee_term)
+                        selectinload(FeeClassMappingModel.term_amounts)
                     )
                     .where(FeeClassMappingModel.id == db_mapping.id)
                 )

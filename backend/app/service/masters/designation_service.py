@@ -114,13 +114,10 @@ async def get_all_designations(db: AsyncSession, skip: int = 0, limit: int = 100
             detail=f"Error fetching designations: {str(e)}"
         )
 
+@cache_dropdown(ttl=300)
 async def get_designations_dropdown(db: AsyncSession):
     """Get designations for dropdown - cached"""
-    return await cache_dropdown(
-        cache_key="designations_dropdown",
-        fetch_function=_fetch_designations_dropdown,
-        db=db
-    )
+    return await _fetch_designations_dropdown(db)
 
 async def _fetch_designations_dropdown(db: AsyncSession):
     """Internal function to fetch designations for dropdown"""
@@ -182,20 +179,30 @@ async def delete_designation(db: AsyncSession, designation_id: UUID):
     try:
         # Get existing designation
         designation = await get_designation_by_id(db, designation_id)
-        
+
         # Check if designation is in use by staff members
-        # You might want to add this check based on business requirements
-        # For now, we'll allow deletion - add foreign key checks if needed
-        
+        from app.models.masters.staff_model import Staff
+        from sqlalchemy import func
+        staff_count = await db.execute(
+            select(func.count(Staff.id)).where(Staff.designation_id == designation_id)
+        )
+        staff_dependencies = staff_count.scalar()
+
+        if staff_dependencies > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete designation '{designation.name}' because it is being used by {staff_dependencies} staff member(s). Please reassign or delete the staff records first."
+            )
+
         await db.delete(designation)
         await db.commit()
-        
+
         # Invalidate cache
         invalidate_cache("designations_dropdown")
-        
+
         log.info(f"Designation deleted successfully: {designation_id}")
         return {"message": "Designation deleted successfully"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
