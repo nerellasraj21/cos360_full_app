@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy import and_
+from sqlalchemy import and_, or_, func
 from typing import Optional, List
 from datetime import date, datetime
 from app.models.masters.attendance_model import StudentAttendance
@@ -413,8 +413,13 @@ async def get_all_student_attendance_with_filters(
             )
 
         if student_name:
+            search = f"%{student_name.lower()}%"
             stmt = stmt.join(StudentAttendance.student).where(
-                StudentAttendance.student.has(name=student_name)
+                or_(
+                    func.lower(Student.first_name).ilike(search),
+                    func.lower(Student.last_name).ilike(search),
+                    func.lower(func.concat(Student.first_name, " ", Student.last_name)).ilike(search)
+                )
             )
 
         result = await db.execute(stmt)
