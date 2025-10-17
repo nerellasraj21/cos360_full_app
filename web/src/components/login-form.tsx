@@ -25,9 +25,10 @@ export default function LoginForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const form = e.target as HTMLFormElement;
-    const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+    const username = (form.elements.namedItem('username') as HTMLInputElement).value;
     const password = (form.elements.namedItem('password') as HTMLInputElement).value;
-    loginMutation.mutate({ email, password }, {
+    console.log(username, password);
+    loginMutation.mutate({ username, password, client_name: 'test_tenant' }, {
       onSuccess: () => {
         console.log("user12", isAuthenticated)
         navigate({ to: '/' });
@@ -55,11 +56,11 @@ export default function LoginForm({
 
               <div className="grid gap-4 sm:gap-6">
                 <div className="grid gap-2 sm:gap-3">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="username">Username</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
+                    id="username"
+                    type="text"
+                    placeholder="Enter your username"
                     required
                   />
                 </div>

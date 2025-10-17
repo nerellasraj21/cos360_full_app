@@ -1,16 +1,19 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import type { AcademicYear, AcademicYearInput } from '@/types/masters/academicyear';
-import { fetchAcademicYears, fetchAcademicYearById, createAcademicYear, updateAcademicYear, deleteAcademicYear, fetchPaginatedAcademicYears } from '@/api/masters/academicyears';
+import type { AcademicYear, AcademicYearInput, AcademicYearDropdown } from '@/types/masters/academicyear';
+import { fetchAcademicYears, fetchAcademicYearById, createAcademicYear, updateAcademicYear, deleteAcademicYear, fetchPaginatedAcademicYears, fetchAcademicYearsDropdown } from '@/api/masters/academicyears';
 import { toast } from 'sonner';
 
 export function useAcademicYears() {
   return useQuery<AcademicYear[]>({
     queryKey: ['academicYears'],
-    queryFn: fetchAcademicYears,
+    queryFn: async () => {
+      const response = await fetchAcademicYears();
+      return response.items;
+    },
   });
 }
 
-export function useAcademicYear(id: number) {
+export function useAcademicYear(id: string) {
   return useQuery<AcademicYear>({
     queryKey: ['academicYear', id],
     queryFn: () => fetchAcademicYearById(id),
@@ -34,8 +37,8 @@ export function useCreateAcademicYear() {
 
 export function useUpdateAcademicYear() {
   const queryClient = useQueryClient();
-  return useMutation<AcademicYear, Error, { id: number; academicYear: AcademicYearInput }>({
-    mutationFn: updateAcademicYear,
+  return useMutation<AcademicYear, Error, { id: string; academicYear: AcademicYearInput }>({
+    mutationFn: ({ id, academicYear }) => updateAcademicYear(id, academicYear),
     onSuccess: () => {
       toast.success('Academic year updated!');
       queryClient.invalidateQueries({ queryKey: ['academicYears'] });
@@ -48,7 +51,7 @@ export function useUpdateAcademicYear() {
 
 export function useDeleteAcademicYear() {
   const queryClient = useQueryClient();
-  return useMutation<void, Error, number>({
+  return useMutation<void, Error, string>({
     mutationFn: deleteAcademicYear,
     onSuccess: () => {
       toast.success('Academic year deleted!');
@@ -73,15 +76,22 @@ export function usePaginatedAcademicYears(queryKey = ['academicYears'], PAGE_SIZ
   });
 }
 
-export function useAcademicYearsPaginated(page: number, pageSize: number) {
+export function useAcademicYearsPaginated(page: number, pageSize: number, enabled: boolean = true) {
   return useQuery<{ total: number; data: AcademicYear[]; hasMore: boolean }, Error>({
     queryKey: ['academicYears', page, pageSize],
     queryFn: async () => {
       const result = await fetchPaginatedAcademicYears(page * pageSize, pageSize);
-      // Add total count once we recieve it from  backend supports it, here hardcoded for demo
-      return { ...result, total: 15 };
+      return result;
     },
-    // keepPreviousData: true, 
+    enabled,
+    // keepPreviousData: true,
+  });
+}
+
+export function useAcademicYearsDropdown() {
+  return useQuery<AcademicYearDropdown[], Error>({
+    queryKey: ['academicYearsDropdown'],
+    queryFn: fetchAcademicYearsDropdown,
   });
 }
 

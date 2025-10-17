@@ -1,295 +1,138 @@
-// import type { Subject, SubjectInput } from '@/types/masters';
-// import CAxios from '../index';
-// import { SUBJECTS_API_BASE } from '@/constants';
+import type { Subject, SubjectInput, BulkClassSubjectMappingRequest, BulkClassSubjectMappingResponse } from '@/types/masters';
+import CAxios from '../index';
+import { SUBJECTS_API_BASE } from '@/constants/api/masters/subjects';
 
-// export const fetchSubjects = async (): Promise<Subject[]> => {
-//   const { data } = await CAxios.get(SUBJECTS_API_BASE);
-//   return data;
-// };
+// Dropdown interface for subjects
+export interface SubjectDropdown {
+  id: string;
+  name: string;
+  code: string;
+  category?: string;
+}
 
-// export const fetchSubjectById = async (id: number): Promise<Subject> => {
-//   const { data } = await CAxios.get(`${SUBJECTS_API_BASE}${id}`);
-//   return data;
-// };
+export const fetchSubjects = async (params?: {
+  skip?: number;
+  limit?: number;
+  active_only?: boolean;
+  academic_year_id?: string;
+}): Promise<{ items: Subject[]; total: number }> => {
+  const queryParams = new URLSearchParams();
+  if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString());
+  if (params?.limit !== undefined) queryParams.append('limit', params.limit.toString());
+  // Set active_only to false by default for table display
+  const activeOnly = params?.active_only !== undefined ? params.active_only : false;
+  queryParams.append('active_only', activeOnly.toString());
+  if (params?.academic_year_id && params.academic_year_id.trim() !== '') queryParams.append('academic_year_id', params.academic_year_id);
 
-// export const createSubject = async (subject: SubjectInput): Promise<Subject> => {
-//   const { data } = await CAxios.post(SUBJECTS_API_BASE, subject);
-//   return data;
-// };
+  const queryString = queryParams.toString();
+  const url = queryString ? `${SUBJECTS_API_BASE}?${queryString}` : SUBJECTS_API_BASE;
 
-// export const updateSubject = async ({ id, subject }: { id: number; subject: SubjectInput }): Promise<Subject> => {
-//   const { data } = await CAxios.put(`${SUBJECTS_API_BASE}${id}`, subject);
-//   return data;
-// };
+  const { data } = await CAxios.get(url);
 
-// export const deleteSubject = async (id: number): Promise<void> => {
-//   await CAxios.delete(`${SUBJECTS_API_BASE}${id}`);
-// };
+  // Handle both response formats: array or { items, total }
+  const items = Array.isArray(data) ? data : data.items || [];
+  const total = Array.isArray(data) ? items.length : data.total || items.length;
 
+  // Transform backend response to match frontend interface
+  const transformedItems = items.map((item: any) => ({
+    ...item,
+    code: item.short_code || item.code || '', // Handle both short_code and code
+    subject_category: item.category ? {
+      id: item.category.id,
+      name: item.category.name,
+    } : null,
+    subject_category_id: item.category_id, // Keep for form compatibility
+  }));
 
-import type { Subject, SubjectInput } from '@/types/masters';
-
-let sampleSubjects: Subject[] = [
-  {
-    id: 1,
-    name: 'Mathematics',
-    category: 'Science',
-    short_code: 'MATH',
-    is_active: true,
-    academic_year_id: 2023,
-    created_at: '2023-01-01T00:00:00Z',
-    updated_at: '2023-01-01T00:00:00Z',
-  },
-  {
-    id: 2,
-    name: 'English',
-    category: 'Language',
-    short_code: 'ENG',
-    is_active: true,
-    academic_year_id: 2023,
-    created_at: '2023-01-01T00:00:00Z',
-    updated_at: '2023-01-01T00:00:00Z',
-  },
-  // Additional sample data
-  {
-    id: 3,
-    name: 'Physics',
-    category: 'Science',
-    short_code: 'PHY',
-    is_active: true,
-    academic_year_id: 2022,
-    created_at: '2022-01-01T00:00:00Z',
-    updated_at: '2022-01-01T00:00:00Z',
-  },
-  {
-    id: 4,
-    name: 'Chemistry',
-    category: 'Science',
-    short_code: 'CHEM',
-    is_active: false,
-    academic_year_id: 2022,
-    created_at: '2022-01-01T00:00:00Z',
-    updated_at: '2022-01-01T00:00:00Z',
-  },
-  {
-    id: 5,
-    name: 'Biology',
-    category: 'Science',
-    short_code: 'BIO',
-    is_active: true,
-    academic_year_id: 2021,
-    created_at: '2021-01-01T00:00:00Z',
-    updated_at: '2021-01-01T00:00:00Z',
-  },
-  {
-    id: 6,
-    name: 'History',
-    category: 'Social Studies',
-    short_code: 'HIST',
-    is_active: true,
-    academic_year_id: 2021,
-    created_at: '2021-01-01T00:00:00Z',
-    updated_at: '2021-01-01T00:00:00Z',
-  },
-  {
-    id: 7,
-    name: 'Geography',
-    category: 'Social Studies',
-    short_code: 'GEO',
-    is_active: false,
-    academic_year_id: 2020,
-    created_at: '2020-01-01T00:00:00Z',
-    updated_at: '2020-01-01T00:00:00Z',
-  },
-  {
-    id: 8,
-    name: 'Computer Science',
-    category: 'Technology',
-    short_code: 'CS',
-    is_active: true,
-    academic_year_id: 2023,
-    created_at: '2023-01-01T00:00:00Z',
-    updated_at: '2023-01-01T00:00:00Z',
-  },
-  {
-    id: 9,
-    name: 'Physical Education',
-    category: 'Sports',
-    short_code: 'PE',
-    is_active: true,
-    academic_year_id: 2022,
-    created_at: '2022-01-01T00:00:00Z',
-    updated_at: '2022-01-01T00:00:00Z',
-  },
-  {
-    id: 10,
-    name: 'Art',
-    category: 'Arts',
-    short_code: 'ART',
-    is_active: false,
-    academic_year_id: 2021,
-    created_at: '2021-01-01T00:00:00Z',
-    updated_at: '2021-01-01T00:00:00Z',
-  },
-  {
-    id: 11,
-    name: 'Music',
-    category: 'Arts',
-    short_code: 'MUS',
-    is_active: true,
-    academic_year_id: 2020,
-    created_at: '2020-01-01T00:00:00Z',
-    updated_at: '2020-01-01T00:00:00Z',
-  },
-  {
-    id: 12,
-    name: 'Economics',
-    category: 'Commerce',
-    short_code: 'ECO',
-    is_active: true,
-    academic_year_id: 2023,
-    created_at: '2023-01-01T00:00:00Z',
-    updated_at: '2023-01-01T00:00:00Z',
-  },
-  {
-    id: 13,
-    name: 'Business Studies',
-    category: 'Commerce',
-    short_code: 'BUS',
-    is_active: false,
-    academic_year_id: 2022,
-    created_at: '2022-01-01T00:00:00Z',
-    updated_at: '2022-01-01T00:00:00Z',
-  },
-  {
-    id: 14,
-    name: 'Political Science',
-    category: 'Social Studies',
-    short_code: 'POL',
-    is_active: true,
-    academic_year_id: 2021,
-    created_at: '2021-01-01T00:00:00Z',
-    updated_at: '2021-01-01T00:00:00Z',
-  },
-  {
-    id: 15,
-    name: 'French',
-    category: 'Language',
-    short_code: 'FR',
-    is_active: true,
-    academic_year_id: 2020,
-    created_at: '2020-01-01T00:00:00Z',
-    updated_at: '2020-01-01T00:00:00Z',
-  },
-  {
-    id: 16,
-    name: 'German',
-    category: 'Language',
-    short_code: 'GER',
-    is_active: false,
-    academic_year_id: 2023,
-    created_at: '2023-01-01T00:00:00Z',
-    updated_at: '2023-01-01T00:00:00Z',
-  },
-  {
-    id: 17,
-    name: 'Spanish',
-    category: 'Language',
-    short_code: 'SPA',
-    is_active: true,
-    academic_year_id: 2022,
-    created_at: '2022-01-01T00:00:00Z',
-    updated_at: '2022-01-01T00:00:00Z',
-  },
-  {
-    id: 18,
-    name: 'Hindi',
-    category: 'Language',
-    short_code: 'HIN',
-    is_active: true,
-    academic_year_id: 2021,
-    created_at: '2021-01-01T00:00:00Z',
-    updated_at: '2021-01-01T00:00:00Z',
-  },
-  {
-    id: 19,
-    name: 'Sanskrit',
-    category: 'Language',
-    short_code: 'SAN',
-    is_active: false,
-    academic_year_id: 2020,
-    created_at: '2020-01-01T00:00:00Z',
-    updated_at: '2020-01-01T00:00:00Z',
-  },
-  {
-    id: 20,
-    name: 'Environmental Science',
-    category: 'Science',
-    short_code: 'EVS',
-    is_active: true,
-    academic_year_id: 2023,
-    created_at: '2023-01-01T00:00:00Z',
-    updated_at: '2023-01-01T00:00:00Z',
-  },
-];
-
-export const fetchSubjects = async (): Promise<Subject[]> => {
-  // Return a copy to simulate API
-  return [...sampleSubjects];
+  return {
+    items: transformedItems,
+    total
+  };
 };
 
-export const fetchSubjectById = async (id: number): Promise<Subject> => {
-  const subject = sampleSubjects.find((s) => s.id === id);
-  if (!subject) throw new Error('Subject not found');
-  return { ...subject };
+export const fetchSubjectById = async (id: string): Promise<Subject> => {
+  const { data } = await CAxios.get(`${SUBJECTS_API_BASE}${id}`);
+
+  // Transform backend response to match frontend interface
+  return {
+    ...data,
+    code: data.short_code || data.code || '', // Handle both short_code and code
+    subject_category: data.category ? {
+      id: data.category.id,
+      name: data.category.name,
+    } : null,
+    subject_category_id: data.category_id, // Keep for form compatibility
+  };
 };
 
 export const createSubject = async (subject: SubjectInput): Promise<Subject> => {
-  const newSubject: Subject = {
+  // Transform subject_category_id to category_id for backend compatibility
+  const payload = {
     ...subject,
-    id: sampleSubjects.length ? Math.max(...sampleSubjects.map((s) => s.id)) + 1 : 1,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    category_id: subject.subject_category_id,
+    subject_category_id: undefined, // Remove the old field
   };
-  sampleSubjects.push(newSubject);
-  return { ...newSubject };
+  delete payload.subject_category_id; // Clean up undefined field
+
+  const { data } = await CAxios.post(SUBJECTS_API_BASE, payload);
+
+  // Transform response to match frontend interface
+  return {
+    ...data,
+    code: data.short_code || data.code || '',
+    subject_category: data.category ? {
+      id: data.category.id,
+      name: data.category.name,
+    } : null,
+    subject_category_id: data.category_id,
+  };
 };
 
-export const updateSubject = async ({ id, subject }: { id: number; subject: SubjectInput }): Promise<Subject> => {
-  const idx = sampleSubjects.findIndex((s) => s.id === id);
-  if (idx === -1) throw new Error('Subject not found');
-  const updatedSubject: Subject = {
-    ...sampleSubjects[idx],
+export const updateSubject = async ({ id, subject }: { id: string; subject: SubjectInput }): Promise<Subject> => {
+  // Transform subject_category_id to category_id for backend compatibility
+  const payload = {
     ...subject,
-    updated_at: new Date().toISOString(),
+    category_id: subject.subject_category_id,
+    subject_category_id: undefined, // Remove the old field
   };
-  sampleSubjects[idx] = updatedSubject;
-  return { ...updatedSubject };
+  delete payload.subject_category_id; // Clean up undefined field
+
+  const { data } = await CAxios.put(`${SUBJECTS_API_BASE}${id}`, payload);
+
+  // Transform response to match frontend interface
+  return {
+    ...data,
+    code: data.short_code || data.code || '',
+    subject_category: data.category ? {
+      id: data.category.id,
+      name: data.category.name,
+    } : null,
+    subject_category_id: data.category_id,
+  };
 };
 
-export const deleteSubject = async (id: number): Promise<void> => {
-  sampleSubjects = sampleSubjects.filter((s) => s.id !== id);
+export const deleteSubject = async (id: string): Promise<void> => {
+  await CAxios.delete(`${SUBJECTS_API_BASE}${id}`);
 };
 
-export const fetchPaginatedSubjects = async (offset = 0, limit = 10): Promise<{ data: Subject[]; hasMore: boolean }> => {
-  const data = sampleSubjects.slice(offset, offset + limit);
-  const hasMore = offset + limit < sampleSubjects.length;
-  return { data, hasMore };
+export const createBulkClassSubjectMappings = async (request: BulkClassSubjectMappingRequest): Promise<BulkClassSubjectMappingResponse> => {
+  const { data } = await CAxios.post('/class-subject-mappings/', request);
+  return data;
 };
 
-export const fetchSubjectsPaginated = async (page = 0, pageSize = 10, academicYearId?: number): Promise<{ data: Subject[]; total: number; hasMore: boolean }> => {
-  const offset = page * pageSize;
-  let filtered = sampleSubjects;
-  // if (academicYearId !== undefined) {
-  //   filtered = filtered.filter(s => s.academic_year_id === academicYearId);
-  // }
-  const data = filtered.slice(offset, offset + pageSize);
-  const total = filtered.length;
-  const hasMore = offset + pageSize < total;
-  return { data, total, hasMore };
+export const fetchSubjectsDropdown = async (params?: {
+  category_id?: string;
+  mandatory_only?: boolean;
+  active_only?: boolean;
+}): Promise<SubjectDropdown[]> => {
+  const queryParams = new URLSearchParams();
+  if (params?.category_id) queryParams.append('category_id', params.category_id);
+  if (params?.mandatory_only !== undefined) queryParams.append('mandatory_only', params.mandatory_only.toString());
+  if (params?.active_only !== undefined) queryParams.append('active_only', params.active_only.toString());
+
+  const queryString = queryParams.toString();
+  const url = queryString ? `${SUBJECTS_API_BASE}dropdown?${queryString}` : `${SUBJECTS_API_BASE}dropdown`;
+
+  const { data } = await CAxios.get(url);
+  return data;
 };
-
-
-
-
-

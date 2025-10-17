@@ -1,55 +1,147 @@
-// src/lib/auth-store.ts
+// Enhanced auth store with student selection capabilities
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-
-interface User {
-  id: string
-  email: string
-  name: string
-  role?: string
-}
-
-interface AuthState {
-  user: User | null
-  token: string | null
-  isAuthenticated: boolean
-  login: (user: User, token: string) => void
-  logout: () => void
-  setUser: (user: User | null) => void
-}
+import type { AuthState, LoginResponse, Student, User, Permission, PermissionMap } from '@/types/auth'
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
-      token: null,
+      role: null,
+      selectedStudent: null,
+      availableStudents: [],
+      studentId: null,
+      permissions: [],
+      permissionsMap: {},
+      menuItems: [],
+      accessToken: null,
+      refreshToken: null,
       isAuthenticated: false,
 
-      login: (user: User, token: string) => {
+      login: (data: LoginResponse) => {
+        // Convert permission map to array format
+        const permissions: Permission[] = [];
+        let id = 1;
+        const permissionsMap = data.permissions || {};
+        Object.entries(permissionsMap).forEach(([resource, actions]) => {
+          if (Array.isArray(actions)) {
+            actions.forEach(action => {
+              permissions.push({
+                id: id.toString(),
+                resource,
+                action,
+                is_granted: true,
+              });
+              id++;
+            });
+          }
+        });
+
+        // Set studentId based on role
+        let studentId: string | null = null;
+        const availableStudents = data.user.parent_profile?.students || [];
+
+        // For students, use user.id as student ID
+        // For parents, studentId will be set when they select a student
+        if (data.role.name.toLowerCase() === 'student') {
+          // Student role - user.id is the student ID
+          studentId = data.user.id;
+        } else if (data.role.name.toLowerCase() === 'parent' && availableStudents.length > 0) {
+          // Parent role - set to first available student initially
+          studentId = availableStudents[0].id;
+        }
+        
+
         set({
-          user,
-          token,
+          user: data.user,
+          role: data.role,
+          permissions,
+          permissionsMap: data.permissions || {},
+          menuItems: data.menu,
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token,
           isAuthenticated: true,
+          // Reset student selection on new login
+          selectedStudent: availableStudents.length > 0 ? availableStudents[0] : null,
+          availableStudents,
+          studentId,
         })
       },
 
       logout: () => {
         set({
           user: null,
-          token: null,
+          role: null,
+          selectedStudent: null,
+          availableStudents: [],
+          studentId: null,
+          permissions: [],
+          permissionsMap: {},
+          menuItems: [],
+          accessToken: null,
+          refreshToken: null,
           isAuthenticated: false,
         })
       },
 
+      selectStudent: (student: Student) => {
+        set({
+          selectedStudent: student,
+          studentId: student.id // Set studentId when parent selects a student
+        })
+      },
+
+      setAvailableStudents: (students: Student[]) => {
+        set({ 
+          availableStudents: students,
+          // Auto-select first student if none selected and students available
+          selectedStudent: get().selectedStudent || (students.length > 0 ? students[0] : null)
+        })
+      },
+
+      refreshTokens: (accessToken: string, refreshToken: string) => {
+        set({
+          accessToken,
+          refreshToken,
+        })
+      },
+
       setUser: (user: User | null) => {
-        set({ user })
+        set({
+          user,
+          availableStudents: user?.parent_profile?.students || []
+        })
+      },
+
+      setStudentId: (studentId: string | null) => {
+        set({ studentId })
+      },
+
+      hasPermission: (resource: string, action: string) => {
+        const { permissionsMap } = get()
+        const hasPerm = permissionsMap[resource]?.includes(action) || false;
+        console.log(`authStore.hasPermission: Checking ${resource}:${action}`, {
+          permissionsMap,
+          resourceExists: !!permissionsMap[resource],
+          actionsForResource: permissionsMap[resource],
+          hasPerm
+        });
+        return hasPerm;
       },
     }),
     {
       name: 'auth-storage',
       partialize: (state) => ({
         user: state.user,
-        token: state.token,
+        role: state.role,
+        selectedStudent: state.selectedStudent,
+        availableStudents: state.availableStudents,
+        studentId: state.studentId,
+        permissions: state.permissions,
+        permissionsMap: state.permissionsMap,
+        menuItems: state.menuItems,
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     }

@@ -8,6 +8,9 @@ import { useLogoutMutation } from "@/api/auth";
 import { useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import AcademicYearDropdown from '@/components/common/AcademicYearDropdown';
+import { StudentSelector } from '@/components/common/StudentSelector';
+import { useAuthStore } from '@/lib/authStore';
+import { useIsParent } from '@/hooks/useStudentContext';
 
 export function Navbar({
     sidebarOpen,
@@ -23,6 +26,7 @@ export function Navbar({
     const navigate = useNavigate();
     const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const { user } = useAuthStore();
 
     const handleFullscreenToggle = () => {
         if (!document.fullscreenElement) {
@@ -59,16 +63,16 @@ export function Navbar({
                     </Button>
 
 
-                    <div className="hidden lg:flex items-center relative flex-1 max-w-md">
+                    {/* <div className="hidden lg:flex items-center relative flex-1 max-w-md">
                         <Input
                             placeholder="Search..."
                             className="border-0 bg-muted/50 focus:ring-0 focus:bg-muted pl-8 h-9 w-full"
                         />
                         <Search className="w-4 h-4 text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
+                    </div> */}
 
 
-                    <Button
+                    {/* <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => setMobileSearchOpen(!mobileSearchOpen)}
@@ -97,11 +101,14 @@ export function Navbar({
                                 Settings
                             </DropdownMenu.Item>
                         </DropdownMenu.Content>
-                    </DropdownMenu.Root>
+                    </DropdownMenu.Root> */}
                 </div>
 
                 {/* Right Section */}
                 <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    {/* Student Selector - Only show for parents */}
+                    <StudentSelectorWrapper />
+                    
                     {/* Academic Year Display */}
                     <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted rounded-full border border-border min-w-[120px] max-w-[180px] w-full">
                         <Calendar className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -132,12 +139,12 @@ export function Navbar({
                     </Button>
 
                     {/* Notifications */}
-                    <Button variant="ghost" size="icon" className="relative shrink-0 cursor-pointer">
+                    {/* <Button variant="ghost" size="icon" className="relative shrink-0 cursor-pointer">
                         <Bell className="w-5 h-5" />
                         <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-medium">
                             3
                         </span>
-                    </Button>
+                    </Button> */}
 
                     {/* User Menu */}
                     <DropdownMenu.Root>
@@ -148,16 +155,19 @@ export function Navbar({
                                     alt="User avatar"
                                     className="w-8 h-8 rounded-full object-cover"
                                 />
-                                <span className="font-medium hidden sm:inline text-sm">admin</span>
+                                <span className="font-medium hidden sm:inline text-sm">{user?.username || 'User'}</span>
                                 <ChevronDown className="w-4 h-4 hidden sm:inline" />
                             </Button>
                         </DropdownMenu.Trigger>
                         <DropdownMenu.Content className="bg-background border border-border rounded-md shadow-lg p-2 min-w-[150px] text-foreground">
                             <div className="px-3 py-2 border-b border-border mb-2">
-                                <p className="font-medium text-sm">admin</p>
-                                <p className="text-xs text-muted-foreground">admin@example.com</p>
+                                <p className="font-medium text-sm">{user?.username || 'User'}</p>
+                                <p className="text-xs text-muted-foreground">{user?.email || ''}</p>
                             </div>
-                            <DropdownMenu.Item className="flex items-center gap-2 py-2 px-3 hover:bg-muted rounded cursor-pointer">
+                            <DropdownMenu.Item
+                                className="flex items-center gap-2 py-2 px-3 hover:bg-muted rounded cursor-pointer"
+                                onClick={() => navigate({ to: "/profile" })}
+                            >
                                 <User className="w-4 h-4" /> Profile
                             </DropdownMenu.Item>
                             <DropdownMenu.Separator className="my-1 bg-border h-px" />
@@ -192,5 +202,26 @@ export function Navbar({
             )}
 
         </>
+    );
+}
+
+// Student Selector Wrapper Component
+function StudentSelectorWrapper() {
+    const isParent = useIsParent();
+    const { selectedStudent, availableStudents, selectStudent } = useAuthStore();
+
+    if (!isParent || availableStudents.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="hidden md:block">
+            <StudentSelector
+                students={availableStudents}
+                selectedStudent={selectedStudent}
+                onStudentChange={selectStudent}
+                className="w-[280px]"
+            />
+        </div>
     );
 }

@@ -1,49 +1,88 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 
 import { MasterPage } from "../masters/common/MasterPage";
 import type { MasterPageConfig, FormField } from "../masters/common/MasterPage";
 import type { StudentTransport, StudentTransportInput } from "@/types/masters/studentTransport";
-import { dummyStudentTransports } from '@/api/masters/studentTransport';
-
-const columns = [
-    { key: "student_id", label: "Student ID", editable: true },
-    { key: "trip_id", label: "Trip ID", editable: true },
-    { key: "stop_id", label: "Stop ID", editable: true },
-    { key: "fee_term_id", label: "Fee Term ID", editable: true },
-    { key: "fee_per_term", label: "Fee Per Term", editable: true, render: (v: number) => `$${v}` },
-    { key: "created_at", label: "Created At", editable: false, render: (v: string) => new Date(v).toLocaleDateString() },
-    { key: "updated_at", label: "Updated At", editable: false, render: (v: string) => new Date(v).toLocaleDateString() },
-];
+import { useStudentTransports, useCreateStudentTransport, useUpdateStudentTransport, useDeleteStudentTransport } from '@/api/hooks/masters/studentTransport';
+import { useAdmissions } from '@/api/hooks/students/admissions';
+import { useRoutes } from '@/api/hooks/masters/routes';
 
 const formFields: FormField[] = [
-    { name: "student_id", label: "Student ID", type: "number", required: true },
-    { name: "trip_id", label: "Trip ID", type: "number", required: true },
-    { name: "stop_id", label: "Stop ID", type: "number", required: true },
-    { name: "fee_term_id", label: "Fee Term ID", type: "number", required: true },
-    { name: "fee_per_term", label: "Fee Per Term", type: "number", required: true },
+    { name: "student_id", label: "Student ID", required: true },
+    { name: "route_id", label: "Route ID", required: true },
+    { name: "stop_id", label: "Stop ID", required: true },
+    { name: "trip_type", label: "Trip Type", required: true },
+    { name: "academic_year_id", label: "Academic Year ID", required: true },
+    { name: "fare_amount", label: "Fare Amount", type: "number", required: true },
 ];
 
 const defaultValues: StudentTransportInput = {
-    student_id: 0,
-    trip_id: 0,
-    stop_id: 0,
-    fee_term_id: 0,
-    fee_per_term: 0,
+    student_id: "",
+    route_id: "",
+    stop_id: "",
+    trip_type: "pickup",
+    academic_year_id: "",
+    fare_amount: 0,
 };
 
 const PAGE_SIZE_DEFAULT = 5;
 
 export default function StudentTransportPage() {
-
-    const [isCreatePending, setIsCreatePending] = useState(false);
-    const [data, setData] = useState<StudentTransport[]>(dummyStudentTransports);
-    const [isLoading, setIsLoading] = useState(false);
     const [page, setPage] = useState(0);
     const [pageSize, setPageSize] = useState(PAGE_SIZE_DEFAULT);
 
+    const { data: studentTransports = [], isLoading } = useStudentTransports();
+    const { data: routes } = useRoutes();
 
-    const total = data.length;
-    const paginatedData = data.slice(page * pageSize, (page + 1) * pageSize);
+    const createStudentTransport = useCreateStudentTransport();
+    const updateStudentTransport = useUpdateStudentTransport();
+    const deleteStudentTransport = useDeleteStudentTransport();
+
+    const routeMap = useMemo(() => new Map(routes?.map(r => [r.id, r.route_name]) || []), [routes]);
+
+    const columns = [
+        {
+            key: "student_id",
+            label: "Student ID",
+            editable: true,
+        },
+        {
+            key: "route_id",
+            label: "Route",
+            editable: true,
+            render: (value: any) => routeMap.get(value) || value,
+        },
+        {
+            key: "stop_id",
+            label: "Stop ID",
+            editable: true,
+        },
+        {
+            key: "trip_type",
+            label: "Trip Type",
+            editable: true,
+        },
+        {
+            key: "academic_year_id",
+            label: "Academic Year",
+            editable: true,
+        },
+        {
+            key: "fare_amount",
+            label: "Fare Amount",
+            editable: true,
+            render: (v: number) => `$${v}`,
+        },
+        {
+            key: "is_active",
+            label: "Active",
+            editable: true,
+            render: (v: boolean) => v ? "Yes" : "No",
+        },
+    ];
+
+    const total = studentTransports.length;
+    const paginatedData = studentTransports.slice(page * pageSize, (page + 1) * pageSize);
     const hasMore = (page + 1) * pageSize < total;
 
     const handlePageChange = (newPage: number) => {
@@ -57,41 +96,17 @@ export default function StudentTransportPage() {
     };
 
     const config: MasterPageConfig<StudentTransport, StudentTransportInput> = {
-        title: "Student Transport Assignments",
+        title: "Student Transport",
         columns,
         defaultValues,
         formFields,
         isLoading,
         data: paginatedData,
-        onCreate: (input) => {
-            setIsCreatePending(true);
-            setTimeout(() => {
-                const now = new Date().toISOString();
-                setData((prev) => [
-                    ...prev,
-                    { 
-                        ...input, 
-                        id: prev.length ? Math.max(...prev.map(t => t.id)) + 1 : 1,
-                        created_at: now,
-                        updated_at: now
-                    },
-                ]);
-                setIsCreatePending(false);
-            }, 500);
-        },
-        onUpdate: (id, updated) => {
-            setData((prev) => prev.map(t => t.id === id ? { 
-                ...t, 
-                ...updated, 
-                updated_at: new Date().toISOString() 
-            } : t));
-        },
-        onDelete: (id) => {
-            setData((prev) => prev.filter(t => t.id !== id));
-        },
-        isCreatePending,
+        onCreate: (input) => createStudentTransport.mutate(input),
+        onUpdate: (id, updated) => updateStudentTransport.mutate({ id: id.toString(), transport: updated }),
+        onDelete: (id) => deleteStudentTransport.mutate(id.toString()),
+        isCreatePending: createStudentTransport.status === 'pending',
         resetForm: () => { },
-        isEditing: true,
         pagination: {
             page,
             pageSize,

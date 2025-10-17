@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'  
 
 import { Toaster } from 'sonner'
+import { AuthProvider } from './components/providers/AuthProvider'
 
 import { routeTree } from './routeTree.gen'
 
@@ -46,7 +47,9 @@ if (!rootElement.innerHTML) {
         }}
       />
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
       </QueryClientProvider>
     </StrictMode>,
   )

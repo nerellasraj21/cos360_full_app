@@ -1,129 +1,140 @@
-// import CAxios from '@/api';
-// import type { ClassAndSection, ClassAndSectionInput } from '@/types/masters/classesandsections';
-// import { CLASSES_AND_SECTIONS_API_BASE } from '@/constants/api/masters/classesandsections';
+import CAxios from '@/api';
+import type {
+    ClassCreate,
+    ClassRead,
+    ClassUpdate,
+    ClassDropdown,
+    SectionDropdown,
+    SectionRead,
+    SectionUpdate,
+    SectionOut
+} from '@/types/masters/classesandsections';
+import type { StudentAdmissionResponse } from '@/types/admission';
+import { CLASSES_AND_SECTIONS_API_BASE } from '@/constants/api/masters/classesandsections';
 
-// // let sampleClassesAndSections: ClassAndSection[] = [
-// //     {
-// //         id: 1,
-// //         class_name: 'Class 1',
-// //         section_name: 'A',
-// //         class_code: 'C1A',
-// //         is_active: true,
-// //         academic_year_id: 2023,
-// //         created_at: '2023-01-01T00:00:00Z',
-// //         updated_at: '2023-01-01T00:00:00Z',
-// //     },
-// //     {
-// //         id: 2,
-// //         class_name: 'Class 2',
-// //         section_name: 'B',
-// //         class_code: 'C2B',
-// //         is_active: true,
-// //         academic_year_id: 2023,
-// //         created_at: '2023-01-01T00:00:00Z',
-// //         updated_at: '2023-01-01T00:00:00Z',
-// //     },
-// // ];
+// API endpoints
+const CLASSES_AND_SECTIONS_BASE = CLASSES_AND_SECTIONS_API_BASE;
 
-// // Get all classes and sections
-// export const fetchClassesAndSections = async (): Promise<ClassAndSection[]> => {
-//     const { data } = await CAxios.get(CLASSES_AND_SECTIONS_API_BASE);
-//     return data;
-// };
-
-// // Get a class and section by ID
-// export const fetchClassAndSectionById = async (id: number): Promise<ClassAndSection> => {
-//     const { data } = await CAxios.get(`${CLASSES_AND_SECTIONS_API_BASE}${id}`);
-//     return data;
-// };
-
-// // Create a new class and section
-// export const createClassAndSection = async (input: ClassAndSectionInput): Promise<ClassAndSection> => {
-//     const { data } = await CAxios.post(CLASSES_AND_SECTIONS_API_BASE, input);
-//     return data;
-// };
-
-// // Update a class and section by ID
-// export const updateClassAndSection = async (id: number, input: ClassAndSectionInput): Promise<ClassAndSection> => {
-//     const { data } = await CAxios.put(`${CLASSES_AND_SECTIONS_API_BASE}${id}`, input);
-//     return data;
-// };
-
-// // Delete a class and section by ID
-// export const deleteClassAndSection = async (id: number): Promise<void> => {
-//     await CAxios.delete(`${CLASSES_AND_SECTIONS_API_BASE}${id}`);
-// };
-
-
-
-
-
-import type { ClassAndSection, ClassAndSectionInput } from '@/types/masters';
-
-let sampleClassesAndSections: ClassAndSection[] = [
-    {
-        id: 1,
-        class_name: 'Class 1',
-        section_name: 'A',
-        class_code: 'C1A',
-        is_active: true,
-        academic_year_id: 2023,
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-    },
-    {
-        id: 2,
-        class_name: 'Class 2',
-        section_name: 'B',
-        class_code: 'C2B',
-        is_active: true,
-        academic_year_id: 2023,
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-    },
-];
-
-export const fetchClassesAndSections = async (): Promise<ClassAndSection[]> => {
-    return [...sampleClassesAndSections];
+// Create class with sections
+export const createClassSections = async (input: ClassCreate): Promise<ClassRead> => {
+    const { data } = await CAxios.post<ClassRead>(CLASSES_AND_SECTIONS_BASE, input);
+    return data;
 };
 
-export const fetchClassAndSectionById = async (id: number): Promise<ClassAndSection> => {
-    const item = sampleClassesAndSections.find((c) => c.id === id);
-    if (!item) throw new Error('Class and Section not found');
-    return { ...item };
+// Read all classes with sections
+export const readAllClassSections = async (params?: {
+    skip?: number;
+    limit?: number;
+    academic_year_id?: string;
+    active_only?: boolean;
+}): Promise<ClassRead[]> => {
+    const queryParams = new URLSearchParams();
+    if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString());
+    if (params?.limit !== undefined) queryParams.append('limit', params.limit.toString());
+    if (params?.academic_year_id) queryParams.append('academic_year_id', params.academic_year_id);
+    // Set active_only to false by default for table display, or use provided value
+    const activeOnly = params?.active_only !== undefined ? params.active_only : false;
+    queryParams.append('active_only', activeOnly.toString());
+
+    const queryString = queryParams.toString();
+    const url = queryString ? `${CLASSES_AND_SECTIONS_BASE}read_all?${queryString}` : `${CLASSES_AND_SECTIONS_BASE}read_all`;
+
+    const { data } = await CAxios.get<ClassRead[]>(url);
+    return data;
 };
 
-export const createClassAndSection = async (input: ClassAndSectionInput): Promise<ClassAndSection> => {
-    let maxId = sampleClassesAndSections.length ? Math.max(...sampleClassesAndSections.map((c) => c.id)) : 0;
-    const now = new Date().toISOString();
-    const newItems: ClassAndSection[] = input.sections.map((section, idx) => {
-        return {
-            id: ++maxId,
-            class_name: input.class_name,
-            section_name: section.section_name,
-            class_code: input.class_code,
-            is_active: input.is_active,
-            academic_year_id: input.academic_year_id,
-            created_at: now,
-            updated_at: now,
-        };
-    });
-    sampleClassesAndSections.push(...newItems);
-    return { ...newItems[0] };
+// Get classes for dropdown
+export const getClassesDropdown = async (active_only?: boolean): Promise<ClassDropdown[]> => {
+    const queryParams = new URLSearchParams();
+    if (active_only !== undefined) queryParams.append('active_only', active_only.toString());
+    const queryString = queryParams.toString();
+    const url = queryString ? `${CLASSES_AND_SECTIONS_BASE}dropdown?${queryString}` : `${CLASSES_AND_SECTIONS_BASE}dropdown`;
+    const { data } = await CAxios.get<ClassDropdown[]>(url);
+    return data;
 };
 
-export const updateClassAndSection = async ({ id, input }: { id: number; input: ClassAndSectionInput }): Promise<ClassAndSection> => {
-    const idx = sampleClassesAndSections.findIndex((c) => c.id === id);
-    if (idx === -1) throw new Error('Class and Section not found');
-    const updatedItem: ClassAndSection = {
-        ...sampleClassesAndSections[idx],
-        ...input,
-        updated_at: new Date().toISOString(),
-    };
-    sampleClassesAndSections[idx] = updatedItem;
-    return { ...updatedItem };
+// Get sections by class ID
+export const getSectionsByClassId = async (class_id: string): Promise<SectionDropdown[]> => {
+    const { data } = await CAxios.get<SectionDropdown[]>(`${CLASSES_AND_SECTIONS_BASE}by_class_id/${class_id}/sections`);
+    return data;
 };
 
-export const deleteClassAndSection = async (id: number): Promise<void> => {
-    sampleClassesAndSections = sampleClassesAndSections.filter((c) => c.id !== id);
+// Update class with sections
+export const updateClassSections = async (
+  classId: string,
+  input: ClassUpdate
+): Promise<ClassRead> => {
+  const { data } = await CAxios.put<ClassRead>(
+    `${CLASSES_AND_SECTIONS_BASE}${classId}`,
+    input
+  );
+  return data;
 };
+
+// Delete class and its sections
+export const deleteClassSections = async (classId: string): Promise<void> => {
+  await CAxios.delete(`${CLASSES_AND_SECTIONS_BASE}${classId}`);
+};
+
+// Section-specific operations (through class)
+export const createSection = async (classId: string, sectionData: { name: string; description?: string; is_active?: boolean }): Promise<any> => {
+  const { data } = await CAxios.post(`${CLASSES_AND_SECTIONS_BASE}${classId}/sections`, sectionData);
+  return data;
+};
+
+export const updateSection = async (classId: string, sectionId: string, sectionData: { name?: string; description?: string; is_active?: boolean }): Promise<any> => {
+  const { data } = await CAxios.put(`${CLASSES_AND_SECTIONS_BASE}${classId}/sections/${sectionId}`, sectionData);
+  return data;
+};
+
+export const deleteSection = async (classId: string, sectionId: string): Promise<void> => {
+  await CAxios.delete(`${CLASSES_AND_SECTIONS_BASE}${classId}/sections/${sectionId}`);
+};
+
+// Direct section operations (individual section management)
+export const getSectionById = async (sectionId: string): Promise<SectionOut> => {
+  const { data } = await CAxios.get<SectionOut>(`${CLASSES_AND_SECTIONS_BASE}sections/${sectionId}`);
+  return data;
+};
+
+export const updateSectionById = async (sectionId: string, sectionData: SectionUpdate): Promise<SectionOut> => {
+  const { data } = await CAxios.put<SectionOut>(`${CLASSES_AND_SECTIONS_BASE}sections/${sectionId}`, sectionData);
+  return data;
+};
+
+export const deleteSectionById = async (sectionId: string): Promise<void> => {
+  await CAxios.delete(`${CLASSES_AND_SECTIONS_BASE}sections/${sectionId}`);
+};
+
+// Get students by class and section
+export const getStudentsByClassSection = async (
+  classId: string,
+  sectionId: string
+): Promise<StudentAdmissionResponse[]> => {
+  console.log('getStudentsByClassSection called with:', { classId, sectionId });
+
+  const queryParams = new URLSearchParams();
+  queryParams.append('class_id', classId);
+  if (sectionId) {
+    queryParams.append('section_id', sectionId);
+  }
+  queryParams.append('active_only', 'true');
+
+  // Use the correct student admission endpoint
+  const url = `/students/admission/?${queryParams.toString()}`;
+  console.log('API URL:', url);
+
+  try {
+    const { data } = await CAxios.get<{ items: StudentAdmissionResponse[] }>(url);
+    console.log('API Response data:', data);
+    console.log('API Response items length:', data.items?.length || 0);
+    return data.items || [];
+  } catch (error) {
+    console.error('API Error in getStudentsByClassSection:', error);
+    throw error;
+  }
+};
+
+// Alias for backward compatibility
+export const fetchClassesAndSections = readAllClassSections;
+

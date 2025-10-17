@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { MasterPage } from '@/pages/masters/common/MasterPage';
-import type { Staff, StaffInput } from '@/types/staff';
+import type { Staff, StaffInput, StaffEnrollmentRequest, Designation } from '@/types/staff';
 import type { FormField } from '@/pages/masters/common/MasterPage';
 import {
   useStaff,
   useCreateStaff,
   useUpdateStaff,
-  useDeleteStaff
+  useDeleteStaff,
+  useStaffEnrollmentMutation
 } from '@/api/hooks/staff/staff';
 import {
   Dialog,
@@ -44,9 +45,8 @@ const sections = [
     label: 'Personal Info',
     fields: [
       { name: 'first_name', label: 'First Name', type: 'text' as const, required: true },
-      { name: 'last_name', label: 'Last Name', type: 'text' as const, required: true },
+      { name: 'last_name', label: 'Last Name', type: 'text' as const, required: false },
       { name: 'gender', label: 'Gender', type: 'text' as const, required: true },
-      { name: 'date_of_birth', label: 'Date of Birth', type: 'date' as const, required: true },
     ],
   },
   {
@@ -54,8 +54,7 @@ const sections = [
     label: 'Contact Info',
     fields: [
       { name: 'email', label: 'Email', type: 'text' as const, required: true },
-      { name: 'phone', label: 'Phone', type: 'text' as const, required: true },
-      { name: 'address', label: 'Address', type: 'text' as const, required: true },
+      { name: 'phone', label: 'Phone', type: 'text' as const, required: false },
     ],
   },
   {
@@ -63,12 +62,9 @@ const sections = [
     label: 'Employment Details',
     fields: [
       { name: 'joining_date', label: 'Joining Date', type: 'date' as const, required: true },
-      { name: 'qualification', label: 'Qualification', type: 'text' as const, required: true },
-      { name: 'experience_years', label: 'Experience Years', type: 'number' as const, required: true },
-      { name: 'designation', label: 'Designation', type: 'text' as const, required: true },
-      { name: 'department', label: 'Department', type: 'text' as const, required: true },
-      { name: 'role_id', label: 'Role Id', type: 'number' as const, required: true },
-      { name: 'is_active', label: 'Is Active', type: 'checkbox' as const },
+      { name: 'qualification', label: 'Qualification', type: 'text' as const, required: false },
+      { name: 'department', label: 'Department', type: 'text' as const, required: false },
+      { name: 'designation_id', label: 'Designation', type: 'text' as const, required: true },
     ],
   },
   {
@@ -80,21 +76,16 @@ const sections = [
 
 const allFields = sections.flatMap((s) => s.fields);
 
-const defaultValues: StaffInput = {
+const defaultValues: StaffEnrollmentRequest = {
   first_name: '',
   last_name: '',
   email: '',
   phone: '',
   gender: '',
-  date_of_birth: '',
   joining_date: '',
   qualification: '',
-  experience_years: 0,
-  address: '',
-  designation: '',
   department: '',
-  is_active: true,
-  role_id: 0,
+  designation_id: '',
 };
 
 export default function StaffPage() {
@@ -102,14 +93,15 @@ export default function StaffPage() {
   const createStaffMutation = useCreateStaff();
   const updateStaffMutation = useUpdateStaff();
   const deleteStaffMutation = useDeleteStaff();
+  const staffEnrollmentMutation = useStaffEnrollmentMutation();
 
   const [addOpen, setAddOpen] = useState(false);
   const [step, setStep] = useState(0);
-  const [formData, setFormData] = useState<StaffInput>(defaultValues);
+  const [formData, setFormData] = useState<StaffEnrollmentRequest>(defaultValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleCreate = async (input: StaffInput) => {
-    await createStaffMutation.mutateAsync(input);
+  const handleCreate = async (input: StaffEnrollmentRequest) => {
+    await staffEnrollmentMutation.mutateAsync(input);
   };
 
   const validateStep = (): boolean => {
@@ -120,7 +112,7 @@ export default function StaffPage() {
     let isValid = true;
     for (const field of currentSection.fields) {
       if (field.required) {
-        const value = formData[field.name as keyof StaffInput];
+        const value = formData[field.name as keyof StaffEnrollmentRequest];
         if (value === null || value === undefined || String(value).trim() === '') {
           newErrors[field.name] = `${field.label} is required.`;
           isValid = false;
@@ -181,21 +173,6 @@ export default function StaffPage() {
 
   function renderField(field: FormField) {
     const { name, label, type = 'text', required = false } = field;
-    if (type === 'checkbox') {
-      return (
-        <div key={name} className="flex items-center gap-2 mt-6 w-full sm:col-span-2">
-          <Label htmlFor={name} className="text-sm font-medium">{label}</Label>
-          <Input
-            id={name}
-            name={name}
-            type="checkbox"
-            checked={formData[name as keyof StaffInput] as boolean}
-            onChange={handleInputChange}
-            className="w-4 h-4"
-          />
-        </div>
-      );
-    }
     return (
       <div key={name} className="mb-4 w-full">
         <Label htmlFor={name} className="text-sm font-medium">{label}</Label>
@@ -203,7 +180,7 @@ export default function StaffPage() {
           id={name}
           name={name}
           type={type}
-          value={formData[name as keyof StaffInput] as string}
+          value={formData[name as keyof StaffEnrollmentRequest] as string}
           onChange={handleInputChange}
           required={required}
           className={`mt-1 w-full ${errors[name] ? 'border-red-500' : ''}`}
@@ -227,9 +204,7 @@ export default function StaffPage() {
                 <div key={field.name} className="flex flex-col sm:flex-row sm:justify-between py-1 break-words">
                   <span className="font-medium mr-2">{field.label}:</span>
                   <span className="text-muted-foreground">
-                    {field.type === 'checkbox'
-                      ? formData[field.name as keyof StaffInput] ? 'Yes' : 'No'
-                      : String(formData[field.name as keyof StaffInput] ?? 'N/A')}
+                    {String(formData[field.name as keyof StaffEnrollmentRequest] ?? 'N/A')}
                   </span>
                 </div>
               ))}
@@ -328,14 +303,14 @@ export default function StaffPage() {
       config={{
         title: 'Staff',
         columns,
-        defaultValues,
+        defaultValues: defaultValues as any, // Type compatibility workaround
         formFields: allFields,
         isLoading,
         data,
-        onCreate: handleCreate,
+        onCreate: handleCreate as any, // Type compatibility workaround
         onUpdate: handleUpdate,
         onDelete: handleDelete,
-        isCreatePending: createStaffMutation.isPending,
+        isCreatePending: staffEnrollmentMutation.isPending,
         resetForm: () => { },
         showColumnSelector: true,
         addModal,

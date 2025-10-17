@@ -53,9 +53,15 @@ const getIconForMenuItem = (name: string) => {
         Invoices: FileText,
         Projects: Folder,
         Settings: Settings,
+        "Fee Management": Bitcoin,
+        "Fee Categories": FileText,
+        "Fee Types": FileText,
+        "Fee Terms": FileText,
+        "Fee Mappings": Users,
+        "Fee Reports": FileText,
     };
-    
-    return iconMap[name] || Folder; 
+
+    return iconMap[name] || Folder;
 };
 
 function RecursiveMenuItem({ 
@@ -163,6 +169,7 @@ export function Sidebar({
     menuData = [],
     isMobile = false
 }: SidebarProps) {
+    console.log('Sidebar received menuData:', menuData);
     const [open, setOpen] = useState(controlledOpen ?? !isMobile);
     const isControlled = controlledOpen !== undefined;
     const sidebarOpen = isControlled ? controlledOpen : open;

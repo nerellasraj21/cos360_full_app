@@ -1,6 +1,6 @@
 export interface AcademicYear {
-  id: number;
-  name: string;
+  id: string;
+  title: string;
   start_date: string;
   end_date: string;
   is_active: boolean;
@@ -9,8 +9,27 @@ export interface AcademicYear {
 }
 
 export interface AcademicYearInput {
-  name: string;
+  title: string;
   start_date: string;
   end_date: string;
-  is_active: boolean;
-} 
+  is_active?: boolean;
+}
+
+export interface AcademicYearDropdown {
+  id: string;
+  title: string;
+  is_current: boolean;
+}
+
+export interface AcademicYearListResponse {
+  items: AcademicYear[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface ApiError {
+  detail: string;
+  error_code?: string;
+  field_errors?: Record<string, string[]>;
+}

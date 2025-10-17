@@ -3,8 +3,8 @@ import Select from 'react-select';
 import { usePaginatedAcademicYears } from '@/api/hooks/masters/academicyears';
 
 export interface AcademicYearSelectProps {
-  value: number | null;
-  onChange: (value: number | null) => void;
+  value: string | null;
+  onChange: (value: string | null) => void;
   required?: boolean;
   disabled?: boolean;
 }
@@ -25,7 +25,7 @@ export const AcademicYearSelect: React.FC<AcademicYearSelectProps> = ({ value, o
 
   const options = academicYears.map(year => ({
     value: year.id,
-    label: year.name,
+    label: year.title,
   }));
 
 
@@ -42,7 +42,7 @@ export const AcademicYearSelect: React.FC<AcademicYearSelectProps> = ({ value, o
       options={options}
       value={selectedOption}
       onChange={opt => {
-        const val = opt ? Number(opt.value) : null;
+        const val = opt ? opt.value : null;
         console.log('AcademicYearSelect onChange', val);
         onChange(val);
       }}

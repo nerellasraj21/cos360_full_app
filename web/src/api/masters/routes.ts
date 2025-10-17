@@ -1,91 +1,133 @@
-import type { Route, RouteInput } from '@/types/masters/route';
-// import CAxios from '../index';
-// import type { Route, RouteInput } from '@/types/masters/route';
+import CAxios from '../index';
+import type {
+  Route,
+  RouteInput,
+  RouteUpdate,
+  RouteDropdown
+} from '@/types/masters/route';
 
-// const ROUTES_API_BASE = '/api/v1/routes/';
+const ROUTES_API_BASE = '/masters/routes/';
 
-// export const fetchRoutes = async (): Promise<Route[]> => {
-//     const { data } = await CAxios.get(ROUTES_API_BASE);
-//     return data;
-// };
-
-// export const fetchRouteById = async (id: number): Promise<Route> => {
-//     const { data } = await CAxios.get(`${ROUTES_API_BASE}${id}`);
-//     return data;
-// };
-
-// export const createRoute = async (route: RouteInput): Promise<Route> => {
-//     const { data } = await CAxios.post(ROUTES_API_BASE, route);
-//     return data;
-// };
-
-// export const updateRoute = async (id: number, route: RouteInput): Promise<Route> => {
-//     const { data } = await CAxios.put(`${ROUTES_API_BASE}${id}`, route);
-//     return data;
-// };
-
-// export const deleteRoute = async (id: number): Promise<void> => {
-//     await CAxios.delete(`${ROUTES_API_BASE}${id}`);
-// }; 
-
-// Dummy data for development
-export const dummyRoutes: Route[] = [
-    {
-        id: 1,
-        route_name: "Route 1",
-        starting_stop: "Stop A",
-        ending_stop: "Stop B",
-        number_of_stops: 5,
-        route_type: "Regular",
-        trip_type: "Morning",
-        start_time: "08:00:00",
-        end_time: "09:00:00",
-        is_active: true,
-    },
-    {
-        id: 2,
-        route_name: "Route 2",
-        starting_stop: "Stop C",
-        ending_stop: "Stop D",
-        number_of_stops: 7,
-        route_type: "Express",
-        trip_type: "Evening",
-        start_time: "17:00:00",
-        end_time: "18:00:00",
-        is_active: false,
-    },
-];
-
-let routesData: Route[] = [...dummyRoutes];
-
-export const fetchRoutes = async (): Promise<Route[]> => {
-    return [...routesData];
+// Helper function to handle API errors
+const handleApiError = (error: any): Error => {
+  if (error.response?.data) {
+    const apiError = error.response.data;
+    return new Error(apiError.detail || 'An error occurred');
+  }
+  return new Error(error.message || 'Network error');
 };
 
-export const fetchRouteById = async (id: number): Promise<Route> => {
-    const route = routesData.find(r => r.id === id);
-    if (!route) throw new Error('Route not found');
-    return { ...route };
-};
-
-
-
+// Create Route
 export const createRoute = async (route: RouteInput): Promise<Route> => {
-    const newId = routesData.length ? Math.max(...routesData.map(r => r.id)) + 1 : 1;
-    const newRoute: Route = { id: newId, ...route, is_active: route.is_active ?? true };
-    routesData.push(newRoute);
-    return { ...newRoute };
+  try {
+    const { data } = await CAxios.post(ROUTES_API_BASE, route);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };
 
-export const updateRoute = async (id: number, route: RouteInput): Promise<Route> => {
-    const idx = routesData.findIndex(r => r.id === id);
-    if (idx === -1) throw new Error('Route not found');
-    routesData[idx] = { id, ...route, is_active: route.is_active ?? routesData[idx].is_active };
-    return { ...routesData[idx] };
+// List All Routes
+export const fetchRoutes = async (activeOnly = true): Promise<Route[]> => {
+  try {
+    const { data } = await CAxios.get(`${ROUTES_API_BASE}all_routes`, {
+      params: { active_only: activeOnly }
+    });
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };
 
-export const deleteRoute = async (id: number): Promise<void> => {
-    const idx = routesData.findIndex(r => r.id === id);
-    if (idx === -1) throw new Error('Route not found');
-    routesData.splice(idx, 1);
+// Get Route by ID
+export const fetchRouteById = async (id: string): Promise<Route> => {
+  try {
+    const { data } = await CAxios.get(`${ROUTES_API_BASE}routeid/${id}`);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Update Route (Full)
+export const updateRoute = async (id: string, route: RouteInput): Promise<Route> => {
+  try {
+    const { data } = await CAxios.put(`${ROUTES_API_BASE}${id}`, route);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Update Route (Partial)
+export const updateRoutePartial = async (id: string, route: RouteUpdate): Promise<Route> => {
+  try {
+    const { data } = await CAxios.patch(`${ROUTES_API_BASE}${id}`, route);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Delete Route
+export const deleteRoute = async (id: string): Promise<void> => {
+  try {
+    await CAxios.delete(`${ROUTES_API_BASE}${id}`);
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Get Routes Dropdown
+export const fetchRoutesDropdown = async (activeOnly = true): Promise<RouteDropdown[]> => {
+  try {
+    const { data } = await CAxios.get(`${ROUTES_API_BASE}dropdown`, {
+      params: { active_only: activeOnly }
+    });
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Get Stops by Route Name
+export const fetchStopsByRouteName = async (routeName: string): Promise<any[]> => {
+  try {
+    const { data } = await CAxios.get(`${ROUTES_API_BASE}stops-by-route`, {
+      params: { route_name: routeName }
+    });
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Paginated Routes (for compatibility)
+export const fetchRoutesPaginated = async (
+  page = 0,
+  pageSize = 10,
+  activeOnly = true
+): Promise<{ data: Route[]; total: number; hasMore: boolean }> => {
+  try {
+    const skip = page * pageSize;
+    const { data } = await CAxios.get(`${ROUTES_API_BASE}all_routes`, {
+      params: {
+        skip,
+        limit: pageSize,
+        active_only: activeOnly
+      }
+    });
+
+    // Handle different response formats
+    const items = data.items || data || [];
+    const total = data.total || data.count || items.length;
+
+    return {
+      data: items,
+      total: total,
+      hasMore: items.length === pageSize
+    };
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };

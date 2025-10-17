@@ -1,83 +1,112 @@
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import type { Subject, SubjectInput } from '@/types/masters';
-import { fetchSubjects,fetchSubjectById,createSubject,updateSubject,deleteSubject, fetchPaginatedSubjects, fetchSubjectsPaginated } from '@/api/masters/subjects';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Subject, SubjectInput, ClassSubjectMappingBulkCreate, ClassSubjectMappingBulkResponse } from '@/types/masters';
+import type { SubjectDropdown } from '@/api/masters/subjects';
+import { fetchSubjects, fetchSubjectById, createSubject, updateSubject, deleteSubject, createBulkClassSubjectMappings, fetchSubjectsDropdown } from '@/api/masters/subjects';
 import { toast } from 'sonner';
+import { useAcademicYearStore } from '@/lib/academicYearStore';
 
 export function useSubjects() {
-    return useQuery<Subject[]>({
-      queryKey: ['subjects'],
-      queryFn: fetchSubjects,
-    });
-  }
-  
-  export function useSubject(id: number) {
-    return useQuery<Subject>({
-      queryKey: ['subject', id],
-      queryFn: () => fetchSubjectById(id),
-      enabled: !!id,
-    });
-  }
-  
-  export function useCreateSubject() {
-    const queryClient = useQueryClient();
-    return useMutation<Subject, Error, SubjectInput>({
-      mutationFn: createSubject,
-      onSuccess: () => {
-        toast.success('Subject created!');
-        queryClient.invalidateQueries({ queryKey: ['subjects'] });
-      },
-      onError: () => {
-        toast.error('Failed to create subject');
-      },
-    });
-  }
-  
-  export function useUpdateSubject() {
-    const queryClient = useQueryClient();
-    return useMutation<Subject, Error, { id: number; subject: SubjectInput }>({
-      mutationFn: updateSubject,
-      onSuccess: () => {
-        toast.success('Subject updated!');
-        queryClient.invalidateQueries({ queryKey: ['subjects'] });
-      },
-      onError: () => {
-        toast.error('Failed to update subject');
-      },
-    });
-  }
-  
-  export function useDeleteSubject() {
-    const queryClient = useQueryClient();
-    return useMutation<void, Error, number>({
-      mutationFn: deleteSubject,
-      onSuccess: () => {
-        toast.success('Subject deleted!');
-        queryClient.invalidateQueries({ queryKey: ['subjects'] });
-      },
-      onError: () => {
-        toast.error('Failed to delete subject');
-      },
-    });
-  }
-  
-  export function usePaginatedSubjects(queryKey = ['subjects'], PAGE_SIZE = 10) {
-    return useInfiniteQuery<{ data: Subject[]; hasMore: boolean }, Error>({
-      queryKey,
-      queryFn: async (context) => {
-        const pageParam = (context.pageParam ?? 0) as number;
-        return fetchPaginatedSubjects(pageParam, PAGE_SIZE);
-      },
-      initialPageParam: 0,
-      getNextPageParam: (lastPage, allPages) =>
-        lastPage.hasMore ? allPages.length * PAGE_SIZE : undefined,
-    });
-  }
-  
-  export function useSubjectsPaginated(page: number, pageSize: number, academicYearId?: number) {
-    return useQuery<{ total: number; data: Subject[]; hasMore: boolean }, Error>({
-      queryKey: ['subjects', page, pageSize, academicYearId],
-      queryFn: async () => fetchSubjectsPaginated(page, pageSize, academicYearId),
-      // keepPreviousData: true,
-    });
-  }
-  
+  return useQuery<Subject[]>({
+    queryKey: ['subjects'],
+    queryFn: async () => {
+      const response = await fetchSubjects();
+      return response.items;
+    },
+  });
+}
+
+export function useSubject(id: string) {
+  return useQuery<Subject>({
+    queryKey: ['subject', id],
+    queryFn: () => fetchSubjectById(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateSubject() {
+  const queryClient = useQueryClient();
+  return useMutation<Subject, Error, SubjectInput>({
+    mutationFn: createSubject,
+    onSuccess: () => {
+      toast.success('Subject created successfully!');
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to create subject: ${error.message}`);
+    },
+  });
+}
+
+export function useUpdateSubject() {
+  const queryClient = useQueryClient();
+  return useMutation<Subject, Error, { id: string; subject: SubjectInput }>({
+    mutationFn: updateSubject,
+    onSuccess: () => {
+      toast.success('Subject updated successfully!');
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to update subject: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteSubject() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: deleteSubject,
+    onSuccess: () => {
+      toast.success('Subject deleted successfully!');
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete subject: ${error.message}`);
+    },
+  });
+}
+
+export function useCreateBulkClassSubjectMappings() {
+  const queryClient = useQueryClient();
+  return useMutation<ClassSubjectMappingBulkResponse, Error, ClassSubjectMappingBulkCreate>({
+    mutationFn: createBulkClassSubjectMappings,
+    onSuccess: (data) => {
+      toast.success(data.message || 'Bulk class-subject mappings created successfully!');
+      queryClient.invalidateQueries({ queryKey: ['class-subject-mappings'] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to create bulk mappings: ${error.message}`);
+    },
+  });
+}
+
+export function useSubjectsPaginated(page: number, pageSize: number, academicYearId?: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['subjects', 'paginated', page, pageSize, academicYearId],
+    queryFn: async () => {
+      const response = await fetchSubjects({
+        skip: page * pageSize,
+        limit: pageSize,
+        active_only: true,
+        academic_year_id: academicYearId
+      });
+
+      return {
+        data: response.items,
+        total: response.total || response.items.length,
+        hasMore: response.total ? (page + 1) * pageSize < response.total : false,
+      };
+    },
+    enabled,
+  });
+}
+
+export function useSubjectsDropdown(params?: {
+  category_id?: string;
+  mandatory_only?: boolean;
+  active_only?: boolean;
+}) {
+  return useQuery<SubjectDropdown[]>({
+    queryKey: ['subjects-dropdown', params],
+    queryFn: () => fetchSubjectsDropdown(params),
+  });
+}

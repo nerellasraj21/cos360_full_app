@@ -1,47 +1,38 @@
 import React from 'react';
 import Select from 'react-select';
-import { usePaginatedAcademicYears } from '@/api/hooks/masters/academicyears';
+import { useAcademicYearsDropdown } from '@/api/hooks/masters/academicyears';
+import { useAcademicYearStore } from '@/lib/academicYearStore';
 
 export const AcademicYearDropdown: React.FC = () => {
-  const PAGE_SIZE = 5;
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = usePaginatedAcademicYears(['academicYears'], PAGE_SIZE);
+  const { data: academicYears, isLoading } = useAcademicYearsDropdown();
+  const { selectedAcademicYearId, setSelectedAcademicYearId } = useAcademicYearStore();
 
-  const academicYears = data
-    ? data.pages.flatMap(page => page.data)
-    : [];
-
-  const options = academicYears.map(year => ({
+  const options = academicYears ? academicYears.map(year => ({
     value: year.id,
-    label: year.name,
-  }));
+    label: year.title,
+  })) : [];
 
-  const [selectedAcademicYearId, setSelectedAcademicYearId] = React.useState<number | null>(null);
-
+  // Initialize from store or fallback to current/first year
   React.useEffect(() => {
-    if (options.length > 0 && selectedAcademicYearId === null) {
-      setSelectedAcademicYearId(options[0].value);
+    if (!academicYears || academicYears.length === 0) return;
+    if (!selectedAcademicYearId || selectedAcademicYearId === '' || selectedAcademicYearId === '371' || selectedAcademicYearId.length < 10) {
+      const currentYear = academicYears.find(year => year.is_current);
+      const fallbackId = (currentYear ? currentYear.id : academicYears[0].id) as string;
+      if (fallbackId && String(fallbackId).length >= 10) {
+        setSelectedAcademicYearId(String(fallbackId));
+      }
     }
-  }, [options, selectedAcademicYearId]);
+  }, [academicYears, selectedAcademicYearId, setSelectedAcademicYearId]);
 
-  const selectedOption = options.find(opt => opt.value === selectedAcademicYearId) || null;
+  const selectedOption = options.find(opt => String(opt.value) === String(selectedAcademicYearId)) || null;
 
   return (
     <Select
       options={options}
       value={selectedOption}
-      onChange={opt => { if (opt) setSelectedAcademicYearId(opt.value); }}
+      onChange={opt => { if (opt) setSelectedAcademicYearId(String(opt.value)); }}
       placeholder="Select Academic Year"
-      isLoading={isFetchingNextPage}
-      onMenuScrollToBottom={() => {
-        if (hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      }}
+      isLoading={isLoading}
       className="min-w-[110px] w-[110px]"
       classNamePrefix="react-select"
       menuPlacement="auto"

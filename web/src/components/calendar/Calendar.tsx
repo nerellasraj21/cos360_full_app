@@ -5,9 +5,10 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader as DialogH, DialogTitle as DialogT, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { useHolidays, useCreateHoliday, useUpdateHoliday, useDeleteHoliday } from "@/api/hooks/masters/holiday";
-import type { Holiday } from "@/types/masters/holiday";
+import { useHolidays, useCreateHoliday, useUpdateHoliday, useDeactivateHoliday as useDeleteHoliday } from "@/api/hooks/masters/holiday";
+import type { HolidayRead } from "@/types/masters/holiday";
 import { useAcademicYearStore } from "@/lib/academicYearStore";
+import { usePermission } from "@/hooks/usePermission";
 
 type ViewType = "month" | "week" | "year" | "vertical" | "day" | "all";
 
@@ -30,11 +31,11 @@ function getWeekDays(current: Date) {
 
 function useDayDrop(
   targetDate: Date,
-  onDrop: (event: Holiday, newStart: Date, newEnd: Date) => void
+  onDrop: (event: HolidayRead, newStart: Date, newEnd: Date) => void
 ) {
   return useDrop({
     accept: "event",
-    drop: (item: Holiday) => {
+    drop: (item: HolidayRead) => {
       const originalStart = parseISO(item.start_date);
       const originalEnd = parseISO(item.end_date);
       const duration = originalEnd.getTime() - originalStart.getTime();
@@ -52,7 +53,7 @@ function useDayDrop(
 interface DayCellProps {
   day: Date;
   children: React.ReactNode;
-  onDrop: (event: Holiday, newStart: Date, newEnd: Date) => void;
+  onDrop: (event: HolidayRead, newStart: Date, newEnd: Date) => void;
   className?: string;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   style?: React.CSSProperties;
@@ -80,14 +81,19 @@ export function Calendar() {
   const [newEventStart, setNewEventStart] = useState("");
   const [newEventEnd, setNewEventEnd] = useState("");
   const [newEventDescription, setNewEventDescription] = useState("");
-  const [selectedEvent, setSelectedEvent] = useState<Holiday | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<HolidayRead | null>(null);
   const [newEventColor, setNewEventColor] = useState("#2563eb"); // default to Tailwind blue-600
 
 
-  const selectedAcademicYearId = 1;
   // Pagination state for All Events view
   const [page, setPage] = useState(0);
   const pageSize = 10;
+
+  const { selectedAcademicYearId, fetchAndSetAcademicYears } = useAcademicYearStore();
+
+  useEffect(() => {
+    fetchAndSetAcademicYears();
+  }, []);
 
   const holidaysQueryParams =
     view === "all"
@@ -104,17 +110,30 @@ export function Calendar() {
   const createHoliday = useCreateHoliday();
   const updateHoliday = useUpdateHoliday();
   const deleteHoliday = useDeleteHoliday();
-  // Map holidays to events (no need to map, just use holidays as events)
-  const events: Holiday[] = holidays || [];
 
-  const handleDrop = (event: Holiday, newStart: Date, newEnd: Date) => {
+  // Permission checks for UI elements
+  const { checkPermission } = usePermission();
+  const hasCreatePermission = checkPermission('holidays', 'create');
+  const hasUpdatePermission = checkPermission('holidays', 'update');
+  const hasDeletePermission = checkPermission('holidays', 'delete');
+
+  // Map holidays to events (no need to map, just use holidays as events)
+  const events: HolidayRead[] = holidays?.items || [];
+
+  const handleDrop = (event: HolidayRead, newStart: Date, newEnd: Date) => {
+    if (!event.id || typeof event.id !== 'string' || event.id.trim() === '') {
+      console.error('Invalid holiday ID for drag and drop update:', event.id);
+      return;
+    }
     updateHoliday.mutate({
-      id: event.id,
+      holidayId: event.id,
       holiday: {
-        ...event,
+        name: event.name,
+        description: event.description,
         start_date: format(newStart, "yyyy-MM-dd"),
         end_date: format(newEnd, "yyyy-MM-dd"),
-        // other fields as needed
+        is_active: event.is_active,
+        color: event.color,
       },
     });
   };
@@ -313,20 +332,22 @@ export function Calendar() {
           <Button size="icon" variant="ghost" className="h-6 w-6 p-0 text-lg" title="Previous day" onClick={() => setDay(addDays(day, -1))}>{"<"}</Button>
           <div className="font-semibold text-lg">{format(day, "EEEE, MMMM d, yyyy")}</div>
           <Button size="icon" variant="ghost" className="h-6 w-6 p-0 text-lg" title="Next day" onClick={() => setDay(addDays(day, 1))}>{">"}</Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6 p-0 text-lg"
-            title="Add event"
-            onClick={() => {
-              setSelectedDate(day);
-              setNewEventStart(format(day, "yyyy-MM-dd"));
-              setNewEventEnd(format(day, "yyyy-MM-dd"));
-              setShowAddDialog(true);
-            }}
-          >
-            +
-          </Button>
+          {hasCreatePermission && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 p-0 text-lg"
+              title="Add event"
+              onClick={() => {
+                setSelectedDate(day);
+                setNewEventStart(format(day, "yyyy-MM-dd"));
+                setNewEventEnd(format(day, "yyyy-MM-dd"));
+                setShowAddDialog(true);
+              }}
+            >
+              +
+            </Button>
+          )}
         </div>
         <Button
           size="sm"
@@ -386,21 +407,23 @@ export function Calendar() {
             >
               <div className="flex items-center mb-1 gap-2">
                 <div className="font-semibold">{format(day, "EEEE, MMM d")}</div>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-6 w-6 p-0 text-lg"
-                  title="Add event"
-                  onClick={e => {
-                    e.stopPropagation();
-                    setSelectedDate(day);
-                    setNewEventStart(format(day, "yyyy-MM-dd"));
-                    setNewEventEnd(format(day, "yyyy-MM-dd"));
-                    setShowAddDialog(true);
-                  }}
-                >
-                  +
-                </Button>
+                {hasCreatePermission && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 p-0 text-lg"
+                    title="Add event"
+                    onClick={e => {
+                      e.stopPropagation();
+                      setSelectedDate(day);
+                      setNewEventStart(format(day, "yyyy-MM-dd"));
+                      setNewEventEnd(format(day, "yyyy-MM-dd"));
+                      setShowAddDialog(true);
+                    }}
+                  >
+                    +
+                  </Button>
+                )}
               </div>
               <div className="flex flex-col gap-1">
                 {dayEvents.length === 0 ? (
@@ -433,7 +456,7 @@ export function Calendar() {
     if (isError) {
       return <div className="text-center text-destructive py-4">Failed to load events</div>;
     }
-    if (!holidays || holidays.length === 0) {
+    if (!holidays?.items || holidays.items.length === 0) {
       return <div className="text-center text-muted-foreground py-4">No events</div>;
     }
     return (
@@ -450,7 +473,7 @@ export function Calendar() {
             </tr>
           </thead>
           <tbody>
-            {holidays.map(ev => (
+            {holidays.items.map(ev => (
               <tr key={ev.id || ev.name + ev.start_date} className="border-b hover:bg-accent/20 cursor-pointer">
                 <td className="px-4 py-2" onClick={() => { setSelectedEvent(ev); setShowEditDialog(true); }}>{ev.name}</td>
                 <td className="px-4 py-2 text-xs text-muted-foreground" title={ev.description}>{ev.description ? (ev.description.length > 60 ? ev.description.slice(0, 60) + "..." : ev.description) : "-"}</td>
@@ -460,7 +483,9 @@ export function Calendar() {
                   <span className="inline-block w-4 h-4 rounded" style={{ backgroundColor: ev.color || "#2563eb" }}></span>
                 </td>
                 <td className="px-4 py-2">
-                  <Button size="sm" variant="outline" onClick={() => { setSelectedEvent(ev); setShowEditDialog(true); }}>Edit</Button>
+                  {hasUpdatePermission && (
+                    <Button size="sm" variant="outline" onClick={() => { setSelectedEvent(ev); setShowEditDialog(true); }}>Edit</Button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -478,7 +503,7 @@ export function Calendar() {
             <span>Page {page + 1}</span>
             <Button
               onClick={() => setPage(p => p + 1)}
-              disabled={holidays.length < pageSize}
+              disabled={holidays.items.length < pageSize}
             >
               Next
             </Button>
@@ -508,16 +533,18 @@ export function Calendar() {
   };
 
   const handleEditEvent = async () => {
-    if (!selectedEvent || !selectedEvent.name.trim() || !selectedEvent.start_date || !selectedEvent.end_date || !selectedAcademicYearId) return;
+    if (!selectedEvent || !selectedEvent.id || typeof selectedEvent.id !== 'string' || selectedEvent.id.trim() === '' || !selectedEvent.name.trim() || !selectedEvent.start_date || !selectedEvent.end_date) {
+      console.error('Invalid holiday data for edit:', selectedEvent);
+      return;
+    }
     await updateHoliday.mutateAsync({
-      id: selectedEvent.id,
+      holidayId: selectedEvent.id,
       holiday: {
         name: selectedEvent.name,
         description: selectedEvent.description,
         start_date: selectedEvent.start_date,
         end_date: selectedEvent.end_date,
         is_active: selectedEvent.is_active ?? true,
-        academic_year_id: selectedAcademicYearId,
         color: selectedEvent.color,
       },
     });
@@ -526,7 +553,10 @@ export function Calendar() {
   };
 
   const handleDeleteEvent = async () => {
-    if (!selectedEvent || !selectedEvent.id) return;
+    if (!selectedEvent || !selectedEvent.id || typeof selectedEvent.id !== 'string' || selectedEvent.id.trim() === '') {
+      console.error('Invalid holiday ID for deletion:', selectedEvent?.id);
+      return;
+    }
     await deleteHoliday.mutateAsync(selectedEvent.id);
     setShowEditDialog(false);
     setSelectedEvent(null);
@@ -570,18 +600,20 @@ export function Calendar() {
               }}>{">"}</Button>
             </>
           )}
-          <Button
-            variant="default"
-            onClick={() => {
-              const today = format(new Date(), "yyyy-MM-dd");
-              setSelectedDate(new Date());
-              setNewEventStart(today);
-              setNewEventEnd(today);
-              setShowAddDialog(true);
-            }}
-          >
-            + Add Event
-          </Button>
+          {hasCreatePermission && (
+            <Button
+              variant="default"
+              onClick={() => {
+                const today = format(new Date(), "yyyy-MM-dd");
+                setSelectedDate(new Date());
+                setNewEventStart(today);
+                setNewEventEnd(today);
+                setShowAddDialog(true);
+              }}
+            >
+              + Add Event
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -746,12 +778,16 @@ export function Calendar() {
                 <div className="text-destructive text-xs">Please fill in all required fields.</div>
               )}
               <DialogFooter>
-                <Button type="submit" disabled={updateHoliday.isPending}>
-                  {updateHoliday.isPending ? "Saving..." : "Save"}
-                </Button>
-                <Button variant="destructive" type="button" onClick={handleDeleteEvent} disabled={deleteHoliday.isPending}>
-                  {deleteHoliday.isPending ? "Deleting..." : "Delete"}
-                </Button>
+                {hasUpdatePermission && (
+                  <Button type="submit" disabled={updateHoliday.isPending}>
+                    {updateHoliday.isPending ? "Saving..." : "Save"}
+                  </Button>
+                )}
+                {hasDeletePermission && (
+                  <Button variant="destructive" type="button" onClick={handleDeleteEvent} disabled={deleteHoliday.isPending}>
+                    {deleteHoliday.isPending ? "Deleting..." : "Delete"}
+                  </Button>
+                )}
                 <DialogClose asChild>
                   <Button variant="outline" type="button">Cancel</Button>
                 </DialogClose>
@@ -764,7 +800,7 @@ export function Calendar() {
   );
 }
 
-export function DraggableEvent({ ev, onClick }: { ev: Holiday, onClick: (e: React.MouseEvent) => void }) {
+export function DraggableEvent({ ev, onClick }: { ev: HolidayRead, onClick: (e: React.MouseEvent) => void }) {
   const [{ isDragging }, drag] = useDrag({
     type: "event",
     item: { ...ev },
@@ -792,7 +828,7 @@ export function DraggableEvent({ ev, onClick }: { ev: Holiday, onClick: (e: Reac
   );
 }
 
-function DraggableMultiDayEvent({ ev, style, onClick }: { ev: Holiday, style: React.CSSProperties, onClick: (e: React.MouseEvent) => void }) {
+function DraggableMultiDayEvent({ ev, style, onClick }: { ev: HolidayRead, style: React.CSSProperties, onClick: (e: React.MouseEvent) => void }) {
   const [{ isDragging }, drag] = useDrag({
     type: "event",
     item: { ...ev },

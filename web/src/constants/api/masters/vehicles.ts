@@ -1,1 +1,1 @@
-export const VEHICLES_API_BASE = '/api/v1/vehicles/'; 
+export const VEHICLES_API_BASE = '/masters/vehicles/';

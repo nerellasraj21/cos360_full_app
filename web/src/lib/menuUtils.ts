@@ -11,205 +11,36 @@ export interface MenuItem {
 }
 
 export const useMenuData = () => {
-    const { user } = useAuthStore();
+    const { menuItems, user, isAuthenticated } = useAuthStore();
 
-    // This is a placeholder - replace with actual API call
     return useQuery({
         queryKey: ['menu'],
         queryFn: () => {
-            // For now, return sample data
-            // In a real implementation, this would be:
-            // return fetch('/api/menu').then(res => res.json())
-            const sampleMenuData: MenuItem[] = [
-                {
-                    "id": 1,
-                    "name": "Dashboard",
-                    "url": "/dashboard",
-                    "level": "L0",
-                    "children": []
-                },
-                {
-                    "id": 2,
-                    "name": "Masters",
-                    "url": null,
-                    "level": "L0",
-                    "children": [
-                        {
-                            "id": 3,
-                            "name": "Subjects",
-                            "url": "/masters/subjects",
-                            "level": "L1",
-                            "children": []
-                        },
-                        {
-                            "id": 4,
-                            "name": "Classes & Sections",
-                            "url": "/masters/classesandsections",
-                            "level": "L1",
-                            "children": []
-                        },
-                        {
-                            "id": 5,
-                            "name": "Academic Years",
-                            "url": "/masters/academicyears",
-                            "level": "L1",
-                            "children": []
-                        },
+            console.log('Loading menu data from authStore - User:', user, 'Authenticated:', isAuthenticated);
 
-                        {
-                            "id": 8,
-                            "name": "Holidays",
-                            "url": "/masters/holidays",
-                            "level": "L1",
-                            "children": []
-                        },
-                    ]
-                },
+            if (!menuItems || menuItems.length === 0) {
+                console.warn('No menu data found in authStore, returning empty array');
+                return [];
+            }
 
-                {
-                    "id": 10,
-                    "name": "Students",
-                    "url": null,
-                    "level": "L0",
-                    "children": [
-                        {
-                            "id": 11,
-                            "name": "Attendance",
-                            "url": "/students/attendance",
-                            "level": "L1",
-                            "children": []
-                        },
-                        {
-                            "id": 20,
-                            "name": "Certificates Upload",
-                            "url": "/students/certificatesupload",
-                            "level": "L1",
-                            "children": []
-                        },
-                    ]
-                },
-                {
-                    "id": 12,
-                    "name": "Staff",
-                    "url": null,
-                    "level": "L0",
-                    "children": [
-                        {
-                            "id": 13,
-                            "name": "Enrollment",
-                            "url": "/staff/enrollment",
-                            "level": "L1",
-                            "children": []
-                        },
-                        {
-                            "id": 14,
-                            "name": "Attendance",
-                            "url": "/staff/attendance",
-                            "level": "L1",
-                            "children": []
-                        },
-                    ]
-                },
+            // Transform authStore menu format to menuUtils format
+            const transformMenuItem = (item: { id: string; name: string; path: string | null; children?: { id: string; name: string; path: string | null; children?: any[] }[] }, level: number = 0): MenuItem => {
+                const levelStr = level === 0 ? "L0" : level === 1 ? "L1" : "L2";
 
-                {
-                    "id": 21,
-                    "name": "Transport",
-                    "url": null,
-                    "level": "L0",
-                    "children": [
-                        {
-                            "id": 22,
-                            "name": "Routes",
-                            "url": "/transport/routes",
-                            "level": "L1",
-                            "children": []
-                        },
-                        {
-                            "id": 23,
-                            "name": "Route Stops",
-                            "url": "/transport/routeStops",
-                            "level": "L1",
-                            "children": []
-                        },
-                        {
-                            "id": 24,
-                            "name": "Vehicles",
-                            "url": "/transport/vehicles",
-                            "level": "L1",
-                            "children": []
-                        },
-                        {
-                            "id": 25,
-                            "name": "Trips",
-                            "url": "/transport/trips",
-                            "level": "L1",
-                            "children": []
-                        },
-                        {
-                            "id": 26,
-                            "name": "Student Transport",
-                            "url": "/transport/studentTransport",
-                            "level": "L1",
-                            "children": []
-                        },
-                        {
-                            "id": 27,
-                            "name": "Student Trips",
-                            "url": "/transport/studentTrips",
-                            "level": "L1",
-                            "children": []
-                        }
-                    ]
-                }
+                return {
+                    id: parseInt(item.id) || Math.floor(Math.random() * 10000), // Fallback for non-numeric ids
+                    name: item.name,
+                    url: item.path, // Map path to url
+                    level: levelStr as "L0" | "L1" | "L2",
+                    children: item.children ? item.children.map((child) => transformMenuItem(child, level + 1)) : []
+                };
+            };
 
-                // , {
-                //     "id": 15,
-                //     "name": "Calender",
-                //     "url": "/Calender",
-                //     "level": "L0",
-                //     "children": []
-                // }
-                , {
-                    "id": 15,
-                    "name": "TimeTable",
-                    "url": "/TimeTable",
-                    "level": "L0",
-                    "children": []
-                },
-                {
-                    "id": 16,
-                    "name": "Academics",
-                    "url": null,
-                    "level": "L0",
-                    "children": [
-                        {
-                            "id": 17,
-                            "name": "Curriculum",
-                            "url": null,
-                            "level": "L1",
-                            "children": [
-                                {
-                                    "id": 18,
-                                    "name": "Subjects",
-                                    "url": "/academics/curriculum/subjects",
-                                    "level": "L2",
-                                    "children": []
-                                },
-                                {
-                                    "id": 19,
-                                    "name": "Syllabus",
-                                    "url": "/academics/curriculum/syllabus",
-                                    "level": "L2",
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ];
-            return sampleMenuData;
+            const transformedMenu = menuItems.map((item: any) => transformMenuItem(item, 0));
+            console.log('Transformed menu data:', transformedMenu);
+            return transformedMenu;
         },
-        enabled: !!user
+        enabled: !!user && !!menuItems && menuItems.length > 0
     });
 };
 

@@ -23,6 +23,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Filter, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { PermissionGuard } from '@/components/PermissionGuard';
+import { PERMISSIONS, type PermissionResource } from '@/constants/permissions';
+
+// Helper function to get resource name from permission constant
+const getResourceName = (resource: PermissionResource): string => {
+  const permission = Object.values(PERMISSIONS[resource])[0] as string;
+  return permission.split(':')[0];
+};
 
 export interface MasterPageConfig<T, TInput> {
   title: string;
@@ -32,8 +40,8 @@ export interface MasterPageConfig<T, TInput> {
   isLoading: boolean;
   data: T[];
   onCreate: (data: TInput) => void;
-  onUpdate: (id: number, data: any) => void;
-  onDelete: (id: number) => void;
+  onUpdate: (id: string | number, data: any) => void;
+  onDelete: (id: string | number) => void;
   isCreatePending: boolean;
   resetForm: () => void;
   isEditing?: boolean;
@@ -51,6 +59,16 @@ export interface MasterPageConfig<T, TInput> {
     value: any,
     onChange: (value: any) => void
   ) => React.ReactNode;
+  // Permission configuration
+  permissions?: {
+    resource: PermissionResource;
+    create?: boolean;
+    read?: boolean;
+    update?: boolean;
+    delete?: boolean;
+    list?: boolean;
+    export?: boolean;
+  };
 }
 
 export interface FormField {
@@ -64,7 +82,7 @@ interface MasterPageProps<T, TInput> {
   config: MasterPageConfig<T, TInput>;
 }
 
-export function MasterPage<T extends { id: number }, TInput extends Record<string, any>>({
+export function MasterPage<T extends { id: string | number }, TInput extends Record<string, any>>({
   config
 }: MasterPageProps<T, TInput>) {
   const [formData, setFormData] = useState<TInput>(config.defaultValues);
@@ -175,8 +193,6 @@ export function MasterPage<T extends { id: number }, TInput extends Record<strin
     let updated: any = { ...row };
     if (key === 'is_active') {
       updated[key] = value === 'true' || value === true || value === 'Yes';
-    } else if (key === 'academic_year_id') {
-      updated[key] = Number(value);
     } else {
       updated[key] = value;
     }
@@ -205,18 +221,21 @@ export function MasterPage<T extends { id: number }, TInput extends Record<strin
   const renderFormField = (field: FormField) => {
     const { name, label, type = 'text', required = false } = field;
 
-
-    if (type === 'academic_year_select' && config.renderCustomField) {
-      return (
-        <div key={name} className="mb-4">
-          <Label htmlFor={name}>{label}</Label>
-          {config.renderCustomField(
-            field,
-            formData[name as keyof TInput],
-            (val: any) => setFormData((prev) => ({ ...prev, [name]: val }))
-          )}
-        </div>
+    // Check for custom field rendering first
+    if (config.renderCustomField) {
+      const customField = config.renderCustomField(
+        field,
+        formData[name as keyof TInput],
+        (val: any) => setFormData((prev) => ({ ...prev, [name]: val }))
       );
+      if (customField) {
+        return (
+          <div key={name} className="mb-4">
+            <Label htmlFor={name}>{label}</Label>
+            {customField}
+          </div>
+        );
+      }
     }
 
     if (type === 'checkbox') {
@@ -293,35 +312,46 @@ export function MasterPage<T extends { id: number }, TInput extends Record<strin
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="flex items-center gap-2">
-                  <Download className="h-4 w-4" />
-                  Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={handleExportCSV} className="cursor-pointer">
-                  <FileText className="h-4 w-4 mr-2" />
-                  Export to CSV
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportExcel} className="cursor-pointer">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Export to Excel
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleDownloadData} className="cursor-pointer">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Data
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {config.addModal ? (
-              config.addModal
-            ) : (
-              <Dialog open={isModalOpen} onOpenChange={handleModalOpenChange}>
-                <DialogTrigger asChild>
-                  <Button>Add {config.title.slice(0, -1)}</Button>
-                </DialogTrigger>
+            <PermissionGuard
+              resource={config.permissions?.resource ? getResourceName(config.permissions.resource) : undefined}
+              action="list"
+              fallback={null}
+            >
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <Download className="h-4 w-4" />
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={handleExportCSV} className="cursor-pointer">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Export to CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportExcel} className="cursor-pointer">
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Export to Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDownloadData} className="cursor-pointer">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Data
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </PermissionGuard>
+            <PermissionGuard
+              resource={config.permissions?.resource ? getResourceName(config.permissions.resource) : undefined}
+              action="create"
+              fallback={null}
+            >
+              {config.addModal ? (
+                config.addModal
+              ) : (
+                <Dialog open={isModalOpen} onOpenChange={handleModalOpenChange}>
+                  <DialogTrigger asChild>
+                    <Button>Add {config.title.slice(0, -1)}</Button>
+                  </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add New {config.title.slice(0, -1)}</DialogTitle>
@@ -343,19 +373,35 @@ export function MasterPage<T extends { id: number }, TInput extends Record<strin
                   </form>
                 </DialogContent>
               </Dialog>
-            )}
+              )}
+            </PermissionGuard>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <Table
-          columns={filteredColumns}
-          data={config.data}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          isEditing={config.isEditing}
-          pagination={config.pagination}
-        />
+        <PermissionGuard
+          resource={config.permissions?.resource ? getResourceName(config.permissions.resource) : undefined}
+          action="read"
+          fallback={
+            <div className="flex items-center justify-center h-32">
+              <p className="text-gray-600">You don't have permission to view this data.</p>
+            </div>
+          }
+        >
+          <Table
+            columns={filteredColumns}
+            data={config.data}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            isEditing={config.isEditing}
+            pagination={config.pagination}
+            permissions={{
+              resource: config.permissions?.resource ? getResourceName(config.permissions.resource) : undefined,
+              canEdit: config.permissions?.update,
+              canDelete: config.permissions?.delete,
+            }}
+          />
+        </PermissionGuard>
         {config.isLoading && <div>Loading...</div>}
       </CardContent>
     </Card>

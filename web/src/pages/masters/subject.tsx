@@ -1,35 +1,68 @@
-import  { useState } from 'react';
+import  { useState, useEffect } from 'react';
 import { MasterPage, type MasterPageConfig, type FormField } from '@/pages/masters/common/MasterPage';
 import type { TableColumn } from '@/components/common/table';
 import { useSubjectsPaginated, useCreateSubject, useUpdateSubject, useDeleteSubject } from '@/api/hooks/masters/subjects';
+import { useSubjectCategories } from '@/api/hooks/masters/subjectCategories';
 import type { Subject, SubjectInput } from '@/types/masters/subject';
-import AcademicYearSelect from '@/components/common/AcademicYearSelect';
+import { SubjectCategoriesDropdown } from '@/components/dropdown-system/components/SubjectCategoriesDropdown';
+import { SubjectCategoriesInfiniteDropdown } from '@/components/dropdown';
 import { useAcademicYearStore } from "@/lib/academicYearStore";
-
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { PermissionGuard } from '@/components/PermissionGuard';
+import { usePermission } from '@/hooks/usePermission';
 
 export default function SubjectPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
+  const { selectedAcademicYearId, fetchAndSetAcademicYears } = useAcademicYearStore();
+  const { checkPermission } = usePermission();
+
+  // Check permissions
+  const hasListPermission = checkPermission('subjects', 'list');
+
+  // Initialize academic years if not loaded
+  useEffect(() => {
+    fetchAndSetAcademicYears();
+  }, [fetchAndSetAcademicYears]);
+
   const {
     data,
     isLoading,
-  } = useSubjectsPaginated(page, pageSize);
+  } = useSubjectsPaginated(page, pageSize, selectedAcademicYearId, hasListPermission);
 
   const subjects = data?.data || [];
-  const total = data?.total || 0;
+  const total = data?.total || subjects.length;
   const hasMore = data?.hasMore || false;
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { data: _categories } = useSubjectCategories();
+
+  // Sort subjects by category for hierarchical display
+  const sortedSubjects = [...subjects].sort((a, b) => {
+    const catA = a.subject_category?.name || '';
+    const catB = b.subject_category?.name || '';
+    return catA.localeCompare(catB);
+  });
 
   const createSubject = useCreateSubject();
   const updateSubject = useUpdateSubject();
   const deleteSubject = useDeleteSubject();
-  const selectedAcademicYearId = useAcademicYearStore(state => state.selectedAcademicYearId);
 
   const columns: TableColumn<Subject>[] = [
-    { key: 'id', label: 'ID' },
     { key: 'name', label: 'Name', editable: true },
-    { key: 'category', label: 'Category', editable: true },
+    {
+      key: 'subject_category_id',
+      label: 'Category',
+      editable: true,
+      render: (_value, row) => row.subject_category?.name || '',
+      renderEdit: (value: string | null, _row: Subject, onChange: (v: string | null) => void) => (
+        <SubjectCategoriesInfiniteDropdown
+          value={value || undefined}
+          onChange={(val, _option) => onChange(val || null)}
+        />
+      ),
+    },
     { key: 'short_code', label: 'Short Code', editable: true },
-
     {
       key: 'is_active',
       label: 'Active',
@@ -44,30 +77,12 @@ export default function SubjectPage() {
         />
       ),
     },
-    { key: 'academic_year_id', label: 'Year', editable: false, renderEdit: (value: number | null, _row: Subject, onChange: (v: number | null) => void) => (
-      <AcademicYearSelect value={value} onChange={onChange} />
-    ) },
-    { key: 'created_at', label: 'Created', render: (v) => v ? new Date(v).toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }) : '-' },
-    { key: 'updated_at', label: 'Updated', render: (v) => v ? new Date(v).toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }) : '-' },
   ];
 
   const formFields: FormField[] = [
-    { name: 'name', label: 'Name', required: true },
-    { name: 'category', label: 'Category', required: true },
-    { name: 'short_code', label: 'Short Code', required: true },
-
+    { name: 'name', label: 'Subject Name', required: true },
+    { name: 'subject_category_id', label: 'Category', required: true },
+    { name: 'short_code', label: 'Short Code' },
     { name: 'is_active', label: 'Active', type: 'checkbox' },
   ];
 
@@ -86,18 +101,18 @@ export default function SubjectPage() {
     columns,
     defaultValues: {
       name: '',
-      category: '',
+      subject_category_id: '',
+      academic_year_id: selectedAcademicYearId,
       short_code: '',
       is_active: true,
-      academic_year_id: selectedAcademicYearId as number,
     },
     formFields,
     isLoading,
-    showColumnSelector:true ,
-    data: subjects,
+    showColumnSelector: true,
+    data: sortedSubjects,
     onCreate: (data) => createSubject.mutate(data),
-    onUpdate: (id, subject) => updateSubject.mutate({ id, subject }),
-    onDelete: (id) => deleteSubject.mutate(id),
+    onUpdate: (id, subject) => updateSubject.mutate({ id: id.toString(), subject }),
+    onDelete: (id) => deleteSubject.mutate(id.toString()),
     isCreatePending: createSubject.status === 'pending',
     resetForm: () => {},
     pagination: {
@@ -107,8 +122,51 @@ export default function SubjectPage() {
       onPageChange: handlePageChange,
       onPageSizeChange: handlePageSizeChange,
     },
-
+    // Permission configuration for Subjects
+    permissions: {
+      resource: 'SUBJECTS',
+      create: true, // Allow create button if user has create permission
+      read: true,   // Allow viewing data in table if user has read permission
+      update: true, // Allow edit functionality if user has update permission
+      delete: true, // Allow delete functionality if user has delete permission
+      list: true,   // Allow accessing this page if user has list permission
+    },
+    renderCustomField: (field, value, onChange) => {
+      if (field.name === 'subject_category_id') {
+        return (
+          <SubjectCategoriesInfiniteDropdown
+            value={value || undefined}
+            onChange={(val) => onChange(val as string | null)}
+            placeholder="Select Category"
+          />
+        );
+      }
+      return null;
+    },
   };
 
-  return <MasterPage config={config} />;
+  return (
+    <PermissionGuard
+      resource="subjects"
+      action="list"
+      fallback={
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Access Denied</h2>
+            <p className="text-gray-600">You don't have permission to view Subjects.</p>
+          </div>
+        </div>
+      }
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>Subjects</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MasterPage config={config} />
+        </CardContent>
+      </Card>
+    </PermissionGuard>
+  );
 }
+

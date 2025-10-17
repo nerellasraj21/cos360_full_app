@@ -168,10 +168,11 @@
   }
 
   .react-select__menu {
-    @apply z-50 mt-1 rounded-lg border border-border bg-card p-1 text-card-foreground shadow-lg;
+    @apply mt-1 rounded-lg border border-border bg-card p-1 text-card-foreground shadow-lg;
     background: var(--color-card);
     color: var(--color-card-foreground);
     min-width: 120px;
+    z-index: 10000;
   }
 
   .react-select__option {

@@ -1,22 +1,84 @@
 import axios from 'axios';
+import { useAuthStore } from '../lib/authStore';
+import { config, getTenantFromHostname, logger } from '../lib/config';
 
 const CAxios = axios.create({
-  baseURL: 'http://localhost:8000', // Change to  env later
-  withCredentials: true, // shd check with backend once, After auth module is completed
+  baseURL: config.api.baseURL,
+  timeout: config.api.timeout,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
-CAxios.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname; // Current Format school1.abc.com or www.school1.abc.com
-    const cleanHost = host.replace(/^www\./, "");
-    const match = cleanHost.match(/^([^.]+)\./); // Regexp match subdomain
-    console.log("match", match)
-    if (match && match[1]) {
-      config.headers = config.headers || {};
-      config.headers['tenant'] = match[1];
-    }
+// Request interceptor to add auth token, tenant, and student context
+CAxios.interceptors.request.use((axiosConfig) => {
+  const { accessToken, selectedStudent } = useAuthStore.getState();
+
+  // Add authorization header if token exists
+  if (accessToken) {
+    axiosConfig.headers.Authorization = `Bearer ${accessToken}`;
   }
-  return config;
+
+  // Add tenant header
+  if (typeof window !== 'undefined') {
+    const tenant = getTenantFromHostname(window.location.hostname);
+    axiosConfig.headers[config.tenant.headerName] = tenant;
+    logger.debug('Setting tenant header', { tenant, header: config.tenant.headerName });
+  }
+
+  // Add student context headers for parent users
+  if (selectedStudent) {
+    axiosConfig.headers['X-Student-ID'] = selectedStudent.id;
+    axiosConfig.headers['X-Academic-Year-ID'] = selectedStudent.academic_year_id;
+    axiosConfig.headers['X-Class-ID'] = selectedStudent.class_id;
+    logger.debug('Setting student context headers', { 
+      studentId: selectedStudent.id,
+      academicYearId: selectedStudent.academic_year_id,
+      classId: selectedStudent.class_id
+    });
+  }
+
+  return axiosConfig;
 });
 
-export default CAxios; 
+// Response interceptor to handle token refresh
+CAxios.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const { refreshToken } = useAuthStore.getState();
+        if (refreshToken) {
+          // Attempt to refresh token
+          const refreshResponse = await axios.post(`${config.api.baseURL}/auth/login/refresh`, {
+            refresh_token: refreshToken,
+          }, {
+            headers: {
+              'Content-Type': 'application/json',
+              [config.tenant.headerName]: config.tenant.defaultTenant, // Use default tenant for refresh
+            },
+          });
+
+          const { access_token, refresh_token } = refreshResponse.data;
+          useAuthStore.getState().refreshTokens(access_token, refresh_token);
+
+          // Retry the original request with new token
+          originalRequest.headers.Authorization = `Bearer ${access_token}`;
+          return CAxios(originalRequest);
+        }
+      } catch (refreshError) {
+        // If refresh fails, logout
+        useAuthStore.getState().logout();
+        window.location.href = '/login';
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+export default CAxios;

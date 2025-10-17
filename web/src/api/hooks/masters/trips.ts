@@ -1,18 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchTrips, fetchTripById, createTrip, updateTrip, deleteTrip } from '@/api/masters/trips';
-import type { Trip, TripInput } from '@/types/masters/trip';
+import { getAllTrips, getTripById, createTrip, updateTrip, deleteTrip } from '@/api/masters/trips';
+import type { TripOut, TripCreate, TripListResponse } from '@/types/masters/trip';
 import { toast } from 'sonner';
 
 export function useTrips() {
-    return useQuery<Trip[]>({
+    return useQuery<TripOut[]>({
         queryKey: ['trips'],
-        queryFn: fetchTrips,
+        queryFn: getAllTrips,
     });
 }
 
 export function useCreateTrip() {
     const queryClient = useQueryClient();
-    return useMutation<Trip, Error, TripInput>({
+    return useMutation<TripOut, Error, TripCreate>({
         mutationFn: createTrip,
         onSuccess: () => {
             toast.success('Trip created!');
@@ -26,7 +26,7 @@ export function useCreateTrip() {
 
 export function useUpdateTrip() {
     const queryClient = useQueryClient();
-    return useMutation<Trip, Error, { id: number; trip: TripInput }>({
+    return useMutation<TripOut, Error, { id: string; trip: TripCreate }>({
         mutationFn: ({ id, trip }) => updateTrip(id, trip),
         onSuccess: () => {
             toast.success('Trip updated!');
@@ -40,7 +40,7 @@ export function useUpdateTrip() {
 
 export function useDeleteTrip() {
     const queryClient = useQueryClient();
-    return useMutation<void, Error, number>({
+    return useMutation<{ message: string }, Error, string>({
         mutationFn: deleteTrip,
         onSuccess: () => {
             toast.success('Trip deleted!');
@@ -50,4 +50,4 @@ export function useDeleteTrip() {
             toast.error('Failed to delete trip');
         },
     });
-} 
+}

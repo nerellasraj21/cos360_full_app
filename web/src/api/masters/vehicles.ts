@@ -1,82 +1,146 @@
-import type { Vehicle, VehicleInput } from '@/types/masters';
+import CAxios from '../index';
+import type {
+  Vehicle,
+  VehicleInput,
+  VehicleUpdate,
+  VehicleDropdown,
+  VehicleRoute,
+  VehicleRouteStop
+} from '@/types/masters/vehicle';
 
-let sampleVehicles: Vehicle[] = [
-  {
-    id: 1,
-    name: 'School Bus',
-    registration_number: 'AB12CD3456',
-    vehicle_type: 'Bus',
-    last_inspected_date: '2023-01-10',
-    pollution_renewal_date: '2023-12-31',
-    is_active: true,
-  },
-  {
-    id: 2,
-    name: 'Staff Car',
-    registration_number: 'XY98ZT7654',
-    vehicle_type: 'Car',
-    last_inspected_date: '2023-02-15',
-    pollution_renewal_date: '2024-02-14',
-    is_active: true,
-  },
-  {
-    id: 3,
-    name: 'Delivery Van',
-    registration_number: 'MN45OP1234',
-    vehicle_type: 'Van',
-    last_inspected_date: '2022-11-20',
-    pollution_renewal_date: '2023-11-19',
-    is_active: false,
-  },
-];
+const VEHICLES_API_BASE = '/masters/vehicles/';
 
-export const fetchVehicles = async (): Promise<Vehicle[]> => {
-  return [...sampleVehicles];
+// Helper function to handle API errors
+const handleApiError = (error: any): Error => {
+  if (error.response?.data) {
+    const apiError = error.response.data;
+    return new Error(apiError.detail || 'An error occurred');
+  }
+  return new Error(error.message || 'Network error');
 };
 
-export const fetchVehicleById = async (id: number): Promise<Vehicle> => {
-  const vehicle = sampleVehicles.find((v) => v.id === id);
-  if (!vehicle) throw new Error('Vehicle not found');
-  return { ...vehicle };
-};
-
+// Create Vehicle
 export const createVehicle = async (vehicle: VehicleInput): Promise<Vehicle> => {
-  const newVehicle: Vehicle = {
-    ...vehicle,
-    id: sampleVehicles.length ? Math.max(...sampleVehicles.map((v) => v.id)) + 1 : 1,
-  };
-  sampleVehicles.push(newVehicle);
-  return { ...newVehicle };
+  try {
+    const { data } = await CAxios.post(VEHICLES_API_BASE, vehicle);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };
 
-export const updateVehicle = async ({ id, vehicle }: { id: number; vehicle: VehicleInput }): Promise<Vehicle> => {
-  const idx = sampleVehicles.findIndex((v) => v.id === id);
-  if (idx === -1) throw new Error('Vehicle not found');
-  const updatedVehicle: Vehicle = {
-    ...sampleVehicles[idx],
-    ...vehicle,
-  };
-  sampleVehicles[idx] = updatedVehicle;
-  return { ...updatedVehicle };
+// List All Vehicles
+export const fetchVehicles = async (activeOnly = true): Promise<Vehicle[]> => {
+  try {
+    const { data } = await CAxios.get(VEHICLES_API_BASE, {
+      params: { active_only: activeOnly }
+    });
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };
 
-export const deleteVehicle = async (id: number): Promise<void> => {
-  sampleVehicles = sampleVehicles.filter((v) => v.id !== id);
+// Get Vehicle by ID
+export const fetchVehicleById = async (id: string): Promise<Vehicle> => {
+  try {
+    const { data } = await CAxios.get(`${VEHICLES_API_BASE}${id}`);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };
 
-export const fetchPaginatedVehicles = async (offset = 0, limit = 10): Promise<{ data: Vehicle[]; hasMore: boolean }> => {
-  const data = sampleVehicles.slice(offset, offset + limit);
-  const hasMore = offset + limit < sampleVehicles.length;
-  return { data, hasMore };
+// Update Vehicle (Full)
+export const updateVehicle = async (id: string, vehicle: VehicleInput): Promise<Vehicle> => {
+  try {
+    const { data } = await CAxios.put(`${VEHICLES_API_BASE}${id}`, vehicle);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };
 
-export const fetchVehiclesPaginated = async (page = 0, pageSize = 10): Promise<{ data: Vehicle[]; total: number; hasMore: boolean }> => {
-  const offset = page * pageSize;
-  const data = sampleVehicles.slice(offset, offset + pageSize);
-  const total = sampleVehicles.length;
-  const hasMore = offset + pageSize < total;
-  return { data, total, hasMore };
-}; 
+// Update Vehicle (Partial)
+export const updateVehiclePartial = async (id: string, vehicle: VehicleUpdate): Promise<Vehicle> => {
+  try {
+    const { data } = await CAxios.patch(`${VEHICLES_API_BASE}${id}`, vehicle);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Delete Vehicle (Soft Delete)
+export const deleteVehicle = async (id: string): Promise<void> => {
+  try {
+    await CAxios.delete(`${VEHICLES_API_BASE}${id}`);
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Get Vehicles Dropdown
+export const fetchVehiclesDropdown = async (activeOnly = true): Promise<VehicleDropdown[]> => {
+  try {
+    const { data } = await CAxios.get(`${VEHICLES_API_BASE}dropdown`, {
+      params: { active_only: activeOnly }
+    });
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Get Vehicle Routes
+export const fetchVehicleRoutes = async (vehicleId: string): Promise<VehicleRoute[]> => {
+  try {
+    const { data } = await CAxios.get(`${VEHICLES_API_BASE}${vehicleId}/routes`);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Get Vehicle Route Stops
+export const fetchVehicleRouteStops = async (vehicleId: string, routeId: string): Promise<VehicleRouteStop[]> => {
+  try {
+    const { data } = await CAxios.get(`${VEHICLES_API_BASE}${vehicleId}/routes/${routeId}/stops`);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Paginated Vehicles (for compatibility)
+export const fetchVehiclesPaginated = async (
+  page = 0,
+  pageSize = 10,
+  activeOnly = true
+): Promise<{ data: Vehicle[]; total: number; hasMore: boolean }> => {
+  try {
+    const skip = page * pageSize;
+    const { data } = await CAxios.get(VEHICLES_API_BASE, {
+      params: {
+        skip,
+        limit: pageSize,
+        active_only: activeOnly
+      }
+    });
+
+    // Handle different response formats
+    const items = data.items || data || [];
+    const total = data.total || data.count || items.length;
+
+    return {
+      data: items,
+      total: total,
+      hasMore: items.length === pageSize
+    };
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
 
 
 /*

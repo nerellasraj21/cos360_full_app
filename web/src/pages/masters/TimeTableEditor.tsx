@@ -1,8 +1,11 @@
 import './timetable.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { fetchSubjects } from '@/api/masters/subjects';
-import { fetchClassesAndSections } from '@/api/masters/classesandsections';
-import type { Subject, ClassAndSection } from '@/types/masters';
+import type { Subject } from '@/types/masters';
+import type { FrontendTimetableRead, FrontendTimetableCreate, TimetableSlotOut } from '@/types/masters/timetable';
+import { useFrontendTimetable, useCreateFrontendTimetableMutation, useUpdateFrontendTimetableMutation } from '@/api/timetable';
+import { useClassesDropdown, useSectionsByClassId } from '@/hooks/masters/useClassesAndSections';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import Select, { type SingleValue } from 'react-select';
@@ -10,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Trash2, Save, Pencil, Download, ChevronDown } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
+import { useAcademicYearStore } from '@/lib/academicYearStore';
+
 
 const BASE_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const SATURDAY = 'Saturday';
@@ -25,6 +30,53 @@ const TYPE_OPTIONS = [
 
 type SelectOption = { value: string; label: string } | null;
 
+function transformFrontendTimetableToRows(data: FrontendTimetableRead, includeSaturday: boolean): any[] {
+   const rows: any[] = [];
+
+   for (const item of data.timetable_data) {
+      const row: any = {
+         time: { from: item.time.from, to: item.time.to },
+         type: item.type
+      };
+
+      if (item.type === 'subject') {
+         row.subjects = item.subjects || {};
+      } else {
+         row.label = item.label;
+      }
+
+      rows.push(row);
+   }
+
+   return rows;
+}
+
+function transformRowsToFrontendTimetableCreate(rows: any[], sectionId: string, includeSaturday: boolean): FrontendTimetableCreate {
+  const timetable_data: any[] = [];
+
+  for (const row of rows) {
+    const item: any = {
+      time: {
+        from: row.time.from,
+        to: row.time.to
+      },
+      type: row.type
+    };
+
+    if (row.type === 'subject') {
+      item.subjects = row.subjects;
+    } else {
+      item.label = row.label;
+    }
+
+    timetable_data.push(item);
+  }
+
+  return {
+    section_id: sectionId,
+    timetable_data
+  };
+}
 
 function TimeRangeInput({
     value,
@@ -83,52 +135,111 @@ function formatTime12hr(time: string) {
 }
 
 export default function TimeTableEditor() {
+    const queryClient = useQueryClient();
     const [subjects, setSubjects] = useState<Subject[]>([]);
-    const [classesAndSections, setClassesAndSections] = useState<ClassAndSection[]>([]);
+    const [subjectsLoading, setSubjectsLoading] = useState(true);
     const [selectedClass, setSelectedClass] = useState<SelectOption>(null);
     const [selectedSection, setSelectedSection] = useState<SelectOption>(null);
     const [includeSaturday, setIncludeSaturday] = useState(false);
     const [rows, setRows] = useState<any[]>([]);
     const [isEditing, setIsEditing] = useState(false);
     const [savedTimetables, setSavedTimetables] = useState<Record<string, any>>({});
+    const [timetableData, setTimetableData] = useState<FrontendTimetableRead | null>(null);
     const tableRef = useRef<HTMLTableElement>(null);
+    const selectedAcademicYearId = useAcademicYearStore(state => state.selectedAcademicYearId);
+
+    // Mutations
+    const createFrontendTimetableMutation = useCreateFrontendTimetableMutation();
+    const updateFrontendTimetableMutation = useUpdateFrontendTimetableMutation();
+
+    // Invalidate query on success
+    useEffect(() => {
+        if (createFrontendTimetableMutation.isSuccess) {
+            queryClient.invalidateQueries({ queryKey: ['timetable', 'frontend', selectedSection?.value] });
+            setIsEditing(false);
+        }
+    }, [createFrontendTimetableMutation.isSuccess, queryClient, selectedSection]);
+
+    useEffect(() => {
+        if (updateFrontendTimetableMutation.isSuccess) {
+            queryClient.invalidateQueries({ queryKey: ['timetable', 'frontend', selectedSection?.value] });
+            setIsEditing(false);
+        }
+    }, [updateFrontendTimetableMutation.isSuccess, queryClient, selectedSection]);
 
 
-    const getTimetableKey = (className: string, sectionName: string) => {
-        return `${className}-${sectionName}`;
+    const getTimetableKey = (classId: string, sectionId: string) => {
+        return `${classId}-${sectionId}`;
     };
 
 
     const isClassAndSectionSelected = selectedClass && selectedSection;
 
 
-    const getDefaultTimetable = () => [
-        { ...getEmptySubjectRow(false), time: { from: '09:00', to: '09:15' } },
-        { ...getEmptySpecialRow(), time: { from: '09:55', to: '10:10' }, label: 'SNACKS' },
-    ];
+    const getDefaultTimetable = () => [];
 
     const activeDays = useMemo(() => {
         return includeSaturday ? [...BASE_DAYS, SATURDAY] : BASE_DAYS;
     }, [includeSaturday]);
 
+    // Use hooks for data fetching
+    const { data: classesData, isLoading: classesLoading } = useClassesDropdown();
+    const { data: sectionsData, isLoading: sectionsLoading } = useSectionsByClassId(selectedClass?.value || '');
+    const { data: frontendTimetableData, isLoading: frontendLoading, error: frontendError, isError: isFrontendError } = useFrontendTimetable(selectedSection?.value || '');
+
+
     useEffect(() => {
-        fetchSubjects().then(setSubjects);
-        fetchClassesAndSections().then(setClassesAndSections);
+        fetchSubjects()
+            .then(response => {
+                setSubjects(response?.items || []);
+                setSubjectsLoading(false);
+            })
+            .catch(() => {
+                setSubjects([]);
+                setSubjectsLoading(false);
+            });
     }, []);
 
+    // Load timetable data when section changes
+    useEffect(() => {
+        console.log('useEffect triggered: frontendTimetableData:', !!frontendTimetableData, 'isFrontendError:', isFrontendError, 'frontendError:', frontendError?.message, 'selectedSection:', selectedSection?.value);
+        if (frontendTimetableData) {
+            setTimetableData(frontendTimetableData);
+            const transformedRows = transformFrontendTimetableToRows(frontendTimetableData, includeSaturday);
+            setRows(transformedRows);
+            setIsEditing(false);
+            console.log('Set isEditing to false (data exists)');
+        } else if (isFrontendError && frontendError?.message === 'Timetable not found for this section') {
+            // 404 error, timetable not found
+            setTimetableData(null);
+            setRows([]);
+            setIsEditing(true);
+            console.log('Set isEditing to true (404 error)');
+        } else if (selectedSection && !isFrontendError) {
+            // No existing data, set to null
+            setTimetableData(null);
+            setRows([]);
+            setIsEditing(true);
+            console.log('Set isEditing to true (no data, no error)');
+        }
+    }, [frontendTimetableData, selectedSection, includeSaturday, isFrontendError, frontendError]);
+
     const classOptions = useMemo(() => {
-        const classNames = [...new Set(classesAndSections.map(item => item.class_name))];
-        return classNames.map(name => ({ value: name, label: name }));
-    }, [classesAndSections]);
+        if (!classesData) return [];
+        return classesData.map(cls => ({ value: cls.id, label: cls.name }));
+    }, [classesData]);
 
     const sectionOptions = useMemo(() => {
-        if (!selectedClass) return [];
-        return classesAndSections
-            .filter(item => item.class_name === selectedClass.value)
-            .map(item => ({ value: item.section_name, label: item.section_name }));
-    }, [selectedClass, classesAndSections]);
+        if (!sectionsData) return [];
+        return sectionsData.map(section => ({ value: section.id, label: section.name }));
+    }, [sectionsData]);
 
-    const subjectOptions = subjects.map((s) => ({ value: s.name, label: s.name }));
+    const subjectOptions = (subjects || []).map((s) => ({ value: s.id, label: s.name }));
+
+    const getSubjectNameById = (id: string) => {
+        const subject = subjects.find(s => s.id === id);
+        return subject ? subject.name : '';
+    };
 
     const handleClassChange = (option: SingleValue<SelectOption>) => {
         setSelectedClass(option);
@@ -139,26 +250,8 @@ export default function TimeTableEditor() {
 
     const handleSectionChange = (option: SingleValue<SelectOption>) => {
         setSelectedSection(option);
-
-        if (option && selectedClass) {
-            const timetableKey = getTimetableKey(selectedClass.value, option.value);
-            const existingTimetable = savedTimetables[timetableKey];
-
-            if (existingTimetable) {
-
-                setRows(existingTimetable.rows);
-                setIncludeSaturday(existingTimetable.includeSaturday || false);
-                setIsEditing(false);
-            } else {
-
-                setRows(getDefaultTimetable());
-                setIncludeSaturday(false);
-                setIsEditing(true);
-            }
-        } else {
-            setRows([]);
-            setIsEditing(false);
-        }
+        setRows([]);
+        setIsEditing(false);
     };
 
     const handleRowChange = (idx: number, key: string, value: any) => {
@@ -181,10 +274,17 @@ export default function TimeTableEditor() {
     };
 
     const addRow = (type: 'subject' | 'special') => {
-        setRows((prev) => [
-            ...prev,
-            type === 'subject' ? getEmptySubjectRow(includeSaturday) : getEmptySpecialRow(),
-        ]);
+        console.log('addRow called with type:', type, 'includeSaturday:', includeSaturday);
+        const newRow = type === 'subject' ? getEmptySubjectRow(includeSaturday) : getEmptySpecialRow();
+        console.log('newRow:', newRow);
+        setRows((prev) => {
+            const updated = [
+                ...prev,
+                newRow,
+            ];
+            console.log('rows after add:', updated);
+            return updated;
+        });
     };
 
     const deleteRow = (idx: number) => {
@@ -248,7 +348,7 @@ export default function TimeTableEditor() {
                     if (day === SATURDAY && !subject) {
                         rowData.push('Holiday');
                     } else {
-                        rowData.push(subject || '--');
+                        rowData.push(getSubjectNameById(subject) || '--');
                     }
                 });
                 data.push(rowData);
@@ -333,6 +433,8 @@ export default function TimeTableEditor() {
         }
     };
 
+    console.log('Rendering component: isEditing:', isEditing, 'isClassAndSectionSelected:', isClassAndSectionSelected, 'rows length:', rows.length, 'frontendLoading:', frontendLoading, 'isFrontendError:', isFrontendError);
+
     return (
         <Card className="p-4">
             <div className="flex justify-between items-center mb-4">
@@ -343,16 +445,14 @@ export default function TimeTableEditor() {
                             size="sm"
                             onClick={() => {
                                 if (isEditing) {
-
-                                    const timetableKey = getTimetableKey(selectedClass!.value, selectedSection!.value);
-                                    setSavedTimetables(prev => ({
-                                        ...prev,
-                                        [timetableKey]: {
-                                            rows: [...rows],
-                                            includeSaturday,
-                                            lastModified: new Date().toISOString()
-                                        }
-                                    }));
+                                    const data = transformRowsToFrontendTimetableCreate(rows, selectedSection!.value, includeSaturday);
+                                    if (timetableData) {
+                                        // Update
+                                        updateFrontendTimetableMutation.mutate({ sectionId: selectedSection!.value, data });
+                                    } else {
+                                        // Create
+                                        createFrontendTimetableMutation.mutate(data);
+                                    }
                                 }
                                 setIsEditing((v) => !v);
                             }}
@@ -418,6 +518,7 @@ export default function TimeTableEditor() {
                         menuPlacement="auto"
                         menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                         styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                        isLoading={classesLoading}
                     />
                     <Select
                         options={sectionOptions}
@@ -430,6 +531,7 @@ export default function TimeTableEditor() {
                         menuPlacement="auto"
                         menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                         styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                        isLoading={sectionsLoading}
                     />
                 </div>
             </div>
@@ -441,6 +543,18 @@ export default function TimeTableEditor() {
                     <div className="text-sm text-muted-foreground mt-2">
                         {!selectedClass && "Start by selecting a class"}
                         {selectedClass && !selectedSection && "Now select a section"}
+                    </div>
+                </div>
+            ) : frontendLoading ? (
+                <div className="border rounded-lg bg-muted/30 p-8 text-center">
+                    <div className="text-muted-foreground text-lg">
+                        Loading timetable data...
+                    </div>
+                </div>
+            ) : isFrontendError && frontendError?.message !== 'Timetable not found for this section' ? (
+                <div className="border rounded-lg bg-muted/30 p-8 text-center">
+                    <div className="text-destructive text-lg">
+                        Error loading timetable: {frontendError?.message}
                     </div>
                 </div>
             ) : (
@@ -506,7 +620,7 @@ export default function TimeTableEditor() {
                                                     />
                                                 ) : (
                                                     <span className={`block px-2 py-1 text-left bg-card/80 rounded text-foreground ${day === SATURDAY && !row.subjects[day] ? 'text-muted-foreground italic' : ''}`}>
-                                                        {day === SATURDAY && !row.subjects[day] ? 'Holiday' : (row.subjects[day] || <span className="text-muted-foreground">--</span>)}
+                                                        {day === SATURDAY && !row.subjects[day] ? 'Holiday' : (getSubjectNameById(row.subjects[day]) || <span className="text-muted-foreground">--</span>)}
                                                     </span>
                                                 )}
                                             </td>

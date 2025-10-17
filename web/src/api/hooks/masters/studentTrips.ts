@@ -1,33 +1,46 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-    fetchStudentTrips, 
+import { usePermission } from '@/hooks/usePermission';
+import { usePermissionProtectedMutation } from '@/hooks/usePermissionProtectedMutation';
+import { PERMISSIONS } from '@/constants/permissions';
+import {
+    fetchStudentTrips,
     fetchStudentTripById,
-    createStudentTrip, 
+    createStudentTrip,
     updateStudentTrip,
-    patchStudentTrip, 
-    deleteStudentTrip 
+    patchStudentTrip,
+    deleteStudentTrip
 } from '@/api/masters/studentTrips';
 import type { StudentTrip, StudentTripInput, StudentTripUpdateInput } from '@/types/masters/studentTrips';
 import { toast } from 'sonner';
 
 export function useStudentTrips() {
+    const { checkPermission } = usePermission();
+    const hasListPermission = checkPermission('transport_trips', 'list');
+
     return useQuery<StudentTrip[]>({
         queryKey: ['student-trips'],
         queryFn: fetchStudentTrips,
+        enabled: hasListPermission,
     });
 }
 
-export function useStudentTripById(id: number) {
+export function useStudentTripById(id: string) {
+    const { checkPermission } = usePermission();
+    const hasReadPermission = checkPermission('transport_trips', 'read');
+
     return useQuery<StudentTrip>({
         queryKey: ['student-trips', id],
         queryFn: () => fetchStudentTripById(id),
-        enabled: !!id,
+        enabled: !!id && hasReadPermission,
     });
 }
 
 export function useCreateStudentTrip() {
     const queryClient = useQueryClient();
-    return useMutation<StudentTrip, Error, StudentTripInput>({
+
+    return usePermissionProtectedMutation<StudentTrip, Error, StudentTripInput>({
+        resource: 'transport_trips',
+        action: 'create',
         mutationFn: createStudentTrip,
         onSuccess: () => {
             toast.success('Student trip created!');
@@ -41,7 +54,10 @@ export function useCreateStudentTrip() {
 
 export function useUpdateStudentTrip() {
     const queryClient = useQueryClient();
-    return useMutation<StudentTrip, Error, { id: number; trip: StudentTripInput }>({
+
+    return usePermissionProtectedMutation<StudentTrip, Error, { id: string; trip: StudentTripInput }>({
+        resource: 'transport_trips',
+        action: 'update',
         mutationFn: ({ id, trip }) => updateStudentTrip(id, trip),
         onSuccess: () => {
             toast.success('Student trip updated!');
@@ -55,7 +71,10 @@ export function useUpdateStudentTrip() {
 
 export function usePatchStudentTrip() {
     const queryClient = useQueryClient();
-    return useMutation<StudentTrip, Error, { id: number; trip: StudentTripUpdateInput }>({
+
+    return usePermissionProtectedMutation<StudentTrip, Error, { id: string; trip: StudentTripUpdateInput }>({
+        resource: 'transport_trips',
+        action: 'update',
         mutationFn: ({ id, trip }) => patchStudentTrip(id, trip),
         onSuccess: () => {
             toast.success('Student trip updated!');
@@ -69,7 +88,10 @@ export function usePatchStudentTrip() {
 
 export function useDeleteStudentTrip() {
     const queryClient = useQueryClient();
-    return useMutation<string, Error, number>({
+
+    return usePermissionProtectedMutation<{ message: string }, Error, string>({
+        resource: 'transport_trips',
+        action: 'delete',
         mutationFn: deleteStudentTrip,
         onSuccess: () => {
             toast.success('Student trip deleted!');

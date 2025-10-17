@@ -13,6 +13,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import { PermissionGuard } from "@/components/PermissionGuard";
 
 
 export interface TableColumn<T> {
@@ -43,6 +44,11 @@ interface TableProps<T> {
   onDelete: (row: T) => void;
   className?: string;
   isEditing?: boolean;
+  permissions?: {
+    resource?: string;
+    canEdit?: boolean;
+    canDelete?: boolean;
+  };
 }
 
 export function Table<T extends { [key: string]: any }>({
@@ -53,6 +59,7 @@ export function Table<T extends { [key: string]: any }>({
   className,
   isEditing = true,
   pagination,
+  permissions,
 }: TablePropsWithPagination<T>) {
   const [editingRow, setEditingRow] = useState<{
     rowIdx: number;
@@ -189,26 +196,37 @@ export function Table<T extends { [key: string]: any }>({
                         ) : (
                           <>
                             {isEditing && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEditRow(rowIdx)}
-                                className="h-8 w-8 p-0 hover:bg-accent"
+                              <PermissionGuard
+                                resource={permissions?.resource}
+                                action="update"
+                                fallback={null}
                               >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Dialog open={deleteIdx === rowIdx} onOpenChange={open => setDeleteIdx(open ? rowIdx : null)}>
-                              <DialogTrigger asChild>
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => setDeleteIdx(rowIdx)}
-                                  className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                                  onClick={() => handleEditRow(rowIdx)}
+                                  className="h-8 w-8 p-0 hover:bg-accent"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  <Pencil className="h-4 w-4" />
                                 </Button>
-                              </DialogTrigger>
+                              </PermissionGuard>
+                            )}
+                            <PermissionGuard
+                              resource={permissions?.resource}
+                              action="delete"
+                              fallback={null}
+                            >
+                              <Dialog open={deleteIdx === rowIdx} onOpenChange={open => setDeleteIdx(open ? rowIdx : null)}>
+                                <DialogTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setDeleteIdx(rowIdx)}
+                                    className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader>
                                   <DialogTitle>Delete Row?</DialogTitle>
@@ -232,6 +250,7 @@ export function Table<T extends { [key: string]: any }>({
                                 </DialogFooter>
                               </DialogContent>
                             </Dialog>
+                            </PermissionGuard>
                           </>
                         )}
                       </div>

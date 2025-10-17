@@ -6,7 +6,7 @@ export interface HolidayQueryParams {
   skip?: number;
   limit?: number;
   active_only?: boolean;
-  academic_year_id?: number;
+  academic_year_id?: string;
 }
 
 export const fetchHolidays = async (params: HolidayQueryParams = {}): Promise<Holiday[]> => {
@@ -46,7 +46,7 @@ export interface HolidayQueryParams {
   skip?: number;
   limit?: number;
   active_only?: boolean;
-  academic_year_id?: number;
+  academic_year_id?: string;
 }
 export const fetchHolidays = async (): Promise<Holiday[]> => {
   return [...sampleHolidays];

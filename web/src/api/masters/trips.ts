@@ -1,49 +1,132 @@
-import type { Trip, TripInput } from '@/types/masters/trip';
+import CAxios from '../index';
+import type {
+  TripCreate,
+  TripUpdate,
+  TripOut,
+  TripListResponse,
+  Driver,
+  DriverListResponse
+} from '@/types/masters/trip';
 
-// Dummy data for local development
-export const dummyTrips: Trip[] = [
-    {
-        id: 1,
-        vehicle_id: 1,
-        route_id: 1,
-        driver_id: 1,
-        trip_number: 1,
-    },
-    {
-        id: 2,
-        vehicle_id: 2,
-        route_id: 2,
-        driver_id: 2,
-        trip_number: 2,
-    },
-];
-
-let tripsData: Trip[] = [...dummyTrips];
-
-export const fetchTrips = async (): Promise<Trip[]> => {
-    return [...tripsData];
+// Helper function to handle API errors
+const handleApiError = (error: any): Error => {
+  if (error.response?.data?.detail) {
+    return new Error(error.response.data.detail);
+  }
+  return new Error(error.message || 'Network error');
 };
 
-export const fetchTripById = async (id: number): Promise<Trip | undefined> => {
-    return tripsData.find((t) => t.id === id);
+export const tripsApi = {
+  // Create trip
+  createTrip: async (tripData: TripCreate): Promise<TripOut> => {
+    console.log('[DEBUG] tripsApi.createTrip called with data:', tripData);
+
+    try {
+      const response = await CAxios.post('/masters/trips/', tripData);
+      console.log('[DEBUG] tripsApi.createTrip success:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[DEBUG] tripsApi.createTrip failed:', error);
+      throw handleApiError(error);
+    }
+  },
+
+  // Get all trips
+  getAllTrips: async (): Promise<TripOut[]> => {
+    console.log('[DEBUG] tripsApi.getAllTrips called');
+
+    try {
+      const response = await CAxios.get('/masters/trips/');
+      console.log('[DEBUG] tripsApi.getAllTrips success:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[DEBUG] tripsApi.getAllTrips failed:', error);
+      throw handleApiError(error);
+    }
+  },
+
+  // Get trip by ID
+  getTripById: async (tripId: string): Promise<TripOut> => {
+    console.log('[DEBUG] tripsApi.getTripById called with tripId:', tripId);
+
+    try {
+      const response = await CAxios.get(`/masters/trips/${tripId}`);
+      console.log('[DEBUG] tripsApi.getTripById success:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[DEBUG] tripsApi.getTripById failed:', error);
+      throw handleApiError(error);
+    }
+  },
+
+  // Update trip (full)
+  updateTrip: async (tripId: string, tripData: TripCreate): Promise<TripOut> => {
+    console.log('[DEBUG] tripsApi.updateTrip called with tripId:', tripId, 'data:', tripData);
+
+    try {
+      const response = await CAxios.put(`/masters/trips/${tripId}`, tripData);
+      console.log('[DEBUG] tripsApi.updateTrip success:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[DEBUG] tripsApi.updateTrip failed:', error);
+      throw handleApiError(error);
+    }
+  },
+
+  // Update trip (partial)
+  updateTripPartial: async (tripId: string, tripData: TripUpdate): Promise<TripOut> => {
+    console.log('[DEBUG] tripsApi.updateTripPartial called with tripId:', tripId, 'data:', tripData);
+
+    try {
+      const response = await CAxios.patch(`/masters/trips/${tripId}`, tripData);
+      console.log('[DEBUG] tripsApi.updateTripPartial success:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[DEBUG] tripsApi.updateTripPartial failed:', error);
+      throw handleApiError(error);
+    }
+  },
+
+  // Delete trip
+  deleteTrip: async (tripId: string): Promise<{ message: string }> => {
+    console.log('[DEBUG] tripsApi.deleteTrip called with tripId:', tripId);
+
+    try {
+      const response = await CAxios.delete(`/masters/trips/${tripId}`);
+      console.log('[DEBUG] tripsApi.deleteTrip success:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[DEBUG] tripsApi.deleteTrip failed:', error);
+      throw handleApiError(error);
+    }
+  },
 };
 
-export const createTrip = async (trip: TripInput): Promise<Trip> => {
-    const newId = tripsData.length ? Math.max(...tripsData.map(t => t.id)) + 1 : 1;
-    const newTrip: Trip = { id: newId, ...trip };
-    tripsData.push(newTrip);
-    return { ...newTrip };
+export const driversApi = {
+  // Get all drivers
+  getAllDrivers: async (): Promise<DriverListResponse> => {
+    console.log('[DEBUG] driversApi.getAllDrivers called');
+
+    try {
+      const response = await CAxios.get('/staff/drivers');
+      console.log('[DEBUG] driversApi.getAllDrivers success:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[DEBUG] driversApi.getAllDrivers failed:', error);
+      throw handleApiError(error);
+    }
+  },
 };
 
-export const updateTrip = async (id: number, trip: TripInput): Promise<Trip> => {
-    const idx = tripsData.findIndex((t) => t.id === id);
-    if (idx === -1) throw new Error('Trip not found');
-    tripsData[idx] = { id, ...trip };
-    return { ...tripsData[idx] };
-};
+export const {
+  createTrip,
+  getAllTrips,
+  getTripById,
+  updateTrip,
+  updateTripPartial,
+  deleteTrip,
+} = tripsApi;
 
-export const deleteTrip = async (id: number): Promise<void> => {
-    const idx = tripsData.findIndex((t) => t.id === id);
-    if (idx === -1) throw new Error('Trip not found');
-    tripsData.splice(idx, 1);
-}; 
+export const {
+  getAllDrivers,
+} = driversApi;
