@@ -1,6 +1,6 @@
 # Core FastAPI and ASGI
 fastapi==0.116.1
-uvicorn==0.35.0
+uvicorn[standard]==0.35.0
 starlette==0.47.3
 pydantic==2.11.7
 pydantic-settings==2.10.1
@@ -12,29 +12,29 @@ SQLAlchemy==2.0.43
 alembic==1.16.5
 asyncpg==0.30.0
 psycopg2-binary==2.9.10
-aiosqlite==0.21.0
 
 # Authentication & Security
-python-jose==3.5.0
-passlib==1.7.4
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
 bcrypt==4.3.0
-cryptography==45.0.6
-PyJWT==2.10.1
 
 # HTTP & Requests
 httpx==0.25.2
 httpcore==1.0.9
 requests==2.32.3
 aiohttp==3.12.15
+aiohappyeyeballs==2.6.1
+aiosignal==1.4.0
 
 # Email & Validation
 email-validator==2.3.0
+dnspython==2.7.0
 
 # Rate Limiting
 slowapi==0.1.9
 limits==5.5.0
 
-# CORS & Middleware
+# Environment Variables
 python-dotenv==1.1.1
 
 # Celery & Task Queue
@@ -44,8 +44,12 @@ amqp==5.3.1
 billiard==4.2.2
 kombu==5.5.4
 vine==5.1.0
+click==8.2.1
+click-didyoumean==0.3.1
+click-plugins==1.1.1.2
+click-repl==0.3.0
 
-# Utilities
+# Date/Time Utilities
 python-dateutil==2.9.0.post0
 pytz==2023.3.post1
 tzdata==2025.2
@@ -56,27 +60,13 @@ pypdf==6.1.0
 reportlab==4.0.4
 Pillow==10.4.0
 
-# Testing
-pytest==7.4.3
-pytest-asyncio==0.21.1
-pytest-cov==6.3.0
-pytest-mock==3.12.0
-pytest-timeout==2.4.0
-pytest-xdist==3.8.0
-Faker==19.12.0
-
-# Logging & Monitoring
+# Logging
 colorlog==6.9.0
 
-# Data Processing
-pandas==2.2.3
-numpy==2.1.0
-
-# Dependencies
+# Core Dependencies
 anyio==4.10.0
 sniffio==1.3.1
 h11==0.16.0
-click==8.2.1
 Jinja2==3.1.6
 MarkupSafe==3.0.2
 idna==3.8
@@ -86,8 +76,30 @@ urllib3==2.2.2
 typing_extensions==4.15.0
 annotated-types==0.7.0
 greenlet==3.2.4
+attrs==25.3.0
+frozenlist==1.7.0
+multidict==6.6.4
+yarl==1.20.1
+propcache==0.3.2
 
-# Additional utilities
-python-socketio==5.13.2
+# WebSocket Support
+python-socketio==5.14.2
 python-engineio==4.12.2
 websocket-client==1.8.0
+simple-websocket==1.1.0
+wsproto==1.2.0
+
+# Additional Core Utilities
+prompt_toolkit==3.0.52
+wcwidth==0.2.14
+six==1.17.0
+cffi==1.17.1
+pycparser==2.22
+ecdsa==0.19.1
+pyasn1==0.6.1
+rsa==4.9.1
+orjson==3.11.3
+cryptography==45.0.6
+defusedxml==0.7.1
+et_xmlfile==2.0.0
+bidict==0.23.1
