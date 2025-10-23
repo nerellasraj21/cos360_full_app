@@ -44,18 +44,6 @@ async def get_all_attendance(request: Request, db: AsyncSession = Depends(get_te
 
 # -------------------- Enhanced Date-based Endpoints --------------------
 
-# Get Attendance by ID
-@router.get("/{attendance_id}", response_model=StudentAttendanceOut)
-async def get_attendance(attendance_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
-    """Get attendance by ID - All authenticated users"""
-    current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    
-    # Multi-layer permission check: Role + Plan validation
-    await check_role_plan_permission_with_error(db, request, role, 'student_attendance', 'read')
-    
-    return await get_attendance_by_id(attendance_id, db, request)
-
 # Get all attendance with optional date filtering
 @router.get("/search", response_model=List[StudentAttendanceOut])
 async def get_attendance_with_filters(
@@ -72,6 +60,18 @@ async def get_attendance_with_filters(
     await check_role_plan_permission_with_error(db, request, role, 'student_attendance', 'list')
 
     return await get_all_student_attendance_with_filters(db, start_date, end_date, student_name, request)
+
+# Get Attendance by ID
+@router.get("/{attendance_id}", response_model=StudentAttendanceOut)
+async def get_attendance(attendance_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
+    """Get attendance by ID - All authenticated users"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_attendance', 'read')
+
+    return await get_attendance_by_id(attendance_id, db, request)
 
 # Update Attendance (PATCH)
 @router.patch("/{attendance_id}", response_model=StudentAttendanceOut)
