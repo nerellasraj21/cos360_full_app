@@ -43,7 +43,9 @@ async def init_models():
 # asyncio.run(init_models())
 @app.on_event("startup")
 async def startup():
-    await init_models()
+    # Database tables are managed by Alembic migrations
+    # No need to create tables on startup in production
+    pass
 
 # Register Routers
 app.include_router(api_v1_router, prefix="/api/v1")
