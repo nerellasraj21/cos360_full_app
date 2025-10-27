@@ -126,7 +126,8 @@ dist/
 .coverage
 htmlcov/
 .tox/
-/tests
+tests/
+test_scripts/
 
 # =============================================================================
 # OS-Specific
