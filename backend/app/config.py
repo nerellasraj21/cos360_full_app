@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     TENANT_STRICT_MODE: bool = True  # Require cschema header
     TENANT_ALLOW_DEFAULT_FALLBACK: bool = False  # Allow default fallback
     TENANT_DEVELOPMENT_MODE: bool = False  # Relaxed validation for dev
+    TENANT_DEFAULT_NAME: str = "default"  # Default tenant name for fallback
 
     class Config:
         env_file = ".env"
