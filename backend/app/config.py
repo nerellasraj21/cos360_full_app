@@ -1,6 +1,6 @@
 from pydantic import AnyHttpUrl, Field
 from pydantic_settings import BaseSettings
-from typing import List, Optional
+from typing import List, Optional, Union
 
 class Settings(BaseSettings):
     # Database
@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # default expiry
 
-    # CORS settings
-    ALLOWED_ORIGINS: List[AnyHttpUrl] = []
+    # CORS settings - accepts both "*" or list of URLs
+    ALLOWED_ORIGINS: List[str] = ["*"]
 
     # Debugging & environment
     DEBUG: bool = False
@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     TENANT_STRICT_MODE: bool = True  # Require cschema header
     TENANT_ALLOW_DEFAULT_FALLBACK: bool = False  # Allow default fallback
     TENANT_DEVELOPMENT_MODE: bool = False  # Relaxed validation for dev
+    TENANT_DEFAULT_NAME: str = "default"  # Default tenant name for fallback
 
     class Config:
         env_file = ".env"

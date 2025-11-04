@@ -17,9 +17,9 @@ class TenantMiddleware(BaseHTTPMiddleware):
     Stores the client_name in request.state for use by other components.
     """
     
-    def __init__(self, app, default_client_name: str = "default"):
+    def __init__(self, app, default_client_name: str = None):
         super().__init__(app)
-        self.default_client_name = default_client_name
+        self.default_client_name = default_client_name or settings.TENANT_DEFAULT_NAME
         self.strict_mode = settings.TENANT_STRICT_MODE
         self.allow_fallback = settings.TENANT_ALLOW_DEFAULT_FALLBACK
         self.development_mode = settings.TENANT_DEVELOPMENT_MODE
