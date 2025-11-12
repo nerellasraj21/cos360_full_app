@@ -1036,9 +1036,7 @@ async def get_all_admissions_with_context(
     return {
         "items": admissions,
         "total_count": total_count,
-        "has_next": has_next,
-        "access_scope": user_context.access_scope,
-        "user_role": user_context.role
+        "has_next": has_next
     }
 
 async def delete_admission(admission_id: UUID, db: AsyncSession):
