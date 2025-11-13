@@ -7,6 +7,7 @@ from app.models.student.student_model import Student
 from app.models.masters.parent_model import Parent
 from app.models.masters.student_parent_association_model import StudentParentLink
 from sqlalchemy.orm import selectinload
+from sqlalchemy import inspect
 from app.models.auth.user_model import User
 from app.models.auth.role_model import Role
 from sqlalchemy.future import select
@@ -518,8 +519,14 @@ async def get_admission_by_id(
                 if link.parent and link.parent.relation_to_student:
                     if link.parent.relation_to_student.lower() == "father":
                         father = link.parent
+                        # Remove student_links attribute to prevent circular reference
+                        if hasattr(father, 'student_links'):
+                            delattr(father, 'student_links')
                     elif link.parent.relation_to_student.lower() == "mother":
                         mother = link.parent
+                        # Remove student_links attribute to prevent circular reference
+                        if hasattr(mother, 'student_links'):
+                            delattr(mother, 'student_links')
 
             # Set father and mother attributes on student
             admission.student.father = father
@@ -933,8 +940,14 @@ async def get_all_admissions(db: AsyncSession, skip: int = 0, limit: int = 10):
                 if link.parent and link.parent.relation_to_student:
                     if link.parent.relation_to_student.lower() == "father":
                         father = link.parent
+                        # Remove student_links attribute to prevent circular reference
+                        if hasattr(father, 'student_links'):
+                            delattr(father, 'student_links')
                     elif link.parent.relation_to_student.lower() == "mother":
                         mother = link.parent
+                        # Remove student_links attribute to prevent circular reference
+                        if hasattr(mother, 'student_links'):
+                            delattr(mother, 'student_links')
 
             # Set father and mother attributes on student
             admission.student.father = father
@@ -1036,7 +1049,9 @@ async def get_all_admissions_with_context(
     return {
         "items": admissions,
         "total_count": total_count,
-        "has_next": has_next
+        "has_next": has_next,
+        "access_scope": user_context.access_scope,
+        "user_role": user_context.role
     }
 
 async def delete_admission(admission_id: UUID, db: AsyncSession):
