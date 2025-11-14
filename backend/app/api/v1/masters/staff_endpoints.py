@@ -20,8 +20,9 @@ from app.service.masters.staff_service import (
     create_staff_enrollment, update_staff_enrollment, get_all_staff_enrollments,
     get_staff_enrollment_by_id, delete_staff_enrollment,
     create_staff_attendance, update_staff_attendance, get_all_staff_attendance,
-    get_attendance_for_staff, delete_staff_attendance,get_all_designations_list,
-    get_attendance_for_staff, get_staff_list_by_gender,get_staff_details_by_designation,get_all_drivers_list
+    get_attendance_for_staff, delete_staff_attendance, get_staff_attendance_by_date,
+    get_staff_attendance_by_id, get_all_designations_list, get_staff_list_by_gender,
+    get_staff_details_by_designation, get_all_drivers_list
 )
 from app.service.masters.designation_service import (
     create_designation,
@@ -115,24 +116,30 @@ async def update_attendance(request: Request, attendance_id: UUID, data: StaffAt
     return await update_staff_attendance(attendance_id, data, db)
 
 @router.get("/attendance", response_model=List[StaffAttendanceOut])
-async def list_attendance(request: Request, db: AsyncSession = Depends(get_tenant_db)):
+async def list_attendance(
+    request: Request,
+    start_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    name: Optional[str] = Query(None, description="Filter by staff name"),
+    db: AsyncSession = Depends(get_tenant_db)
+):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'staff_attendance', 'list')
-    
-    return await get_all_staff_attendance(db)
+
+    return await get_all_staff_attendance(db, start_date, end_date, name)
 
 @router.get("/attendance/{attendance_id}", response_model=StaffAttendanceOut)
 async def get_attendance(request: Request, attendance_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'staff_attendance', 'read')
-    
-    return await get_attendance_for_staff(attendance_id, db)
+
+    return await get_staff_attendance_by_id(attendance_id, db)
 
 @router.delete("/attendance/{attendance_id}")
 async def remove_attendance(request: Request, attendance_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
@@ -156,11 +163,25 @@ async def filter_staff_attendance(
 ):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'staff_attendance', 'list')
-    
+
     return await get_attendance_for_staff(staff_id, db, start_date, end_date)
+
+@router.get("/attendance/by-date/{attendance_date}", response_model=List[StaffAttendanceOut])
+async def get_attendance_by_date(
+    request: Request,
+    attendance_date: date,
+    db: AsyncSession = Depends(get_tenant_db)
+):
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'staff_attendance', 'list')
+
+    return await get_staff_attendance_by_date(attendance_date, db)
 
 @router.get("/", response_model=List[StaffOut])
 async def get_staff_list(
