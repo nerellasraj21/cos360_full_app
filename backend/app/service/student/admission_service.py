@@ -178,24 +178,41 @@ async def add_admission(
             )
 
         # Check if emails already exist and get existing parent users
+        # IMPORTANT: Filter by Parent role to avoid conflicts with other roles
         existing_users_result = await db.execute(
-            select(User).options(selectinload(User.role)).where(User.email.in_([father_email, mother_email]))
+            select(User)
+            .options(selectinload(User.role))
+            .join(Role)
+            .where(
+                and_(
+                    User.email.in_([father_email, mother_email]),
+                    Role.name == "Parent"
+                )
+            )
         )
         existing_users = existing_users_result.scalars().all()
 
         # Create dictionaries for easy lookup
         existing_emails = {user.email: user for user in existing_users}
 
+        # Check if emails exist with non-parent roles (blocked scenario)
+        all_users_result = await db.execute(
+            select(User)
+            .options(selectinload(User.role))
+            .where(User.email.in_([father_email, mother_email]))
+        )
+        all_users = all_users_result.scalars().all()
+
         # Allow reuse of parent emails, but prevent conflicts with non-parent users
         for email in [father_email, mother_email]:
-            if email in existing_emails:
-                user = existing_emails[email]
-                if user.role.name != "Parent":
-                    raise create_business_rule_error(
-                        message=f"Email {email} is already registered to a {user.role.name}, not a parent",
-                        rule="email_role_conflict",
-                        request=request
-                    )
+            non_parent_users = [u for u in all_users if u.email == email and u.role.name != "Parent"]
+            if non_parent_users:
+                user = non_parent_users[0]
+                raise create_business_rule_error(
+                    message=f"Email {email} is already registered to a {user.role.name}, not a parent",
+                    rule="email_role_conflict",
+                    request=request
+                )
 
         # Convert student fields, excluding the nested ones
         student_data = admission.student.dict(exclude={"father", "mother"})
@@ -238,7 +255,7 @@ async def add_admission(
             if father_email in existing_emails:
                 father_user_data = existing_emails[father_email]
                 # Get existing parent record
-                logger.info(f"Looking for existing father with user_id: {father_user_data.id}")
+                logger.info(f"Reusing existing father with user_id: {father_user_data.id}, email: {father_email}")
                 existing_father_result = await db.execute(
                     select(Parent).where(Parent.user_id == father_user_data.id)
                 )
@@ -252,6 +269,18 @@ async def add_admission(
                         resource_id=str(father_user_data.id),
                         request=request
                     )
+
+                # Update existing parent data with new information
+                logger.info(f"Updating existing father data for parent_id: {father_dict.id}")
+                father_data = admission.student.father.dict()
+                for field, value in father_data.items():
+                    # Don't update email (it's the lookup key) or relation_to_student
+                    if field not in ['email'] and hasattr(father_dict, field):
+                        old_value = getattr(father_dict, field)
+                        if old_value != value:
+                            logger.info(f"Updating father.{field}: '{old_value}' -> '{value}'")
+                            setattr(father_dict, field, value)
+                await db.flush()
             else:
                 # Create new father user and parent
                 try:
@@ -292,7 +321,7 @@ async def add_admission(
             if mother_email in existing_emails:
                 mother_user_data = existing_emails[mother_email]
                 # Get existing parent record
-                logger.info(f"Looking for existing mother with user_id: {mother_user_data.id}")
+                logger.info(f"Reusing existing mother with user_id: {mother_user_data.id}, email: {mother_email}")
                 existing_mother_result = await db.execute(
                     select(Parent).where(Parent.user_id == mother_user_data.id)
                 )
@@ -306,6 +335,18 @@ async def add_admission(
                         resource_id=str(mother_user_data.id),
                         request=request
                     )
+
+                # Update existing parent data with new information
+                logger.info(f"Updating existing mother data for parent_id: {mother_dict.id}")
+                mother_data = admission.student.mother.dict()
+                for field, value in mother_data.items():
+                    # Don't update email (it's the lookup key) or relation_to_student
+                    if field not in ['email'] and hasattr(mother_dict, field):
+                        old_value = getattr(mother_dict, field)
+                        if old_value != value:
+                            logger.info(f"Updating mother.{field}: '{old_value}' -> '{value}'")
+                            setattr(mother_dict, field, value)
+                await db.flush()
             else:
                 # Create new mother user and parent
                 try:
@@ -343,7 +384,7 @@ async def add_admission(
 
         # Check if father-student link already exists
         try:
-            existing_father_link = await db.execute(
+            existing_father_link_result = await db.execute(
                 select(StudentParentLink).where(
                     and_(
                         StudentParentLink.student_id == student_dict.id,
@@ -351,7 +392,8 @@ async def add_admission(
                     )
                 )
             )
-            if not existing_father_link.scalar_one_or_none():
+            existing_father_links = existing_father_link_result.scalars().all()
+            if len(existing_father_links) == 0:
                 student_parent_link_father = StudentParentLink(
                     student_id=student_dict.id, 
                     parent_id=father_dict.id
@@ -369,7 +411,7 @@ async def add_admission(
 
         # Check if mother-student link already exists
         try:
-            existing_mother_link = await db.execute(
+            existing_mother_link_result = await db.execute(
                 select(StudentParentLink).where(
                     and_(
                         StudentParentLink.student_id == student_dict.id,
@@ -377,7 +419,8 @@ async def add_admission(
                     )
                 )
             )
-            if not existing_mother_link.scalar_one_or_none():
+            existing_mother_links = existing_mother_link_result.scalars().all()
+            if len(existing_mother_links) == 0:
                 student_parent_link_mother = StudentParentLink(
                     student_id=student_dict.id, 
                     parent_id=mother_dict.id
@@ -454,8 +497,10 @@ async def add_admission(
         raise
     except Exception as e:
         await db.rollback()
+        import traceback
         logger.error(f"Unexpected error in add_admission: {str(e)}")
-        
+        logger.error(f"Traceback: {traceback.format_exc()}")
+
         # Handle database-specific errors
         if "constraint" in str(e).lower() or "duplicate" in str(e).lower():
             error_code, message, details = map_database_error(e)

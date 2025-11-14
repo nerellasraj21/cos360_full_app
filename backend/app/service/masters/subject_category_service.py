@@ -14,20 +14,28 @@ log = log.getLogger("masters.subject_category_service")
 async def create_subject_category(db: AsyncSession, data: SubjectCategoryCreate):
     """Create a new subject category"""
     try:
-        # Check if category already exists
         existing = await db.execute(select(SubjectCategory).where(SubjectCategory.name == data.name))
         if existing.scalars().first():
             raise HTTPException(status_code=400, detail="Category already exists")
-        
+
         new_category = SubjectCategory(name=data.name)
         db.add(new_category)
+        await db.flush()
+
+        result = await db.execute(
+            select(SubjectCategory).where(SubjectCategory.id == new_category.id)
+        )
+        created_category = result.scalar_one()
+
         await db.commit()
-        
-        # Invalidate cache after creating new category
+
         invalidate_cache("dropdown", "subject_categories")
-        
-        return new_category
+
+        return created_category
+    except HTTPException:
+        raise
     except Exception as e:
+        await db.rollback()
         log.error(f"Error creating subject category: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Subject category creation failed: {str(e)}")
 
@@ -98,27 +106,29 @@ async def get_subject_category_by_id(db: AsyncSession, category_id: UUID):
 async def update_subject_category(db: AsyncSession, category_id: UUID, category_update: SubjectCategoryUpdate):
     """Update subject category"""
     try:
-        # Get existing category
         category = await get_subject_category_by_id(db, category_id)
-        
-        # Check name uniqueness if name is being updated
+
         if category_update.name and category_update.name != category.name:
             await check_subject_category_name_unique(db, category_update.name, category_id)
-        
-        # Update fields
+
         update_data = category_update.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(category, field, value)
-        
+
+        await db.flush()
+
+        result = await db.execute(
+            select(SubjectCategory).where(SubjectCategory.id == category_id)
+        )
+        updated_category = result.scalar_one()
+
         await db.commit()
-        await db.refresh(category)
-        
-        # Invalidate cache
+
         invalidate_cache("dropdown", "subject_categories")
-        
+
         log.info(f"Subject category updated successfully: {category_id}")
-        return category
-        
+        return updated_category
+
     except HTTPException:
         raise
     except IntegrityError as e:
