@@ -167,9 +167,17 @@ async def create_staff_attendance(data: StaffAttendanceCreate, db: AsyncSession)
     try:
         new_attendance = StaffAttendance(**data.dict())
         db.add(new_attendance)
+        await db.flush()
+
+        result = await db.execute(
+            select(StaffAttendance)
+            .options(selectinload(StaffAttendance.staff))
+            .where(StaffAttendance.id == new_attendance.id)
+        )
+        attendance_out = result.scalar_one()
+
         await db.commit()
-        await db.refresh(new_attendance)
-        return new_attendance
+        return attendance_out
     except SQLAlchemyError as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating staff attendance: {str(e)}")
@@ -200,6 +208,22 @@ async def get_all_staff_attendance(
         raise Exception(f"Error retrieving staff attendance records: {str(e)}")
 
 
+async def get_staff_attendance_by_id(attendance_id: UUID, db: AsyncSession):
+    try:
+        result = await db.execute(
+            select(StaffAttendance)
+            .options(selectinload(StaffAttendance.staff))
+            .where(StaffAttendance.id == attendance_id)
+        )
+        attendance = result.scalar_one_or_none()
+        if not attendance:
+            raise HTTPException(status_code=404, detail="Staff attendance record not found")
+        return attendance
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving staff attendance: {str(e)}")
+
 async def get_attendance_for_staff(
     staff_id: UUID,
     db: AsyncSession,
@@ -223,17 +247,32 @@ async def get_attendance_for_staff(
 
 
 async def update_staff_attendance(attendance_id: UUID, data: StaffAttendanceUpdate, db: AsyncSession):
-    result = await db.execute(select(StaffAttendance).where(StaffAttendance.id == attendance_id))
-    attendance = result.scalar_one_or_none()
-    if not attendance:
-        raise HTTPException(status_code=404, detail="Attendance record not found")
+    try:
+        result = await db.execute(select(StaffAttendance).where(StaffAttendance.id == attendance_id))
+        attendance = result.scalar_one_or_none()
+        if not attendance:
+            raise HTTPException(status_code=404, detail="Attendance record not found")
 
-    for field, value in data.dict(exclude_unset=True).items():
-        setattr(attendance, field, value)
+        for field, value in data.dict(exclude_unset=True).items():
+            setattr(attendance, field, value)
 
-    await db.commit()
-    await db.refresh(attendance)
-    return attendance
+        await db.flush()
+
+        result = await db.execute(
+            select(StaffAttendance)
+            .options(selectinload(StaffAttendance.staff))
+            .where(StaffAttendance.id == attendance.id)
+        )
+        attendance_out = result.scalar_one()
+
+        await db.commit()
+        return attendance_out
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating staff attendance: {str(e)}")
 
 
 async def delete_staff_attendance(attendance_id: UUID, db: AsyncSession):
@@ -245,6 +284,17 @@ async def delete_staff_attendance(attendance_id: UUID, db: AsyncSession):
     await db.delete(attendance)
     await db.commit()
     return {"detail": "Staff attendance deleted successfully"}
+
+async def get_staff_attendance_by_date(attendance_date: date, db: AsyncSession):
+    try:
+        stmt = select(StaffAttendance).options(
+            selectinload(StaffAttendance.staff).selectinload(Staff.designation_obj)
+        ).where(StaffAttendance.date == attendance_date)
+
+        result = await db.execute(stmt)
+        return result.scalars().all()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving staff attendance by date: {str(e)}")
 
 async def get_staff_list_by_gender(
     gender: Optional[GenderEnum],db: AsyncSession):
