@@ -7,6 +7,7 @@ from app.db.tenant_session import get_tenant_db
 from app.service.masters.transport import add_route_stop, update_partial_details_route_stop, update_all_details_route_stop, deactivate_route_stop, get_each_route_stop_by_id, get_route_stops
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from uuid import UUID
+# Updated service functions to include route_name in responses
 router = APIRouter(prefix="/masters/route-stops", tags=["Masters/Route Stops"])
  
 @router.post("/", response_model=RouteStopOut)

@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.models.masters.transport import RouteStop
 from app.schemas.masters.transport import RouteStopCreate, RouteStopUpdate
 from fastapi import HTTPException
@@ -9,41 +10,122 @@ async def add_route_stop(data: RouteStopCreate, db: AsyncSession):
     stop = RouteStop(**data.dict())
     db.add(stop)
     await db.commit()
-    await db.refresh(stop)
-    return stop
+    await db.refresh(stop, ["route"])
+
+    # Create response dict with route_name
+    stop_dict = {
+        "id": stop.id,
+        "route_id": stop.route_id,
+        "name": stop.name,
+        "number": stop.number,
+        "reaching_time": stop.reaching_time,
+        "fees": stop.fees,
+        "is_active": stop.is_active,
+        "route_name": stop.route.route_name if stop.route else None
+    }
+    return stop_dict
 
 async def get_route_stops(db: AsyncSession):
-    result = await db.execute(select(RouteStop).where(RouteStop.is_active == True))
-    return result.scalars().all()
+    result = await db.execute(
+        select(RouteStop)
+        .options(selectinload(RouteStop.route))
+        .where(RouteStop.is_active == True)
+    )
+    stops = result.scalars().all()
+
+    # Convert to dicts with route_name
+    stops_list = []
+    for stop in stops:
+        stop_dict = {
+            "id": stop.id,
+            "route_id": stop.route_id,
+            "name": stop.name,
+            "number": stop.number,
+            "reaching_time": stop.reaching_time,
+            "fees": stop.fees,
+            "is_active": stop.is_active,
+            "route_name": stop.route.route_name if stop.route else None
+        }
+        stops_list.append(stop_dict)
+
+    return stops_list
 
 async def get_each_route_stop_by_id(stop_id: UUID, db: AsyncSession):
-    result = await db.execute(select(RouteStop).where(RouteStop.id == stop_id))
+    result = await db.execute(
+        select(RouteStop)
+        .options(selectinload(RouteStop.route))
+        .where(RouteStop.id == stop_id)
+    )
     stop = result.scalar_one_or_none()
     if not stop:
         raise HTTPException(404, detail="Route stop not found")
-    return stop
+
+    # Create response dict with route_name
+    stop_dict = {
+        "id": stop.id,
+        "route_id": stop.route_id,
+        "name": stop.name,
+        "number": stop.number,
+        "reaching_time": stop.reaching_time,
+        "fees": stop.fees,
+        "is_active": stop.is_active,
+        "route_name": stop.route.route_name if stop.route else None
+    }
+    return stop_dict
 
 async def update_all_details_route_stop(stop_id: UUID, data: RouteStopCreate, db: AsyncSession):
-    result = await db.execute(select(RouteStop).where(RouteStop.id == stop_id))
+    result = await db.execute(
+        select(RouteStop)
+        .options(selectinload(RouteStop.route))
+        .where(RouteStop.id == stop_id)
+    )
     stop = result.scalar_one_or_none()
     if not stop:
         raise HTTPException(404, detail="Route stop not found")
     for key, value in data.dict().items():
         setattr(stop, key, value)
     await db.commit()
-    await db.refresh(stop)
-    return stop
+    await db.refresh(stop, ["route"])
+
+    # Create response dict with route_name
+    stop_dict = {
+        "id": stop.id,
+        "route_id": stop.route_id,
+        "name": stop.name,
+        "number": stop.number,
+        "reaching_time": stop.reaching_time,
+        "fees": stop.fees,
+        "is_active": stop.is_active,
+        "route_name": stop.route.route_name if stop.route else None
+    }
+    return stop_dict
 
 async def update_partial_details_route_stop(stop_id: UUID, data: RouteStopUpdate, db: AsyncSession):
-    result = await db.execute(select(RouteStop).where(RouteStop.id == stop_id))
+    result = await db.execute(
+        select(RouteStop)
+        .options(selectinload(RouteStop.route))
+        .where(RouteStop.id == stop_id)
+    )
     stop = result.scalar_one_or_none()
     if not stop:
         raise HTTPException(404, detail="Route stop not found")
     for key, value in data.dict(exclude_unset=True).items():
         setattr(stop, key, value)
     await db.commit()
-    await db.refresh(stop)
-    return stop
+    await db.refresh(stop, ["route"])
+
+    # Create response dict with route_name
+    stop_dict = {
+        "id": stop.id,
+        "route_id": stop.route_id,
+        "name": stop.name,
+        "number": stop.number,
+        "reaching_time": stop.reaching_time,
+        "fees": stop.fees,
+        "is_active": stop.is_active,
+        "route_name": stop.route.route_name if stop.route else None
+    }
+    return stop_dict
 
 async def deactivate_route_stop(stop_id: UUID, db: AsyncSession):
     result = await db.execute(select(RouteStop).where(RouteStop.id == stop_id))
