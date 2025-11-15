@@ -17,17 +17,25 @@ class ParentCreate(ParentBase):
     pass
 
 class ParentUpdate(BaseModel):
-    name: Optional[str]
-    email: Optional[EmailStr]
-    phone: Optional[str]
-    occupation: Optional[str]
-    aadhar_number: Optional[str]
-    gender: Optional[Literal["Male", "Female", "Other"]]
-    relation_to_student: Optional[Literal["Father", "Mother", "Guardian"]]
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    occupation: Optional[str] = None
+    aadhar_number: Optional[str] = None
+    gender: Optional[Literal["Male", "Female", "Other"]] = None
+    relation_to_student: Optional[Literal["Father", "Mother", "Guardian"]] = None
+
+# Simple student schema for parent responses (avoids circular reference)
+class StudentSimpleOut(BaseModel):
+    id: UUID
+    first_name: str
+    last_name: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 class ParentOut(ParentBase):
     id: UUID
-    students: List["StudentOut"] = []
+    students: List[StudentSimpleOut] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -42,9 +50,18 @@ class ParentOut(ParentBase):
             aadhar_number=parent.aadhar_number,
             gender=parent.gender,
             relation_to_student=parent.relation_to_student,
-            students=[link.student for link in parent.student_links]
+            students=[StudentSimpleOut(
+                id=link.student.id,
+                first_name=link.student.first_name,
+                last_name=link.student.last_name
+            ) for link in parent.student_links]
         )
-    
 
-from app.schemas.student.student_schema import StudentOut
-ParentOut.update_forward_refs()
+class ParentListResponse(BaseModel):
+    items: List[ParentOut]
+    total_count: int
+    has_next: bool
+    skip: int
+    limit: int
+
+    model_config = ConfigDict(from_attributes=True)
