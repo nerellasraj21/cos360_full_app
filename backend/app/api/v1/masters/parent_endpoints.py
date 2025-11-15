@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from uuid import UUID
-from app.schemas.masters.parent_schema import ParentCreate, ParentUpdate, ParentOut
+from app.schemas.masters.parent_schema import ParentCreate, ParentUpdate, ParentOut, ParentListResponse
 from app.service.masters.parent_service import (
     create_parent,
     get_parent_by_id,
     get_all_parents,
+    search_parents,
     update_parent,
     delete_parent,
 )
@@ -25,11 +26,47 @@ async def create_parent_profile(
     """Create parent profile - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'parent_management', 'create')
-    
+
     return await create_parent(parent_data, db)
+
+
+@router.get("/search", response_model=ParentListResponse)
+async def search_parents_endpoint(
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    search_query: Optional[str] = Query(None, description="Search by name, email, or phone"),
+    email: Optional[str] = Query(None, description="Filter by email"),
+    phone: Optional[str] = Query(None, description="Filter by phone"),
+    relation_to_student: Optional[str] = Query(None, description="Filter by relation (Father, Mother, Guardian)"),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(10, ge=1, le=100, description="Number of records to return")
+):
+    """Search parents by email, phone, name, or relation. Use during student admission to find existing parents."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    await check_role_plan_permission_with_error(db, request, role, 'parent_management', 'list')
+
+    result = await search_parents(
+        db=db,
+        search_query=search_query,
+        email=email,
+        phone=phone,
+        relation_to_student=relation_to_student,
+        skip=skip,
+        limit=limit
+    )
+
+    return {
+        "items": [ParentOut.from_orm_with_students(p) for p in result["items"]],
+        "total_count": result["total_count"],
+        "has_next": result["has_next"],
+        "skip": result["skip"],
+        "limit": result["limit"]
+    }
 
 
 @router.get("/{parent_id}", response_model=ParentOut)
@@ -41,27 +78,38 @@ async def read_parent(
     """Get parent by ID - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'parent_management', 'read')
-    
+
     parent = await get_parent_by_id(parent_id, db)
     if not parent:
         raise HTTPException(status_code=404, detail="Parent not found")
-    return parent
+    return ParentOut.from_orm_with_students(parent)
 
 
-@router.get("/", response_model=List[ParentOut])
-async def list_all_parents(request: Request, db: AsyncSession = Depends(get_tenant_db)):
-    """List all parents - All authenticated users"""
+@router.get("/", response_model=ParentListResponse)
+async def list_all_parents(
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of records to return")
+):
+    """List all parents with pagination - All authenticated users"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'parent_management', 'list')
-    
-    parents = await get_all_parents(db)
-    return [ParentOut.from_orm_with_students(p) for p in parents]
+
+    result = await get_all_parents(db, skip=skip, limit=limit)
+    return {
+        "items": [ParentOut.from_orm_with_students(p) for p in result["items"]],
+        "total_count": result["total_count"],
+        "has_next": result["has_next"],
+        "skip": result["skip"],
+        "limit": result["limit"]
+    }
 
 
 @router.patch("/{parent_id}", response_model=ParentOut)
@@ -74,14 +122,14 @@ async def update_parent_profile(
     """Update parent profile - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'parent_management', 'update')
-    
+
     updated = await update_parent(parent_id, parent_data, db)
     if not updated:
         raise HTTPException(status_code=404, detail="Parent not found")
-    return updated
+    return ParentOut.from_orm_with_students(updated)
 
 
 @router.delete("/{parent_id}", status_code=status.HTTP_204_NO_CONTENT)
