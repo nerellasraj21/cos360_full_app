@@ -114,7 +114,7 @@ async def bulk_create_or_update_mappings(
             "updated_at": mapping.updated_at,
             "class_name": mapping.class_.name if hasattr(mapping, 'class_') and mapping.class_ else None,
             "subject_name": mapping.subject.name if hasattr(mapping, 'subject') and mapping.subject else None,
-            "academic_year_name": mapping.academic_year.name if hasattr(mapping, 'academic_year') and mapping.academic_year else None
+            "academic_year_name": mapping.academic_year.title if hasattr(mapping, 'academic_year') and mapping.academic_year else None
         }
         mappings_read.append(mapping_dict)
     
@@ -158,7 +158,7 @@ async def get_all_mappings(
             "updated_at": mapping.updated_at,
             "class_name": mapping.class_.name if mapping.class_ else None,
             "subject_name": mapping.subject.name if mapping.subject else None,
-            "academic_year_name": mapping.academic_year.name if mapping.academic_year else None
+            "academic_year_name": mapping.academic_year.title if mapping.academic_year else None
         }
         items.append(ClassSubjectMapRead(**mapping_dict))
 
@@ -200,7 +200,7 @@ async def get_mappings_by_class(
             "updated_at": mapping.updated_at,
             "class_name": mapping.class_.name if mapping.class_ else None,
             "subject_name": mapping.subject.name if mapping.subject else None,
-            "academic_year_name": mapping.academic_year.name if mapping.academic_year else None
+            "academic_year_name": mapping.academic_year.title if mapping.academic_year else None
         }
         result.append(ClassSubjectMapRead(**mapping_dict))
     
@@ -250,7 +250,7 @@ async def get_mapping(
         updated_at=mapping.updated_at,
         class_name=mapping.class_.name if mapping.class_ else None,
         subject_name=mapping.subject.name if mapping.subject else None,
-        academic_year_name=mapping.academic_year.name if mapping.academic_year else None
+        academic_year_name=mapping.academic_year.title if mapping.academic_year else None
     )
 
 @router.put("/{mapping_id}", response_model=ClassSubjectMapRead)
@@ -268,7 +268,7 @@ async def update_mapping(
     await check_role_plan_permission_with_error(db, request, role, 'class_subject_mappings', 'update')
     
     mapping = await update_class_subject_mapping(db, mapping_id, mapping_update)
-    
+
     return ClassSubjectMapRead(
         id=mapping.id,
         class_id=mapping.class_id,
@@ -281,7 +281,7 @@ async def update_mapping(
         updated_at=mapping.updated_at,
         class_name=mapping.class_.name if mapping.class_ else None,
         subject_name=mapping.subject.name if mapping.subject else None,
-        academic_year_name=mapping.academic_year.name if mapping.academic_year else None
+        academic_year_name=mapping.academic_year.title if mapping.academic_year else None
     )
 
 @router.delete("/{mapping_id}", status_code=status.HTTP_204_NO_CONTENT)
