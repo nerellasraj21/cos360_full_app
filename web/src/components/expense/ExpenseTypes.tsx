@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Loader2 } from 'lucide-react';
 import { useExpenseTypes, useExpenseCategoryDropdown, useCreateExpenseType, useUpdateExpenseType, useDeleteExpenseType } from '@/hooks/expense';
 import { validateTypeForm } from '@/lib/expenseValidation';
 import { handleExpenseApiError } from '@/lib/expenseErrorHandler';
@@ -180,7 +180,10 @@ export function ExpenseTypes() {
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8">
-                    Loading expense types...
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                      <span className="ml-2">Loading expense types...</span>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : filteredTypes.length === 0 ? (

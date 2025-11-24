@@ -7,6 +7,7 @@ import { PermissionGuard } from '@/components/common';
 import type { RouteStop, RouteStopInput } from '@/types/masters/routeStop';
 import Select from 'react-select';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { ShieldX } from 'lucide-react';
 
 const formFields: FormField[] = [
@@ -94,7 +95,11 @@ export default function RouteStopsPage() {
       key: 'is_active',
       label: 'Active',
       editable: true,
-      render: (_value: any, row: RouteStop) => row.is_active ? 'Yes' : 'No',
+      render: (_value: any, row: RouteStop) => (
+        <Badge variant={row.is_active ? "default" : "secondary"}>
+          {row.is_active ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
       renderEdit: (value: any, _row: RouteStop, onChange: (val: any) => void) => (
         <div className="flex items-center justify-center">
           <input

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit2, Trash2, Plus, Calculator, AlertCircle } from 'lucide-react';
+import { Edit, Trash2, Plus, Calculator, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -179,7 +179,10 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
     if (isLoading) {
         return (
             <div className={cn("p-6", className)}>
-                <div className="text-center text-muted-foreground">Loading fee mappings...</div>
+                <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Loading fee mappings...</span>
+                </div>
             </div>
         );
     }
@@ -297,7 +300,7 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                                                         className="h-8 w-8 p-0"
                                                         title="Edit Mapping"
                                                     >
-                                                        <Edit2 className="h-4 w-4" />
+                                                        <Edit className="h-4 w-4" />
                                                     </Button>
                                                     <Button
                                                         variant="ghost"

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Upload } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -296,7 +296,10 @@ export function ExpenseTransactionsPage() {
   if (isLoading) {
     return (
       <div className="p-6">
-        <div className="text-center text-muted-foreground">Loading expense transactions...</div>
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Loading expense transactions...</span>
+        </div>
       </div>
     );
   }
@@ -455,7 +458,7 @@ export function ExpenseTransactionsPage() {
                                 onClick={() => handleEdit(transaction)}
                                 className="h-8 w-8 p-0"
                               >
-                                <Edit2 className="h-4 w-4" />
+                                <Edit className="h-4 w-4" />
                               </Button>
                             </PermissionGuard>
                             {transaction.status === 'pending' && (

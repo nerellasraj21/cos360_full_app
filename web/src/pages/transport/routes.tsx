@@ -7,6 +7,7 @@ import { useRoutes, useCreateRoute, useUpdateRoute, useDeleteRoute } from '@/api
 import { PermissionGuard } from '@/components/common';
 import Select from 'react-select';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { ShieldX } from 'lucide-react';
 
 const columns = [
@@ -90,7 +91,11 @@ const columns = [
         key: "is_active",
         label: "Active",
         editable: true,
-        render: (v: boolean) => v ? "Yes" : "No",
+        render: (v: boolean) => (
+            <Badge variant={v ? "default" : "secondary"}>
+                {v ? 'Active' : 'Inactive'}
+            </Badge>
+        ),
         renderEdit: (value: any, _row: Route, onChange: (val: any) => void) => (
             <div className="flex items-center justify-center">
                 <input

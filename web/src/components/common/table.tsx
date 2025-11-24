@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { Pencil, Trash2, Check, X } from "lucide-react";
+import { Edit, Trash2, Check, X } from "lucide-react";
 import {
   Dialog,
   DialogTrigger,
@@ -207,7 +207,7 @@ export function Table<T extends { [key: string]: any }>({
                                   onClick={() => handleEditRow(rowIdx)}
                                   className="h-8 w-8 p-0 hover:bg-accent"
                                 >
-                                  <Pencil className="h-4 w-4" />
+                                  <Edit className="h-4 w-4" />
                                 </Button>
                               </PermissionGuard>
                             )}

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, Search, Filter, Eye } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Filter, Eye, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { feeStudentMappingsApi } from '@/api/fee/studentMappings';
 import type { FeeStudentMapping } from '@/types/fee/mapping';
@@ -247,7 +247,10 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8">
-                    Loading mappings...
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                      <span className="ml-2">Loading mappings...</span>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : filteredMappings.length === 0 ? (

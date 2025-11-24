@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit2, Trash2, Plus, Briefcase } from 'lucide-react';
+import { Edit, Trash2, Plus, Briefcase, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -94,7 +94,10 @@ export function DesignationsTable({ className }: DesignationsTableProps) {
     if (isLoading) {
         return (
             <div className={cn("p-6", className)}>
-                <div className="text-center text-muted-foreground">Loading designations...</div>
+                <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Loading designations...</span>
+                </div>
             </div>
         );
     }
@@ -158,7 +161,7 @@ export function DesignationsTable({ className }: DesignationsTableProps) {
                                                         className="h-8 w-8 p-0"
                                                         title="Edit Designation"
                                                     >
-                                                        <Edit2 className="h-4 w-4" />
+                                                        <Edit className="h-4 w-4" />
                                                     </Button>
                                                 )}
                                                 {hasDeletePermission && (

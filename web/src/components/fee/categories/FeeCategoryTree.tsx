@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, Plus, Edit2, Trash2, MoreVertical } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, MoreVertical, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useFeeCategories, useCreateFeeCategory, useUpdateFeeCategory, useDeleteFeeCategory } from '@/hooks/fee/useFeeCategories';
 import { useFeeCategoryTypes } from '@/hooks/fee/useFeeCategories';
@@ -58,14 +59,9 @@ function CategoryNode({ category, onEdit, onDelete, onManageTypes, canUpdate, ca
                     <div className="flex-1">
                         <h3 className="font-medium text-gray-900">{category.category_name}</h3>
                         <div className="flex items-center gap-2 mt-1">
-                            <span className={cn(
-                                "px-2 py-1 text-xs rounded-full",
-                                category.category_status === 'active'
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-gray-100 text-gray-800"
-                            )}>
+                            <Badge variant={category.category_status === 'active' ? "default" : "secondary"}>
                                 {category.category_status === 'active' ? 'Active' : 'Inactive'}
-                            </span>
+                            </Badge>
                             {canViewTypes && (
                                 <span className="text-xs text-gray-500">
                                     {feeTypes.length} fee type{feeTypes.length !== 1 ? 's' : ''}
@@ -105,7 +101,7 @@ function CategoryNode({ category, onEdit, onDelete, onManageTypes, canUpdate, ca
                             className="h-8 w-8 p-0"
                             title="Edit Category"
                         >
-                            <Edit2 className="h-4 w-4" />
+                            <Edit className="h-4 w-4" />
                         </Button>
                     )}
                     {canDelete && (
@@ -129,7 +125,10 @@ function CategoryNode({ category, onEdit, onDelete, onManageTypes, canUpdate, ca
             {isExpanded && canViewTypes && (
                 <div className="border-t border-gray-200 bg-gray-50">
                     {typesLoading ? (
-                        <div className="p-4 text-center text-gray-500">Loading fee types...</div>
+                        <div className="p-4 flex justify-center items-center">
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                            <span className="ml-2 text-gray-500">Loading fee types...</span>
+                        </div>
                     ) : feeTypes.length > 0 ? (
                         <div className="p-3 space-y-2">
                             {feeTypes.map((feeType: FeeType) => (
@@ -137,14 +136,9 @@ function CategoryNode({ category, onEdit, onDelete, onManageTypes, canUpdate, ca
                                     <div>
                                         <span className="font-medium text-sm">{feeType.type_name}</span>
                                         <div className="flex items-center gap-2 mt-1">
-                                            <span className={cn(
-                                                "px-2 py-1 text-xs rounded-full",
-                                                feeType.fee_status === 'active'
-                                                    ? "bg-green-100 text-green-800"
-                                                    : "bg-gray-100 text-gray-800"
-                                            )}>
+                                            <Badge variant={feeType.fee_status === 'active' ? "default" : "secondary"}>
                                                 {feeType.fee_status === 'active' ? 'Active' : 'Inactive'}
-                                            </span>
+                                            </Badge>
                                             <span className="text-xs text-gray-500">
                                                 Term: {(() => {
                                                     if (!feeType.fee_term_name) return 'Unknown';

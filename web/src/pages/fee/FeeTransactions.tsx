@@ -32,7 +32,7 @@ import type {
   PaymentMethod,
   TransactionStatus
 } from '@/types/fee/transaction';
-import { Plus, Search, Eye, Edit, DollarSign, Receipt } from 'lucide-react';
+import { Plus, Search, Eye, Edit, DollarSign, Receipt, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PermissionGuard } from '@/components/common';
 import { ShieldX } from 'lucide-react';
@@ -351,9 +351,9 @@ function FeeTransactionsContent() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Loading transactions...</p>
+          <div className="flex justify-center items-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="ml-2">Loading transactions...</span>
           </div>
         </div>
       </div>

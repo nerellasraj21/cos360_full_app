@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Plus, Edit, Trash2, Calendar, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -82,8 +82,9 @@ export function FeeTermsList() {
         return (
             <Card>
                 <CardContent className="p-6">
-                    <div className="flex items-center justify-center">
-                        <div className="text-muted-foreground">Loading fee terms...</div>
+                    <div className="flex justify-center items-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <span className="ml-2">Loading fee terms...</span>
                     </div>
                 </CardContent>
             </Card>

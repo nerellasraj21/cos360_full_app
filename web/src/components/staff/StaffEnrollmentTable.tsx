@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Edit2, Trash2, Plus, Users, Mail, Phone, Calendar, Award, MapPin, Filter, Download, FileText, FileSpreadsheet, Eye } from 'lucide-react';
+import { Edit, Trash2, Plus, Users, Mail, Phone, Calendar, Award, MapPin, Filter, Download, FileText, FileSpreadsheet, Eye, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -377,7 +377,10 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (
-                        <div className="text-center py-8">Loading staff enrollments...</div>
+                        <div className="flex justify-center items-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                            <span className="ml-2">Loading staff enrollments...</span>
+                        </div>
                     ) : (
                         <>
                             <Table>
@@ -464,7 +467,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                                             onClick={() => handleEdit(staffMember)}
                                                             title="Edit Staff"
                                                         >
-                                                            <Edit2 className="h-4 w-4" />
+                                                            <Edit className="h-4 w-4" />
                                                         </Button>
                                                     )}
                                                     {hasDeletePermission && (

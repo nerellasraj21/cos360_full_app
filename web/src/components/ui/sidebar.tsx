@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { useLogoutMutation } from "../../api/auth";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useLocation } from "@tanstack/react-router";
 import type { MenuItem } from "../../lib/menuUtils";
 import { useThemeStore } from "../../lib/themeStore";
 
@@ -64,22 +64,22 @@ const getIconForMenuItem = (name: string) => {
     return iconMap[name] || Folder;
 };
 
-function RecursiveMenuItem({ 
-    item, 
-    open, 
-    expandedMenus, 
-    onExpand, 
+function RecursiveMenuItem({
+    item,
+    open,
+    expandedMenus,
+    onExpand,
     hoveredMenu,
     onMouseEnter,
     onMouseLeave,
     level = 0,
     isMobile = false,
     onItemClick
-}: { 
-    item: MenuItem; 
-    open: boolean; 
+}: {
+    item: MenuItem;
+    open: boolean;
     expandedMenus: Set<number>;
-    onExpand: (id: number) => void; 
+    onExpand: (id: number) => void;
     hoveredMenu: number | null;
     onMouseEnter: (id: number, hasChildren: boolean, event: React.MouseEvent) => void;
     onMouseLeave: () => void;
@@ -92,6 +92,8 @@ function RecursiveMenuItem({
     const isExpanded = expandedMenus.has(item.id);
     const isHovered = hoveredMenu === item.id;
     const navigate = useNavigate();
+    const location = useLocation();
+    const isActive = item.url && location.pathname === item.url;
     
     const handleClick = () => {
         if (hasChildren) {
@@ -108,10 +110,13 @@ function RecursiveMenuItem({
         <div className="relative">
             <button
                 className={clsx(
-                    "flex items-center w-full gap-3 px-3 cursor-pointer py-2.5 rounded-lg hover:bg-sidebar-accent transition-colors group text-left",
+                    "flex items-center w-full gap-3 px-3 cursor-pointer py-2.5 rounded-lg transition-colors group text-left",
                     open ? "justify-start" : "justify-center",
                     level > 0 && "ml-4 text-sm",
-                    "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-sidebar"
+                    "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-sidebar",
+                    isActive
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "hover:bg-sidebar-accent"
                 )}
                 onClick={handleClick}
                 onMouseEnter={(e) => !isMobile && onMouseEnter(item.id, hasChildren, e)}
@@ -173,8 +178,8 @@ export function Sidebar({
     const [open, setOpen] = useState(controlledOpen ?? !isMobile);
     const isControlled = controlledOpen !== undefined;
     const sidebarOpen = isControlled ? controlledOpen : open;
-    
-    
+
+
     // Track which menus are expanded by ID
     const [expandedMenus, setExpandedMenus] = useState<Set<number>>(new Set());
 
@@ -186,6 +191,39 @@ export function Sidebar({
 
     const logoutMutation = useLogoutMutation();
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Helper function to find if any child is active
+    const hasActiveChild = (item: MenuItem): boolean => {
+        if (item.url && location.pathname === item.url) {
+            return true;
+        }
+        if (item.children) {
+            return item.children.some(child => hasActiveChild(child));
+        }
+        return false;
+    };
+
+    // Auto-expand menus with active children on mount
+    useEffect(() => {
+        const menusToExpand = new Set<number>();
+
+        const findActiveParents = (items: MenuItem[]) => {
+            items.forEach(item => {
+                if (item.children) {
+                    if (hasActiveChild(item)) {
+                        menusToExpand.add(item.id);
+                        findActiveParents(item.children);
+                    }
+                }
+            });
+        };
+
+        findActiveParents(menuData);
+        if (menusToExpand.size > 0) {
+            setExpandedMenus(menusToExpand);
+        }
+    }, [location.pathname, menuData]);
 
     const handleLogout = () => {
         logoutMutation.mutate(undefined, {

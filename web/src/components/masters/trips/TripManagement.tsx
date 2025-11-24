@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Loader2 } from 'lucide-react';
 import { tripsApi, driversApi } from '@/api/masters/trips';
 import { VehiclesDropdown } from '@/components/dropdown-system/components/VehiclesDropdown';
 import { TransportRoutesDropdown } from '@/components/dropdown-system/components/TransportRoutesDropdown';
@@ -303,7 +303,10 @@ export function TripManagement({ className }: TripManagementProps) {
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8">
-                    Loading trips...
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                      <span className="ml-2">Loading trips...</span>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : filteredTrips.length === 0 ? (

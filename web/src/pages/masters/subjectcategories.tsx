@@ -33,7 +33,6 @@ export default function SubjectCategoriesPage() {
   const deleteSubjectCategory = useDeleteSubjectCategory();
 
   const columns: TableColumn<SubjectCategory>[] = [
-    { key: 'id', label: 'ID' },
     { key: 'name', label: 'Name', editable: true },
   ];
 
@@ -72,6 +71,14 @@ export default function SubjectCategoriesPage() {
       total,
       onPageChange: handlePageChange,
       onPageSizeChange: handlePageSizeChange,
+    },
+    permissions: {
+      resource: 'SUBJECT_CATEGORIES',
+      create: true,
+      read: true,
+      update: true,
+      delete: true,
+      list: true,
     },
   };
 

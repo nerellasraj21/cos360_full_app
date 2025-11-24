@@ -6,6 +6,7 @@ import type { StudentTransport, StudentTransportInput } from "@/types/masters/st
 import { useStudentTransports, useCreateStudentTransport, useUpdateStudentTransport, useDeleteStudentTransport } from '@/api/hooks/masters/studentTransport';
 import { useAdmissions } from '@/api/hooks/students/admissions';
 import { useRoutes } from '@/api/hooks/masters/routes';
+import { Badge } from '@/components/ui/badge';
 
 const formFields: FormField[] = [
     { name: "student_id", label: "Student ID", required: true },
@@ -77,7 +78,11 @@ export default function StudentTransportPage() {
             key: "is_active",
             label: "Active",
             editable: true,
-            render: (v: boolean) => v ? "Yes" : "No",
+            render: (v: boolean) => (
+                <Badge variant={v ? "default" : "secondary"}>
+                    {v ? 'Active' : 'Inactive'}
+                </Badge>
+            ),
         },
     ];
 

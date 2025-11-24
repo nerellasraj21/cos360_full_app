@@ -6,6 +6,7 @@ import type { AcademicYear, AcademicYearInput } from '@/types/masters/academicye
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/usePermission';
+import { Badge } from '@/components/ui/badge';
 
 export default function AcademicYearsPage() {
   const [page, setPage] = useState(0);
@@ -70,7 +71,11 @@ export default function AcademicYearsPage() {
       key: 'is_active',
       label: 'Active',
       editable: true,
-      render: (v) => v ? 'Yes' : 'No',
+      render: (v) => (
+        <Badge variant={v ? "default" : "secondary"}>
+          {v ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
       renderEdit: (value: boolean, _row: AcademicYear, onChange: (v: boolean) => void) => (
         <input
           type="checkbox"

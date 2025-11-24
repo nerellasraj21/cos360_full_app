@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -50,8 +50,9 @@ export function FeeTypesList() {
         return (
             <Card>
                 <CardContent className="p-6">
-                    <div className="flex items-center justify-center">
-                        <div className="text-muted-foreground">Loading fee types...</div>
+                    <div className="flex justify-center items-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <span className="ml-2">Loading fee types...</span>
                     </div>
                 </CardContent>
             </Card>

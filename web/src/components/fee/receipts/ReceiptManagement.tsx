@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Download, RefreshCw, Shield, Search, Plus, Eye, Printer, Receipt } from 'lucide-react';
+import { FileText, Download, RefreshCw, Shield, Search, Plus, Eye, Printer, Receipt, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { feeReceiptsApi } from '@/api/fee/receipts';
 import { searchTransactions } from '@/api/fee/transactions';
@@ -191,31 +191,40 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="transactionSelect">Select Transaction</Label>
-                <Select
-                  value={selectedTransactionId}
-                  onValueChange={setSelectedTransactionId}
-                  disabled={transactionsLoading}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={transactionsLoading ? "Loading transactions..." : "Choose a transaction..."} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {transactions.map((transaction) => (
-                      <SelectItem key={transaction.id} value={transaction.id}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{transaction.transaction_number}</span>
-                          <span className="text-sm text-muted-foreground">
-                            {transaction.student_name || 'N/A'} • ₹{transaction.total_amount.toLocaleString()} • {transaction.payment_method.toUpperCase()}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {transactions.length === 0 && !transactionsLoading && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    No completed transactions found for the current academic year.
-                  </p>
+                {transactionsLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Loading transactions...</span>
+                  </div>
+                ) : (
+                  <>
+                    <Select
+                      value={selectedTransactionId}
+                      onValueChange={setSelectedTransactionId}
+                      disabled={transactionsLoading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a transaction..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {transactions.map((transaction) => (
+                          <SelectItem key={transaction.id} value={transaction.id}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{transaction.transaction_number}</span>
+                              <span className="text-sm text-muted-foreground">
+                                {transaction.student_name || 'N/A'} • ₹{transaction.total_amount.toLocaleString()} • {transaction.payment_method.toUpperCase()}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {transactions.length === 0 && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        No completed transactions found for the current academic year.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -533,7 +542,10 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8">
-                    Loading receipts...
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                      <span className="ml-2">Loading receipts...</span>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : receipts.length === 0 ? (

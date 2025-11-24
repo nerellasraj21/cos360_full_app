@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Table } from '@/components/common/table';
-import type { TableColumn } from '@/components/common/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import React, { useState } from "react";
+import { Table } from "@/components/common/table";
+import type { TableColumn } from "@/components/common/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -12,24 +12,30 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
-  DialogClose
-} from '@/components/ui/dialog';
+  DialogClose,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Filter, Download, FileText, FileSpreadsheet } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { PermissionGuard } from '@/components/PermissionGuard';
-import { PERMISSIONS, type PermissionResource } from '@/constants/permissions';
+} from "@/components/ui/dropdown-menu";
+import {
+  Filter,
+  Download,
+  FileText,
+  FileSpreadsheet,
+  Loader2,
+} from "lucide-react";
+import * as XLSX from "xlsx";
+import { PermissionGuard } from "@/components/PermissionGuard";
+import { PERMISSIONS, type PermissionResource } from "@/constants/permissions";
 
 // Helper function to get resource name from permission constant
 const getResourceName = (resource: PermissionResource): string => {
   const permission = Object.values(PERMISSIONS[resource])[0] as string;
-  return permission.split(':')[0];
+  return permission.split(":")[0];
 };
 
 export interface MasterPageConfig<T, TInput> {
@@ -74,7 +80,7 @@ export interface MasterPageConfig<T, TInput> {
 export interface FormField {
   name: string;
   label: string;
-  type?: 'text' | 'number' | 'date' | 'checkbox' | 'academic_year_select';
+  type?: "text" | "number" | "date" | "checkbox" | "academic_year_select";
   required?: boolean;
 }
 
@@ -82,20 +88,22 @@ interface MasterPageProps<T, TInput> {
   config: MasterPageConfig<T, TInput>;
 }
 
-export function MasterPage<T extends { id: string | number }, TInput extends Record<string, any>>({
-  config
-}: MasterPageProps<T, TInput>) {
+export function MasterPage<
+  T extends { id: string | number },
+  TInput extends Record<string, any>,
+>({ config }: MasterPageProps<T, TInput>) {
   const [formData, setFormData] = useState<TInput>(config.defaultValues);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
-    new Set(config.columns.map(col => col.key as string))
+    new Set(config.columns.map((col) => col.key as string))
   );
 
-
-  const filteredColumns = config.columns.filter(col => visibleColumns.has(col.key as string));
+  const filteredColumns = config.columns.filter((col) =>
+    visibleColumns.has(col.key as string)
+  );
 
   const handleColumnToggle = (columnKey: string) => {
-    setVisibleColumns(prev => {
+    setVisibleColumns((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(columnKey)) {
         newSet.delete(columnKey);
@@ -107,7 +115,7 @@ export function MasterPage<T extends { id: string | number }, TInput extends Rec
   };
 
   const handleSelectAllColumns = () => {
-    setVisibleColumns(new Set(config.columns.map(col => col.key as string)));
+    setVisibleColumns(new Set(config.columns.map((col) => col.key as string)));
   };
 
   const handleDeselectAllColumns = () => {
@@ -115,67 +123,83 @@ export function MasterPage<T extends { id: string | number }, TInput extends Rec
   };
 
   const handleExportCSV = () => {
-    const headers = filteredColumns.map(col => col.label).join(',');
-    const rows = config.data.map(row =>
-      filteredColumns.map(col => {
-        const value = row[col.key as keyof T];
+    const headers = filteredColumns.map((col) => col.label).join(",");
+    const rows = config.data
+      .map((row) =>
+        filteredColumns
+          .map((col) => {
+            const value = row[col.key as keyof T];
 
-        const escapedValue = String(value).replace(/"/g, '""');
-        return `"${escapedValue}"`;
-      }).join(',')
-    ).join('\n');
+            const escapedValue = String(value).replace(/"/g, '""');
+            return `"${escapedValue}"`;
+          })
+          .join(",")
+      )
+      .join("\n");
 
     const csvContent = `${headers}\n${rows}`;
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${config.title.toLowerCase().replace(/\s+/g, '_')}_data.csv`);
-    link.style.visibility = 'hidden';
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `${config.title.toLowerCase().replace(/\s+/g, "_")}_data.csv`
+    );
+    link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const handleExportExcel = () => {
-
-    const data = config.data.map(row =>
-      filteredColumns.reduce((acc, col) => {
-        acc[col.label] = row[col.key as keyof T];
-        return acc;
-      }, {} as Record<string, any>)
+    const data = config.data.map((row) =>
+      filteredColumns.reduce(
+        (acc, col) => {
+          acc[col.label] = row[col.key as keyof T];
+          return acc;
+        },
+        {} as Record<string, any>
+      )
     );
-
 
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
 
-
-    XLSX.writeFile(workbook, `${config.title.toLowerCase().replace(/\s+/g, '_')}_data.xlsx`);
+    XLSX.writeFile(
+      workbook,
+      `${config.title.toLowerCase().replace(/\s+/g, "_")}_data.xlsx`
+    );
   };
 
   const handleDownloadData = () => {
     const jsonData = {
       title: config.title,
-      columns: filteredColumns.map(col => ({ key: col.key, label: col.label })),
-      data: config.data.map(row => {
+      columns: filteredColumns.map((col) => ({
+        key: col.key,
+        label: col.label,
+      })),
+      data: config.data.map((row) => {
         const filteredRow: any = {};
-        filteredColumns.forEach(col => {
+        filteredColumns.forEach((col) => {
           filteredRow[col.key as string] = row[col.key as keyof T];
         });
         return filteredRow;
       }),
-      exportedAt: new Date().toISOString()
+      exportedAt: new Date().toISOString(),
     };
 
     const jsonContent = JSON.stringify(jsonData, null, 2);
-    const blob = new Blob([jsonContent], { type: 'application/json' });
-    const link = document.createElement('a');
+    const blob = new Blob([jsonContent], { type: "application/json" });
+    const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${config.title.toLowerCase().replace(/\s+/g, '_')}_data.json`);
-    link.style.visibility = 'hidden';
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `${config.title.toLowerCase().replace(/\s+/g, "_")}_data.json`
+    );
+    link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -185,14 +209,14 @@ export function MasterPage<T extends { id: string | number }, TInput extends Rec
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
   const handleEdit = (row: T, key: keyof T | string, value: any) => {
     let updated: any = { ...row };
-    if (key === 'is_active') {
-      updated[key] = value === 'true' || value === true || value === 'Yes';
+    if (key === "is_active") {
+      updated[key] = value === "true" || value === true || value === "Yes";
     } else {
       updated[key] = value;
     }
@@ -219,7 +243,7 @@ export function MasterPage<T extends { id: string | number }, TInput extends Rec
   };
 
   const renderFormField = (field: FormField) => {
-    const { name, label, type = 'text', required = false } = field;
+    const { name, label, type = "text", required = false } = field;
 
     // Check for custom field rendering first
     if (config.renderCustomField) {
@@ -238,7 +262,7 @@ export function MasterPage<T extends { id: string | number }, TInput extends Rec
       }
     }
 
-    if (type === 'checkbox') {
+    if (type === "checkbox") {
       return (
         <div key={name} className="flex items-center gap-2 mt-6">
           <Label htmlFor={name}>{label}</Label>
@@ -278,9 +302,12 @@ export function MasterPage<T extends { id: string | number }, TInput extends Rec
             {config.showColumnSelector && (
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
                     <Filter className="h-4 w-4" />
-
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
@@ -302,7 +329,9 @@ export function MasterPage<T extends { id: string | number }, TInput extends Rec
                     <DropdownMenuCheckboxItem
                       key={col.key as string}
                       checked={visibleColumns.has(col.key as string)}
-                      onCheckedChange={() => handleColumnToggle(col.key as string)}
+                      onCheckedChange={() =>
+                        handleColumnToggle(col.key as string)
+                      }
                       onSelect={(e) => e.preventDefault()}
                       className="cursor-pointer"
                     >
@@ -313,27 +342,44 @@ export function MasterPage<T extends { id: string | number }, TInput extends Rec
               </DropdownMenu>
             )}
             <PermissionGuard
-              resource={config.permissions?.resource ? getResourceName(config.permissions.resource) : undefined}
+              resource={
+                config.permissions?.resource
+                  ? getResourceName(config.permissions.resource)
+                  : undefined
+              }
               action="list"
               fallback={null}
             >
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
                     <Download className="h-4 w-4" />
                     Export
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={handleExportCSV} className="cursor-pointer">
+                  <DropdownMenuItem
+                    onClick={handleExportCSV}
+                    className="cursor-pointer"
+                  >
                     <FileText className="h-4 w-4 mr-2" />
                     Export to CSV
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportExcel} className="cursor-pointer">
+                  <DropdownMenuItem
+                    onClick={handleExportExcel}
+                    className="cursor-pointer"
+                  >
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
                     Export to Excel
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleDownloadData} className="cursor-pointer">
+                  <DropdownMenuItem
+                    onClick={handleDownloadData}
+                    className="cursor-pointer"
+                  >
                     <Download className="h-4 w-4 mr-2" />
                     Download Data
                   </DropdownMenuItem>
@@ -341,7 +387,11 @@ export function MasterPage<T extends { id: string | number }, TInput extends Rec
               </DropdownMenu>
             </PermissionGuard>
             <PermissionGuard
-              resource={config.permissions?.resource ? getResourceName(config.permissions.resource) : undefined}
+              resource={
+                config.permissions?.resource
+                  ? getResourceName(config.permissions.resource)
+                  : undefined
+              }
               action="create"
               fallback={null}
             >
@@ -352,27 +402,29 @@ export function MasterPage<T extends { id: string | number }, TInput extends Rec
                   <DialogTrigger asChild>
                     <Button>Add {config.title.slice(0, -1)}</Button>
                   </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add New {config.title.slice(0, -1)}</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleAdd}>
-                    <div className="space-y-4">
-                      {config.formFields.map(renderFormField)}
-                    </div>
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button type="button" variant="outline">
-                          Cancel
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>
+                        Add New {config.title.slice(0, -1)}
+                      </DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleAdd}>
+                      <div className="space-y-4">
+                        {config.formFields.map(renderFormField)}
+                      </div>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button type="button" variant="outline">
+                            Cancel
+                          </Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={config.isCreatePending}>
+                          Add {config.title.slice(0, -1)}
                         </Button>
-                      </DialogClose>
-                      <Button type="submit" disabled={config.isCreatePending}>
-                        Add {config.title.slice(0, -1)}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               )}
             </PermissionGuard>
           </div>
@@ -380,32 +432,44 @@ export function MasterPage<T extends { id: string | number }, TInput extends Rec
       </CardHeader>
       <CardContent>
         <PermissionGuard
-          resource={config.permissions?.resource ? getResourceName(config.permissions.resource) : undefined}
+          resource={
+            config.permissions?.resource
+              ? getResourceName(config.permissions.resource)
+              : undefined
+          }
           action="read"
           fallback={
             <div className="flex items-center justify-center h-32">
-              <p className="text-gray-600">You don't have permission to view this data.</p>
+              <p className="text-gray-600">
+                You don't have permission to view this data.
+              </p>
             </div>
           }
         >
-          <Table
-            columns={filteredColumns}
-            data={config.data}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            isEditing={config.isEditing}
-            pagination={config.pagination}
-            permissions={{
-              resource: config.permissions?.resource ? getResourceName(config.permissions.resource) : undefined,
-              canEdit: config.permissions?.update,
-              canDelete: config.permissions?.delete,
-            }}
-          />
+          {config.isLoading ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="ml-2">Loading data...</span>
+            </div>
+          ) : (
+            <Table
+              columns={filteredColumns}
+              data={config.data}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              isEditing={config.isEditing}
+              pagination={config.pagination}
+              permissions={{
+                resource: config.permissions?.resource
+                  ? getResourceName(config.permissions.resource)
+                  : undefined,
+                canEdit: config.permissions?.update,
+                canDelete: config.permissions?.delete,
+              }}
+            />
+          )}
         </PermissionGuard>
-        {config.isLoading && <div>Loading...</div>}
       </CardContent>
     </Card>
   );
 }
-
-

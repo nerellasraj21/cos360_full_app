@@ -1,6 +1,7 @@
 import { Table, type TableColumn } from '@/components/common/table';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -266,7 +267,12 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
   ];
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex justify-center items-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading admissions...</span>
+      </div>
+    );
   }
 
   const handleEdit = async (row: AdmissionTableData, key: string, value: any) => {

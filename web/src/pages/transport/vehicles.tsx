@@ -7,6 +7,7 @@ import type { Vehicle, VehicleInput } from '@/types/masters/vehicle';
 import Select from 'react-select';
 import type { SingleValue } from 'react-select';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { ShieldX } from 'lucide-react';
 
 export default function VehiclePage() {
@@ -62,7 +63,11 @@ export default function VehiclePage() {
       key: 'is_active',
       label: 'Active',
       editable: true,
-      render: (v) => v ? 'Yes' : 'No',
+      render: (v) => (
+        <Badge variant={v ? "default" : "secondary"}>
+          {v ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
       renderEdit: (value, _row, onChange) => (
         <input
           type="checkbox"
