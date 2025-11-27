@@ -194,7 +194,7 @@ export default function ClassSubjectMappingsPage() {
       academic_year_id: selectedAcademicYearId || "",
       exclude_marks: false,
       order: undefined,
-      is_active: true,
+      is_active: false,
     },
     formFields,
     isLoading,

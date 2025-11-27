@@ -100,12 +100,6 @@ export default function LoginForm({
                       )}
                     </button>
                   </div>
-                  <Link
-                    to="/forgot-password"
-                    className="text-xs sm:text-sm underline-offset-4 hover:underline text-right"
-                  >
-                    Forgot your password?
-                  </Link>
                 </div>
                 <Button
                   type="submit"
@@ -114,6 +108,12 @@ export default function LoginForm({
                 >
                   {loginMutation.isPending ? "Logging in..." : "Login"}
                 </Button>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs sm:text-sm underline-offset-4 hover:underline text-center"
+                >
+                  Forgot your password?
+                </Link>
               </div>
               {loginMutation.isError && (
                 <div className="mt-4 p-2 sm:p-3 bg-red-50 border border-red-200 rounded-md text-xs sm:text-sm">

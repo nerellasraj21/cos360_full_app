@@ -86,7 +86,7 @@ export function useSubjectsPaginated(page: number, pageSize: number, academicYea
       const response = await fetchSubjects({
         skip: page * pageSize,
         limit: pageSize,
-        active_only: true,
+        active_only: false,
         academic_year_id: academicYearId
       });
 

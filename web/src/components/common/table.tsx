@@ -144,7 +144,7 @@ export function Table<T extends { [key: string]: any }>({
               const currentRow = isRowEditing ? editingRow.currentValues : row;
 
               return (
-                <tr key={rowIdx} className={cn("border-b last:border-0 hover:bg-accent/30", isRowEditing && "bg-accent/50")}>
+                <tr key={rowIdx} className={cn("border-b last:border-0 hover:bg-muted/50 dark:hover:bg-muted/70", isRowEditing && "bg-accent/50")}>
                   {columns.map((col) => {
                     const value = currentRow[col.key as keyof T];
                     return (
@@ -180,7 +180,7 @@ export function Table<T extends { [key: string]: any }>({
                               size="sm"
                               variant="ghost"
                               onClick={handleSaveRow}
-                              className="h-8 w-8 p-0 hover:bg-green-100 hover:text-green-600"
+                              className="h-8 w-8 p-0 hover:bg-green-100 hover:text-green-600 dark:hover:bg-green-900/50 dark:hover:text-green-400"
                             >
                               <Check className="h-4 w-4" />
                             </Button>
@@ -188,7 +188,7 @@ export function Table<T extends { [key: string]: any }>({
                               size="sm"
                               variant="ghost"
                               onClick={handleDiscardRow}
-                              className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+                              className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/50 dark:hover:text-red-400"
                             >
                               <X className="h-4 w-4" />
                             </Button>

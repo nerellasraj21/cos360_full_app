@@ -40,6 +40,8 @@ const getResourceName = (resource: PermissionResource): string => {
 
 export interface MasterPageConfig<T, TInput> {
   title: string;
+  /** Custom label for the add button (defaults to "Add {title minus last char}") */
+  addButtonLabel?: string;
   columns: TableColumn<T>[];
   defaultValues: TInput;
   formFields: FormField[];
@@ -82,6 +84,8 @@ export interface FormField {
   label: string;
   type?: "text" | "number" | "date" | "checkbox" | "academic_year_select";
   required?: boolean;
+  pattern?: string;
+  patternMessage?: string;
 }
 
 interface MasterPageProps<T, TInput> {
@@ -288,6 +292,8 @@ export function MasterPage<
           value={formData[name as keyof TInput] as string}
           onChange={handleInputChange}
           required={required}
+          pattern={field.pattern}
+          title={field.patternMessage}
         />
       </div>
     );
@@ -400,12 +406,12 @@ export function MasterPage<
               ) : (
                 <Dialog open={isModalOpen} onOpenChange={handleModalOpenChange}>
                   <DialogTrigger asChild>
-                    <Button>Add {config.title.slice(0, -1)}</Button>
+                    <Button>{config.addButtonLabel || `Add ${config.title.slice(0, -1)}`}</Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>
-                        Add New {config.title.slice(0, -1)}
+                        {config.addButtonLabel ? `${config.addButtonLabel}` : `Add New ${config.title.slice(0, -1)}`}
                       </DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleAdd}>
@@ -419,7 +425,7 @@ export function MasterPage<
                           </Button>
                         </DialogClose>
                         <Button type="submit" disabled={config.isCreatePending}>
-                          Add {config.title.slice(0, -1)}
+                          {config.addButtonLabel || `Add ${config.title.slice(0, -1)}`}
                         </Button>
                       </DialogFooter>
                     </form>

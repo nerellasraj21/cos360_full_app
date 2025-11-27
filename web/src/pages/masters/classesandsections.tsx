@@ -21,12 +21,9 @@ import {
   ClassSectionsTable,
   EditClassModal,
   EditSectionModal,
-  SectionsManagement,
 } from "@/components/masters/classesandsections";
 import { useAcademicYearStore } from "@/lib/academicYearStore";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -248,95 +245,56 @@ export default function ClassesAndSectionsPage() {
             <CardTitle>Classes & Sections Management</CardTitle>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="table" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="table">Classes View</TabsTrigger>
-                <TabsTrigger value="sections">Sections View</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="table" className="space-y-4">
-                {!hasClassesListPermission ? (
-                  <div className="flex items-center justify-center h-32">
-                    <p className="text-gray-600">
-                      Permission not available for Classes.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium">
-                        Classes with Expandable Sections
-                      </h3>
-                      <PermissionGuard
-                        resource="classes"
-                        action="create"
-                        fallback={null}
-                      >
-                        <AddClassAndSectionsModal
-                          onSubmit={(data) => {
-                            createClassMutation.mutate(data);
-                          }}
-                          isPending={createClassMutation.status === "pending"}
-                        />
-                      </PermissionGuard>
-                    </div>
-
-                    {!shouldFetchData ? (
-                      <div className="flex items-center justify-center h-32">
-                        <p className="text-gray-600">
-                          You don't have permission to view class data.
-                        </p>
-                      </div>
-                    ) : isLoading ? (
-                      <div className="flex justify-center items-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                        <span className="ml-2">Loading classes...</span>
-                      </div>
-                    ) : (
-                      <ClassSectionsTable
-                        data={classSectionsData || []}
-                        onEditClass={handleEditClass}
-                        onDeleteClass={handleDeleteClass}
-                        onEditSection={handleEditSection}
-                        onDeleteSection={handleDeleteSection}
-                        onAddSection={handleAddSection}
-                        isLoading={isLoading}
-                        hasSectionsPermission={hasSectionsListPermission}
+            <div className="space-y-4">
+              {!hasClassesListPermission ? (
+                <div className="flex items-center justify-center h-32">
+                  <p className="text-gray-600">
+                    Permission not available for Classes.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-end items-center">
+                    <PermissionGuard
+                      resource="classes"
+                      action="create"
+                      fallback={null}
+                    >
+                      <AddClassAndSectionsModal
+                        onSubmit={(data) => {
+                          createClassMutation.mutate(data);
+                        }}
+                        isPending={createClassMutation.status === "pending"}
                       />
-                    )}
-                  </>
-                )}
-              </TabsContent>
+                    </PermissionGuard>
+                  </div>
 
-              <TabsContent value="sections" className="space-y-4">
-                {!shouldFetchData ? (
-                  <div className="flex items-center justify-center h-32">
-                    <p className="text-gray-600">
-                      Permission not available for Sections.
-                    </p>
-                  </div>
-                ) : !hasSectionsReadPermission ? (
-                  <div className="flex items-center justify-center h-32">
-                    <p className="text-gray-600">
-                      You don't have permission to view section data.
-                    </p>
-                  </div>
-                ) : isLoading ? (
-                  <div className="flex justify-center items-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                    <span className="ml-2">Loading sections...</span>
-                  </div>
-                ) : (
-                  <SectionsManagement
-                    data={classSectionsData || []}
-                    onEditSection={handleEditSection}
-                    onDeleteSection={handleDeleteSection}
-                    onAddSection={handleAddSection}
-                    isLoading={isLoading}
-                  />
-                )}
-              </TabsContent>
-            </Tabs>
+                  {!shouldFetchData ? (
+                    <div className="flex items-center justify-center h-32">
+                      <p className="text-gray-600">
+                        You don't have permission to view class data.
+                      </p>
+                    </div>
+                  ) : isLoading ? (
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                      <span className="ml-2">Loading classes...</span>
+                    </div>
+                  ) : (
+                    <ClassSectionsTable
+                      data={classSectionsData || []}
+                      onEditClass={handleEditClass}
+                      onDeleteClass={handleDeleteClass}
+                      onEditSection={handleEditSection}
+                      onDeleteSection={handleDeleteSection}
+                      onAddSection={handleAddSection}
+                      isLoading={isLoading}
+                      hasSectionsPermission={hasSectionsListPermission}
+                    />
+                  )}
+                </>
+              )}
+            </div>
           </CardContent>
         </Card>
 

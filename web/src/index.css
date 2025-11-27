@@ -236,8 +236,8 @@
   }
 
   .ant-table-tbody>tr:hover>td {
-    background: var(--color-accent) !important;
-    color: var(--color-accent-foreground) !important;
+    background: var(--color-muted) !important;
+    color: var(--color-foreground) !important;
   }
 
   /* Ant Design Select - Both light and dark modes */
