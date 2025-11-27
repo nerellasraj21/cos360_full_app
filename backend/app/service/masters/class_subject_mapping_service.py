@@ -22,9 +22,21 @@ async def create_class_subject_mapping(db: AsyncSession, mapping_data: ClassSubj
     try:
         mapping = ClassSubjectMap(**mapping_data.model_dump())
         db.add(mapping)
+        await db.flush()
+
+        result = await db.execute(
+            select(ClassSubjectMap)
+            .options(
+                selectinload(ClassSubjectMap.class_),
+                selectinload(ClassSubjectMap.subject),
+                selectinload(ClassSubjectMap.academic_year)
+            )
+            .where(ClassSubjectMap.id == mapping.id)
+        )
+        mapping_out = result.scalar_one()
+
         await db.commit()
-        await db.refresh(mapping)
-        return mapping
+        return mapping_out
     except Exception as e:
         await db.rollback()
         log.error(f"Failed to create class-subject mapping: {e}")
@@ -70,7 +82,7 @@ async def bulk_create_or_update_class_subject_mappings(
         )
         
         # Create new mappings
-        created_mappings = []
+        created_mapping_ids = []
         for mapping_data in mappings_data:
             # Verify subject exists
             subject_result = await db.execute(
@@ -80,7 +92,7 @@ async def bulk_create_or_update_class_subject_mappings(
             if not subject:
                 log.warning(f"Subject {mapping_data['subject_id']} not found, skipping")
                 continue
-            
+
             new_mapping = ClassSubjectMap(
                 class_id=class_id,
                 subject_id=mapping_data['subject_id'],
@@ -90,14 +102,23 @@ async def bulk_create_or_update_class_subject_mappings(
                 is_active=mapping_data.get('is_active', True)
             )
             db.add(new_mapping)
-            created_mappings.append(new_mapping)
-        
+            await db.flush()
+            created_mapping_ids.append(new_mapping.id)
+
+        # Fetch all created mappings with relationships before commit
+        result = await db.execute(
+            select(ClassSubjectMap)
+            .options(
+                selectinload(ClassSubjectMap.class_),
+                selectinload(ClassSubjectMap.subject),
+                selectinload(ClassSubjectMap.academic_year)
+            )
+            .where(ClassSubjectMap.id.in_(created_mapping_ids))
+        )
+        created_mappings = result.scalars().all()
+
         await db.commit()
-        
-        # Refresh all created mappings
-        for mapping in created_mappings:
-            await db.refresh(mapping)
-        
+
         return {
             "success": True,
             "message": f"Successfully created {len(created_mappings)} class-subject mappings",
@@ -129,7 +150,7 @@ async def get_class_subject_mapping_by_id(db: AsyncSession, mapping_id: UUID) ->
     return mapping
 
 async def get_class_subject_mappings_by_class(
-    db: AsyncSession, 
+    db: AsyncSession,
     class_id: UUID,
     academic_year_id: Optional[UUID] = None,
     active_only: bool = True
@@ -213,19 +234,18 @@ async def update_class_subject_mapping(
             select(ClassSubjectMap).where(ClassSubjectMap.id == mapping_id)
         )
         mapping = result.scalar_one_or_none()
-        
+
         if not mapping:
             raise HTTPException(status_code=404, detail="Class-subject mapping not found")
-        
+
         # Update fields
         update_data = mapping_update.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(mapping, field, value)
-        
-        await db.commit()
-        await db.refresh(mapping)
-        
-        # Load relationships
+
+        await db.flush()
+
+        # Load relationships before commit
         result = await db.execute(
             select(ClassSubjectMap)
             .options(
@@ -235,8 +255,11 @@ async def update_class_subject_mapping(
             )
             .where(ClassSubjectMap.id == mapping_id)
         )
-        return result.scalar_one()
-        
+        mapping_out = result.scalar_one()
+
+        await db.commit()
+        return mapping_out
+
     except HTTPException:
         await db.rollback()
         raise

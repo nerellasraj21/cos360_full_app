@@ -10,7 +10,7 @@ class Subject(BaseOrg):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     name = Column(String(50), nullable=False, unique=True)
     category_id = Column(UUID(as_uuid=True), ForeignKey("subject_categories.id"), nullable=True)
-    is_active = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
     short_code = Column(String(10), nullable=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())   
