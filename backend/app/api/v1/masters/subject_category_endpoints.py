@@ -21,7 +21,7 @@ from app.service.masters.subject_category_service import (
 )
 from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit_create
 
-router = APIRouter()
+# router = APIRouter()
 router = APIRouter(prefix="/masters/subject_categories", tags=["Masters/SubjectCategories"])
 
 @router.post("/categories", response_model=SubjectCategoryOut)

@@ -52,55 +52,55 @@ async def create_subject(
             )
         
         # Validate subject name
-        if not subject_data.subject_name or not subject_data.subject_name.strip():
+        if not subject_data.name or not subject_data.name.strip():
             raise create_validation_error(
                 message="Subject name is required",
                 field="subject_name",
                 request=request
             )
         
-        if len(subject_data.subject_name.strip()) > 100:
+        if len(subject_data.name.strip()) > 100:
             raise create_validation_error(
                 message="Subject name cannot exceed 100 characters",
                 field="subject_name",
-                value=subject_data.subject_name,
+                value=subject_data.name,
                 request=request
             )
         
         # Validate subject code if provided
-        if subject_data.subject_code and len(subject_data.subject_code) > 20:
+        if subject_data.short_code and len(subject_data.short_code) > 20:
             raise create_validation_error(
                 message="Subject code cannot exceed 20 characters",
                 field="subject_code",
-                value=subject_data.subject_code,
+                value=subject_data.short_code,
                 request=request
             )
         
         # Check for duplicate subject name
         existing_subject = await db.execute(
             select(Subject).where(
-                Subject.subject_name == subject_data.subject_name.strip(),
+                Subject.name == subject_data.name.strip(),
                 Subject.academic_year_id == subject_data.academic_year_id
             )
         )
         if existing_subject.scalar_one_or_none():
             raise create_business_rule_error(
-                message=f"Subject with name '{subject_data.subject_name}' already exists for this academic year",
+                message=f"Subject with name '{subject_data.name}' already exists for this academic year",
                 rule="unique_subject_name_per_year",
                 request=request
             )
         
         # Check for duplicate subject code if provided
-        if subject_data.subject_code:
+        if subject_data.short_code:
             existing_code = await db.execute(
                 select(Subject).where(
-                    Subject.subject_code == subject_data.subject_code.strip(),
+                    Subject.short_code == subject_data.short_code.strip(),
                     Subject.academic_year_id == subject_data.academic_year_id
                 )
             )
             if existing_code.scalar_one_or_none():
                 raise create_business_rule_error(
-                    message=f"Subject with code '{subject_data.subject_code}' already exists for this academic year",
+                    message=f"Subject with code '{subject_data.short_code}' already exists for this academic year",
                     rule="unique_subject_code_per_year",
                     request=request
                 )
@@ -121,7 +121,7 @@ async def create_subject(
         # Invalidate cache after creating new subject
         invalidate_cache("dropdown", "subjects")
         
-        log.info(f"Successfully created subject: {subject.subject_name} (ID: {subject.id})")
+        log.info(f"Successfully created subject: {subject.name} (ID: {subject.id})")
         return subject
         
     except HTTPException:
