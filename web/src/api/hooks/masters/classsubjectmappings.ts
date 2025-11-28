@@ -123,7 +123,7 @@ export function useClassSubjectMappingsPaginated(page: number, pageSize: number,
       const response = await fetchClassSubjectMappings({
         skip: page * pageSize,
         limit: pageSize,
-        active_only: true,
+        active_only: false,
         academic_year_id: academicYearId
       });
 

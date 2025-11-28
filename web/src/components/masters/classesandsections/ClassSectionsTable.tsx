@@ -242,7 +242,7 @@ export function ClassSectionsTable({
           <TableBody>
             {paginatedData.map((classItem) => (
               <React.Fragment key={classItem.id}>
-                <TableRow className="hover:bg-gray-50">
+                <TableRow className="hover:bg-muted/50">
                   <TableCell>
                     {hasSectionsPermission ? (
                       <Button
@@ -327,18 +327,18 @@ export function ClassSectionsTable({
                 </TableRow>
                 {expandedRows.has(classItem.id) && (
                   <TableRow>
-                    <TableCell colSpan={6} className="bg-gray-50 p-0">
+                    <TableCell colSpan={6} className="bg-muted/50 p-0">
                       <div className="p-4">
                         <div className="mb-3">
-                          <h4 className="font-medium text-sm text-gray-700 mb-2">Sections:</h4>
+                          <h4 className="font-medium text-sm text-foreground/80 mb-2">Sections:</h4>
                           {classItem.sections.length === 0 ? (
-                            <p className="text-sm text-gray-500 italic">No sections found</p>
+                            <p className="text-sm text-muted-foreground italic">No sections found</p>
                           ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                               {classItem.sections.map((section) => (
                                 <div
                                   key={section.id}
-                                  className="flex items-center justify-between bg-white p-3 rounded border"
+                                  className="flex items-center justify-between bg-background p-3 rounded border"
                                 >
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium">{section.name}</span>
@@ -387,7 +387,7 @@ export function ClassSectionsTable({
                           )}
                         </div>
                         {classItem.description && (
-                          <div className="text-sm text-gray-600">
+                          <div className="text-sm text-muted-foreground">
                             <strong>Description:</strong> {classItem.description}
                           </div>
                         )}
@@ -399,7 +399,7 @@ export function ClassSectionsTable({
             ))}
             {data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   No classes found
                 </TableCell>
               </TableRow>
@@ -411,7 +411,7 @@ export function ClassSectionsTable({
         {data.length > pageSize && (
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Rows per page:</span>
+              <span className="text-sm text-muted-foreground">Rows per page:</span>
               <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
                 <SelectTrigger className="w-20">
                   <SelectValue />
@@ -425,7 +425,7 @@ export function ClassSectionsTable({
               </Select>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted-foreground">
                 {Math.min((currentPage - 1) * pageSize + 1, data.length)}-{Math.min(currentPage * pageSize, data.length)} of {data.length}
               </span>
               <div className="flex gap-1">

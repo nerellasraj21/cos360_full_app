@@ -189,7 +189,7 @@ export default function TimeTableEditor() {
 
 
     useEffect(() => {
-        fetchSubjects()
+        fetchSubjects({ active_only: true })
             .then(response => {
                 setSubjects(response?.items || []);
                 setSubjectsLoading(false);

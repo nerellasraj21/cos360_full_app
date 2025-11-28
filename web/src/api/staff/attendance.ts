@@ -24,7 +24,7 @@ export const createStaffAttendance = async (
     attendanceData: StaffAttendanceCreate
 ): Promise<StaffAttendanceOut> => {
     try {
-        const { data } = await CAxios.post('/masters/staff/attendance', attendanceData);
+        const { data } = await CAxios.post('/staff/attendance', attendanceData);
         return data;
     } catch (error) {
         throw handleApiError(error);
@@ -34,7 +34,7 @@ export const createStaffAttendance = async (
 // Get all attendances
 export const getAllStaffAttendances = async (): Promise<StaffAttendanceOut[]> => {
     try {
-        const { data } = await CAxios.get('/masters/staff/attendance');
+        const { data } = await CAxios.get('/staff/attendance');
         return data;
     } catch (error) {
         throw handleApiError(error);
@@ -46,7 +46,7 @@ export const getStaffAttendanceById = async (
     attendanceId: string
 ): Promise<StaffAttendanceOut> => {
     try {
-        const { data } = await CAxios.get(`/masters/staff/attendance/${attendanceId}`);
+        const { data } = await CAxios.get(`/staff/attendance/${attendanceId}`);
         return data;
     } catch (error) {
         throw handleApiError(error);
@@ -59,7 +59,7 @@ export const updateStaffAttendance = async (
     attendanceData: StaffAttendanceUpdate
 ): Promise<StaffAttendanceOut> => {
     try {
-        const { data } = await CAxios.patch(`/masters/staff/attendance/${attendanceId}`, attendanceData);
+        const { data } = await CAxios.patch(`/staff/attendance/${attendanceId}`, attendanceData);
         return data;
     } catch (error) {
         throw handleApiError(error);
@@ -69,7 +69,7 @@ export const updateStaffAttendance = async (
 // Delete attendance
 export const deleteStaffAttendance = async (attendanceId: string): Promise<void> => {
     try {
-        await CAxios.delete(`/masters/staff/attendance/${attendanceId}`);
+        await CAxios.delete(`/staff/attendance/${attendanceId}`);
     } catch (error) {
         throw handleApiError(error);
     }
