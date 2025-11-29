@@ -30,6 +30,80 @@ import { usePermission } from "@/hooks/usePermission";
 
 type SelectOption = { value: string; label: string } | null;
 
+// Custom styles for react-select with proper dark mode support
+const getCustomSelectStyles = () => {
+  const isDark = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
+
+  return {
+    control: (base: any) => ({
+      ...base,
+      backgroundColor: isDark ? '#2d3748' : '#ffffff',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0',
+      color: isDark ? '#f7fafc' : '#1a202c',
+      minHeight: '36px',
+      '&:hover': {
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : '#cbd5e0',
+      },
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: isDark ? '#2d3748' : '#ffffff',
+      border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid #e2e8f0',
+      zIndex: 9999,
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+      pointerEvents: 'auto',
+    }),
+    menuPortal: (base: any) => ({
+      ...base,
+      zIndex: 9999,
+      pointerEvents: 'auto',
+    }),
+    menuList: (base: any) => ({
+      ...base,
+      pointerEvents: 'auto',
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isSelected
+        ? '#556ee6'
+        : state.isFocused
+        ? (isDark ? '#4a5568' : '#f7fafc')
+        : (isDark ? '#2d3748' : '#ffffff'),
+      color: state.isSelected
+        ? '#ffffff'
+        : (isDark ? '#f7fafc' : '#1a202c'),
+      cursor: 'pointer',
+      pointerEvents: 'auto',
+      '&:active': {
+        backgroundColor: '#556ee6',
+      },
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: isDark ? '#f7fafc' : '#1a202c',
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: isDark ? '#f7fafc' : '#1a202c',
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: isDark ? '#a0aec0' : '#718096',
+    }),
+    dropdownIndicator: (base: any) => ({
+      ...base,
+      color: isDark ? '#a0aec0' : '#718096',
+      '&:hover': {
+        color: isDark ? '#f7fafc' : '#1a202c',
+      },
+    }),
+    indicatorSeparator: (base: any) => ({
+      ...base,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0',
+    }),
+  };
+};
+
 export default function ClassSubjectMappingsPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
@@ -235,11 +309,10 @@ export default function ClassSubjectMappingsPage() {
             placeholder="Select Class"
             classNamePrefix="react-select"
             menuPlacement="auto"
-            menuPortalTarget={
-              typeof window !== "undefined" ? document.body : undefined
-            }
-            styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+            menuShouldBlockScroll={false}
             isLoading={classesLoading}
+            styles={getCustomSelectStyles()}
           />
         );
       }
@@ -254,11 +327,10 @@ export default function ClassSubjectMappingsPage() {
             placeholder="Select Subject"
             classNamePrefix="react-select"
             menuPlacement="auto"
-            menuPortalTarget={
-              typeof window !== "undefined" ? document.body : undefined
-            }
-            styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+            menuShouldBlockScroll={false}
             isLoading={subjectsLoading}
+            styles={getCustomSelectStyles()}
           />
         );
       }

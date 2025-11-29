@@ -164,13 +164,22 @@ export function useLoginMutation() {
   return useMutation({
     mutationFn: async (credentials: LoginRequest): Promise<LoginResponse> => {
       console.log("credentials", credentials);
-      const { data } = await CAxios.post<LoginResponse>('/auth/login', credentials);
-      return data;
+      try {
+        const { data } = await CAxios.post<LoginResponse>('/auth/login', credentials);
+        return data;
+      } catch (error: any) {
+        // Extract error message from response
+        const errorMessage = error.response?.data?.detail ||
+                           error.response?.data?.message ||
+                           error.message ||
+                           'Login failed. Please check your credentials and try again.';
+        throw new Error(errorMessage);
+      }
     },
     onSuccess: async (data) => {
       // First, login the user
       login(data);
-      
+
       // If user is a parent, fetch their students
       if (data.user.parent_profile) {
         try {
@@ -184,7 +193,7 @@ export function useLoginMutation() {
           // Don't fail the login if student fetching fails
         }
       }
-      
+
       queryClient.clear();
     },
     onError: (error: any) => {
