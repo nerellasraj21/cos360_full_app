@@ -44,7 +44,7 @@ export const AcademicStepForm = () => {
             <SelectContent>
               {academicYears.map((year) => (
                 <SelectItem key={year.id} value={year.id}>
-                  {year.title} {year.is_current ? '(Current)' : ''}
+                  {`${year.title}${year.is_current ? ' (Current)' : ''}`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -67,7 +67,7 @@ export const AcademicStepForm = () => {
             <SelectContent>
               {academicYears.map((year) => (
                 <SelectItem key={year.id} value={year.id}>
-                  {year.title} {year.is_current ? '(Current)' : ''}
+                  {`${year.title}${year.is_current ? ' (Current)' : ''}`}
                 </SelectItem>
               ))}
             </SelectContent>

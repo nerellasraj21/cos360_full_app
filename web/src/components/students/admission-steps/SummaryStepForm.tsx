@@ -2,10 +2,34 @@ import React from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { StudentAdmissionCreate } from '@/types/admission';
+import { useAcademicYearsDropdown } from '@/api/hooks/masters/academicyears';
+import { useClassesDropdown, useSectionsByClassId } from '@/hooks/masters/useClassesAndSections';
 
 export function SummaryStepForm() {
   const { watch } = useFormContext<StudentAdmissionCreate>();
   const formData = watch();
+
+  // Fetch data to display names instead of IDs
+  const { data: academicYears = [] } = useAcademicYearsDropdown();
+  const { data: classes = [] } = useClassesDropdown(true);
+  const { data: admittedSections = [] } = useSectionsByClassId(formData.admitted_class_id || undefined);
+  const { data: currentSections = [] } = useSectionsByClassId(formData.current_class_id || undefined);
+
+  // Helper functions to get display names
+  const getAcademicYearName = (yearId: string) => {
+    const year = academicYears.find(y => String(y.id) === String(yearId));
+    return year ? year.title : yearId;
+  };
+
+  const getClassName = (classId: string) => {
+    const classItem = classes.find(c => String(c.id) === String(classId));
+    return classItem ? classItem.name : classId;
+  };
+
+  const getSectionName = (sections: any[], sectionId: string) => {
+    const section = sections.find(s => String(s.id) === String(sectionId));
+    return section ? section.name : sectionId;
+  };
 
   return (
     <div className="space-y-6">
@@ -15,9 +39,12 @@ export function SummaryStepForm() {
         </CardHeader>
         <CardContent className="space-y-2">
           <p><strong>Admission Date:</strong> {formData.admission_date}</p>
-          <p><strong>Academic Year:</strong> {formData.academic_year_id}</p>
-          <p><strong>Admitted Class:</strong> {formData.admitted_class_id}</p>
-          <p><strong>Admitted Section:</strong> {formData.admitted_section_id}</p>
+          <p><strong>Academic Year:</strong> {getAcademicYearName(formData.academic_year_id || '')}</p>
+          <p><strong>Admitted Academic Year:</strong> {getAcademicYearName(formData.admitted_academic_year_id || '')}</p>
+          <p><strong>Admitted Class:</strong> {getClassName(formData.admitted_class_id || '')}</p>
+          <p><strong>Admitted Section:</strong> {getSectionName(admittedSections, formData.admitted_section_id || '')}</p>
+          <p><strong>Current Class:</strong> {getClassName(formData.current_class_id || '')}</p>
+          <p><strong>Current Section:</strong> {getSectionName(currentSections, formData.current_section_id || '')}</p>
         </CardContent>
       </Card>
 

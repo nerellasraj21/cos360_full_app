@@ -18,7 +18,7 @@ import {
   getStudentByAdmissionId,
   searchStudents,
   listAdmissions,
-  deleteStudentAdmission,
+  toggleStudentActiveStatus,
   fetchStudentsDropdown,
   fetchStudentsDropdownSimple
 } from '@/api/students/admissions';
@@ -119,19 +119,21 @@ export function useUpdateAdmission() {
   });
 }
 
-export function useDeleteAdmission() {
+export function useToggleStudentStatus() {
   const queryClient = useQueryClient();
-  return usePermissionProtectedMutation<{ message: string }, Error, string>({
-    mutationFn: deleteStudentAdmission,
-    onSuccess: () => {
-      toast.success('Student admission deleted successfully!');
+  return usePermissionProtectedMutation<StudentAdmissionResponse, Error, { studentId: string; isActive: boolean }>({
+    mutationFn: ({ studentId, isActive }) => toggleStudentActiveStatus(studentId, isActive),
+    onSuccess: (data, variables) => {
+      const action = variables.isActive ? 'enabled' : 'disabled';
+      toast.success(`Student ${action} successfully!`);
       queryClient.invalidateQueries({ queryKey: ['admissions'] });
+      queryClient.invalidateQueries({ queryKey: ['admission', 'student', data.student_id] });
       queryClient.invalidateQueries({ queryKey: ['students'] });
     },
     onError: (error) => {
-      toast.error(`Failed to delete admission: ${error.message}`);
+      toast.error(`Failed to update student status: ${error.message}`);
     },
     resource: 'student_admissions',
-    action: 'delete',
+    action: 'update',
   });
 }

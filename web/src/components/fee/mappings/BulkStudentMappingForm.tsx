@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,18 +8,16 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Badge } from '@/components/ui/badge';
-import { X, Plus } from 'lucide-react';
+import { X } from 'lucide-react';
 import { toast } from 'sonner';
 import { feeStudentMappingsApi } from '@/api/fee/studentMappings';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { useClassesDropdown, useSectionsByClassId } from '@/hooks/masters/useClassesAndSections';
-import { fetchStudentsDropdown } from '@/api/students/admissions';
 import { useFeeTypes } from '@/hooks/fee/useFeeTypes';
+import CAxios from '@/api/index';
 import Select, { type SingleValue } from 'react-select';
 import type { FeeStudentMappingBulkCreateRequest, FeeStudentMappingBulkResponse } from '@/types/fee/mapping';
 import type { StudentDropdownItem } from '@/types/admission';
-import type { ClassDropdown, SectionDropdown } from '@/types/masters/classesandsections';
-import type { FeeType } from '@/types/fee';
 
 const formSchema = z.object({
   student_ids: z.array(z.string()).min(1, 'At least one student must be selected'),
@@ -27,20 +25,18 @@ const formSchema = z.object({
   section_id: z.string().min(1, 'Section is required'),
   fee_type_id: z.string().min(1, 'Fee type is required'),
   total_fee: z.number().min(0, 'Total fee must be non-negative'),
-  academic_year_id: z.string().min(1, 'Academic year is required'),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
 interface BulkStudentMappingFormProps {
-  academicYearId?: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
 type SelectOption = { value: string; label: string } | null;
 
-export function BulkStudentMappingForm({ academicYearId, onSuccess, onCancel }: BulkStudentMappingFormProps) {
+export function BulkStudentMappingForm({ onSuccess, onCancel }: BulkStudentMappingFormProps) {
   const [loading, setLoading] = useState(false);
   const [bulkResult, setBulkResult] = useState<FeeStudentMappingBulkResponse | null>(null);
   const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
@@ -49,7 +45,7 @@ export function BulkStudentMappingForm({ academicYearId, onSuccess, onCancel }: 
   const [students, setStudents] = useState<StudentDropdownItem[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(true);
 
-  const { academicYears, selectedAcademicYearId } = useAcademicYearStore();
+  const { selectedAcademicYearId } = useAcademicYearStore();
 
   // Use hooks for data fetching
   const { data: classesData, isLoading: classesLoading } = useClassesDropdown();
@@ -64,27 +60,46 @@ export function BulkStudentMappingForm({ academicYearId, onSuccess, onCancel }: 
       section_id: '',
       fee_type_id: '',
       total_fee: 0,
-      academic_year_id: academicYearId || selectedAcademicYearId || '',
     },
   });
 
-  // Fetch students data
+  // Fetch students data when class and section are selected
   useEffect(() => {
     const fetchStudents = async () => {
+      // Only fetch students if both class and section are selected
+      if (!selectedClass?.value || !selectedSection?.value) {
+        setStudents([]);
+        setStudentsLoading(false);
+        return;
+      }
+
       try {
         setStudentsLoading(true);
-        const studentsData = await fetchStudentsDropdown();
-        setStudents(studentsData);
+
+        // Fetch students with class and section filter from the API
+        console.log('[DEBUG] Fetching students for class:', selectedClass.value, 'section:', selectedSection.value);
+        const { data } = await CAxios.get('/students/admission/students/dropdown', {
+          params: {
+            class_id: selectedClass.value,
+            section_id: selectedSection.value,
+            active_only: true
+          }
+        });
+
+        console.log('[DEBUG] Students API response:', data);
+        console.log('[DEBUG] Number of students returned:', data?.length || 0);
+        setStudents(data || []);
       } catch (error) {
-        console.error('Error fetching students:', error);
+        console.error('[ERROR] Failed to fetch students:', error);
         toast.error('Failed to load students');
+        setStudents([]);
       } finally {
         setStudentsLoading(false);
       }
     };
 
     fetchStudents();
-  }, []);
+  }, [selectedClass, selectedSection]);
 
   // Transform data for react-select
   const classOptions = useMemo(() => {
@@ -98,31 +113,35 @@ export function BulkStudentMappingForm({ academicYearId, onSuccess, onCancel }: 
   }, [sectionsData]);
 
   const studentOptions = useMemo(() => {
-    return students.map(student => ({
-      value: student.id,
-      label: student.admission_number ? `${student.name} (${student.admission_number})` : student.name
-    }));
+    return students.map(student => {
+      // Use display_name if available (it may already include admission number)
+      // Otherwise construct it from name and admission_number
+      const label = student.display_name ||
+                   (student.admission_number ? `${student.name} (${student.admission_number})` : student.name) ||
+                   'Unknown Student';
+      return {
+        value: student.id,
+        label: label
+      };
+    });
   }, [students]);
-
-  const academicYearOptions = useMemo(() => {
-    return academicYears.map(year => ({
-      value: year.id,
-      label: year.title
-    }));
-  }, [academicYears]);
 
   // Handle class change
   const handleClassChange = (option: SingleValue<SelectOption>) => {
     setSelectedClass(option);
     setSelectedSection(null); // Reset section when class changes
+    setSelectedStudents([]); // Clear selected students
     form.setValue('class_id', option?.value || '');
     form.setValue('section_id', ''); // Reset section in form
+    form.setValue('student_ids', []); // Clear student IDs in form
   };
 
   // Handle section change
   const handleSectionChange = (option: SingleValue<SelectOption>) => {
     setSelectedSection(option);
+    setSelectedStudents([]); // Clear selected students when section changes
     form.setValue('section_id', option?.value || '');
+    form.setValue('student_ids', []); // Clear student IDs in form
   };
 
 
@@ -131,7 +150,12 @@ export function BulkStudentMappingForm({ academicYearId, onSuccess, onCancel }: 
       setLoading(true);
       setBulkResult(null);
 
-      const result = await feeStudentMappingsApi.bulkCreateMappings(data);
+      const requestData: FeeStudentMappingBulkCreateRequest = {
+        ...data,
+        academic_year_id: selectedAcademicYearId || '',
+      };
+
+      const result = await feeStudentMappingsApi.bulkCreateMappings(requestData);
       setBulkResult(result);
 
       if (result.success_count > 0) {
@@ -154,7 +178,13 @@ export function BulkStudentMappingForm({ academicYearId, onSuccess, onCancel }: 
   const addStudent = (studentId: string | number, studentOption?: any) => {
     const id = String(studentId);
     if (!selectedStudents.find(s => s.id === id)) {
-      const student = studentOption || { id, name: `Student ${id}`, admission_number: id };
+      const student = studentOption || {
+        id,
+        name: `Student ${id}`,
+        display_name: `Student ${id}`,
+        admission_number: id,
+        admission_num: id
+      };
       const newSelected = [...selectedStudents, student];
       setSelectedStudents(newSelected);
       form.setValue('student_ids', newSelected.map(s => s.id));
@@ -188,9 +218,11 @@ export function BulkStudentMappingForm({ academicYearId, onSuccess, onCancel }: 
                       className="w-full"
                       classNamePrefix="react-select"
                       menuPlacement="auto"
-                      menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                       styles={{
-                        menuPortal: base => ({ ...base, zIndex: 9999 }),
+                        control: (provided) => ({
+                          ...provided,
+                          cursor: 'pointer',
+                        }),
                         menu: (provided) => ({ ...provided, zIndex: 9999 }),
                         option: (provided, state) => ({
                           ...provided,
@@ -226,9 +258,11 @@ export function BulkStudentMappingForm({ academicYearId, onSuccess, onCancel }: 
                       className="w-full"
                       classNamePrefix="react-select"
                       menuPlacement="auto"
-                      menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                       styles={{
-                        menuPortal: base => ({ ...base, zIndex: 9999 }),
+                        control: (provided) => ({
+                          ...provided,
+                          cursor: 'pointer',
+                        }),
                         menu: (provided) => ({ ...provided, zIndex: 9999 }),
                         option: (provided, state) => ({
                           ...provided,
@@ -270,9 +304,11 @@ export function BulkStudentMappingForm({ academicYearId, onSuccess, onCancel }: 
                       className="w-full"
                       classNamePrefix="react-select"
                       menuPlacement="auto"
-                      menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                       styles={{
-                        menuPortal: base => ({ ...base, zIndex: 9999 }),
+                        control: (provided) => ({
+                          ...provided,
+                          cursor: 'pointer',
+                        }),
                         menu: (provided) => ({ ...provided, zIndex: 9999 }),
                         option: (provided, state) => ({
                           ...provided,
@@ -313,98 +349,74 @@ export function BulkStudentMappingForm({ academicYearId, onSuccess, onCancel }: 
                 </FormItem>
               )}
             />
-
-            {/* Academic Year Selection */}
-            <FormField
-              control={form.control}
-              name="academic_year_id"
-              render={({ field }) => (
-                <FormItem className="md:col-span-2">
-                  <FormLabel>Academic Year</FormLabel>
-                  <FormControl>
-                    <Select
-                      options={academicYearOptions}
-                      value={academicYearOptions.find(option => option.value === field.value) || null}
-                      onChange={(option) => field.onChange(option?.value || '')}
-                      placeholder="Select academic year"
-                      className="w-full"
-                      classNamePrefix="react-select"
-                      menuPlacement="auto"
-                      menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                      styles={{
-                        menuPortal: base => ({ ...base, zIndex: 9999 }),
-                        menu: (provided) => ({ ...provided, zIndex: 9999 }),
-                        option: (provided, state) => ({
-                          ...provided,
-                          cursor: 'pointer',
-                          backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
-                          color: state.isSelected ? 'white' : 'black',
-                          '&:hover': {
-                            backgroundColor: state.isSelected ? '#3b82f6' : '#f3f4f6',
-                          },
-                        }),
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </div>
 
           {/* Student Selection */}
           <div className="space-y-4">
             <Label>Students</Label>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Select
-                  options={studentOptions}
-                  onChange={(option) => {
-                    if (option) {
-                      const selectedStudentData = students.find(s => s.id === option.value);
-                      addStudent(option.value, selectedStudentData);
-                    }
-                  }}
-                  placeholder="Select students to add"
-                  className="w-full"
-                  classNamePrefix="react-select"
-                  menuPlacement="auto"
-                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                  styles={{
-                    menuPortal: base => ({ ...base, zIndex: 9999 }),
-                    menu: (provided) => ({ ...provided, zIndex: 9999 }),
-                    option: (provided, state) => ({
-                      ...provided,
-                      cursor: 'pointer',
-                      backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
-                      color: state.isSelected ? 'white' : 'black',
-                      '&:hover': {
-                        backgroundColor: state.isSelected ? '#3b82f6' : '#f3f4f6',
-                      },
-                    }),
-                  }}
-                  isLoading={studentsLoading}
-                />
+            {!selectedClass || !selectedSection ? (
+              <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                Please select a class and section first to view available students.
               </div>
-            </div>
+            ) : (
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Select
+                    options={studentOptions}
+                    onChange={(option) => {
+                      if (option) {
+                        const selectedStudentData = students.find(s => s.id === option.value);
+                        addStudent(option.value, selectedStudentData);
+                      }
+                    }}
+                    placeholder={studentsLoading ? "Loading students..." : studentOptions.length === 0 ? "No students found" : "Select students to add"}
+                    className="w-full"
+                    classNamePrefix="react-select"
+                    menuPlacement="auto"
+                    styles={{
+                      control: (provided) => ({
+                        ...provided,
+                        cursor: 'pointer',
+                      }),
+                      menu: (provided) => ({ ...provided, zIndex: 9999 }),
+                      option: (provided, state) => ({
+                        ...provided,
+                        cursor: 'pointer',
+                        backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
+                        color: state.isSelected ? 'white' : 'black',
+                        '&:hover': {
+                          backgroundColor: state.isSelected ? '#3b82f6' : '#f3f4f6',
+                        },
+                      }),
+                    }}
+                    isLoading={studentsLoading}
+                    isDisabled={!selectedClass || !selectedSection || studentsLoading}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Selected Students */}
             {selectedStudents.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Selected Students ({selectedStudents.length})</Label>
                 <div className="flex flex-wrap gap-2">
-                  {selectedStudents.map((student) => (
-                    <Badge key={student.id} variant="secondary" className="flex items-center gap-1">
-                      {student.name} ({student.admission_number})
-                      <button
-                        type="button"
-                        onClick={() => removeStudent(student.id)}
-                        className="ml-1 hover:bg-destructive hover:text-destructive-foreground rounded-full p-0.5"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </Badge>
-                  ))}
+                  {selectedStudents.map((student) => {
+                    const admissionNum = student.admission_number || student.admission_num || '';
+                    const studentName = student.display_name || student.name || '';
+                    return (
+                      <Badge key={student.id} variant="secondary" className="flex items-center gap-1">
+                        {studentName} {admissionNum && `(${admissionNum})`}
+                        <button
+                          type="button"
+                          onClick={() => removeStudent(student.id)}
+                          className="ml-1 hover:bg-destructive hover:text-destructive-foreground rounded-full p-0.5"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
                 </div>
               </div>
             )}

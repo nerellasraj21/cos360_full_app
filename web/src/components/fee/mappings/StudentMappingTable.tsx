@@ -69,7 +69,7 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
   // Helper functions to get names by IDs
   const getStudentName = (studentId: string) => {
     const student = students.find(s => s.id === studentId);
-    return student ? student.name : `Student ${studentId}`;
+    return student ? (student.display_name || student.name) : `Student ${studentId}`;
   };
 
   const getClassName = (classId: string) => {
@@ -152,7 +152,6 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
                 <DialogTitle>Bulk Create Fee Student Mappings</DialogTitle>
               </DialogHeader>
               <BulkStudentMappingForm
-                academicYearId={academicYearId}
                 onSuccess={handleFormSuccess}
                 onCancel={() => setShowBulkDialog(false)}
               />
@@ -237,7 +236,7 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
             <TableHeader>
               <TableRow>
                 <TableHead>Student</TableHead>
-                <TableHead>Academic Year & Class</TableHead>
+                <TableHead>Class & Section</TableHead>
                 <TableHead>Fee Type</TableHead>
                 <TableHead>Total Fee</TableHead>
                 <TableHead>Actions</TableHead>
@@ -263,22 +262,17 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
                 filteredMappings.map((mapping) => (
                   <TableRow key={mapping.id}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">
-                          {getStudentName(mapping.student_id)}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {mapping.student_admission_num}
-                        </div>
+                      <div className="font-medium">
+                        {getStudentName(mapping.student_id)}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div>
                         <div className="font-medium">
-                          {getAcademicYearName(mapping.academic_year_id)}
+                          Class: {getClassName(mapping.class_id)}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          Class: {getClassName(mapping.class_id)} | Section: {getSectionName(mapping.class_id, mapping.section_id)}
+                          Section: {getSectionName(mapping.class_id, mapping.section_id)}
                         </div>
                       </div>
                     </TableCell>

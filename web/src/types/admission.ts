@@ -1,8 +1,13 @@
 export interface Parent {
+  id?: string;
   name: string;
   email: string;
   phone: string;
   occupation?: string;
+  aadhar_number?: string;
+  gender?: string;
+  relation_to_student?: string;
+  students?: any[];
 }
 
 export interface StudentCreate {
@@ -40,8 +45,17 @@ export interface StudentOut {
   last_name: string;
   date_of_birth: string;
   gender: string;
+  is_primary?: string;
   aadhar_number?: string;
-  user_id: string;
+  apaar_number?: string;
+  caste?: string;
+  sub_caste?: string;
+  community?: string;
+  nationality?: string;
+  mother_tongue?: string;
+  identification_marks?: string;
+  is_active: boolean;
+  user_id?: string;
   parent_links?: Array<{
     parent: {
       id: string;
@@ -50,6 +64,8 @@ export interface StudentOut {
       phone: string;
     };
   }>;
+  father?: Parent;
+  mother?: Parent;
 }
 
 export interface StudentAdmissionBase {
@@ -107,7 +123,7 @@ export interface StudentAdmissionCreate extends StudentAdmissionBase {
 
 export interface StudentAdmissionResponse extends StudentAdmissionBase {
   id: string;
-  student_id: string;
+  student_id?: string;
   admission_number?: string;
   admitted_academic_year_id?: string;
   student: StudentOut;

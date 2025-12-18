@@ -1,14 +1,15 @@
 import { Table, type TableColumn } from '@/components/common/table';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Eye, Edit, CheckCircle, XCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { useAdmissions, useUpdateAdmission, useDeleteAdmission } from '@/api/hooks/students/admissions';
+import { useAdmissions, useUpdateAdmission, useToggleStudentStatus } from '@/api/hooks/students/admissions';
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections';
 import { useAcademicYearsDropdown } from '@/api/hooks/masters/academicyears';
 import { toast } from 'sonner';
@@ -24,7 +25,7 @@ interface AdmissionTableData {
   section_name: string;
   academic_year: string;
   admission_date: string;
-  status: string;
+  is_active: boolean;
   student_id: string;
   current_class_id: string;
   current_section_id: string;
@@ -34,10 +35,9 @@ interface AdmissionTableProps {
    searchQuery?: string;
    searchResults?: StudentOut[];
    hasUpdatePermission?: boolean;
-   hasDeletePermission?: boolean;
 }
 
-const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true, hasDeletePermission = true }: AdmissionTableProps = {}) => {
+const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true }: AdmissionTableProps = {}) => {
   const navigate = useNavigate();
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -59,12 +59,12 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
   const { data: classesData = [] } = useClassSectionsDropdown();
   const { data: academicYears = [] } = useAcademicYearsDropdown();
   const updateMutation = useUpdateAdmission();
-  const deleteMutation = useDeleteAdmission();
+  const toggleStatusMutation = useToggleStudentStatus();
 
   // Helper functions to get display names
   const getAcademicYearName = (yearId: string) => {
-    const year = academicYears.find(y => y.id === yearId);
-    return year ? year.title : `Year ${yearId}`;
+    const year = academicYears.find(y => String(y.id) === String(yearId));
+    return year ? year.title : yearId;
   };
 
   const getClassName = (classId: string) => {
@@ -91,7 +91,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
         section_name: 'N/A',
         academic_year: 'N/A',
         admission_date: 'N/A',
-        status: 'Active',
+        is_active: true,
         student_id: student.id,
         current_class_id: '',
         current_section_id: ''
@@ -104,7 +104,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
         section_name: getSectionName(item.current_class_id || '', item.current_section_id || ''),
         academic_year: getAcademicYearName(item.admitted_academic_year_id || ''),
         admission_date: item.admission_date,
-        status: 'Active', // Since the API doesn't have is_active, assume active
+        is_active: item.student?.is_active ?? true,
         student_id: item.student_id || item.student?.id || '',
         current_class_id: item.current_class_id || '',
         current_section_id: item.current_section_id || ''
@@ -192,16 +192,12 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       render: (value) => new Date(value).toLocaleDateString()
     },
     {
-      key: 'status',
+      key: 'is_active',
       label: 'Status',
-      render: (value) => (
-        <span className={`px-2 py-1 rounded-full text-xs ${
-          value === 'Active' ? 'bg-green-100 text-green-800' :
-          value === 'Inactive' ? 'bg-red-100 text-red-800' :
-          'bg-gray-100 text-gray-800'
-        }`}>
-          {value}
-        </span>
+      render: (value: boolean) => (
+        <Badge variant={value ? 'default' : 'secondary'}>
+          {value ? 'Active' : 'Inactive'}
+        </Badge>
       )
     },
     {
@@ -220,46 +216,53 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                 setViewModalOpen(true);
               }
             }}
+            className="h-8 w-8 p-0 hover:bg-accent"
           >
-            View
+            <Eye className="h-4 w-4" />
           </Button>
           {hasUpdatePermission && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                // Find the full admission data
-                const admission = admissionsResponse?.items?.find(item => item.id === row.id);
-                if (admission) {
-                  setSelectedAdmission(admission);
-                  setEditForm({
-                    current_class_id: admission.current_class_id || '',
-                    current_section_id: admission.current_section_id || '',
-                    address_line1: admission.address_line1 || '',
-                    address_line2: admission.address_line2 || '',
-                    city: admission.city || '',
-                    state: admission.state || '',
-                    is_previous_school: admission.is_previous_school || false,
-                    previous_school_name: admission.previous_school_name || '',
-                    previous_class: admission.previous_class || '',
-                    previous_school_remark: admission.previous_school_remark || ''
-                  });
-                  setEditModalOpen(true);
-                }
-              }}
-            >
-              Edit
-            </Button>
-          )}
-          {hasDeletePermission && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDelete(row)}
-              className="text-red-600 hover:text-red-700"
-            >
-              Delete
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  // Find the full admission data
+                  const admission = admissionsResponse?.items?.find(item => item.id === row.id);
+                  if (admission) {
+                    setSelectedAdmission(admission);
+                    setEditForm({
+                      current_class_id: admission.current_class_id || '',
+                      current_section_id: admission.current_section_id || '',
+                      address_line1: admission.address_line1 || '',
+                      address_line2: admission.address_line2 || '',
+                      city: admission.city || '',
+                      state: admission.state || '',
+                      is_previous_school: admission.is_previous_school || false,
+                      previous_school_name: admission.previous_school_name || '',
+                      previous_class: admission.previous_class || '',
+                      previous_school_remark: admission.previous_school_remark || ''
+                    });
+                    setEditModalOpen(true);
+                  }
+                }}
+                className="h-8 w-8 p-0 hover:bg-accent"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleToggleStatus(row)}
+                className={`h-8 w-8 p-0 ${row.is_active ? 'hover:bg-destructive/10 hover:text-destructive' : 'hover:bg-green-500/10 hover:text-green-600'}`}
+                disabled={toggleStatusMutation.isPending}
+              >
+                {row.is_active ? (
+                  <XCircle className="h-4 w-4" />
+                ) : (
+                  <CheckCircle className="h-4 w-4" />
+                )}
+              </Button>
+            </>
           )}
         </div>
       )
@@ -339,13 +342,17 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
     }
   };
 
-  const handleDelete = async (row: AdmissionTableData) => {
+  const handleToggleStatus = async (row: AdmissionTableData) => {
     try {
-      if (confirm(`Are you sure you want to delete admission for ${row.student_name}?`)) {
-        await deleteMutation.mutateAsync(row.id);
+      const action = row.is_active ? 'disable' : 'enable';
+      if (confirm(`Are you sure you want to ${action} ${row.student_name}?`)) {
+        await toggleStatusMutation.mutateAsync({
+          studentId: row.student_id,
+          isActive: !row.is_active
+        });
       }
     } catch (error) {
-      console.error('Error deleting admission:', error);
+      console.error('Error toggling student status:', error);
     }
   };
 
@@ -401,7 +408,6 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
         columns={columns}
         data={admissions}
         onEdit={handleEdit}
-        onDelete={handleDelete}
         isEditing={true}
         pagination={{
           page: 0,

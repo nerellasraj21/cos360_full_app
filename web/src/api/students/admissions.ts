@@ -103,10 +103,10 @@ export const listAdmissions = async (
   }
 };
 
-// Delete student admission
-export const deleteStudentAdmission = async (admissionId: string): Promise<{ message: string }> => {
+// Toggle student active status
+export const toggleStudentActiveStatus = async (studentId: string, isActive: boolean): Promise<StudentAdmissionResponse> => {
   try {
-    const { data } = await CAxios.delete(`${STUDENT_ADMISSIONS}${admissionId}`);
+    const { data } = await CAxios.patch(`${STUDENT_ADMISSIONS}${studentId}/toggle-active`, { is_active: isActive });
     return data;
   } catch (error) {
     throw handleApiError(error);
@@ -145,5 +145,4 @@ export const fetchStudentsDropdownSimple = async (
 export const fetchStudentAdmissions = listAdmissions;
 export const fetchStudentById = getAdmissionByStudentId;
 export const updateStudent = updateStudentAdmission;
-export const deleteStudent = deleteStudentAdmission;
 export const searchStudentAdmissions = searchStudents;

@@ -53,7 +53,7 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
   const [students, setStudents] = useState<StudentDropdownItem[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(true);
 
-  const { academicYears, selectedAcademicYearId } = useAcademicYearStore();
+  const { selectedAcademicYearId } = useAcademicYearStore();
 
   // Use hooks for data fetching
   const { data: classesData, isLoading: classesLoading } = useClassesDropdown();
@@ -105,7 +105,7 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
       if (studentItem) {
         setSelectedStudent({
           value: studentItem.id,
-          label: studentItem.admission_number ? `${studentItem?.display_name || studentItem.name} (${studentItem.admission_number})` : studentItem.name
+          label: studentItem.display_name || studentItem.name
         });
       }
     }
@@ -135,16 +135,9 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
   const studentOptions = useMemo(() => {
     return students.map(student => ({
       value: student.id,
-      label: student.admission_number ? `${student?.display_name} (${student.admission_number})` : student.name
+      label: student.display_name || student.name
     }));
   }, [students]);
-
-  const academicYearOptions = useMemo(() => {
-    return academicYears.map(year => ({
-      value: year.id,
-      label: year.title
-    }));
-  }, [academicYears]);
 
   // Handle class change
   const handleClassChange = (option: SingleValue<SelectOption>) => {
@@ -214,11 +207,12 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
                     menuPlacement="auto"
                     menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                     styles={{
-                      menuPortal: base => ({ ...base, zIndex: 9999 }),
-                      menu: (provided) => ({ ...provided, zIndex: 9999 }),
+                      menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                      menu: (provided) => ({ ...provided, zIndex: 9999, pointerEvents: 'auto' }),
                       option: (provided, state) => ({
                         ...provided,
                         cursor: 'pointer',
+                        pointerEvents: 'auto',
                         backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
                         color: state.isSelected ? 'white' : 'black',
                         '&:hover': {
@@ -267,11 +261,12 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
                     menuPlacement="auto"
                     menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                     styles={{
-                      menuPortal: base => ({ ...base, zIndex: 9999 }),
-                      menu: (provided) => ({ ...provided, zIndex: 9999 }),
+                      menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                      menu: (provided) => ({ ...provided, zIndex: 9999, pointerEvents: 'auto' }),
                       option: (provided, state) => ({
                         ...provided,
                         cursor: 'pointer',
+                        pointerEvents: 'auto',
                         backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
                         color: state.isSelected ? 'white' : 'black',
                         '&:hover': {
@@ -305,11 +300,12 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
                     menuPlacement="auto"
                     menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                     styles={{
-                      menuPortal: base => ({ ...base, zIndex: 9999 }),
-                      menu: (provided) => ({ ...provided, zIndex: 9999 }),
+                      menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                      menu: (provided) => ({ ...provided, zIndex: 9999, pointerEvents: 'auto' }),
                       option: (provided, state) => ({
                         ...provided,
                         cursor: 'pointer',
+                        pointerEvents: 'auto',
                         backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
                         color: state.isSelected ? 'white' : 'black',
                         '&:hover': {
@@ -349,11 +345,12 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
                     menuPlacement="auto"
                     menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                     styles={{
-                      menuPortal: base => ({ ...base, zIndex: 9999 }),
-                      menu: (provided) => ({ ...provided, zIndex: 9999 }),
+                      menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                      menu: (provided) => ({ ...provided, zIndex: 9999, pointerEvents: 'auto' }),
                       option: (provided, state) => ({
                         ...provided,
                         cursor: 'pointer',
+                        pointerEvents: 'auto',
                         backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
                         color: state.isSelected ? 'white' : 'black',
                         '&:hover': {
@@ -384,43 +381,6 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
                     min="0"
                     placeholder="Enter total fee amount"
                     onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Academic Year Selection */}
-          <FormField
-            control={form.control}
-            name="academic_year_id"
-            render={({ field }) => (
-              <FormItem className="md:col-span-2">
-                <FormLabel>Academic Year</FormLabel>
-                <FormControl>
-                  <Select
-                    options={academicYearOptions}
-                    value={academicYearOptions.find(option => option.value === field.value) || null}
-                    onChange={(option) => field.onChange(option?.value || '')}
-                    placeholder="Select academic year"
-                    className="w-full"
-                    classNamePrefix="react-select"
-                    menuPlacement="auto"
-                    menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                    styles={{
-                      menuPortal: base => ({ ...base, zIndex: 9999 }),
-                      menu: (provided) => ({ ...provided, zIndex: 9999 }),
-                      option: (provided, state) => ({
-                        ...provided,
-                        cursor: 'pointer',
-                        backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
-                        color: state.isSelected ? 'white' : 'black',
-                        '&:hover': {
-                          backgroundColor: state.isSelected ? '#3b82f6' : '#f3f4f6',
-                        },
-                      }),
-                    }}
                   />
                 </FormControl>
                 <FormMessage />

@@ -71,7 +71,6 @@ const AdmissionPage = () => {
               searchQuery={searchQuery}
               searchResults={searchResults}
               hasUpdatePermission={checkPermission('student_admissions', 'update')}
-              hasDeletePermission={checkPermission('student_admissions', 'delete')}
             />
           </Card>
         )}
