@@ -3,11 +3,18 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from app.models.student.student_model import Student
 from app.models.masters.admission_model import Admission
-from typing import List, Dict
+from typing import List, Dict, Optional
+from uuid import UUID
 
-async def get_students_dropdown(db: AsyncSession, active_only: bool = True) -> List[Dict]:
+async def get_students_dropdown(
+    db: AsyncSession,
+    class_id: Optional[UUID] = None,
+    section_id: Optional[UUID] = None,
+    active_only: bool = True
+) -> List[Dict]:
     """
     Get students dropdown data with name + admission number.
+    Supports filtering by class_id, section_id, and active status.
     Returns: [{"id": "uuid", "display_name": "First Last (ADM001)", "first_name": "First", "last_name": "Last", "admission_number": "ADM001"}]
     """
     stmt = (
@@ -15,10 +22,16 @@ async def get_students_dropdown(db: AsyncSession, active_only: bool = True) -> L
         .join(Admission, Student.id == Admission.student_id)
         .options(selectinload(Student.user))
     )
-    
+
     if active_only:
         stmt = stmt.where(Student.user.has(is_active=True))
-    
+
+    if class_id:
+        stmt = stmt.where(Admission.current_class_id == class_id)
+
+    if section_id:
+        stmt = stmt.where(Admission.current_section_id == section_id)
+
     result = await db.execute(stmt)
     students_data = result.all()
     
@@ -38,16 +51,32 @@ async def get_students_dropdown(db: AsyncSession, active_only: bool = True) -> L
     
     return sorted(dropdown_data, key=lambda x: x['display_name'])
 
-async def get_students_simple_dropdown(db: AsyncSession, active_only: bool = True) -> List[Dict]:
+async def get_students_simple_dropdown(
+    db: AsyncSession,
+    class_id: Optional[UUID] = None,
+    section_id: Optional[UUID] = None,
+    active_only: bool = True
+) -> List[Dict]:
     """
     Get simple students dropdown data.
+    Supports filtering by class_id, section_id, and active status.
     Returns: [{"id": "uuid", "name": "First Last"}]
     """
-    stmt = select(Student).options(selectinload(Student.user))
-    
+    stmt = (
+        select(Student)
+        .join(Admission, Student.id == Admission.student_id)
+        .options(selectinload(Student.user))
+    )
+
     if active_only:
         stmt = stmt.where(Student.user.has(is_active=True))
-    
+
+    if class_id:
+        stmt = stmt.where(Admission.current_class_id == class_id)
+
+    if section_id:
+        stmt = stmt.where(Admission.current_section_id == section_id)
+
     result = await db.execute(stmt)
     students = result.scalars().all()
     
