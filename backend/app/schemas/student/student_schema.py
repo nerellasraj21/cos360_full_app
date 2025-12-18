@@ -45,6 +45,7 @@ class StudentOut(StudentBase):
     id: UUID
     first_name: str
     last_name: str
+    is_active: Optional[bool] = None
     father: Optional["ParentOut"]
     mother: Optional["ParentOut"]
 

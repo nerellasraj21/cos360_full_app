@@ -4,10 +4,10 @@ from app.schemas.student.admission_schema import StudentAdmissionCreate, Student
 from app.schemas.student.student_schema import StudentOut, StudentDropdown, StudentSimpleDropdown
 from app.schemas.common.pagination_schema import PaginatedResponse
 from app.db.tenant_session import get_tenant_db
-from typing import List
+from typing import List, Optional
 from app.service.student.admission_service import (
     add_admission, update_partial_details_admission, get_admission_by_id, get_student_by_admission_id,
-    search_students, get_all_admissions, delete_admission,
+    search_students, get_all_admissions, delete_admission, toggle_student_active,
     # Enhanced user-context aware functions
     get_all_admissions_with_context, get_admission_by_id_with_context, search_students_with_context
 )
@@ -105,52 +105,76 @@ async def delete_student_admission(admission_id: UUID, request: Request, db: Asy
     """Delete student admission and related data - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_admissions', 'delete')
-    
+
     return await delete_admission(admission_id, db)
+
+@router.patch("/{student_id}/toggle-active", status_code=status.HTTP_200_OK)
+async def toggle_student_active_status(student_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
+    """Toggle student active/inactive status - Admin only"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    await check_role_plan_permission_with_error(db, request, role, 'student_admissions', 'update')
+
+    return await toggle_student_active(student_id, db)
 
 # Student Dropdown Endpoints
 @router.get("/students/dropdown", response_model=List[StudentDropdown], status_code=status.HTTP_200_OK)
 async def get_student_dropdown(
-    request: Request, 
+    request: Request,
     db: AsyncSession = Depends(get_tenant_db),
+    class_id: Optional[UUID] = Query(None, description="Filter by class ID"),
+    section_id: Optional[UUID] = Query(None, description="Filter by section ID"),
     active_only: bool = Query(True, description="Filter only active students")
 ):
     """
     Get students dropdown data with display name including admission number.
     Returns students in format: "First Last (ADM001)"
-    
+
+    Supports filtering by:
+    - class_id: Filter students by class
+    - section_id: Filter students by section
+    - active_only: Filter only active students (default: True)
+
     **Required Permission**: students:list
     """
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'students', 'list')
-    
-    return await get_students_dropdown(db, active_only)
+
+    return await get_students_dropdown(db, class_id, section_id, active_only)
 
 @router.get("/students/dropdown/simple", response_model=List[StudentSimpleDropdown], status_code=status.HTTP_200_OK)
 async def get_student_simple_dropdown(
-    request: Request, 
+    request: Request,
     db: AsyncSession = Depends(get_tenant_db),
+    class_id: Optional[UUID] = Query(None, description="Filter by class ID"),
+    section_id: Optional[UUID] = Query(None, description="Filter by section ID"),
     active_only: bool = Query(True, description="Filter only active students")
 ):
     """
     Get simple students dropdown data with just ID and name.
     Returns students in format: "First Last"
-    
+
+    Supports filtering by:
+    - class_id: Filter students by class
+    - section_id: Filter students by section
+    - active_only: Filter only active students (default: True)
+
     **Required Permission**: students:list
     """
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'students', 'list')
-    
-    return await get_students_simple_dropdown(db, active_only)
+
+    return await get_students_simple_dropdown(db, class_id, section_id, active_only)
 
 # User-Specific Self-Access Endpoints
 
