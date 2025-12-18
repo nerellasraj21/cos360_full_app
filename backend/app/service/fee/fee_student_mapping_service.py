@@ -621,7 +621,10 @@ async def create_bulk_fee_student_mappings(db: AsyncSession, bulk_data: FeeStude
                 
                 db.add(db_mapping)
                 await db.flush()  # Flush to get the ID without committing
-                
+
+                # Create term amounts
+                await create_term_amounts(db, db_mapping.id, bulk_data.total_fee, bulk_data.fee_type_id)
+
                 # Load with relationships for response
                 result = await db.execute(
                     select(FeeStudentMappingModel)
