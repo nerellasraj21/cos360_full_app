@@ -1048,7 +1048,9 @@ async def get_all_admissions_with_context(
     base_stmt = select(Admission).options(
         selectinload(Admission.student)
         .selectinload(Student.parent_links)
-        .selectinload(StudentParentLink.parent)
+        .selectinload(StudentParentLink.parent),
+        selectinload(Admission.student)
+        .selectinload(Student.user)
     )
 
     # Apply user scoping to main query
@@ -1069,21 +1071,26 @@ async def get_all_admissions_with_context(
 
     # Process father/mother relationships for each admission (existing logic)
     for admission in admissions:
-        if admission.student and admission.student.parent_links:
-            father = None
-            mother = None
+        if admission.student:
+            if admission.student.user:
+                admission.student.is_active = admission.student.user.is_active
+            else:
+                admission.student.is_active = None
 
-            for link in admission.student.parent_links:
-                if link.parent and link.parent.relation_to_student:
-                    if link.parent.relation_to_student.lower() == "father":
-                        father = link.parent
-                    elif link.parent.relation_to_student.lower() == "mother":
-                        mother = link.parent
+            if admission.student.parent_links:
+                father = None
+                mother = None
 
-            admission.student.father = father
-            admission.student.mother = mother
-        else:
-            if admission.student:
+                for link in admission.student.parent_links:
+                    if link.parent and link.parent.relation_to_student:
+                        if link.parent.relation_to_student.lower() == "father":
+                            father = link.parent
+                        elif link.parent.relation_to_student.lower() == "mother":
+                            mother = link.parent
+
+                admission.student.father = father
+                admission.student.mother = mother
+            else:
                 admission.student.father = None
                 admission.student.mother = None
 
@@ -1153,5 +1160,29 @@ async def delete_admission(admission_id: UUID, db: AsyncSession):
     await db.delete(admission)
     
     await db.commit()
-    
+
     return {"message": "Admission and related data deleted successfully"}
+
+async def toggle_student_active(student_id: UUID, db: AsyncSession):
+    """Toggle student's active status by updating the related user's is_active field"""
+    stmt = (
+        select(Student)
+        .options(selectinload(Student.user))
+        .where(Student.id == student_id)
+    )
+    result = await db.execute(stmt)
+    student = result.scalar_one_or_none()
+
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    if not student.user:
+        raise HTTPException(status_code=400, detail="Student has no associated user")
+
+    student.user.is_active = not student.user.is_active
+    await db.commit()
+
+    return {
+        "message": f"Student {'activated' if student.user.is_active else 'deactivated'} successfully",
+        "is_active": student.user.is_active
+    }
