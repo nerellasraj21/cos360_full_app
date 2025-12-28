@@ -45,6 +45,7 @@ export interface Subject {
   export interface ClassSubjectMapping {
     id: string;
     class_id: string;
+    section_id?: string;
     subject_id: string;
     academic_year_id: string;
     exclude_marks: boolean;
@@ -53,6 +54,7 @@ export interface Subject {
     created_at: string;
     updated_at: string;
     class_name?: string;
+    section_name?: string;
     subject_name?: string;
     academic_year_name?: string;
   }
@@ -92,6 +94,7 @@ export interface Subject {
 
   export interface ClassSubjectMappingBulkCreate {
     class_id: string;
+    section_id?: string;
     academic_year_id: string;
     subjects: SubjectMappingItem[];
   }
@@ -100,6 +103,9 @@ export interface Subject {
     success: boolean;
     message: string;
     created_count: number;
+    updated_count: number;
+    deactivated_count: number;
+    sections_processed: number;
     mappings: ClassSubjectMapping[];
   }
   

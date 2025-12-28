@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   MasterPage,
   type MasterPageConfig,
@@ -7,7 +7,6 @@ import {
 import type { TableColumn } from "@/components/common/table";
 import {
   useClassSubjectMappingsPaginated,
-  useCreateClassSubjectMapping,
   useUpdateClassSubjectMapping,
   useDeleteClassSubjectMapping,
 } from "@/api/hooks/masters/classsubjectmappings";
@@ -15,20 +14,14 @@ import type {
   ClassSubjectMapping,
   ClassSubjectMappingInput,
 } from "@/types/masters/subject";
-import {
-  useClassesDropdown,
-  useSectionsByClassId,
-} from "@/hooks/masters/useClassesAndSections";
 import { fetchSubjects } from "@/api/masters/subjects";
 import type { Subject } from "@/types/masters";
 import { useAcademicYearStore } from "@/lib/academicYearStore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import Select, { type SingleValue } from "react-select";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { usePermission } from "@/hooks/usePermission";
-
-type SelectOption = { value: string; label: string } | null;
+import { AddBulkClassSubjectMappingsModal } from "@/components/masters/classsubjectmappings";
 
 // Custom styles for react-select with proper dark mode support
 const getCustomSelectStyles = () => {
@@ -107,7 +100,6 @@ const getCustomSelectStyles = () => {
 export default function ClassSubjectMappingsPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
-  const [selectedClass, setSelectedClass] = useState<SelectOption>(null);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [subjectsLoading, setSubjectsLoading] = useState(true);
   const { selectedAcademicYearId, fetchAndSetAcademicYears } =
@@ -122,7 +114,7 @@ export default function ClassSubjectMappingsPage() {
     fetchAndSetAcademicYears();
   }, [fetchAndSetAcademicYears]);
 
-  // Fetch subjects for dropdown
+  // Fetch subjects for bulk modal
   useEffect(() => {
     fetchSubjects()
       .then((response) => {
@@ -146,39 +138,8 @@ export default function ClassSubjectMappingsPage() {
   const total = data?.total || mappings.length;
   const hasMore = data?.hasMore || false;
 
-  const createMapping = useCreateClassSubjectMapping();
   const updateMapping = useUpdateClassSubjectMapping();
   const deleteMapping = useDeleteClassSubjectMapping();
-
-  // Dropdown hooks from timetable
-  const { data: classesData, isLoading: classesLoading } = useClassesDropdown();
-  const { data: sectionsData, isLoading: sectionsLoading } =
-    useSectionsByClassId(selectedClass?.value || "");
-
-  // Memoized dropdown options
-  const classOptions = useMemo(() => {
-    if (!classesData) return [];
-    return classesData.map((cls) => ({ value: cls.id, label: cls.name }));
-  }, [classesData]);
-
-  const sectionOptions = useMemo(() => {
-    if (!sectionsData) return [];
-    return sectionsData.map((section) => ({
-      value: section.id,
-      label: section.name,
-    }));
-  }, [sectionsData]);
-
-  const subjectOptions = (subjects || []).map((s) => ({
-    value: s.id,
-    label: s.name,
-  }));
-
-  // Handlers for dropdown changes
-  const handleClassChange = (option: SingleValue<SelectOption>) => {
-    setSelectedClass(option);
-    // Reset section when class changes
-  };
 
   const columns: TableColumn<ClassSubjectMapping>[] = [
     {
@@ -186,6 +147,12 @@ export default function ClassSubjectMappingsPage() {
       label: "Class",
       editable: false,
       render: (value) => value || "N/A",
+    },
+    {
+      key: "section_name",
+      label: "Section",
+      editable: false,
+      render: (value) => value || "All",
     },
     {
       key: "subject_name",
@@ -261,6 +228,7 @@ export default function ClassSubjectMappingsPage() {
     ClassSubjectMappingInput
   > = {
     title: "Class-Subject Mappings",
+    addButtonLabel: "Add Class-Subject Mappings",
     columns,
     defaultValues: {
       class_id: "",
@@ -274,11 +242,19 @@ export default function ClassSubjectMappingsPage() {
     isLoading,
     showColumnSelector: true,
     data: mappings,
-    onCreate: (data) => createMapping.mutate(data),
+    // Using custom addModal for bulk creation
+    addModal: (
+      <AddBulkClassSubjectMappingsModal
+        subjects={subjects}
+        subjectsLoading={subjectsLoading}
+        selectStyles={getCustomSelectStyles()}
+      />
+    ),
+    onCreate: () => {}, // Handled by custom modal
     onUpdate: (id, mapping) =>
       updateMapping.mutate({ id: id.toString(), mapping }),
     onDelete: (id) => deleteMapping.mutate(id.toString()),
-    isCreatePending: createMapping.status === "pending",
+    isCreatePending: false, // Handled by custom modal
     resetForm: () => {},
     pagination: {
       page,
@@ -290,51 +266,11 @@ export default function ClassSubjectMappingsPage() {
     // Permission configuration for Class Subject Mappings
     permissions: {
       resource: "CLASS_SUBJECT_MAPPINGS",
-      create: true, // Allow create button if user has create permission
-      read: true, // Allow viewing data in table if user has read permission
-      update: true, // Allow edit functionality if user has update permission
-      delete: true, // Allow delete functionality if user has delete permission
-      list: true, // Allow accessing this page if user has list permission
-    },
-    renderCustomField: (field, value, onChange) => {
-      if (field.name === "class_id") {
-        return (
-          <Select
-            options={classOptions}
-            value={classOptions.find((opt) => opt.value === value) || null}
-            onChange={(option: SingleValue<SelectOption>) => {
-              handleClassChange(option);
-              onChange(option?.value || "");
-            }}
-            placeholder="Select Class"
-            classNamePrefix="react-select"
-            menuPlacement="auto"
-            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-            menuShouldBlockScroll={false}
-            isLoading={classesLoading}
-            styles={getCustomSelectStyles()}
-          />
-        );
-      }
-      if (field.name === "subject_id") {
-        return (
-          <Select
-            options={subjectOptions}
-            value={subjectOptions.find((opt) => opt.value === value) || null}
-            onChange={(option: SingleValue<SelectOption>) =>
-              onChange(option?.value || "")
-            }
-            placeholder="Select Subject"
-            classNamePrefix="react-select"
-            menuPlacement="auto"
-            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-            menuShouldBlockScroll={false}
-            isLoading={subjectsLoading}
-            styles={getCustomSelectStyles()}
-          />
-        );
-      }
-      return null;
+      create: true,
+      read: true,
+      update: true,
+      delete: true,
+      list: true,
     },
   };
 

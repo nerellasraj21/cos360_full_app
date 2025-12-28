@@ -8,6 +8,8 @@ import type {
   DriverListResponse
 } from '@/types/masters/trip';
 
+const TRIPS_API_BASE = '/masters/trips/';
+
 // Helper function to handle API errors
 const handleApiError = (error: any): Error => {
   if (error.response?.data?.detail) {
@@ -22,7 +24,7 @@ export const tripsApi = {
     console.log('[DEBUG] tripsApi.createTrip called with data:', tripData);
 
     try {
-      const response = await CAxios.post('/masters/trips/', tripData);
+      const response = await CAxios.post(TRIPS_API_BASE, tripData);
       console.log('[DEBUG] tripsApi.createTrip success:', response.data);
       return response.data;
     } catch (error) {
@@ -36,7 +38,7 @@ export const tripsApi = {
     console.log('[DEBUG] tripsApi.getAllTrips called');
 
     try {
-      const response = await CAxios.get('/masters/trips/');
+      const response = await CAxios.get(TRIPS_API_BASE);
       console.log('[DEBUG] tripsApi.getAllTrips success:', response.data);
       return response.data;
     } catch (error) {
@@ -50,7 +52,7 @@ export const tripsApi = {
     console.log('[DEBUG] tripsApi.getTripById called with tripId:', tripId);
 
     try {
-      const response = await CAxios.get(`/masters/trips/${tripId}`);
+      const response = await CAxios.get(`${TRIPS_API_BASE}${tripId}`);
       console.log('[DEBUG] tripsApi.getTripById success:', response.data);
       return response.data;
     } catch (error) {
@@ -64,7 +66,7 @@ export const tripsApi = {
     console.log('[DEBUG] tripsApi.updateTrip called with tripId:', tripId, 'data:', tripData);
 
     try {
-      const response = await CAxios.put(`/masters/trips/${tripId}`, tripData);
+      const response = await CAxios.put(`${TRIPS_API_BASE}${tripId}`, tripData);
       console.log('[DEBUG] tripsApi.updateTrip success:', response.data);
       return response.data;
     } catch (error) {
@@ -78,7 +80,7 @@ export const tripsApi = {
     console.log('[DEBUG] tripsApi.updateTripPartial called with tripId:', tripId, 'data:', tripData);
 
     try {
-      const response = await CAxios.patch(`/masters/trips/${tripId}`, tripData);
+      const response = await CAxios.patch(`${TRIPS_API_BASE}${tripId}`, tripData);
       console.log('[DEBUG] tripsApi.updateTripPartial success:', response.data);
       return response.data;
     } catch (error) {
@@ -92,7 +94,7 @@ export const tripsApi = {
     console.log('[DEBUG] tripsApi.deleteTrip called with tripId:', tripId);
 
     try {
-      const response = await CAxios.delete(`/masters/trips/${tripId}`);
+      const response = await CAxios.delete(`${TRIPS_API_BASE}${tripId}`);
       console.log('[DEBUG] tripsApi.deleteTrip success:', response.data);
       return response.data;
     } catch (error) {
