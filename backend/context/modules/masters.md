@@ -62,6 +62,23 @@ Evidence: `app/api/v1/masters/`, `app/service/masters/`, `context_guide.json:376
 | Trip        | `transport/trip_model.py`         | Trip schedules      |
 | StudentTrip | `transport/student_trip_model.py` | Student assignments |
 
+### ClassSubjectMapping
+
+- `id` (UUID): Primary key
+- `class_id` (UUID FK): Parent class
+- `section_id` (UUID FK): Section within the class (**Added 2025-12-28**)
+- `subject_id` (UUID FK): Subject being mapped
+- `academic_year_id` (UUID FK): Academic year
+- `exclude_marks` (boolean): Whether to exclude from marks calculation
+- `order` (integer): Display order
+- `is_active` (boolean): Status
+
+**Constraints:**
+- Unique constraint on `(class_id, section_id, subject_id, academic_year_id)` - prevents duplicate mappings
+- Foreign key to `sections(id)` for section association
+
+Evidence: Database schema, `class_subject_mapping_model.py`
+
 ### Services
 
 | Service                    | File                               | Purpose              |
@@ -70,7 +87,7 @@ Evidence: `app/api/v1/masters/`, `app/service/masters/`, `context_guide.json:376
 | ClassService               | `class_service.py`                 | Class management     |
 | SubjectService             | `subject_service.py`               | Subject management   |
 | SubjectCategoryService     | `subject_category_service.py`      | Category management  |
-| ClassSubjectMappingService | `class_subject_mapping_service.py` | Subject mapping      |
+| ClassSubjectMappingService | `class_subject_mapping_service.py` | Section-based subject mapping |
 | StaffService               | `staff_service.py`                 | Staff management     |
 | ParentService              | `parent_service.py`                | Parent management    |
 | DesignationService         | `designation_service.py`           | Designation CRUD     |
@@ -186,6 +203,15 @@ Evidence: `context_guide.json:376-379`
 
 Evidence: `context_guide.json:380-385`
 
+### Class-Subject Mapping Rules
+
+- Subject mappings are now **section-specific** (as of 2025-12-28)
+- Each mapping links a subject to a specific class+section combination
+- Unique constraint enforces: one subject per class+section+academic_year
+- This allows different sections to have different subject assignments
+
+Evidence: Database migration 2025-12-28, `class_subject_mapping_model.py`
+
 ### Database Refresh Pattern Fixes
 
 Fixed in this module:
@@ -247,6 +273,18 @@ GET    /api/v1/masters/subjects/{id}
 PUT    /api/v1/masters/subjects/{id}
 DELETE /api/v1/masters/subjects/{id}
 ```
+
+### Class Subject Mapping Endpoints
+
+```
+GET    /api/v1/masters/class-subject-mappings/
+POST   /api/v1/masters/class-subject-mappings/bulk  (section-based bulk upsert)
+GET    /api/v1/masters/class-subject-mappings/{id}
+PUT    /api/v1/masters/class-subject-mappings/{id}
+DELETE /api/v1/masters/class-subject-mappings/{id}
+```
+
+**Note**: Mappings require `section_id` as of 2025-12-28. Each mapping is section-specific.
 
 ### Staff Endpoints
 

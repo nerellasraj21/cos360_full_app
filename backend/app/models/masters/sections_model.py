@@ -19,6 +19,8 @@ class Section(BaseOrg):
     class_ = relationship("Class", back_populates="sections")
     # Fee Student Mapping relationship
     fee_student_mappings = relationship("FeeStudentMapping", back_populates="section")
-    
+    # Class Subject Mapping relationship
+    class_subject_mappings = relationship("ClassSubjectMap", back_populates="section")
+
     def __repr__(self):
         return f"<Section(id={self.id}, name='{self.name}', class_id={self.class_id})>"
