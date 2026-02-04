@@ -132,6 +132,28 @@ async def update_parent_profile(
     return ParentOut.from_orm_with_students(updated)
 
 
+@router.get("/salary-ranges/dropdown")
+async def get_salary_ranges_dropdown(request: Request):
+    """
+    Get salary range options for dropdown.
+
+    Returns a list of all available salary ranges with:
+    - value: The enum value for storage
+    - label: Human-readable display text
+    - display: Short display text for compact views
+
+    **Required Permission**: parent_management:list
+    """
+    current_user = await get_current_user_token(request)
+
+    return [
+        {"value": "below_1l", "label": "Below ₹1 Lakh", "display": "< ₹1L"},
+        {"value": "1l_3l", "label": "₹1 - ₹3 Lakhs", "display": "₹1L - ₹3L"},
+        {"value": "3l_5l", "label": "₹3 - ₹5 Lakhs", "display": "₹3L - ₹5L"},
+        {"value": "5l_10l", "label": "₹5 - ₹10 Lakhs", "display": "₹5L - ₹10L"},
+        {"value": "above_10l", "label": "Above ₹10 Lakhs", "display": "> ₹10L"}
+    ]
+
 @router.delete("/{parent_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_parent_profile(
     parent_id: UUID,
@@ -141,10 +163,10 @@ async def remove_parent_profile(
     """Delete parent profile - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'parent_management', 'delete')
-    
+
     deleted = await delete_parent(parent_id, db)
     if not deleted:
         raise HTTPException(status_code=404, detail="Parent not found")

@@ -16,14 +16,14 @@ class StudentBase(BaseModel):
     date_of_birth: date
     gender: str
     is_primary: Optional[str] = "not_primary"
-    aadhar_number: Optional[str]
-    apaar_number: Optional[str]
-    caste: Optional[str]
-    sub_caste: Optional[str]
-    community: Optional[str]
+    aadhar_number: Optional[str] = None
+    apaar_number: Optional[str] = None
+    caste: Optional[str] = None
+    sub_caste: Optional[str] = None
+    community: Optional[str] = None
     nationality: Optional[str] = "Indian"
     mother_tongue: Optional[str] = "Telugu"
-    identification_marks: Optional[str]
+    identification_marks: Optional[str] = None
 
     @validator("aadhar_number", "apaar_number")
     def validate_aadhar(cls, v):
