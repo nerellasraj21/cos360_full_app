@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { StudentAdmissionCreate } from '@/types/admission';
 import { useAcademicYearsDropdown } from '@/api/hooks/masters/academicyears';
 import { useClassesDropdown, useSectionsByClassId } from '@/hooks/masters/useClassesAndSections';
+import { useStatesDropdown } from '@/api/hooks/masters/locations';
+import { useCastesDropdown, useSubCastesDropdown } from '@/api/hooks/masters/castes';
 
 export function SummaryStepForm() {
   const { watch } = useFormContext<StudentAdmissionCreate>();
@@ -14,6 +16,9 @@ export function SummaryStepForm() {
   const { data: classes = [] } = useClassesDropdown(true);
   const { data: admittedSections = [] } = useSectionsByClassId(formData.admitted_class_id || undefined);
   const { data: currentSections = [] } = useSectionsByClassId(formData.current_class_id || undefined);
+  const { data: states = [] } = useStatesDropdown(true);
+  const { data: castes = [] } = useCastesDropdown(true);
+  const { data: subCastes = [] } = useSubCastesDropdown(formData.caste_id || undefined, true);
 
   // Helper functions to get display names
   const getAcademicYearName = (yearId: string) => {
@@ -29,6 +34,24 @@ export function SummaryStepForm() {
   const getSectionName = (sections: any[], sectionId: string) => {
     const section = sections.find(s => String(s.id) === String(sectionId));
     return section ? section.name : sectionId;
+  };
+
+  const getStateName = (stateId: string) => {
+    if (!stateId) return '';
+    const state = states.find(s => String(s.id) === String(stateId));
+    return state ? state.name : stateId;
+  };
+
+  const getCasteName = (casteId: string) => {
+    if (!casteId) return '';
+    const caste = castes.find(c => String(c.id) === String(casteId));
+    return caste ? caste.name : casteId;
+  };
+
+  const getSubCasteName = (subCasteId: string) => {
+    if (!subCasteId) return '';
+    const subCaste = subCastes.find(sc => String(sc.id) === String(subCasteId));
+    return subCaste ? subCaste.name : subCasteId;
   };
 
   return (
@@ -58,8 +81,8 @@ export function SummaryStepForm() {
           <p><strong>Gender:</strong> {formData.student_gender}</p>
           <p><strong>Aadhar Number:</strong> {formData.student_aadhar_number}</p>
           <p><strong>APAAR Number:</strong> {formData.student_apaar_number}</p>
-          <p><strong>Caste:</strong> {formData.student_caste}</p>
-          <p><strong>Sub Caste:</strong> {formData.student_sub_caste}</p>
+          <p><strong>Caste:</strong> {getCasteName(formData.caste_id || '')}</p>
+          <p><strong>Sub Caste:</strong> {getSubCasteName(formData.sub_caste_id || '')}</p>
           <p><strong>Community:</strong> {formData.student_community}</p>
           <p><strong>Identification Marks:</strong> {formData.student_identification_marks}</p>
         </CardContent>
@@ -101,7 +124,7 @@ export function SummaryStepForm() {
           <p><strong>Address Line 1:</strong> {formData.address_line1}</p>
           <p><strong>Address Line 2:</strong> {formData.address_line2}</p>
           <p><strong>City:</strong> {formData.city}</p>
-          <p><strong>State:</strong> {formData.state}</p>
+          <p><strong>State:</strong> {getStateName(formData.state_id || '')}</p>
         </CardContent>
       </Card>
 

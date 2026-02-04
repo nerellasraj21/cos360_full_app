@@ -1,11 +1,28 @@
-
 import { useFormContext } from 'react-hook-form';
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-// Select component will be replaced with native select
+import { CasteDropdown } from '@/components/dropdown/CasteDropdown';
+import { SubCasteDropdown } from '@/components/dropdown/SubCasteDropdown';
 
 export const StudentStepForm = () => {
-  const { register, formState: { errors } } = useFormContext();
+  const { register, setValue, watch, formState: { errors } } = useFormContext();
+  const [selectedCasteId, setSelectedCasteId] = useState<string | undefined>();
+
+  // Watch caste field
+  const casteId = watch('caste_id');
+
+  // Sync state with form field
+  useEffect(() => {
+    setSelectedCasteId(casteId || undefined);
+  }, [casteId]);
+
+  // Clear sub-caste when caste changes
+  useEffect(() => {
+    if (casteId) {
+      setValue('sub_caste_id', '');
+    }
+  }, [selectedCasteId, setValue]);
 
   return (
     <div className="space-y-4">
@@ -86,11 +103,23 @@ export const StudentStepForm = () => {
 
         <div>
           <Label htmlFor="student_mother_tongue">Mother Tongue</Label>
-          <Input
+          <select
             id="student_mother_tongue"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             {...register('student_mother_tongue')}
-            placeholder="Telugu"
-          />
+          >
+            <option value="Telugu">Telugu</option>
+            <option value="Hindi">Hindi</option>
+            <option value="English">English</option>
+            <option value="Tamil">Tamil</option>
+            <option value="Malayalam">Malayalam</option>
+            <option value="Kannada">Kannada</option>
+            <option value="Marathi">Marathi</option>
+            <option value="Bengali">Bengali</option>
+            <option value="Gujarati">Gujarati</option>
+            <option value="Urdu">Urdu</option>
+            <option value="Others">Others</option>
+          </select>
         </div>
 
         <div>
@@ -125,21 +154,23 @@ export const StudentStepForm = () => {
           )}
         </div>
 
-        <div>
-          <Label htmlFor="student_caste">Caste (Optional)</Label>
-          <Input
-            id="student_caste"
-            {...register('student_caste')}
-          />
-        </div>
+        <CasteDropdown
+          id="caste_id"
+          label="Caste (Optional)"
+          value={selectedCasteId}
+          onChange={(value) => {
+            setValue('caste_id', value || '');
+            setSelectedCasteId(value || undefined);
+          }}
+        />
 
-        <div>
-          <Label htmlFor="student_sub_caste">Sub Caste (Optional)</Label>
-          <Input
-            id="student_sub_caste"
-            {...register('student_sub_caste')}
-          />
-        </div>
+        <SubCasteDropdown
+          id="sub_caste_id"
+          label="Sub-Caste (Optional)"
+          casteId={selectedCasteId}
+          value={watch('sub_caste_id')}
+          onChange={(value) => setValue('sub_caste_id', value || '')}
+        />
 
         <div>
           <Label htmlFor="student_community">Community (Optional)</Label>

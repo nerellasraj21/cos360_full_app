@@ -1,3 +1,9 @@
+// Admission Type dropdown option
+export interface AdmissionTypeOption {
+  value: string;
+  label: string;
+}
+
 export interface Parent {
   id?: string;
   name: string;

@@ -1,10 +1,72 @@
 
+import { useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Search, Loader2 } from 'lucide-react';
+import { searchParentByPhone } from '@/api/masters/parents';
+import { SalaryRangeDropdown } from '@/components/dropdown/SalaryRangeDropdown';
 
 export const ParentsStepForm = () => {
-  const { register, formState: { errors } } = useFormContext();
+  const { register, setValue, watch, formState: { errors } } = useFormContext();
+  const [fatherSearching, setFatherSearching] = useState(false);
+  const [motherSearching, setMotherSearching] = useState(false);
+  const [fatherFound, setFatherFound] = useState<boolean | null>(null);
+  const [motherFound, setMotherFound] = useState<boolean | null>(null);
+
+  const handleFatherPhoneSearch = async (phone: string) => {
+    if (!phone || phone.length < 10) return;
+
+    setFatherSearching(true);
+    setFatherFound(null);
+
+    try {
+      const parent = await searchParentByPhone(phone);
+      if (parent) {
+        setFatherFound(true);
+        setValue('father_name', parent.name || '');
+        setValue('father_email', parent.email || '');
+        setValue('father_occupation', parent.occupation || '');
+        setValue('father_aadhar_number', parent.aadhar_number || '');
+        setValue('father_gender', parent.gender || '');
+      } else {
+        setFatherFound(false);
+      }
+    } catch (error) {
+      console.error('Error searching for father:', error);
+      setFatherFound(false);
+    } finally {
+      setFatherSearching(false);
+    }
+  };
+
+  const handleMotherPhoneSearch = async (phone: string) => {
+    if (!phone || phone.length < 10) return;
+
+    setMotherSearching(true);
+    setMotherFound(null);
+
+    try {
+      const parent = await searchParentByPhone(phone);
+      if (parent) {
+        setMotherFound(true);
+        setValue('mother_name', parent.name || '');
+        setValue('mother_email', parent.email || '');
+        setValue('mother_occupation', parent.occupation || '');
+        setValue('mother_aadhar_number', parent.aadhar_number || '');
+        setValue('mother_gender', parent.gender || '');
+      } else {
+        setMotherFound(false);
+      }
+    } catch (error) {
+      console.error('Error searching for mother:', error);
+      setMotherFound(false);
+    } finally {
+      setMotherSearching(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -27,7 +89,7 @@ export const ParentsStepForm = () => {
           </div>
 
           <div>
-            <Label htmlFor="father_email">Email</Label>
+            <Label htmlFor="father_email">Email *</Label>
             <Input
               id="father_email"
               type="email"
@@ -46,17 +108,43 @@ export const ParentsStepForm = () => {
 
           <div>
             <Label htmlFor="father_phone">Phone (Optional)</Label>
-            <Input
-              id="father_phone"
-              {...register('father_phone', {
-                pattern: {
-                  value: /^[\+]?[1-9][\d]{0,15}$/,
-                  message: 'Invalid phone number format'
-                }
-              })}
-            />
-            {errors.father_phone && (
-              <span className="text-red-500">{errors.father_phone.message as string}</span>
+            <div className="flex gap-2 items-start">
+              <div className="flex-1">
+                <Input
+                  id="father_phone"
+                  {...register('father_phone', {
+                    pattern: {
+                      value: /^[\+]?[1-9][\d]{0,15}$/,
+                      message: 'Invalid phone number format'
+                    }
+                  })}
+                />
+                {errors.father_phone && (
+                  <span className="text-red-500 text-sm">{errors.father_phone.message as string}</span>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const phone = (document.getElementById('father_phone') as HTMLInputElement)?.value;
+                  handleFatherPhoneSearch(phone);
+                }}
+                disabled={fatherSearching}
+                className="mt-0"
+              >
+                {fatherSearching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            {fatherFound !== null && (
+              <Badge variant={fatherFound ? "default" : "secondary"} className="mt-1">
+                {fatherFound ? 'Parent found' : 'New parent'}
+              </Badge>
             )}
           </div>
 
@@ -67,6 +155,12 @@ export const ParentsStepForm = () => {
               {...register('father_occupation')}
             />
           </div>
+
+          <SalaryRangeDropdown
+            id="father_salary_range"
+            label="Salary Range (Optional)"
+            register={register('father_salary_range')}
+          />
 
           <div>
             <Label htmlFor="father_aadhar_number">Aadhar Number (Optional)</Label>
@@ -92,9 +186,9 @@ export const ParentsStepForm = () => {
               {...register('father_gender')}
             >
               <option value="">Select Gender</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
+              <option value="M">Male</option>
+              <option value="F">Female</option>
+              <option value="O">Other</option>
             </select>
           </div>
 
@@ -125,7 +219,7 @@ export const ParentsStepForm = () => {
           </div>
 
           <div>
-            <Label htmlFor="mother_email">Email</Label>
+            <Label htmlFor="mother_email">Email *</Label>
             <Input
               id="mother_email"
               type="email"
@@ -134,6 +228,12 @@ export const ParentsStepForm = () => {
                 pattern: {
                   value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
                   message: 'Invalid email address'
+                },
+                validate: {
+                  differentFromFather: (value) => {
+                    const fatherEmail = watch('father_email');
+                    return value !== fatherEmail || "Mother's email must be different from father's email";
+                  }
                 }
               })}
             />
@@ -144,17 +244,43 @@ export const ParentsStepForm = () => {
 
           <div>
             <Label htmlFor="mother_phone">Phone (Optional)</Label>
-            <Input
-              id="mother_phone"
-              {...register('mother_phone', {
-                pattern: {
-                  value: /^[\+]?[1-9][\d]{0,15}$/,
-                  message: 'Invalid phone number format'
-                }
-              })}
-            />
-            {errors.mother_phone && (
-              <span className="text-red-500">{errors.mother_phone.message as string}</span>
+            <div className="flex gap-2 items-start">
+              <div className="flex-1">
+                <Input
+                  id="mother_phone"
+                  {...register('mother_phone', {
+                    pattern: {
+                      value: /^[\+]?[1-9][\d]{0,15}$/,
+                      message: 'Invalid phone number format'
+                    }
+                  })}
+                />
+                {errors.mother_phone && (
+                  <span className="text-red-500 text-sm">{errors.mother_phone.message as string}</span>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const phone = (document.getElementById('mother_phone') as HTMLInputElement)?.value;
+                  handleMotherPhoneSearch(phone);
+                }}
+                disabled={motherSearching}
+                className="mt-0"
+              >
+                {motherSearching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            {motherFound !== null && (
+              <Badge variant={motherFound ? "default" : "secondary"} className="mt-1">
+                {motherFound ? 'Parent found' : 'New parent'}
+              </Badge>
             )}
           </div>
 
@@ -165,6 +291,12 @@ export const ParentsStepForm = () => {
               {...register('mother_occupation')}
             />
           </div>
+
+          <SalaryRangeDropdown
+            id="mother_salary_range"
+            label="Salary Range (Optional)"
+            register={register('mother_salary_range')}
+          />
 
           <div>
             <Label htmlFor="mother_aadhar_number">Aadhar Number (Optional)</Label>
@@ -190,9 +322,9 @@ export const ParentsStepForm = () => {
               {...register('mother_gender')}
             >
               <option value="">Select Gender</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
+              <option value="M">Male</option>
+              <option value="F">Female</option>
+              <option value="O">Other</option>
             </select>
           </div>
 

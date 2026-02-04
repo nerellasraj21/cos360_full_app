@@ -1,11 +1,11 @@
-import  { useState, useEffect } from 'react';
+import  { useState, useEffect, useCallback } from 'react';
 import { MasterPage, type MasterPageConfig, type FormField } from '@/pages/masters/common/MasterPage';
 import type { TableColumn } from '@/components/common/table';
 import { useSubjectsPaginated, useCreateSubject, useUpdateSubject, useDeleteSubject } from '@/api/hooks/masters/subjects';
 import { useSubjectCategories } from '@/api/hooks/masters/subjectCategories';
 import type { Subject, SubjectInput } from '@/types/masters/subject';
 import { SubjectCategoriesDropdown } from '@/components/dropdown-system/components/SubjectCategoriesDropdown';
-import { SubjectCategoriesInfiniteDropdown } from '@/components/dropdown';
+import { SubjectCategoriesInfiniteDropdown, CreateCategoryPopover } from '@/components/dropdown';
 import { useAcademicYearStore } from "@/lib/academicYearStore";
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -57,10 +57,17 @@ export default function SubjectPage() {
       editable: true,
       render: (_value, row) => row.subject_category?.name || '',
       renderEdit: (value: string | null, _row: Subject, onChange: (v: string | null) => void) => (
-        <SubjectCategoriesInfiniteDropdown
-          value={value || undefined}
-          onChange={(val, _option) => onChange(val || null)}
-        />
+        <div className="flex items-start gap-2">
+          <div className="flex-1">
+            <SubjectCategoriesInfiniteDropdown
+              value={value || undefined}
+              onChange={(val, _option) => onChange(val || null)}
+            />
+          </div>
+          <CreateCategoryPopover
+            onCategoryCreated={(categoryId) => onChange(categoryId)}
+          />
+        </div>
       ),
     },
     { key: 'short_code', label: 'Short Code', editable: true },
@@ -101,6 +108,12 @@ export default function SubjectPage() {
     setPage(0);
   };
 
+  // Handle category creation callback
+  const handleCategoryCreated = useCallback((categoryId: string, _categoryName: string, onChange: (val: string | null) => void) => {
+    // Auto-select the newly created category
+    onChange(categoryId);
+  }, []);
+
   const config: MasterPageConfig<Subject, SubjectInput> = {
     title: 'Subjects',
     columns,
@@ -139,11 +152,20 @@ export default function SubjectPage() {
     renderCustomField: (field, value, onChange) => {
       if (field.name === 'subject_category_id') {
         return (
-          <SubjectCategoriesInfiniteDropdown
-            value={value || undefined}
-            onChange={(val) => onChange(val as string | null)}
-            placeholder="Select Category"
-          />
+          <div className="flex items-start gap-2">
+            <div className="flex-1">
+              <SubjectCategoriesInfiniteDropdown
+                value={value || undefined}
+                onChange={(val) => onChange(val as string | null)}
+                placeholder="Select Category"
+              />
+            </div>
+            <CreateCategoryPopover
+              onCategoryCreated={(categoryId, categoryName) =>
+                handleCategoryCreated(categoryId, categoryName, onChange)
+              }
+            />
+          </div>
         );
       }
       return null;

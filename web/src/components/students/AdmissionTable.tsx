@@ -61,6 +61,11 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
   const updateMutation = useUpdateAdmission();
   const toggleStatusMutation = useToggleStudentStatus();
 
+  // Debug: Log admissions data when it changes
+  console.log('📊 Admissions Response:', admissionsResponse);
+  console.log('📊 Total Count:', admissionsResponse?.total_count);
+  console.log('📊 Items Count:', admissionsResponse?.items?.length);
+
   // Helper functions to get display names
   const getAcademicYearName = (yearId: string) => {
     const year = academicYears.find(y => String(y.id) === String(yearId));

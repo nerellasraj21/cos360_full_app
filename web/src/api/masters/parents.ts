@@ -34,6 +34,20 @@ export const parentsApi = {
     return response.data;
   },
 
+  // Search parent by phone
+  searchParentByPhone: async (phone: string): Promise<Parent | null> => {
+    console.log('[DEBUG] parentsApi.searchParentByPhone called with phone:', phone);
+
+    try {
+      const response = await CAxios.get(`/parents/search?phone=${phone}`);
+      console.log('[DEBUG] parentsApi.searchParentByPhone returning:', response.data);
+      return response.data;
+    } catch (error) {
+      console.log('[DEBUG] parentsApi.searchParentByPhone - no parent found or error:', error);
+      return null;
+    }
+  },
+
   // Create new parent
   createParent: async (data: ParentCreateRequest): Promise<Parent> => {
     console.log('[DEBUG] parentsApi.createParent called with data:', data);
@@ -95,6 +109,7 @@ export const parentsApi = {
 export const {
   getAllParents,
   getParentById,
+  searchParentByPhone,
   createParent,
   updateParent,
   deleteParent,

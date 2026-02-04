@@ -1,18 +1,31 @@
 
 import { useFormContext } from 'react-hook-form';
+import { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useClassesDropdown, useSectionsByClassId } from '@/hooks/masters/useClassesAndSections';
-import { useAcademicYearsDropdown } from '@/api/hooks/masters/academicyears';
+import { AdmissionTypeDropdown } from '@/components/dropdown/AdmissionTypeDropdown';
 
 export const AcademicStepForm = () => {
   const { register, setValue, watch, formState: { errors } } = useFormContext();
   const selectedClassId = watch('admitted_class_id');
+  const selectedSectionId = watch('admitted_section_id');
+  const currentClassId = watch('current_class_id');
+  const [syncClassSection, setSyncClassSection] = useState(false);
 
   const { data: classes = [], isLoading: classesLoading } = useClassesDropdown(true);
   const { data: sections = [], isLoading: sectionsLoading } = useSectionsByClassId(selectedClassId || undefined);
-  const { data: academicYears = [], isLoading: academicYearsLoading } = useAcademicYearsDropdown();
+  const { data: currentSections = [], isLoading: currentSectionsLoading } = useSectionsByClassId(currentClassId || undefined);
+
+  // Sync current class/section when checkbox is checked
+  useEffect(() => {
+    if (syncClassSection) {
+      setValue('current_class_id', selectedClassId);
+      setValue('current_section_id', selectedSectionId);
+    }
+  }, [syncClassSection, selectedClassId, selectedSectionId, setValue]);
 
   return (
     <div className="space-y-4">
@@ -20,62 +33,34 @@ export const AcademicStepForm = () => {
       
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="admission_date">Admission Date</Label>
+          <Label htmlFor="admission_date">Admission Date *</Label>
           <Input
             id="admission_date"
             type="date"
-            {...register('admission_date', { required: 'Admission date is required' })}
+            max={new Date().toISOString().split('T')[0]}
+            {...register('admission_date', {
+              required: 'Admission date is required',
+              validate: {
+                notFuture: (value) => {
+                  const selectedDate = new Date(value);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  return selectedDate <= today || 'Admission date cannot be in the future';
+                }
+              }
+            })}
           />
           {errors.admission_date && (
             <span className="text-red-500">{errors.admission_date.message as string}</span>
           )}
         </div>
 
-        <div>
-          <Label htmlFor="academic_year_id">Current Academic Year</Label>
-          <Select
-            value={watch('academic_year_id') || ''}
-            onValueChange={(value) => setValue('academic_year_id', value)}
-            disabled={academicYearsLoading}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select Current Academic Year" />
-            </SelectTrigger>
-            <SelectContent>
-              {academicYears.map((year) => (
-                <SelectItem key={year.id} value={year.id}>
-                  {`${year.title}${year.is_current ? ' (Current)' : ''}`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.academic_year_id && (
-            <span className="text-red-500">{errors.academic_year_id.message as string}</span>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="admitted_academic_year_id">Admitted Academic Year</Label>
-          <Select
-            value={watch('admitted_academic_year_id') || ''}
-            onValueChange={(value) => setValue('admitted_academic_year_id', value)}
-            disabled={academicYearsLoading}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select Admitted Academic Year" />
-            </SelectTrigger>
-            <SelectContent>
-              {academicYears.map((year) => (
-                <SelectItem key={year.id} value={year.id}>
-                  {`${year.title}${year.is_current ? ' (Current)' : ''}`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.admitted_academic_year_id && (
-            <span className="text-red-500">{errors.admitted_academic_year_id.message as string}</span>
-          )}
-        </div>
+        <AdmissionTypeDropdown
+          id="admission_type"
+          label="Admission Type"
+          value={watch('admission_type')}
+          onChange={(value) => setValue('admission_type', value)}
+        />
 
         <div>
           <Label htmlFor="admitted_class_id">Class</Label>
@@ -120,6 +105,19 @@ export const AcademicStepForm = () => {
           </Select>
         </div>
 
+        <div className="col-span-2">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="sync_class_section"
+              checked={syncClassSection}
+              onCheckedChange={(checked) => setSyncClassSection(checked as boolean)}
+            />
+            <Label htmlFor="sync_class_section" className="cursor-pointer">
+              Current Class/Section same as Admission Class/Section
+            </Label>
+          </div>
+        </div>
+
         <div>
           <Label htmlFor="current_class_id">Current Class</Label>
           <Select
@@ -128,7 +126,7 @@ export const AcademicStepForm = () => {
               setValue('current_class_id', value);
               setValue('current_section_id', ''); // Reset current section when class changes
             }}
-            disabled={classesLoading}
+            disabled={classesLoading || syncClassSection}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select Current Class" />
@@ -151,13 +149,13 @@ export const AcademicStepForm = () => {
           <Select
             value={watch('current_section_id') || ''}
             onValueChange={(value) => setValue('current_section_id', value)}
-            disabled={sectionsLoading || !watch('current_class_id')}
+            disabled={currentSectionsLoading || !watch('current_class_id') || syncClassSection}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select Current Section" />
             </SelectTrigger>
             <SelectContent>
-              {sections.map((section) => (
+              {currentSections.map((section) => (
                 <SelectItem key={section.id} value={section.id}>
                   {section.name}
                 </SelectItem>

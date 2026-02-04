@@ -1,10 +1,39 @@
-
 import { useFormContext } from 'react-hook-form';
+import { useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { StateDropdown } from '@/components/dropdown/StateDropdown';
+import { DistrictDropdown } from '@/components/dropdown/DistrictDropdown';
+import { MandalDropdown } from '@/components/dropdown/MandalDropdown';
 
 export const AddressStepForm = () => {
-  const { register, formState: { errors } } = useFormContext();
+  const { register, setValue, watch, formState: { errors } } = useFormContext();
+
+  // Watch location fields directly
+  const stateId = watch('state_id');
+  const districtId = watch('district_id');
+
+  // Track previous values to detect actual changes
+  const prevStateIdRef = useRef<string>();
+  const prevDistrictIdRef = useRef<string>();
+
+  // Clear dependent fields only when parent actually changes
+  useEffect(() => {
+    if (prevStateIdRef.current !== undefined && prevStateIdRef.current !== stateId) {
+      // State changed, clear district and mandal
+      setValue('district_id', '');
+      setValue('mandal_id', '');
+    }
+    prevStateIdRef.current = stateId;
+  }, [stateId, setValue]);
+
+  useEffect(() => {
+    if (prevDistrictIdRef.current !== undefined && prevDistrictIdRef.current !== districtId) {
+      // District changed, clear mandal
+      setValue('mandal_id', '');
+    }
+    prevDistrictIdRef.current = districtId;
+  }, [districtId, setValue]);
 
   return (
     <div className="space-y-4">
@@ -23,9 +52,10 @@ export const AddressStepForm = () => {
         </div>
 
         <div>
-          <Label htmlFor="address_line2">Address Line 2</Label>
+          <Label htmlFor="address_line2">Address Line 2 (Optional)</Label>
           <Input
             id="address_line2"
+            placeholder="Apartment, suite, etc. (optional)"
             {...register('address_line2')}
           />
         </div>
@@ -41,14 +71,52 @@ export const AddressStepForm = () => {
           )}
         </div>
 
+        <StateDropdown
+          id="state_id"
+          label="State"
+          value={stateId || ''}
+          required={true}
+          onChange={(value) => {
+            console.log('State selected:', value);
+            setValue('state_id', value || '', { shouldValidate: true, shouldDirty: true });
+          }}
+        />
+
+        <DistrictDropdown
+          id="district_id"
+          label="District (Optional)"
+          stateId={stateId || undefined}
+          value={districtId || ''}
+          onChange={(value) => {
+            console.log('District selected:', value);
+            setValue('district_id', value || '', { shouldValidate: true, shouldDirty: true });
+          }}
+        />
+
+        <MandalDropdown
+          id="mandal_id"
+          label="Mandal (Optional)"
+          districtId={districtId || undefined}
+          value={watch('mandal_id') || ''}
+          onChange={(value) => {
+            console.log('Mandal selected:', value);
+            setValue('mandal_id', value || '', { shouldValidate: true, shouldDirty: true });
+          }}
+        />
+
         <div>
-          <Label htmlFor="state">State</Label>
+          <Label htmlFor="pincode">Pincode (Optional)</Label>
           <Input
-            id="state"
-            {...register('state', { required: 'State is required' })}
+            id="pincode"
+            {...register('pincode', {
+              pattern: {
+                value: /^\d{6}$/,
+                message: 'Pincode must be 6 digits'
+              }
+            })}
           />
-          {errors.state && (
-            <span className="text-red-500">{errors.state.message as string}</span>
+          {errors.pincode && (
+            <span className="text-red-500">{errors.pincode.message as string}</span>
           )}
         </div>
       </div>

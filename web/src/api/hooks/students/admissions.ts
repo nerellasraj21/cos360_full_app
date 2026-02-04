@@ -9,7 +9,8 @@ import type {
   StudentAdmissionUpdate,
   StudentDropdownItem,
   StudentDropdownSimpleItem,
-  StudentOut
+  StudentOut,
+  AdmissionTypeOption
 } from '@/types/admission';
 import {
   createStudentAdmission,
@@ -20,7 +21,8 @@ import {
   listAdmissions,
   toggleStudentActiveStatus,
   fetchStudentsDropdown,
-  fetchStudentsDropdownSimple
+  fetchStudentsDropdownSimple,
+  fetchAdmissionTypesDropdown
 } from '@/api/students/admissions';
 
 // Types
@@ -83,15 +85,41 @@ export function useStudentsDropdownSimple(activeOnly = true) {
   });
 }
 
+export function useAdmissionTypesDropdown() {
+  return useQuery<AdmissionTypeOption[]>({
+    queryKey: ['admission-types', 'dropdown'],
+    queryFn: fetchAdmissionTypesDropdown,
+    staleTime: 10 * 60 * 1000, // 10 minutes - admission types rarely change
+  });
+}
+
 // Mutation hooks
 export function useCreateAdmission() {
   const queryClient = useQueryClient();
   return usePermissionProtectedMutation<StudentAdmissionResponse, Error, StudentAdmissionCreate>({
     mutationFn: createStudentAdmission,
-    onSuccess: () => {
+    onSuccess: async (data) => {
+      console.log('✅ Admission created successfully:', data);
       toast.success('Student admission created successfully!');
-      queryClient.invalidateQueries({ queryKey: ['admissions'] });
-      queryClient.invalidateQueries({ queryKey: ['students'] });
+
+      // Invalidate and refetch all admission-related queries
+      console.log('🔄 Invalidating queries...');
+      await queryClient.invalidateQueries({
+        queryKey: ['admissions'],
+        refetchType: 'all' // Refetch all queries (active and inactive)
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ['students'],
+        refetchType: 'all'
+      });
+
+      // Also explicitly refetch the admissions list query
+      await queryClient.refetchQueries({
+        queryKey: ['admissions', { skip: 0, limit: 50 }],
+        type: 'all'
+      });
+
+      console.log('✅ Queries invalidated and refetched');
     },
     onError: (error) => {
       toast.error(`Failed to create admission: ${error.message}`);

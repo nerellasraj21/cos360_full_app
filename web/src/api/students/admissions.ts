@@ -4,7 +4,8 @@ import type {
   StudentAdmissionUpdate,
   StudentDropdownItem,
   StudentDropdownSimpleItem,
-  StudentOut
+  StudentOut,
+  AdmissionTypeOption
 } from '@/types/admission';
 import type { ApiError, PaginatedResponse } from '@/types/common';
 import CAxios from '../index';
@@ -19,8 +20,25 @@ import {
 // Helper function to handle API errors
 const handleApiError = (error: any): Error => {
   if (error.response?.data) {
-    const apiError: ApiError = error.response.data;
-    return new Error(apiError.detail || 'An error occurred');
+    const apiError = error.response.data;
+
+    // Handle validation errors (422) - detail is an array of error objects
+    if (Array.isArray(apiError.detail)) {
+      const validationErrors = apiError.detail
+        .map((err: any) => {
+          const field = err.loc?.[1] || err.loc?.[0] || 'unknown';
+          return `${field}: ${err.msg}`;
+        })
+        .join('; ');
+      return new Error(validationErrors || 'Validation error');
+    }
+
+    // Handle string error messages
+    if (typeof apiError.detail === 'string') {
+      return new Error(apiError.detail);
+    }
+
+    return new Error('An error occurred');
   }
   return new Error(error.message || 'Network error');
 };
@@ -30,9 +48,15 @@ export const createStudentAdmission = async (
   admissionData: StudentAdmissionCreate
 ): Promise<StudentAdmissionResponse> => {
   try {
+    console.log('🚀 API Call - Creating admission with data:', JSON.stringify(admissionData, null, 2));
     const { data } = await CAxios.post(STUDENT_ADMISSIONS, admissionData);
+    console.log('✅ API Success - Response:', data);
     return data;
-  } catch (error) {
+  } catch (error: any) {
+    console.error('❌ API Error - Full error object:', error);
+    console.error('❌ API Error - Response:', error?.response);
+    console.error('❌ API Error - Response data:', error?.response?.data);
+    console.error('❌ API Error - Response status:', error?.response?.status);
     throw handleApiError(error);
   }
 };
@@ -95,7 +119,12 @@ export const listAdmissions = async (
 ): Promise<PaginatedResponse<StudentAdmissionResponse>> => {
   try {
     const { data } = await CAxios.get(STUDENT_ADMISSIONS_LIST, {
-      params: { skip, limit }
+      params: {
+        skip,
+        limit,
+        sort_by: 'created_at',
+        sort_order: 'desc'
+      }
     });
     return data;
   } catch (error) {
@@ -135,6 +164,16 @@ export const fetchStudentsDropdownSimple = async (
     const { data } = await CAxios.get(STUDENT_ADMISSIONS_DROPDOWN_SIMPLE, {
       params: { active_only: activeOnly }
     });
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Get admission types dropdown
+export const fetchAdmissionTypesDropdown = async (): Promise<AdmissionTypeOption[]> => {
+  try {
+    const { data } = await CAxios.get('/students/admission/admission-types/dropdown');
     return data;
   } catch (error) {
     throw handleApiError(error);

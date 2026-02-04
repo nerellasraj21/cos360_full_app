@@ -41,7 +41,10 @@ export function useCreateSubjectCategory() {
     mutationFn: createSubjectCategory,
     onSuccess: () => {
       toast.success('Subject category created successfully!');
+      // Invalidate all subject-categories related queries
       queryClient.invalidateQueries({ queryKey: ['subject-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['subject-categories-dropdown'] });
+      queryClient.invalidateQueries({ queryKey: ['subject-categories-infinite'] });
     },
     onError: (error) => {
       toast.error(`Failed to create subject category: ${error.message}`);
