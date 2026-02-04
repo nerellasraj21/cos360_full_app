@@ -35,20 +35,28 @@ from app.service.base.user_scoped_service import UserScopedService
 
 logger = logging.getLogger(__name__)
 
-async def generate_admission_number(db: AsyncSession, admission_date) -> str:
-    """Generate admission number in format: ADM{YEAR}{SEQUENCE}"""
+async def generate_admission_number(db: AsyncSession, admission_date, admission_type: str = "non_primary") -> str:
+    """
+    Generate admission number with type-specific prefixes:
+    - Primary: P{YEAR}{SEQUENCE} (e.g., P2024001)
+    - Non-Primary: NP{YEAR}{SEQUENCE} (e.g., NP2024001)
+    """
     year = admission_date.year
+    prefix = "P" if admission_type == "primary" else "NP"
 
-    # Get the count of admissions for the current year
+    # Get the count of admissions for the current year AND type
     count_stmt = select(func.count(Admission.id)).where(
-        extract('year', Admission.admission_date) == year
+        and_(
+            extract('year', Admission.admission_date) == year,
+            func.cast(Admission.admission_type, String) == admission_type
+        )
     )
     result = await db.execute(count_stmt)
     count = result.scalar() or 0
 
     # Generate next sequence number (padded to 3 digits)
     sequence = count + 1
-    admission_number = f"ADM{year}{sequence:03d}"
+    admission_number = f"{prefix}{year}{sequence:03d}"
 
     # Check if admission number already exists (for safety)
     existing_stmt = select(Admission).where(Admission.admission_number == admission_number)
@@ -59,7 +67,7 @@ async def generate_admission_number(db: AsyncSession, admission_date) -> str:
         # If exists, increment until we find a unique one
         while existing:
             sequence += 1
-            admission_number = f"ADM{year}{sequence:03d}"
+            admission_number = f"{prefix}{year}{sequence:03d}"
             existing_stmt = select(Admission).where(Admission.admission_number == admission_number)
             existing_result = await db.execute(existing_stmt)
             existing = existing_result.scalar_one_or_none()
@@ -117,10 +125,15 @@ async def add_admission(
             raise
 
         # Generate admission number
-        admission_number = await generate_admission_number(db, admission.admission_date)
+        # Determine admission_type from admission or student.is_primary
+        admission_type = admission.admission_type or (
+            "primary" if admission.student.is_primary == "primary" else "non_primary"
+        )
+        admission_number = await generate_admission_number(db, admission.admission_date, admission_type)
 
         admission_dict = admission.dict(exclude={"student"})
         admission_dict["admission_number"] = admission_number
+        admission_dict["admission_type"] = admission_type
 
         # Validate student data
         if not admission.student.first_name or not admission.student.first_name.strip():

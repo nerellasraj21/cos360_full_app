@@ -4,17 +4,19 @@ from app.schemas.student.admission_schema import StudentAdmissionCreate, Student
 from app.schemas.student.student_schema import StudentOut, StudentDropdown, StudentSimpleDropdown
 from app.schemas.common.pagination_schema import PaginatedResponse
 from app.db.tenant_session import get_tenant_db
-from typing import List, Optional
+from typing import List, Optional, Literal
 from app.service.student.admission_service import (
     add_admission, update_partial_details_admission, get_admission_by_id, get_student_by_admission_id,
     search_students, get_all_admissions, delete_admission, toggle_student_active,
     # Enhanced user-context aware functions
-    get_all_admissions_with_context, get_admission_by_id_with_context, search_students_with_context
+    get_all_admissions_with_context, get_admission_by_id_with_context, search_students_with_context,
+    generate_admission_number
 )
 from app.service.student.student_service import get_students_dropdown, get_students_simple_dropdown
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from app.tools.enhanced_permissions import check_user_resource_access
 from uuid import UUID
+from datetime import datetime
 router = APIRouter(prefix="/students/admission", tags=["Student/Student Admission"])
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -22,12 +24,45 @@ async def create_admission(admission: StudentAdmissionCreate, request: Request, 
     """Create a new student admission - Admin only"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'student_admissions', 'create')
-    
+
     admission_response = await add_admission(admission, db, request)
     return admission_response
+
+@router.get("/next-admission-number")
+async def get_next_admission_number(
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    type: Literal["primary", "non_primary"] = Query("non_primary", description="Admission type: primary or non_primary")
+):
+    """
+    Preview next admission number (non-binding).
+
+    Returns the next available admission number for the specified type:
+    - Primary: P{YEAR}{SEQ} (e.g., P2024001)
+    - Non-Primary: NP{YEAR}{SEQ} (e.g., NP2024001)
+
+    **Note**: This is a preview only. The actual number will be generated during admission creation.
+
+    **Required Permission**: student_admissions:create
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, 'student_admissions', 'create')
+
+    # Generate preview number using current date
+    preview_number = await generate_admission_number(db, datetime.now().date(), type)
+
+    return {
+        "next_number": preview_number,
+        "format": "P{YEAR}{SEQ}" if type == "primary" else "NP{YEAR}{SEQ}",
+        "type": type,
+        "note": "Preview only. Actual number generated during admission creation."
+    }
 
 @router.get("/id/{student_id}")
 async def get_admission(student_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
@@ -220,3 +255,21 @@ async def get_my_children_admissions(
 
     # Use user-context aware service method for parent's children admissions
     return await get_all_admissions_with_context(db, user_context, skip, limit)
+
+@router.get("/admission-types/dropdown")
+async def get_admission_types_dropdown(request: Request):
+    """
+    Get admission type options for dropdown.
+
+    Returns a list of all available admission types with:
+    - value: The enum value for storage
+    - label: Human-readable display text
+
+    **Required Permission**: student_admissions:read
+    """
+    current_user = await get_current_user_token(request)
+
+    return [
+        {"value": "primary", "label": "Primary Admission"},
+        {"value": "non_primary", "label": "Non-Primary Admission"}
+    ]

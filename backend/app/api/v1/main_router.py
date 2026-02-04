@@ -24,11 +24,14 @@ from app.api.v1.student.certificate_endpoints import router as certificate_route
 from app.api.v1.student.certificate_type_endpoints import router as certificate_type_router
 from app.api.v1.masters.parent_endpoints import router as parent_router
 from app.api.v1.masters.staff_endpoints import router as staff_router
+from app.api.v1.masters.caste_endpoints import router as caste_router
+from app.api.v1.masters.location_endpoints import router as location_router
 from app.api.v1.student.student_document_endpoints import router as student_document_router
 # from app.api.v1.masters.student_homework_endpoints import router as student_homework_router
 from app.api.v1.student.student_transport_endpoints import router as student_transport_router
 from app.api.v1.student.student_parent_endpoints import router as student_parent_link_router
 from app.api.v1.masters.subject_category_endpoints import router as subject_category_router
+from app.api.v1.masters.subject_category_endpoints import subject_categories_alias_router
 from app.api.v1.fee.fee_term_endpoints import router as fee_term_router
 from app.api.v1.fee.fee_category_endpoints import router as fee_category_router
 from app.api.v1.fee.fee_type_endpoints import router as fee_type_router
@@ -89,12 +92,15 @@ router.include_router(certificate_router)
 router.include_router(certificate_type_router)
 router.include_router(parent_router)
 router.include_router(staff_router)
+router.include_router(caste_router)
+router.include_router(location_router)
 router.include_router(student_document_router)
 # router.include_router(student_homework_router)
 router.include_router(student_transport_router)
 router.include_router(student_parent_link_router)
 router.include_router(attendance_router)
 router.include_router(subject_category_router)
+router.include_router(subject_categories_alias_router)  # Frontend-compatible alias for inline category creation
 router.include_router(fee_term_router)
 router.include_router(fee_category_router)
 router.include_router(fee_type_router)

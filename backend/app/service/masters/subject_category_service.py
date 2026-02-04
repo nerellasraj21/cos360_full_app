@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from app.models.masters.subject_category_model import SubjectCategory
 from app.schemas.masters.subject_category_schema import SubjectCategoryCreate, SubjectCategoryUpdate
@@ -39,14 +39,32 @@ async def create_subject_category(db: AsyncSession, data: SubjectCategoryCreate)
         log.error(f"Error creating subject category: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Subject category creation failed: {str(e)}")
 
-async def get_all_subject_categories(db: AsyncSession):
-    """Get all subject categories - No cache to avoid serialization issues"""
+async def get_all_subject_categories(db: AsyncSession, skip: int = 0, limit: int = 50):
+    """Get all subject categories with pagination - No cache to avoid serialization issues"""
     try:
-        result = await db.execute(select(SubjectCategory.id, SubjectCategory.name).order_by(SubjectCategory.name))
+        # Get total count
+        count_result = await db.execute(select(func.count(SubjectCategory.id)))
+        total_count = count_result.scalar()
+
+        # Get paginated items
+        result = await db.execute(
+            select(SubjectCategory.id, SubjectCategory.name)
+            .order_by(SubjectCategory.name)
+            .offset(skip)
+            .limit(limit)
+        )
         categories = result.all()
 
-        log.debug(f"Retrieved {len(categories)} subject categories from database")
-        return [{"id": cat.id, "name": cat.name} for cat in categories]
+        # Calculate has_next
+        has_next = (skip + limit) < total_count
+
+        log.debug(f"Retrieved {len(categories)} subject categories from database (skip={skip}, limit={limit}, total={total_count})")
+
+        return {
+            "items": [{"id": cat.id, "name": cat.name} for cat in categories],
+            "total_count": total_count,
+            "has_next": has_next
+        }
     except Exception as e:
         log.error(f"Error fetching subject categories: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Fetching subject categories failed: {str(e)}")

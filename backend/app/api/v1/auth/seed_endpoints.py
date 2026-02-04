@@ -1,9 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from app.db.session import get_public_db
+from app.db.tenant_session import get_tenant_db
 from app.models.public import RoleTemplate, PermissionTemplate, MenuAction, Menu, Plan, PlanMenuAccess
+from app.models.masters.caste_model import Caste, SubCaste
+from app.models.masters.location.state_model import State
+from app.models.masters.location.district_model import District
+from app.models.masters.location.mandal_model import Mandal
+from app.tools.simple_permissions import get_current_user_token, check_role_plan_permission_with_error
 import logging
+from uuid import uuid4
+from datetime import datetime
 
 logger = logging.getLogger("seed_endpoints")
 router = APIRouter(prefix="/auth/seed", tags=["Auth/Seed Data"])
@@ -213,4 +221,248 @@ async def verify_permission_data():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to verify permission data: {str(e)}"
+        )
+
+@router.post("/caste-data", status_code=status.HTTP_201_CREATED)
+async def seed_caste_data(
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db)
+):
+    """
+    Seed default caste and sub-caste data.
+    This should only be run once during initial setup.
+
+    **Required Permission**: Admin only
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get('role')
+
+    # Only admin can seed data
+    if role != 'Admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can seed data"
+        )
+
+    try:
+        # Common Indian castes with sub-castes
+        castes_data = {
+            "General": ["General"],
+            "OBC": ["OBC-A", "OBC-B", "OBC-C", "OBC-D"],
+            "SC": ["Adi Andhra", "Adi Dravida", "Mala", "Madiga", "Chamar", "Pasi"],
+            "ST": ["Chenchu", "Konda Reddy", "Koya", "Gond", "Bhil", "Santhal"],
+            "EWS": ["EWS"]
+        }
+
+        castes_created = []
+        sub_castes_created = []
+
+        for caste_name, sub_caste_list in castes_data.items():
+            # Check if caste exists
+            query = select(Caste).where(Caste.name == caste_name)
+            result = await db.execute(query)
+            existing_caste = result.scalar_one_or_none()
+
+            if not existing_caste:
+                caste = Caste(
+                    id=uuid4(),
+                    name=caste_name,
+                    code=caste_name[:3].upper(),
+                    is_active=True
+                )
+                db.add(caste)
+                await db.flush()  # Flush to get the ID
+                castes_created.append(caste_name)
+            else:
+                caste = existing_caste
+
+            # Add sub-castes
+            for sub_caste_name in sub_caste_list:
+                # Check if sub-caste exists
+                sub_query = select(SubCaste).where(
+                    SubCaste.caste_id == caste.id,
+                    SubCaste.name == sub_caste_name
+                )
+                result = await db.execute(sub_query)
+                existing_sub_caste = result.scalar_one_or_none()
+
+                if not existing_sub_caste:
+                    sub_caste = SubCaste(
+                        id=uuid4(),
+                        caste_id=caste.id,
+                        name=sub_caste_name,
+                        code=sub_caste_name[:3].upper() if len(sub_caste_name) >= 3 else sub_caste_name.upper(),
+                        is_active=True
+                    )
+                    db.add(sub_caste)
+                    sub_castes_created.append(f"{caste_name} -> {sub_caste_name}")
+
+        await db.commit()
+
+        return {
+            "message": "Caste data seeded successfully",
+            "details": {
+                "castes_created": castes_created,
+                "sub_castes_created": sub_castes_created,
+                "total_castes": len(castes_created),
+                "total_sub_castes": len(sub_castes_created)
+            }
+        }
+
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error seeding caste data: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to seed caste data: {str(e)}"
+        )
+
+@router.post("/location-data", status_code=status.HTTP_201_CREATED)
+async def seed_location_data():
+    """
+    Seed default location data (States, Districts, Mandals) to PUBLIC schema.
+    This should only be run once during initial setup.
+
+    Note: This endpoint does not require authentication as it seeds PUBLIC schema data.
+    """
+    try:
+        async with get_public_db() as public_db:
+            # Major Indian states with districts and mandals
+            # For brevity, including Andhra Pradesh and Telangana as primary states
+            location_data = {
+                "Andhra Pradesh": {
+                    "code": "AP",
+                    "districts": {
+                        "Visakhapatnam": ["Visakhapatnam Urban", "Visakhapatnam Rural", "Bheemunipatnam", "Anakapalli"],
+                        "Vijayawada": ["Vijayawada Urban", "Vijayawada Rural", "Gannavaram", "Kankipadu"],
+                        "Guntur": ["Guntur Urban", "Guntur Rural", "Tenali", "Mangalagiri"],
+                        "Nellore": ["Nellore Urban", "Nellore Rural", "Kavali", "Gudur"],
+                        "Kurnool": ["Kurnool Urban", "Kurnool Rural", "Nandyal", "Adoni"]
+                    }
+                },
+                "Telangana": {
+                    "code": "TS",
+                    "districts": {
+                        "Hyderabad": ["Hyderabad Urban", "Secunderabad", "Kukatpally", "LB Nagar"],
+                        "Rangareddy": ["Shamshabad", "Rajendranagar", "Serilingampally", "Chevella"],
+                        "Warangal": ["Warangal Urban", "Warangal Rural", "Hanamkonda", "Parkal"],
+                        "Nizamabad": ["Nizamabad Urban", "Nizamabad Rural", "Bodhan", "Armoor"],
+                        "Karimnagar": ["Karimnagar Urban", "Karimnagar Rural", "Jagitial", "Peddapalli"]
+                    }
+                },
+                "Karnataka": {
+                    "code": "KA",
+                    "districts": {
+                        "Bangalore": ["Bangalore North", "Bangalore South", "Bangalore East", "Anekal"],
+                        "Mysore": ["Mysore Urban", "Mysore Rural", "K.R. Nagar", "Hunsur"]
+                    }
+                },
+                "Tamil Nadu": {
+                    "code": "TN",
+                    "districts": {
+                        "Chennai": ["Chennai North", "Chennai South", "Chennai Central", "Ambattur"],
+                        "Coimbatore": ["Coimbatore North", "Coimbatore South", "Pollachi", "Sulur"]
+                    }
+                },
+                "Maharashtra": {
+                    "code": "MH",
+                    "districts": {
+                        "Mumbai": ["Mumbai City", "Mumbai Suburban", "Kurla", "Andheri"],
+                        "Pune": ["Pune City", "Pune Rural", "Haveli", "Bhor"]
+                    }
+                }
+            }
+
+            states_created = []
+            districts_created = []
+            mandals_created = []
+
+            for state_name, state_info in location_data.items():
+                # Check if state exists
+                query = select(State).where(State.name == state_name)
+                result = await public_db.execute(query)
+                existing_state = result.scalar_one_or_none()
+
+                if not existing_state:
+                    state = State(
+                        id=uuid4(),
+                        name=state_name,
+                        code=state_info["code"],
+                        is_active=True,
+                        created_at=datetime.now(),
+                        updated_at=datetime.now()
+                    )
+                    public_db.add(state)
+                    await public_db.flush()
+                    states_created.append(state_name)
+                else:
+                    state = existing_state
+
+                # Add districts
+                for district_name, mandal_list in state_info["districts"].items():
+                    # Check if district exists
+                    dist_query = select(District).where(
+                        District.state_id == state.id,
+                        District.name == district_name
+                    )
+                    result = await public_db.execute(dist_query)
+                    existing_district = result.scalar_one_or_none()
+
+                    if not existing_district:
+                        district = District(
+                            id=uuid4(),
+                            state_id=state.id,
+                            name=district_name,
+                            code=district_name[:3].upper(),
+                            is_active=True,
+                            created_at=datetime.now(),
+                            updated_at=datetime.now()
+                        )
+                        public_db.add(district)
+                        await public_db.flush()
+                        districts_created.append(f"{state_name} -> {district_name}")
+                    else:
+                        district = existing_district
+
+                    # Add mandals
+                    for mandal_name in mandal_list:
+                        # Check if mandal exists
+                        mandal_query = select(Mandal).where(
+                            Mandal.district_id == district.id,
+                            Mandal.name == mandal_name
+                        )
+                        result = await public_db.execute(mandal_query)
+                        existing_mandal = result.scalar_one_or_none()
+
+                        if not existing_mandal:
+                            mandal = Mandal(
+                                id=uuid4(),
+                                district_id=district.id,
+                                name=mandal_name,
+                                is_active=True,
+                                created_at=datetime.now(),
+                                updated_at=datetime.now()
+                            )
+                            public_db.add(mandal)
+                            mandals_created.append(f"{state_name} -> {district_name} -> {mandal_name}")
+
+            await public_db.commit()
+
+            return {
+                "message": "Location data seeded successfully",
+                "details": {
+                    "states_created": states_created,
+                    "districts_created": districts_created,
+                    "mandals_created": mandals_created,
+                    "total_states": len(states_created),
+                    "total_districts": len(districts_created),
+                    "total_mandals": len(mandals_created)
+                }
+            }
+
+    except Exception as e:
+        logger.error(f"Error seeding location data: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to seed location data: {str(e)}"
         )

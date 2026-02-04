@@ -1,7 +1,8 @@
 # Module Context - Masters (Core Data)
 
-Version: 1.0
+Version: 1.2
 Generated On: 2025-12-26
+Last Updated: 2025-12-28
 Source: Codebase Analysis
 Confidence Level: High
 
@@ -64,6 +65,8 @@ Evidence: `app/api/v1/masters/`, `app/service/masters/`, `context_guide.json:376
 
 ### ClassSubjectMapping
 
+[EVIDENCE-BASED]
+
 - `id` (UUID): Primary key
 - `class_id` (UUID FK): Parent class
 - `section_id` (UUID FK): Section within the class (**Added 2025-12-28**)
@@ -73,11 +76,18 @@ Evidence: `app/api/v1/masters/`, `app/service/masters/`, `context_guide.json:376
 - `order` (integer): Display order
 - `is_active` (boolean): Status
 
-**Constraints:**
+**Database Constraints:**
 - Unique constraint on `(class_id, section_id, subject_id, academic_year_id)` - prevents duplicate mappings
-- Foreign key to `sections(id)` for section association
+- Foreign key `fk_class_subject_mappings_section_id` to `sections(id)`
+- Index `ix_class_subject_mappings_section_id` for query performance
 
-Evidence: Database schema, `class_subject_mapping_model.py`
+**Bulk API Behavior (Updated 2025-12-28):**
+- `section_id` is **optional** in bulk create/update requests
+- If `section_id` is provided: applies to that specific section only
+- If `section_id` is `null` or omitted: applies to **ALL active sections** in the class
+- Response includes `sections_processed` count
+
+Evidence: Database schema, `class_subject_mapping_model.py`, `class_subject_mapping_service.py`
 
 ### Services
 
@@ -107,21 +117,22 @@ Evidence: Database schema, `class_subject_mapping_model.py`
 
 ### API Endpoints
 
-| Endpoint File                        | Routes                                    |
-| ------------------------------------ | ----------------------------------------- |
-| `academic_year_routes.py`            | `/api/v1/masters/academic-years/`         |
-| `class_endpoints.py`                 | `/api/v1/masters/classes/`                |
-| `subject_routes.py`                  | `/api/v1/masters/subjects/`               |
-| `subject_category_endpoints.py`      | `/api/v1/masters/subject-categories/`     |
-| `class_subject_mapping_endpoints.py` | `/api/v1/masters/class-subject-mappings/` |
-| `staff_endpoints.py`                 | `/api/v1/masters/staff/`                  |
-| `parent_endpoints.py`                | `/api/v1/masters/parents/`                |
-| `holiday_endpoints.py`               | `/api/v1/masters/holidays/`               |
-| `timetable_routes.py`                | `/api/v1/masters/timetables/`             |
-| `transport/routes_endpoints.py`      | `/api/v1/masters/transport/routes/`       |
-| `transport/route_stop_endpoints.py`  | `/api/v1/masters/transport/stops/`        |
-| `transport/vehicle_endpoints.py`     | `/api/v1/masters/transport/vehicles/`     |
-| `transport/trip_endpoints.py`        | `/api/v1/masters/transport/trips/`        |
+| Endpoint File                        | Routes                                         |
+| ------------------------------------ | ---------------------------------------------- |
+| `academic_year_routes.py`            | `/api/v1/masters/academic-years/`              |
+| `class_endpoints.py`                 | `/api/v1/masters/classes/`                     |
+| `subject_routes.py`                  | `/api/v1/masters/subjects/`                    |
+| `subject_category_endpoints.py`      | `/api/v1/masters/subject_categories/categories/` |
+| `subject_category_endpoints.py`      | `/api/v1/subject-categories` (alias)           |
+| `class_subject_mapping_endpoints.py` | `/api/v1/masters/class-subject-mappings/`      |
+| `staff_endpoints.py`                 | `/api/v1/masters/staff/`                       |
+| `parent_endpoints.py`                | `/api/v1/masters/parents/`                     |
+| `holiday_endpoints.py`               | `/api/v1/masters/holidays/`                    |
+| `timetable_routes.py`                | `/api/v1/masters/timetables/`                  |
+| `transport/routes_endpoints.py`      | `/api/v1/masters/transport/routes/`            |
+| `transport/route_stop_endpoints.py`  | `/api/v1/masters/transport/stops/`             |
+| `transport/vehicle_endpoints.py`     | `/api/v1/masters/transport/vehicles/`          |
+| `transport/trip_endpoints.py`        | `/api/v1/masters/transport/trips/`             |
 
 ---
 
@@ -205,12 +216,25 @@ Evidence: `context_guide.json:380-385`
 
 ### Class-Subject Mapping Rules
 
-- Subject mappings are now **section-specific** (as of 2025-12-28)
+[EVIDENCE-BASED]
+
+**Data Model (Updated 2025-12-28):**
+- Subject mappings are now **section-specific**
 - Each mapping links a subject to a specific class+section combination
 - Unique constraint enforces: one subject per class+section+academic_year
 - This allows different sections to have different subject assignments
 
-Evidence: Database migration 2025-12-28, `class_subject_mapping_model.py`
+**Bulk Operations:**
+- Bulk endpoint supports upsert behavior (create/update/deactivate)
+- When `section_id` is null: applies to ALL active sections in the class
+- When `section_id` is provided: applies to that specific section only
+- Subjects NOT in the request are automatically deactivated (`is_active=false`)
+
+**Service Architecture:**
+- `_process_section_mappings()`: Internal helper for single section processing
+- `bulk_create_or_update_class_subject_mappings()`: Main entry point with multi-section support
+
+Evidence: Database migration 2025-12-28, `class_subject_mapping_model.py`, `class_subject_mapping_service.py:47-235`
 
 ### Database Refresh Pattern Fixes
 
@@ -274,17 +298,46 @@ PUT    /api/v1/masters/subjects/{id}
 DELETE /api/v1/masters/subjects/{id}
 ```
 
+### Subject Category Endpoints
+
+**Primary Endpoints** (under `/masters/subject_categories/categories`):
+
+```
+GET    /api/v1/masters/subject_categories/categories           # List all
+POST   /api/v1/masters/subject_categories/categories           # Create
+GET    /api/v1/masters/subject_categories/categories/dropdown  # Dropdown
+GET    /api/v1/masters/subject_categories/categories/{id}      # Get by ID
+PUT    /api/v1/masters/subject_categories/categories/{id}      # Update
+DELETE /api/v1/masters/subject_categories/categories/{id}      # Delete
+```
+
+**Alias Endpoints** (Added 2025-12-28 for frontend inline creation):
+
+```
+GET    /api/v1/subject-categories    # List all (alias)
+POST   /api/v1/subject-categories    # Create (alias)
+```
+
+**Note:** The alias endpoints at `/api/v1/subject-categories` were added to support inline category creation from the Subject creation form. They call the same service functions as the primary endpoints.
+
 ### Class Subject Mapping Endpoints
 
 ```
-GET    /api/v1/masters/class-subject-mappings/
-POST   /api/v1/masters/class-subject-mappings/bulk  (section-based bulk upsert)
-GET    /api/v1/masters/class-subject-mappings/{id}
-PUT    /api/v1/masters/class-subject-mappings/{id}
-DELETE /api/v1/masters/class-subject-mappings/{id}
+GET    /api/v1/masters/class-subject-mappings/           # List with filters
+GET    /api/v1/masters/class-subject-mappings/by-class/{class_id}  # By class
+GET    /api/v1/masters/class-subject-mappings/dropdown   # For dropdowns
+POST   /api/v1/masters/class-subject-mappings/           # Single create
+POST   /api/v1/masters/class-subject-mappings/bulk       # Bulk upsert
+GET    /api/v1/masters/class-subject-mappings/{id}       # Get by ID
+PUT    /api/v1/masters/class-subject-mappings/{id}       # Update
+DELETE /api/v1/masters/class-subject-mappings/{id}       # Delete
 ```
 
-**Note**: Mappings require `section_id` as of 2025-12-28. Each mapping is section-specific.
+**Bulk Endpoint Behavior (Updated 2025-12-28):**
+- `section_id` is **optional** in request body
+- If `section_id` is `null` or omitted: applies to ALL active sections
+- Response includes `sections_processed` count
+- Upsert: creates new, updates existing, deactivates missing subjects
 
 ### Staff Endpoints
 
