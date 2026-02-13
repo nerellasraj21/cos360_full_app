@@ -6,18 +6,18 @@ import {
     updateStudentTransport,
     deleteStudentTransport
 } from '@/api/masters/studentTransport';
-import type { StudentTransport, StudentTransportInput, StudentTransportUpdateInput } from '@/types/masters/studentTransport';
+import type { StudentTransportOut, StudentTransportCreate, StudentTransportUpdate } from '@/types/masters/studentTransport';
 import { toast } from 'sonner';
 
 export function useStudentTransports() {
-    return useQuery<StudentTransport[]>({
+    return useQuery<StudentTransportOut[]>({
         queryKey: ['student-transports'],
         queryFn: fetchStudentTransports,
     });
 }
 
 export function useStudentTransportsByStudent(studentId: string) {
-    return useQuery<StudentTransport[]>({
+    return useQuery<StudentTransportOut[]>({
         queryKey: ['student-transports', studentId],
         queryFn: () => fetchStudentTransportsByStudent(studentId),
         enabled: !!studentId,
@@ -26,7 +26,7 @@ export function useStudentTransportsByStudent(studentId: string) {
 
 export function useCreateStudentTransport() {
     const queryClient = useQueryClient();
-    return useMutation<StudentTransport, Error, StudentTransportInput>({
+    return useMutation<StudentTransportOut, Error, StudentTransportCreate>({
         mutationFn: createStudentTransport,
         onSuccess: () => {
             toast.success('Student transport created!');
@@ -40,7 +40,7 @@ export function useCreateStudentTransport() {
 
 export function useUpdateStudentTransport() {
     const queryClient = useQueryClient();
-    return useMutation<StudentTransport, Error, { id: string; transport: StudentTransportInput }>({
+    return useMutation<StudentTransportOut, Error, { id: string; transport: StudentTransportUpdate }>({
         mutationFn: ({ id, transport }) => updateStudentTransport(id, transport),
         onSuccess: () => {
             toast.success('Student transport updated!');

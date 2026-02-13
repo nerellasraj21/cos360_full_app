@@ -60,6 +60,11 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
     fetchMappings();
   }, [academicYearId, selectedClass, selectedSection, selectedFeeType]);
 
+  // Clear section when class changes
+  useEffect(() => {
+    setSelectedSection('');
+  }, [selectedClass]);
+
   // Fetch students and classes data for name resolution
   const { data: students = [] } = useStudentsDropdown();
   const { data: classesData = [] } = useClassSectionsDropdown();
@@ -204,7 +209,11 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Classes</SelectItem>
-                {/* Add class options here */}
+                {classesData.map((classItem) => (
+                  <SelectItem key={classItem.id} value={classItem.id}>
+                    {classItem.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={selectedSection} onValueChange={setSelectedSection}>
@@ -213,7 +222,13 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Sections</SelectItem>
-                {/* Add section options here */}
+                {selectedClass && classesData
+                  .find(c => c.id === selectedClass)
+                  ?.sections.map((section) => (
+                    <SelectItem key={section.id} value={section.id}>
+                      {section.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <Select value={selectedFeeType} onValueChange={setSelectedFeeType}>
@@ -222,7 +237,11 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Fee Types</SelectItem>
-                {/* Add fee type options here */}
+                {feeTypes.map((feeType) => (
+                  <SelectItem key={feeType.id} value={feeType.id}>
+                    {feeType.type_name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

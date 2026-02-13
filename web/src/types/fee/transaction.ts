@@ -64,6 +64,7 @@ export interface FeeTransactionCreateRequest {
   transaction_items: Array<{
     fee_type_id: string;
     fee_term_id: string;
+    term_date_id: string;
     amount_due: number;
     amount_paid: number;
     description?: string;

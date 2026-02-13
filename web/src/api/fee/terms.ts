@@ -1,4 +1,5 @@
 import CAxios from '../index';
+import axios from 'axios';
 import { FEE_TERMS, FEE_TERMS_DROPDOWN } from '@/constants/api/fee';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import type {
@@ -54,25 +55,71 @@ export const feeTermsApi = {
 
     // Create new term with dates
     createTerm: async (data: FeeTermCreateRequest): Promise<FeeTerm> => {
-        console.log('[DEBUG] feeTermsApi.createTerm called with data:', data);
+        console.log('[Fee Terms API] Creating term with data:', data);
 
         try {
+            // Ensure academic year is included
+            if (!data.academic_year_id) {
+                const academicYearId = useAcademicYearStore.getState().selectedAcademicYearId;
+                if (!academicYearId) {
+                    throw new Error('Academic year is required. Please select an academic year.');
+                }
+                data.academic_year_id = academicYearId;
+            }
+
             const response = await CAxios.post(FEE_TERMS, data);
-            console.log('[DEBUG] feeTermsApi.createTerm success:', response.data);
+            console.log('[Fee Terms API] Term created successfully:', response.data);
             return response.data;
-        } catch (error) {
-            console.error('[DEBUG] feeTermsApi.createTerm failed:', error);
-            throw error;
+        } catch (error: any) {
+            console.error('[Fee Terms API Error]', {
+                status: error.response?.status,
+                detail: error.response?.data?.detail,
+                errors: error.response?.data?.errors,
+                fullData: error.response?.data
+            });
+
+            // Better error messages
+            if (error.response?.data?.detail) {
+                throw new Error(error.response.data.detail);
+            } else if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+                const errorMessages = error.response.data.errors.map((e: any) => e.msg || e.message).join(', ');
+                throw new Error(`Validation error: ${errorMessages}`);
+            } else if (error.message) {
+                throw new Error(error.message);
+            }
+
+            throw new Error('Failed to create fee term. Please try again.');
         }
     },
 
     // Update term with dates
     updateTerm: async (id: string, data: FeeTermUpdateRequest): Promise<FeeTerm> => {
-        console.log('[DEBUG] feeTermsApi.updateTerm called with id:', id, 'data:', data);
+        console.log('[Fee Terms API] Updating term with id:', id, 'data:', data);
 
-        const response = await CAxios.put(`${FEE_TERMS}${id}`, data);
-        console.log('[DEBUG] feeTermsApi.updateTerm updated:', response.data);
-        return response.data;
+        try {
+            const response = await CAxios.put(`${FEE_TERMS}${id}`, data);
+            console.log('[Fee Terms API] Term updated successfully:', response.data);
+            return response.data;
+        } catch (error: any) {
+            console.error('[Fee Terms API Error]', {
+                status: error.response?.status,
+                detail: error.response?.data?.detail,
+                errors: error.response?.data?.errors,
+                fullData: error.response?.data
+            });
+
+            // Better error messages
+            if (error.response?.data?.detail) {
+                throw new Error(error.response.data.detail);
+            } else if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+                const errorMessages = error.response.data.errors.map((e: any) => e.msg || e.message).join(', ');
+                throw new Error(`Validation error: ${errorMessages}`);
+            } else if (error.message) {
+                throw new Error(error.message);
+            }
+
+            throw new Error('Failed to update fee term. Please try again.');
+        }
     },
 
     // Delete term

@@ -33,7 +33,8 @@ interface TermAmountModalProps {
 interface TermAmountFormData {
     term_number: number;
     term_amount: number;
-    term_id?: string;
+    term_id?: string;  // ⚠️ DEPRECATED - For backward compatibility only
+    term_date_id?: string;  // ✅ NEW - Use this for new code
     term_name?: string;
     due_date?: string;
 }
@@ -74,9 +75,10 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                     initialTermAmounts.push({
                         term_number: i + 1,
                         term_amount: existingAmount ? existingAmount.term_amount : 0,
-                        term_id: existingAmount?.term_id || `fallback_term_${i + 1}`,
-                        term_name: `Term ${i + 1}`,
-                        due_date: undefined
+                        term_date_id: existingAmount?.term_date_id || existingAmount?.term_id || `fallback_term_${i + 1}`,
+                        term_id: existingAmount?.term_id,  // Keep for backward compatibility
+                        term_name: existingAmount?.term_name || `Term ${i + 1}`,
+                        due_date: existingAmount?.term_date
                     });
                 }
 
@@ -105,9 +107,10 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                     initialTermAmounts.push({
                         term_number: i + 1,
                         term_amount: existingAmount ? existingAmount.term_amount : 0,
-                        term_id: existingAmount?.term_id || termDate.id, // Use unique term date ID
-                        term_name: feeTerm.term_name ? `${feeTerm.term_name} - Term ${i + 1}` : `Term ${i + 1}`,
-                        due_date: termDate.fee_term_date
+                        term_date_id: existingAmount?.term_date_id || termDate.id, // ✅ Use term_date_id
+                        term_id: existingAmount?.term_id || feeTerm.id, // ⚠️ Keep for backward compatibility
+                        term_name: existingAmount?.term_name || (feeTerm.term_name ? `${feeTerm.term_name} - Term ${i + 1}` : `Term ${i + 1}`),
+                        due_date: existingAmount?.term_date || termDate.fee_term_date
                     });
                 }
             } else {
@@ -119,9 +122,10 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                     initialTermAmounts.push({
                         term_number: i + 1,
                         term_amount: existingAmount ? existingAmount.term_amount : 0,
-                        term_id: existingAmount?.term_id || `${feeTerm.id}_term_${i + 1}`, // Ensure uniqueness
-                        term_name: feeTerm.term_name ? `${feeTerm.term_name} - Term ${i + 1}` : `Term ${i + 1}`,
-                        due_date: undefined
+                        term_date_id: existingAmount?.term_date_id || `${feeTerm.id}_term_${i + 1}`, // Ensure uniqueness
+                        term_id: existingAmount?.term_id || feeTerm.id, // Keep for backward compatibility
+                        term_name: existingAmount?.term_name || (feeTerm.term_name ? `${feeTerm.term_name} - Term ${i + 1}` : `Term ${i + 1}`),
+                        due_date: existingAmount?.term_date
                     });
                 }
             }
@@ -195,18 +199,18 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
             return;
         }
 
-        // Validate that all term IDs are valid and unique
-        const invalidTermIds = termAmounts.filter(ta => !ta.term_id || ta.term_id.startsWith('fallback_term_'));
-        if (invalidTermIds.length > 0) {
-            toast.error('Some term IDs are invalid. Please ensure the fee type has a properly configured fee term.');
+        // Validate that all term date IDs are valid and unique
+        const invalidTermDateIds = termAmounts.filter(ta => !ta.term_date_id || ta.term_date_id.startsWith('fallback_term_'));
+        if (invalidTermDateIds.length > 0) {
+            toast.error('Some term date IDs are invalid. Please ensure the fee type has a properly configured fee term.');
             return;
         }
 
-        // Check for duplicate term IDs
-        const termIds = termAmounts.map(ta => ta.term_id);
-        const uniqueTermIds = new Set(termIds);
-        if (uniqueTermIds.size !== termIds.length) {
-            toast.error('Duplicate term IDs found. Each term must have a unique ID.');
+        // Check for duplicate term date IDs
+        const termDateIds = termAmounts.map(ta => ta.term_date_id);
+        const uniqueTermDateIds = new Set(termDateIds);
+        if (uniqueTermDateIds.size !== termDateIds.length) {
+            toast.error('Duplicate term date IDs found. Each term must have a unique ID.');
             return;
         }
 
@@ -223,9 +227,18 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                 // Use PUT for updates
                 const termAmountData = termAmounts.map((ta, index) => {
                     const existing = existingTermAmounts[index];
+
+                    // Validate required fields
+                    if (!existing?.id) {
+                        throw new Error(`Missing ID for term ${index + 1}. Cannot update without existing ID.`);
+                    }
+
+                    // Backend expects term_id (not term_date_id)
+                    const termId = ta.term_date_id || ta.term_id || ta.term_number.toString();
+
                     return {
-                        id: existing?.id || '',
-                        term_id: ta.term_id || ta.term_number.toString(),
+                        id: existing.id, // Must be valid UUID
+                        term_id: termId, // Backend expects this field
                         term_amount: ta.term_amount || 0
                     };
                 });
@@ -238,10 +251,15 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                 });
             } else {
                 // Use POST for new
-                const termAmountData = termAmounts.map(ta => ({
-                    term_id: ta.term_id || ta.term_number.toString(),
-                    term_amount: ta.term_amount || 0
-                }));
+                const termAmountData = termAmounts.map(ta => {
+                    // Backend CREATE expects term_date_id (see BACKEND_HANDOVER_FEE_TERM_AMOUNTS.md)
+                    const termDateId = ta.term_date_id || ta.term_id || ta.term_number.toString();
+
+                    return {
+                        term_date_id: termDateId, // Backend expects this field for CREATE
+                        term_amount: ta.term_amount || 0
+                    };
+                });
 
                 console.log('TermAmountModal: Creating term amounts:', termAmountData);
 
@@ -272,6 +290,12 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
         return (
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Calculator className="h-5 w-5" />
+                            Manage Term Amounts
+                        </DialogTitle>
+                    </DialogHeader>
                     <div className="flex items-center justify-center py-8">
                         <div className="text-gray-500">Loading term amounts...</div>
                     </div>

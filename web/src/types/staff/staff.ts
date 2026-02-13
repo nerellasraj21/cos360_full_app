@@ -79,7 +79,7 @@ export interface StaffAttendanceUpdateRequest {
 export interface Designation {
   id: string;
   title: string;
-  staff_members?: Staff[];
+  staff_count?: number;  // Changed from staff_members to match backend
   created_at: string;
   updated_at: string;
 }
@@ -109,9 +109,8 @@ export interface StaffAttendanceListResponse {
 
 export interface DesignationListResponse {
   items: Designation[];
-  total: number;
-  skip: number;
-  limit: number;
+  total_count: number;  // Changed from 'total' to match backend
+  has_next: boolean;    // Added to match backend response
 }
 
 export interface DesignationDropdown {

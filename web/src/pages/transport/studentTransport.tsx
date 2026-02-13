@@ -1,29 +1,26 @@
-import React, { useState, useMemo } from "react";
+import { useState } from "react";
 
 import { MasterPage } from "../masters/common/MasterPage";
 import type { MasterPageConfig, FormField } from "../masters/common/MasterPage";
-import type { StudentTransport, StudentTransportInput } from "@/types/masters/studentTransport";
+import type { StudentTransportOut, StudentTransportCreate } from "@/types/masters/studentTransport";
 import { useStudentTransports, useCreateStudentTransport, useUpdateStudentTransport, useDeleteStudentTransport } from '@/api/hooks/masters/studentTransport';
-import { useAdmissions } from '@/api/hooks/students/admissions';
-import { useRoutes } from '@/api/hooks/masters/routes';
 import { Badge } from '@/components/ui/badge';
 
+// Updated to match backend schema (2026-02-09)
 const formFields: FormField[] = [
+    { name: "trip_id", label: "Trip ID", required: true },
     { name: "student_id", label: "Student ID", required: true },
-    { name: "route_id", label: "Route ID", required: true },
     { name: "stop_id", label: "Stop ID", required: true },
-    { name: "trip_type", label: "Trip Type", required: true },
-    { name: "academic_year_id", label: "Academic Year ID", required: true },
-    { name: "fare_amount", label: "Fare Amount", type: "number", required: true },
+    { name: "fee_term_id", label: "Fee Term ID", required: true },
+    { name: "fee_per_term", label: "Fee Per Term", type: "number", required: true },
 ];
 
-const defaultValues: StudentTransportInput = {
+const defaultValues: StudentTransportCreate = {
+    trip_id: "",
     student_id: "",
-    route_id: "",
     stop_id: "",
-    trip_type: "pickup",
-    academic_year_id: "",
-    fare_amount: 0,
+    fee_term_id: "",
+    fee_per_term: 0,
 };
 
 const PAGE_SIZE_DEFAULT = 5;
@@ -33,25 +30,22 @@ export default function StudentTransportPage() {
     const [pageSize, setPageSize] = useState(PAGE_SIZE_DEFAULT);
 
     const { data: studentTransports = [], isLoading } = useStudentTransports();
-    const { data: routes } = useRoutes();
 
     const createStudentTransport = useCreateStudentTransport();
     const updateStudentTransport = useUpdateStudentTransport();
     const deleteStudentTransport = useDeleteStudentTransport();
 
-    const routeMap = useMemo(() => new Map(routes?.map(r => [r.id, r.route_name]) || []), [routes]);
-
+    // Updated columns to match new backend schema
     const columns = [
+        {
+            key: "trip_id",
+            label: "Trip ID",
+            editable: true,
+        },
         {
             key: "student_id",
             label: "Student ID",
             editable: true,
-        },
-        {
-            key: "route_id",
-            label: "Route",
-            editable: true,
-            render: (value: any) => routeMap.get(value) || value,
         },
         {
             key: "stop_id",
@@ -59,18 +53,13 @@ export default function StudentTransportPage() {
             editable: true,
         },
         {
-            key: "trip_type",
-            label: "Trip Type",
+            key: "fee_term_id",
+            label: "Fee Term",
             editable: true,
         },
         {
-            key: "academic_year_id",
-            label: "Academic Year",
-            editable: true,
-        },
-        {
-            key: "fare_amount",
-            label: "Fare Amount",
+            key: "fee_per_term",
+            label: "Fee Per Term",
             editable: true,
             render: (v: number) => `$${v}`,
         },
@@ -100,7 +89,7 @@ export default function StudentTransportPage() {
         setPage(0);
     };
 
-    const config: MasterPageConfig<StudentTransport, StudentTransportInput> = {
+    const config: MasterPageConfig<StudentTransportOut, StudentTransportCreate> = {
         title: "Student Transport",
         columns,
         defaultValues,
@@ -118,6 +107,14 @@ export default function StudentTransportPage() {
             total,
             onPageChange: handlePageChange,
             onPageSizeChange: handlePageSizeChange,
+        },
+        permissions: {
+            resource: 'STUDENT_TRANSPORT',
+            create: true,
+            read: true,
+            update: true,
+            delete: true,
+            list: true,
         },
     };
 

@@ -9,6 +9,7 @@ import type {
   ErrorResponse
 } from '@/types/certificates/types';
 import { CERTIFICATE_TYPES_BASE } from '@/constants/api/certificates';
+import { toast } from 'sonner';
 
 // Fetch all certificate types with pagination
 export async function fetchCertificateTypes(params?: {
@@ -84,19 +85,27 @@ export function useCreateCertificateType() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['certificate-types'] });
       queryClient.invalidateQueries({ queryKey: ['certificate-types-dropdown'] });
+      toast.success('Certificate type created successfully');
     },
     onError: (error: any) => {
       console.error('Certificate type creation error:', error);
+      let errorMessage = 'Failed to create certificate type';
+
       if (error.response?.status === 400) {
         const errorData = error.response.data as ErrorResponse;
         if (errorData.detail.includes('duplicate') || errorData.detail.includes('unique')) {
-          throw new Error('Certificate type name already exists');
+          errorMessage = 'Certificate type name already exists';
+        } else {
+          errorMessage = errorData.detail || 'Invalid data provided';
         }
-        throw new Error(errorData.detail || 'Invalid data provided');
       } else if (error.response?.status === 403) {
-        throw new Error('Permission denied: certificate_types:create');
+        errorMessage = 'Permission denied: certificate_types:create';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
       }
-      throw new Error(error.response?.data?.detail || 'Failed to create certificate type');
+
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
     },
   });
 }
@@ -108,21 +117,29 @@ export function useUpdateCertificateType() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['certificate-types'] });
       queryClient.invalidateQueries({ queryKey: ['certificate-types-dropdown'] });
+      toast.success('Certificate type updated successfully');
     },
     onError: (error: any) => {
       console.error('Certificate type update error:', error);
+      let errorMessage = 'Failed to update certificate type';
+
       if (error.response?.status === 400) {
         const errorData = error.response.data as ErrorResponse;
         if (errorData.detail.includes('duplicate') || errorData.detail.includes('unique')) {
-          throw new Error('Certificate type name already exists');
+          errorMessage = 'Certificate type name already exists';
+        } else {
+          errorMessage = errorData.detail || 'Invalid data provided';
         }
-        throw new Error(errorData.detail || 'Invalid data provided');
       } else if (error.response?.status === 404) {
-        throw new Error('Certificate type not found');
+        errorMessage = 'Certificate type not found';
       } else if (error.response?.status === 403) {
-        throw new Error('Permission denied: certificate_types:update');
+        errorMessage = 'Permission denied: certificate_types:update';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
       }
-      throw new Error(error.response?.data?.detail || 'Failed to update certificate type');
+
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
     },
   });
 }
@@ -134,21 +151,29 @@ export function useDeleteCertificateType() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['certificate-types'] });
       queryClient.invalidateQueries({ queryKey: ['certificate-types-dropdown'] });
+      toast.success('Certificate type deleted successfully');
     },
     onError: (error: any) => {
       console.error('Certificate type deletion error:', error);
+      let errorMessage = 'Failed to delete certificate type';
+
       if (error.response?.status === 400) {
         const errorData = error.response.data as ErrorResponse;
         if (errorData.detail.includes('in use')) {
-          throw new Error('Cannot delete certificate type that is in use by student certificates');
+          errorMessage = 'Cannot delete certificate type that is in use by student certificates';
+        } else {
+          errorMessage = errorData.detail || 'Cannot delete certificate type';
         }
-        throw new Error(errorData.detail || 'Cannot delete certificate type');
       } else if (error.response?.status === 404) {
-        throw new Error('Certificate type not found');
+        errorMessage = 'Certificate type not found';
       } else if (error.response?.status === 403) {
-        throw new Error('Permission denied: certificate_types:delete');
+        errorMessage = 'Permission denied: certificate_types:delete';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
       }
-      throw new Error(error.response?.data?.detail || 'Failed to delete certificate type');
+
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
     },
   });
 }

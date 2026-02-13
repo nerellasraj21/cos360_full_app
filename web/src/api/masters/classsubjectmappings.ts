@@ -25,7 +25,9 @@ export const fetchClassSubjectMappings = async (params?: {
   const url = queryString ? `${CLASS_SUBJECT_MAPPINGS_API_BASE}?${queryString}` : CLASS_SUBJECT_MAPPINGS_API_BASE;
 
   const { data } = await CAxios.get(url);
-  return Array.isArray(data) ? { items: data, total: data.length } : { items: data.items || [], total: data.total || 0 };
+  return Array.isArray(data)
+    ? { items: data, total: data.length }
+    : { items: data.items || [], total: data.total_count || data.total || 0 };
 };
 
 export const fetchMappingsByClass = async (classId: string, params?: {

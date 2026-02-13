@@ -581,6 +581,65 @@ function EditDialog({ open, onOpenChange, itemId }: Props) {
 }
 ```
 
+### 4. React-Select in Dialog Pattern
+
+When using react-select dropdowns inside Dialog components, you must handle portaling correctly to avoid pointer event blocking:
+
+```typescript
+import Select from 'react-select';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+
+// CRITICAL: Dialog must have modal={false} when using portaled react-select menus
+<Dialog open={isOpen} onOpenChange={setIsOpen} modal={false}>
+  <DialogContent>
+    <Select
+      options={options}
+      value={selectedValue}
+      onChange={handleChange}
+      placeholder="Select option"
+      classNamePrefix="react-select"
+      menuPlacement="auto"
+      // Portal the menu to document.body to avoid clipping
+      menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+      // CRITICAL: Add pointer events to ensure clickability
+      styles={{
+        menuPortal: base => ({
+          ...base,
+          zIndex: 9999,
+          pointerEvents: 'auto'  // Essential for clickability
+        }),
+        menu: base => ({
+          ...base,
+          pointerEvents: 'auto'  // Essential for clickability
+        })
+      }}
+      // Keyboard accessibility props
+      menuShouldBlockScroll={false}
+      closeMenuOnScroll={false}
+      tabSelectsValue={false}
+      openMenuOnFocus={true}
+      blurInputOnSelect={true}
+    />
+  </DialogContent>
+</Dialog>
+```
+
+**Key Requirements:**
+
+1. **Dialog `modal={false}`** - Prevents overlay from blocking pointer events
+2. **`menuPortalTarget={document.body}`** - Renders menu outside dialog to avoid clipping
+3. **`pointerEvents: 'auto'`** - Ensures menu is clickable (both menuPortal and menu styles)
+4. **`zIndex: 9999`** - Places menu above dialog overlay
+5. **Keyboard accessibility props** - Ensures keyboard navigation (arrows, Enter, Escape) works properly
+
+**Common Mistakes:**
+
+- ❌ Forgetting `modal={false}` → dropdowns visible but unclickable
+- ❌ Missing `pointerEvents: 'auto'` → dropdowns may be blocked
+- ❌ Not using `menuPortalTarget` → dropdowns clipped by dialog overflow
+
+**Reference:** See `TRANSPORT_ROUTES_DROPDOWN_FIX.md` for detailed explanation
+
 ## Important Conventions
 
 ### 1. Naming Conventions

@@ -60,10 +60,24 @@ export default function RouteStopsPage() {
             menuPlacement="auto"
             menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
             styles={{
-              menuPortal: base => ({ ...base, zIndex: 9999 }),
+              menuPortal: base => ({
+                ...base,
+                zIndex: 9999,
+                pointerEvents: 'auto' // Essential for clickability
+              }),
+              menu: base => ({
+                ...base,
+                pointerEvents: 'auto' // Essential for clickability
+              }),
               control: (base) => ({ ...base, minHeight: '32px', fontSize: '12px' })
             }}
             isClearable={false}
+            // Keyboard accessibility props
+            menuShouldBlockScroll={false}
+            closeMenuOnScroll={false}
+            tabSelectsValue={false}
+            openMenuOnFocus={true}
+            blurInputOnSelect={true}
           />
         );
       },
@@ -129,7 +143,23 @@ export default function RouteStopsPage() {
           classNamePrefix="react-select"
           menuPlacement="auto"
           menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-          styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+          styles={{
+            menuPortal: base => ({
+              ...base,
+              zIndex: 9999,
+              pointerEvents: 'auto' // Essential for clickability
+            }),
+            menu: base => ({
+              ...base,
+              pointerEvents: 'auto' // Essential for clickability
+            })
+          }}
+          // Keyboard accessibility props
+          menuShouldBlockScroll={false}
+          closeMenuOnScroll={false}
+          tabSelectsValue={false}
+          openMenuOnFocus={true}
+          blurInputOnSelect={true}
         />
       );
     }
@@ -174,6 +204,7 @@ export default function RouteStopsPage() {
       <MasterPage<RouteStop, RouteStopInput>
         config={{
           title: 'Route Stops Management',
+          addButtonLabel: 'Add Route Stops Management',
           columns,
           defaultValues,
           formFields,

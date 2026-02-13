@@ -36,17 +36,15 @@ export function FeeTypeForm({ type, onSuccess, onCancel }: FeeTypeFormProps) {
     const createMutation = useCreateFeeType();
     const updateMutation = useUpdateFeeType();
 
-    const { data: categories = [] } = useFeeCategories({
+    const { data: categoriesResponse } = useFeeCategories({
         academic_year_id: selectedAcademicYearId,
     });
+
+    const categories = categoriesResponse?.items || [];
 
     const { data: terms = [], isLoading: termsLoading } = useFeeTerms({
         academic_year_id: selectedAcademicYearId,
     });
-
-    // Debug logging
-    console.log('FeeTypeForm - Terms data:', terms);
-    console.log('FeeTypeForm - Terms loading:', termsLoading);
 
     const {
         register,
@@ -175,9 +173,9 @@ export function FeeTypeForm({ type, onSuccess, onCancel }: FeeTypeFormProps) {
                     </SelectTrigger>
                     <SelectContent>
                         {terms.length === 0 ? (
-                            <SelectItem value="">
+                            <div className="px-2 py-1.5 text-sm text-muted-foreground">
                                 No fee terms available
-                            </SelectItem>
+                            </div>
                         ) : (
                             terms.map((term) => {
                                 const displayName = (() => {
@@ -187,11 +185,9 @@ export function FeeTypeForm({ type, onSuccess, onCancel }: FeeTypeFormProps) {
                                     }
                                     return term.term_name;
                                 })();
-                                console.log('FeeTypeForm - Rendering term:', term.id, 'displayName:', displayName, 'term_name:', term.term_name);
                                 return (
                                     <SelectItem key={term.id} value={term.id}>
-                                        {/* <span title={`ID: ${term.id}`}>{displayName} ({term.number_of_terms || 0} terms)</span> */}
-                                   {term.number_of_terms ? ` ${displayName}-(${term.number_of_terms} terms)` : ''}
+                                        {displayName}{term.number_of_terms ? ` (${term.number_of_terms} terms)` : ''}
                                     </SelectItem>
                                 );
                             })

@@ -1,59 +1,94 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePermission } from '@/hooks/usePermission';
 import { usePermissionProtectedMutation } from '@/hooks/usePermissionProtectedMutation';
-import { PERMISSIONS } from '@/constants/permissions';
 import { toast } from 'sonner';
 import { feeCategoriesApi } from '@/api/fee';
 import type {
     FeeCategory,
     FeeCategoryCreateRequest,
     FeeCategoryUpdateRequest,
+    FeeCategorySearchParams,
+    FeeCategoryListResponse,
+    FeeCategoryHealthCheck,
     FeeType
 } from '@/types/fee';
 
-// Query keys for fee categories
+// ===== QUERY KEYS =====
+
+/**
+ * Query key factory for fee categories
+ */
 export const feeCategoryKeys = {
     all: ['fee-categories'] as const,
     lists: () => [...feeCategoryKeys.all, 'list'] as const,
-    list: (params?: any) => [...feeCategoryKeys.lists(), params] as const,
+    list: (params?: FeeCategorySearchParams) => [...feeCategoryKeys.lists(), params] as const,
     details: () => [...feeCategoryKeys.all, 'detail'] as const,
     detail: (id: string) => [...feeCategoryKeys.details(), id] as const,
     types: (categoryId: string) => [...feeCategoryKeys.detail(categoryId), 'types'] as const,
+    health: () => [...feeCategoryKeys.all, 'health'] as const,
 };
 
-// Get all fee categories
-export function useFeeCategories(params?: {
-  academic_year_id?: string;
-  is_active?: boolean;
-  skip?: number;
-  limit?: number;
-}) {
-  const { checkPermission } = usePermission();
-  const hasListPermission = checkPermission('fee_categories', 'list');
+// ===== READ HOOKS =====
 
-  return useQuery<FeeCategory[]>({
-    queryKey: feeCategoryKeys.list(params),
-    queryFn: () => feeCategoriesApi.getAllCategories(params),
-    enabled: hasListPermission,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+/**
+ * Hook to get health status of fee categories module
+ */
+export function useFeeCategoriesHealth() {
+    return useQuery<FeeCategoryHealthCheck>({
+        queryKey: feeCategoryKeys.health(),
+        queryFn: () => feeCategoriesApi.healthCheck(),
+        staleTime: 60 * 1000, // 1 minute
+    });
 }
 
-// Get single fee category by ID
+/**
+ * Hook to get all fee categories with pagination
+ * @param params - Search and pagination parameters
+ * @returns Paginated fee categories with total count
+ */
+export function useFeeCategories(params?: FeeCategorySearchParams) {
+    const { checkPermission } = usePermission();
+    const hasListPermission = checkPermission('fee_categories', 'list');
+
+    console.log('[useFeeCategories] Hook called with:', {
+        params,
+        hasListPermission,
+        queryKey: feeCategoryKeys.list(params)
+    });
+
+    return useQuery<FeeCategoryListResponse>({
+        queryKey: feeCategoryKeys.list(params),
+        queryFn: () => {
+            console.log('[useFeeCategories] Fetching data...');
+            return feeCategoriesApi.getAllCategories(params);
+        },
+        enabled: hasListPermission,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+}
+
+/**
+ * Hook to get single fee category by ID
+ * @param id - Category ID
+ */
 export function useFeeCategory(id: string) {
-  const { checkPermission } = usePermission();
-  const hasReadPermission = checkPermission('fee_categories', 'read');
+    const { checkPermission } = usePermission();
+    const hasReadPermission = checkPermission('fee_categories', 'read');
 
-  return useQuery<FeeCategory>({
-    queryKey: feeCategoryKeys.detail(id),
-    queryFn: () => feeCategoriesApi.getCategory(id),
-    enabled: !!id && hasReadPermission,
-    staleTime: 5 * 60 * 1000,
-  });
+    return useQuery<FeeCategory>({
+        queryKey: feeCategoryKeys.detail(id),
+        queryFn: () => feeCategoriesApi.getCategory(id),
+        enabled: !!id && hasReadPermission,
+        staleTime: 5 * 60 * 1000,
+    });
 }
 
-// Get fee types for a category (filtered from all types)
-export function useFeeCategoryTypes(categoryId: string, canview = true) {
+/**
+ * Hook to get fee types for a category (filtered from all types)
+ * @param categoryId - Category ID
+ * @param enabled - Whether to enable the query
+ */
+export function useFeeCategoryTypes(categoryId: string, enabled = true) {
     return useQuery<FeeType[]>({
         queryKey: feeCategoryKeys.types(categoryId),
         queryFn: async () => {
@@ -63,12 +98,16 @@ export function useFeeCategoryTypes(categoryId: string, canview = true) {
             // Filter types by category_id
             return allTypes.filter(type => type.fee_category_id === categoryId);
         },
-        enabled: !!categoryId && canview,
+        enabled: !!categoryId && enabled,
         staleTime: 5 * 60 * 1000,
     });
 }
 
-// Create fee category mutation
+// ===== MUTATION HOOKS =====
+
+/**
+ * Hook to create a new fee category
+ */
 export function useCreateFeeCategory() {
     const queryClient = useQueryClient();
 
@@ -77,8 +116,14 @@ export function useCreateFeeCategory() {
         action: 'create',
         mutationFn: feeCategoriesApi.createCategory,
         onSuccess: (data) => {
-            // Invalidate and refetch categories list
-            queryClient.invalidateQueries({ queryKey: feeCategoryKeys.lists() });
+            // Invalidate ALL category-related queries to ensure refresh
+            queryClient.invalidateQueries({ queryKey: feeCategoryKeys.all });
+
+            // Also refetch active queries immediately
+            queryClient.refetchQueries({
+                queryKey: feeCategoryKeys.lists(),
+                type: 'active'
+            });
 
             // Add the new category to the cache
             queryClient.setQueryData(feeCategoryKeys.detail(data.id), data);
@@ -91,7 +136,9 @@ export function useCreateFeeCategory() {
     });
 }
 
-// Update fee category mutation
+/**
+ * Hook to update an existing fee category
+ */
 export function useUpdateFeeCategory() {
     const queryClient = useQueryClient();
 
@@ -103,8 +150,14 @@ export function useUpdateFeeCategory() {
             // Update the specific category in cache
             queryClient.setQueryData(feeCategoryKeys.detail(data.id), data);
 
-            // Invalidate lists to ensure consistency
-            queryClient.invalidateQueries({ queryKey: feeCategoryKeys.lists() });
+            // Invalidate ALL category-related queries
+            queryClient.invalidateQueries({ queryKey: feeCategoryKeys.all });
+
+            // Refetch active queries immediately
+            queryClient.refetchQueries({
+                queryKey: feeCategoryKeys.lists(),
+                type: 'active'
+            });
 
             toast.success('Fee category updated successfully');
         },
@@ -114,7 +167,9 @@ export function useUpdateFeeCategory() {
     });
 }
 
-// Delete fee category mutation
+/**
+ * Hook to delete a fee category
+ */
 export function useDeleteFeeCategory() {
     const queryClient = useQueryClient();
 
@@ -126,8 +181,14 @@ export function useDeleteFeeCategory() {
             // Remove from cache
             queryClient.removeQueries({ queryKey: feeCategoryKeys.detail(id) });
 
-            // Invalidate lists
-            queryClient.invalidateQueries({ queryKey: feeCategoryKeys.lists() });
+            // Invalidate ALL category-related queries
+            queryClient.invalidateQueries({ queryKey: feeCategoryKeys.all });
+
+            // Refetch active queries immediately
+            queryClient.refetchQueries({
+                queryKey: feeCategoryKeys.lists(),
+                type: 'active'
+            });
 
             toast.success('Fee category deleted successfully');
         },

@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, MoreVertical, Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Loader2, ChevronLeft, ChevronsLeft, ChevronRightIcon, ChevronsRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useFeeCategories, useCreateFeeCategory, useUpdateFeeCategory, useDeleteFeeCategory } from '@/hooks/fee/useFeeCategories';
 import { useFeeCategoryTypes } from '@/hooks/fee/useFeeCategories';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { usePermission } from '@/hooks/usePermission';
 import { CategoryTypeManager } from './CategoryTypeManager';
-import type { FeeCategory, FeeCategoryInput } from '@/types/fee/category';
+import type { FeeCategory, FeeCategoryInput, CategoryStatus } from '@/types/fee/category';
 import type { FeeType } from '@/types/fee/type';
 import { toast } from 'sonner';
 
@@ -31,7 +32,7 @@ interface CategoryNodeProps {
 function CategoryNode({ category, onEdit, onDelete, onManageTypes, canUpdate, canDelete, canViewTypes }: CategoryNodeProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [showActions, setShowActions] = useState(false);
-    const { data: feeTypes = [], isLoading: typesLoading } = useFeeCategoryTypes(category.id,canViewTypes);
+    const { data: feeTypes = [], isLoading: typesLoading } = useFeeCategoryTypes(category.id, canViewTypes);
 
     const toggleExpanded = () => {
         setIsExpanded(!isExpanded);
@@ -167,10 +168,19 @@ function CategoryNode({ category, onEdit, onDelete, onManageTypes, canUpdate, ca
 export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
     const { selectedAcademicYearId } = useAcademicYearStore();
     const { checkPermission } = usePermission();
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(50);
+    const [statusFilter, setStatusFilter] = useState<CategoryStatus | 'all'>('all');
+
+    // Dialog states
     const [editingCategory, setEditingCategory] = useState<FeeCategory | null>(null);
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState<FeeCategory | null>(null);
     const [showTypeManager, setShowTypeManager] = useState<FeeCategory | null>(null);
+
+    // Form state
     const [formData, setFormData] = useState<FeeCategoryInput>({
         category_name: '',
         category_status: 'active',
@@ -183,14 +193,39 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
     const canDelete = checkPermission('fee_categories', 'delete');
     const canViewTypes = checkPermission('fee_types', 'list');
 
+    // Calculate pagination params
+    const skip = (currentPage - 1) * pageSize;
 
-    const { data: categories = [], isLoading } = useFeeCategories({
+    // Fetch categories with pagination
+    const { data: categoriesResponse, isLoading, error, isFetching } = useFeeCategories({
         academic_year_id: selectedAcademicYearId,
+        category_status: statusFilter === 'all' ? undefined : statusFilter,
+        skip,
+        limit: pageSize,
     });
 
     const createMutation = useCreateFeeCategory();
     const updateMutation = useUpdateFeeCategory();
     const deleteMutation = useDeleteFeeCategory();
+
+    // Extract data from paginated response
+    const categories = categoriesResponse?.items || [];
+    const totalCategories = categoriesResponse?.total || 0;
+    const totalPages = Math.ceil(totalCategories / pageSize);
+
+    // Debug logging
+    console.log('[FeeCategoryTree] Component state:', {
+        isLoading,
+        isFetching,
+        error,
+        categoriesResponse,
+        categories,
+        totalCategories,
+        selectedAcademicYearId,
+        skip,
+        limit: pageSize,
+        statusFilter
+    });
 
     const handleCreate = () => {
         setFormData({
@@ -230,6 +265,10 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
             } else {
                 await createMutation.mutateAsync(formData);
             }
+
+            // Small delay to ensure cache invalidation and refetch complete
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             setShowCreateDialog(false);
             setEditingCategory(null);
         } catch (error) {
@@ -241,32 +280,91 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
         if (showDeleteDialog) {
             try {
                 await deleteMutation.mutateAsync(showDeleteDialog.id);
+
+                // Small delay to ensure cache invalidation and refetch complete
+                await new Promise(resolve => setTimeout(resolve, 100));
+
                 setShowDeleteDialog(null);
+
+                // If we deleted the last item on the current page, go to previous page
+                if (categories.length === 1 && currentPage > 1) {
+                    setCurrentPage(currentPage - 1);
+                }
             } catch (error) {
                 // Error handling is done in the mutation hook
             }
         }
     };
 
-    if (isLoading) {
+    const handlePageChange = (newPage: number) => {
+        setCurrentPage(newPage);
+    };
+
+    const handlePageSizeChange = (newSize: string) => {
+        setPageSize(parseInt(newSize));
+        setCurrentPage(1); // Reset to first page
+    };
+
+    const handleStatusFilterChange = (status: string) => {
+        setStatusFilter(status as CategoryStatus | 'all');
+        setCurrentPage(1); // Reset to first page
+    };
+
+    console.log('[FeeCategoryTree] Render check:', { isLoading, error, categoriesLength: categories.length });
+
+    if (isLoading && !isFetching && !categoriesResponse) {
         return (
             <div className={cn("p-6", className)}>
-                <div className="text-center text-gray-500">Loading fee categories...</div>
+                <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Loading fee categories...</span>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        console.error('[FeeCategoryTree] Error loading categories:', error);
+        return (
+            <div className={cn("p-6", className)}>
+                <div className="text-center py-8 text-red-600">
+                    Error loading categories: {error.message}
+                </div>
             </div>
         );
     }
 
     return (
         <div className={cn("space-y-4", className)}>
-            {/* Header */}
+            {/* Header with Filters */}
             <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">Fee Categories</h2>
+                <div className="flex items-center gap-4">
+                    <h2 className="text-lg font-semibold text-gray-900">Fee Categories</h2>
+
+                    {/* Status Filter */}
+                    <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+                        <SelectTrigger className="w-[150px]">
+                            <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Status</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
                 {canCreate && (
                     <Button onClick={handleCreate} className="flex items-center gap-2">
                         <Plus className="h-4 w-4" />
                         Add Category
                     </Button>
                 )}
+            </div>
+
+            {/* Summary */}
+            <div className="text-sm text-gray-600">
+                Showing {categories.length > 0 ? skip + 1 : 0}-{Math.min(skip + pageSize, totalCategories)} of {totalCategories} categories
             </div>
 
             {/* Categories List */}
@@ -287,12 +385,74 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
                 </div>
             ) : (
                 <div className="text-center py-8 text-gray-500">
-                    <p>No fee categories found for the selected academic year.</p>
+                    <p>No fee categories found for the selected filters.</p>
                     {canCreate && (
                         <Button onClick={handleCreate} className="mt-4">
                             Create First Category
                         </Button>
                     )}
+                </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t pt-4">
+                    {/* Page Size Selector */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">Items per page:</span>
+                        <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                            <SelectTrigger className="w-[80px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="10">10</SelectItem>
+                                <SelectItem value="25">25</SelectItem>
+                                <SelectItem value="50">50</SelectItem>
+                                <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Page Navigation */}
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(1)}
+                            disabled={currentPage === 1}
+                        >
+                            <ChevronsLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+
+                        <span className="text-sm text-gray-600 px-4">
+                            Page {currentPage} of {totalPages}
+                        </span>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                        >
+                            <ChevronRightIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(totalPages)}
+                            disabled={currentPage === totalPages}
+                        >
+                            <ChevronsRight className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
             )}
 
@@ -342,7 +502,14 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
                             onClick={handleSubmit}
                             disabled={!formData.category_name.trim() || createMutation.isPending || updateMutation.isPending}
                         >
-                            {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save'}
+                            {createMutation.isPending || updateMutation.isPending ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                'Save'
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -372,7 +539,14 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
                             onClick={handleConfirmDelete}
                             disabled={deleteMutation.isPending}
                         >
-                            {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                            {deleteMutation.isPending ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                'Delete'
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

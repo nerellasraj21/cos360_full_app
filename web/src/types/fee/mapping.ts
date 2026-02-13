@@ -16,7 +16,15 @@ export interface FeeClassMapping {
 export interface FeeClassMappingTermAmount {
   id: string;
   fee_class_mapping_id: string;
-  term_id: string;
+
+  // Backward compatibility - deprecated but still present
+  term_id?: string;  // ⚠️ DEPRECATED - Will be removed in future version
+
+  // New fields for multi-term fee support
+  term_date_id: string;  // ✅ NEW (Required) - Use this for new code
+  term_date?: string;    // ✅ NEW (Optional) - Actual installment date (e.g., "2024-04-15")
+  term_name?: string;    // ✅ NEW (Optional) - Parent term name (e.g., "Quarterly Q1 2024")
+
   term_amount: number;
   created_at: string;
   updated_at: string;

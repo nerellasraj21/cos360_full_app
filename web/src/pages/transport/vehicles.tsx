@@ -38,12 +38,17 @@ export default function VehiclePage() {
           placeholder="Select Vehicle Type"
           classNamePrefix="react-select"
           menuPlacement="auto"
-          menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
           styles={{
-            menuPortal: base => ({ ...base, zIndex: 9999 }),
+            menu: (base) => ({ ...base, zIndex: 9999 }),
+            menuPortal: (base) => ({ ...base, zIndex: 9999 }),
             control: (base) => ({ ...base, minHeight: '32px', fontSize: '12px' })
           }}
           isClearable={false}
+          openMenuOnClick={true}
+          closeMenuOnSelect={true}
+          blurInputOnSelect={true}
+          autoFocus={false}
+          tabSelectsValue={false}
         />
       )
     },
@@ -149,8 +154,15 @@ export default function VehiclePage() {
             placeholder="Select Vehicle Type"
             classNamePrefix="react-select"
             menuPlacement="auto"
-            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-            styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+            styles={{
+              menu: (base) => ({ ...base, zIndex: 9999 }),
+              menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+            }}
+            openMenuOnClick={true}
+            closeMenuOnSelect={true}
+            blurInputOnSelect={true}
+            autoFocus={false}
+            tabSelectsValue={false}
           />
         );
       }

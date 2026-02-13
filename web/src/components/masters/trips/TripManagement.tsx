@@ -9,10 +9,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, Edit, Trash2, Search, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { tripsApi, driversApi } from '@/api/masters/trips';
+import { fetchVehicles } from '@/api/masters/vehicles';
+import { fetchRoutes } from '@/api/masters/routes';
 import { VehiclesDropdown } from '@/components/dropdown-system/components/VehiclesDropdown';
 import { TransportRoutesDropdown } from '@/components/dropdown-system/components/TransportRoutesDropdown';
 import type { TripOut, TripCreate, Driver } from '@/types/masters/trip';
+import type { Vehicle } from '@/types/masters/vehicle';
+import type { Route } from '@/types/masters/route';
 
 interface TripManagementProps {
   className?: string;
@@ -21,6 +26,8 @@ interface TripManagementProps {
 export function TripManagement({ className }: TripManagementProps) {
   const [trips, setTrips] = useState<TripOut[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
   const [driversLoading, setDriversLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,21 +43,33 @@ export function TripManagement({ className }: TripManagementProps) {
     trip_number: 0,
   });
 
-  // Load trips and drivers on component mount
+  // Load trips, drivers, vehicles, and routes on component mount
   useEffect(() => {
     loadTrips();
     loadDrivers();
+    loadVehicles();
+    loadRoutes();
   }, []);
 
   const loadTrips = async () => {
     try {
       setLoading(true);
       const response = await tripsApi.getAllTrips();
-      setTrips(response.items || []);
+      const tripsList = response.items || response || [];
+      console.log('Loaded trips:', tripsList);
+      console.log('Trips count:', Array.isArray(tripsList) ? tripsList.length : 0);
+      // Log the first trip to see all available fields
+      if (Array.isArray(tripsList) && tripsList.length > 0) {
+        console.log('First trip data:', tripsList[0]);
+        console.log('First trip keys:', Object.keys(tripsList[0]));
+        console.log('created_at value:', tripsList[0].created_at);
+        console.log('updated_at value:', tripsList[0].updated_at);
+      }
+      setTrips(Array.isArray(tripsList) ? tripsList : []);
     } catch (error) {
       console.error('Error loading trips:', error);
-      console.error('Failed to load trips');
-      // toast.error('Failed to load trips');
+      toast.error('Failed to load trips');
+      setTrips([]);
     } finally {
       setLoading(false);
     }
@@ -60,12 +79,39 @@ export function TripManagement({ className }: TripManagementProps) {
     try {
       setDriversLoading(true);
       const response = await driversApi.getAllDrivers();
-      setDrivers(response.items || []);
+      const driversList = response.items || response || [];
+      console.log('Loaded drivers:', driversList);
+      setDrivers(Array.isArray(driversList) ? driversList : []);
     } catch (error) {
       console.error('Error loading drivers:', error);
       toast.error('Failed to load drivers');
+      setDrivers([]);
     } finally {
       setDriversLoading(false);
+    }
+  };
+
+  const loadVehicles = async () => {
+    try {
+      const vehiclesList = await fetchVehicles(false); // Load all vehicles including inactive
+      console.log('Loaded vehicles:', vehiclesList);
+      setVehicles(Array.isArray(vehiclesList) ? vehiclesList : []);
+    } catch (error) {
+      console.error('Error loading vehicles:', error);
+      toast.error('Failed to load vehicles');
+      setVehicles([]);
+    }
+  };
+
+  const loadRoutes = async () => {
+    try {
+      const routesList = await fetchRoutes(false); // Load all routes including inactive
+      console.log('Loaded routes:', routesList);
+      setRoutes(Array.isArray(routesList) ? routesList : []);
+    } catch (error) {
+      console.error('Error loading routes:', error);
+      toast.error('Failed to load routes');
+      setRoutes([]);
     }
   };
 
@@ -98,11 +144,12 @@ export function TripManagement({ className }: TripManagementProps) {
         trip_number: formData.trip_number,
       };
 
-      await tripsApi.createTrip(tripData);
+      const createdTrip = await tripsApi.createTrip(tripData);
+      console.log('Trip created:', createdTrip);
       toast.success('Trip created successfully');
       setShowCreateDialog(false);
       resetForm();
-      loadTrips();
+      await loadTrips(); // Ensure trips are reloaded
     } catch (error: any) {
       console.error('Error creating trip:', error);
       toast.error(error.message || 'Failed to create trip');
@@ -163,6 +210,39 @@ export function TripManagement({ className }: TripManagementProps) {
     return driver?.full_name || 'Unknown Driver';
   };
 
+  const getVehicleType = (vehicleId: string) => {
+    const vehicle = vehicles.find(v => v.id === vehicleId);
+    return vehicle?.vehicle_type || 'Unknown';
+  };
+
+  const getRouteName = (routeId: string) => {
+    const route = routes.find(r => r.id === routeId);
+    return route?.route_name || 'Unknown Route';
+  };
+
+  const formatTripDate = (trip: TripOut) => {
+    // Try created_at first, then updated_at
+    const dateString = trip.created_at || trip.updated_at;
+
+    if (!dateString) {
+      console.log('No date available for trip:', trip.id, trip);
+      return 'Not available';
+    }
+
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date format:', dateString);
+        return 'Invalid date';
+      }
+      return date.toLocaleDateString();
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Error';
+    }
+  };
+
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Header */}
@@ -219,13 +299,22 @@ export function TripManagement({ className }: TripManagementProps) {
                       <SelectValue placeholder={driversLoading ? "Loading drivers..." : "Select driver..."} />
                     </SelectTrigger>
                     <SelectContent>
-                      {drivers.map((driver) => (
-                        <SelectItem key={driver.user_id} value={driver.user_id}>
-                          {driver.full_name}
-                        </SelectItem>
-                      ))}
+                      {drivers.length === 0 ? (
+                        <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                          {driversLoading ? 'Loading drivers...' : 'No drivers available'}
+                        </div>
+                      ) : (
+                        drivers.map((driver) => (
+                          <SelectItem key={driver.user_id} value={driver.user_id}>
+                            {driver.full_name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
+                  {!driversLoading && drivers.length === 0 && (
+                    <p className="text-xs text-destructive">No drivers found. Please add drivers first.</p>
+                  )}
                 </div>
 
                 {/* Trip Number */}
@@ -323,13 +412,13 @@ export function TripManagement({ className }: TripManagementProps) {
                     </TableCell>
                     <TableCell>{getDriverName(trip.driver_id)}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{trip.vehicle_id}</Badge>
+                      <Badge variant="secondary">{getVehicleType(trip.vehicle_id)}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{trip.route_id}</Badge>
+                      <Badge variant="secondary">{getRouteName(trip.route_id)}</Badge>
                     </TableCell>
                     <TableCell>
-                      {trip.created_at ? new Date(trip.created_at).toLocaleDateString() : 'N/A'}
+                      {formatTripDate(trip)}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

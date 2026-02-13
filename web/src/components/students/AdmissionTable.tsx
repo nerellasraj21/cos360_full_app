@@ -42,6 +42,8 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedAdmission, setSelectedAdmission] = useState<StudentAdmissionResponse | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [editForm, setEditForm] = useState({
     current_class_id: '',
     current_section_id: '',
@@ -55,7 +57,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
     previous_school_remark: ''
   });
 
-  const { data: admissionsResponse, isLoading } = useAdmissions({ skip: 0, limit: 50 });
+  const { data: admissionsResponse, isLoading } = useAdmissions({ skip: page * pageSize, limit: pageSize });
   const { data: classesData = [] } = useClassSectionsDropdown();
   const { data: academicYears = [] } = useAcademicYearsDropdown();
   const updateMutation = useUpdateAdmission();
@@ -84,6 +86,15 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       return section ? section.name : `Section ${sectionId}`;
     }
     return `Section ${sectionId}`;
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setPage(0);
   };
 
   // Transform API data to table format
@@ -415,11 +426,11 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
         onEdit={handleEdit}
         isEditing={true}
         pagination={{
-          page: 0,
-          pageSize: 50,
+          page,
+          pageSize,
           total: admissionsResponse?.total_count || 0,
-          onPageChange: () => {},
-          onPageSizeChange: () => {},
+          onPageChange: handlePageChange,
+          onPageSizeChange: handlePageSizeChange,
         }}
       />
 

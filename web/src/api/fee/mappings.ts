@@ -102,7 +102,7 @@ export const feeMappingsApi = {
     // New endpoints for class mapping term amounts
     createClassMappingTermAmounts: async (data: {
         fee_class_mapping_id: string;
-        term_amounts: { term_id: string; term_amount: number }[];
+        term_amounts: { term_date_id: string; term_amount: number }[];
     }): Promise<any> => {
         console.log('[DEBUG] feeMappingsApi.createClassMappingTermAmounts called with data:', data);
 

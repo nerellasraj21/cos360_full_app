@@ -150,6 +150,35 @@ export function BulkStudentMappingForm({ onSuccess, onCancel }: BulkStudentMappi
       setLoading(true);
       setBulkResult(null);
 
+      // Validate that all selected students have admission numbers
+      const studentsWithoutAdmission = selectedStudents.filter(
+        s => !s.admission_number && !s.admission_num
+      );
+
+      if (studentsWithoutAdmission.length > 0) {
+        const studentNames = studentsWithoutAdmission
+          .map(s => s.name || s.display_name || s.id)
+          .join(', ');
+        toast.error(`The following students don't have admission numbers: ${studentNames}`);
+        setLoading(false);
+        return;
+      }
+
+      // Log the request data for debugging
+      console.log('[DEBUG] Bulk create request:', {
+        student_ids: data.student_ids,
+        class_id: data.class_id,
+        section_id: data.section_id,
+        fee_type_id: data.fee_type_id,
+        total_fee: data.total_fee,
+        academic_year_id: selectedAcademicYearId,
+        selected_students: selectedStudents.map(s => ({
+          id: s.id,
+          name: s.name,
+          admission_number: s.admission_number || s.admission_num
+        }))
+      });
+
       const requestData: FeeStudentMappingBulkCreateRequest = {
         ...data,
         academic_year_id: selectedAcademicYearId || '',
@@ -167,9 +196,22 @@ export function BulkStudentMappingForm({ onSuccess, onCancel }: BulkStudentMappi
         toast.error('Failed to create any mappings');
       }
     } catch (error: any) {
-      console.error('Error creating bulk mappings:', error);
-      const errorMessage = error.response?.data?.detail || 'Failed to create bulk mappings';
-      toast.error(errorMessage);
+      console.error('[ERROR] Bulk create failed:', error);
+      console.error('[ERROR] Response data:', error.response?.data);
+
+      // Extract more detailed error message
+      let errorMessage = 'Failed to create bulk mappings';
+      if (error.response?.data?.detail) {
+        if (typeof error.response.data.detail === 'string') {
+          errorMessage = error.response.data.detail;
+        } else if (Array.isArray(error.response.data.detail)) {
+          errorMessage = error.response.data.detail.map((e: any) => e.msg || JSON.stringify(e)).join(', ');
+        } else {
+          errorMessage = JSON.stringify(error.response.data.detail);
+        }
+      }
+
+      toast.error(errorMessage, { duration: 5000 });
     } finally {
       setLoading(false);
     }
@@ -404,9 +446,14 @@ export function BulkStudentMappingForm({ onSuccess, onCancel }: BulkStudentMappi
                   {selectedStudents.map((student) => {
                     const admissionNum = student.admission_number || student.admission_num || '';
                     const studentName = student.display_name || student.name || '';
+                    const hasAdmission = !!admissionNum;
                     return (
-                      <Badge key={student.id} variant="secondary" className="flex items-center gap-1">
-                        {studentName} {admissionNum && `(${admissionNum})`}
+                      <Badge
+                        key={student.id}
+                        variant={hasAdmission ? "secondary" : "destructive"}
+                        className="flex items-center gap-1"
+                      >
+                        {studentName} {admissionNum ? `(${admissionNum})` : '(No Admission #)'}
                         <button
                           type="button"
                           onClick={() => removeStudent(student.id)}
@@ -418,6 +465,11 @@ export function BulkStudentMappingForm({ onSuccess, onCancel }: BulkStudentMappi
                     );
                   })}
                 </div>
+                {selectedStudents.some(s => !s.admission_number && !s.admission_num) && (
+                  <div className="text-sm text-destructive bg-destructive/10 p-2 rounded-md">
+                    ⚠️ Warning: Some selected students don't have admission numbers. This will cause the bulk creation to fail.
+                  </div>
+                )}
               </div>
             )}
           </div>

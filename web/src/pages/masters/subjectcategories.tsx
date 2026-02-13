@@ -52,6 +52,7 @@ export default function SubjectCategoriesPage() {
 
   const config: MasterPageConfig<SubjectCategory, SubjectCategoryInput> = {
     title: 'Subject Categories',
+    addButtonLabel: 'Add Subject Categories',
     columns,
     defaultValues: {
       name: '',

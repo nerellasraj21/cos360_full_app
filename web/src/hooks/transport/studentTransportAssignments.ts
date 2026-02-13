@@ -11,10 +11,10 @@ import {
   fetchStudentTransportById
 } from '@/api/transport/index';
 import type {
-  StudentTrip as StudentTransportOut,
-  StudentTripBase as StudentTransportCreate,
-  StudentTripUpdateInput as StudentTransportUpdate
-} from '@/types/masters/studentTrips';
+  StudentTransportOut,
+  StudentTransportCreate,
+  StudentTransportUpdate
+} from '@/types/masters/studentTransport';
 import { toast } from 'sonner';
 
 /**

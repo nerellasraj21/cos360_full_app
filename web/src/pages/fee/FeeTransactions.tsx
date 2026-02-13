@@ -21,7 +21,7 @@ import {
 } from '@/api/fee/transactions';
 import { generateReceipt } from '@/api/fee/receipts';
 import { getDropdownOptions } from '@/api/fee/types';
-import { getTermsDropdown } from '@/api/fee/terms';
+import { getTermsDropdown, getTerm } from '@/api/fee/terms';
 import { getClassesDropdown, getSectionsByClassId } from '@/api/masters/classesandsections';
 import type {
   FeeTransaction,
@@ -80,6 +80,7 @@ function FeeTransactionsContent() {
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [selectedStudent, setSelectedStudent] = useState<string>('');
+  const [termDetailsCache, setTermDetailsCache] = useState<Record<string, any>>({});
 
   // Create transaction form state
   const [createForm, setCreateForm] = useState({
@@ -95,6 +96,7 @@ function FeeTransactionsContent() {
     transaction_items: [] as Array<{
       fee_type_id: string;
       fee_term_id: string;
+      term_date_id: string;
       amount_due: number;
       amount_paid: number;
       description: string;
@@ -146,6 +148,34 @@ function FeeTransactionsContent() {
 
   // Fetch students dropdown data
   const { data: students = [], isLoading: studentsLoading } = useStudentsDropdown();
+
+  // Debug: Log student data to see the actual structure
+  useEffect(() => {
+    if (students.length > 0) {
+      console.log('[DEBUG] First student:', JSON.stringify(students[0], null, 2));
+      console.log('[DEBUG] Total students loaded:', students.length);
+    }
+  }, [students]);
+
+  // Helper function to get student display name
+  const getStudentDisplayName = (student: any) => {
+    // Helper to check if a value is empty (null, undefined, or empty string)
+    const isEmpty = (val: any) => !val || val.trim() === '';
+
+    // Check all possible name properties, filtering out empty strings
+    const displayName = (!isEmpty(student.display_name) && student.display_name) ||
+                       (!isEmpty(student.name) && student.name) ||
+                       (!isEmpty(student.student_name) && student.student_name) ||
+                       (!isEmpty(student.full_name) && student.full_name) ||
+                       // Try first_name + last_name combination
+                       (!isEmpty(student.first_name) && !isEmpty(student.last_name) && `${student.first_name} ${student.last_name}`.trim()) ||
+                       (!isEmpty(student.first_name) && student.first_name) ||
+                       (!isEmpty(student.last_name) && student.last_name) ||
+                       // Fallback to ID with proper formatting
+                       `Student ${student.id}`;
+
+    return displayName;
+  };
 
   // Fetch fee types and terms for transaction items
   const { data: feeTypes = [] } = useQuery({
@@ -272,6 +302,15 @@ function FeeTransactionsContent() {
         return;
       }
 
+      // Validate that all transaction items have required fields
+      const invalidItems = createForm.transaction_items.filter(
+        item => !item.fee_type_id || !item.fee_term_id || !item.term_date_id || item.amount_paid <= 0
+      );
+      if (invalidItems.length > 0) {
+        toast.error('All transaction items must have fee type, fee term, payment date, and amount paid greater than 0');
+        return;
+      }
+
       const transactionData: FeeTransactionCreateRequest = {
         student_id: createForm.student_id,
         student_admission_num: createForm.student_admission_num,
@@ -292,14 +331,32 @@ function FeeTransactionsContent() {
         })
       };
 
+      console.log('[DEBUG] Creating transaction with data:', transactionData);
+
       await createTransaction(transactionData);
       toast.success('Transaction created successfully');
       setShowCreateDialog(false);
       resetCreateForm();
       refetch();
-    } catch (error) {
-      console.error('Failed to create transaction:', error);
-      toast.error('Failed to create transaction');
+    } catch (error: any) {
+      console.error('[ERROR] Failed to create transaction:', error);
+      console.error('[ERROR] Response data:', error.response?.data);
+
+      // Extract detailed error message
+      let errorMessage = 'Failed to create transaction';
+      if (error.response?.data?.detail) {
+        if (typeof error.response.data.detail === 'string') {
+          errorMessage = error.response.data.detail;
+        } else if (Array.isArray(error.response.data.detail)) {
+          errorMessage = error.response.data.detail.map((e: any) => e.msg || JSON.stringify(e)).join(', ');
+        } else {
+          errorMessage = JSON.stringify(error.response.data.detail);
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage, { duration: 5000 });
     }
   };
 
@@ -389,7 +446,7 @@ function FeeTransactionsContent() {
                 New Transaction
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Create New Transaction</DialogTitle>
                 <DialogDescription>
@@ -397,7 +454,7 @@ function FeeTransactionsContent() {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4">
+              <div className="space-y-4 overflow-y-auto flex-1 pr-2">
                 {/* Student Selection */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -416,7 +473,7 @@ function FeeTransactionsContent() {
                       <SelectContent>
                         {students.map((student) => (
                           <SelectItem key={student.id} value={student.id}>
-                            {student.name} {student.admission_number ? `(${student.admission_number})` : ''}
+                            {getStudentDisplayName(student)} {student.admission_number ? `(${student.admission_number})` : ''}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -517,6 +574,7 @@ function FeeTransactionsContent() {
                         const newItem = {
                           fee_type_id: '',
                           fee_term_id: '',
+                          term_date_id: '',
                           amount_due: 0,
                           amount_paid: 0,
                           description: ''
@@ -539,7 +597,7 @@ function FeeTransactionsContent() {
                     <div className="space-y-3">
                       {createForm.transaction_items.map((item, index) => (
                         <Card key={index} className="p-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                             <div className="space-y-2">
                               <Label htmlFor={`fee_type_${index}`}>Fee Type *</Label>
                               <Select
@@ -567,10 +625,21 @@ function FeeTransactionsContent() {
                               <Label htmlFor={`fee_term_${index}`}>Fee Term *</Label>
                               <Select
                                 value={item.fee_term_id}
-                                onValueChange={(value) => {
+                                onValueChange={async (value) => {
                                   const updatedItems = [...createForm.transaction_items];
                                   updatedItems[index].fee_term_id = value;
+                                  updatedItems[index].term_date_id = ''; // Reset term date when term changes
                                   setCreateForm(prev => ({ ...prev, transaction_items: updatedItems }));
+
+                                  // Fetch term details to get term dates
+                                  if (value && !termDetailsCache[value]) {
+                                    try {
+                                      const termDetails = await getTerm(value);
+                                      setTermDetailsCache(prev => ({ ...prev, [value]: termDetails }));
+                                    } catch (error) {
+                                      console.error('Failed to fetch term details:', error);
+                                    }
+                                  }
                                 }}
                               >
                                 <SelectTrigger>
@@ -584,6 +653,33 @@ function FeeTransactionsContent() {
                                         {term.term_name}
                                       </SelectItem>
                                     ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor={`term_date_${index}`}>Payment Date *</Label>
+                              <Select
+                                value={item.term_date_id}
+                                onValueChange={(value) => {
+                                  const updatedItems = [...createForm.transaction_items];
+                                  updatedItems[index].term_date_id = value;
+                                  setCreateForm(prev => ({ ...prev, transaction_items: updatedItems }));
+                                }}
+                                disabled={!item.fee_term_id}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select payment date" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {item.fee_term_id && termDetailsCache[item.fee_term_id]?.fee_term_dates?.map((termDate: any) => (
+                                    <SelectItem key={termDate.id} value={termDate.id}>
+                                      {new Date(termDate.fee_term_date).toLocaleDateString()}
+                                    </SelectItem>
+                                  ))}
+                                  {(!item.fee_term_id || !termDetailsCache[item.fee_term_id]?.fee_term_dates?.length) && (
+                                    <SelectItem value="" disabled>No dates available</SelectItem>
+                                  )}
                                 </SelectContent>
                               </Select>
                             </div>
@@ -665,23 +761,23 @@ function FeeTransactionsContent() {
                     rows={3}
                   />
                 </div>
+              </div>
 
-                {/* Action Buttons */}
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowCreateDialog(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleCreateTransaction}
-                    disabled={!createForm.student_id || calculatedTotal <= 0}
-                  >
-                    Create Transaction
-                  </Button>
-                </div>
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCreateDialog(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateTransaction}
+                  disabled={!createForm.student_id || calculatedTotal <= 0}
+                >
+                  Create Transaction
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -711,7 +807,7 @@ function FeeTransactionsContent() {
                 <SelectContent>
                   {students.map((student) => (
                     <SelectItem key={student.id} value={student.id}>
-                      {student.name} {student.admission_number ? `(${student.admission_number})` : ''}
+                      {getStudentDisplayName(student)} {student.admission_number ? `(${student.admission_number})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -867,7 +963,7 @@ function FeeTransactionsContent() {
                         <div className="font-medium">
                           {(() => {
                             const student = students.find(s => s.id === transaction.student_id);
-                            return student ? student.name : (transaction.student_admission_num || 'N/A');
+                            return student ? getStudentDisplayName(student) : (transaction.student_admission_num || 'N/A');
                           })()}
                         </div>
                         <div className="text-sm text-muted-foreground">

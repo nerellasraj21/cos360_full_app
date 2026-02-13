@@ -9,23 +9,22 @@ import { useClassesDropdown, useSectionsByClassId } from '@/hooks/masters/useCla
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import Select, { type SingleValue } from 'react-select';
+import CreatableSelect from 'react-select/creatable';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Trash2, Save, Pencil, Download, ChevronDown } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
+import { toast } from 'sonner';
 
 
 const BASE_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const SATURDAY = 'Saturday';
+// Default special event labels (users can create custom ones like "Assembly", "Prayer", etc.)
 const SPECIAL_LABELS = [
     { value: 'SNACKS', label: 'Snacks' },
     { value: 'LUNCH', label: 'Lunch' },
     { value: 'DISPERSAL', label: 'Dispersal' },
-];
-const TYPE_OPTIONS = [
-    { value: 'subject', label: 'Subject' },
-    { value: 'special', label: 'Special' },
 ];
 
 type SelectOption = { value: string; label: string } | null;
@@ -148,6 +147,50 @@ export default function TimeTableEditor() {
     const tableRef = useRef<HTMLTableElement>(null);
     const selectedAcademicYearId = useAcademicYearStore(state => state.selectedAcademicYearId);
 
+    // Custom events state (for user-created special event types)
+    const [customEvents, setCustomEvents] = useState<Array<{value: string, label: string}>>([]);
+
+    // Combined special labels (defaults + custom)
+    const allSpecialLabels = useMemo(() => {
+        return [...SPECIAL_LABELS, ...customEvents];
+    }, [customEvents]);
+
+    // Helper to validate event names
+    const isValidEventName = (name: string): boolean => {
+        if (!name || name.trim().length === 0) return false;
+        if (name.length > 50) return false;
+        if (!/^[a-zA-Z0-9\s]+$/.test(name)) return false; // Alphanumeric + spaces only
+        return true;
+    };
+
+    // Helper to add custom event
+    const addCustomEvent = (eventName: string) => {
+        const trimmed = eventName.trim();
+
+        if (!isValidEventName(trimmed)) {
+            toast.error('Event name must be 1-50 alphanumeric characters');
+            return null;
+        }
+
+        // Convert to uppercase with underscores for value
+        const value = trimmed.toUpperCase().replace(/\s+/g, '_');
+
+        // Check for duplicates
+        const isDuplicate = [...SPECIAL_LABELS, ...customEvents].some(e => e.value === value);
+        if (isDuplicate) {
+            toast.error('This event already exists');
+            return null;
+        }
+
+        // Capitalize first letter of each word for label
+        const label = trimmed.replace(/\b\w/g, l => l.toUpperCase());
+
+        const newEvent = { value, label };
+        setCustomEvents(prev => [...prev, newEvent]);
+        toast.success(`Created custom event: ${label}`);
+        return newEvent;
+    };
+
     // Mutations
     const createFrontendTimetableMutation = useCreateFrontendTimetableMutation();
     const updateFrontendTimetableMutation = useUpdateFrontendTimetableMutation();
@@ -208,6 +251,29 @@ export default function TimeTableEditor() {
             const transformedRows = transformFrontendTimetableToRows(frontendTimetableData, includeSaturday);
             setRows(transformedRows);
             setIsEditing(false);
+
+            // Extract custom events from loaded timetable data
+            const defaultValues = SPECIAL_LABELS.map(l => l.value);
+            const extractedEvents: Array<{value: string, label: string}> = [];
+
+            frontendTimetableData.timetable_data.forEach(item => {
+                if (item.type === 'special' && item.label && !defaultValues.includes(item.label)) {
+                    const existing = extractedEvents.find(e => e.value === item.label);
+                    if (!existing) {
+                        // Convert ASSEMBLY to Assembly
+                        const label = item.label.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        extractedEvents.push({
+                            value: item.label,
+                            label: label
+                        });
+                    }
+                }
+            });
+
+            if (extractedEvents.length > 0) {
+                setCustomEvents(extractedEvents);
+            }
+
             console.log('Set isEditing to false (data exists)');
         } else if (isFrontendError && frontendError?.message === 'Timetable not found for this section') {
             // 404 error, timetable not found
@@ -291,15 +357,6 @@ export default function TimeTableEditor() {
         setRows((prev) => prev.filter((_, i) => i !== idx));
     };
 
-    const handleTypeChange = (rowIdx: number, type: 'subject' | 'special') => {
-        setRows((prev) => {
-            const updated = [...prev];
-            const template = type === 'subject' ? getEmptySubjectRow(includeSaturday) : getEmptySpecialRow();
-            updated[rowIdx] = { ...template, time: updated[rowIdx].time };
-            return updated;
-        });
-    };
-
     const handleSaturdayToggle = (checked: boolean) => {
         setIncludeSaturday(checked);
 
@@ -353,7 +410,7 @@ export default function TimeTableEditor() {
                 });
                 data.push(rowData);
             } else {
-                const specialLabel = SPECIAL_LABELS.find(opt => opt.value === row.label)?.label || '--';
+                const specialLabel = allSpecialLabels.find(opt => opt.value === row.label)?.label || row.label || '--';
                 const rowData = [timeStr, ...Array(activeDays.length).fill(specialLabel)];
                 data.push(rowData);
             }
@@ -558,14 +615,13 @@ export default function TimeTableEditor() {
                     </div>
                 </div>
             ) : (
-                <div className={isEditing ? 'border rounded-lg overflow-x-auto' : 'border rounded-lg bg-muted/30'}>
+                <div className="border rounded-lg bg-muted/30 overflow-x-auto">
                     <table ref={!isEditing ? tableRef : undefined} className="w-full text-sm table-fixed align-middle timetable-table">
                         <colgroup>
                             <col style={{ width: '12rem' }} />
                             {activeDays.map((_, i) => (
                                 <col key={i} style={{ width: '10.5rem' }} />
                             ))}
-                            {isEditing && <col style={{ width: '6.5rem' }} />}
                             {isEditing && <col style={{ width: '4.5rem' }} />}
                         </colgroup>
                         <thead>
@@ -579,7 +635,6 @@ export default function TimeTableEditor() {
                                         )}
                                     </th>
                                 ))}
-                                {isEditing && <th className="p-2 font-medium text-center text-muted-foreground">Type</th>}
                                 {isEditing && <th className="p-2 font-medium text-center text-muted-foreground">Actions</th>}
                             </tr>
                         </thead>
@@ -628,10 +683,18 @@ export default function TimeTableEditor() {
                                     ) : (
                                         <td colSpan={activeDays.length} className="align-middle text-center p-1 bg-muted/50">
                                             {isEditing ? (
-                                                <Select
-                                                    options={SPECIAL_LABELS}
-                                                    value={SPECIAL_LABELS.find((opt) => opt.value === row.label) || null}
-                                                    onChange={(opt) => handleRowChange(rowIdx, 'label', opt ? opt.value : SPECIAL_LABELS[0].value)}
+                                                <CreatableSelect
+                                                    options={allSpecialLabels}
+                                                    value={allSpecialLabels.find((opt) => opt.value === row.label) || null}
+                                                    onCreateOption={(inputValue) => {
+                                                        const newEvent = addCustomEvent(inputValue);
+                                                        if (newEvent) {
+                                                            handleRowChange(rowIdx, 'label', newEvent.value);
+                                                        }
+                                                    }}
+                                                    onChange={(opt) => handleRowChange(rowIdx, 'label', opt ? opt.value : allSpecialLabels[0].value)}
+                                                    placeholder="Select or create event..."
+                                                    formatCreateLabel={(inputValue) => `Create "${inputValue}"`}
                                                     className="w-full"
                                                     classNamePrefix="react-select"
                                                     menuPlacement="auto"
@@ -640,25 +703,9 @@ export default function TimeTableEditor() {
                                                 />
                                             ) : (
                                                 <span className="block px-2 py-1 text-center bg-card/80 rounded text-foreground font-semibold">
-                                                    {SPECIAL_LABELS.find((opt) => opt.value === row.label)?.label || '--'}
+                                                    {allSpecialLabels.find((opt) => opt.value === row.label)?.label || row.label || '--'}
                                                 </span>
                                             )}
-                                        </td>
-                                    )}
-
-                                    {isEditing && (
-                                        <td className="align-middle text-center">
-                                            <Select
-                                                options={TYPE_OPTIONS}
-                                                value={TYPE_OPTIONS.find((opt) => opt.value === row.type) || TYPE_OPTIONS[0]}
-                                                onChange={(opt) => handleTypeChange(rowIdx, opt ? (opt.value as 'subject' | 'special') : 'subject')}
-                                                className="timetable-type-select min-w-[5.5rem] max-w-[6.5rem]"
-                                                classNamePrefix="react-select"
-                                                menuPlacement="auto"
-                                                menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                                                styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
-                                                isSearchable={false}
-                                            />
                                         </td>
                                     )}
 

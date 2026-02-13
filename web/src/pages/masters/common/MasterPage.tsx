@@ -404,7 +404,7 @@ export function MasterPage<
               {config.addModal ? (
                 config.addModal
               ) : (
-                <Dialog open={isModalOpen} onOpenChange={handleModalOpenChange}>
+                <Dialog open={isModalOpen} onOpenChange={handleModalOpenChange} modal={false}>
                   <DialogTrigger asChild>
                     <Button>{config.addButtonLabel || `Add ${config.title.slice(0, -1)}`}</Button>
                   </DialogTrigger>

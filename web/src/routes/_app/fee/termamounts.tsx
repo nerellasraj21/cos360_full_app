@@ -1,0 +1,9 @@
+import { createFileRoute, redirect } from '@tanstack/react-router'
+
+// Fee Term Amounts is not a standalone page - it's a modal in Fee Mappings
+// Redirect users to the Fee Mappings page (Class Mappings tab)
+export const Route = createFileRoute('/_app/fee/termamounts')({
+  beforeLoad: () => {
+    throw redirect({ to: '/fee/mappings', replace: true })
+  },
+})

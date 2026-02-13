@@ -86,6 +86,12 @@ export function FeeTermForm({ term, onSuccess, onCancel }: FeeTermFormProps) {
             return;
         }
 
+        // Validate that number of dates matches number of terms
+        if (feeTermDates.length !== data.number_of_terms) {
+            setError(`You must add exactly ${data.number_of_terms} payment date${data.number_of_terms > 1 ? 's' : ''} (currently ${feeTermDates.length} added)`);
+            return;
+        }
+
         setError(null);
 
         try {

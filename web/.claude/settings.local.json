@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Read(//c/Users/nerel/Documents/Workspace/**)",
+      "Bash(npm run dev:*)"
     ]
   }
 }

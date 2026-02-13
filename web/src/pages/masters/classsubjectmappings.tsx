@@ -214,8 +214,7 @@ export default function ClassSubjectMappingsPage() {
   ];
 
   const handlePageChange = (newPage: number) => {
-    if (newPage > page && hasMore) setPage(newPage);
-    if (newPage < page && page > 0) setPage(newPage);
+    setPage(newPage);
   };
 
   const handlePageSizeChange = (newSize: number) => {

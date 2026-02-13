@@ -95,24 +95,14 @@ export const getAttendanceByDate = async (
 ): Promise<StudentAttendanceOut[]> => {
   try {
     const { data } = await CAxios.get(`/student/attendance/by-date/${attendanceDate}`);
-
-    // If the by-date endpoint returns empty, try the general endpoint with filtering
-    if (!data || data.length === 0) {
-      const allData = await getAllAttendances();
-      const filteredData = allData.filter(att => att.date === attendanceDate);
-      return filteredData;
-    }
-
-    return data;
+    return data || [];
   } catch (error) {
-    // Fallback to general endpoint if by-date fails
-    try {
-      const allData = await getAllAttendances();
-      const filteredData = allData.filter(att => att.date === attendanceDate);
-      return filteredData;
-    } catch (fallbackError) {
-      throw handleApiError(error);
+    // Return empty array if no attendance found for this date
+    // This is normal for dates with no attendance records yet
+    if ((error as any).response?.status === 404) {
+      return [];
     }
+    throw handleApiError(error);
   }
 };
 

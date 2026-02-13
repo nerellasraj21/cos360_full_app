@@ -1,20 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Edit2, Trash2, Plus, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Select as SelectComponent, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import {
   useCertificateTypes,
-  useCertificateTypesDropdown,
   useCreateCertificateType,
   useUpdateCertificateType,
   useDeleteCertificateType
 } from '@/api/certificateTypes';
-import type { CertificateTypeRead, CertificateTypeCreate, CertificateTypeUpdate, CertificateTypeDropdown } from '@/types/certificates/types';
+import type { CertificateTypeRead, CertificateTypeCreate, CertificateTypeUpdate } from '@/types/certificates/types';
 import { toast } from 'sonner';
 
 interface CertificateTypeManagerProps {
@@ -34,7 +32,6 @@ export const CertificateTypeManager: React.FC<CertificateTypeManagerProps> = ({ 
   });
 
   const { data: certificateTypesResponse, isLoading } = useCertificateTypes({ skip: 0, limit: 100 });
-  const { data: dropdownOptions } = useCertificateTypesDropdown();
 
   const certificateTypes: CertificateTypeRead[] = certificateTypesResponse?.items || [];
 
@@ -191,25 +188,6 @@ export const CertificateTypeManager: React.FC<CertificateTypeManagerProps> = ({ 
           <Button onClick={handleCreate} className="mt-4">
             Create First Certificate Type
           </Button>
-        </div>
-      )}
-
-      {/* Dropdown Preview */}
-      {dropdownOptions && dropdownOptions.length > 0 && (
-        <div className="bg-card border border-border rounded-lg p-4">
-          <h3 className="text-sm font-medium text-foreground mb-2">Dropdown Preview</h3>
-          <SelectComponent>
-            <SelectTrigger className="w-full max-w-xs">
-              <SelectValue placeholder="Select certificate type" />
-            </SelectTrigger>
-            <SelectContent>
-              {dropdownOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </SelectComponent>
         </div>
       )}
 

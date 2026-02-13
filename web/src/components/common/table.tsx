@@ -263,8 +263,8 @@ export function Table<T extends { [key: string]: any }>({
         </tbody>
       </table>
       {pagination && (
-        <div className="flex items-center justify-between mt-4">
-          <div>
+        <div className="flex items-center justify-between mt-4 pt-4 border-t">
+          <div className="flex items-center gap-2">
             <Button
               size="sm"
               variant="outline"
@@ -278,15 +278,14 @@ export function Table<T extends { [key: string]: any }>({
               variant="outline"
               onClick={() => pagination.onPageChange(pagination.page + 1)}
               disabled={(pagination.page + 1) * pagination.pageSize >= pagination.total}
-              className="ml-2"
             >
               Next
             </Button>
           </div>
-          <div className="flex items-center gap-2">
-            <span>Rows per page:</span>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Rows per page:</span>
             <select
-              className="border rounded px-2 py-1"
+              className="border rounded px-2 py-1 bg-background text-foreground dark:bg-muted dark:border-muted-foreground/20"
               value={pagination.pageSize}
               onChange={e => pagination.onPageSizeChange(Number(e.target.value))}
             >
@@ -294,7 +293,7 @@ export function Table<T extends { [key: string]: any }>({
                 <option key={size} value={size}>{size}</option>
               ))}
             </select>
-            <span>
+            <span className="text-muted-foreground">
               {pagination.page * pagination.pageSize + 1}
               -
               {Math.min((pagination.page + 1) * pagination.pageSize, pagination.total)}

@@ -1,24 +1,24 @@
 import CAxios from '../index';
-import type { StudentTransport, StudentTransportInput, StudentTransportUpdateInput } from '@/types/masters/studentTransport';
+import type { StudentTransportOut, StudentTransportCreate, StudentTransportUpdate } from '@/types/masters/studentTransport';
 
 const STUDENT_TRANSPORT_API_BASE = '/students/student-transport/';
 
-export const fetchStudentTransports = async (): Promise<StudentTransport[]> => {
+export const fetchStudentTransports = async (): Promise<StudentTransportOut[]> => {
     const { data } = await CAxios.get(STUDENT_TRANSPORT_API_BASE);
     return data;
 };
 
-export const fetchStudentTransportsByStudent = async (studentId: string): Promise<StudentTransport[]> => {
+export const fetchStudentTransportsByStudent = async (studentId: string): Promise<StudentTransportOut[]> => {
     const { data } = await CAxios.get(`${STUDENT_TRANSPORT_API_BASE}student/${studentId}`);
     return data;
 };
 
-export const createStudentTransport = async (transport: StudentTransportInput): Promise<StudentTransport> => {
+export const createStudentTransport = async (transport: StudentTransportCreate): Promise<StudentTransportOut> => {
     const { data } = await CAxios.post(STUDENT_TRANSPORT_API_BASE, transport);
     return data;
 };
 
-export const updateStudentTransport = async (id: string, transport: StudentTransportUpdateInput): Promise<StudentTransport> => {
+export const updateStudentTransport = async (id: string, transport: StudentTransportUpdate): Promise<StudentTransportOut> => {
     const { data } = await CAxios.patch(`${STUDENT_TRANSPORT_API_BASE}${id}`, transport);
     return data;
 };

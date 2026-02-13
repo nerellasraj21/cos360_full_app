@@ -102,23 +102,38 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
             return;
         }
 
-        try {
-            const mappingData = {
-                class_id: formData.class_id,
-                fee_type_id: formData.fee_type_id,
-                total_fee: formData.total_fee,
-                academic_year_id: selectedAcademicYearId || '',
-                all_by_default: formData.all_by_default
-            };
+        // Validate academic year for new mappings
+        if (!editingMapping && !selectedAcademicYearId) {
+            toast.error('Please select an academic year');
+            return;
+        }
 
+        try {
             if (editingMapping) {
+                // UPDATE: Only send updatable fields (total_fee, all_by_default)
+                // Backend typically doesn't allow changing relationship fields (class_id, fee_type_id, academic_year_id)
+                const updateData = {
+                    total_fee: formData.total_fee,
+                    all_by_default: formData.all_by_default
+                };
+
                 await updateMutation.mutateAsync({
                     id: editingMapping.id,
-                    data: mappingData
+                    data: updateData
                 });
             } else {
-                await createMutation.mutateAsync(mappingData);
+                // CREATE: Send all required fields
+                const createData = {
+                    class_id: formData.class_id,
+                    fee_type_id: formData.fee_type_id,
+                    total_fee: formData.total_fee,
+                    academic_year_id: selectedAcademicYearId!,
+                    all_by_default: formData.all_by_default
+                };
+
+                await createMutation.mutateAsync(createData);
             }
+
             setShowCreateDialog(false);
             setEditingMapping(null);
         } catch (error) {
@@ -156,14 +171,30 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
             return { status: 'not-set', message: 'Not Set' };
         }
 
-        const totalTermAmount = mapping.class_fee_mapping_terms.reduce((sum, ta) => sum + ta.term_amount, 0);
+        const totalTermAmount = mapping.class_fee_mapping_terms.reduce((sum, ta) => sum + (Number(ta.term_amount) || 0), 0);
         const difference = Math.abs(totalTermAmount - mapping.total_fee);
 
+        const termCount = mapping.class_fee_mapping_terms.length;
+        const termLabel = termCount === 1 ? '1 term' : `${termCount} terms`;
+
         if (difference < 0.01) { // Allow for small floating point differences
-            return { status: 'complete', message: 'Complete' };
+            return { status: 'complete', message: `Complete (${termLabel})` };
         } else {
             return { status: 'incomplete', message: `Mismatch: ₹${difference.toFixed(2)}` };
         }
+    };
+
+    // Helper to get term display text (supports both old term_id and new term_date_id)
+    const getTermDisplayText = (term: any) => {
+        // Prefer new format with term_name and term_date
+        if (term.term_name) {
+            if (term.term_date) {
+                return `${term.term_name} (Due: ${new Date(term.term_date).toLocaleDateString()})`;
+            }
+            return term.term_name;
+        }
+        // Fallback to term_id or term_date_id
+        return term.term_date_id || term.term_id || 'Unknown Term';
     };
 
     if (!selectedAcademicYearId) {
@@ -190,8 +221,46 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
     if (error) {
         return (
             <div className={cn("p-6", className)}>
-                <div className="text-center text-destructive">
-                    <p>Error loading fee mappings: {error.message}</p>
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-6">
+                    <div className="flex items-start gap-4">
+                        <AlertCircle className="h-6 w-6 text-destructive mt-1 flex-shrink-0" />
+                        <div className="flex-1">
+                            <h3 className="font-semibold text-destructive mb-2">Failed to Load Fee Class Mappings</h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                The backend encountered an error while retrieving fee class mappings.
+                            </p>
+                            <div className="bg-background/50 rounded p-3 mb-4">
+                                <p className="text-xs font-mono text-foreground">
+                                    Error: {error.message}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Endpoint: GET /api/v1/fee/class-mappings/
+                                </p>
+                                {selectedAcademicYearId && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Academic Year ID: {selectedAcademicYearId}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="space-y-2 text-sm">
+                                <p className="font-medium">Backend team should check:</p>
+                                <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-2">
+                                    <li>Database table 'fee_class_mappings' exists and is accessible</li>
+                                    <li>Foreign key relationships are properly configured</li>
+                                    <li>Backend server logs for detailed stack trace</li>
+                                    <li>SQL query syntax and data integrity</li>
+                                </ul>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="mt-4"
+                                onClick={() => window.location.reload()}
+                            >
+                                Retry
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             </div>
         );

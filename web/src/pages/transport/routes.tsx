@@ -4,13 +4,23 @@ import { MasterPage } from "../masters/common/MasterPage";
 import type { MasterPageConfig, FormField } from "../masters/common/MasterPage";
 import type { Route, RouteInput } from "@/types/masters/route";
 import { useRoutes, useCreateRoute, useUpdateRoute, useDeleteRoute } from '@/api/hooks/masters/routes';
+import {
+    useRouteTypesDropdown,
+    useTripTypesDropdown,
+    useCreateRouteType,
+    useCreateTripType
+} from '@/api/hooks/masters/transportOptions';
 import { PermissionGuard } from '@/components/common';
 import Select from 'react-select';
+import CreatableSelect from 'react-select/creatable';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ShieldX } from 'lucide-react';
+import { ShieldX, Loader2 } from 'lucide-react';
+import type { RouteTypeDropdown, TripTypeDropdown } from '@/types/masters/transportTypes';
+import { toast } from 'sonner';
 
-const columns = [
+// Helper function to create columns with dynamic options
+const createColumns = (routeTypeOptions: RouteTypeDropdown[], tripTypeOptions: TripTypeDropdown[]) => [
     { key: "route_name", label: "Route Name", editable: true },
     { key: "starting_stop", label: "Starting Stop", editable: true },
     { key: "ending_stop", label: "Ending Stop", editable: true },
@@ -19,20 +29,30 @@ const columns = [
         key: "route_type",
         label: "Route Type",
         editable: true,
+        render: (value: string | null) => {
+            // Backend returns route_type as a STRING directly
+            return value || <span className="text-muted-foreground">-</span>;
+        },
         renderEdit: (value: any, _row: Route, onChange: (val: any) => void) => (
             <Select
-                options={routeTypeOptions}
-                value={routeTypeOptions.find((opt) => opt.value === value) || null}
+                options={routeTypeOptions.map(rt => ({ value: rt.type_name, label: rt.type_name }))}
+                value={routeTypeOptions.map(rt => ({ value: rt.type_name, label: rt.type_name })).find((opt) => opt.value === value) || null}
                 onChange={(option: any) => onChange(option?.value || '')}
                 placeholder="Select Route Type"
                 classNamePrefix="react-select"
                 menuPlacement="auto"
                 menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                 styles={{
-                    menuPortal: base => ({ ...base, zIndex: 9999 }),
-                    control: (base) => ({ ...base, minHeight: '32px', fontSize: '12px' })
+                    menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                    control: (base) => ({ ...base, minHeight: '32px', fontSize: '12px' }),
+                    menu: (base) => ({ ...base, pointerEvents: 'auto' })
                 }}
                 isClearable={false}
+                menuShouldBlockScroll={false}
+                closeMenuOnScroll={false}
+                tabSelectsValue={false}
+                openMenuOnFocus={true}
+                blurInputOnSelect={true}
             />
         )
     },
@@ -40,20 +60,30 @@ const columns = [
         key: "trip_type",
         label: "Trip Type",
         editable: true,
+        render: (value: string | null) => {
+            // Backend returns trip_type as a STRING directly
+            return value || <span className="text-muted-foreground">-</span>;
+        },
         renderEdit: (value: any, _row: Route, onChange: (val: any) => void) => (
             <Select
-                options={tripTypeOptions}
-                value={tripTypeOptions.find((opt) => opt.value === value) || null}
+                options={tripTypeOptions.map(tt => ({ value: tt.type_name, label: tt.type_name }))}
+                value={tripTypeOptions.map(tt => ({ value: tt.type_name, label: tt.type_name })).find((opt) => opt.value === value) || null}
                 onChange={(option: any) => onChange(option?.value || '')}
                 placeholder="Select Trip Type"
                 classNamePrefix="react-select"
                 menuPlacement="auto"
                 menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                 styles={{
-                    menuPortal: base => ({ ...base, zIndex: 9999 }),
-                    control: (base) => ({ ...base, minHeight: '32px', fontSize: '12px' })
+                    menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                    control: (base) => ({ ...base, minHeight: '32px', fontSize: '12px' }),
+                    menu: (base) => ({ ...base, pointerEvents: 'auto' })
                 }}
                 isClearable={false}
+                menuShouldBlockScroll={false}
+                closeMenuOnScroll={false}
+                tabSelectsValue={false}
+                openMenuOnFocus={true}
+                blurInputOnSelect={true}
             />
         )
     },
@@ -109,16 +139,6 @@ const columns = [
     },
 ];
 
-const routeTypeOptions = [
-    { value: 'upward', label: 'Upward' },
-    { value: 'downward', label: 'Downward' }
-];
-
-const tripTypeOptions = [
-    { value: 'first trip', label: 'First Trip' },
-    { value: 'second trip', label: 'Second Trip' }
-];
-
 const formFields: FormField[] = [
     { name: "route_name", label: "Route Name", required: true },
     { name: "starting_stop", label: "Starting Stop", required: true },
@@ -136,8 +156,8 @@ const defaultValues: RouteInput = {
     starting_stop: "",
     ending_stop: "",
     number_of_stops: 8,
-    route_type: 'upward',
-    trip_type: 'first trip',
+    route_type: '', // Type name string (e.g., "Upward")
+    trip_type: '', // Type name string (e.g., "First Trip")
     start_time: "07:00:00",
     end_time: "08:30:00",
     is_active: true,
@@ -150,10 +170,19 @@ export default function RoutesPage() {
     const [page, setPage] = useState(0);
     const [pageSize, setPageSize] = useState(PAGE_SIZE_DEFAULT);
 
+    // Fetch routes data
     const { data: routes = [], isLoading } = useRoutes();
     const createRoute = useCreateRoute();
     const updateRoute = useUpdateRoute();
     const deleteRoute = useDeleteRoute();
+
+    // Fetch dynamic options from backend
+    const { data: routeTypeOptions = [], isLoading: isLoadingRouteTypes } = useRouteTypesDropdown();
+    const { data: tripTypeOptions = [], isLoading: isLoadingTripTypes } = useTripTypesDropdown();
+
+    // Mutations for creating new types on the fly
+    const createRouteTypeMutation = useCreateRouteType();
+    const createTripTypeMutation = useCreateTripType();
 
     const total = routes.length;
     const paginatedData = routes.slice(page * pageSize, (page + 1) * pageSize);
@@ -169,8 +198,24 @@ export default function RoutesPage() {
         setPage(0);
     };
 
+    // Show loading state while fetching options
+    if (isLoadingRouteTypes || isLoadingTripTypes) {
+        return (
+            <Card>
+                <CardContent className="flex justify-center items-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Loading options...</span>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    // Create columns with dynamic options
+    const columns = createColumns(routeTypeOptions, tripTypeOptions);
+
     const config: MasterPageConfig<Route, RouteInput> = {
         title: "Route Management",
+        addButtonLabel: "Add Route Management",
         columns,
         defaultValues,
         formFields,
@@ -199,31 +244,125 @@ export default function RoutesPage() {
         },
         renderCustomField: (field, value, onChange) => {
             if (field.name === 'route_type') {
+                const selectOptions = routeTypeOptions.map(rt => ({ value: rt.type_name, label: rt.type_name }));
+
+                const handleCreateRouteType = async (inputValue: string) => {
+                    const trimmedValue = inputValue.trim();
+                    if (!trimmedValue) return;
+
+                    // Check for duplicates
+                    if (routeTypeOptions.some(rt => rt.type_name.toLowerCase() === trimmedValue.toLowerCase())) {
+                        toast.error(`Route type "${trimmedValue}" already exists`);
+                        return;
+                    }
+
+                    try {
+                        const newType = await createRouteTypeMutation.mutateAsync({
+                            type_name: trimmedValue,
+                            is_active: true
+                        });
+                        onChange(newType.type_name); // Store the type_name STRING
+                        toast.success(`Route type "${trimmedValue}" created successfully`);
+                    } catch (error: any) {
+                        toast.error(error.message || 'Failed to create route type');
+                    }
+                };
+
                 return (
-                    <Select
-                        options={routeTypeOptions}
-                        value={routeTypeOptions.find((opt) => opt.value === value) || null}
-                        onChange={(option: any) => onChange(option?.value || '')}
-                        placeholder="Select Route Type"
-                        classNamePrefix="react-select"
-                        menuPlacement="auto"
-                        menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                        styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
-                    />
+                    <div>
+                        <CreatableSelect
+                            options={selectOptions}
+                            value={selectOptions.find((opt) => opt.value === value) || null}
+                            onChange={(option: any) => onChange(option?.value || '')}
+                            onCreateOption={handleCreateRouteType}
+                            placeholder="Select or type to create..."
+                            formatCreateLabel={(inputValue) => `Create "${inputValue}"`}
+                            classNamePrefix="react-select"
+                            menuPlacement="auto"
+                            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                            styles={{
+                                menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                                menu: (base) => ({ ...base, pointerEvents: 'auto' })
+                            }}
+                            menuShouldBlockScroll={false}
+                            closeMenuOnScroll={false}
+                            tabSelectsValue={false}
+                            openMenuOnFocus={true}
+                            blurInputOnSelect={true}
+                            isDisabled={createRouteTypeMutation.isPending}
+                            isLoading={createRouteTypeMutation.isPending}
+                            onKeyDown={(e) => {
+                                // Prevent form submission on Enter
+                                if (e.key === 'Enter') {
+                                    e.stopPropagation();
+                                }
+                            }}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Type a new route type and press Enter to create it
+                        </p>
+                    </div>
                 );
             }
             if (field.name === 'trip_type') {
+                const selectOptions = tripTypeOptions.map(tt => ({ value: tt.type_name, label: tt.type_name }));
+
+                const handleCreateTripType = async (inputValue: string) => {
+                    const trimmedValue = inputValue.trim();
+                    if (!trimmedValue) return;
+
+                    // Check for duplicates
+                    if (tripTypeOptions.some(tt => tt.type_name.toLowerCase() === trimmedValue.toLowerCase())) {
+                        toast.error(`Trip type "${trimmedValue}" already exists`);
+                        return;
+                    }
+
+                    try {
+                        const newType = await createTripTypeMutation.mutateAsync({
+                            type_name: trimmedValue,
+                            is_active: true
+                        });
+                        onChange(newType.type_name); // Store the type_name STRING
+                        toast.success(`Trip type "${trimmedValue}" created successfully`);
+                    } catch (error: any) {
+                        toast.error(error.message || 'Failed to create trip type');
+                    }
+                };
+
                 return (
-                    <Select
-                        options={tripTypeOptions}
-                        value={tripTypeOptions.find((opt) => opt.value === value) || null}
-                        onChange={(option: any) => onChange(option?.value || '')}
-                        placeholder="Select Trip Type"
-                        classNamePrefix="react-select"
-                        menuPlacement="auto"
-                        menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                        styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
-                    />
+                    <div>
+                        <CreatableSelect
+                            options={selectOptions}
+                            value={selectOptions.find((opt) => opt.value === value) || null}
+                            onChange={(option: any) => onChange(option?.value || '')}
+                            onCreateOption={handleCreateTripType}
+                            placeholder="Select or type to create..."
+                            formatCreateLabel={(inputValue) => `Create "${inputValue}"`}
+                            classNamePrefix="react-select"
+                            menuPlacement="auto"
+                            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                            styles={{
+                                menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                                menu: (base) => ({ ...base, pointerEvents: 'auto' })
+                            }}
+                            menuShouldBlockScroll={false}
+                            closeMenuOnScroll={false}
+                            tabSelectsValue={false}
+                            openMenuOnFocus={true}
+                            blurInputOnSelect={true}
+                            isDisabled={createTripTypeMutation.isPending}
+                            isLoading={createTripTypeMutation.isPending}
+                            onKeyDown={(e) => {
+                                // Prevent form submission on Enter
+                                if (e.key === 'Enter') {
+                                    e.stopPropagation();
+                                }
+                            }}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Type a new trip type and press Enter to create it
+                        </p>
+                    </div>
                 );
             }
             if (field.name === 'start_time' || field.name === 'end_time') {

@@ -315,6 +315,44 @@ Content-Type: application/json
 
 ---
 
+## Pagination
+
+The Class Subject Mapping page includes full pagination support for viewing large datasets.
+
+### Features
+
+- **Previous/Next Navigation**: Navigate through pages using Previous and Next buttons
+- **Page Size Selector**: Adjust rows per page (5, 10, 20, 50, 100)
+- **Page Information**: View current page, total pages, and record range
+- **Auto-disable Logic**: Buttons automatically disable when at first/last page
+
+### UI Elements
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│  [Previous]  [Next]      Rows per page: [5▼]  1-5 of 50 │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Implementation Details
+
+- **Component**: Uses the shared `Table` component from `@/components/common/table.tsx`
+- **Hook**: `useClassSubjectMappingsPaginated` handles pagination logic
+- **State Management**: Page and pageSize state managed in the page component
+- **API Parameters**:
+  - `skip`: Calculated as `page * pageSize`
+  - `limit`: Current page size
+- **Styling**: Fully responsive with dark mode support
+
+### Developer Notes
+
+- Pagination state resets when changing page size
+- Total count is fetched from the API response
+- Next button disabled when: `(page + 1) * pageSize >= total`
+- Previous button disabled when: `page === 0`
+
+---
+
 ## Testing Checklist
 
 - [ ] Class Subject Mapping page loads without errors
@@ -329,6 +367,11 @@ Content-Type: application/json
 - [ ] Upsert correctly deactivates removed subjects
 - [ ] Dropdown endpoint returns section_name
 - [ ] Warning message shown when "All Sections" is selected
+- [ ] **Pagination: Previous button works and disables at first page**
+- [ ] **Pagination: Next button works and disables at last page**
+- [ ] **Pagination: Page size selector changes displayed rows**
+- [ ] **Pagination: Page information displays correctly**
+- [ ] **Pagination: Works correctly in both light and dark mode**
 
 ---
 

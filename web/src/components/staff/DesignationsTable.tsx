@@ -146,7 +146,7 @@ export function DesignationsTable({ className }: DesignationsTableProps) {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-foreground">
-                                            {designation.staff_members?.length || 0} staff member{designation.staff_members?.length !== 1 ? 's' : ''}
+                                            {designation.staff_count || 0} staff member{designation.staff_count !== 1 ? 's' : ''}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-foreground">
                                             {new Date(designation.created_at).toLocaleDateString()}
