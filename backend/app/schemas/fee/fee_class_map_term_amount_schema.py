@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 class FeeClassMappingTermAmountBase(BaseModel):
-    term_id: UUID
+    term_date_id: UUID
     term_amount: Decimal
     
     @field_validator('term_amount')
@@ -18,7 +18,7 @@ class FeeClassMappingTermAmountCreate(FeeClassMappingTermAmountBase):
 
 class FeeClassMappingTermAmountUpdate(BaseModel):
     id: Optional[UUID] = None  # For identifying existing records
-    term_id: UUID
+    term_date_id: UUID
     term_amount: Decimal
     
     @field_validator('term_amount')
@@ -30,7 +30,9 @@ class FeeClassMappingTermAmountUpdate(BaseModel):
 class FeeClassMappingTermAmountRead(FeeClassMappingTermAmountBase):
     id: UUID
     fee_class_mapping_id: UUID
-    term_name: Optional[str] = None  # For joined queries
+    term_id: Optional[UUID] = None  # DEPRECATED: Use term_date_id instead. Kept for frontend backward compatibility.
+    term_date: Optional[str] = None  # Actual date string for UI
+    term_name: Optional[str] = None  # Parent term name (computed from fee_term_date.fee_term)
     model_config = {"from_attributes": True}
 
 class FeeClassMappingTermAmountBulkCreate(BaseModel):

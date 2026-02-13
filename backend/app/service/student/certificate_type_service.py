@@ -115,21 +115,14 @@ async def get_all_certificate_types(db: AsyncSession, skip: int = 0, limit: int 
             detail=f"Error fetching certificate types: {str(e)}"
         )
 
+@cache_dropdown(ttl=300)
 async def get_certificate_types_dropdown(db: AsyncSession):
     """Get certificate types for dropdown - cached"""
-    return await cache_dropdown(
-        cache_key="certificate_types_dropdown",
-        fetch_function=_fetch_certificate_types_dropdown,
-        db=db
-    )
-
-async def _fetch_certificate_types_dropdown(db: AsyncSession):
-    """Internal function to fetch certificate types for dropdown"""
     try:
         query = select(CertificateType).order_by(CertificateType.name)
         result = await db.execute(query)
         return result.scalars().all()
-        
+
     except Exception as e:
         log.error(f"Error fetching certificate types dropdown: {str(e)}")
         raise HTTPException(
@@ -185,17 +178,17 @@ async def delete_certificate_type(db: AsyncSession, certificate_type_id: UUID):
         certificate_type = await get_certificate_type_by_id(db, certificate_type_id)
 
         # Check if certificate type is in use by student certificates
-        from app.models.student.student_certificate_model import StudentCertificate
+        from app.models.student.student_certificate_model import CertificateIssue
         from sqlalchemy import func
         certificate_count = await db.execute(
-            select(func.count(StudentCertificate.id)).where(StudentCertificate.certificate_type_id == certificate_type_id)
+            select(func.count(CertificateIssue.id)).where(CertificateIssue.certificate_type_id == certificate_type_id)
         )
         certificate_dependencies = certificate_count.scalar()
 
         if certificate_dependencies > 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot delete certificate type '{certificate_type.type_name}' because it is being used by {certificate_dependencies} student certificate(s). Please reassign or delete the certificates first."
+                detail=f"Cannot delete certificate type '{certificate_type.name}' because it is being used by {certificate_dependencies} student certificate(s). Please reassign or delete the certificates first."
             )
 
         await db.delete(certificate_type)

@@ -6,13 +6,14 @@ from uuid import UUID
 # Forward reference for term amounts
 class FeeStudentMapTermAmountRead(BaseModel):
     id: UUID
-    term_id: UUID
+    term_date_id: UUID
     term_amount: Decimal
-    term_name: Optional[str] = None
+    term_date: Optional[str] = None  # Actual date string for UI
+    term_name: Optional[str] = None  # Parent term name
     model_config = {"from_attributes": True}
 
 class FeeStudentMapTermAmountCreate(BaseModel):
-    term_id: UUID
+    term_date_id: UUID
     term_amount: Decimal
     
     @field_validator('term_amount')

@@ -19,8 +19,14 @@ from app.middleware.rate_limit_middleware import rate_limit_dropdown, rate_limit
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from typing import List, Optional
 from uuid import UUID
+from datetime import datetime
 
 router = APIRouter(prefix="/fee/types", tags=["Fee/Fee Types"])
+
+@router.get("/health", status_code=status.HTTP_200_OK)
+async def type_health_check():
+    """Health check for fee type endpoints"""
+    return {"status": "healthy", "module": "fee_types", "timestamp": datetime.now()}
 
 # Create Fee Type
 @router.post("/", response_model=FeeTypeRead, status_code=status.HTTP_201_CREATED)
@@ -41,18 +47,20 @@ async def create_fee_type_endpoint(request: Request,
 
 # Get All Fee Types
 @router.get("/", response_model=List[FeeTypeRead])
-async def get_all_fee_types_endpoint(request: Request, 
+async def get_all_fee_types_endpoint(request: Request,
 
+    limit: int = Query(50, ge=1, le=500, description="Number of records to return (1-500)"),
+    offset: int = Query(0, ge=0, description="Number of records to skip"),
     db: AsyncSession = Depends(get_tenant_db)
 ):
-    """Get all fee types with their related information"""
+    """Get all fee types with their related information and pagination"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'fee_types', 'list')
-    
-    return await get_all_fee_types(db)
+
+    return await get_all_fee_types(db, limit, offset)
 
 # Get Fee Types for Dropdown
 @router.get("/dropdown", response_model=List[FeeTypeDropdown])

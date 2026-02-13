@@ -206,8 +206,8 @@ async def get_fee_type_by_id(db: AsyncSession, fee_type_id: UUID):
             detail="An error occurred while retrieving fee type"
         )
 
-async def get_all_fee_types(db: AsyncSession):
-    """Get all fee types with all relationships"""
+async def get_all_fee_types(db: AsyncSession, limit: int = 50, offset: int = 0):
+    """Get all fee types with all relationships and pagination"""
     try:
         result = await db.execute(
             select(FeeTypeModel)
@@ -216,6 +216,8 @@ async def get_all_fee_types(db: AsyncSession):
                 selectinload(FeeTypeModel.fee_term).selectinload(FeeTerm.fee_term_dates),
                 selectinload(FeeTypeModel.academic_year)
             )
+            .limit(limit)
+            .offset(offset)
         )
         fee_types = result.scalars().all()
         

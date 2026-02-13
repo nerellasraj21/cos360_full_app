@@ -8,6 +8,7 @@ from app.models.fee.fee_student_mapping_model import FeeStudentMapping as FeeStu
 from app.models.fee.fee_student_map_term_amount_model import FeeStudentMapTermAmount as FeeStudentMapTermAmountModel
 from app.models.fee.fee_type_model import FeeType
 from app.models.fee.fee_term_model import FeeTerm
+from app.models.fee.fee_term_dates_model import FeeTermDates
 from app.models.student.student_model import Student
 from app.models.masters.admission_model import Admission
 from app.models.masters.class_model import Class
@@ -149,23 +150,41 @@ async def get_fee_terms_for_type(db: AsyncSession, fee_type_id: UUID):
         )
 
 async def create_term_amounts(db: AsyncSession, fee_student_mapping_id: UUID, total_fee: Decimal, fee_type_id: UUID):
-    """Create term amounts based on fee type terms"""
+    """Create term amounts based on fee type term dates"""
     fee_term = await get_fee_terms_for_type(db, fee_type_id)
-    
-    # Calculate amount per term
-    amount_per_term = total_fee / fee_term.number_of_terms
-    
-    # Create term amounts for each term
+
+    # Get all term dates for this fee term
+    result = await db.execute(
+        select(FeeTermDates)
+        .where(FeeTermDates.term_id == fee_term.id)
+        .order_by(FeeTermDates.fee_term_date.asc())
+    )
+    term_dates = result.scalars().all()
+
+    if len(term_dates) != fee_term.number_of_terms:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Data inconsistency: Fee term has {fee_term.number_of_terms} terms but {len(term_dates)} dates"
+        )
+
+    # Calculate amount per term (equal split by default)
+    amount_per_term = total_fee / len(term_dates)
+
+    # CRITICAL FIX: Create term amounts for EACH TERM DATE
+    # NOTE: Both term_id and term_date_id are required (denormalized for performance)
+    # - term_id: References the fee term (e.g., "Quarterly")
+    # - term_date_id: References the specific term date (e.g., "Q1 - Jan 15")
     term_amounts = []
-    for i in range(fee_term.number_of_terms):
+    for term_date in term_dates:
         term_amount = FeeStudentMapTermAmountModel(
             fee_student_map_id=fee_student_mapping_id,
-            term_amount=amount_per_term,
-            term_id=fee_term.id
+            term_id=term_date.term_id,  # ✅ FIXED: Extract from FeeTermDates (NOT NULL constraint)
+            term_date_id=term_date.id,   # ✅ The specific term date
+            term_amount=amount_per_term
         )
         db.add(term_amount)
         term_amounts.append(term_amount)
-    
+
     return term_amounts
 
 async def get_student_details(db: AsyncSession, student_id: UUID, admission_number: str, class_id: UUID, section_id: UUID):
@@ -370,29 +389,34 @@ async def get_all_fee_student_mappings(
     class_id: Optional[UUID] = None,
     section_id: Optional[UUID] = None,
     fee_type_id: Optional[UUID] = None,
-    academic_year_id: Optional[UUID] = None
+    academic_year_id: Optional[UUID] = None,
+    limit: int = 50,
+    offset: int = 0
 ):
-    """Get all fee student mappings with optional filters"""
+    """Get all fee student mappings with optional filters and pagination"""
     try:
         # Simplified query without complex relationships to avoid issues
         query = select(FeeStudentMappingModel)
-        
+
         # Apply filters
         if student_id is not None:
             query = query.where(FeeStudentMappingModel.student_id == student_id)
-        
+
         if class_id is not None:
             query = query.where(FeeStudentMappingModel.class_id == class_id)
-            
+
         if section_id is not None:
             query = query.where(FeeStudentMappingModel.section_id == section_id)
-        
+
         if fee_type_id is not None:
             query = query.where(FeeStudentMappingModel.fee_type_id == fee_type_id)
-        
+
         if academic_year_id is not None:
             query = query.where(FeeStudentMappingModel.academic_year_id == academic_year_id)
-        
+
+        # Apply pagination
+        query = query.limit(limit).offset(offset)
+
         result = await db.execute(query)
         mappings = result.scalars().all()
         
@@ -646,7 +670,8 @@ async def create_bulk_fee_student_mappings(db: AsyncSession, bulk_data: FeeStude
                 
                 # Add student details
                 if mapping.student:
-                    student_admission = mapping.student.admissions[0] if mapping.student.admissions else None
+                    # admissions is a single object (uselist=False), not a list
+                    student_admission = mapping.student.admissions
                     mapping.student_details = {
                         "student_id": mapping.student.id,
                         "student_name": f"{mapping.student.first_name} {mapping.student.last_name}",

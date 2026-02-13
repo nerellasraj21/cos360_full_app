@@ -1,5 +1,5 @@
 from app.db.base import BaseOrg
-from sqlalchemy import TIMESTAMP, Column, String, func, Boolean, Numeric, Text, Index
+from sqlalchemy import TIMESTAMP, Column, String, func, Boolean, Numeric, Text, Index, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
@@ -16,9 +16,9 @@ class FeeTransaction(BaseOrg):
     transaction_number = Column(String(50), nullable=False, unique=True, index=True)  # Auto-generated unique per tenant
     
     # Student linkage
-    student_id = Column(UUID(as_uuid=True), nullable=False, index=True)  # Links to students table
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True)  # Links to students table
     student_admission_num = Column(String(50), nullable=False, index=True)  # For business validation
-    academic_year_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"), nullable=False, index=True)
     
     # Transaction core details
     total_amount = Column(Numeric(10, 2), nullable=False)  # Total transaction amount
@@ -55,6 +55,9 @@ class FeeTransaction(BaseOrg):
     transaction_items = relationship("FeeTransactionItem", back_populates="fee_transaction", cascade="all, delete-orphan")
     receipts = relationship("FeeReceipt", back_populates="fee_transaction", cascade="all, delete-orphan")
     refunds = relationship("FeeRefund", back_populates="fee_transaction")
+    student = relationship("Student", foreign_keys=[student_id])
+    academic_year = relationship("AcademicYear", foreign_keys=[academic_year_id])
+    fee_receipts = relationship("FeeReceipt", back_populates="fee_transaction", foreign_keys="[FeeReceipt.fee_transaction_id]", overlaps="receipts")
     
     # Database indexes for performance
     __table_args__ = (

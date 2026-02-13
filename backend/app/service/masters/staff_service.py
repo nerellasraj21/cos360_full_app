@@ -330,7 +330,7 @@ async def get_all_drivers_list(db: AsyncSession):
             select(Staff)
             .join(Staff.designation_obj)
             .options(selectinload(Staff.designation_obj))
-            .where(Designation.title == "Driver")
+            .where(Designation.title.ilike("driver"))
         )
 
         result = await db.execute(stmt)
@@ -338,8 +338,10 @@ async def get_all_drivers_list(db: AsyncSession):
 
         return [
             {
+                "id": driver.user_id,
                 "full_name": f"{driver.first_name} {driver.last_name or ''}".strip(),
-                "user_id": driver.user_id
+                "user_id": driver.user_id,
+                "staff_id": driver.id
             }
             for driver in drivers
         ]

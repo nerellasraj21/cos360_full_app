@@ -1,8 +1,8 @@
 # Project Context
 
-Version: 1.0
-Generated On: 2025-12-26
-Source: Codebase Analysis
+Version: 1.1
+Generated On: 2026-02-06
+Source: Codebase Analysis + Fee Documentation Consolidation
 Confidence Level: High
 
 ---
@@ -299,6 +299,31 @@ The following logical modules have been identified:
 | Public (System)     | `app/api/v1/public/`, `app/service/public/`           | Complete |
 
 Evidence: `app/api/v1/main_router.py:1-128`, folder structure analysis
+
+---
+
+## Fee Management Summary (2026-02-06)
+
+[EVIDENCE-BASED]
+
+Fee Management covers:
+- Structure: categories, types, terms, term dates
+- Assignment: class mappings, class mapping term amounts, student mappings, student term amounts
+- Collection: transactions and transaction items with payment method validation
+- Receipts: PDF generation, verification, reprint tracking
+- Refunds: request, approval, processing workflow
+- Reporting: fee collection summary, pending fees, fee structure, export
+
+Primary interfaces:
+- Fee APIs under `/api/v1/fee/`
+- Fee reports under `/api/v1/reports/fees/`
+
+Canonical docs:
+- `context/modules/Fee_Management.md`
+- `AI_GOVERNANCE/handovers/Fee_Management_Functional.md`
+- `AI_GOVERNANCE/handovers/Fee_Management_Implementation.md`
+
+Evidence: `app/api/v1/fee/`, `app/service/fee/`, `app/api/v1/reports/fee_reports.py`
 
 ---
 

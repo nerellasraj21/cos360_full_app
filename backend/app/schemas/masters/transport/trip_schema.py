@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from uuid import UUID
+from datetime import datetime
 
 class TripBase(BaseModel):
     vehicle_id: UUID
@@ -21,6 +22,8 @@ class TripUpdate(BaseModel):
 
 class TripOut(TripBase):
     id: UUID
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True

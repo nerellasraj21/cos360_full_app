@@ -14,6 +14,9 @@ class FeeTermDates(BaseOrg):
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
     
     fee_term = relationship("FeeTerm", back_populates="fee_term_dates")
+    fee_class_mapping_term_amounts = relationship("FeeClassMappingTermAmount", back_populates="fee_term_date", lazy="select")
+    fee_student_map_term_amounts = relationship("FeeStudentMapTermAmount", back_populates="fee_term_date", lazy="select")
+    fee_transaction_items = relationship("FeeTransactionItem", back_populates="fee_term_date", lazy="select")
     
     def __repr__(self):
         return f"<FeeTermDates(id={self.id}, term_id={self.term_id}, fee_term_date={self.fee_term_date})>"

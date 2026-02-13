@@ -17,6 +17,8 @@ from app.api.v1.masters.transport.route_stop_endpoints import router as route_st
 # from app.api.v1.masters.transport.student_trip_endpoints import router as student_trip_router
 from app.api.v1.masters.transport.trip_endpoints import router as trip_router
 from app.api.v1.masters.transport.vehicle_endpoints import router as vehicle_router
+from app.api.v1.masters.transport.route_type_endpoints import router as route_type_router
+from app.api.v1.masters.transport.trip_type_endpoints import router as trip_type_router
 from app.api.v1.masters.timetable_routes import router as timetable_router
 from app.api.v1.student.admission_endpoints import router as admission_router
 from app.api.v1.student.attendance_endpoints import router as attendance_router
@@ -44,6 +46,7 @@ from app.api.v1.fee.fee_refund_endpoints import router as fee_refund_router
 from app.api.v1.auth.seed_endpoints import router as seed_router
 from app.api.v1.auth.test_setup_endpoints import router as test_setup_router
 from app.api.v1.auth.test_jwt_endpoints import router as test_jwt_router
+from app.api.v1.auth.fix_permissions_endpoints import router as fix_permissions_router
 from app.api.v1.super_admin.auth_endpoints import router as super_admin_auth_router
 from app.api.v1.super_admin.setup_endpoints import router as super_admin_setup_router
 from app.api.v1.super_admin.system_endpoints import router as super_admin_system_router
@@ -86,6 +89,8 @@ router.include_router(route_stop_router)
 # router.include_router(student_trip_router)
 router.include_router(trip_router)
 router.include_router(vehicle_router)
+router.include_router(route_type_router)
+router.include_router(trip_type_router)
 router.include_router(timetable_router)
 router.include_router(admission_router)
 router.include_router(certificate_router)
@@ -113,6 +118,7 @@ router.include_router(fee_refund_router)
 router.include_router(seed_router)
 router.include_router(test_setup_router)
 router.include_router(test_jwt_router)
+router.include_router(fix_permissions_router)
 router.include_router(super_admin_auth_router)
 router.include_router(super_admin_setup_router)
 router.include_router(super_admin_system_router)

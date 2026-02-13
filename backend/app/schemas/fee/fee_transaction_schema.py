@@ -6,7 +6,7 @@ from decimal import Decimal
 
 class FeeTransactionItemBase(BaseModel):
     fee_type_id: UUID
-    fee_term_id: UUID
+    term_date_id: UUID  # Changed from fee_term_id to term_date_id
     amount_due: Decimal
     amount_paid: Decimal
     description: Optional[str] = None
@@ -107,9 +107,14 @@ class FeeTransactionRead(FeeTransactionBase):
     transaction_date: datetime
     created_at: datetime
     updated_at: datetime
-    
+
+    # Student information
+    student_first_name: Optional[str] = None
+    student_last_name: Optional[str] = None
+    student_full_name: Optional[str] = None
+
     transaction_items: List[FeeTransactionItemRead] = []
-    
+
     model_config = {"from_attributes": True}
 
 class FeeTransactionSummary(BaseModel):
@@ -118,12 +123,15 @@ class FeeTransactionSummary(BaseModel):
     transaction_number: str
     student_id: UUID
     student_admission_num: str
+    student_first_name: Optional[str] = None
+    student_last_name: Optional[str] = None
+    student_full_name: Optional[str] = None
     total_amount: Decimal
     payment_method: str
     status: str
     transaction_date: datetime
     receipt_generated: bool
-    
+
     model_config = {"from_attributes": True}
 
 # Outstanding Fee Calculation Schemas

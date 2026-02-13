@@ -140,12 +140,14 @@ async def get_fee_category_by_id(db: AsyncSession, fee_category_id: UUID):
             detail="An error occurred while retrieving fee category"
         )
 
-async def get_all_fee_categories(db: AsyncSession):
-    """Get all fee categories with academic year titles"""
+async def get_all_fee_categories(db: AsyncSession, limit: int = 50, offset: int = 0):
+    """Get all fee categories with academic year titles and pagination"""
     try:
         result = await db.execute(
             select(FeeCategoryModel)
             .options(selectinload(FeeCategoryModel.academic_year))
+            .limit(limit)
+            .offset(offset)
         )
         fee_categories = result.scalars().all()
         

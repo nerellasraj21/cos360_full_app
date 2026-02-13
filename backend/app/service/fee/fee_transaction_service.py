@@ -14,6 +14,7 @@ from app.models.fee.fee_type_model import FeeType
 from app.models.fee.fee_term_model import FeeTerm
 from app.models.masters.academic_year_model import AcademicYear
 from app.models.masters.admission_model import Admission
+from app.models.student.student_model import Student
 from app.schemas.fee import (
     FeeTransactionCreate, FeeTransactionUpdate, FeeTransactionRead,
     OutstandingFeeSummary, OutstandingFeeItem,
@@ -65,25 +66,25 @@ class FeeTransactionService:
     
     @staticmethod
     async def validate_student_exists(
-        db: AsyncSession, 
-        student_id: UUID, 
-        admission_num: str, 
+        db: AsyncSession,
+        student_id: UUID,
+        admission_num: str,
         academic_year_id: UUID,
         request: Optional[Request] = None
     ):
         """
         Validate student and admission details with comprehensive error handling
-        
+
         Args:
             db: Database session
             student_id: Student UUID
-            admission_num: Admission number
-            academic_year_id: Academic year UUID
+            admission_num: Admission number (globally unique)
+            academic_year_id: Academic year UUID (for fee structure validation)
             request: FastAPI request object for context
-            
+
         Returns:
             Admission record if found
-            
+
         Raises:
             HTTPException: For validation or not found errors
         """
@@ -95,43 +96,62 @@ class FeeTransactionService:
                     field="student_id",
                     request=request
                 )
-            
+
             if not admission_num or not admission_num.strip():
                 raise create_validation_error(
                     message="Admission number is required",
                     field="admission_num",
                     request=request
                 )
-            
+
             if not academic_year_id:
                 raise create_validation_error(
                     message="Academic year ID is required",
                     field="academic_year_id",
                     request=request
                 )
-            
-            # Query for admission record
+
+            # Query for admission record by admission number (globally unique)
+            # and verify it belongs to the specified student
             result = await db.execute(
                 select(Admission).where(
                     and_(
                         Admission.student_id == student_id,
-                        Admission.admission_number == admission_num.strip(),
-                        Admission.academic_year_id == academic_year_id
+                        Admission.admission_number == admission_num.strip()
                     )
                 )
             )
             admission = result.scalar_one_or_none()
-            
+
             if not admission:
                 raise create_not_found_error(
-                    message=f"Student with ID {student_id} and admission number {admission_num} not found for academic year {academic_year_id}",
+                    message=f"Student with ID {student_id} and admission number {admission_num} not found",
                     resource_type="student_admission",
-                    resource_id=f"{student_id}:{admission_num}:{academic_year_id}",
+                    resource_id=f"{student_id}:{admission_num}",
                     request=request
                 )
-            
+
+            # Verify student has fee mappings for the requested academic year
+            fee_mapping_result = await db.execute(
+                select(FeeStudentMapping).where(
+                    and_(
+                        FeeStudentMapping.student_id == student_id,
+                        FeeStudentMapping.academic_year_id == academic_year_id
+                    )
+                ).limit(1)
+            )
+            has_fee_mapping = fee_mapping_result.scalar_one_or_none()
+
+            if not has_fee_mapping:
+                raise create_not_found_error(
+                    message=f"Student has no fee structure configured for academic year {academic_year_id}",
+                    resource_type="fee_student_mapping",
+                    resource_id=f"{student_id}:{academic_year_id}",
+                    request=request
+                )
+
             return admission
-            
+
         except HTTPException:
             raise
         except Exception as e:
@@ -204,20 +224,20 @@ class FeeTransactionService:
                     
                     # Extract and validate required fields
                     fee_type_id = item.get('fee_type_id')
-                    fee_term_id = item.get('fee_term_id')
+                    term_date_id = item.get('term_date_id')
                     amount_paid = item.get('amount_paid')
-                    
+
                     if not fee_type_id:
                         raise create_validation_error(
                             message=f"Fee type ID is required for item {i+1}",
                             field=f"fee_items[{i}].fee_type_id",
                             request=request
                         )
-                    
-                    if not fee_term_id:
+
+                    if not term_date_id:
                         raise create_validation_error(
-                            message=f"Fee term ID is required for item {i+1}",
-                            field=f"fee_items[{i}].fee_term_id",
+                            message=f"Term date ID is required for item {i+1}",
+                            field=f"fee_items[{i}].term_date_id",
                             request=request
                         )
                     
@@ -252,36 +272,36 @@ class FeeTransactionService:
                         )
                     
                     # Get term amount
-                    term_amount = next((ta for ta in fee_mapping.term_amounts if ta.term_id == fee_term_id), None)
+                    term_amount = next((ta for ta in fee_mapping.term_amounts if ta.term_date_id == term_date_id), None)
                     if not term_amount:
                         raise create_not_found_error(
-                            message=f"Term amount not found for fee term {fee_term_id}",
+                            message=f"Term amount not found for term date {term_date_id}",
                             resource_type="fee_term_amount",
-                            resource_id=f"{fee_type_id}:{fee_term_id}",
+                            resource_id=f"{fee_type_id}:{term_date_id}",
                             request=request
                         )
-                    
+
                     # Calculate outstanding amount (amount_due - already_paid)
                     already_paid = await FeeTransactionService.get_student_payments_for_fee_term(
-                        db, student_id, fee_type_id, fee_term_id, academic_year_id, request
+                        db, student_id, fee_type_id, term_date_id, academic_year_id, request
                     )
                     outstanding = term_amount.term_amount - already_paid
                     
                     if amount_paid > outstanding:
                         raise create_business_rule_error(
-                            message=f"Payment amount {amount_paid} exceeds outstanding amount {outstanding} for fee term",
+                            message=f"Payment amount {amount_paid} exceeds outstanding amount {outstanding} for fee term date",
                             rule="payment_amount_exceeds_outstanding",
                             details={
                                 "amount_paid": float(amount_paid),
                                 "outstanding_amount": float(outstanding),
-                                "fee_term_id": str(fee_term_id)
+                                "term_date_id": str(term_date_id)
                             },
                             request=request
                         )
-                    
+
                     validated_items.append({
                         'fee_type_id': fee_type_id,
-                        'fee_term_id': fee_term_id,
+                        'term_date_id': term_date_id,
                         'amount_due': term_amount.term_amount,
                         'amount_paid': amount_paid,
                         'description': item.get('description')
@@ -313,27 +333,27 @@ class FeeTransactionService:
     
     @staticmethod
     async def get_student_payments_for_fee_term(
-        db: AsyncSession, 
-        student_id: UUID, 
-        fee_type_id: UUID, 
-        fee_term_id: UUID, 
+        db: AsyncSession,
+        student_id: UUID,
+        fee_type_id: UUID,
+        term_date_id: UUID,
         academic_year_id: UUID,
         request: Optional[Request] = None
     ) -> Decimal:
         """
-        Get total payments made by student for specific fee term with error handling
-        
+        Get total payments made by student for specific term date with error handling
+
         Args:
             db: Database session
             student_id: Student UUID
             fee_type_id: Fee type UUID
-            fee_term_id: Fee term UUID
+            term_date_id: Term date UUID
             academic_year_id: Academic year UUID
             request: FastAPI request object for context
-            
+
         Returns:
-            Decimal: Total amount paid for the fee term
-            
+            Decimal: Total amount paid for the term date
+
         Raises:
             HTTPException: For validation or system errors
         """
@@ -345,28 +365,28 @@ class FeeTransactionService:
                     field="student_id",
                     request=request
                 )
-            
+
             if not fee_type_id:
                 raise create_validation_error(
                     message="Fee type ID is required",
                     field="fee_type_id",
                     request=request
                 )
-            
-            if not fee_term_id:
+
+            if not term_date_id:
                 raise create_validation_error(
-                    message="Fee term ID is required",
-                    field="fee_term_id",
+                    message="Term date ID is required",
+                    field="term_date_id",
                     request=request
                 )
-            
+
             if not academic_year_id:
                 raise create_validation_error(
                     message="Academic year ID is required",
                     field="academic_year_id",
                     request=request
                 )
-            
+
             result = await db.execute(
                 select(func.sum(FeeTransactionItem.amount_paid))
                 .select_from(
@@ -381,7 +401,7 @@ class FeeTransactionService:
                         FeeTransaction.academic_year_id == academic_year_id,
                         FeeTransaction.status == 'completed',
                         FeeTransactionItem.fee_type_id == fee_type_id,
-                        FeeTransactionItem.fee_term_id == fee_term_id
+                        FeeTransactionItem.term_date_id == term_date_id
                     )
                 )
             )
@@ -551,7 +571,7 @@ class FeeTransactionService:
                 db_item = FeeTransactionItem(
                     fee_transaction_id=db_transaction.id,
                     fee_type_id=item_data['fee_type_id'],
-                    fee_term_id=item_data['fee_term_id'],
+                    term_date_id=item_data['term_date_id'],
                     amount_due=item_data['amount_due'],
                     amount_paid=item_data['amount_paid'],
                     description=item_data.get('description')
@@ -563,13 +583,22 @@ class FeeTransactionService:
             # Load with all relationships before commit (proper refresh pattern)
             result = await db.execute(
                 select(FeeTransaction)
-                .options(selectinload(FeeTransaction.transaction_items))
+                .options(
+                    selectinload(FeeTransaction.transaction_items),
+                    selectinload(FeeTransaction.student)
+                )
                 .where(FeeTransaction.id == db_transaction.id)
             )
             db_transaction = result.scalar_one()
-            
+
             await db.commit()
-            
+
+            # Populate student name fields
+            if db_transaction.student:
+                db_transaction.student_first_name = db_transaction.student.first_name
+                db_transaction.student_last_name = db_transaction.student.last_name
+                db_transaction.student_full_name = f"{db_transaction.student.first_name} {db_transaction.student.last_name}"
+
             log.info(f"Successfully created fee transaction: {transaction_number} for student {transaction_data.student_id}")
             return db_transaction
             
@@ -634,11 +663,14 @@ class FeeTransactionService:
             
             result = await db.execute(
                 select(FeeTransaction)
-                .options(selectinload(FeeTransaction.transaction_items))
+                .options(
+                    selectinload(FeeTransaction.transaction_items),
+                    selectinload(FeeTransaction.student)
+                )
                 .where(FeeTransaction.id == transaction_id)
             )
             transaction = result.scalar_one_or_none()
-            
+
             if not transaction:
                 raise create_not_found_error(
                     message="Transaction not found",
@@ -646,7 +678,13 @@ class FeeTransactionService:
                     resource_id=str(transaction_id),
                     request=request
                 )
-            
+
+            # Populate student name fields
+            if transaction.student:
+                transaction.student_first_name = transaction.student.first_name
+                transaction.student_last_name = transaction.student.last_name
+                transaction.student_full_name = f"{transaction.student.first_name} {transaction.student.last_name}"
+
             return transaction
             
         except HTTPException:
@@ -859,9 +897,10 @@ class FeeTransactionService:
         """Search transactions with filters"""
         try:
             query = select(FeeTransaction).options(
-                selectinload(FeeTransaction.transaction_items)
+                selectinload(FeeTransaction.transaction_items),
+                selectinload(FeeTransaction.student)
             )
-            
+
             conditions = []
             if student_id:
                 conditions.append(FeeTransaction.student_id == student_id)
@@ -875,16 +914,23 @@ class FeeTransactionService:
                 conditions.append(FeeTransaction.transaction_date >= date_from)
             if date_to:
                 conditions.append(FeeTransaction.transaction_date <= date_to)
-            
+
             if conditions:
                 query = query.where(and_(*conditions))
-            
+
             query = query.order_by(desc(FeeTransaction.transaction_date))
             query = query.offset(offset).limit(limit)
-            
+
             result = await db.execute(query)
             transactions = result.scalars().all()
-            
+
+            # Populate student name fields for each transaction
+            for transaction in transactions:
+                if transaction.student:
+                    transaction.student_first_name = transaction.student.first_name
+                    transaction.student_last_name = transaction.student.last_name
+                    transaction.student_full_name = f"{transaction.student.first_name} {transaction.student.last_name}"
+
             return transactions
 
         except Exception as e:
@@ -949,7 +995,8 @@ class FeeTransactionService:
                 .options(
                     selectinload(FeeTransaction.transaction_items),
                     selectinload(FeeTransaction.academic_year),
-                    selectinload(FeeTransaction.fee_receipts)
+                    selectinload(FeeTransaction.fee_receipts),
+                    selectinload(FeeTransaction.student)
                 )
                 .where(FeeTransaction.student_id == student_id)
                 .offset(skip)
@@ -959,6 +1006,13 @@ class FeeTransactionService:
 
             result = await db.execute(query)
             transactions = result.scalars().all()
+
+            # Populate student name fields for each transaction
+            for transaction in transactions:
+                if transaction.student:
+                    transaction.student_first_name = transaction.student.first_name
+                    transaction.student_last_name = transaction.student.last_name
+                    transaction.student_full_name = f"{transaction.student.first_name} {transaction.student.last_name}"
 
             has_next = (skip + limit) < total_count
 
@@ -1033,7 +1087,8 @@ class FeeTransactionService:
             base_stmt = select(FeeTransaction).options(
                 selectinload(FeeTransaction.transaction_items),
                 selectinload(FeeTransaction.academic_year),
-                selectinload(FeeTransaction.fee_receipts)
+                selectinload(FeeTransaction.fee_receipts),
+                selectinload(FeeTransaction.student)
             )
 
             # Apply filters
@@ -1055,6 +1110,13 @@ class FeeTransactionService:
 
             result = await db.execute(stmt)
             transactions = result.scalars().all()
+
+            # Populate student name fields for each transaction
+            for transaction in transactions:
+                if transaction.student:
+                    transaction.student_first_name = transaction.student.first_name
+                    transaction.student_last_name = transaction.student.last_name
+                    transaction.student_full_name = f"{transaction.student.first_name} {transaction.student.last_name}"
 
             has_next = (skip + limit) < total_count
 
@@ -1115,9 +1177,23 @@ class FeeTransactionService:
                     )
             # "all" access scope - no additional validation needed
 
+            # Get student's current academic year from their admission
+            admission_result = await db.execute(
+                select(Admission.academic_year_id).where(
+                    Admission.student_id == student_id
+                ).order_by(Admission.created_at.desc()).limit(1)
+            )
+            academic_year_id = admission_result.scalar_one_or_none()
+
+            if not academic_year_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="No admission record found for student"
+                )
+
             # Use existing calculate_outstanding_fees method
             outstanding_fees = await FeeTransactionService.calculate_outstanding_fees(
-                db, student_id
+                db, student_id, academic_year_id
             )
 
             log.info(f"User {user_context.username} accessed outstanding fees for student {student_id} (scope: {user_context.access_scope})")
