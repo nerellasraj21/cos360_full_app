@@ -1,13 +1,13 @@
-from fastapi import HTTPException, status, APIRouter, Depends, Request
+from fastapi import HTTPException, status, APIRouter, Depends, Request, Query
 from app.schemas.fee.fee_term_schema import FeeTermCreate, FeeTermRead, FeeTermUpdate, FeeTermDropdown
 from app.schemas.fee.fee_term_dates_schema import FeeTermDatesRead
 from app.db.tenant_session import get_tenant_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.service.fee.fee_term_service import (
-    create_fee_term_with_dates, 
-    get_fee_term_with_dates, 
-    get_all_fee_terms, 
-    update_fee_term_with_dates, 
+    create_fee_term_with_dates,
+    get_fee_term_with_dates,
+    get_all_fee_terms,
+    update_fee_term_with_dates,
     delete_fee_term_with_dates,
     delete_fee_term_date,
     get_fee_terms_dropdown,
@@ -16,8 +16,14 @@ from app.service.fee.fee_term_service import (
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from typing import List
 from uuid import UUID
+from datetime import datetime
 
 router = APIRouter(prefix="/fee/terms", tags=["Fee/Fee Terms & Dates"])
+
+@router.get("/health", status_code=status.HTTP_200_OK)
+async def term_health_check():
+    """Health check for fee term endpoints"""
+    return {"status": "healthy", "module": "fee_terms", "timestamp": datetime.now()}
 
 # Create Fee Term with Dates
 @router.post("/", response_model=FeeTermRead, status_code=status.HTTP_201_CREATED)
@@ -37,18 +43,20 @@ async def create_fee_term(request: Request,
 
 # Get All Fee Terms
 @router.get("/", response_model=List[FeeTermRead])
-async def get_all_fee_terms_endpoint(request: Request, 
+async def get_all_fee_terms_endpoint(request: Request,
 
+    limit: int = Query(50, ge=1, le=500, description="Number of records to return (1-500)"),
+    offset: int = Query(0, ge=0, description="Number of records to skip"),
     db: AsyncSession = Depends(get_tenant_db)
 ):
-    """Get all fee terms with their associated dates"""
+    """Get all fee terms with their associated dates and pagination"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'fee_terms', 'list')
-    
-    return await get_all_fee_terms(db)
+
+    return await get_all_fee_terms(db, limit, offset)
 
 # Get Fee Terms Dropdown
 @router.get("/dropdown", response_model=List[FeeTermDropdown])

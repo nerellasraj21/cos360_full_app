@@ -9,6 +9,7 @@ from app.db.tenant_session import get_tenant_db
 from app.tools.simple_permissions import get_current_user_token, check_role_plan_permission_with_error
 from app.service.fee.fee_receipt_service import FeeReceiptService
 from app.schemas.fee import FeeReceiptRead, ReceiptContent
+from app.utils.validation_helpers import validate_date_range
 
 router = APIRouter(prefix="/fee/receipts", tags=["Fee/Fee Receipts"])
 
@@ -176,21 +177,24 @@ async def search_fee_receipts(
     receipt_number: Optional[str] = Query(None, description="Search by receipt number"),
     date_from: Optional[datetime] = Query(None, description="Filter from date"),
     date_to: Optional[datetime] = Query(None, description="Filter to date"),
-    limit: int = Query(50, description="Number of records to return"),
-    offset: int = Query(0, description="Number of records to skip")
+    limit: int = Query(50, ge=1, le=500, description="Number of records to return (1-500)"),
+    offset: int = Query(0, ge=0, description="Number of records to skip")
 ):
     """
-    Search receipts with filters
-    
+    Search receipts with validated filters
+
     **Required permissions**: fee_receipts:list
     """
     # Authentication and authorization
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Permission check
     await check_role_plan_permission_with_error(db, request, role, 'fee_receipts', 'list')
-    
+
+    # Validate date range
+    validate_date_range(date_from, date_to)
+
     return await FeeReceiptService.search_receipts(
         db=db,
         student_id=student_id,

@@ -20,6 +20,7 @@ class FeeTransactionItem(BaseOrg):
     # Fee structure linkage
     fee_type_id = Column(UUID(as_uuid=True), nullable=False, index=True)  # Links to fee_types
     fee_term_id = Column(UUID(as_uuid=True), nullable=False, index=True)  # Links to fee_terms
+    term_date_id = Column(UUID(as_uuid=True), ForeignKey("fee_term_dates.id"), nullable=False, index=True)  # Links to fee_term_dates
     
     # Amount details
     amount_due = Column(Numeric(10, 2), nullable=False)  # Original amount due for this fee type/term
@@ -34,6 +35,7 @@ class FeeTransactionItem(BaseOrg):
     
     # Relationships
     fee_transaction = relationship("FeeTransaction", back_populates="transaction_items")
+    fee_term_date = relationship("FeeTermDates", back_populates="fee_transaction_items")
     
     # Database indexes
     __table_args__ = (

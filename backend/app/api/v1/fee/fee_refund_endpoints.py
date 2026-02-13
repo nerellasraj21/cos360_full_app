@@ -9,8 +9,10 @@ from app.db.tenant_session import get_tenant_db
 from app.tools.simple_permissions import get_current_user_token, check_role_plan_permission_with_error
 from app.service.fee.fee_refund_service import FeeRefundService
 from app.schemas.fee import (
-    FeeRefundCreate, FeeRefundRead, FeeRefundApproval, FeeRefundProcessing
+    FeeRefundCreate, FeeRefundRead, FeeRefundApproval, FeeRefundProcessing,
+    RefundStatus, RefundReason
 )
+from app.utils.validation_helpers import validate_date_range
 
 router = APIRouter(prefix="/fee/refunds", tags=["Fee/Fee Refunds"])
 
@@ -171,31 +173,34 @@ async def search_refunds(
     db: AsyncSession = Depends(get_tenant_db),
     student_id: Optional[UUID] = Query(None, description="Filter by student ID"),
     academic_year_id: Optional[UUID] = Query(None, description="Filter by academic year"),
-    status: Optional[str] = Query(None, description="Filter by refund status"),
-    refund_reason: Optional[str] = Query(None, description="Filter by refund reason"),
+    status: Optional[RefundStatus] = Query(None, description="Filter by refund status"),
+    refund_reason: Optional[RefundReason] = Query(None, description="Filter by refund reason"),
     date_from: Optional[datetime] = Query(None, description="Filter from date"),
     date_to: Optional[datetime] = Query(None, description="Filter to date"),
-    limit: int = Query(100, description="Number of records to return"),
-    offset: int = Query(0, description="Number of records to skip")
+    limit: int = Query(50, ge=1, le=500, description="Number of records to return (1-500)"),
+    offset: int = Query(0, ge=0, description="Number of records to skip")
 ):
     """
-    Search refunds with filters
-    
+    Search refunds with validated filters
+
     **Required permissions**: fee_refunds:list
     """
     # Authentication and authorization
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Permission check
     await check_role_plan_permission_with_error(db, request, role, 'fee_refunds', 'list')
-    
+
+    # Validate date range
+    validate_date_range(date_from, date_to)
+
     return await FeeRefundService.search_refunds(
         db=db,
         student_id=student_id,
         academic_year_id=academic_year_id,
-        status=status,
-        refund_reason=refund_reason,
+        status=status.value if status else None,
+        refund_reason=refund_reason.value if refund_reason else None,
         date_from=date_from,
         date_to=date_to,
         limit=limit,

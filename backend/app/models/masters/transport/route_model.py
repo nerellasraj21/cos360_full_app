@@ -12,8 +12,8 @@ class Route(BaseOrg):
     starting_stop = Column(String, nullable=False)
     ending_stop = Column(String, nullable=False)
     number_of_stops = Column(Integer)
-    route_type = Column(String)  # upward/downward
-    trip_type = Column(String)   # first trip/second trip
+    route_type = Column(String)  # String field - no foreign key
+    trip_type = Column(String)   # String field - no foreign key
     start_time = Column(Time)
     end_time = Column(Time)
     is_active = Column(Boolean, default=True)

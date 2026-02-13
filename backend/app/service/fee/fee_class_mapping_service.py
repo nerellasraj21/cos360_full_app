@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 from app.models.fee.fee_class_mapping_model import FeeClassMapping as FeeClassMappingModel
+from app.models.fee.fee_class_map_term_amount_model import FeeClassMappingTermAmount
 from app.models.fee.fee_type_model import FeeType
 from app.models.masters.class_model import Class
 from app.models.masters.academic_year_model import AcademicYear
@@ -118,7 +119,7 @@ async def create_fee_class_mapping(db: AsyncSession, mapping_data: FeeClassMappi
                 selectinload(FeeClassMappingModel.class_ref),
                 selectinload(FeeClassMappingModel.fee_type),
                 selectinload(FeeClassMappingModel.academic_year),
-                selectinload(FeeClassMappingModel.term_amounts)
+                selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingTermAmount.fee_term)
             )
             .where(FeeClassMappingModel.id == db_mapping.id)
         )
@@ -177,12 +178,12 @@ async def get_fee_class_mapping_by_id(db: AsyncSession, mapping_id: UUID):
                 selectinload(FeeClassMappingModel.class_ref),
                 selectinload(FeeClassMappingModel.fee_type),
                 selectinload(FeeClassMappingModel.academic_year),
-                selectinload(FeeClassMappingModel.term_amounts)
+                selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingTermAmount.fee_term)
             )
             .where(FeeClassMappingModel.id == mapping_id)
         )
         mapping = result.scalar_one_or_none()
-        
+
         if not mapping:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -217,24 +218,26 @@ async def get_fee_class_mapping_by_id(db: AsyncSession, mapping_id: UUID):
         )
 
 async def get_all_fee_class_mappings(
-    db: AsyncSession, 
+    db: AsyncSession,
     class_id: Optional[int] = None,
     fee_type_id: Optional[str] = None,
-    all_by_default: Optional[bool] = None
+    all_by_default: Optional[bool] = None,
+    limit: int = 50,
+    offset: int = 0
 ):
-    """Get all fee class mappings with optional filters"""
+    """Get all fee class mappings with optional filters and pagination"""
     try:
         query = select(FeeClassMappingModel).options(
             selectinload(FeeClassMappingModel.class_ref),
             selectinload(FeeClassMappingModel.fee_type),
             selectinload(FeeClassMappingModel.academic_year),
-            selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingModel.term_amounts.property.mapper.class_.fee_term)
+            selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingTermAmount.fee_term)
         )
-        
+
         # Apply filters
         if class_id is not None:
             query = query.where(FeeClassMappingModel.class_id == class_id)
-        
+
         if fee_type_id is not None:
             try:
                 fee_type_uuid = UUID(fee_type_id)
@@ -244,10 +247,13 @@ async def get_all_fee_class_mappings(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid fee type ID format"
                 )
-        
+
         if all_by_default is not None:
             query = query.where(FeeClassMappingModel.all_by_default == all_by_default)
-        
+
+        # Apply pagination
+        query = query.limit(limit).offset(offset)
+
         result = await db.execute(query)
         mappings = result.scalars().all()
         
@@ -345,7 +351,7 @@ async def update_fee_class_mapping(db: AsyncSession, mapping_id: UUID, mapping_d
                 selectinload(FeeClassMappingModel.class_ref),
                 selectinload(FeeClassMappingModel.fee_type),
                 selectinload(FeeClassMappingModel.academic_year),
-                selectinload(FeeClassMappingModel.term_amounts)
+                selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingTermAmount.fee_term)
             )
             .where(FeeClassMappingModel.id == db_mapping.id)
         )
@@ -468,7 +474,7 @@ async def create_bulk_fee_class_mappings(db: AsyncSession, bulk_data: FeeClassMa
                         selectinload(FeeClassMappingModel.class_ref),
                         selectinload(FeeClassMappingModel.fee_type),
                         selectinload(FeeClassMappingModel.academic_year),
-                        selectinload(FeeClassMappingModel.term_amounts)
+                        selectinload(FeeClassMappingModel.term_amounts).selectinload(FeeClassMappingTermAmount.fee_term)
                     )
                     .where(FeeClassMappingModel.id == db_mapping.id)
                 )

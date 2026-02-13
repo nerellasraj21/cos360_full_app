@@ -105,11 +105,13 @@ async def get_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
             detail=f"An error occurred while retrieving fee term: {str(e)}"
         )
 
-async def get_all_fee_terms(db: AsyncSession):
+async def get_all_fee_terms(db: AsyncSession, limit: int = 50, offset: int = 0):
     try:
         result = await db.execute(
             select(FeeTermModel)
             .options(selectinload(FeeTermModel.fee_term_dates))
+            .limit(limit)
+            .offset(offset)
         )
         return result.scalars().all()
     except Exception as e:

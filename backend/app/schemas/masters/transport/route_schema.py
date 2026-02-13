@@ -8,8 +8,8 @@ class RouteBase(BaseModel):
     starting_stop: str
     ending_stop: str
     number_of_stops: int
-    route_type: str
-    trip_type: str
+    route_type: Optional[str] = None  # String field - dropdown value
+    trip_type: Optional[str] = None   # String field - dropdown value
     start_time: time
     end_time: time
     is_active: bool = True

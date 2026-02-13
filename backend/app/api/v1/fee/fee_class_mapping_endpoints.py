@@ -20,8 +20,14 @@ from app.service.fee.fee_class_mapping_service import (
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from typing import List, Optional
 from uuid import UUID
+from datetime import datetime
 
 router = APIRouter(prefix="/fee/class-mappings", tags=["Fee/Fee Class Mappings"])
+
+@router.get("/health", status_code=status.HTTP_200_OK)
+async def class_mapping_health_check():
+    """Health check for fee class mapping endpoints"""
+    return {"status": "healthy", "module": "fee_class_mappings", "timestamp": datetime.now()}
 
 # Create Fee Class Mapping
 @router.post("/", response_model=FeeClassMappingRead, status_code=status.HTTP_201_CREATED)
@@ -41,21 +47,23 @@ async def create_fee_class_mapping_endpoint(request: Request,
 
 # Get All Fee Class Mappings with filters
 @router.get("/", response_model=List[FeeClassMappingList])
-async def get_all_fee_class_mappings_endpoint(request: Request, 
+async def get_all_fee_class_mappings_endpoint(request: Request,
 
     class_id: Optional[UUID] = Query(None, description="Filter by class ID"),
     fee_type_id: Optional[UUID] = Query(None, description="Filter by fee type ID"),
     all_by_default: Optional[bool] = Query(None, description="Filter by all_by_default flag"),
+    limit: int = Query(50, ge=1, le=500, description="Number of records to return (1-500)"),
+    offset: int = Query(0, ge=0, description="Number of records to skip"),
     db: AsyncSession = Depends(get_tenant_db)
 ):
-    """Get all fee class mappings with optional filters"""
+    """Get all fee class mappings with optional filters and pagination"""
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, 'fee_class_mappings', 'list')
-    
-    return await get_all_fee_class_mappings(db, class_id, fee_type_id, all_by_default)
+
+    return await get_all_fee_class_mappings(db, class_id, fee_type_id, all_by_default, limit, offset)
 
 # Get Single Fee Class Mapping
 @router.get("/{mapping_id}", response_model=FeeClassMappingRead)

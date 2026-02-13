@@ -5,7 +5,7 @@
     "framework": "FastAPI",
     "database": "PostgreSQL with Multi-tenant Architecture",
     "version": "Phase 1 Complete + Expense Module V1 + Frontend Permission Integration",
-    "last_updated": "2025-09-19",
+    "last_updated": "2026-02-06",
     "migration_revision": "Current - UUID migration completed"
   },
   "critical_instructions": {
@@ -156,7 +156,8 @@
       "fee_student_mappings": "/api/v1/fee/student-mappings/",
       "student_management": "/api/v1/student/",
       "masters_data": "/api/v1/masters/",
-      "expense_management": "/api/v1/expense/"
+      "expense_management": "/api/v1/expense/",
+      "fee_reports": "/api/v1/reports/fees/"
     }
   },
   "recent_testing_validation": {
@@ -229,7 +230,11 @@
   "required_headers": {
     "tenant_detection": {
       "header": "cschema",
-      "values": ["cos360_main", "test_tenant", "default"]
+      "values": [
+        "cos360_main",
+        "test_tenant",
+        "default"
+      ]
     },
     "super_admin_tenant_targeting": {
       "header": "X-SuperAdmin-Target-Tenant",
@@ -347,7 +352,13 @@
     },
     "resources": {
       "total_resources": 34,
-      "actions_per_resource": ["create", "read", "update", "delete", "list"],
+      "actions_per_resource": [
+        "create",
+        "read",
+        "update",
+        "delete",
+        "list"
+      ],
       "enterprise_plan_access": "All 34 resources available"
     },
     "bypass_rules": {
@@ -376,13 +387,22 @@
     "academic_year_management": {
       "status": "DONE",
       "endpoints": "/api/v1/masters/academic_years/",
-      "features": ["CRUD", "pagination", "dropdown", "soft_delete"],
+      "features": [
+        "CRUD",
+        "pagination",
+        "dropdown",
+        "soft_delete"
+      ],
       "test_data": "22 academic years in cos360_main"
     },
     "class_section_management": {
       "status": "DONE",
       "endpoints": "/api/v1/masters/classes/",
-      "features": ["CRUD", "section_management", "dropdown"],
+      "features": [
+        "CRUD",
+        "section_management",
+        "dropdown"
+      ],
       "test_data": "9 classes in cos360_main"
     },
     "fee_management": {
@@ -396,9 +416,17 @@
         "student_mappings",
         "transactions",
         "receipts",
-        "refunds"
+        "refunds",
+        "class_mapping_term_amounts",
+        "reports"
       ],
-      "test_data": "Available in test_tenant_schema"
+      "test_data": "Available in test_tenant_schema",
+      "reports_endpoints": "/api/v1/reports/fees/",
+      "documentation": {
+        "module_context": "context/modules/Fee_Management.md",
+        "handover_functional": "AI_GOVERNANCE/handovers/Fee_Management_Functional.md",
+        "handover_implementation": "AI_GOVERNANCE/handovers/Fee_Management_Implementation.md"
+      }
     },
     "expense_management": {
       "status": "COMPLETE",
@@ -497,7 +525,12 @@
     "student_management": {
       "status": "DONE",
       "endpoints": "/api/v1/students/",
-      "features": ["admissions", "documents", "certificates", "transport"],
+      "features": [
+        "admissions",
+        "documents",
+        "certificates",
+        "transport"
+      ],
       "test_data": "Production deployment successful with 6+ students created",
       "critical_fixes": {
         "session_context_issue": "RESOLVED - Fixed flush() before SELECT query for multi-tenant compatibility",
@@ -607,11 +640,32 @@
         "total_resources": 45,
         "full_crud_resources": 45,
         "sample_permissions": {
-          "fee_categories": ["create", "delete", "list", "read", "update"],
-          "student_admissions": ["create", "delete", "list", "read", "update"],
-          "academic_years": ["create", "delete", "list", "read", "update"]
+          "fee_categories": [
+            "create",
+            "delete",
+            "list",
+            "read",
+            "update"
+          ],
+          "student_admissions": [
+            "create",
+            "delete",
+            "list",
+            "read",
+            "update"
+          ],
+          "academic_years": [
+            "create",
+            "delete",
+            "list",
+            "read",
+            "update"
+          ]
         },
-        "special_actions": ["approve", "process"]
+        "special_actions": [
+          "approve",
+          "process"
+        ]
       },
       "api_response_structure": {
         "status": "SUCCESS",

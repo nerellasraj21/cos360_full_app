@@ -11,8 +11,11 @@ from app.tools.enhanced_permissions import check_user_resource_access
 from app.service.fee.fee_transaction_service import FeeTransactionService
 from app.schemas.fee import (
     FeeTransactionCreate, FeeTransactionUpdate, FeeTransactionRead, FeeTransactionSummary,
-    OutstandingFeeSummary, StudentTransactionHistory
+    OutstandingFeeSummary, StudentTransactionHistory,
+    TransactionStatus, PaymentMethod
 )
+from app.utils.validation_helpers import validate_date_range
+from app.middleware.rate_limit_middleware import rate_limit_create, rate_limit_api
 
 router = APIRouter(prefix="/fee/transactions", tags=["Fee/Fee Transactions"])
 
@@ -23,19 +26,20 @@ async def transaction_health_check():
     return {"status": "healthy", "module": "fee_transactions", "timestamp": datetime.now()}
 
 @router.post("/", response_model=FeeTransactionRead, status_code=status.HTTP_201_CREATED)
+@rate_limit_create("20 per minute")
 async def create_fee_transaction(
     transaction_data: FeeTransactionCreate,
     request: Request,
     db: AsyncSession = Depends(get_tenant_db)
 ):
     """
-    Create a new fee transaction
-    
+    Create a new fee transaction. Rate limited to 20 per minute.
+
     - **Records fee payment for student** (cash, UPI, cheque, bank transfer)
     - **Validates fee structure** and outstanding amounts
     - **Auto-generates transaction number** unique per tenant
     - **Supports multiple fee types** in single transaction
-    
+
     **Required permissions**: fee_transactions:create
     """
     # Authentication and authorization
@@ -100,36 +104,40 @@ async def update_fee_transaction_status(
     return await FeeTransactionService.update_transaction_status(db, transaction_id, update_data, updated_by_user_id)
 
 @router.get("/", response_model=List[FeeTransactionRead])
+@rate_limit_api("60 per minute")
 async def search_fee_transactions(
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
     student_id: Optional[UUID] = Query(None, description="Filter by student ID"),
     academic_year_id: Optional[UUID] = Query(None, description="Filter by academic year"),
-    payment_method: Optional[str] = Query(None, description="Filter by payment method"),
-    status: Optional[str] = Query(None, description="Filter by transaction status"),
+    payment_method: Optional[PaymentMethod] = Query(None, description="Filter by payment method"),
+    status: Optional[TransactionStatus] = Query(None, description="Filter by transaction status"),
     date_from: Optional[datetime] = Query(None, description="Filter from date"),
     date_to: Optional[datetime] = Query(None, description="Filter to date"),
-    limit: int = Query(100, description="Number of records to return"),
-    offset: int = Query(0, description="Number of records to skip")
+    limit: int = Query(50, ge=1, le=500, description="Number of records to return (1-500)"),
+    offset: int = Query(0, ge=0, description="Number of records to skip")
 ):
     """
-    Search fee transactions with filters
-    
+    Search fee transactions with validated filters. Rate limited to 60 per minute.
+
     **Required permissions**: fee_transactions:list
     """
     # Authentication and authorization
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
+
     # Permission check
     await check_role_plan_permission_with_error(db, request, role, 'fee_transactions', 'list')
-    
+
+    # Validate date range
+    validate_date_range(date_from, date_to)
+
     return await FeeTransactionService.search_transactions(
         db=db,
         student_id=student_id,
         academic_year_id=academic_year_id,
-        payment_method=payment_method,
-        transaction_status=status,
+        payment_method=payment_method.value if payment_method else None,
+        transaction_status=status.value if status else None,
         date_from=date_from,
         date_to=date_to,
         limit=limit,

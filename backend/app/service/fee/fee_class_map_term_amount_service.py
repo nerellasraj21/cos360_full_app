@@ -1,12 +1,13 @@
 from fastapi import HTTPException, status
 import logging as log
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 from app.models.fee.fee_class_map_term_amount_model import FeeClassMappingTermAmount as FeeClassMappingTermAmountModel
 from app.models.fee.fee_class_mapping_model import FeeClassMapping
 from app.models.fee.fee_term_model import FeeTerm
+from app.models.fee.fee_term_dates_model import FeeTermDates
 from app.schemas.fee.fee_class_map_term_amount_schema import (
     FeeClassMappingTermAmountBulkCreate,
     FeeClassMappingTermAmountBulkUpdate,
@@ -59,7 +60,7 @@ async def validate_term_exists(db: AsyncSession, term_id: UUID):
         )
 
 async def validate_term_count(db: AsyncSession, fee_class_mapping: FeeClassMapping, term_amounts: List):
-    """Validate that the number of term amounts matches the fee term's number_of_terms"""
+    """Validate that the number of term amounts matches the number of term dates"""
     # Get the fee term associated with the fee type
     fee_term = None
     if fee_class_mapping.fee_type:
@@ -67,18 +68,27 @@ async def validate_term_count(db: AsyncSession, fee_class_mapping: FeeClassMappi
             select(FeeTerm).where(FeeTerm.id == fee_class_mapping.fee_type.fee_term_id)
         )
         fee_term = result.scalar_one_or_none()
-    
+
     if not fee_term:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Associated fee term not found"
         )
-    
-    if len(term_amounts) != fee_term.number_of_terms:
+
+    # Get actual term dates count
+    result = await db.execute(
+        select(func.count(FeeTermDates.id))
+        .where(FeeTermDates.term_id == fee_term.id)
+    )
+    term_dates_count = result.scalar()
+
+    if len(term_amounts) != term_dates_count:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Number of term amounts ({len(term_amounts)}) must match number_of_terms ({fee_term.number_of_terms}) in the associated fee term"
+            detail=f"Number of term amounts ({len(term_amounts)}) must match number of term dates ({term_dates_count})"
         )
+
+    return fee_term
 
 def validate_total_amount_matches(fee_class_mapping: FeeClassMapping, term_amounts: List):
     """Validate that the sum of term amounts equals the total fee in the mapping"""
@@ -96,28 +106,56 @@ async def create_fee_class_mapping_term_amounts(db: AsyncSession, bulk_data: Fee
         fee_class_mapping = await validate_fee_class_mapping_exists(db, bulk_data.fee_class_mapping_id)
         
         # Validate term count matches
-        await validate_term_count(db, fee_class_mapping, bulk_data.term_amounts)
+        fee_term = await validate_term_count(db, fee_class_mapping, bulk_data.term_amounts)
         
         # Validate total amount matches
         validate_total_amount_matches(fee_class_mapping, bulk_data.term_amounts)
         
-        # Validate all terms exist and are unique
-        term_ids = []
+        # Validate all term_date_ids exist, belong to correct term, and are unique
+        term_date_ids = []
+        term_dates_map = {}  # Store term_date objects for reuse
         for term_amount_data in bulk_data.term_amounts:
-            await validate_term_exists(db, term_amount_data.term_id)
-            if term_amount_data.term_id in term_ids:
+            # Validate term_date exists and belongs to correct term
+            result = await db.execute(
+                select(FeeTermDates).where(
+                    and_(
+                        FeeTermDates.id == term_amount_data.term_date_id,
+                        FeeTermDates.term_id == fee_term.id
+                    )
+                )
+            )
+            term_date = result.scalar_one_or_none()
+            if not term_date:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Duplicate term_id {term_amount_data.term_id} in request"
+                    detail=f"Term date {term_amount_data.term_date_id} not found or doesn't belong to term {fee_term.term_name}"
                 )
-            term_ids.append(term_amount_data.term_id)
-        
+
+            # Store term_date object with term_id for later use
+            term_dates_map[term_amount_data.term_date_id] = term_date
+
+            # Check for duplicates in request
+            if term_amount_data.term_date_id in term_date_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Duplicate term_date_id {term_amount_data.term_date_id} in request"
+                )
+            term_date_ids.append(term_amount_data.term_date_id)
+
         # Create term amounts
+        # IMPORTANT: term_id is a required field derived from the FeeTermDates record.
+        # Even though term_id can be derived from term_date_id → fee_term_dates.term_id,
+        # it is stored directly in the model for query performance (denormalized).
+        # DO NOT omit term_id - it has a NOT NULL database constraint.
         created_amounts = []
         for term_amount_data in bulk_data.term_amounts:
+            # Get term_id from the stored term_date object
+            term_date = term_dates_map[term_amount_data.term_date_id]
+
             db_term_amount = FeeClassMappingTermAmountModel(
-                fee_class_mapping_id=UUID(bulk_data.fee_class_mapping_id),
-                term_id=UUID(term_amount_data.term_id),
+                fee_class_mapping_id=bulk_data.fee_class_mapping_id,
+                term_id=term_date.term_id,  # Required: NOT NULL constraint
+                term_date_id=term_amount_data.term_date_id,
                 term_amount=term_amount_data.term_amount
             )
             db.add(db_term_amount)
@@ -132,11 +170,19 @@ async def create_fee_class_mapping_term_amounts(db: AsyncSession, bulk_data: Fee
             # Load with relationships for response
             result = await db.execute(
                 select(FeeClassMappingTermAmountModel)
-                .options(selectinload(FeeClassMappingTermAmountModel.fee_term))
+                .options(
+                    selectinload(FeeClassMappingTermAmountModel.fee_term_date)
+                        .selectinload(FeeTermDates.fee_term)
+                )
                 .where(FeeClassMappingTermAmountModel.id == amount.id)
             )
             amount_with_relations = result.scalar_one()
-            amount_with_relations.term_name = amount_with_relations.fee_term.term_name if amount_with_relations.fee_term else None
+            if amount_with_relations.fee_term_date:
+                amount_with_relations.term_name = amount_with_relations.fee_term_date.fee_term.term_name if amount_with_relations.fee_term_date.fee_term else None
+                amount_with_relations.term_date = str(amount_with_relations.fee_term_date.fee_term_date) if amount_with_relations.fee_term_date.fee_term_date else None
+            else:
+                amount_with_relations.term_name = None
+                amount_with_relations.term_date = None
             result_amounts.append(amount_with_relations)
         
         return result_amounts
@@ -146,10 +192,10 @@ async def create_fee_class_mapping_term_amounts(db: AsyncSession, bulk_data: Fee
         raise
     except IntegrityError as e:
         await db.rollback()
-        if "uq_fee_class_mapping_term" in str(e):
+        if "uq_fee_class_mapping_term" in str(e) or "uq_fee_class_mapping_term_date" in str(e):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Term amount already exists for this fee class mapping and term combination"
+                detail="Term amount already exists for this fee class mapping and term date combination"
             )
         else:
             log.error(f"Integrity error creating fee class mapping term amounts: {str(e)}")
@@ -174,34 +220,64 @@ async def update_fee_class_mapping_term_amounts(db: AsyncSession, bulk_data: Fee
         # Get existing term amounts for this mapping
         result = await db.execute(
             select(FeeClassMappingTermAmountModel)
-            .where(FeeClassMappingTermAmountModel.fee_class_mapping_id == UUID(bulk_data.fee_class_mapping_id))
+            .where(FeeClassMappingTermAmountModel.fee_class_mapping_id == bulk_data.fee_class_mapping_id)
         )
         existing_amounts = result.scalars().all()
         existing_by_id = {str(amount.id): amount for amount in existing_amounts}
         
+        # Get fee_term for validation
+        fee_term = None
+        if fee_class_mapping.fee_type:
+            result = await db.execute(
+                select(FeeTerm).where(FeeTerm.id == fee_class_mapping.fee_type.fee_term_id)
+            )
+            fee_term = result.scalar_one_or_none()
+
+        if not fee_term:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Associated fee term not found"
+            )
+
         # Process updates
         updated_amounts = []
         for term_amount_data in bulk_data.term_amounts:
-            # Validate term exists
-            await validate_term_exists(db, term_amount_data.term_id)
-            
+            # Validate term_date exists and belongs to correct term
+            result = await db.execute(
+                select(FeeTermDates).where(
+                    and_(
+                        FeeTermDates.id == term_amount_data.term_date_id,
+                        FeeTermDates.term_id == fee_term.id
+                    )
+                )
+            )
+            term_date = result.scalar_one_or_none()
+            if not term_date:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Term date {term_amount_data.term_date_id} not found or doesn't belong to term {fee_term.term_name}"
+                )
+
             if term_amount_data.id:
                 # Update existing record
-                if term_amount_data.id not in existing_by_id:
+                term_amount_id_str = str(term_amount_data.id)
+                if term_amount_id_str not in existing_by_id:
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
                         detail=f"Term amount with id {term_amount_data.id} not found"
                     )
-                
-                existing_amount = existing_by_id[term_amount_data.id]
-                existing_amount.term_id = UUID(term_amount_data.term_id)
+
+                existing_amount = existing_by_id[term_amount_id_str]
+                existing_amount.term_id = term_date.term_id  # Update term_id (maintains consistency)
+                existing_amount.term_date_id = term_amount_data.term_date_id
                 existing_amount.term_amount = term_amount_data.term_amount
                 updated_amounts.append(existing_amount)
             else:
-                # Create new record
+                # Create new record during update operation
                 new_amount = FeeClassMappingTermAmountModel(
-                    fee_class_mapping_id=UUID(bulk_data.fee_class_mapping_id),
-                    term_id=UUID(term_amount_data.term_id),
+                    fee_class_mapping_id=bulk_data.fee_class_mapping_id,
+                    term_id=term_date.term_id,  # Required: NOT NULL constraint
+                    term_date_id=term_amount_data.term_date_id,
                     term_amount=term_amount_data.term_amount
                 )
                 db.add(new_amount)
@@ -228,11 +304,19 @@ async def update_fee_class_mapping_term_amounts(db: AsyncSession, bulk_data: Fee
             # Load with relationships for response
             result = await db.execute(
                 select(FeeClassMappingTermAmountModel)
-                .options(selectinload(FeeClassMappingTermAmountModel.fee_term))
+                .options(
+                    selectinload(FeeClassMappingTermAmountModel.fee_term_date)
+                        .selectinload(FeeTermDates.fee_term)
+                )
                 .where(FeeClassMappingTermAmountModel.id == amount.id)
             )
             amount_with_relations = result.scalar_one()
-            amount_with_relations.term_name = amount_with_relations.fee_term.term_name if amount_with_relations.fee_term else None
+            if amount_with_relations.fee_term_date:
+                amount_with_relations.term_name = amount_with_relations.fee_term_date.fee_term.term_name if amount_with_relations.fee_term_date.fee_term else None
+                amount_with_relations.term_date = str(amount_with_relations.fee_term_date.fee_term_date) if amount_with_relations.fee_term_date.fee_term_date else None
+            else:
+                amount_with_relations.term_name = None
+                amount_with_relations.term_date = None
             result_amounts.append(amount_with_relations)
         
         return result_amounts
@@ -242,10 +326,10 @@ async def update_fee_class_mapping_term_amounts(db: AsyncSession, bulk_data: Fee
         raise
     except IntegrityError as e:
         await db.rollback()
-        if "uq_fee_class_mapping_term" in str(e):
+        if "uq_fee_class_mapping_term" in str(e) or "uq_fee_class_mapping_term_date" in str(e):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Term amount already exists for this fee class mapping and term combination"
+                detail="Term amount already exists for this fee class mapping and term date combination"
             )
         else:
             log.error(f"Integrity error updating fee class mapping term amounts: {str(e)}")
@@ -266,13 +350,7 @@ async def delete_fee_class_mapping_term_amounts(db: AsyncSession, bulk_data: Fee
     try:
         deleted_count = 0
         for term_amount_id in bulk_data.term_amount_ids:
-            try:
-                term_amount_uuid = UUID(term_amount_id)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid term amount ID format: {term_amount_id}"
-                )
+            term_amount_uuid = term_amount_id
             
             result = await db.execute(
                 select(FeeClassMappingTermAmountModel)
@@ -296,4 +374,101 @@ async def delete_fee_class_mapping_term_amounts(db: AsyncSession, bulk_data: Fee
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while deleting fee class mapping term amounts"
+        )
+
+async def get_term_amount_by_id(db: AsyncSession, term_amount_id: UUID):
+    """Get single term amount by ID with relationships"""
+    try:
+        result = await db.execute(
+            select(FeeClassMappingTermAmountModel)
+            .options(
+                selectinload(FeeClassMappingTermAmountModel.fee_term),
+                selectinload(FeeClassMappingTermAmountModel.fee_class_mapping)
+            )
+            .where(FeeClassMappingTermAmountModel.id == term_amount_id)
+        )
+        term_amount = result.scalar_one_or_none()
+
+        if not term_amount:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Term amount with id {term_amount_id} not found"
+            )
+
+        # Add relationship names
+        term_amount.term_name = term_amount.fee_term.term_name if term_amount.fee_term else None
+
+        return term_amount
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"Error getting term amount: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving term amount"
+        )
+
+async def get_term_amounts_by_class_mapping(db: AsyncSession, class_mapping_id: UUID):
+    """Get all term amounts for a specific class mapping"""
+    try:
+        result = await db.execute(
+            select(FeeClassMappingTermAmountModel)
+            .options(
+                selectinload(FeeClassMappingTermAmountModel.fee_term),
+                selectinload(FeeClassMappingTermAmountModel.fee_class_mapping)
+            )
+            .where(FeeClassMappingTermAmountModel.fee_class_mapping_id == class_mapping_id)
+            .order_by(FeeClassMappingTermAmountModel.term_id)
+        )
+        term_amounts = result.scalars().all()
+
+        # Add relationship names
+        for term_amount in term_amounts:
+            term_amount.term_name = term_amount.fee_term.term_name if term_amount.fee_term else None
+
+        return term_amounts
+    except Exception as e:
+        log.error(f"Error getting term amounts by mapping: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving term amounts"
+        )
+
+async def get_all_term_amounts(
+    db: AsyncSession,
+    class_mapping_id: Optional[UUID] = None,
+    fee_term_id: Optional[UUID] = None,
+    limit: int = 100,
+    offset: int = 0
+):
+    """Get all term amounts with optional filters and pagination"""
+    try:
+        query = select(FeeClassMappingTermAmountModel).options(
+            selectinload(FeeClassMappingTermAmountModel.fee_term),
+            selectinload(FeeClassMappingTermAmountModel.fee_class_mapping)
+        )
+
+        # Apply filters
+        if class_mapping_id:
+            query = query.where(FeeClassMappingTermAmountModel.fee_class_mapping_id == class_mapping_id)
+
+        if fee_term_id:
+            query = query.where(FeeClassMappingTermAmountModel.term_id == fee_term_id)
+
+        # Apply pagination
+        query = query.limit(limit).offset(offset)
+
+        result = await db.execute(query)
+        term_amounts = result.scalars().all()
+
+        # Add relationship names
+        for term_amount in term_amounts:
+            term_amount.term_name = term_amount.fee_term.term_name if term_amount.fee_term else None
+
+        return term_amounts
+    except Exception as e:
+        log.error(f"Error getting all term amounts: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving term amounts"
         )

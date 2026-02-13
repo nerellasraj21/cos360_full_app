@@ -10,18 +10,20 @@ class FeeClassMappingTermAmount(BaseOrg):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     fee_class_mapping_id = Column(UUID(as_uuid=True), ForeignKey("fee_class_mappings.id", ondelete="CASCADE"), nullable=False)
     term_id = Column(UUID(as_uuid=True), ForeignKey("fee_terms.id"), nullable=False)
+    term_date_id = Column(UUID(as_uuid=True), ForeignKey("fee_term_dates.id"), nullable=False)
     term_amount = Column(Numeric(10, 2), nullable=False)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
     
-    # Unique constraint: one term amount per fee class mapping per term
+    # Unique constraint: one term amount per fee class mapping per term date
     __table_args__ = (
-        UniqueConstraint('fee_class_mapping_id', 'term_id', name='uq_fee_class_mapping_term'),
+        UniqueConstraint('fee_class_mapping_id', 'term_date_id', name='uq_fee_class_mapping_term_date'),
     )
     
     # Relationships
     fee_class_mapping = relationship("FeeClassMapping", back_populates="term_amounts")
     fee_term = relationship("FeeTerm", back_populates="fee_class_mapping_term_amounts")
+    fee_term_date = relationship("FeeTermDates", back_populates="fee_class_mapping_term_amounts")
     
     def __repr__(self):
         return f"<FeeClassMappingTermAmount(id={self.id}, fee_class_mapping_id={self.fee_class_mapping_id}, term_id={self.term_id}, term_amount={self.term_amount})>"
