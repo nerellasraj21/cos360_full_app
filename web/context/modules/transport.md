@@ -1,30 +1,29 @@
 # Module Context – Transport
 
-Version: 1.0
+Version: 1.1
 Generated On: 2025-12-26
-Source: Codebase Analysis
+Last Updated: 2026-02-27
+Source: Codebase Analysis + Implementation Handovers
 Confidence Level: High
 
 ---
 
 ## Responsibility
 
-[EVIDENCE-BASED]
-
 The Transport module manages school transportation:
 
 1. **Vehicles**: Fleet vehicle management
-2. **Routes**: Transport route definitions
-3. **Route Stops**: Stops along each route
-4. **Trips**: Scheduled trip management
-5. **Student Transport**: Student-transport assignments
-6. **Student Trips**: Student trip enrollment
+2. **Route Types**: Dynamic route type management (create-on-the-fly)
+3. **Trip Types**: Dynamic trip type management (create-on-the-fly)
+4. **Routes**: Transport route definitions with typed route/trip types
+5. **Route Stops**: Stops along each route
+6. **Trips**: Scheduled trip management
+7. **Student Transport**: Student-transport assignments
+8. **Student Trips**: Student trip enrollment
 
 ---
 
 ## Key Components
-
-[EVIDENCE-BASED]
 
 ### Routes
 
@@ -47,45 +46,73 @@ The Transport module manages school transportation:
 | `src/api/hooks/masters/trips.ts` | Trip hooks |
 | `src/api/hooks/masters/studentTransport.ts` | Student transport hooks |
 | `src/api/hooks/masters/studentTrips.ts` | Student trip hooks |
+| `src/api/hooks/masters/transportOptions.ts` | Route type + trip type hooks with invalidation |
 
-### Transport Hooks
+### Transport Types API Layer
 
-| Directory | Purpose |
-|-----------|---------|
-| `src/hooks/transport/` | Additional transport hooks |
+| File | Purpose |
+|------|---------|
+| `src/api/masters/transportTypes.ts` | Route/trip type CRUD functions |
+| `src/types/masters/transportTypes.ts` | RouteType, TripType interfaces |
+| `src/types/masters/route.ts` | Route interface with nested type objects |
 
-### Components
+### Components and Pages
 
 | Directory | Purpose |
 |-----------|---------|
 | `src/components/masters/trips/` | Trip-related components |
-
-### Pages
-
-| Directory | Purpose |
-|-----------|---------|
 | `src/pages/transport/` | Transport page components |
+| `src/pages/transport/routes.tsx` | Route management with create-on-fly types |
 
 ---
 
 ## Data Model Summary
 
-[INFERENCE - Based on common transport patterns]
-
 ### Entity Relationships
 
 ```
 Vehicle
-    └── Route
+    └── Route (has route_type_id + trip_type_id → RouteType, TripType)
         └── Route Stop (ordered list)
             └── Trip (scheduled instance)
                 └── Student Trip (student on trip)
+
+RouteType  (dynamic master list)
+TripType   (dynamic master list)
 ```
 
-### Expected Types
+### Type Definitions
 
 ```typescript
-interface Vehicle {
+// ⚠ CRITICAL: field is "type_name" NOT "name"
+export interface RouteTypeDropdown {
+  id: string;
+  type_name: string;
+}
+
+export interface TripTypeDropdown {
+  id: string;
+  type_name: string;
+}
+
+// Route interface (src/types/masters/route.ts)
+export interface Route {
+  id: string;
+  route_name: string;
+  route_type_id?: string;   // UUID reference (null for old routes)
+  trip_type_id?: string;    // UUID reference (null for old routes)
+  route_type?: {            // Populated by backend if joined
+    id: string;
+    type_name: string;
+  };
+  trip_type?: {
+    id: string;
+    type_name: string;
+  };
+  is_active: boolean;
+}
+
+export interface Vehicle {
   id: string;
   name: string;
   number: string;
@@ -93,14 +120,7 @@ interface Vehicle {
   is_active: boolean;
 }
 
-interface Route {
-  id: string;
-  name: string;
-  vehicle_id?: string;
-  is_active: boolean;
-}
-
-interface RouteStop {
+export interface RouteStop {
   id: string;
   route_id: string;
   name: string;
@@ -108,142 +128,151 @@ interface RouteStop {
   pickup_time?: string;
   drop_time?: string;
 }
-
-interface Trip {
-  id: string;
-  route_id: string;
-  type: 'pickup' | 'drop';
-  scheduled_time: string;
-}
-
-interface StudentTransport {
-  id: string;
-  student_id: string;
-  route_id: string;
-  stop_id: string;
-}
-
-interface StudentTrip {
-  id: string;
-  student_id: string;
-  trip_id: string;
-}
 ```
 
 ---
 
 ## Invariants & Rules
 
-[INFERENCE]
+### Transport Types (Route Types and Trip Types)
 
-### Vehicle Rules
+1. **Dynamic**: Types stored in the database, not hardcoded enums
+2. **Create-on-the-fly**: Users type a new name in the CreatableSelect dropdown and press Enter
+3. **Duplicate prevention**: Frontend checks case-insensitively before posting
+4. **Field name is `type_name`** — backend Pydantic model uses `type_name`, NOT `name`
+5. **Create payload**: `{ "type_name": "Upward", "is_active": true }`
 
-1. Vehicles have capacity limits
-2. Vehicles can be assigned to routes
+### Route Field Compatibility
 
-### Route Rules
+- **New routes**: have `route_type_id` and `trip_type_id` UUID fields
+- **Old routes** (created before UUID migration): `null` for both UUID fields; used legacy string `route_type` field
+- Table renders "-" for old routes gracefully; edit them to assign UUID-based types
 
-1. Routes have ordered stops
-2. Routes associated with vehicles
-3. Pickup and drop times per stop
+### Required Backend Response Format
 
-### Assignment Rules
+```json
+// GET /masters/route-types/dropdown
+[{ "id": "uuid", "type_name": "Upward" }]
 
-1. Students assigned to specific stops
-2. Students assigned to specific trips
-3. Capacity validation likely required
+// GET /masters/routes/all_routes
+[{
+  "id": "uuid",
+  "route_name": "Morning Route",
+  "route_type_id": "uuid-or-null",
+  "trip_type_id": "uuid-or-null",
+  "route_type": { "id": "uuid", "type_name": "Upward" },
+  "trip_type": { "id": "uuid", "type_name": "First Trip" }
+}]
+```
 
 ---
 
 ## Public Interfaces
 
-[EVIDENCE-BASED]
-
 ### Dropdown Components
 
-From dropdown system:
 ```typescript
 TransportRoutesDropdown
-VehiclesDropdown (if exists)
+VehiclesDropdown
 ```
 
-### Expected Hooks
+### Transport Type Hooks (`src/api/hooks/masters/transportOptions.ts`)
 
 ```typescript
-// Vehicles
-useVehicles()
-useCreateVehicle()
-useUpdateVehicle()
-useDeleteVehicle()
+useRouteTypesDropdown()  // GET /masters/route-types/dropdown
+useCreateRouteType()     // POST — invalidates transportTypesKeys.routeTypes()
+useTripTypesDropdown()   // GET /masters/trip-types/dropdown
+useCreateTripType()      // POST — invalidates transportTypesKeys.tripTypes()
+```
 
-// Routes
-useRoutes()
-useCreateRoute()
-useUpdateRoute()
-useDeleteRoute()
+### Route/Vehicle Hooks
 
-// Route Stops
-useRouteStops(routeId)
-useCreateRouteStop()
-useUpdateRouteStop()
-useDeleteRouteStop()
-
-// Trips
-useTrips()
-useCreateTrip()
-useUpdateTrip()
-useDeleteTrip()
-
-// Student Transport
-useStudentTransport()
-useAssignStudentTransport()
-
-// Student Trips
+```typescript
+useVehicles() / useCreateVehicle() / useUpdateVehicle() / useDeleteVehicle()
+useRoutes() / useCreateRoute() / useUpdateRoute() / useDeleteRoute()
+useRouteStops(routeId) / useCreateRouteStop()
+useTrips() / useCreateTrip()
+useStudentTransport() / useAssignStudentTransport()
 useStudentTrips()
 ```
 
 ---
 
-## Dependencies
+## API Endpoints
 
-[EVIDENCE-BASED]
+### Transport Types
+
+```
+GET    /api/v1/masters/route-types/dropdown
+POST   /api/v1/masters/route-types/           { type_name, is_active }
+GET    /api/v1/masters/route-types/
+PUT    /api/v1/masters/route-types/{id}
+DELETE /api/v1/masters/route-types/{id}
+
+GET    /api/v1/masters/trip-types/dropdown
+POST   /api/v1/masters/trip-types/            { type_name, is_active }
+GET    /api/v1/masters/trip-types/
+PUT    /api/v1/masters/trip-types/{id}
+DELETE /api/v1/masters/trip-types/{id}
+```
+
+### Routes
+
+```
+GET    /api/v1/masters/routes/
+GET    /api/v1/masters/routes/all_routes
+POST   /api/v1/masters/routes/
+PUT    /api/v1/masters/routes/{id}
+DELETE /api/v1/masters/routes/{id}
+```
+
+---
+
+## Permissions Required
+
+| Resource | Actions needed |
+|----------|---------------|
+| `route_types` | list, read, create, update, delete |
+| `trip_types` | list, read, create, update, delete |
+| `routes` | list, read, create, update, delete |
+
+**Permission cache**: After backend adds permissions, users must logout and login to refresh JWT. Old sessions get 403 errors.
+
+---
+
+## Dependencies
 
 ### Internal Dependencies
 
 - **Students Module**: Student selection for assignments
-- **Masters Module**: API hooks in masters directory
+- **Masters Module**: API hooks live in `src/api/hooks/masters/` directory
 - **Dropdown System**: Transport route dropdowns
 
 ### External Dependencies
 
 - **@tanstack/react-query**: Data fetching and caching
+- **react-select/creatable**: CreatableSelect for create-on-fly type dropdowns
+
+---
+
+## Known Issues
+
+1. **Old routes show "-" for type columns**: Routes before the UUID migration have `null` type IDs. Edit them to assign types, or ask backend for a data migration.
+
+2. **Console logs in production**: `src/api/masters/transportTypes.ts` has debug `console.log` calls. Wrap in `import.meta.env.DEV` checks before production.
+
+3. **React-select in Dialog**: When using react-select inside Dialog, use `modal={false}` on Dialog + `menuPortalTarget={document.body}` + `pointerEvents: 'auto'` styles. See CLAUDE.md for the full pattern.
 
 ---
 
 ## Known Risks
 
-[INFERENCE]
-
-### Capacity Management
-
-1. **Overcapacity**: Need to validate against vehicle capacity
-2. **Route Optimization**: No evidence of route optimization
-
-### Schedule Management
-
-1. **Time Conflicts**: Trip scheduling conflicts
-2. **Dynamic Updates**: Real-time location tracking absent
-
-### Data Integrity
-
-1. **Orphan Assignments**: Stop removed with active assignments
-2. **Route Changes**: Impact on existing assignments
+- **Overcapacity**: Need to validate against vehicle capacity limits
+- **Orphan assignments**: Stops removed while students are assigned
 
 ---
 
 ## Test Coverage
-
-[UNCERTAIN]
 
 No dedicated transport module tests found in codebase.
 
@@ -251,14 +280,8 @@ No dedicated transport module tests found in codebase.
 
 ## Uncertainties
 
-[UNCERTAIN]
-
 1. **GPS Tracking**: No evidence of real-time vehicle tracking
 2. **Parent Notifications**: How parents are notified unclear
 3. **Fee Integration**: Transport fee connection unclear
-4. **Attendance Integration**: Transport attendance tracking unclear
-5. **Driver Management**: Driver assignment not analyzed
-6. **Route Optimization**: If route optimization exists
-7. **Emergency Protocols**: Emergency handling procedures unclear
-8. **Capacity Enforcement**: How capacity limits are enforced
-9. **Pickup/Drop Windows**: Time window tolerance handling
+4. **Driver Management**: Driver assignment not analyzed
+5. **Capacity Enforcement**: How capacity limits are enforced

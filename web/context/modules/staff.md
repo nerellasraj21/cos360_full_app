@@ -1,15 +1,14 @@
 # Module Context – Staff
 
-Version: 1.0
+Version: 1.1
 Generated On: 2025-12-26
-Source: Codebase Analysis
+Last Updated: 2026-02-27
+Source: Codebase Analysis + Backend Handover
 Confidence Level: High
 
 ---
 
 ## Responsibility
-
-[EVIDENCE-BASED]
 
 The Staff module manages all staff-related functionality:
 
@@ -22,8 +21,6 @@ The Staff module manages all staff-related functionality:
 ---
 
 ## Key Components
-
-[EVIDENCE-BASED]
 
 ### Routes
 
@@ -40,38 +37,34 @@ The Staff module manages all staff-related functionality:
 
 | File | Purpose |
 |------|---------|
-| `src/api/hooks/staff/attendance.ts` | Attendance CRUD hooks |
+| `src/api/hooks/staff/attendance.ts` | Attendance CRUD hooks (legacy `/masters/` path) |
 | `src/api/hooks/staff/staff.ts` | Staff management hooks |
 | `src/api/hooks/staff/useStaffProfile.ts` | Staff profile hooks |
+| `src/hooks/staff/useStaff.ts` | New staff hooks (new `/staff/` path) |
 
 ### API Endpoints
 
 | File | Purpose |
 |------|---------|
 | `src/api/staff/attendance.ts` | Attendance API functions |
-| `src/api/staff/` | Staff API functions |
+| `src/api/staff/staff.ts` | Staff API functions (new paths) |
 
-### Components
+### Components and Pages
 
 | Directory | Purpose |
 |-----------|---------|
 | `src/components/staff/` | Staff-related components |
-
-### Pages
-
-| Directory | Purpose |
-|-----------|---------|
+| `src/components/staff/DesignationsTable.tsx` | Designations table component |
 | `src/pages/staff/` | Staff page components |
 
 ---
 
 ## Data Model Summary
 
-[EVIDENCE-BASED]
-
 ### Staff Attendance Types
 
 ```typescript
+// src/types/attendance.ts, src/types/staff.ts
 interface StaffAttendanceCreate {
   staff_id: number;
   date: string;
@@ -90,19 +83,54 @@ interface StaffAttendanceFilter {
   page?: number;
   page_size?: number;
 }
-
-interface ExportRequest {
-  // Export configuration
-}
 ```
 
-**Source**: `src/types/attendance.ts`, `src/types/staff.ts`
+### Designation Types
+
+```typescript
+// src/types/staff/staff.ts
+export interface Designation {
+  id: string;
+  title: string;
+  staff_members?: Staff[];  // Optional array — backend may not include this yet
+  created_at: string;       // ISO 8601 format
+  updated_at: string;
+}
+
+export interface Staff {
+  id: string;
+  first_name: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  designation_id?: string;
+  is_active: boolean;
+}
+
+export interface DesignationListResponse {
+  items: Designation[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+```
 
 ---
 
 ## Invariants & Rules
 
-[EVIDENCE-BASED]
+### Dual API Paths — CRITICAL WARNING
+
+Staff attendance has **two separate hook stacks**. Using the wrong one causes unexpected behavior:
+
+| Hook Stack | File | API Path | Status |
+|------------|------|----------|--------|
+| Legacy | `src/api/hooks/staff/attendance.ts` | `/masters/staff/attendance` | In use by attendance page |
+| New | `src/hooks/staff/useStaff.ts` | `/staff/attendance` | Available, partially used |
+
+The legacy stack fetches ALL attendance records and filters in memory. The new stack uses proper query parameters. Prefer the new path when adding features.
+
+See `docs/STAFF_ATTENDANCE_FLOW.md` for full data flow documentation.
 
 ### Attendance Workflow
 
@@ -134,8 +162,6 @@ On any attendance mutation, these queries are invalidated:
 
 ## Public Interfaces
 
-[EVIDENCE-BASED]
-
 ### Query Hooks
 
 ```typescript
@@ -146,6 +172,9 @@ useStaffAttendanceByDate(date: string)
 useStaffAttendanceByDateFilter(staffId: string, params?: { start_date?: string; end_date?: string })
 useStaffAttendanceReport(filters?: StaffAttendanceFilter)
 useStaffAttendanceStats(filters?: Omit<StaffAttendanceFilter, 'page' | 'page_size'>)
+
+// Designations
+useDesignations(params?: { skip?: number; limit?: number })
 
 // Staff management
 useStaff(...)
@@ -175,12 +204,30 @@ useExportStaffAttendance()
 | `/staff/attendance/report` | GET | Get report |
 | `/staff/attendance/stats` | GET | Get statistics |
 | `/staff/attendance/export` | POST | Export report |
+| `/staff/designations/` | GET | List designations (paginated) |
+| `/staff/designations/` | POST | Create designation |
+| `/staff/designations/{id}` | PUT | Update designation |
+| `/staff/designations/{id}` | DELETE | Delete designation |
+
+---
+
+## Known Issues
+
+### Designations — Missing Backend Fields
+
+`GET /api/v1/staff/designations/` currently returns only `{ id, title }` per item.
+
+The frontend (`src/components/staff/DesignationsTable.tsx`) expects:
+- `created_at` — timestamp for "Created Date" column
+- `staff_members` — array of staff for "Staff Count" column
+
+**Current workaround**: The table shows "0 staff members" and an error for created date.
+
+**Backend action needed**: Return `created_at`, `updated_at`, and either a `staff_members` array (Option 1) or a `staff_count` integer (Option 2) in the designation list endpoint.
 
 ---
 
 ## Dependencies
-
-[EVIDENCE-BASED]
 
 ### Internal Dependencies
 
@@ -190,23 +237,11 @@ useExportStaffAttendance()
 ### External Dependencies
 
 - **@tanstack/react-query**: Data fetching and caching
-- **sonner**: Toast notifications (in some implementations)
+- **sonner**: Toast notifications
 
 ---
 
 ## Known Risks
-
-[INFERENCE]
-
-### Dual API Paths
-
-**Warning**: Staff attendance has dual API paths:
-- New path: `/staff/attendance`
-- Legacy path: `/masters/staff/attendance`
-
-Different hook stacks may exist for the same functionality.
-
-**Evidence**: `STAFF_ATTENDANCE_FLOW.md`, `context_guide.json:144-147`
 
 ### Performance
 
@@ -222,20 +257,14 @@ Different hook stacks may exist for the same functionality.
 
 ## Test Coverage
 
-[UNCERTAIN]
-
 No dedicated staff module tests found in codebase.
 
 ---
 
 ## Uncertainties
 
-[UNCERTAIN]
-
-1. **Staff Types/Designations**: Full designation hierarchy unclear
+1. **Legacy Migration**: Status of `/masters/` to `/staff/` API migration — incomplete, legacy hooks still used
 2. **Leave Management**: Integration with leave system unclear
 3. **Salary Integration**: Connection to payroll (if any) unknown
-4. **Reporting Hierarchy**: Staff reporting structure unclear
-5. **Legacy Migration**: Status of `/masters/` to `/staff/` API migration
-6. **Biometric Integration**: No evidence of biometric attendance integration
-7. **Approval Workflow**: Attendance approval process (if any) unclear
+4. **Biometric Integration**: No evidence of biometric attendance integration
+5. **Approval Workflow**: Attendance approval process (if any) unclear

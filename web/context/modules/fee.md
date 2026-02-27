@@ -1,15 +1,14 @@
 # Module Context – Fee
 
-Version: 1.0
+Version: 1.1
 Generated On: 2025-12-26
-Source: Codebase Analysis
+Last Updated: 2026-02-27
+Source: Codebase Analysis + QA Audit
 Confidence Level: High
 
 ---
 
 ## Responsibility
-
-[EVIDENCE-BASED]
 
 The Fee module manages all fee-related functionality:
 
@@ -25,8 +24,6 @@ The Fee module manages all fee-related functionality:
 ---
 
 ## Key Components
-
-[EVIDENCE-BASED]
 
 ### Routes
 
@@ -72,12 +69,11 @@ The Fee module manages all fee-related functionality:
 | Directory | Purpose |
 |-----------|---------|
 | `src/pages/fee/` | Fee page components |
+| `src/pages/fee/FeeTransactions.tsx` | Transaction management (has known issues — see below) |
 
 ---
 
 ## Data Model Summary
-
-[EVIDENCE-BASED]
 
 ### Type Definitions Location
 
@@ -99,16 +95,24 @@ The Fee module manages all fee-related functionality:
 Fee Category (e.g., "Academic Fees")
     └── Fee Type (e.g., "Tuition Fee")
             └── Fee Term (e.g., "Term 1")
-                    └── Fee Mapping (Class/Student level)
+                    └── Fee Mapping (Class or Student level)
                             └── Transaction (Payment)
                                     └── Receipt (Generated)
 ```
 
+### Class vs Student Level Mappings
+
+```
+Class Mappings:  GET/POST /fee/class-mappings/
+Student Mappings: GET/POST /fee/student-mappings/
+                  POST     /fee/student-mappings/bulk
+```
+
+**⚠ Warning**: Both `feeMappingsApi` and `feeClassMappingsApi` target `/fee/class-mappings/`. Similarly `feeMappingsApi.bulkCreateStudentMappings` and `feeStudentMappingsApi.bulkCreateMappings` target the same endpoint. Use the dedicated API file, not the generic mappings API.
+
 ---
 
 ## Invariants & Rules
-
-[INFERENCE - Based on structure]
 
 ### Fee Structure Rules
 
@@ -117,21 +121,15 @@ Fee Category (e.g., "Academic Fees")
 3. **Terms** define payment periods
 4. **Mappings** can be at class or student level
 
-### Common Patterns
+### Academic Year Scoping
 
-- Standard CRUD operations for each entity
-- Bulk operations for fee assignments
-- Active/inactive status for all entities
+API functions internally access `useAcademicYearStore.getState().selectedAcademicYearId` to scope requests. If `selectedAcademicYearId` is undefined, the API call silently fails. Always ensure the academic year is selected before triggering fee queries.
 
 ---
 
 ## Public Interfaces
 
-[EVIDENCE-BASED]
-
 ### Hook Patterns
-
-Based on file naming convention, the following hooks are expected:
 
 ```typescript
 // Categories
@@ -166,16 +164,29 @@ FeeTypesDropdown
 FeeTermsDropdown
 ```
 
+### Key API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/fee/categories/` | GET/POST | Fee categories CRUD |
+| `/fee/types/` | GET/POST | Fee types CRUD |
+| `/fee/terms/` | GET/POST | Fee terms CRUD |
+| `/fee/class-mappings/` | GET/POST | Class-level fee assignments |
+| `/fee/student-mappings/` | GET/POST | Student-level fee assignments |
+| `/fee/student-mappings/bulk` | POST | Bulk student assignments |
+| `/fee/transactions/` | GET/POST | Fee payments |
+| `/fee/receipts/` | GET/POST | Receipt management |
+| `/fee/refunds/` | GET/POST | Refund processing |
+
 ---
 
 ## Dependencies
-
-[EVIDENCE-BASED]
 
 ### Internal Dependencies
 
 - **Students Module**: Student selection for fee assignments
 - **Masters Module**: Classes for class-level mappings
+- **Academic Year Store**: All queries scoped by selected academic year
 - **Dropdown System**: Fee type and term dropdowns
 
 ### External Dependencies
@@ -185,9 +196,35 @@ FeeTermsDropdown
 
 ---
 
-## Known Risks
+## Known Issues (QA Audit — 2026-02-05)
 
-[INFERENCE]
+A comprehensive QA audit found 82+ integration issues in the fee module. Key items:
+
+### Critical
+
+1. **FeeTransactions uses direct API calls** — `src/pages/fee/FeeTransactions.tsx` calls API functions directly inside `useQuery` instead of using dedicated React Query hooks. A `src/api/hooks/fee/transactions.ts` file is missing.
+
+2. **27+ API functions lack error handling** — `src/api/fee/types.ts`, `terms.ts`, `receipts.ts`, `mappings.ts`, `classMappings.ts` have no try/catch. Raw axios errors propagate to components.
+
+3. **Student mappings response shape is inconsistent** — `getAllMappings` returns `FeeStudentMapping[] | FeeStudentMappingListResponse`. Components must defensively check: `Array.isArray(response) ? response : (response.items || [])`.
+
+4. **`total_fee` type mismatch** — `FeeStudentMapping.total_fee` is typed as `string` but `FeeStudentMappingCreate.total_fee` expects `number`. Source: `src/types/fee/mapping.ts`.
+
+### High Priority
+
+5. **Invalid cache invalidation** — `src/api/hooks/fee/useFeeTypes.ts` invalidates a query key structure that doesn't exist: `['fee-categories', 'detail', data.fee_category_id, 'types']`.
+
+6. **28+ console.log statements** expose sensitive payment/student data in `transactions.ts`, `receipts.ts`, `refunds.ts`. Remove before production.
+
+### Medium Priority
+
+7. **15+ hardcoded API paths** — Some files use string literals instead of constants (e.g., `CAxios.get('/fee/types/')`), inconsistent with files that use constant variables.
+
+**Full fix plan**: See `docs/FEE_MODULE_API_INTEGRATION_FIX_PLAN.md` (archived) if it exists.
+
+---
+
+## Known Risks
 
 ### Financial Data
 
@@ -200,24 +237,15 @@ FeeTermsDropdown
 1. **Bulk Mappings**: Large class fee assignments may be slow
 2. **Report Generation**: Complex reports with date ranges
 
-### Concurrency
-
-1. **Payment Conflicts**: Multiple simultaneous payments for same fee
-2. **Receipt Generation**: Race conditions in receipt numbering
-
 ---
 
 ## Test Coverage
-
-[UNCERTAIN]
 
 No dedicated fee module tests found in codebase.
 
 ---
 
 ## Uncertainties
-
-[UNCERTAIN]
 
 1. **Payment Gateway Integration**: No evidence of online payment integration
 2. **Partial Payments**: How partial payments are handled unclear

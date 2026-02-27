@@ -1,15 +1,14 @@
 # Module Context – Students
 
-Version: 1.0
+Version: 1.1
 Generated On: 2025-12-26
-Source: Codebase Analysis
+Last Updated: 2026-02-27
+Source: Codebase Analysis + Feature Handovers
 Confidence Level: High
 
 ---
 
 ## Responsibility
-
-[EVIDENCE-BASED]
 
 The Students module manages all student-related functionality:
 
@@ -22,8 +21,6 @@ The Students module manages all student-related functionality:
 ---
 
 ## Key Components
-
-[EVIDENCE-BASED]
 
 ### Routes
 
@@ -60,46 +57,34 @@ The Students module manages all student-related functionality:
 |------|---------|
 | `src/api/students/admissions.ts` | Admission API functions |
 
-### Components
+### Components and Pages
 
 | Directory | Purpose |
 |-----------|---------|
 | `src/components/students/` | Student-related components |
-| `src/components/students/admission-steps/` | Multi-step admission form components |
-
-### Pages
-
-| File | Purpose |
-|------|---------|
+| `src/components/students/admission-steps/` | Multi-step admission form step components |
 | `src/pages/students/` | Student page components |
 
 ---
 
 ## Data Model Summary
 
-[EVIDENCE-BASED]
-
 ### Student Admission Types
 
 ```typescript
-interface StudentAdmissionCreate {
-  // [Complex multi-field admission data]
-}
-
+// src/types/admission.ts
+interface StudentAdmissionCreate { /* Complex multi-field admission data */ }
 interface StudentAdmissionResponse {
   student_id: string;
-  // [Full admission response data]
+  /* Full admission response data */
 }
-
-interface StudentAdmissionUpdate {
-  // [Update fields]
-}
+interface StudentAdmissionUpdate { /* Update fields */ }
 
 interface StudentOut {
   id: string;
   name: string;
   admission_number: string;
-  // [Additional student fields]
+  /* Additional student fields */
 }
 ```
 
@@ -111,7 +96,6 @@ interface StudentDropdownItem {
   name: string;
   admission_number: string;
   class_name: string;
-  // [Display fields]
 }
 
 interface StudentDropdownSimpleItem {
@@ -120,37 +104,75 @@ interface StudentDropdownSimpleItem {
 }
 ```
 
-**Source**: `src/types/admission.ts`
+---
 
-### Attendance Types
+## Admission Form — Steps and Features
 
-```typescript
-// Defined in src/types/attendance.ts
+### Form Structure (Multi-Step)
+
+The admission form is divided into steps implemented under `src/components/students/admission-steps/`:
+
+```
+Step 1: Personal Information
+  - Student name, DOB, gender
+  - Mother tongue (dropdown — hardcoded/master list)
+  - Academic year (taken from header store, not re-entered)
+  - Class and Section (cascading: Class → Section)
+  - Primary Status (moved to Step 1)
+
+Step 2: Parent/Guardian Information
+  - Father, Mother, Guardian details
+  - Parent search by phone number (search existing parent records)
+  - Salary range (pending backend support)
+
+Step 3: Address Information
+  - Current and permanent address
+  - Location fields (State/District/Mandal) — pending backend support
+
+Step 4: Other Details
+  - Health information, certificates
+  - Experience fields (label updated)
+
+Preview: Summary before submission
 ```
 
-### Document Types
+### Implemented Features (Production-Ready)
 
-```typescript
-// Defined in src/types/documents.ts
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Mother tongue dropdown | Done | Hardcoded language list |
+| Academic year from header | Done | Uses `academicYearStore` — not re-entered on form |
+| Class/Section cascade sync | Done | Checkbox "Same as Admission Class" syncs fields |
+| Primary Status on Step 1 | Done | Moved from later step |
+| Parent search by phone | Done | Search existing parent records by phone number |
+
+### Pending Features (Backend Required)
+
+| Feature | Backend Need |
+|---------|-------------|
+| Auto-generate admission number | `GET /students/admissions/next-number?type=primary` |
+| Caste/Sub-Caste dropdowns | `/masters/castes` + `/masters/castes/{id}/sub-castes` |
+| Parent salary range | `salary_range` field on parent model |
+| Location masters (State/District/Mandal) | `/masters/states`, `/masters/districts`, `/masters/mandals` |
+
+### Cascading Dropdown Behavior
+
 ```
-
-### Certificate Types
-
-```typescript
-// Defined in src/types/certificates/
+Class dropdown → changes → clears Section dropdown
+Section dropdown → depends on selected class ID
+"Same as Admission Class" checkbox → syncs Class+Section fields
 ```
 
 ---
 
 ## Invariants & Rules
 
-[EVIDENCE-BASED]
-
 ### Admission Process
 
 1. Multi-step form with validation at each step
-2. Academic year and class selection required
+2. Academic year auto-populated from `academicYearStore` (not shown as a field on the form)
 3. Parent information linked to admission
+4. Permission-protected at every CRUD operation
 
 ### Permission-Protected Operations
 
@@ -176,7 +198,7 @@ usePermissionProtectedMutation({
 
 **Evidence**: `src/api/hooks/students/admissions.ts`
 
-### Student Toggle Status
+### Student Status Toggle
 
 - Students can be enabled/disabled
 - Status toggle requires `update` permission on `student_admissions`
@@ -185,26 +207,17 @@ usePermissionProtectedMutation({
 
 ## Public Interfaces
 
-[EVIDENCE-BASED]
-
 ### Query Hooks
 
 ```typescript
-// Admissions
 useAdmissions(params?: { skip?: number; limit?: number })
 useAdmissionByStudentId(studentId: string)
 useStudentByAdmissionId(admissionId: string)
 useStudentsSearch(query: string)
 useStudentsDropdown(activeOnly?: boolean)
 useStudentsDropdownSimple(activeOnly?: boolean)
-
-// Attendance
 useStudentAttendance(...)
-
-// Documents
 useStudentDocuments(...)
-
-// Certificates
 useStudentCertificates(...)
 ```
 
@@ -227,11 +240,13 @@ useToggleStudentStatus()
 | `/students/dropdown/simple` | GET | Simple dropdown list |
 | `/students/search` | GET | Search students |
 
+### Student Attendance API
+
+The student attendance API had a known fix (endpoint/params/response). See `docs/STUDENT_ATTENDANCE_API_FIX.md` if available.
+
 ---
 
 ## Dependencies
-
-[EVIDENCE-BASED]
 
 ### Internal Dependencies
 
@@ -250,11 +265,9 @@ useToggleStudentStatus()
 
 ## Known Risks
 
-[INFERENCE]
-
 ### Data Integrity
 
-1. **Duplicate Admissions**: No client-side check for duplicate admission numbers
+1. **Duplicate Admissions**: No client-side check for duplicate admission numbers (pending auto-generate feature)
 2. **Orphan Records**: Parent-student relationship management unclear
 
 ### Performance
@@ -271,15 +284,11 @@ useToggleStudentStatus()
 
 ## Test Coverage
 
-[UNCERTAIN]
-
 No dedicated student module tests found in codebase.
 
 ---
 
 ## Uncertainties
-
-[UNCERTAIN]
 
 1. **Admission Workflow States**: Full admission workflow (pending, approved, etc.) unclear
 2. **Document Storage**: Storage mechanism (S3, local, etc.) unknown
