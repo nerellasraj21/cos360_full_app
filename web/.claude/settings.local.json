@@ -3,7 +3,11 @@
     "allow": [
       "Bash(mkdir:*)",
       "Read(//c/Users/nerel/Documents/Workspace/**)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(python3:*)",
+      "Bash(npm run build:check:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)"
     ]
   }
 }

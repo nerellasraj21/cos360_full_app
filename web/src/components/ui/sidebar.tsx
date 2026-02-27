@@ -19,6 +19,13 @@ import {
     Sun,
     Moon,
     X,
+    ClipboardList,
+    Award,
+    Ticket,
+    BarChart3,
+    Star,
+    ListChecks,
+    PenLine,
 } from "lucide-react";
 import clsx from "clsx";
 import { useLogoutMutation } from "../../api/auth";
@@ -59,6 +66,26 @@ const getIconForMenuItem = (name: string) => {
         "Fee Terms": FileText,
         "Fee Mappings": Users,
         "Fee Reports": FileText,
+        // Exam module
+        "Exam Management": ClipboardList,
+        "Exams": ClipboardList,
+        "Exam List": ClipboardList,
+        "Create Exam": PenLine,
+        "Mark Entry": PenLine,
+        "Mark Permissions": Users,
+        "Exam Dates": Calendar,
+        "Results": Award,
+        "Student Results": Award,
+        "Hall Tickets": Ticket,
+        "Hall Ticket Download": Ticket,
+        "Grading Setup": Star,
+        "Exam Grade Schemes": Star,
+        "Subject Grade Schemes": Star,
+        "Remark Grade Sets": ListChecks,
+        "Board Patterns": BookOpen,
+        "Exam Settings": Settings,
+        "Audit Log": BarChart3,
+        "Notifications": MessageSquare,
     };
 
     return iconMap[name] || Folder;

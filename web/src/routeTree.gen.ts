@@ -20,6 +20,7 @@ import { Route as AppStudentsRouteImport } from './routes/_app/students'
 import { Route as AppProfileRouteImport } from './routes/_app/profile'
 import { Route as AppFeeRouteImport } from './routes/_app/fee'
 import { Route as AppExpenseRouteImport } from './routes/_app/expense'
+import { Route as AppExamRouteImport } from './routes/_app/exam'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
 import { Route as AppTimeTableRouteImport } from './routes/_app/TimeTable'
@@ -27,6 +28,7 @@ import { Route as AppCalenderRouteImport } from './routes/_app/Calender'
 import { Route as AppStaffIndexRouteImport } from './routes/_app/staff/index'
 import { Route as AppFeeIndexRouteImport } from './routes/_app/fee/index'
 import { Route as AppExpenseIndexRouteImport } from './routes/_app/expense/index'
+import { Route as AppExamIndexRouteImport } from './routes/_app/exam/index'
 import { Route as AppTransportVehiclesRouteImport } from './routes/_app/transport/vehicles'
 import { Route as AppTransportTripsRouteImport } from './routes/_app/transport/trips'
 import { Route as AppTransportStudentTripsRouteImport } from './routes/_app/transport/studentTrips'
@@ -79,8 +81,39 @@ import { Route as AppExpenseDepartmentsRouteImport } from './routes/_app/expense
 import { Route as AppExpenseCategoriesRouteImport } from './routes/_app/expense/categories'
 import { Route as AppExpenseAuditRouteImport } from './routes/_app/expense/audit'
 import { Route as AppExpenseApprovalsRouteImport } from './routes/_app/expense/approvals'
+import { Route as AppExamSettingsRouteImport } from './routes/_app/exam/settings'
+import { Route as AppExamResultsRouteImport } from './routes/_app/exam/results'
+import { Route as AppExamMarksRouteImport } from './routes/_app/exam/marks'
+import { Route as AppExamHallTicketsRouteImport } from './routes/_app/exam/hall-tickets'
+import { Route as AppExamGradingRouteImport } from './routes/_app/exam/grading'
+import { Route as AppExamExamsRouteImport } from './routes/_app/exam/exams'
+import { Route as AppExamBoardPatternsRouteImport } from './routes/_app/exam/board-patterns'
+import { Route as AppExamAuditRouteImport } from './routes/_app/exam/audit'
 import { Route as AppAdminProfileRouteImport } from './routes/_app/admin/profile'
+import { Route as AppExamResultsIndexRouteImport } from './routes/_app/exam/results/index'
+import { Route as AppExamMarksIndexRouteImport } from './routes/_app/exam/marks/index'
+import { Route as AppExamHallTicketsIndexRouteImport } from './routes/_app/exam/hall-tickets/index'
+import { Route as AppExamExamsIndexRouteImport } from './routes/_app/exam/exams/index'
 import { Route as AppStudentsAdmissionAdmissionIdRouteImport } from './routes/_app/students/admission/$admissionId'
+import { Route as AppExamResultsIdRouteImport } from './routes/_app/exam/results/$id'
+import { Route as AppExamMarksExamIdRouteImport } from './routes/_app/exam/marks/$examId'
+import { Route as AppExamHallTicketsExamIdRouteImport } from './routes/_app/exam/hall-tickets/$examId'
+import { Route as AppExamGradingSubjectSchemesRouteImport } from './routes/_app/exam/grading/subject-schemes'
+import { Route as AppExamGradingRemarksRouteImport } from './routes/_app/exam/grading/remarks'
+import { Route as AppExamGradingExamSchemesRouteImport } from './routes/_app/exam/grading/exam-schemes'
+import { Route as AppExamExamsCreateRouteImport } from './routes/_app/exam/exams/create'
+import { Route as AppExamExamsIdRouteImport } from './routes/_app/exam/exams/$id'
+import { Route as AppExamExamsIdIndexRouteImport } from './routes/_app/exam/exams/$id/index'
+import { Route as AppExamMarksExamIdSummaryRouteImport } from './routes/_app/exam/marks/$examId/summary'
+import { Route as AppExamMarksExamIdClassIdRouteImport } from './routes/_app/exam/marks/$examId/$classId'
+import { Route as AppExamHallTicketsExamIdDownloadRouteImport } from './routes/_app/exam/hall-tickets/$examId/download'
+import { Route as AppExamExamsIdResultsRouteImport } from './routes/_app/exam/exams/$id/results'
+import { Route as AppExamExamsIdPermissionsRouteImport } from './routes/_app/exam/exams/$id/permissions'
+import { Route as AppExamExamsIdNotifyRouteImport } from './routes/_app/exam/exams/$id/notify'
+import { Route as AppExamExamsIdDatesRouteImport } from './routes/_app/exam/exams/$id/dates'
+import { Route as AppExamExamsIdAuditRouteImport } from './routes/_app/exam/exams/$id/audit'
+import { Route as AppExamMarksExamIdClassIdSectionIdRouteImport } from './routes/_app/exam/marks/$examId/$classId/$sectionId'
+import { Route as AppExamMarksExamIdClassIdSectionIdSubjectConfigIdRouteImport } from './routes/_app/exam/marks/$examId/$classId/$sectionId/$subjectConfigId'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/_auth',
@@ -135,6 +168,11 @@ const AppExpenseRoute = AppExpenseRouteImport.update({
   path: '/expense',
   getParentRoute: () => AppRoute,
 } as any)
+const AppExamRoute = AppExamRouteImport.update({
+  id: '/exam',
+  path: '/exam',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -169,6 +207,11 @@ const AppExpenseIndexRoute = AppExpenseIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppExpenseRoute,
+} as any)
+const AppExamIndexRoute = AppExamIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppExamRoute,
 } as any)
 const AppTransportVehiclesRoute = AppTransportVehiclesRouteImport.update({
   id: '/transport/vehicles',
@@ -442,10 +485,70 @@ const AppExpenseApprovalsRoute = AppExpenseApprovalsRouteImport.update({
   path: '/approvals',
   getParentRoute: () => AppExpenseRoute,
 } as any)
+const AppExamSettingsRoute = AppExamSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppExamRoute,
+} as any)
+const AppExamResultsRoute = AppExamResultsRouteImport.update({
+  id: '/results',
+  path: '/results',
+  getParentRoute: () => AppExamRoute,
+} as any)
+const AppExamMarksRoute = AppExamMarksRouteImport.update({
+  id: '/marks',
+  path: '/marks',
+  getParentRoute: () => AppExamRoute,
+} as any)
+const AppExamHallTicketsRoute = AppExamHallTicketsRouteImport.update({
+  id: '/hall-tickets',
+  path: '/hall-tickets',
+  getParentRoute: () => AppExamRoute,
+} as any)
+const AppExamGradingRoute = AppExamGradingRouteImport.update({
+  id: '/grading',
+  path: '/grading',
+  getParentRoute: () => AppExamRoute,
+} as any)
+const AppExamExamsRoute = AppExamExamsRouteImport.update({
+  id: '/exams',
+  path: '/exams',
+  getParentRoute: () => AppExamRoute,
+} as any)
+const AppExamBoardPatternsRoute = AppExamBoardPatternsRouteImport.update({
+  id: '/board-patterns',
+  path: '/board-patterns',
+  getParentRoute: () => AppExamRoute,
+} as any)
+const AppExamAuditRoute = AppExamAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AppExamRoute,
+} as any)
 const AppAdminProfileRoute = AppAdminProfileRouteImport.update({
   id: '/admin/profile',
   path: '/admin/profile',
   getParentRoute: () => AppRoute,
+} as any)
+const AppExamResultsIndexRoute = AppExamResultsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppExamResultsRoute,
+} as any)
+const AppExamMarksIndexRoute = AppExamMarksIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppExamMarksRoute,
+} as any)
+const AppExamHallTicketsIndexRoute = AppExamHallTicketsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppExamHallTicketsRoute,
+} as any)
+const AppExamExamsIndexRoute = AppExamExamsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppExamExamsRoute,
 } as any)
 const AppStudentsAdmissionAdmissionIdRoute =
   AppStudentsAdmissionAdmissionIdRouteImport.update({
@@ -453,12 +556,117 @@ const AppStudentsAdmissionAdmissionIdRoute =
     path: '/$admissionId',
     getParentRoute: () => AppStudentsAdmissionRoute,
   } as any)
+const AppExamResultsIdRoute = AppExamResultsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppExamResultsRoute,
+} as any)
+const AppExamMarksExamIdRoute = AppExamMarksExamIdRouteImport.update({
+  id: '/$examId',
+  path: '/$examId',
+  getParentRoute: () => AppExamMarksRoute,
+} as any)
+const AppExamHallTicketsExamIdRoute =
+  AppExamHallTicketsExamIdRouteImport.update({
+    id: '/$examId',
+    path: '/$examId',
+    getParentRoute: () => AppExamHallTicketsRoute,
+  } as any)
+const AppExamGradingSubjectSchemesRoute =
+  AppExamGradingSubjectSchemesRouteImport.update({
+    id: '/subject-schemes',
+    path: '/subject-schemes',
+    getParentRoute: () => AppExamGradingRoute,
+  } as any)
+const AppExamGradingRemarksRoute = AppExamGradingRemarksRouteImport.update({
+  id: '/remarks',
+  path: '/remarks',
+  getParentRoute: () => AppExamGradingRoute,
+} as any)
+const AppExamGradingExamSchemesRoute =
+  AppExamGradingExamSchemesRouteImport.update({
+    id: '/exam-schemes',
+    path: '/exam-schemes',
+    getParentRoute: () => AppExamGradingRoute,
+  } as any)
+const AppExamExamsCreateRoute = AppExamExamsCreateRouteImport.update({
+  id: '/create',
+  path: '/create',
+  getParentRoute: () => AppExamExamsRoute,
+} as any)
+const AppExamExamsIdRoute = AppExamExamsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppExamExamsRoute,
+} as any)
+const AppExamExamsIdIndexRoute = AppExamExamsIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppExamExamsIdRoute,
+} as any)
+const AppExamMarksExamIdSummaryRoute =
+  AppExamMarksExamIdSummaryRouteImport.update({
+    id: '/summary',
+    path: '/summary',
+    getParentRoute: () => AppExamMarksExamIdRoute,
+  } as any)
+const AppExamMarksExamIdClassIdRoute =
+  AppExamMarksExamIdClassIdRouteImport.update({
+    id: '/$classId',
+    path: '/$classId',
+    getParentRoute: () => AppExamMarksExamIdRoute,
+  } as any)
+const AppExamHallTicketsExamIdDownloadRoute =
+  AppExamHallTicketsExamIdDownloadRouteImport.update({
+    id: '/download',
+    path: '/download',
+    getParentRoute: () => AppExamHallTicketsExamIdRoute,
+  } as any)
+const AppExamExamsIdResultsRoute = AppExamExamsIdResultsRouteImport.update({
+  id: '/results',
+  path: '/results',
+  getParentRoute: () => AppExamExamsIdRoute,
+} as any)
+const AppExamExamsIdPermissionsRoute =
+  AppExamExamsIdPermissionsRouteImport.update({
+    id: '/permissions',
+    path: '/permissions',
+    getParentRoute: () => AppExamExamsIdRoute,
+  } as any)
+const AppExamExamsIdNotifyRoute = AppExamExamsIdNotifyRouteImport.update({
+  id: '/notify',
+  path: '/notify',
+  getParentRoute: () => AppExamExamsIdRoute,
+} as any)
+const AppExamExamsIdDatesRoute = AppExamExamsIdDatesRouteImport.update({
+  id: '/dates',
+  path: '/dates',
+  getParentRoute: () => AppExamExamsIdRoute,
+} as any)
+const AppExamExamsIdAuditRoute = AppExamExamsIdAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AppExamExamsIdRoute,
+} as any)
+const AppExamMarksExamIdClassIdSectionIdRoute =
+  AppExamMarksExamIdClassIdSectionIdRouteImport.update({
+    id: '/$sectionId',
+    path: '/$sectionId',
+    getParentRoute: () => AppExamMarksExamIdClassIdRoute,
+  } as any)
+const AppExamMarksExamIdClassIdSectionIdSubjectConfigIdRoute =
+  AppExamMarksExamIdClassIdSectionIdSubjectConfigIdRouteImport.update({
+    id: '/$subjectConfigId',
+    path: '/$subjectConfigId',
+    getParentRoute: () => AppExamMarksExamIdClassIdSectionIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/Calender': typeof AppCalenderRoute
   '/TimeTable': typeof AppTimeTableRoute
   '/about': typeof AppAboutRoute
   '/dashboard': typeof AppDashboardRoute
+  '/exam': typeof AppExamRouteWithChildren
   '/expense': typeof AppExpenseRouteWithChildren
   '/fee': typeof AppFeeRouteWithChildren
   '/profile': typeof AppProfileRoute
@@ -469,6 +677,14 @@ export interface FileRoutesByFullPath {
   '/login': typeof AuthLoginRoute
   '/': typeof AppIndexRoute
   '/admin/profile': typeof AppAdminProfileRoute
+  '/exam/audit': typeof AppExamAuditRoute
+  '/exam/board-patterns': typeof AppExamBoardPatternsRoute
+  '/exam/exams': typeof AppExamExamsRouteWithChildren
+  '/exam/grading': typeof AppExamGradingRouteWithChildren
+  '/exam/hall-tickets': typeof AppExamHallTicketsRouteWithChildren
+  '/exam/marks': typeof AppExamMarksRouteWithChildren
+  '/exam/results': typeof AppExamResultsRouteWithChildren
+  '/exam/settings': typeof AppExamSettingsRoute
   '/expense/approvals': typeof AppExpenseApprovalsRoute
   '/expense/audit': typeof AppExpenseAuditRoute
   '/expense/categories': typeof AppExpenseCategoriesRoute
@@ -521,10 +737,34 @@ export interface FileRoutesByFullPath {
   '/transport/studentTrips': typeof AppTransportStudentTripsRoute
   '/transport/trips': typeof AppTransportTripsRoute
   '/transport/vehicles': typeof AppTransportVehiclesRoute
+  '/exam/': typeof AppExamIndexRoute
   '/expense/': typeof AppExpenseIndexRoute
   '/fee/': typeof AppFeeIndexRoute
   '/staff': typeof AppStaffIndexRoute
+  '/exam/exams/$id': typeof AppExamExamsIdRouteWithChildren
+  '/exam/exams/create': typeof AppExamExamsCreateRoute
+  '/exam/grading/exam-schemes': typeof AppExamGradingExamSchemesRoute
+  '/exam/grading/remarks': typeof AppExamGradingRemarksRoute
+  '/exam/grading/subject-schemes': typeof AppExamGradingSubjectSchemesRoute
+  '/exam/hall-tickets/$examId': typeof AppExamHallTicketsExamIdRouteWithChildren
+  '/exam/marks/$examId': typeof AppExamMarksExamIdRouteWithChildren
+  '/exam/results/$id': typeof AppExamResultsIdRoute
   '/students/admission/$admissionId': typeof AppStudentsAdmissionAdmissionIdRoute
+  '/exam/exams/': typeof AppExamExamsIndexRoute
+  '/exam/hall-tickets/': typeof AppExamHallTicketsIndexRoute
+  '/exam/marks/': typeof AppExamMarksIndexRoute
+  '/exam/results/': typeof AppExamResultsIndexRoute
+  '/exam/exams/$id/audit': typeof AppExamExamsIdAuditRoute
+  '/exam/exams/$id/dates': typeof AppExamExamsIdDatesRoute
+  '/exam/exams/$id/notify': typeof AppExamExamsIdNotifyRoute
+  '/exam/exams/$id/permissions': typeof AppExamExamsIdPermissionsRoute
+  '/exam/exams/$id/results': typeof AppExamExamsIdResultsRoute
+  '/exam/hall-tickets/$examId/download': typeof AppExamHallTicketsExamIdDownloadRoute
+  '/exam/marks/$examId/$classId': typeof AppExamMarksExamIdClassIdRouteWithChildren
+  '/exam/marks/$examId/summary': typeof AppExamMarksExamIdSummaryRoute
+  '/exam/exams/$id/': typeof AppExamExamsIdIndexRoute
+  '/exam/marks/$examId/$classId/$sectionId': typeof AppExamMarksExamIdClassIdSectionIdRouteWithChildren
+  '/exam/marks/$examId/$classId/$sectionId/$subjectConfigId': typeof AppExamMarksExamIdClassIdSectionIdSubjectConfigIdRoute
 }
 export interface FileRoutesByTo {
   '/Calender': typeof AppCalenderRoute
@@ -539,6 +779,10 @@ export interface FileRoutesByTo {
   '/login': typeof AuthLoginRoute
   '/': typeof AppIndexRoute
   '/admin/profile': typeof AppAdminProfileRoute
+  '/exam/audit': typeof AppExamAuditRoute
+  '/exam/board-patterns': typeof AppExamBoardPatternsRoute
+  '/exam/grading': typeof AppExamGradingRouteWithChildren
+  '/exam/settings': typeof AppExamSettingsRoute
   '/expense/approvals': typeof AppExpenseApprovalsRoute
   '/expense/audit': typeof AppExpenseAuditRoute
   '/expense/categories': typeof AppExpenseCategoriesRoute
@@ -591,10 +835,33 @@ export interface FileRoutesByTo {
   '/transport/studentTrips': typeof AppTransportStudentTripsRoute
   '/transport/trips': typeof AppTransportTripsRoute
   '/transport/vehicles': typeof AppTransportVehiclesRoute
+  '/exam': typeof AppExamIndexRoute
   '/expense': typeof AppExpenseIndexRoute
   '/fee': typeof AppFeeIndexRoute
   '/staff': typeof AppStaffIndexRoute
+  '/exam/exams/create': typeof AppExamExamsCreateRoute
+  '/exam/grading/exam-schemes': typeof AppExamGradingExamSchemesRoute
+  '/exam/grading/remarks': typeof AppExamGradingRemarksRoute
+  '/exam/grading/subject-schemes': typeof AppExamGradingSubjectSchemesRoute
+  '/exam/hall-tickets/$examId': typeof AppExamHallTicketsExamIdRouteWithChildren
+  '/exam/marks/$examId': typeof AppExamMarksExamIdRouteWithChildren
+  '/exam/results/$id': typeof AppExamResultsIdRoute
   '/students/admission/$admissionId': typeof AppStudentsAdmissionAdmissionIdRoute
+  '/exam/exams': typeof AppExamExamsIndexRoute
+  '/exam/hall-tickets': typeof AppExamHallTicketsIndexRoute
+  '/exam/marks': typeof AppExamMarksIndexRoute
+  '/exam/results': typeof AppExamResultsIndexRoute
+  '/exam/exams/$id/audit': typeof AppExamExamsIdAuditRoute
+  '/exam/exams/$id/dates': typeof AppExamExamsIdDatesRoute
+  '/exam/exams/$id/notify': typeof AppExamExamsIdNotifyRoute
+  '/exam/exams/$id/permissions': typeof AppExamExamsIdPermissionsRoute
+  '/exam/exams/$id/results': typeof AppExamExamsIdResultsRoute
+  '/exam/hall-tickets/$examId/download': typeof AppExamHallTicketsExamIdDownloadRoute
+  '/exam/marks/$examId/$classId': typeof AppExamMarksExamIdClassIdRouteWithChildren
+  '/exam/marks/$examId/summary': typeof AppExamMarksExamIdSummaryRoute
+  '/exam/exams/$id': typeof AppExamExamsIdIndexRoute
+  '/exam/marks/$examId/$classId/$sectionId': typeof AppExamMarksExamIdClassIdSectionIdRouteWithChildren
+  '/exam/marks/$examId/$classId/$sectionId/$subjectConfigId': typeof AppExamMarksExamIdClassIdSectionIdSubjectConfigIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -604,6 +871,7 @@ export interface FileRoutesById {
   '/_app/TimeTable': typeof AppTimeTableRoute
   '/_app/about': typeof AppAboutRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/exam': typeof AppExamRouteWithChildren
   '/_app/expense': typeof AppExpenseRouteWithChildren
   '/_app/fee': typeof AppFeeRouteWithChildren
   '/_app/profile': typeof AppProfileRoute
@@ -614,6 +882,14 @@ export interface FileRoutesById {
   '/_auth/login': typeof AuthLoginRoute
   '/_app/': typeof AppIndexRoute
   '/_app/admin/profile': typeof AppAdminProfileRoute
+  '/_app/exam/audit': typeof AppExamAuditRoute
+  '/_app/exam/board-patterns': typeof AppExamBoardPatternsRoute
+  '/_app/exam/exams': typeof AppExamExamsRouteWithChildren
+  '/_app/exam/grading': typeof AppExamGradingRouteWithChildren
+  '/_app/exam/hall-tickets': typeof AppExamHallTicketsRouteWithChildren
+  '/_app/exam/marks': typeof AppExamMarksRouteWithChildren
+  '/_app/exam/results': typeof AppExamResultsRouteWithChildren
+  '/_app/exam/settings': typeof AppExamSettingsRoute
   '/_app/expense/approvals': typeof AppExpenseApprovalsRoute
   '/_app/expense/audit': typeof AppExpenseAuditRoute
   '/_app/expense/categories': typeof AppExpenseCategoriesRoute
@@ -666,10 +942,34 @@ export interface FileRoutesById {
   '/_app/transport/studentTrips': typeof AppTransportStudentTripsRoute
   '/_app/transport/trips': typeof AppTransportTripsRoute
   '/_app/transport/vehicles': typeof AppTransportVehiclesRoute
+  '/_app/exam/': typeof AppExamIndexRoute
   '/_app/expense/': typeof AppExpenseIndexRoute
   '/_app/fee/': typeof AppFeeIndexRoute
   '/_app/staff/': typeof AppStaffIndexRoute
+  '/_app/exam/exams/$id': typeof AppExamExamsIdRouteWithChildren
+  '/_app/exam/exams/create': typeof AppExamExamsCreateRoute
+  '/_app/exam/grading/exam-schemes': typeof AppExamGradingExamSchemesRoute
+  '/_app/exam/grading/remarks': typeof AppExamGradingRemarksRoute
+  '/_app/exam/grading/subject-schemes': typeof AppExamGradingSubjectSchemesRoute
+  '/_app/exam/hall-tickets/$examId': typeof AppExamHallTicketsExamIdRouteWithChildren
+  '/_app/exam/marks/$examId': typeof AppExamMarksExamIdRouteWithChildren
+  '/_app/exam/results/$id': typeof AppExamResultsIdRoute
   '/_app/students/admission/$admissionId': typeof AppStudentsAdmissionAdmissionIdRoute
+  '/_app/exam/exams/': typeof AppExamExamsIndexRoute
+  '/_app/exam/hall-tickets/': typeof AppExamHallTicketsIndexRoute
+  '/_app/exam/marks/': typeof AppExamMarksIndexRoute
+  '/_app/exam/results/': typeof AppExamResultsIndexRoute
+  '/_app/exam/exams/$id/audit': typeof AppExamExamsIdAuditRoute
+  '/_app/exam/exams/$id/dates': typeof AppExamExamsIdDatesRoute
+  '/_app/exam/exams/$id/notify': typeof AppExamExamsIdNotifyRoute
+  '/_app/exam/exams/$id/permissions': typeof AppExamExamsIdPermissionsRoute
+  '/_app/exam/exams/$id/results': typeof AppExamExamsIdResultsRoute
+  '/_app/exam/hall-tickets/$examId/download': typeof AppExamHallTicketsExamIdDownloadRoute
+  '/_app/exam/marks/$examId/$classId': typeof AppExamMarksExamIdClassIdRouteWithChildren
+  '/_app/exam/marks/$examId/summary': typeof AppExamMarksExamIdSummaryRoute
+  '/_app/exam/exams/$id/': typeof AppExamExamsIdIndexRoute
+  '/_app/exam/marks/$examId/$classId/$sectionId': typeof AppExamMarksExamIdClassIdSectionIdRouteWithChildren
+  '/_app/exam/marks/$examId/$classId/$sectionId/$subjectConfigId': typeof AppExamMarksExamIdClassIdSectionIdSubjectConfigIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -678,6 +978,7 @@ export interface FileRouteTypes {
     | '/TimeTable'
     | '/about'
     | '/dashboard'
+    | '/exam'
     | '/expense'
     | '/fee'
     | '/profile'
@@ -688,6 +989,14 @@ export interface FileRouteTypes {
     | '/login'
     | '/'
     | '/admin/profile'
+    | '/exam/audit'
+    | '/exam/board-patterns'
+    | '/exam/exams'
+    | '/exam/grading'
+    | '/exam/hall-tickets'
+    | '/exam/marks'
+    | '/exam/results'
+    | '/exam/settings'
     | '/expense/approvals'
     | '/expense/audit'
     | '/expense/categories'
@@ -740,10 +1049,34 @@ export interface FileRouteTypes {
     | '/transport/studentTrips'
     | '/transport/trips'
     | '/transport/vehicles'
+    | '/exam/'
     | '/expense/'
     | '/fee/'
     | '/staff'
+    | '/exam/exams/$id'
+    | '/exam/exams/create'
+    | '/exam/grading/exam-schemes'
+    | '/exam/grading/remarks'
+    | '/exam/grading/subject-schemes'
+    | '/exam/hall-tickets/$examId'
+    | '/exam/marks/$examId'
+    | '/exam/results/$id'
     | '/students/admission/$admissionId'
+    | '/exam/exams/'
+    | '/exam/hall-tickets/'
+    | '/exam/marks/'
+    | '/exam/results/'
+    | '/exam/exams/$id/audit'
+    | '/exam/exams/$id/dates'
+    | '/exam/exams/$id/notify'
+    | '/exam/exams/$id/permissions'
+    | '/exam/exams/$id/results'
+    | '/exam/hall-tickets/$examId/download'
+    | '/exam/marks/$examId/$classId'
+    | '/exam/marks/$examId/summary'
+    | '/exam/exams/$id/'
+    | '/exam/marks/$examId/$classId/$sectionId'
+    | '/exam/marks/$examId/$classId/$sectionId/$subjectConfigId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/Calender'
@@ -758,6 +1091,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/'
     | '/admin/profile'
+    | '/exam/audit'
+    | '/exam/board-patterns'
+    | '/exam/grading'
+    | '/exam/settings'
     | '/expense/approvals'
     | '/expense/audit'
     | '/expense/categories'
@@ -810,10 +1147,33 @@ export interface FileRouteTypes {
     | '/transport/studentTrips'
     | '/transport/trips'
     | '/transport/vehicles'
+    | '/exam'
     | '/expense'
     | '/fee'
     | '/staff'
+    | '/exam/exams/create'
+    | '/exam/grading/exam-schemes'
+    | '/exam/grading/remarks'
+    | '/exam/grading/subject-schemes'
+    | '/exam/hall-tickets/$examId'
+    | '/exam/marks/$examId'
+    | '/exam/results/$id'
     | '/students/admission/$admissionId'
+    | '/exam/exams'
+    | '/exam/hall-tickets'
+    | '/exam/marks'
+    | '/exam/results'
+    | '/exam/exams/$id/audit'
+    | '/exam/exams/$id/dates'
+    | '/exam/exams/$id/notify'
+    | '/exam/exams/$id/permissions'
+    | '/exam/exams/$id/results'
+    | '/exam/hall-tickets/$examId/download'
+    | '/exam/marks/$examId/$classId'
+    | '/exam/marks/$examId/summary'
+    | '/exam/exams/$id'
+    | '/exam/marks/$examId/$classId/$sectionId'
+    | '/exam/marks/$examId/$classId/$sectionId/$subjectConfigId'
   id:
     | '__root__'
     | '/_app'
@@ -822,6 +1182,7 @@ export interface FileRouteTypes {
     | '/_app/TimeTable'
     | '/_app/about'
     | '/_app/dashboard'
+    | '/_app/exam'
     | '/_app/expense'
     | '/_app/fee'
     | '/_app/profile'
@@ -832,6 +1193,14 @@ export interface FileRouteTypes {
     | '/_auth/login'
     | '/_app/'
     | '/_app/admin/profile'
+    | '/_app/exam/audit'
+    | '/_app/exam/board-patterns'
+    | '/_app/exam/exams'
+    | '/_app/exam/grading'
+    | '/_app/exam/hall-tickets'
+    | '/_app/exam/marks'
+    | '/_app/exam/results'
+    | '/_app/exam/settings'
     | '/_app/expense/approvals'
     | '/_app/expense/audit'
     | '/_app/expense/categories'
@@ -884,10 +1253,34 @@ export interface FileRouteTypes {
     | '/_app/transport/studentTrips'
     | '/_app/transport/trips'
     | '/_app/transport/vehicles'
+    | '/_app/exam/'
     | '/_app/expense/'
     | '/_app/fee/'
     | '/_app/staff/'
+    | '/_app/exam/exams/$id'
+    | '/_app/exam/exams/create'
+    | '/_app/exam/grading/exam-schemes'
+    | '/_app/exam/grading/remarks'
+    | '/_app/exam/grading/subject-schemes'
+    | '/_app/exam/hall-tickets/$examId'
+    | '/_app/exam/marks/$examId'
+    | '/_app/exam/results/$id'
     | '/_app/students/admission/$admissionId'
+    | '/_app/exam/exams/'
+    | '/_app/exam/hall-tickets/'
+    | '/_app/exam/marks/'
+    | '/_app/exam/results/'
+    | '/_app/exam/exams/$id/audit'
+    | '/_app/exam/exams/$id/dates'
+    | '/_app/exam/exams/$id/notify'
+    | '/_app/exam/exams/$id/permissions'
+    | '/_app/exam/exams/$id/results'
+    | '/_app/exam/hall-tickets/$examId/download'
+    | '/_app/exam/marks/$examId/$classId'
+    | '/_app/exam/marks/$examId/summary'
+    | '/_app/exam/exams/$id/'
+    | '/_app/exam/marks/$examId/$classId/$sectionId'
+    | '/_app/exam/marks/$examId/$classId/$sectionId/$subjectConfigId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -974,6 +1367,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppExpenseRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/exam': {
+      id: '/_app/exam'
+      path: '/exam'
+      fullPath: '/exam'
+      preLoaderRoute: typeof AppExamRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -1022,6 +1422,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/expense/'
       preLoaderRoute: typeof AppExpenseIndexRouteImport
       parentRoute: typeof AppExpenseRoute
+    }
+    '/_app/exam/': {
+      id: '/_app/exam/'
+      path: '/'
+      fullPath: '/exam/'
+      preLoaderRoute: typeof AppExamIndexRouteImport
+      parentRoute: typeof AppExamRoute
     }
     '/_app/transport/vehicles': {
       id: '/_app/transport/vehicles'
@@ -1387,12 +1794,96 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppExpenseApprovalsRouteImport
       parentRoute: typeof AppExpenseRoute
     }
+    '/_app/exam/settings': {
+      id: '/_app/exam/settings'
+      path: '/settings'
+      fullPath: '/exam/settings'
+      preLoaderRoute: typeof AppExamSettingsRouteImport
+      parentRoute: typeof AppExamRoute
+    }
+    '/_app/exam/results': {
+      id: '/_app/exam/results'
+      path: '/results'
+      fullPath: '/exam/results'
+      preLoaderRoute: typeof AppExamResultsRouteImport
+      parentRoute: typeof AppExamRoute
+    }
+    '/_app/exam/marks': {
+      id: '/_app/exam/marks'
+      path: '/marks'
+      fullPath: '/exam/marks'
+      preLoaderRoute: typeof AppExamMarksRouteImport
+      parentRoute: typeof AppExamRoute
+    }
+    '/_app/exam/hall-tickets': {
+      id: '/_app/exam/hall-tickets'
+      path: '/hall-tickets'
+      fullPath: '/exam/hall-tickets'
+      preLoaderRoute: typeof AppExamHallTicketsRouteImport
+      parentRoute: typeof AppExamRoute
+    }
+    '/_app/exam/grading': {
+      id: '/_app/exam/grading'
+      path: '/grading'
+      fullPath: '/exam/grading'
+      preLoaderRoute: typeof AppExamGradingRouteImport
+      parentRoute: typeof AppExamRoute
+    }
+    '/_app/exam/exams': {
+      id: '/_app/exam/exams'
+      path: '/exams'
+      fullPath: '/exam/exams'
+      preLoaderRoute: typeof AppExamExamsRouteImport
+      parentRoute: typeof AppExamRoute
+    }
+    '/_app/exam/board-patterns': {
+      id: '/_app/exam/board-patterns'
+      path: '/board-patterns'
+      fullPath: '/exam/board-patterns'
+      preLoaderRoute: typeof AppExamBoardPatternsRouteImport
+      parentRoute: typeof AppExamRoute
+    }
+    '/_app/exam/audit': {
+      id: '/_app/exam/audit'
+      path: '/audit'
+      fullPath: '/exam/audit'
+      preLoaderRoute: typeof AppExamAuditRouteImport
+      parentRoute: typeof AppExamRoute
+    }
     '/_app/admin/profile': {
       id: '/_app/admin/profile'
       path: '/admin/profile'
       fullPath: '/admin/profile'
       preLoaderRoute: typeof AppAdminProfileRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/exam/results/': {
+      id: '/_app/exam/results/'
+      path: '/'
+      fullPath: '/exam/results/'
+      preLoaderRoute: typeof AppExamResultsIndexRouteImport
+      parentRoute: typeof AppExamResultsRoute
+    }
+    '/_app/exam/marks/': {
+      id: '/_app/exam/marks/'
+      path: '/'
+      fullPath: '/exam/marks/'
+      preLoaderRoute: typeof AppExamMarksIndexRouteImport
+      parentRoute: typeof AppExamMarksRoute
+    }
+    '/_app/exam/hall-tickets/': {
+      id: '/_app/exam/hall-tickets/'
+      path: '/'
+      fullPath: '/exam/hall-tickets/'
+      preLoaderRoute: typeof AppExamHallTicketsIndexRouteImport
+      parentRoute: typeof AppExamHallTicketsRoute
+    }
+    '/_app/exam/exams/': {
+      id: '/_app/exam/exams/'
+      path: '/'
+      fullPath: '/exam/exams/'
+      preLoaderRoute: typeof AppExamExamsIndexRouteImport
+      parentRoute: typeof AppExamExamsRoute
     }
     '/_app/students/admission/$admissionId': {
       id: '/_app/students/admission/$admissionId'
@@ -1401,8 +1892,321 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppStudentsAdmissionAdmissionIdRouteImport
       parentRoute: typeof AppStudentsAdmissionRoute
     }
+    '/_app/exam/results/$id': {
+      id: '/_app/exam/results/$id'
+      path: '/$id'
+      fullPath: '/exam/results/$id'
+      preLoaderRoute: typeof AppExamResultsIdRouteImport
+      parentRoute: typeof AppExamResultsRoute
+    }
+    '/_app/exam/marks/$examId': {
+      id: '/_app/exam/marks/$examId'
+      path: '/$examId'
+      fullPath: '/exam/marks/$examId'
+      preLoaderRoute: typeof AppExamMarksExamIdRouteImport
+      parentRoute: typeof AppExamMarksRoute
+    }
+    '/_app/exam/hall-tickets/$examId': {
+      id: '/_app/exam/hall-tickets/$examId'
+      path: '/$examId'
+      fullPath: '/exam/hall-tickets/$examId'
+      preLoaderRoute: typeof AppExamHallTicketsExamIdRouteImport
+      parentRoute: typeof AppExamHallTicketsRoute
+    }
+    '/_app/exam/grading/subject-schemes': {
+      id: '/_app/exam/grading/subject-schemes'
+      path: '/subject-schemes'
+      fullPath: '/exam/grading/subject-schemes'
+      preLoaderRoute: typeof AppExamGradingSubjectSchemesRouteImport
+      parentRoute: typeof AppExamGradingRoute
+    }
+    '/_app/exam/grading/remarks': {
+      id: '/_app/exam/grading/remarks'
+      path: '/remarks'
+      fullPath: '/exam/grading/remarks'
+      preLoaderRoute: typeof AppExamGradingRemarksRouteImport
+      parentRoute: typeof AppExamGradingRoute
+    }
+    '/_app/exam/grading/exam-schemes': {
+      id: '/_app/exam/grading/exam-schemes'
+      path: '/exam-schemes'
+      fullPath: '/exam/grading/exam-schemes'
+      preLoaderRoute: typeof AppExamGradingExamSchemesRouteImport
+      parentRoute: typeof AppExamGradingRoute
+    }
+    '/_app/exam/exams/create': {
+      id: '/_app/exam/exams/create'
+      path: '/create'
+      fullPath: '/exam/exams/create'
+      preLoaderRoute: typeof AppExamExamsCreateRouteImport
+      parentRoute: typeof AppExamExamsRoute
+    }
+    '/_app/exam/exams/$id': {
+      id: '/_app/exam/exams/$id'
+      path: '/$id'
+      fullPath: '/exam/exams/$id'
+      preLoaderRoute: typeof AppExamExamsIdRouteImport
+      parentRoute: typeof AppExamExamsRoute
+    }
+    '/_app/exam/exams/$id/': {
+      id: '/_app/exam/exams/$id/'
+      path: '/'
+      fullPath: '/exam/exams/$id/'
+      preLoaderRoute: typeof AppExamExamsIdIndexRouteImport
+      parentRoute: typeof AppExamExamsIdRoute
+    }
+    '/_app/exam/marks/$examId/summary': {
+      id: '/_app/exam/marks/$examId/summary'
+      path: '/summary'
+      fullPath: '/exam/marks/$examId/summary'
+      preLoaderRoute: typeof AppExamMarksExamIdSummaryRouteImport
+      parentRoute: typeof AppExamMarksExamIdRoute
+    }
+    '/_app/exam/marks/$examId/$classId': {
+      id: '/_app/exam/marks/$examId/$classId'
+      path: '/$classId'
+      fullPath: '/exam/marks/$examId/$classId'
+      preLoaderRoute: typeof AppExamMarksExamIdClassIdRouteImport
+      parentRoute: typeof AppExamMarksExamIdRoute
+    }
+    '/_app/exam/hall-tickets/$examId/download': {
+      id: '/_app/exam/hall-tickets/$examId/download'
+      path: '/download'
+      fullPath: '/exam/hall-tickets/$examId/download'
+      preLoaderRoute: typeof AppExamHallTicketsExamIdDownloadRouteImport
+      parentRoute: typeof AppExamHallTicketsExamIdRoute
+    }
+    '/_app/exam/exams/$id/results': {
+      id: '/_app/exam/exams/$id/results'
+      path: '/results'
+      fullPath: '/exam/exams/$id/results'
+      preLoaderRoute: typeof AppExamExamsIdResultsRouteImport
+      parentRoute: typeof AppExamExamsIdRoute
+    }
+    '/_app/exam/exams/$id/permissions': {
+      id: '/_app/exam/exams/$id/permissions'
+      path: '/permissions'
+      fullPath: '/exam/exams/$id/permissions'
+      preLoaderRoute: typeof AppExamExamsIdPermissionsRouteImport
+      parentRoute: typeof AppExamExamsIdRoute
+    }
+    '/_app/exam/exams/$id/notify': {
+      id: '/_app/exam/exams/$id/notify'
+      path: '/notify'
+      fullPath: '/exam/exams/$id/notify'
+      preLoaderRoute: typeof AppExamExamsIdNotifyRouteImport
+      parentRoute: typeof AppExamExamsIdRoute
+    }
+    '/_app/exam/exams/$id/dates': {
+      id: '/_app/exam/exams/$id/dates'
+      path: '/dates'
+      fullPath: '/exam/exams/$id/dates'
+      preLoaderRoute: typeof AppExamExamsIdDatesRouteImport
+      parentRoute: typeof AppExamExamsIdRoute
+    }
+    '/_app/exam/exams/$id/audit': {
+      id: '/_app/exam/exams/$id/audit'
+      path: '/audit'
+      fullPath: '/exam/exams/$id/audit'
+      preLoaderRoute: typeof AppExamExamsIdAuditRouteImport
+      parentRoute: typeof AppExamExamsIdRoute
+    }
+    '/_app/exam/marks/$examId/$classId/$sectionId': {
+      id: '/_app/exam/marks/$examId/$classId/$sectionId'
+      path: '/$sectionId'
+      fullPath: '/exam/marks/$examId/$classId/$sectionId'
+      preLoaderRoute: typeof AppExamMarksExamIdClassIdSectionIdRouteImport
+      parentRoute: typeof AppExamMarksExamIdClassIdRoute
+    }
+    '/_app/exam/marks/$examId/$classId/$sectionId/$subjectConfigId': {
+      id: '/_app/exam/marks/$examId/$classId/$sectionId/$subjectConfigId'
+      path: '/$subjectConfigId'
+      fullPath: '/exam/marks/$examId/$classId/$sectionId/$subjectConfigId'
+      preLoaderRoute: typeof AppExamMarksExamIdClassIdSectionIdSubjectConfigIdRouteImport
+      parentRoute: typeof AppExamMarksExamIdClassIdSectionIdRoute
+    }
   }
 }
+
+interface AppExamExamsIdRouteChildren {
+  AppExamExamsIdAuditRoute: typeof AppExamExamsIdAuditRoute
+  AppExamExamsIdDatesRoute: typeof AppExamExamsIdDatesRoute
+  AppExamExamsIdNotifyRoute: typeof AppExamExamsIdNotifyRoute
+  AppExamExamsIdPermissionsRoute: typeof AppExamExamsIdPermissionsRoute
+  AppExamExamsIdResultsRoute: typeof AppExamExamsIdResultsRoute
+  AppExamExamsIdIndexRoute: typeof AppExamExamsIdIndexRoute
+}
+
+const AppExamExamsIdRouteChildren: AppExamExamsIdRouteChildren = {
+  AppExamExamsIdAuditRoute: AppExamExamsIdAuditRoute,
+  AppExamExamsIdDatesRoute: AppExamExamsIdDatesRoute,
+  AppExamExamsIdNotifyRoute: AppExamExamsIdNotifyRoute,
+  AppExamExamsIdPermissionsRoute: AppExamExamsIdPermissionsRoute,
+  AppExamExamsIdResultsRoute: AppExamExamsIdResultsRoute,
+  AppExamExamsIdIndexRoute: AppExamExamsIdIndexRoute,
+}
+
+const AppExamExamsIdRouteWithChildren = AppExamExamsIdRoute._addFileChildren(
+  AppExamExamsIdRouteChildren,
+)
+
+interface AppExamExamsRouteChildren {
+  AppExamExamsIdRoute: typeof AppExamExamsIdRouteWithChildren
+  AppExamExamsCreateRoute: typeof AppExamExamsCreateRoute
+  AppExamExamsIndexRoute: typeof AppExamExamsIndexRoute
+}
+
+const AppExamExamsRouteChildren: AppExamExamsRouteChildren = {
+  AppExamExamsIdRoute: AppExamExamsIdRouteWithChildren,
+  AppExamExamsCreateRoute: AppExamExamsCreateRoute,
+  AppExamExamsIndexRoute: AppExamExamsIndexRoute,
+}
+
+const AppExamExamsRouteWithChildren = AppExamExamsRoute._addFileChildren(
+  AppExamExamsRouteChildren,
+)
+
+interface AppExamGradingRouteChildren {
+  AppExamGradingExamSchemesRoute: typeof AppExamGradingExamSchemesRoute
+  AppExamGradingRemarksRoute: typeof AppExamGradingRemarksRoute
+  AppExamGradingSubjectSchemesRoute: typeof AppExamGradingSubjectSchemesRoute
+}
+
+const AppExamGradingRouteChildren: AppExamGradingRouteChildren = {
+  AppExamGradingExamSchemesRoute: AppExamGradingExamSchemesRoute,
+  AppExamGradingRemarksRoute: AppExamGradingRemarksRoute,
+  AppExamGradingSubjectSchemesRoute: AppExamGradingSubjectSchemesRoute,
+}
+
+const AppExamGradingRouteWithChildren = AppExamGradingRoute._addFileChildren(
+  AppExamGradingRouteChildren,
+)
+
+interface AppExamHallTicketsExamIdRouteChildren {
+  AppExamHallTicketsExamIdDownloadRoute: typeof AppExamHallTicketsExamIdDownloadRoute
+}
+
+const AppExamHallTicketsExamIdRouteChildren: AppExamHallTicketsExamIdRouteChildren =
+  {
+    AppExamHallTicketsExamIdDownloadRoute:
+      AppExamHallTicketsExamIdDownloadRoute,
+  }
+
+const AppExamHallTicketsExamIdRouteWithChildren =
+  AppExamHallTicketsExamIdRoute._addFileChildren(
+    AppExamHallTicketsExamIdRouteChildren,
+  )
+
+interface AppExamHallTicketsRouteChildren {
+  AppExamHallTicketsExamIdRoute: typeof AppExamHallTicketsExamIdRouteWithChildren
+  AppExamHallTicketsIndexRoute: typeof AppExamHallTicketsIndexRoute
+}
+
+const AppExamHallTicketsRouteChildren: AppExamHallTicketsRouteChildren = {
+  AppExamHallTicketsExamIdRoute: AppExamHallTicketsExamIdRouteWithChildren,
+  AppExamHallTicketsIndexRoute: AppExamHallTicketsIndexRoute,
+}
+
+const AppExamHallTicketsRouteWithChildren =
+  AppExamHallTicketsRoute._addFileChildren(AppExamHallTicketsRouteChildren)
+
+interface AppExamMarksExamIdClassIdSectionIdRouteChildren {
+  AppExamMarksExamIdClassIdSectionIdSubjectConfigIdRoute: typeof AppExamMarksExamIdClassIdSectionIdSubjectConfigIdRoute
+}
+
+const AppExamMarksExamIdClassIdSectionIdRouteChildren: AppExamMarksExamIdClassIdSectionIdRouteChildren =
+  {
+    AppExamMarksExamIdClassIdSectionIdSubjectConfigIdRoute:
+      AppExamMarksExamIdClassIdSectionIdSubjectConfigIdRoute,
+  }
+
+const AppExamMarksExamIdClassIdSectionIdRouteWithChildren =
+  AppExamMarksExamIdClassIdSectionIdRoute._addFileChildren(
+    AppExamMarksExamIdClassIdSectionIdRouteChildren,
+  )
+
+interface AppExamMarksExamIdClassIdRouteChildren {
+  AppExamMarksExamIdClassIdSectionIdRoute: typeof AppExamMarksExamIdClassIdSectionIdRouteWithChildren
+}
+
+const AppExamMarksExamIdClassIdRouteChildren: AppExamMarksExamIdClassIdRouteChildren =
+  {
+    AppExamMarksExamIdClassIdSectionIdRoute:
+      AppExamMarksExamIdClassIdSectionIdRouteWithChildren,
+  }
+
+const AppExamMarksExamIdClassIdRouteWithChildren =
+  AppExamMarksExamIdClassIdRoute._addFileChildren(
+    AppExamMarksExamIdClassIdRouteChildren,
+  )
+
+interface AppExamMarksExamIdRouteChildren {
+  AppExamMarksExamIdClassIdRoute: typeof AppExamMarksExamIdClassIdRouteWithChildren
+  AppExamMarksExamIdSummaryRoute: typeof AppExamMarksExamIdSummaryRoute
+}
+
+const AppExamMarksExamIdRouteChildren: AppExamMarksExamIdRouteChildren = {
+  AppExamMarksExamIdClassIdRoute: AppExamMarksExamIdClassIdRouteWithChildren,
+  AppExamMarksExamIdSummaryRoute: AppExamMarksExamIdSummaryRoute,
+}
+
+const AppExamMarksExamIdRouteWithChildren =
+  AppExamMarksExamIdRoute._addFileChildren(AppExamMarksExamIdRouteChildren)
+
+interface AppExamMarksRouteChildren {
+  AppExamMarksExamIdRoute: typeof AppExamMarksExamIdRouteWithChildren
+  AppExamMarksIndexRoute: typeof AppExamMarksIndexRoute
+}
+
+const AppExamMarksRouteChildren: AppExamMarksRouteChildren = {
+  AppExamMarksExamIdRoute: AppExamMarksExamIdRouteWithChildren,
+  AppExamMarksIndexRoute: AppExamMarksIndexRoute,
+}
+
+const AppExamMarksRouteWithChildren = AppExamMarksRoute._addFileChildren(
+  AppExamMarksRouteChildren,
+)
+
+interface AppExamResultsRouteChildren {
+  AppExamResultsIdRoute: typeof AppExamResultsIdRoute
+  AppExamResultsIndexRoute: typeof AppExamResultsIndexRoute
+}
+
+const AppExamResultsRouteChildren: AppExamResultsRouteChildren = {
+  AppExamResultsIdRoute: AppExamResultsIdRoute,
+  AppExamResultsIndexRoute: AppExamResultsIndexRoute,
+}
+
+const AppExamResultsRouteWithChildren = AppExamResultsRoute._addFileChildren(
+  AppExamResultsRouteChildren,
+)
+
+interface AppExamRouteChildren {
+  AppExamAuditRoute: typeof AppExamAuditRoute
+  AppExamBoardPatternsRoute: typeof AppExamBoardPatternsRoute
+  AppExamExamsRoute: typeof AppExamExamsRouteWithChildren
+  AppExamGradingRoute: typeof AppExamGradingRouteWithChildren
+  AppExamHallTicketsRoute: typeof AppExamHallTicketsRouteWithChildren
+  AppExamMarksRoute: typeof AppExamMarksRouteWithChildren
+  AppExamResultsRoute: typeof AppExamResultsRouteWithChildren
+  AppExamSettingsRoute: typeof AppExamSettingsRoute
+  AppExamIndexRoute: typeof AppExamIndexRoute
+}
+
+const AppExamRouteChildren: AppExamRouteChildren = {
+  AppExamAuditRoute: AppExamAuditRoute,
+  AppExamBoardPatternsRoute: AppExamBoardPatternsRoute,
+  AppExamExamsRoute: AppExamExamsRouteWithChildren,
+  AppExamGradingRoute: AppExamGradingRouteWithChildren,
+  AppExamHallTicketsRoute: AppExamHallTicketsRouteWithChildren,
+  AppExamMarksRoute: AppExamMarksRouteWithChildren,
+  AppExamResultsRoute: AppExamResultsRouteWithChildren,
+  AppExamSettingsRoute: AppExamSettingsRoute,
+  AppExamIndexRoute: AppExamIndexRoute,
+}
+
+const AppExamRouteWithChildren =
+  AppExamRoute._addFileChildren(AppExamRouteChildren)
 
 interface AppExpenseRouteChildren {
   AppExpenseApprovalsRoute: typeof AppExpenseApprovalsRoute
@@ -1511,6 +2315,7 @@ interface AppRouteChildren {
   AppTimeTableRoute: typeof AppTimeTableRoute
   AppAboutRoute: typeof AppAboutRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppExamRoute: typeof AppExamRouteWithChildren
   AppExpenseRoute: typeof AppExpenseRouteWithChildren
   AppFeeRoute: typeof AppFeeRouteWithChildren
   AppProfileRoute: typeof AppProfileRoute
@@ -1549,6 +2354,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTimeTableRoute: AppTimeTableRoute,
   AppAboutRoute: AppAboutRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppExamRoute: AppExamRouteWithChildren,
   AppExpenseRoute: AppExpenseRouteWithChildren,
   AppFeeRoute: AppFeeRouteWithChildren,
   AppProfileRoute: AppProfileRoute,
