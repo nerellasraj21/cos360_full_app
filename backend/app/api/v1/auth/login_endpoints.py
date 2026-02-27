@@ -2,16 +2,18 @@ from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.tenant_session import get_tenant_db
 from app.schemas.auth.login_schema import (
-    LoginRequest, 
-    LoginResponse, 
+    LoginRequest,
+    LoginResponse,
     LegacyLoginResponse,
     LoginErrorResponse,
     RefreshTokenRequest,
     RefreshTokenResponse,
+    LogoutRequest,
     LogoutResponse,
     LogoutErrorResponse,
-    LogoutInstructions
+    LogoutInstructions,
 )
+from app.service.auth.token_blacklist_service import TokenBlacklistService
 from app.service.auth.auth_service import login_user
 from app.service.auth.multi_tenant_auth_service import MultiTenantAuthService
 from app.tools.jwt_utils import verify_refresh_token, verify_access_token, create_access_token, create_refresh_token
@@ -110,7 +112,15 @@ async def refresh_token(request: RefreshTokenRequest, fastapi_request: Request):
     try:
         # Verify the refresh token
         payload = verify_refresh_token(request.refresh_token)
-        
+
+        # Reject if this refresh token was already blacklisted (i.e. user logged out)
+        if await TokenBlacklistService.is_blacklisted(request.refresh_token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token has been invalidated. Please login again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
         # Validate tenant if present
         client_name = payload.get("client_name")
         if client_name and client_name != "default":
@@ -157,45 +167,55 @@ async def refresh_token(request: RefreshTokenRequest, fastapi_request: Request):
                  401: {"model": LogoutErrorResponse, "description": "Invalid or expired token"},
                  500: {"model": LogoutErrorResponse, "description": "Server error"}
              })
-async def logout(request: Request):
+async def logout(request: Request, body: LogoutRequest = None):
     """
-    Simple client-side logout endpoint.
-    
-    Validates the access token and instructs the client to clear tokens and redirect.
-    The token remains valid until natural expiry, but client should clear it immediately.
+    Server-side logout endpoint.
+
+    Blacklists the access token (and optionally the refresh token when provided
+    in the request body) so they cannot be used again even before natural expiry.
     """
     try:
-        # Extract token from Authorization header
+        # Extract access token from Authorization header
         authorization = request.headers.get("Authorization")
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authorization header missing or invalid",
-                headers={"WWW-Authenticate": "Bearer"}
+                headers={"WWW-Authenticate": "Bearer"},
             )
-        
-        token = authorization.split(" ")[1]
-        
-        # Verify the access token (this will raise HTTPException if invalid)
-        payload = verify_access_token(token)
-        
-        username = payload.get("username", "unknown")
+
+        access_token = authorization.split(" ")[1]
+
+        # Verify the access token (raises 401 if invalid/expired)
+        payload = verify_access_token(access_token)
+
+        username    = payload.get("username", "unknown")
         client_name = payload.get("client_name", "unknown")
-        
-        logger.info(f"User logout: {username} from tenant: {client_name}")
-        
-        # Return success response with client instructions
+
+        # Blacklist the access token
+        await TokenBlacklistService.blacklist_token(access_token, payload)
+        logger.info(f"User logout: {username} from tenant: {client_name} — access token blacklisted")
+
+        # Blacklist the refresh token too if the client sent it
+        if body and body.refresh_token:
+            try:
+                refresh_payload = verify_refresh_token(body.refresh_token)
+                await TokenBlacklistService.blacklist_token(body.refresh_token, refresh_payload)
+                logger.info(f"Refresh token also blacklisted for user: {username}")
+            except HTTPException:
+                # Invalid refresh token — ignore, access token is already revoked
+                logger.warning(f"Could not blacklist refresh token for user: {username} (invalid token)")
+
         return LogoutResponse(
             message="Logout successful",
             instructions=LogoutInstructions(
                 clear_tokens=True,
                 clear_menu=True,
-                redirect_to="/login"
-            )
+                redirect_to="/login",
+            ),
         )
-        
+
     except HTTPException:
-        # Re-raise HTTP exceptions (like invalid token)
         raise
     except Exception as e:
         logger.error(f"Unexpected error during logout: {str(e)}")

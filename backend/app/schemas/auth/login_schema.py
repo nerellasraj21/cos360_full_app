@@ -50,6 +50,9 @@ class RefreshTokenResponse(BaseModel):
     token_type: str = "bearer"
 
 # Logout schemas
+class LogoutRequest(BaseModel):
+    refresh_token: Optional[str] = Field(None, description="Refresh token to also invalidate on logout")
+
 class LogoutInstructions(BaseModel):
     clear_tokens: bool = True
     clear_menu: bool = True

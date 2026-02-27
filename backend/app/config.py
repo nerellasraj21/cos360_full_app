@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         populate_by_name = True  # Enables Field(alias=...) to work
+        extra = "ignore"  # Ignore unknown env vars (e.g. SCHEMA_NAME used by alembic)
 
 
 settings = Settings()

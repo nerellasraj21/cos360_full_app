@@ -17,3 +17,5 @@ from .student import *
 
 # Expense models (new)
 from .expense import *
+# Exam module models
+from .exam import *

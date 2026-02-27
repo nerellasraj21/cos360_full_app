@@ -143,22 +143,23 @@ async def create_test_users(db: AsyncSession = Depends(get_tenant_db)):
         """))
         
         # Create test users
+        # Passwords: admin=testpass123, teacher=Teacher@123, student=Student@123
         await db.execute(text("""
             INSERT INTO users (id, username, email, password_hash, is_active, role_id) VALUES
             ('550e8400-e29b-41d4-a716-446655440401', 'admin@test.com', 'admin@test.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6VqPd6.cQK', true, '550e8400-e29b-41d4-a716-446655440001'),
-            ('550e8400-e29b-41d4-a716-446655440402', 'teacher@test.com', 'teacher@test.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6VqPd6.cQK', true, '550e8400-e29b-41d4-a716-446655440002'),
-            ('550e8400-e29b-41d4-a716-446655440403', 'student@test.com', 'student@test.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6VqPd6.cQK', true, '550e8400-e29b-41d4-a716-446655440003')
-            ON CONFLICT (id) DO NOTHING;
+            ('550e8400-e29b-41d4-a716-446655440402', 'teacher@test.com', 'teacher@test.com', '$2b$12$6rWZ47GjhcJykdRc4CeVyu9ZGCHpS2.1cd.espKGXPLBBFgsTdUtm', true, '550e8400-e29b-41d4-a716-446655440002'),
+            ('550e8400-e29b-41d4-a716-446655440403', 'student@test.com', 'student@test.com', '$2b$12$p2DckEXZWUIKDAd3nrf/E.1Burzlad3yYnFidJDOXzdiy797iJ2GK', true, '550e8400-e29b-41d4-a716-446655440003')
+            ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash;
         """))
-        
+
         await db.commit()
-        
+
         return {
             "message": "Test users created successfully",
             "users": [
                 {"username": "admin@test.com", "password": "testpass123", "role": "Admin"},
-                {"username": "teacher@test.com", "password": "testpass123", "role": "Teacher"},
-                {"username": "student@test.com", "password": "testpass123", "role": "Student"}
+                {"username": "teacher@test.com", "password": "Teacher@123", "role": "Teacher"},
+                {"username": "student@test.com", "password": "Student@123", "role": "Student"}
             ]
         }
         

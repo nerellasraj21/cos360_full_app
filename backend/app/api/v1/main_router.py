@@ -68,6 +68,18 @@ from app.api.v1.reports.attendance_reports import router as attendance_reports_r
 from app.api.v1.reports.financial_reports import router as financial_reports_router
 from app.api.v1.reports.reports import router as reports_router
 from app.api.v1.profile import router as profile_router
+from app.api.v1.exam.exam_settings_endpoints import router as exam_settings_router
+from app.api.v1.exam.grading_endpoints import router as grading_router
+from app.api.v1.exam.board_pattern_endpoints import router as board_pattern_router
+from app.api.v1.exam.remark_grade_endpoints import router as remark_grade_router
+from app.api.v1.exam.exam_endpoints import router as exam_router
+from app.api.v1.exam.exam_date_endpoints import router as exam_date_router
+from app.api.v1.exam.mark_permission_endpoints import router as mark_permission_router
+from app.api.v1.exam.mark_entry_endpoints import router as mark_entry_router
+from app.api.v1.exam.result_endpoints import router as exam_result_router
+from app.api.v1.exam.hall_ticket_endpoints import router as hall_ticket_router
+from app.api.v1.exam.audit_endpoints import router as exam_audit_router
+from app.api.v1.exam.notification_endpoints import router as exam_notification_router
 
 router = APIRouter()
 router.include_router(academic_year_router)
@@ -139,3 +151,16 @@ router.include_router(financial_reports_router, prefix="/reports/financial", tag
 router.include_router(reports_router, prefix="/reports", tags=["Reports"])
 router.include_router(profile_router)
 
+# ── Exam Module ───────────────────────────────────────────────────────────────
+router.include_router(exam_settings_router)
+router.include_router(grading_router)
+router.include_router(board_pattern_router)
+router.include_router(remark_grade_router)
+router.include_router(exam_router)
+router.include_router(exam_date_router)
+router.include_router(mark_permission_router)
+router.include_router(mark_entry_router)
+router.include_router(exam_result_router)
+router.include_router(hall_ticket_router)
+router.include_router(exam_audit_router)
+router.include_router(exam_notification_router)
