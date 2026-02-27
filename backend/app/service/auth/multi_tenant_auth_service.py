@@ -267,7 +267,7 @@ class MultiTenantAuthService:
         schema_name = await TenantService.get_tenant_schema(final_client_name)
         if not schema_name:
             if final_client_name == "default":
-                schema_name = "cos360_main"  # Backward compatibility
+                schema_name = "cos360_masters"  # Backward compatibility
                 logger.info(f"DEBUG 3: Using default schema: {schema_name}")
             else:
                 logger.warning(f"DEBUG 3: Tenant not found or inactive: {final_client_name}")

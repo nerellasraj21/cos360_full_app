@@ -7,6 +7,7 @@ import logging
 from app.db.tenant_session import get_tenant_db
 from app.tools.jwt_utils import verify_access_token
 from app.service.auth.multi_tenant_permission_service import MultiTenantPermissionService
+from app.service.auth.token_blacklist_service import TokenBlacklistService
 
 logger = logging.getLogger("permission_decorators")
 
@@ -22,11 +23,20 @@ async def get_current_user_token(request: Request) -> dict:
                 detail="Authorization header missing or invalid",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         token = auth_header.split(" ")[1]
         payload = verify_access_token(token)
+
+        # Reject tokens that were blacklisted at logout
+        if await TokenBlacklistService.is_blacklisted(token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been invalidated. Please login again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
         return payload
-        
+
     except HTTPException:
         raise
     except Exception as e:

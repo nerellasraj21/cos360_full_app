@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class MasterSchemaService:
 
     @staticmethod
-    async def create_master_schema_from_source(db: AsyncSession, source_schema: str = "cos360_main") -> Dict:
+    async def create_master_schema_from_source(db: AsyncSession, source_schema: str = "cos360_masters") -> Dict:
         """
         Create master schema from source schema with complete validation
         """

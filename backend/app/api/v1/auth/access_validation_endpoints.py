@@ -45,7 +45,7 @@ router = APIRouter(prefix="/auth", tags=["Auth/Access Validation"])
     Returns boolean result with detailed information for debugging.
     """
 )
-@rate_limit_api
+@rate_limit_api()
 async def validate_user_access(
     request_data: AccessValidationRequest,
     request: Request,
@@ -116,7 +116,7 @@ async def validate_user_access(
     This is useful for quick access checks in frontend applications.
     """
 )
-@rate_limit_api
+@rate_limit_api()
 async def validate_endpoint_access(
     user_id: str,
     endpoint: str,
@@ -181,7 +181,7 @@ async def validate_endpoint_access(
     Returns a simple boolean result indicating whether the user has access.
     """
 )
-@rate_limit_api
+@rate_limit_api()
 async def validate_menu_access(
     user_id: str,
     menu_item: str,
@@ -238,8 +238,9 @@ async def validate_menu_access(
     summary="Get Available Resources",
     description="Get list of all available resources and actions for permission validation."
 )
-@rate_limit_api
+@rate_limit_api()
 async def get_available_resources(
+    request: Request,
     current_user: dict = Depends(get_current_user_token)
 ):
     """

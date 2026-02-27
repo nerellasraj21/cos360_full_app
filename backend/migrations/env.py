@@ -1,6 +1,9 @@
 from logging.config import fileConfig
 import os
 
+from dotenv import load_dotenv
+load_dotenv()  # Load .env so DATABASE_URL and SCHEMA_NAME are available to alembic
+
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from sqlalchemy import event
@@ -23,6 +26,20 @@ from app.models.fee.fee_class_map_term_amount_model import FeeClassMappingTermAm
 from app.models.public.super_admin_model import SuperAdmin, SuperAdminAudit
 from app.models.public.tenant_model import Tenant
 from app.models.public.plan_model import Plan
+# Import exam module models
+from app.models.exam.grading_model import ExamGradeScheme, ExamGradeBand, SubjectGradeScheme, SubjectGradeBand
+from app.models.exam.remark_grade_model import RemarkGradeSet, RemarkGradeOption
+from app.models.exam.board_pattern_model import BoardExamPattern, BoardPatternExamType
+from app.models.exam.exam_settings_model import ExamSettings
+from app.models.exam.exam_stream_model import ExamStream
+from app.models.exam.exam_model import Exam
+from app.models.exam.exam_class_section_model import ExamClassSection
+from app.models.exam.exam_subject_config_model import ExamSubjectConfig, ExamSubjectComponent
+from app.models.exam.exam_date_model import ExamDate
+from app.models.exam.student_marks_model import StudentMark
+from app.models.exam.mark_permission_model import ExamMarkEntryPermission
+from app.models.exam.audit_log_model import ExamAuditLog
+from app.models.exam.student_result_model import StudentExamResult, StudentSubjectResult
 
 
 
@@ -111,7 +128,7 @@ def run_migrations_online() -> None:
         @event.listens_for(connection, "begin")
         def set_search_path(conn):
             import os
-            schema_name = os.getenv('SCHEMA_NAME', 'cos360_main')
+            schema_name = os.getenv('SCHEMA_NAME', 'cos360_masters')
             conn.exec_driver_sql(f'SET search_path TO {schema_name}')
             
         context.configure(

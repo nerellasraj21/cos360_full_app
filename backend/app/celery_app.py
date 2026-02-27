@@ -11,7 +11,13 @@ celery_app = Celery(
     "cos360",
     broker=f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}",
     backend=f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}",
-    include=["app.tasks.report_tasks"]
+    include=[
+        "app.tasks.report_tasks",
+        "app.tasks.exam.excel_upload_task",
+        "app.tasks.exam.pdf_generation_task",
+        "app.tasks.exam.aggregate_compute_task",
+        "app.tasks.exam.notification_task",
+    ]
 )
 
 # Celery configuration
