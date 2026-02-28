@@ -43,25 +43,36 @@ function EditExamDialog({ exam, onClose }: EditExamDialogProps) {
   const updateMutation = useUpdateExam(exam.id)
   const [form, setForm] = useState({
     exam_name: exam.exam_name,
-    board: exam.board as ExamBoard,
-    level: exam.level as ExamLevel,
-    exam_type: exam.exam_type,
-    nature: exam.nature as ExamNature,
-    status: exam.status as ExamStatus,
     mark_entry_deadline: exam.mark_entry_deadline ?? '',
+    hall_ticket_min_attendance: exam.hall_ticket_min_attendance != null ? String(exam.hall_ticket_min_attendance) : '',
+    attendance_from_date: exam.attendance_from_date ?? '',
+    attendance_to_date: exam.attendance_to_date ?? '',
+    publish_rank: !!(exam as any).publish_rank,
+    term: (exam as any).term ?? '',
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     updateMutation.mutate(
-      { ...form, mark_entry_deadline: form.mark_entry_deadline || null },
+      {
+        exam_name: form.exam_name || undefined,
+        mark_entry_deadline: form.mark_entry_deadline || undefined,
+        hall_ticket_min_attendance: form.hall_ticket_min_attendance !== '' ? Number(form.hall_ticket_min_attendance) : undefined,
+        attendance_from_date: form.attendance_from_date || undefined,
+        attendance_to_date: form.attendance_to_date || undefined,
+        publish_rank: form.publish_rank,
+        term: form.term || undefined,
+      },
       { onSuccess: () => onClose() }
     )
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Board, level, nature, and academic year cannot be changed after creation.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2 space-y-1">
           <label className="text-sm font-medium">Exam Name</label>
           <Input
@@ -71,75 +82,6 @@ function EditExamDialog({ exam, onClose }: EditExamDialogProps) {
           />
         </div>
         <div className="space-y-1">
-          <label className="text-sm font-medium">Board</label>
-          <select
-            value={form.board}
-            onChange={(e) => setForm(p => ({ ...p, board: e.target.value as ExamBoard }))}
-            className="h-9 w-full rounded border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="CBSE">CBSE</option>
-            <option value="ICSE">ICSE</option>
-            <option value="State">State</option>
-            <option value="BTech">BTech</option>
-            <option value="Custom">Custom</option>
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Level</label>
-          <select
-            value={form.level}
-            onChange={(e) => setForm(p => ({ ...p, level: e.target.value as ExamLevel }))}
-            className="h-9 w-full rounded border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="pre_primary">Pre-Primary</option>
-            <option value="primary">Primary</option>
-            <option value="upper_primary">Upper Primary</option>
-            <option value="secondary">Secondary</option>
-            <option value="inter">Inter</option>
-            <option value="diploma">Diploma</option>
-            <option value="btech">B.Tech</option>
-            <option value="mtech">M.Tech</option>
-            <option value="iit">IIT</option>
-            <option value="others">Others</option>
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Exam Type</label>
-          <Input
-            value={form.exam_type}
-            onChange={(e) => setForm(p => ({ ...p, exam_type: e.target.value }))}
-            placeholder="FA1, SA1, etc."
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Nature</label>
-          <select
-            value={form.nature}
-            onChange={(e) => setForm(p => ({ ...p, nature: e.target.value as ExamNature }))}
-            className="h-9 w-full rounded border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="formative">Formative</option>
-            <option value="summative">Summative</option>
-            <option value="cumulative">Cumulative</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Status</label>
-          <select
-            value={form.status}
-            onChange={(e) => setForm(p => ({ ...p, status: e.target.value as ExamStatus }))}
-            className="h-9 w-full rounded border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="draft">Draft</option>
-            <option value="active">Active</option>
-            <option value="published">Published</option>
-            <option value="locked">Locked</option>
-            <option value="finalized">Finalized</option>
-          </select>
-        </div>
-        <div className="space-y-1">
           <label className="text-sm font-medium">Mark Entry Deadline</label>
           <Input
             type="date"
@@ -147,10 +89,56 @@ function EditExamDialog({ exam, onClose }: EditExamDialogProps) {
             onChange={(e) => setForm(p => ({ ...p, mark_entry_deadline: e.target.value }))}
           />
         </div>
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Min Attendance %</label>
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            value={form.hall_ticket_min_attendance}
+            onChange={(e) => setForm(p => ({ ...p, hall_ticket_min_attendance: e.target.value }))}
+            placeholder="e.g. 75"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Attendance From</label>
+          <Input
+            type="date"
+            value={form.attendance_from_date}
+            onChange={(e) => setForm(p => ({ ...p, attendance_from_date: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Attendance To</label>
+          <Input
+            type="date"
+            value={form.attendance_to_date}
+            onChange={(e) => setForm(p => ({ ...p, attendance_to_date: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Term</label>
+          <Input
+            value={form.term}
+            onChange={(e) => setForm(p => ({ ...p, term: e.target.value }))}
+            placeholder="e.g. Term 1"
+            maxLength={20}
+          />
+        </div>
+        <div className="flex items-center gap-2 pt-5">
+          <input
+            type="checkbox"
+            id="list_edit_publish_rank"
+            checked={form.publish_rank}
+            onChange={(e) => setForm(p => ({ ...p, publish_rank: e.target.checked }))}
+            className="h-4 w-4"
+          />
+          <label htmlFor="list_edit_publish_rank" className="cursor-pointer text-sm">Publish Rank</label>
+        </div>
       </div>
       <div className="flex justify-end gap-2 pt-2">
         <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-        <Button type="submit" disabled={updateMutation.isPending}>
+        <Button type="submit" disabled={updateMutation.isPending || !form.exam_name.trim()}>
           {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Save Changes
         </Button>
@@ -183,7 +171,10 @@ export default function ExamList() {
   useEffect(() => {
     if (academicYears.length === 0) fetchAndSetAcademicYears()
   }, [academicYears.length, fetchAndSetAcademicYears])
-  const isAdmin = useAuthStore(s => s.user?.role?.name === 'admin')
+  const isAdmin = useAuthStore(s => {
+    const roleName = s.user?.role?.name?.toLowerCase() ?? ''
+    return roleName === 'admin' || roleName === 'superadmin' || roleName === 'principal'
+  })
 
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [natureFilter, setNatureFilter] = useState<string>('all')

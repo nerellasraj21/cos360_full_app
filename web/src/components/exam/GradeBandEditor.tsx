@@ -145,7 +145,7 @@ export function GradeBandEditor({ bands, onChange, readOnly = false }: GradeBand
                 </td>
                 <td className="px-2 py-1.5">
                   {readOnly ? (
-                    <span>{band.gpa.toFixed(1)}</span>
+                    <span>{Number(band.gpa).toFixed(1)}</span>
                   ) : (
                     <Input
                       type="number"

@@ -50,15 +50,15 @@ export default function ExamGradeSchemes() {
       description: scheme.description ?? '',
       is_default: scheme.is_default,
       bands: (scheme.bands ?? []).map(b => ({
-        from_percent: b.from_percent ?? 0,
-        to_percent: b.to_percent ?? 100,
-        from_marks: b.from_marks ?? null,
-        to_marks: b.to_marks ?? null,
+        from_percent: Number(b.from_percent) || 0,
+        to_percent: Number(b.to_percent) || 0,
+        from_marks: b.from_marks != null ? Number(b.from_marks) : null,
+        to_marks: b.to_marks != null ? Number(b.to_marks) : null,
         grade_label: b.grade_label ?? '',
-        gpa: b.gpa ?? 0,
+        gpa: Number(b.gpa) || 0,
         remarks: b.remarks ?? null,
         is_pass: b.is_pass ?? true,
-        sort_order: b.sort_order ?? 0,
+        sort_order: Number(b.sort_order) || 0,
       })),
     })
     setEditTarget(scheme)

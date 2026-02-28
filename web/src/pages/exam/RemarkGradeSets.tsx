@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import { Plus, Edit, Trash2, Loader2, MessageSquare, ChevronDown, ChevronRight, Save, X } from 'lucide-react'
+import { Plus, Edit, Trash2, Loader2, MessageSquare, ChevronDown, ChevronRight, ChevronUp, Save, X, GripVertical } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,7 @@ export default function RemarkGradeSets() {
   const [editTarget, setEditTarget] = useState<RemarkGradeSet | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
 
   const { data: sets = [], isLoading } = useRemarkGradeSets()
   const createMutation = useCreateRemarkGradeSet()
@@ -40,7 +41,26 @@ export default function RemarkGradeSets() {
     },
   })
 
-  const { fields, append, remove } = useFieldArray({ control: form.control, name: 'options' })
+  const { fields, append, remove, move } = useFieldArray({ control: form.control, name: 'options' })
+
+  const handleOptionDragStart = (index: number) => {
+    setDragIndex(index)
+  }
+
+  const handleOptionDragOver = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault()
+    if (dragIndex === null || dragIndex === targetIndex) return
+    move(dragIndex, targetIndex)
+    setDragIndex(targetIndex)
+  }
+
+  const handleOptionDragEnd = () => {
+    setDragIndex(null)
+    const currentOptions = form.getValues('options')
+    currentOptions.forEach((_, i) => {
+      form.setValue(`options.${i}.sort_order`, i)
+    })
+  }
 
   const openCreate = () => {
     form.reset({
@@ -235,9 +255,44 @@ export default function RemarkGradeSets() {
                   Add Option
                 </Button>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {fields.map((field, index) => (
-                  <div key={field.id} className="flex items-center gap-2">
+                  <div
+                    key={field.id}
+                    className={`flex items-center gap-2 rounded px-1 transition-colors ${dragIndex === index ? 'bg-blue-50 dark:bg-blue-950/30' : ''}`}
+                    draggable
+                    onDragStart={() => handleOptionDragStart(index)}
+                    onDragOver={(e) => handleOptionDragOver(e, index)}
+                    onDragEnd={handleOptionDragEnd}
+                  >
+                    <GripVertical className="h-4 w-4 flex-shrink-0 cursor-grab text-muted-foreground" />
+                    {/* Up / Down reorder buttons */}
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        disabled={index === 0}
+                        onClick={() => {
+                          move(index, index - 1)
+                          const opts = form.getValues('options')
+                          opts.forEach((_, i) => form.setValue(`options.${i}.sort_order`, i))
+                        }}
+                        className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      >
+                        <ChevronUp className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={index === fields.length - 1}
+                        onClick={() => {
+                          move(index, index + 1)
+                          const opts = form.getValues('options')
+                          opts.forEach((_, i) => form.setValue(`options.${i}.sort_order`, i))
+                        }}
+                        className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      >
+                        <ChevronDown className="h-3 w-3" />
+                      </button>
+                    </div>
                     <Input
                       {...form.register(`options.${index}.grade_letter`)}
                       className="w-16 text-center"

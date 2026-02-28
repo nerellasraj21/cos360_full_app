@@ -248,7 +248,14 @@ export default function TimeTableEditor() {
         console.log('useEffect triggered: frontendTimetableData:', !!frontendTimetableData, 'isFrontendError:', isFrontendError, 'frontendError:', frontendError?.message, 'selectedSection:', selectedSection?.value);
         if (frontendTimetableData) {
             setTimetableData(frontendTimetableData);
-            const transformedRows = transformFrontendTimetableToRows(frontendTimetableData, includeSaturday);
+
+            // Auto-detect if Saturday was saved in this timetable
+            const hasSaturday = frontendTimetableData.timetable_data.some(
+                item => item.type === 'subject' && item.subjects && SATURDAY in item.subjects
+            );
+            setIncludeSaturday(hasSaturday);
+
+            const transformedRows = transformFrontendTimetableToRows(frontendTimetableData, hasSaturday);
             setRows(transformedRows);
             setIsEditing(false);
 
@@ -288,7 +295,7 @@ export default function TimeTableEditor() {
             setIsEditing(true);
             console.log('Set isEditing to true (no data, no error)');
         }
-    }, [frontendTimetableData, selectedSection, includeSaturday, isFrontendError, frontendError]);
+    }, [frontendTimetableData, selectedSection, isFrontendError, frontendError]);
 
     const classOptions = useMemo(() => {
         if (!classesData) return [];
@@ -307,6 +314,16 @@ export default function TimeTableEditor() {
         return subject ? subject.name : '';
     };
 
+    // Display helper for Saturday cells — value can be a subject UUID, a special label, or free text
+    const getSaturdayCellDisplay = (value: string): string => {
+        if (!value) return 'Holiday';
+        const subject = subjects.find(s => s.id === value);
+        if (subject) return subject.name;
+        const special = allSpecialLabels.find(l => l.value === value);
+        if (special) return special.label;
+        return value; // free-text entered by admin
+    };
+
     const handleClassChange = (option: SingleValue<SelectOption>) => {
         setSelectedClass(option);
         setSelectedSection(null); // Reset section when class changes
@@ -318,6 +335,7 @@ export default function TimeTableEditor() {
         setSelectedSection(option);
         setRows([]);
         setIsEditing(false);
+        setIncludeSaturday(false);
     };
 
     const handleRowChange = (idx: number, key: string, value: any) => {
@@ -402,8 +420,8 @@ export default function TimeTableEditor() {
                 const rowData = [timeStr];
                 activeDays.forEach(day => {
                     const subject = row.subjects[day];
-                    if (day === SATURDAY && !subject) {
-                        rowData.push('Holiday');
+                    if (day === SATURDAY) {
+                        rowData.push(getSaturdayCellDisplay(subject));
                     } else {
                         rowData.push(getSubjectNameById(subject) || '--');
                     }
@@ -627,14 +645,18 @@ export default function TimeTableEditor() {
                         <thead>
                             <tr className="border-b">
                                 <th className="p-2 font-medium text-left text-muted-foreground">Time</th>
-                                {activeDays.map((day) => (
-                                    <th key={day} className={`p-2 font-medium text-left text-muted-foreground ${day === SATURDAY ? 'bg-muted/30' : ''}`}>
-                                        {day}
-                                        {day === SATURDAY && !isEditing && (
-                                            <span className="text-xs text-muted-foreground ml-1">(Holiday)</span>
-                                        )}
-                                    </th>
-                                ))}
+                                {activeDays.map((day) => {
+                                    const saturdayIsAllEmpty = day === SATURDAY && !isEditing &&
+                                        rows.filter(r => r.type === 'subject').every(r => !r.subjects?.[SATURDAY]);
+                                    return (
+                                        <th key={day} className={`p-2 font-medium text-left text-muted-foreground ${day === SATURDAY ? 'bg-muted/30' : ''}`}>
+                                            {day}
+                                            {saturdayIsAllEmpty && (
+                                                <span className="text-xs text-muted-foreground ml-1">(Holiday)</span>
+                                            )}
+                                        </th>
+                                    );
+                                })}
                                 {isEditing && <th className="p-2 font-medium text-center text-muted-foreground">Actions</th>}
                             </tr>
                         </thead>
@@ -662,20 +684,54 @@ export default function TimeTableEditor() {
                                         activeDays.map((day) => (
                                             <td key={day} className={`align-middle ${day === SATURDAY ? 'bg-muted/20' : ''}`}>
                                                 {isEditing ? (
-                                                    <Select
-                                                        options={subjectOptions}
-                                                        value={subjectOptions.find((opt) => opt.value === row.subjects[day]) || null}
-                                                        onChange={(opt) => handleSubjectChange(rowIdx, day, opt ? opt.value : '')}
-                                                        isClearable
-                                                        placeholder="Select..."
-                                                        classNamePrefix="react-select"
-                                                        menuPlacement="auto"
-                                                        menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                                                        styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
-                                                    />
+                                                    day === SATURDAY ? (
+                                                        // Saturday: CreatableSelect — subjects + special events + free text
+                                                        <CreatableSelect
+                                                            options={[
+                                                                { label: 'Subjects', options: subjectOptions },
+                                                                { label: 'Events', options: allSpecialLabels },
+                                                            ]}
+                                                            value={(() => {
+                                                                const val = row.subjects[day];
+                                                                if (!val) return null;
+                                                                const subOpt = subjectOptions.find(o => o.value === val);
+                                                                if (subOpt) return subOpt;
+                                                                const specOpt = allSpecialLabels.find(o => o.value === val);
+                                                                if (specOpt) return specOpt;
+                                                                return { value: val, label: val };
+                                                            })()}
+                                                            onChange={(opt) => handleSubjectChange(rowIdx, day, opt ? opt.value : '')}
+                                                            onCreateOption={(inputValue) => {
+                                                                const trimmed = inputValue.trim();
+                                                                if (trimmed) handleSubjectChange(rowIdx, day, trimmed);
+                                                            }}
+                                                            isClearable
+                                                            placeholder="Subject / Event / Holiday..."
+                                                            formatCreateLabel={(v) => `Use "${v}"`}
+                                                            classNamePrefix="react-select"
+                                                            menuPlacement="auto"
+                                                            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                                                            styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                                                        />
+                                                    ) : (
+                                                        <Select
+                                                            options={subjectOptions}
+                                                            value={subjectOptions.find((opt) => opt.value === row.subjects[day]) || null}
+                                                            onChange={(opt) => handleSubjectChange(rowIdx, day, opt ? opt.value : '')}
+                                                            isClearable
+                                                            placeholder="Select..."
+                                                            classNamePrefix="react-select"
+                                                            menuPlacement="auto"
+                                                            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                                                            styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                                                        />
+                                                    )
                                                 ) : (
                                                     <span className={`block px-2 py-1 text-left bg-card/80 rounded text-foreground ${day === SATURDAY && !row.subjects[day] ? 'text-muted-foreground italic' : ''}`}>
-                                                        {day === SATURDAY && !row.subjects[day] ? 'Holiday' : (getSubjectNameById(row.subjects[day]) || <span className="text-muted-foreground">--</span>)}
+                                                        {day === SATURDAY
+                                                            ? getSaturdayCellDisplay(row.subjects[day])
+                                                            : (getSubjectNameById(row.subjects[day]) || <span className="text-muted-foreground">--</span>)
+                                                        }
                                                     </span>
                                                 )}
                                             </td>

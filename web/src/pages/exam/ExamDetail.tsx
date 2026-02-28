@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import {
   ArrowLeft, Edit, Copy, Trash2, Loader2, Calendar, Lock,
-  CheckCircle, BarChart3, Users, FileText, Clock, ClipboardList, Plus
+  CheckCircle, BarChart3, Users, FileText, Clock, ClipboardList, Plus, Save,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,18 +41,32 @@ const STATUS_BADGE: Record<ExamStatus, string> = {
 export default function ExamDetail() {
   const { id } = useParams({ strict: false }) as { id: string }
   const navigate = useNavigate()
-  const isAdmin = useAuthStore(s => s.user?.role?.name === 'admin')
+  const isAdmin = useAuthStore(s => {
+    const roleName = s.user?.role?.name?.toLowerCase() ?? ''
+    return roleName === 'admin' || roleName === 'superadmin' || roleName === 'principal'
+  })
   const { setActiveExam } = useExamStore()
   const { academicYears } = useAcademicYearStore()
 
   const [showClone, setShowClone] = useState(false)
   const [cloneName, setCloneName] = useState('')
   const [showDelete, setShowDelete] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
+  const [editForm, setEditForm] = useState({
+    exam_name: '',
+    mark_entry_deadline: '',
+    hall_ticket_min_attendance: '',
+    attendance_from_date: '',
+    attendance_to_date: '',
+    publish_rank: false,
+    term: '',
+  })
   const [activeTab, setActiveTab] = useState<'overview' | 'dates' | 'marks' | 'permissions' | 'audit'>('overview')
 
   const { data: exam, isLoading } = useExamDetail(id)
   const deleteMutation = useDeleteExam()
   const cloneMutation = useCloneExam()
+  const updateMutation = useUpdateExam(id)
   const { data: classSections = [], isError: sectionsError } = useExamClassSections(id)
   const { data: subjectConfigs = [], isError: configsError } = useExamSubjectConfigs(id)
   const { data: examDates = [] } = useExamDates(id)
@@ -104,6 +118,34 @@ export default function ExamDetail() {
     )
   }
 
+  const openEdit = () => {
+    setEditForm({
+      exam_name: exam.exam_name ?? '',
+      mark_entry_deadline: exam.mark_entry_deadline ?? '',
+      hall_ticket_min_attendance: exam.hall_ticket_min_attendance != null ? String(exam.hall_ticket_min_attendance) : '',
+      attendance_from_date: exam.attendance_from_date ?? '',
+      attendance_to_date: exam.attendance_to_date ?? '',
+      publish_rank: !!exam.publish_rank,
+      term: exam.term ?? '',
+    })
+    setShowEdit(true)
+  }
+
+  const handleEdit = () => {
+    updateMutation.mutate(
+      {
+        exam_name: editForm.exam_name || undefined,
+        mark_entry_deadline: editForm.mark_entry_deadline || undefined,
+        hall_ticket_min_attendance: editForm.hall_ticket_min_attendance !== '' ? Number(editForm.hall_ticket_min_attendance) : undefined,
+        attendance_from_date: editForm.attendance_from_date || undefined,
+        attendance_to_date: editForm.attendance_to_date || undefined,
+        publish_rank: editForm.publish_rank,
+        term: editForm.term || undefined,
+      },
+      { onSuccess: () => setShowEdit(false) }
+    )
+  }
+
   const TABS = [
     { key: 'overview', label: 'Overview', icon: ClipboardList },
     { key: 'dates', label: 'Dates', icon: Calendar },
@@ -141,6 +183,17 @@ export default function ExamDetail() {
 
         {isAdmin && (
           <div className="flex gap-2">
+            {(exam.status === 'draft' || exam.status === 'active') && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openEdit}
+                className="gap-1"
+              >
+                <Edit className="h-4 w-4" />
+                Edit
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -505,6 +558,93 @@ export default function ExamDetail() {
           </Button>
         </div>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={showEdit} onOpenChange={setShowEdit}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Exam</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Board, level, nature, and academic year cannot be changed after creation.
+          </p>
+          <div className="grid gap-3 py-1 md:grid-cols-2">
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-sm font-medium">Exam Name</label>
+              <Input
+                value={editForm.exam_name}
+                onChange={(e) => setEditForm(p => ({ ...p, exam_name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Mark Entry Deadline</label>
+              <Input
+                type="date"
+                value={editForm.mark_entry_deadline}
+                onChange={(e) => setEditForm(p => ({ ...p, mark_entry_deadline: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Min Attendance %</label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={editForm.hall_ticket_min_attendance}
+                onChange={(e) => setEditForm(p => ({ ...p, hall_ticket_min_attendance: e.target.value }))}
+                placeholder="e.g. 75"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Attendance From</label>
+              <Input
+                type="date"
+                value={editForm.attendance_from_date}
+                onChange={(e) => setEditForm(p => ({ ...p, attendance_from_date: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Attendance To</label>
+              <Input
+                type="date"
+                value={editForm.attendance_to_date}
+                onChange={(e) => setEditForm(p => ({ ...p, attendance_to_date: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Term</label>
+              <Input
+                value={editForm.term}
+                onChange={(e) => setEditForm(p => ({ ...p, term: e.target.value }))}
+                placeholder="e.g. Term 1"
+                maxLength={20}
+              />
+            </div>
+            <div className="flex items-center gap-2 pt-5">
+              <input
+                type="checkbox"
+                id="edit_publish_rank"
+                checked={editForm.publish_rank}
+                onChange={(e) => setEditForm(p => ({ ...p, publish_rank: e.target.checked }))}
+                className="h-4 w-4"
+              />
+              <label htmlFor="edit_publish_rank" className="cursor-pointer text-sm">Publish Rank</label>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={() => setShowEdit(false)}>Cancel</Button>
+            <Button
+              disabled={updateMutation.isPending || !editForm.exam_name.trim()}
+              onClick={handleEdit}
+              className="gap-2"
+            >
+              {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              <Save className="h-4 w-4" />
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Clone Dialog */}
       <Dialog open={showClone} onOpenChange={setShowClone}>

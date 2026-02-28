@@ -167,7 +167,11 @@ export default function CreateExam() {
     setNewDate(prev => ({ ...prev, subject_id: '', exam_date: '', start_time: '', end_time: '', venue: '' }))
   }
 
-  const grandTotal = subjectConfigs.reduce((sum, cfg) => {
+  // Only count configs for currently selected class-sections (ignore stale wizard data)
+  const selectedCsKeys = new Set(classSections.map(cs => `${cs.class_id}|${cs.section_id ?? ''}`))
+  const activeConfigs = subjectConfigs.filter(cfg => selectedCsKeys.has(`${cfg.class_id}|${cfg.section_id ?? ''}`))
+
+  const grandTotal = activeConfigs.reduce((sum, cfg) => {
     const t = cfg.components
       .filter(c => c.include_in_total && c.entry_type === 'marks')
       .reduce((s, c) => s + (c.max_marks ?? 0), 0)
@@ -179,27 +183,33 @@ export default function CreateExam() {
     !form.watch('academic_year_id') && 'Academic Year (Section 1)',
     !form.watch('exam_type') && 'Exam Type (Section 1)',
     classSections.length === 0 && 'Class & Sections — select at least one (Section 2)',
-    subjectConfigs.length === 0 && 'Subject Configuration — configure at least one subject (Section 3)',
+    activeConfigs.length === 0 && 'Subject Configuration — configure at least one subject (Section 3)',
   ].filter(Boolean) as string[]
 
   const handleSubmit = async () => {
     const detailsValid = await form.trigger()
     if (!detailsValid) {
       setOpenSections(prev => new Set([...prev, 1]))
+      const firstError = Object.values(form.formState.errors)[0]
+      const msg = (firstError as any)?.message
+      toast.error(msg ? `Exam Details: ${msg}` : 'Please fix the errors in Exam Details (Section 1).')
       return
     }
     if (classSections.length === 0) {
       setOpenSections(prev => new Set([...prev, 2]))
       return
     }
-    // Filter out blank/unconfigured subject configs FIRST (subjects the user only peeked at)
+    // Filter out blank/unconfigured subject configs AND stale configs for deselected class-sections
     const isBlankConfig = (cfg: SubjectConfigPayload) =>
       cfg.components.length === 1 &&
       !cfg.components[0].component_name?.trim() &&
       cfg.components[0].max_marks == null &&
       cfg.subject_grade_scheme_id == null &&
       cfg.credit_hours == null
-    const configsToSend = subjectConfigs.filter(cfg => !isBlankConfig(cfg))
+    const selectedKeys = new Set(classSections.map(cs => `${cs.class_id}|${cs.section_id ?? ''}`))
+    const configsToSend = subjectConfigs.filter(cfg =>
+      !isBlankConfig(cfg) && selectedKeys.has(`${cfg.class_id}|${cfg.section_id ?? ''}`)
+    )
 
     if (configsToSend.length === 0) {
       setOpenSections(new Set([3]))
@@ -309,6 +319,16 @@ export default function CreateExam() {
                   <SelectContent>{BOARDS.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
+
+              {form.watch('board') === 'Custom' && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Custom Board Name *</label>
+                  <Input {...form.register('custom_board_name')} placeholder="e.g. IIT, State Board" />
+                  {form.formState.errors.custom_board_name && (
+                    <p className="text-xs text-destructive">{form.formState.errors.custom_board_name.message}</p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Level *</label>
@@ -676,7 +696,7 @@ export default function CreateExam() {
               <div className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-3 md:grid-cols-3">
                 {([
                   { label: 'Exam Name', value: form.watch('exam_name'), required: true },
-                  { label: 'Board', value: form.watch('board'), required: true },
+                  { label: 'Board', value: form.watch('board') === 'Custom' && form.watch('custom_board_name') ? `Custom (${form.watch('custom_board_name')})` : form.watch('board'), required: true },
                   { label: 'Level', value: LEVELS.find(l => l.value === form.watch('level'))?.label, required: true },
                   { label: 'Exam Type', value: form.watch('exam_type'), required: true },
                   { label: 'Nature', value: NATURES.find(n => n.value === form.watch('nature'))?.label, required: true },
@@ -742,8 +762,8 @@ export default function CreateExam() {
               <div className="flex items-center justify-between border-b bg-muted/20 px-4 py-2">
                 <span className="text-sm font-semibold">3 · Subject Configuration</span>
                 <div className="flex items-center gap-2">
-                  {subjectConfigs.length > 0
-                    ? <Badge variant="secondary" className="text-xs">{subjectConfigs.length} subjects · {grandTotal} marks total</Badge>
+                  {activeConfigs.length > 0
+                    ? <Badge variant="secondary" className="text-xs">{activeConfigs.length} subjects · {grandTotal} marks total</Badge>
                     : <Badge variant="destructive" className="text-xs">None configured</Badge>
                   }
                   <Button variant="ghost" size="sm" onClick={() => editSection(3)} className="h-6 px-2 text-xs">Edit</Button>

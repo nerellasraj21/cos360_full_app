@@ -1,7 +1,7 @@
 # Module Context – Exam
 
-Version: 1.0
-Generated On: 2026-02-27
+Version: 1.4
+Generated On: 2026-02-28
 Source: EXAM_MODULE_FRONTEND_DEV.md v3.0
 Confidence Level: High
 
@@ -142,7 +142,7 @@ The backend uses **flat paths** (no `/exam/` prefix on most endpoints):
 /hall-tickets/{examId}/download
 ```
 
-**Note**: Grade band endpoints do NOT exist on the backend. Bands are embedded in `GradeSchemeCreate.bands[]` at scheme creation time only.
+**Note**: Grade band endpoints do NOT exist as separate CRUD routes. Bands are embedded in the scheme payload on both create and update. The `PUT /grade-schemes/exam/{id}` and `PUT /grade-schemes/subject/{id}` endpoints now accept a `bands[]` array and perform a full replace (delete all + re-insert). Similarly, `PUT /remark-grades/{id}` accepts an `options[]` array and fully replaces options.
 
 ---
 
@@ -229,6 +229,95 @@ The `useDeleteExamDate` hook takes `{ examId, dateId }` — not a single `id`:
 deleteMutation.mutate({ examId: id, dateId: deleteTarget })
 ```
 
+### Decimal Fields Serialized as Strings (Pydantic v2)
+
+The backend returns `Numeric`/`Decimal` columns (`from_percent`, `to_percent`, `gpa`, `from_marks`, `to_marks`) as **strings** in JSON (e.g., `"45.00"`, `"4.50"`) because Pydantic v2 serializes `Decimal` as string in JSON mode. This affects two places:
+
+1. **Rendering** — `band.gpa.toFixed(1)` crashes on a string. Always use `Number(band.gpa).toFixed(1)`.
+2. **Form editing** — Zod's `z.number()` rejects strings silently. In `openEdit`, always coerce with `Number(b.from_percent)`, `Number(b.gpa)` etc. before calling `form.reset()`.
+
+Applies to: `GradeBandEditor.tsx`, `ExamGradeSchemes.tsx` `openEdit`, `SubjectGradeSchemes.tsx` `openEdit`.
+
+### Grade Schemes / Remark Grade Sets — Update Did Not Save Bands/Options
+
+**Root cause (backend):** The original `ExamGradeSchemeUpdate`, `SubjectGradeSchemeUpdate`, and `RemarkGradeSetUpdate` Pydantic schemas did not include `bands`/`options` fields. The service functions only updated scalar fields (name, description). Bands and options were silently ignored on every PUT request.
+
+**Fix applied (2026-02-28):**
+
+- `ExamGradeSchemeUpdate` now includes `bands: List[GradeBandCreate]`
+- `SubjectGradeSchemeUpdate` now includes `bands: List[GradeBandCreate]`
+- `RemarkGradeSetUpdate` now includes `options: Optional[List[RemarkGradeOptionCreate]]`
+- Both grading service update functions now delete all existing bands then insert new ones
+- Remark grade service update function now deletes all existing options then inserts new ones when `options` is provided
+
+### BoardPatternUpdate — Exam Types Not Saved on Edit (Fixed in v1.4)
+
+**Root cause (backend):** `BoardPatternUpdate` Pydantic schema had no `exam_types` field. The service explicitly said `"Update scalar fields only. exam_types are managed via separate endpoints."` — those separate endpoints never existed in the frontend. Every edit to exam types was silently discarded; only board/level/is_active scalar changes were saved.
+
+**Fix applied (2026-02-28):**
+
+- `BoardPatternUpdate` schema now includes `exam_types: Optional[List[BoardPatternExamTypeCreate]] = None`
+- `update_board_pattern` service: when `exam_types` is provided, deletes all existing exam types then re-inserts the new ones (same delete-all + re-insert pattern used for grade scheme bands)
+
+**Files changed (backend):**
+
+- `app/schemas/exam/board_pattern_schema.py` — added `exam_types` field to `BoardPatternUpdate`
+- `app/service/exam/board_pattern_service.py` — added exam_types replace logic in `update_board_pattern`
+
+### Remark Grade Options — Sort Order Reordering
+
+The remark grade set edit form now supports **drag-and-drop reordering** of options (GripVertical handle, same UX as `GradeBandEditor`). The `sort_order` field of each option is updated automatically on drag end. The frontend sends the updated `sort_order` values in the `options[]` array on save.
+
+### CreateExam — Custom Board Name Required
+
+When `board === 'Custom'` the Zod schema's `.refine()` requires `custom_board_name` to be filled. Without the fix, submission silently failed (no toast) because the form had no input for that field. Fix: A `Custom Board Name` input now renders conditionally in Section 1 when Board = Custom.
+
+### CreateExam — Stale Wizard Data Causes Backend 422
+
+**Root cause:** `examStore` persists `subject_configs` to sessionStorage. When the user changes class-sections between wizard attempts, subject configs from the previous attempt remain in state. These stale configs reference old class_ids/section_ids and are sent to the backend, which rejects them with 422.
+
+**Fix applied (2026-02-28):**
+
+- `configsToSend` in `handleSubmit` is now filtered by both `isBlankConfig` AND whether the config's `(class_id, section_id)` matches the currently selected `classSections`.
+- `grandTotal`, `activeConfigs`, and the Section 3 badge in the Review section only count configs for the current class-sections.
+- `missingItems` uses `activeConfigs.length` (not raw `subjectConfigs.length`) to determine if subjects are configured.
+- Added toast when `form.trigger()` fails so users see which field is invalid (previously silent).
+
+### ExamDetail — Edit Exam (Added in v1.2)
+
+An **Edit** button is now shown in the `ExamDetail` header for admin users when the exam is in `draft` or `active` status. It opens a dialog that allows editing the fields permitted by `ExamUpdate`:
+
+- Exam Name, Mark Entry Deadline, Min Attendance %, Attendance From/To, Term, Publish Rank
+
+Fields that cannot be changed after creation (board, level, nature, academic_year_id, exam_type) are not shown in the edit dialog.
+
+The `useUpdateExam(examId)` hook sends `PUT /exams/{examId}` with only the changed fields.
+
+### ExamList — Edit Option in Dropdown (Added in v1.2)
+
+The `...` action dropdown in `ExamList` also has an **Edit Exam** option for admin users. Unlike the ExamDetail edit button (which is restricted to `draft`/`active`), the ExamList dropdown shows Edit for **any exam status**. Both open the same `EditExamDialog` with the same backend-allowed fields.
+
+### isAdmin Role Case Mismatch (Fixed in v1.3)
+
+**Root cause:** The `isAdmin` check was `role?.name === 'admin'` (lowercase), but the DB stores the role as `'Admin'` (capital A). This caused `isAdmin` to always be `false` for all Admin users — hiding the Edit button, Edit Exam dropdown option, and the Permissions/Audit tabs.
+
+**Fix applied:**
+
+```typescript
+const isAdmin = useAuthStore(s => {
+  const roleName = s.user?.role?.name?.toLowerCase() ?? ''
+  return roleName === 'admin' || roleName === 'superadmin' || roleName === 'principal'
+})
+```
+
+This is applied in both `ExamList.tsx` and `ExamDetail.tsx`. The `.toLowerCase()` ensures the check works regardless of how the role name is cased in the DB (`Admin`, `admin`, `ADMIN`).
+
+**Debugging tip:** To verify the role name stored for the logged-in user, run in browser Console:
+
+```js
+JSON.parse(localStorage.getItem('auth-storage') || sessionStorage.getItem('auth-storage') || '{}').state?.user?.role
+```
+
 ---
 
 ## Sidebar Menus
@@ -250,7 +339,7 @@ Seeded menus (13 total):
 | `src/hooks/useExam.ts` | `src/api/hooks/exam/useExam.ts` | Matches existing hook directory convention |
 | `src/stores/examStore.ts` | `src/lib/examStore.ts` | Matches existing store directory convention |
 | Zustand custom storage object | `createJSONStorage(() => sessionStorage)` | Resolves TypeScript strict type error |
-| `Role === 'admin'` string comparison | `role?.name === 'admin'` | `Role` is an object interface with `.name` field |
+| `Role === 'admin'` string comparison | `role?.name?.toLowerCase() === 'admin'` | `Role` is an object with `.name`; DB stores `'Admin'` (capital A) so case-insensitive check is required |
 | `AcademicYear.name` | `AcademicYear.title` | Actual field in `src/types/masters/academicyear.ts` |
 
 ---
