@@ -42,3 +42,4 @@ class BoardPatternUpdate(BaseModel):
     custom_board_name: Optional[str] = Field(None, max_length=100)
     level: Optional[ExamLevel] = None
     is_active: Optional[bool] = None
+    exam_types: Optional[List[BoardPatternExamTypeCreate]] = None

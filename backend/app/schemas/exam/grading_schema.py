@@ -43,7 +43,7 @@ class ExamGradeSchemeCreate(ExamGradeSchemeBase):
 
 
 class ExamGradeSchemeUpdate(ExamGradeSchemeBase):
-    pass
+    bands: List[GradeBandCreate] = Field(default_factory=list)
 
 
 class ExamGradeSchemeRead(ExamGradeSchemeBase):
@@ -68,7 +68,7 @@ class SubjectGradeSchemeCreate(ExamGradeSchemeCreate):
 
 
 class SubjectGradeSchemeUpdate(ExamGradeSchemeBase):
-    pass
+    bands: List[GradeBandCreate] = Field(default_factory=list)
 
 
 class SubjectGradeSchemeRead(ExamGradeSchemeRead):
