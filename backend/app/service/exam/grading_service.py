@@ -6,7 +6,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, literal
+from sqlalchemy import select, literal, delete as sa_delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -242,13 +242,31 @@ async def get_exam_grade_scheme_or_404(
 async def update_exam_grade_scheme(
     db: AsyncSession, scheme_id: UUID, payload: ExamGradeSchemeUpdate
 ) -> ExamGradeScheme:
-    """Update scalar fields only (bands are managed via separate endpoints)."""
+    """Update scalar fields and replace all bands."""
     try:
         scheme = await _get_exam_grade_scheme_or_404(scheme_id, db)
 
         scheme.name = payload.name
         scheme.description = payload.description
         scheme.is_default = payload.is_default
+
+        # Replace all existing bands
+        await db.execute(sa_delete(ExamGradeBand).where(ExamGradeBand.scheme_id == scheme_id))
+        for band_payload in payload.bands:
+            band = ExamGradeBand(
+                id=uuid.uuid4(),
+                scheme_id=scheme.id,
+                from_percent=band_payload.from_percent,
+                to_percent=band_payload.to_percent,
+                from_marks=band_payload.from_marks,
+                to_marks=band_payload.to_marks,
+                grade_label=band_payload.grade_label,
+                gpa=band_payload.gpa,
+                remarks=band_payload.remarks,
+                is_pass=band_payload.is_pass,
+                sort_order=band_payload.sort_order,
+            )
+            db.add(band)
 
         await db.flush()
 
@@ -400,12 +418,31 @@ async def get_subject_grade_scheme_or_404(
 async def update_subject_grade_scheme(
     db: AsyncSession, scheme_id: UUID, payload: "SubjectGradeSchemeUpdate"
 ) -> SubjectGradeScheme:
-    """Update scalar fields only (bands managed via separate endpoints)."""
+    """Update scalar fields and replace all bands."""
     try:
         scheme = await _get_subject_grade_scheme_or_404(scheme_id, db)
         scheme.name = payload.name
         scheme.description = payload.description
         scheme.is_default = payload.is_default
+
+        # Replace all existing bands
+        await db.execute(sa_delete(SubjectGradeBand).where(SubjectGradeBand.scheme_id == scheme_id))
+        for band_payload in payload.bands:
+            band = SubjectGradeBand(
+                id=uuid.uuid4(),
+                scheme_id=scheme.id,
+                from_percent=band_payload.from_percent,
+                to_percent=band_payload.to_percent,
+                from_marks=band_payload.from_marks,
+                to_marks=band_payload.to_marks,
+                grade_label=band_payload.grade_label,
+                gpa=band_payload.gpa,
+                remarks=band_payload.remarks,
+                is_pass=band_payload.is_pass,
+                sort_order=band_payload.sort_order,
+            )
+            db.add(band)
+
         await db.flush()
         result = await db.execute(
             select(SubjectGradeScheme)

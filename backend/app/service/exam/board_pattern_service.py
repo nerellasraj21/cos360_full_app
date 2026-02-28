@@ -165,7 +165,7 @@ async def get_board_pattern_or_404(db: AsyncSession, pattern_id: UUID) -> BoardE
 async def update_board_pattern(
     db: AsyncSession, pattern_id: UUID, payload: BoardPatternUpdate
 ) -> BoardExamPattern:
-    """Update scalar fields only. exam_types are managed via separate endpoints."""
+    """Update scalar fields and optionally replace exam_types (delete-all + re-insert)."""
     try:
         pattern = await _get_board_pattern_or_404(pattern_id, db)
 
@@ -177,6 +177,21 @@ async def update_board_pattern(
             pattern.level = payload.level
         if payload.is_active is not None:
             pattern.is_active = payload.is_active
+
+        if payload.exam_types is not None:
+            for et in list(pattern.exam_types):
+                await db.delete(et)
+            await db.flush()
+            for et_payload in payload.exam_types:
+                db.add(BoardPatternExamType(
+                    id=uuid.uuid4(),
+                    pattern_id=pattern.id,
+                    exam_type_name=et_payload.exam_type_name,
+                    nature=et_payload.nature,
+                    weightage_percent=et_payload.weightage_percent,
+                    count_per_year=et_payload.count_per_year,
+                    sort_order=et_payload.sort_order,
+                ))
 
         await db.flush()
 

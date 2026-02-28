@@ -29,3 +29,4 @@ class RemarkGradeSetRead(BaseModel):
 
 class RemarkGradeSetUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=100)
+    options: Optional[List[RemarkGradeOptionCreate]] = None

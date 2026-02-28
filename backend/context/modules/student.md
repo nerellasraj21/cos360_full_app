@@ -12,6 +12,7 @@ Confidence Level: High
 [EVIDENCE-BASED]
 
 The Student Management module handles:
+
 - Student admissions and enrollment
 - Student profile management
 - Attendance tracking
@@ -29,37 +30,40 @@ Evidence: `app/api/v1/student/`, `app/service/student/`, `context_guide.json:498
 [EVIDENCE-BASED]
 
 ### Models
-| Model | File | Purpose |
-|-------|------|---------|
-| Student | `app/models/student/student_model.py` | Core student data |
-| StudentDocument | `app/models/student/student_document_model.py` | Document attachments |
+
+| Model              | File                                              | Purpose                |
+| ------------------ | ------------------------------------------------- | ---------------------- |
+| Student            | `app/models/student/student_model.py`             | Core student data      |
+| StudentDocument    | `app/models/student/student_document_model.py`    | Document attachments   |
 | StudentCertificate | `app/models/student/student_certificate_model.py` | Generated certificates |
-| CertificateType | `app/models/student/certificate_type_model.py` | Certificate templates |
-| StudentTransport | `app/models/student/student_transport_model.py` | Transport assignments |
-| StudentHomework | `app/models/student/student_homework_model.py` | Homework tracking |
-| Attendance | `app/models/masters/attendance_model.py` | Attendance records |
+| CertificateType    | `app/models/student/certificate_type_model.py`    | Certificate templates  |
+| StudentTransport   | `app/models/student/student_transport_model.py`   | Transport assignments  |
+| StudentHomework    | `app/models/student/student_homework_model.py`    | Homework tracking      |
+| Attendance         | `app/models/masters/attendance_model.py`          | Attendance records     |
 
 ### Services
-| Service | File | Purpose |
-|---------|------|---------|
-| AdmissionService | `admission_service.py` | Student admission workflow |
-| StudentService | `student_service.py` | Core student operations |
-| StudentAttendanceService | `student_attendance_service.py` | Attendance management |
-| StudentCertificateService | `student_certificate_service.py` | Certificate generation |
-| StudentDocumentService | `student_document_service.py` | Document handling |
-| StudentTransportService | `student_transport_service.py` | Transport assignment |
-| CertificateTypeService | `certificate_type_service.py` | Certificate type CRUD |
+
+| Service                   | File                             | Purpose                    |
+| ------------------------- | -------------------------------- | -------------------------- |
+| AdmissionService          | `admission_service.py`           | Student admission workflow |
+| StudentService            | `student_service.py`             | Core student operations    |
+| StudentAttendanceService  | `student_attendance_service.py`  | Attendance management      |
+| StudentCertificateService | `student_certificate_service.py` | Certificate generation     |
+| StudentDocumentService    | `student_document_service.py`    | Document handling          |
+| StudentTransportService   | `student_transport_service.py`   | Transport assignment       |
+| CertificateTypeService    | `certificate_type_service.py`    | Certificate type CRUD      |
 
 ### API Endpoints
-| Endpoint File | Routes |
-|--------------|--------|
-| `admission_endpoints.py` | `/api/v1/students/admissions/` |
-| `attendance_endpoints.py` | `/api/v1/students/attendance/` |
-| `certificate_endpoints.py` | `/api/v1/students/certificates/` |
-| `certificate_type_endpoints.py` | `/api/v1/students/certificate-types/` |
-| `student_document_endpoints.py` | `/api/v1/students/documents/` |
-| `student_transport_endpoints.py` | `/api/v1/students/transport/` |
-| `student_parent_endpoints.py` | `/api/v1/students/parents/` |
+
+| Endpoint File                    | Routes                                |
+| -------------------------------- | ------------------------------------- |
+| `admission_endpoints.py`         | `/api/v1/students/admissions/`        |
+| `attendance_endpoints.py`        | `/api/v1/students/attendance/`        |
+| `certificate_endpoints.py`       | `/api/v1/students/certificates/`      |
+| `certificate_type_endpoints.py`  | `/api/v1/students/certificate-types/` |
+| `student_document_endpoints.py`  | `/api/v1/students/documents/`         |
+| `student_transport_endpoints.py` | `/api/v1/students/transport/`         |
+| `student_parent_endpoints.py`    | `/api/v1/students/parents/`           |
 
 ---
 
@@ -68,6 +72,7 @@ Evidence: `app/api/v1/student/`, `app/service/student/`, `context_guide.json:498
 [EVIDENCE-BASED]
 
 ### Student
+
 - `id` (UUID): Primary key
 - `admission_number`: Auto-generated (ADM{YEAR}{SEQUENCE})
 - `first_name`, `last_name`: Name fields
@@ -80,6 +85,7 @@ Evidence: `app/api/v1/student/`, `app/service/student/`, `context_guide.json:498
 - `is_active`: Enrollment status
 
 ### StudentDocument
+
 - `id` (UUID): Primary key
 - `student_id` (UUID FK): Parent student
 - `document_type`: Type identifier
@@ -87,6 +93,7 @@ Evidence: `app/api/v1/student/`, `app/service/student/`, `context_guide.json:498
 - `uploaded_at`: Upload timestamp
 
 ### StudentCertificate
+
 - `id` (UUID): Primary key
 - `student_id` (UUID FK): Parent student
 - `certificate_type_id` (UUID FK): Certificate template
@@ -94,6 +101,7 @@ Evidence: `app/api/v1/student/`, `app/service/student/`, `context_guide.json:498
 - `file_path`: Storage path
 
 ### Attendance
+
 - `id` (UUID): Primary key
 - `student_id` (UUID FK): Student
 - `date`: Attendance date
@@ -107,12 +115,14 @@ Evidence: `app/api/v1/student/`, `app/service/student/`, `context_guide.json:498
 [EVIDENCE-BASED]
 
 ### Admission Number Generation
+
 - Format: `ADM{YEAR}{SEQUENCE}` (e.g., ADM2024001)
 - Auto-generated during admission process
 
 Evidence: `context_guide.json:508-509`
 
 ### Parent-Student Linking
+
 - Students can have multiple parents
 - Parents can have multiple students
 - Association table: `student_parent_association`
@@ -120,6 +130,7 @@ Evidence: `context_guide.json:508-509`
 Evidence: `app/models/masters/student_parent_association_model.py`
 
 ### Session Context Issue (FIXED)
+
 - **Problem**: flush() before SELECT required for multi-tenant compatibility
 - **Status**: RESOLVED in admission_service.py
 
@@ -132,6 +143,7 @@ Evidence: `context_guide.json:503-506`
 [EVIDENCE-BASED]
 
 ### Admission Endpoints
+
 ```
 POST   /api/v1/students/admissions/
   - Create new student admission
@@ -154,6 +166,7 @@ DELETE /api/v1/students/admissions/{id}
 ```
 
 ### Attendance Endpoints
+
 ```
 POST   /api/v1/students/attendance/
   - Record attendance
@@ -166,6 +179,7 @@ GET    /api/v1/students/attendance/student/{student_id}
 ```
 
 ### Certificate Endpoints
+
 ```
 POST   /api/v1/students/certificates/
   - Generate certificate
@@ -178,6 +192,7 @@ GET    /api/v1/students/certificates/{id}/download
 ```
 
 ### Document Endpoints
+
 ```
 POST   /api/v1/students/documents/
   - Upload document
@@ -196,11 +211,13 @@ DELETE /api/v1/students/documents/{id}
 [EVIDENCE-BASED]
 
 ### Internal Dependencies
+
 - Masters Module (classes, sections, academic years)
 - Authentication Module (user accounts)
 - Parent model from Masters
 
 ### File Storage
+
 - Documents stored in filesystem (`student_documents/`)
 - Certificates stored in `uploaded_certificates/`
 
@@ -211,10 +228,12 @@ DELETE /api/v1/students/documents/{id}
 [INFERENCE]
 
 ### Data Integrity
+
 1. **Orphan Records**: Deleting class/section may affect student assignments
 2. **File Cleanup**: Deleted document references may leave orphan files
 
 ### Performance
+
 1. **Large Uploads**: No visible file size limits on document uploads
 2. **Certificate Generation**: PDF generation for large batches may be slow
 

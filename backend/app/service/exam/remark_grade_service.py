@@ -3,7 +3,7 @@ import uuid
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, delete as sa_delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -124,10 +124,25 @@ async def get_remark_grade_set_or_404(db: AsyncSession, set_id: UUID) -> RemarkG
 async def update_remark_grade_set(
     db: AsyncSession, set_id: UUID, payload: "RemarkGradeSetUpdate"
 ) -> RemarkGradeSet:
-    """Update the name of a remark grade set."""
+    """Update name and replace all options of a remark grade set."""
     try:
         grade_set = await _get_remark_grade_set_or_404(set_id, db)
-        grade_set.name = payload.name
+        if payload.name is not None:
+            grade_set.name = payload.name
+
+        if payload.options is not None:
+            # Replace all existing options
+            await db.execute(sa_delete(RemarkGradeOption).where(RemarkGradeOption.set_id == set_id))
+            for opt_payload in payload.options:
+                option = RemarkGradeOption(
+                    id=uuid.uuid4(),
+                    set_id=grade_set.id,
+                    grade_letter=opt_payload.grade_letter,
+                    label=opt_payload.label,
+                    sort_order=opt_payload.sort_order,
+                )
+                db.add(option)
+
         await db.flush()
         result = await db.execute(
             select(RemarkGradeSet)
