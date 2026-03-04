@@ -33,17 +33,34 @@ async def create_staff_enrollment(data: StaffEnrollmentCreate, db: AsyncSession)
                 raise HTTPException(status_code=400, detail="Default 'Staff' role not found. Please provide a role_id.")
             role_id = staff_role.id
 
+        # Use email as the login identifier; fall back to phone, then first_name
+        if not data.email and not data.phone:
+            raise HTTPException(
+                status_code=400,
+                detail="Either email or phone is required for staff enrollment"
+            )
+        username_identifier = data.email or data.phone
+
         new_user = User(
-            username = data.first_name,
+            username = username_identifier,
             email = data.email,
-            password_hash = hash_password("staff@123"),
+            password_hash = hash_password("Welcome@123"),
             is_active = True,
             role_id = role_id
         )
 
-
         db.add(new_user)
         await db.flush()
+
+        # Mark as first login via raw SQL (graceful if column doesn't exist yet)
+        try:
+            from sqlalchemy import text as _text
+            await db.execute(
+                _text("UPDATE users SET is_first_login = TRUE WHERE id = :id"),
+                {"id": str(new_user.id)}
+            )
+        except Exception:
+            pass  # column not yet added — seed script adds it
 
         staff_data = data.dict(exclude={"role_id"})
 

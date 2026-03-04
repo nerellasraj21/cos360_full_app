@@ -6,7 +6,7 @@ from app.models.auth.role_model import Role
 from app.models.auth.menu_model import Menu
 from app.models.auth.permissions_model import RoleMenuPermission
 from app.models.auth.resource_permission_model import ResourcePermission
-from app.tools.jwt_utils import create_access_token, create_refresh_token
+from app.tools.jwt_utils import create_access_token, create_refresh_token, create_change_password_token
 from app.tools.password_util import verify_password
 from app.db.tenant_session import get_tenant_db, TenantService
 from app.middleware.tenant_middleware import get_client_name_from_request
@@ -19,63 +19,82 @@ class MultiTenantAuthService:
     """Service for multi-tenant authentication and menu management"""
     
     @staticmethod
-    async def authenticate_user(db: AsyncSession, username: str, password: str) -> User:
+    async def _attach_role(db: AsyncSession, user: User) -> User:
+        """Fetch and attach the role object to a user."""
+        role_result = await db.execute(
+            select(Role).where(Role.id == user.role_id)
+        )
+        user.role = role_result.scalar_one_or_none()
+        return user
+
+    @staticmethod
+    async def authenticate_user(db: AsyncSession, identifier: str, password: str) -> User:
         """
-        Authenticate user within the current tenant schema.
-        
+        Authenticate a user by username, email, or phone number.
+
+        Lookup order:
+        1. users.username == identifier  (covers email-as-username for newly enrolled staff)
+        2. users.email == identifier     (explicit email match)
+        3. staff.phone JOIN users        (phone number login)
+
         Args:
             db: Database session (already configured for tenant schema)
-            username: User's username
-            password: User's password
-            
+            identifier: Email, phone number, or username
+            password: Password to verify
+
         Returns:
-            User: Authenticated user object with role relationship
-            
+            User: Authenticated user with .role attached
+
         Raises:
-            HTTPException: If credentials are invalid
+            HTTPException 401: If credentials are invalid or user is inactive
         """
         try:
-            # Query user first (without problematic selectinload)
-            result = await db.execute(
-                select(User).where(User.username == username)
-            )
+            user = None
+
+            # 1. Try username match
+            result = await db.execute(select(User).where(User.username == identifier))
             user = result.scalar_one_or_none()
 
-            if user:
-                # Query role separately and manually attach it
-                from app.models.auth.role_model import Role
-                role_result = await db.execute(
-                    select(Role).where(Role.id == user.role_id)
-                )
-                role = role_result.scalar_one_or_none()
-
-                # Manually set the role relationship to maintain compatibility
-                user.role = role
-            
+            # 2. Try email match (if different from username)
             if not user:
-                logger.warning(f"User not found: {username}")
+                result = await db.execute(select(User).where(User.email == identifier))
+                user = result.scalar_one_or_none()
+
+            # 3. Try phone via Staff table
+            if not user:
+                from app.models.masters.staff_model import Staff
+                result = await db.execute(
+                    select(User)
+                    .join(Staff, Staff.user_id == User.id)
+                    .where(Staff.phone == identifier)
+                )
+                user = result.scalar_one_or_none()
+
+            if not user:
+                logger.warning(f"User not found for identifier: {identifier}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid Credentials"
                 )
-            
+
             if not user.is_active:
-                logger.warning(f"Inactive user attempted login: {username}")
+                logger.warning(f"Inactive user attempted login: {identifier}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid Credentials"
                 )
-            
+
             if not verify_password(password, user.password_hash):
-                logger.warning(f"Invalid password for user: {username}")
+                logger.warning(f"Invalid password for identifier: {identifier}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid Credentials"
                 )
-            
-            logger.info(f"User authenticated successfully: {username}")
+
+            await MultiTenantAuthService._attach_role(db, user)
+            logger.info(f"User authenticated successfully: {identifier}")
             return user
-            
+
         except HTTPException:
             raise
         except Exception as e:
@@ -297,9 +316,36 @@ class MultiTenantAuthService:
                 permissions = await MultiTenantAuthService.get_user_permissions(db, user.role_id)
                 logger.info(f"DEBUG 10: Permissions fetched successfully, resource count: {len(permissions)}")
 
+                # ---- First-login check (Staff, Teacher, Student & Parent) ----
+                role_name = user.role.name if user.role else ""
+                if role_name in ("Staff", "Teacher", "Student", "Parent"):
+                    # Check via raw SQL — graceful if column not yet added to DB
+                    try:
+                        from sqlalchemy import text as _text
+                        fl_result = await db.execute(
+                            _text("SELECT is_first_login FROM users WHERE id = :id"),
+                            {"id": str(user.id)}
+                        )
+                        is_first_login_val = fl_result.scalar_one_or_none()
+                    except Exception:
+                        is_first_login_val = None  # column doesn't exist yet
+
+                    if is_first_login_val is True:
+                        logger.info(f"First-time login detected for staff user: {user.username}")
+                        change_token = create_change_password_token({
+                            "sub": str(user.id),
+                            "username": user.username,
+                            "role": role_name,
+                            "client_name": final_client_name
+                        })
+                        return {
+                            "requires_password_change": True,
+                            "change_password_token": change_token,
+                            "message": "Please set a new password to continue"
+                        }
+
                 # Determine entity_id based on role
                 entity_id = None
-                role_name = user.role.name
                 logger.info(f"DEBUG 11: Determining entity_id for role: {role_name}")
 
                 try:
@@ -383,6 +429,131 @@ class MultiTenantAuthService:
                     detail="Login error"
                 )
     
+    @staticmethod
+    async def set_password_first_login(
+        request: Request,
+        change_password_token: str,
+        new_password: str,
+        client_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Complete the first-time password change flow.
+
+        1. Verifies the change_password_token
+        2. Updates the user's password_hash in DB
+        3. Clears is_first_login flag
+        4. Returns a full login response (menu, permissions, tokens)
+
+        Raises:
+            HTTPException 401: Invalid / expired token
+            HTTPException 400: Passwords don't meet requirements
+        """
+        from app.tools.jwt_utils import verify_change_password_token
+        from app.tools.password_util import hash_password
+
+        payload = verify_change_password_token(change_password_token)
+
+        user_id = payload.get("sub")
+        final_client_name = client_name or payload.get("client_name") or get_client_name_from_request(request)
+
+        schema_name = await TenantService.get_tenant_schema(final_client_name)
+        if not schema_name:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid connection")
+
+        async for db in get_tenant_db(request):
+            try:
+                from uuid import UUID as _UUID
+                result = await db.execute(select(User).where(User.id == _UUID(user_id)))
+                user = result.scalar_one_or_none()
+                if not user:
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+                user.password_hash = hash_password(new_password)
+                await db.flush()
+
+                # Clear first-login flag via raw SQL (graceful if column doesn't exist)
+                try:
+                    from sqlalchemy import text as _text
+                    await db.execute(
+                        _text("UPDATE users SET is_first_login = FALSE WHERE id = :id"),
+                        {"id": str(user.id)}
+                    )
+                except Exception:
+                    pass
+
+                # Attach role
+                await MultiTenantAuthService._attach_role(db, user)
+
+                menu = await MultiTenantAuthService.build_hierarchical_menu(db, user.role_id)
+                permissions = await MultiTenantAuthService.get_user_permissions(db, user.role_id)
+
+                # Resolve entity_id based on role
+                entity_id = None
+                role_name_sp = user.role.name if user.role else ""
+                try:
+                    if role_name_sp == "Student":
+                        from app.models.student.student_model import Student
+                        stu_result = await db.execute(select(Student).where(Student.user_id == user.id))
+                        stu = stu_result.scalar_one_or_none()
+                        if stu:
+                            entity_id = str(stu.id)
+                    elif role_name_sp == "Parent":
+                        from app.models.masters.parent_model import Parent
+                        par_result = await db.execute(select(Parent).where(Parent.user_id == user.id))
+                        par = par_result.scalar_one_or_none()
+                        if par:
+                            entity_id = str(par.id)
+                    else:
+                        from app.models.masters.staff_model import Staff
+                        staff_result = await db.execute(select(Staff).where(Staff.user_id == user.id))
+                        staff = staff_result.scalar_one_or_none()
+                        if staff:
+                            entity_id = str(staff.id)
+                except Exception:
+                    pass
+
+                token_data = {
+                    "sub": str(user.id),
+                    "username": user.username,
+                    "role": user.role.name if user.role else "",
+                    "client_name": final_client_name,
+                }
+                access_token = create_access_token(token_data)
+                refresh_token = create_refresh_token(token_data)
+
+                await db.commit()
+
+                return {
+                    "message": "Password updated successfully",
+                    "user": {
+                        "id": user.id,
+                        "username": user.username,
+                        "email": user.email,
+                        "is_active": user.is_active,
+                    },
+                    "role": {
+                        "id": user.role.id if user.role else None,
+                        "name": user.role.name if user.role else "",
+                        "description": user.role.description if user.role else None,
+                    },
+                    "menu": menu,
+                    "permissions": permissions,
+                    "entity_id": entity_id,
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "token_type": "bearer",
+                }
+            except HTTPException:
+                await db.rollback()
+                raise
+            except Exception as e:
+                await db.rollback()
+                logger.error(f"Error in set_password_first_login: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to update password"
+                )
+
     @staticmethod
     async def validate_tenant(client_name: str) -> bool:
         """

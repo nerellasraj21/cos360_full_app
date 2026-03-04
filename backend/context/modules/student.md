@@ -263,6 +263,94 @@ Evidence: `context_guide.json:498-514`
 
 ---
 
+---
+
+## User-Context Aware Endpoints (March 2026)
+
+[EVIDENCE-BASED]
+
+Several student endpoints now use `check_user_resource_access` (from `app/tools/enhanced_permissions.py`) instead of `check_role_plan_permission_with_error`. These endpoints return different data depending on the caller's role and access scope.
+
+### How it works
+
+`UserContextService._determine_access_scope` checks in this priority order:
+
+1. `{action}_own` → scope = `"own"` (Student seeing their own data)
+2. `{action}_related` → scope = `"related"` (Parent seeing linked children)
+3. `{action}` → scope = `"all"` (Admin/Teacher seeing everything)
+4. None found → `"denied"` → 403
+
+### Admission Endpoints (User-Context Aware)
+
+| Endpoint | Permission checked | Student result | Parent result | Admin/Teacher result |
+| -------- | ----------------- | -------------- | ------------- | -------------------- |
+| `GET /students/admission/` | `student_admissions:list` | Own admission only | Linked children's admissions | All admissions |
+| `GET /students/admission/id/{student_id}` | `student_admissions:read` | Own record only | Linked child's record | Any record |
+| `GET /students/admission/search` | `student_admissions:list` | Own name match only | Children's name match | All matches |
+
+### Attendance Endpoints (User-Context Aware)
+
+| Endpoint | Who calls it | Required query params |
+| -------- | ------------ | --------------------- |
+| `GET /student/attendance/my-attendance` | Student (self) | `start_date`, `end_date` (both mandatory) |
+| `GET /student/attendance/student/{student_id}/filter` | Parent / Admin / Teacher | `start_date`, `end_date` (both mandatory) |
+
+> **IMPORTANT**: Both `start_date` and `end_date` are mandatory. Omitting either returns `422 Unprocessable Entity`. Frontend must always supply both — recommended default: first day of current month to today.
+
+### Route Ordering Bug (Fixed March 2026)
+
+`GET /my-attendance` was defined **after** `GET /{attendance_id}` in `attendance_endpoints.py`. FastAPI matched `/{attendance_id}` first and tried to parse `"my-attendance"` as a UUID → 422. Fixed by moving the static route before the dynamic one.
+
+**Rule**: In FastAPI, always define static path segments (`/my-attendance`, `/search`, `/next-admission-number`) **before** dynamic segments (`/{id}`, `/{attendance_id}`).
+
+### Transport Ownership Checks (March 2026)
+
+`GET /students/student-transport/student/{student_id}` enforces ownership at the endpoint level:
+
+- **Student role**: Verifies `student.user_id == current_user.sub` (UUID from JWT). Returns 403 if student_id doesn't match their own.
+- **Parent role**: Verifies `student_id` is in the parent's linked children via `student_parent_links`. Returns 403 otherwise.
+- **Admin/Teacher/Staff**: Uses `check_role_plan_permission_with_error` as before.
+
+---
+
+## Menu Structure for Student/Parent Roles (March 2026)
+
+[EVIDENCE-BASED]
+
+Student and Parent roles are limited to 13 menus (seeded by `seed_endpoints.py`). The URL allowlist used is:
+
+```text
+/dashboard
+/students
+/students/admission
+/students/attendance
+/students/studenttransport      (all lowercase — was /transport/studentTransport before fix)
+/students/studentdocuments
+/students/studentcertificates
+/exam
+/exam/exams
+/exam/marks
+/exam/hall-tickets
+/exam/results
+```
+
+Admin Transport menus (`/transport/routes`, `/transport/vehicles`, etc.) are NOT included.
+
+---
+
+## Student Profile Endpoint (March 2026)
+
+[EVIDENCE-BASED]
+
+`GET /api/v1/profile/student/me` — Returns the logged-in student's profile.
+`PUT /api/v1/profile/student/me` — Update profile (only `email` field is editable by the student).
+
+Permissions required: `profile:read_own` and `profile:update_own` (seeded for Student role March 2026).
+
+Service: `app/service/profile/student_profile_service.py`
+
+---
+
 ## Compliance Statement
 
 > This document complies with **AI_HALLUCINATION_SOP.md**.

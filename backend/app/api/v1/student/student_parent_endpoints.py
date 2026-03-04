@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 from typing import List
 from uuid import UUID
 
@@ -73,13 +74,31 @@ async def get_parent_students(
     request: Request,
     db: AsyncSession = Depends(get_tenant_db)
 ):
-    """Get all students for a specific parent - All authenticated users"""
+    """Get all students for a specific parent.
+    Parent role: can only fetch their own children (parent_id must match caller's parent UUID).
+    Admin/Staff: requires parent_management:read permission.
+    """
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
 
-    await check_role_plan_permission_with_error(
-        db, request, role, 'parent_management', 'read'
-    )
+    if role == "Parent":
+        # Resolve the caller's own parent UUID from their user_id
+        # JWT stores user UUID in 'sub' field (set by login_user as str(user.id))
+        user_id = current_user.get('sub')
+        r = await db.execute(
+            text("SELECT id FROM parents WHERE user_id = :uid"),
+            {"uid": user_id}
+        )
+        caller_parent_id = r.scalar_one_or_none()
+        if not caller_parent_id or str(caller_parent_id) != str(parent_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only view your own children"
+            )
+    else:
+        await check_role_plan_permission_with_error(
+            db, request, role, 'parent_management', 'read'
+        )
 
     return await get_students_for_parent(parent_id, db)
 

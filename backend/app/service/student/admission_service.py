@@ -29,6 +29,24 @@ from app.tools.error_handler import (
 )
 from app.tools.database_error_mapper import map_database_error
 
+
+async def _generate_unique_username(base: str, db: AsyncSession) -> str:
+    """
+    Generate a unique username from a base string.
+    Tries: base → base1 → base2 → ...
+    base is already lowercased and sanitized by the caller.
+    """
+    candidate = base
+    counter = 1
+    while True:
+        result = await db.execute(
+            select(User).where(User.username == candidate)
+        )
+        if result.scalar_one_or_none() is None:
+            return candidate
+        candidate = f"{base}{counter}"
+        counter += 1
+
 # Import user context components
 from app.schemas.auth.user_context_schema import UserContext
 from app.service.base.user_scoped_service import UserScopedService
@@ -240,10 +258,15 @@ async def add_admission(
                 request=request
             )
 
-        # Create student user
+        # Create student user — username: firstname.lastname (collision-safe)
         try:
+            base_username = (
+                f"{student_dict.first_name.strip().lower().replace(' ', '')}"
+                f".{student_dict.last_name.strip().lower().replace(' ', '')}"
+            )
+            student_username = await _generate_unique_username(base_username, db)
             student_user_data = User(
-                username=student_dict.first_name,
+                username=student_username,
                 password_hash=hash_password("student@123"),
                 is_active=True,
                 role_id=student_role_id
@@ -306,7 +329,7 @@ async def add_admission(
                     )
                 
                 father_user_data = User(
-                    username=father_dict.name,
+                    username=father_dict.email,
                     email=father_dict.email,
                     password_hash=hash_password("parent@123"),
                     is_active=True,
@@ -372,7 +395,7 @@ async def add_admission(
                     )
                 
                 mother_user_data = User(
-                    username=mother_dict.name,
+                    username=mother_dict.email,
                     email=mother_dict.email,
                     password_hash=hash_password("parent@123"),
                     is_active=True,

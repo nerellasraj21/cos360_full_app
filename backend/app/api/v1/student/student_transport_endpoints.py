@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, status, Request, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
+from sqlalchemy.future import select as sa_select
 from app.db.tenant_session import get_tenant_db
 from app.tools.simple_permissions import check_role_permission, get_current_user_token, check_role_plan_permission_with_error
 from app.schemas.student.student_transport_schema import (
@@ -43,10 +45,31 @@ async def get_all_transport_assignments(request: Request, db: AsyncSession = Dep
 async def get_transport_by_student(request: Request, student_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get('role')
-    
-    # Multi-layer permission check: Role + Plan validation
-    await check_role_plan_permission_with_error(db, request, role, 'student_transport', 'read')
-    
+    user_id = current_user.get('sub')
+
+    if role == "Student":
+        # Student may only view their own transport assignment
+        from app.models.student.student_model import Student
+        stu_result = await db.execute(sa_select(Student).where(Student.user_id == user_id))
+        student = stu_result.scalar_one_or_none()
+        if not student or str(student.id) != str(student_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="You can only view your own transport assignment")
+
+    elif role == "Parent":
+        # Parent may only view transport for their linked children
+        r = await db.execute(
+            text("""SELECT spl.student_id FROM student_parent_links spl
+                    JOIN parents p ON p.id = spl.parent_id
+                    WHERE p.user_id = :uid AND spl.student_id = :sid"""),
+            {"uid": user_id, "sid": str(student_id)}
+        )
+        if not r.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="You can only view transport for your own children")
+    else:
+        await check_role_plan_permission_with_error(db, request, role, 'student_transport', 'read')
+
     return await get_transport_by_student_id(student_id, db, request)
 
 

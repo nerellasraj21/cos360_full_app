@@ -12,6 +12,9 @@ from app.schemas.auth.login_schema import (
     LogoutResponse,
     LogoutErrorResponse,
     LogoutInstructions,
+    PasswordChangeRequiredResponse,
+    SetPasswordRequest,
+    SetPasswordResponse,
 )
 from app.service.auth.token_blacklist_service import TokenBlacklistService
 from app.service.auth.auth_service import login_user
@@ -26,21 +29,19 @@ logger = logging.getLogger("login_endpoints")
 router = APIRouter(prefix="/auth", tags=["Auth/Login"])
 
 @router.post("/login",
-             response_model=Union[LoginResponse, LegacyLoginResponse],
+             response_model=Union[LoginResponse, PasswordChangeRequiredResponse, LegacyLoginResponse],
              responses={
                  401: {"model": LoginErrorResponse, "description": "Invalid connection or credentials"},
                  500: {"model": LoginErrorResponse, "description": "Server error"}
              })
 async def login(request: LoginRequest, fastapi_request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """
-    Multi-tenant login endpoint supporting:
-    1. Client detection from cschema header or subdomain
-    2. Backward compatibility with legacy clients
-    3. Complete user profile with hierarchical menus
-    4. Access token (24 hours) and refresh token (7 days)
-    
-    For new multi-tenant clients, returns user, role, menu, and tokens.
-    For legacy clients (without client_name), returns only access_token for backward compatibility.
+    Multi-tenant login endpoint.
+
+    Normal login → returns full LoginResponse (user, role, menu, tokens).
+    First-time staff login → returns PasswordChangeRequiredResponse with a
+    short-lived change_password_token. Call POST /auth/staff/set-password to
+    complete the flow and receive full credentials.
     """
     try:
         logger.info(f"DEBUG LOGIN 1: Login request for user: {request.username}")
@@ -51,49 +52,90 @@ async def login(request: LoginRequest, fastapi_request: Request, db: AsyncSessio
 
         logger.info(f"DEBUG LOGIN 2: client_name_from_request: {client_name_from_request}")
         logger.info(f"DEBUG LOGIN 3: client_name_from_body: {client_name_from_body}")
-        
-        # Check if this is a multi-tenant request
+
         is_multi_tenant_request = bool(client_name_from_request or client_name_from_body)
-        
+
         if is_multi_tenant_request:
-            # Multi-tenant login flow
             try:
                 login_result = await MultiTenantAuthService.login_user(
-                    fastapi_request, 
-                    request.username, 
+                    fastapi_request,
+                    request.username,
                     request.password,
-                    client_name_from_body
+                    client_name_from_body,
                 )
+                # First-time staff login — return the password-change challenge
+                if login_result.get("requires_password_change"):
+                    return PasswordChangeRequiredResponse(**login_result)
                 return LoginResponse(**login_result)
-                
+
             except HTTPException as e:
                 logger.warning(f"Multi-tenant login failed: {e.detail}")
                 raise e
-                
+
         else:
             # Legacy login flow for backward compatibility
             logger.info("Using legacy login flow for backward compatibility")
             try:
                 access_token = await login_user(db, request.username, request.password)
                 return LegacyLoginResponse(access_token=access_token)
-                
+
             except HTTPException as e:
                 logger.warning(f"Legacy login failed: {e.detail}")
-                # Convert legacy error to new format
                 if "Invalid username or password" in str(e.detail):
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Invalid Credentials"
+                        detail="Invalid Credentials",
                     )
                 raise e
-    
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Unexpected error during login: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication service unavailable"
+            detail="Authentication service unavailable",
+        )
+
+
+@router.post(
+    "/staff/set-password",
+    response_model=SetPasswordResponse,
+    responses={
+        401: {"model": LoginErrorResponse, "description": "Invalid or expired change-password token"},
+        400: {"model": LoginErrorResponse, "description": "Passwords do not match"},
+        500: {"model": LoginErrorResponse, "description": "Server error"},
+    },
+)
+async def set_password_first_login(body: SetPasswordRequest, fastapi_request: Request):
+    """
+    Complete the first-time staff login flow by setting a new password.
+
+    Steps:
+    1. Call POST /auth/login with email/phone + temp password (Welcome@123).
+    2. Receive `change_password_token` in the response.
+    3. Call this endpoint with that token + your new password.
+    4. Receive full login credentials — you are now fully authenticated.
+    """
+    if body.new_password != body.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Passwords do not match",
+        )
+    try:
+        result = await MultiTenantAuthService.set_password_first_login(
+            fastapi_request,
+            body.change_password_token,
+            body.new_password,
+        )
+        return SetPasswordResponse(**result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in set_password_first_login: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Password update service unavailable",
         )
 
 @router.post("/refresh",

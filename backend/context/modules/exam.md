@@ -216,15 +216,17 @@ No database migrations required — schema (tables/columns) unchanged; only serv
 
 | Endpoint                          | Was                                   | Now                                   |
 | --------------------------------- | ------------------------------------- | ------------------------------------- |
+| `GET /grade-schemes/exam`         | Returned `gpa` etc. as strings        | Returns as JSON numbers (float)       |
+| `GET /grade-schemes/subject`      | Returned `gpa` etc. as strings        | Returns as JSON numbers (float)       |
 | `PUT /grade-schemes/exam/{id}`    | Ignored `bands[]` in body             | Replaces all bands                    |
 | `PUT /grade-schemes/subject/{id}` | Ignored `bands[]` in body             | Replaces all bands                    |
 | `PUT /remark-grades/{id}`         | Name-only update, ignored `options[]` | Replaces all options when provided    |
 | `PUT /board-patterns/{id}`        | Ignored `exam_types[]` in body        | Replaces all exam types when provided |
 
-- Frontend `GradeBandEditor.tsx`: Pydantic v2 serializes PostgreSQL Numeric columns (`gpa`, `from_percent`, `to_percent`) as strings in JSON mode (e.g. `"4.50"`). Calling `.toFixed()` on a string threw TypeError and crashed the page via React's error boundary. Fix: wrap with `Number()` before formatting.
+- Frontend `GradeBandEditor.tsx` + Backend `grading_schema.py`: Pydantic v2 serializes PostgreSQL Numeric columns (`gpa`, `from_percent`, `to_percent`) as strings in JSON mode (e.g. `"4.50"`). Calling `.toFixed()` on a string threw TypeError and crashed the page via React's error boundary. Frontend fix: wrap with `Number()` before formatting. Backend fix: `GradeBandRead` and `SubjectGradeBandRead` now override `from_percent`, `to_percent`, `from_marks`, `to_marks`, and `gpa` as `float` so the API returns JSON numbers directly.
 - Backend `grading_schema.py` + `grading_service.py`: `ExamGradeSchemeUpdate` and `SubjectGradeSchemeUpdate` had no `bands` field; update functions only saved scalar fields. Added `bands: List[GradeBandCreate]` to both schemas; update functions now delete all existing bands and re-insert from payload.
 - Backend `remark_grade_schema.py` + `remark_grade_service.py`: `RemarkGradeSetUpdate` had no `options` field; update only saved `name`. Added `options: Optional[List[RemarkGradeOptionCreate]]`; update now deletes and re-inserts options when provided.
-- Frontend `RemarkGradeSets.tsx`: Edit form had no drag reordering; `sort_order` was only set on `append()`. Added GripVertical drag handles; dragging reorders via `react-hook-form` `move()` and recalculates `sort_order` on drag end.
+- Frontend `RemarkGradeSets.tsx`: Edit form had no drag reordering; `sort_order` was only set on `append()`. Added GripVertical drag handles; dragging reorders via `react-hook-form` `move()` and recalculates `sort_order` on drag end. Backend already handles `sort_order` correctly via delete-all + re-insert.
 - Backend `board_pattern_schema.py` + `board_pattern_service.py`: `BoardPatternUpdate` had no `exam_types` field; update only saved scalar fields. Added `exam_types: Optional[List[BoardPatternExamTypeCreate]]`; update now deletes and re-inserts exam types when provided.
 
 Evidence: `app/schemas/exam/`, `app/service/exam/`
