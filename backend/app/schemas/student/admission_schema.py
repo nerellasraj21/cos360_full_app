@@ -34,6 +34,9 @@ class StudentAdmissionResponse(StudentAdmissionBase):
     academic_year_id: Optional[UUID] = None
     admitted_class_id: Optional[UUID] = None
     admitted_section_id: Optional[UUID] = None
+    address_line1: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
     student: StudentOut
 
     model_config = ConfigDict(from_attributes=True)

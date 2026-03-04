@@ -30,6 +30,11 @@ class GradeBandRead(GradeBandBase):
     model_config = {"from_attributes": True}
     id: UUID
     scheme_id: UUID
+    from_percent: float
+    to_percent: float
+    from_marks: Optional[float] = None
+    to_marks: Optional[float] = None
+    gpa: float
 
 
 class ExamGradeSchemeBase(BaseModel):
@@ -61,6 +66,11 @@ class SubjectGradeBandRead(GradeBandBase):
     model_config = {"from_attributes": True}
     id: UUID
     scheme_id: UUID
+    from_percent: float
+    to_percent: float
+    from_marks: Optional[float] = None
+    to_marks: Optional[float] = None
+    gpa: float
 
 
 class SubjectGradeSchemeCreate(ExamGradeSchemeCreate):

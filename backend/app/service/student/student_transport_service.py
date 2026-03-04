@@ -9,6 +9,8 @@ from app.models.student.student_transport_model import StudentTransportAssignmen
 from app.models.student.student_model import Student
 from app.models.masters.transport.trip_model import Trip
 from app.models.masters.transport.route_stop_model import RouteStop
+from app.models.masters.transport.route_model import Route
+from app.models.masters.transport.vehicle_model import Vehicle
 from app.schemas.student.student_transport_schema import (
     StudentTransportCreate,
     StudentTransportUpdate,
@@ -124,7 +126,8 @@ async def add_student_transport(
             select(StudentTransportAssignment)
             .options(
                 selectinload(StudentTransportAssignment.student),
-                selectinload(StudentTransportAssignment.trip),
+                selectinload(StudentTransportAssignment.trip).selectinload(Trip.route),
+                selectinload(StudentTransportAssignment.trip).selectinload(Trip.vehicle),
                 selectinload(StudentTransportAssignment.stop)
             )
             .where(StudentTransportAssignment.id == new_assignment.id)
@@ -180,7 +183,8 @@ async def get_transport_assignments(
             select(StudentTransportAssignment)
             .options(
                 selectinload(StudentTransportAssignment.student),
-                selectinload(StudentTransportAssignment.trip),
+                selectinload(StudentTransportAssignment.trip).selectinload(Trip.route),
+                selectinload(StudentTransportAssignment.trip).selectinload(Trip.vehicle),
                 selectinload(StudentTransportAssignment.stop)
             )
         )
@@ -231,7 +235,8 @@ async def get_transport_by_student_id(
             select(StudentTransportAssignment)
             .options(
                 selectinload(StudentTransportAssignment.student),
-                selectinload(StudentTransportAssignment.trip),
+                selectinload(StudentTransportAssignment.trip).selectinload(Trip.route),
+                selectinload(StudentTransportAssignment.trip).selectinload(Trip.vehicle),
                 selectinload(StudentTransportAssignment.stop)
             )
             .where(StudentTransportAssignment.student_id == student_id)
@@ -344,7 +349,8 @@ async def update_partial_details_transport_assignment(
             select(StudentTransportAssignment)
             .options(
                 selectinload(StudentTransportAssignment.student),
-                selectinload(StudentTransportAssignment.trip),
+                selectinload(StudentTransportAssignment.trip).selectinload(Trip.route),
+                selectinload(StudentTransportAssignment.trip).selectinload(Trip.vehicle),
                 selectinload(StudentTransportAssignment.stop)
             )
             .where(StudentTransportAssignment.id == transport_id)

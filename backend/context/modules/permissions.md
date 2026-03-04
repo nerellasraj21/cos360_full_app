@@ -12,7 +12,7 @@ Use this guide to:
 - Test endpoints after adding permissions
 - Troubleshoot permission issues
 
-**Last Updated**: 2026-02-09
+**Last Updated**: 2026-03-04
 **Author**: System Architecture Team
 **Status**: Production Ready ✅
 
@@ -1765,6 +1765,96 @@ AND rp.is_granted = true;
 
 ---
 
+## Known Permission Fixes and Bug History
+
+### Student/Parent Role: Missing `student_admissions:list_own` / `list_related` (March 2026)
+
+**Symptom**: Student and Parent roles received `403 Access Denied` on the Student Admissions page even after `student_admissions:read_own` / `read_related` was seeded.
+
+**Root cause**: The list endpoint `GET /students/admission/` calls:
+
+```python
+check_user_resource_access(db, request, 'student_admissions', 'list')
+```
+
+`_determine_access_scope` checks in order: `list_own` → `list_related` → `list`. Student only had `read_own` and Parent only had `read_related` — no `list_*` variant existed → "denied" → 403.
+
+**Fix applied**:
+
+- Added `("student_admissions", "list_own")` to Student permissions in `seed_endpoints.py` and `reseed_student_parent_permissions.py`
+- Added `("student_admissions", "list_related")` to Parent permissions in both files
+- Ran `scripts/reseed_student_parent_permissions.py` — DB now has 29 Student permissions and 21 Parent permissions
+
+**Student Admissions behaviour after fix**:
+
+| Role | `GET /students/admission/` response |
+| ---- | ---------------------------------- |
+| Student | Returns a list containing only the logged-in student's own admission record |
+| Parent | Returns a list of all linked children's admission records |
+| Admin/Teacher/Staff | Returns all admissions (paginated) |
+
+**Lesson**: When seeding `read_own`, also always seed `list_own`. Same applies to `_related`. The `read` and `list` scopes are checked by completely different endpoints and must be granted separately.
+
+---
+
+### Teacher Role: Missing `student_admissions:list` (March 2026)
+
+**Symptom**: Teacher role received `403 Forbidden` when accessing the student list page (`GET /students/admission/`), even though Teacher had `student_admissions:read`.
+
+**Root cause**: `read` and `list` are separate, independent permissions. The `GET /students/admission/` (list all) and `GET /students/admission/search` endpoints call:
+
+```python
+check_user_resource_access(db, request, 'student_admissions', 'list')
+```
+
+While `GET /students/admission/id/{student_id}` calls:
+
+```python
+check_user_resource_access(db, request, 'student_admissions', 'read')
+```
+
+Having `read` does NOT grant `list`. A Teacher with only `student_admissions:read` can fetch a single student by ID, but cannot access the list or search endpoints — they are protected by a completely separate permission entry in `resource_permissions`.
+
+**Fix applied**:
+
+- Added `("student_admissions", "list")` to Teacher permissions in `app/api/v1/auth/seed_endpoints.py`
+- Inserted the permission directly into `test_tenant_schema.resource_permissions`
+
+**Teacher permissions for `student_admissions` — before and after**:
+
+| Action | Before Fix | After Fix |
+| ------ | ---------- | --------- |
+| `read` | granted    | granted   |
+| `list` | missing    | granted   |
+
+**Important principle — `read` vs `list` distinction**:
+
+| Action | Protects                                          | Example endpoint                       |
+| ------ | ------------------------------------------------- | -------------------------------------- |
+| `read` | Fetching a single record by ID                    | `GET /students/admission/id/{id}`      |
+| `list` | Fetching all records or searching across records  | `GET /students/admission/`             |
+| `list` | Search endpoints                                  | `GET /students/admission/search`       |
+
+Always check whether a role needs both `read` AND `list` when granting access to a resource. Granting only `read` will still result in 403 on any list or search endpoint.
+
+**SQL to apply the fix manually**:
+
+```sql
+INSERT INTO resource_permissions (id, role_id, resource, action, is_granted, created_at, updated_at)
+SELECT
+    gen_random_uuid(),
+    (SELECT id FROM roles WHERE name = 'Teacher'),
+    'student_admissions',
+    'list',
+    true,
+    NOW(),
+    NOW()
+ON CONFLICT (role_id, resource, action) DO UPDATE
+SET is_granted = true, updated_at = NOW();
+```
+
+---
+
 ## 🎬 Final Notes
 
 ### Remember
@@ -1802,8 +1892,8 @@ psql -d db -c "SELECT * FROM resource_permissions WHERE resource = 'mymodule';"
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2026-02-09
+**Document Version**: 1.1
+**Last Updated**: 2026-03-04
 **Maintainer**: System Architecture Team
 **Next Review**: When permission system changes
 
@@ -1811,9 +1901,12 @@ psql -d db -c "SELECT * FROM resource_permissions WHERE resource = 'mymodule';"
 
 ## 📎 Document Change Log
 
-| Date       | Version | Changes          | Author            |
-| ---------- | ------- | ---------------- | ----------------- |
-| 2026-02-09 | 1.0     | Initial creation | Claude Code Agent |
+| Date       | Version | Changes                                                                               | Author            |
+| ---------- | ------- | ------------------------------------------------------------------------------------- | ----------------- |
+| 2026-02-09 | 1.0     | Initial creation                                                                      | Claude Code Agent |
+| 2026-03-04 | 1.1     | Add Teacher role `student_admissions:list` fix; document `read` vs `list` distinction | Claude Code Agent |
+| 2026-03-04 | 1.2     | Fix Parent children endpoint: use sub (UUID) not id; self-owned access patterns added | Claude Code Agent |
+| 2026-03-04 | 1.3     | Add Student `student_admissions:list_own` and Parent `student_admissions:list_related`; add Student/Parent menu filtering (13 menus only); add Student `profile:read_own` / `profile:update_own`; add Student/Parent `student_transport:read_own` / `read_related` | Claude Code Agent |
 
 ---
 

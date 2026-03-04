@@ -69,5 +69,28 @@ class LogoutErrorResponse(BaseModel):
 class LoginErrorResponse(BaseModel):
     detail: str
 
+# First-time login / password change schemas
+class PasswordChangeRequiredResponse(BaseModel):
+    """Returned when a staff member logs in for the first time with a temp password."""
+    requires_password_change: bool = True
+    change_password_token: str = Field(..., description="Short-lived token (15 min) to authorize the set-password call")
+    message: str = "Please set a new password to continue"
+
+class SetPasswordRequest(BaseModel):
+    change_password_token: str = Field(..., description="Token received from the first-login response")
+    new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
+    confirm_password: str = Field(..., description="Must match new_password")
+
+class SetPasswordResponse(BaseModel):
+    message: str = "Password updated successfully"
+    user: UserInfo
+    role: RoleInfo
+    menu: List[MenuItemResponse]
+    permissions: Dict[str, List[str]] = Field(default_factory=dict)
+    entity_id: Optional[str] = None
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
 # Enable forward references for nested MenuItemResponse
 MenuItemResponse.model_rebuild()
