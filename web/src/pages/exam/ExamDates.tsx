@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
-import { Plus, Edit, Trash2, Loader2, Calendar, ArrowLeft, Save, X } from 'lucide-react'
+import { Plus, Edit, Trash2, Loader2, Calendar, ArrowLeft, Save, X, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -21,6 +22,10 @@ export default function ExamDates() {
   const [editTarget, setEditTarget] = useState<ExamDate | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [formData, setFormData] = useState<Partial<ExamDatePayload>>({})
+  const [isDirty, setIsDirty] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortKey, setSortKey] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const { data: exam } = useExamDetail(id)
   const { data: dates = [], isLoading } = useExamDates(id)
@@ -28,9 +33,38 @@ export default function ExamDates() {
   const updateMutation = useUpdateExamDate()
   const deleteMutation = useDeleteExamDate()
 
+  const handleSort = (key: string) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />
+    return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />
+  }
+  const filteredDates = useMemo(() => {
+    let items = dates
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      items = items.filter(d =>
+        (d.subject_name ?? '').toLowerCase().includes(q) ||
+        (d.class_name ?? '').toLowerCase().includes(q) ||
+        (d.venue ?? '').toLowerCase().includes(q)
+      )
+    }
+    if (sortKey) {
+      items = [...items].sort((a, b) => {
+        const aVal = String((a as any)[sortKey] ?? '')
+        const bVal = String((b as any)[sortKey] ?? '')
+        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      })
+    }
+    return items
+  }, [dates, searchQuery, sortKey, sortDir])
+
   const openCreate = () => {
     setFormData({ exam_id: id, exam_date: '', start_time: null, end_time: null, venue: null, notes: null })
     setEditTarget(null)
+    setIsDirty(false)
     setShowForm(true)
   }
 
@@ -47,14 +81,15 @@ export default function ExamDates() {
       notes: date.notes,
     })
     setEditTarget(date)
+    setIsDirty(false)
     setShowForm(true)
   }
 
   const handleSave = () => {
     if (editTarget) {
-      updateMutation.mutate({ id: editTarget.id, data: formData }, { onSuccess: () => setShowForm(false) })
+      updateMutation.mutate({ id: editTarget.id, data: formData }, { onSuccess: () => { setIsDirty(false); setShowForm(false) } })
     } else {
-      createMutation.mutate(formData as ExamDatePayload, { onSuccess: () => setShowForm(false) })
+      createMutation.mutate(formData as ExamDatePayload, { onSuccess: () => { setIsDirty(false); setShowForm(false) } })
     }
   }
 
@@ -98,23 +133,38 @@ export default function ExamDates() {
           </CardContent>
         </Card>
       ) : (
+        <div className="space-y-3">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filters</span>
+          </div>
+          <div className="relative max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input placeholder="Search by subject, class or venue..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
+          </div>
+        </div>
         <div className="overflow-hidden rounded-lg border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">
-                <th className="px-4 py-3 text-left font-medium">Subject</th>
-                <th className="px-4 py-3 text-left font-medium">Class</th>
+                <th className="px-4 py-3 text-left font-medium w-12">S.No.</th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('subject_name')}>Subject <SortIcon col="subject_name" /></th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('class_name')}>Class <SortIcon col="class_name" /></th>
                 <th className="px-4 py-3 text-left font-medium">Section</th>
-                <th className="px-4 py-3 text-left font-medium">Date</th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('exam_date')}>Date <SortIcon col="exam_date" /></th>
                 <th className="px-4 py-3 text-left font-medium">Start</th>
                 <th className="px-4 py-3 text-left font-medium">End</th>
-                <th className="px-4 py-3 text-left font-medium">Venue</th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('venue')}>Venue <SortIcon col="venue" /></th>
                 <th className="px-4 py-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {dates.map((date) => (
-                <tr key={date.id} className="border-b transition-colors hover:bg-muted/20">
+              {filteredDates.length === 0 ? (
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground text-sm">{searchQuery ? 'No dates match your search' : 'No exam dates'}</td></tr>
+              ) : filteredDates.map((date, idx) => (
+                <tr key={date.id} className="border-b transition-colors hover:bg-muted/20" style={{ height: '48px' }}>
+                  <td className="px-4 py-3 text-muted-foreground text-sm">{idx + 1}</td>
                   <td className="px-4 py-3 font-medium">{date.subject_name ?? date.subject_id}</td>
                   <td className="px-4 py-3 text-muted-foreground">{date.class_name ?? date.class_id}</td>
                   <td className="px-4 py-3 text-muted-foreground">{date.section_name ?? date.section_id ?? '—'}</td>
@@ -142,15 +192,16 @@ export default function ExamDates() {
             </tbody>
           </table>
         </div>
+        </div>
       )}
 
       {/* Add/Edit Form */}
-      <Dialog open={showForm} onOpenChange={setShowForm}>
+      <Dialog open={showForm} onOpenChange={setShowForm} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editTarget ? 'Edit Exam Date' : 'Add Exam Date'}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
+          <div className="grid gap-3" onChange={() => setIsDirty(true)}>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-sm font-medium">Class ID</label>
@@ -182,7 +233,9 @@ export default function ExamDates() {
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+              <DialogClose asChild>
+                <Button variant="outline">Cancel</Button>
+              </DialogClose>
               <Button
                 onClick={handleSave}
                 disabled={createMutation.isPending || updateMutation.isPending}

@@ -1,8 +1,9 @@
 # Module Context – Authentication
 
-Version: 1.0
+Version: 1.1
 Generated On: 2025-12-26
-Source: Codebase Analysis
+Last Updated: 2026-03-04
+Source: Codebase Analysis + Mar 2026 Backend Handover
 Confidence Level: High
 
 ---
@@ -39,6 +40,7 @@ interface AuthState {
   selectedStudent: Student | null;
   availableStudents: Student[];
   studentId: string | null;
+  entityId: string | null;     // student UUID (Student role) or parent UUID (Parent role)
   permissions: Permission[];
   permissionsMap: PermissionMap;
   menuItems: MenuItem[];
@@ -51,10 +53,11 @@ interface AuthState {
 ### Routes
 
 | File | Purpose |
-|------|---------|
+| --- | --- |
 | `src/routes/_auth.tsx` | Authentication layout (unauthenticated users) |
 | `src/routes/_auth/login.tsx` | Login page |
 | `src/routes/_auth/forgot-password.tsx` | Password recovery |
+| `src/routes/_auth/set-password.tsx` | First-login set-password page |
 
 ### Components
 
@@ -143,10 +146,26 @@ interface Student {
 
 ### Authentication Flow
 
-1. **Login**: POST to `/auth/login` returns tokens + user data + permissions
-2. **Token Storage**: Tokens persisted in localStorage via Zustand persist
-3. **Token Refresh**: 401 responses trigger automatic refresh attempt
-4. **Logout**: Clears all auth state and redirects to login
+1. **Login**: `POST /auth/login` — two possible responses:
+   - **Normal**: returns tokens + user + permissions + menus + `entity_id`
+   - **First-login**: returns `{ requires_password_change: true, change_password_token, message }`
+2. **First-login redirect**: store `change_password_token` in `sessionStorage`, navigate to `/set-password`
+3. **Set password**: `POST /auth/staff/set-password` — works for ALL roles (Staff, Teacher, Student, Parent). On success returns normal `LoginResponse`.
+4. **Token Storage**: Tokens + `entityId` persisted in localStorage via Zustand `persist` with `partialize`
+5. **Token Refresh**: 401 responses trigger automatic refresh attempt
+6. **Logout**: Clears all auth state and redirects to login
+
+### entity_id
+
+`entity_id` in login response is role-specific:
+
+| Role | `entity_id` is | How to use |
+| --- | --- | --- |
+| Student | student profile UUID | Pass as `student_id` in all self-service endpoints |
+| Parent | parent profile UUID | Fetch children list with this ID, then use child's `id` |
+| Admin/Staff/Teacher | not present | Not needed |
+
+Stored as `entityId` in `authStore` — persisted to localStorage, cleared on logout.
 
 ### Route Protection
 
@@ -194,8 +213,8 @@ hasPermission: (resource: string, action: string) => {
 
 ```typescript
 // Authentication actions
-login: (data: LoginResponse) => void;
-logout: () => void;
+login: (data: LoginResponse) => void;   // sets entityId from data.entity_id
+logout: () => void;                      // clears entityId
 refreshTokens: (accessToken: string, refreshToken: string) => void;
 setUser: (user: User | null) => void;
 
@@ -208,10 +227,20 @@ setAvailableStudents: (students: Student[]) => void;
 setStudentId: (studentId: string | null) => void;
 ```
 
+### Parent Children Hook
+
+```typescript
+// src/api/auth.ts
+useParentChildren(parentEntityId: string | null): UseQueryResult<Student[]>
+// GET /student-parent-links/parent/{parentEntityId}/students
+// enabled: !!parentEntityId, staleTime: 5 min
+// Use directly in components — do NOT rely on availableStudents from store
+```
+
 ### API Headers Added Automatically
 
 | Header | Value | Purpose |
-|--------|-------|---------|
+| --- | --- | --- |
 | `Authorization` | `Bearer {accessToken}` | Authentication |
 | `cschema` | Tenant identifier | Multi-tenancy |
 | `X-Student-ID` | Selected student ID | Parent context |
@@ -277,13 +306,25 @@ No dedicated authentication tests found in codebase. Testing approach unclear.
 
 ---
 
+## Role-Based Access Summary (Mar 2026)
+
+| Role | Menu scope | Data scope | `entity_id` |
+| --- | --- | --- | --- |
+| Student | 13 student-facing menus | Own data only (403 on others) | student UUID |
+| Parent | 13 student-facing menus | Linked children only (403 on others) | parent UUID |
+| Admin/Staff/Teacher | All module menus | Full access | not present |
+
+**Menu rendering**: Always use `menus` array from login response — never hardcode menus per role.
+
+**403 vs 404**: Backend returns 404 (not 403) when a user tries to access a record they don't own — prevents information leakage. Handle both with a "not found" message on detail pages.
+
+---
+
 ## Uncertainties
 
 [UNCERTAIN]
 
-1. **Password Requirements**: No client-side password validation schema found
-2. **Session Invalidation**: Server-side session invalidation mechanism unknown
-3. **Multi-Device Sessions**: Unknown if multiple sessions allowed
-4. **2FA/MFA**: No evidence of two-factor authentication
-5. **Password Reset Flow**: Backend implementation details unknown
-6. **Token Expiry Times**: JWT expiry durations not visible in frontend code
+1. **Session Invalidation**: Server-side session invalidation mechanism unknown
+2. **Multi-Device Sessions**: Unknown if multiple sessions allowed
+3. **2FA/MFA**: No evidence of two-factor authentication
+4. **Token Expiry Times**: JWT expiry durations not visible in frontend code

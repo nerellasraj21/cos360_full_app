@@ -1,8 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type {
-  AttendanceRequest,
-  AttendanceResponse,
   StudentAttendanceOut,
   BulkAttendanceUpdate
 } from '@/types/attendance';
@@ -38,6 +36,7 @@ export function useAttendanceByDate(date: string) {
 }
 
 // Get student attendance history
+// NOTE: Backend requires both start_date and end_date (422 if missing)
 export function useStudentAttendance(
   studentId: string,
   params?: {
@@ -45,10 +44,10 @@ export function useStudentAttendance(
     end_date?: string;
   }
 ) {
-  return useQuery<AttendanceResponse[]>({
+  return useQuery<StudentAttendanceOut[]>({
     queryKey: ['attendance', 'student', studentId, params],
     queryFn: () => getStudentAttendance(studentId, params),
-    enabled: !!studentId,
+    enabled: !!studentId && !!params?.start_date && !!params?.end_date,
   });
 }
 

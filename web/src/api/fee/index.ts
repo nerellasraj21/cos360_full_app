@@ -22,7 +22,22 @@ export {
   bulkCreateStudentMappings as bulkCreateFeeStudentMappings,
 } from './mappings';
 
-export * from './transactions';
+// Transactions - with renamed healthCheck to avoid conflict with categories
+export {
+  healthCheck as transactionsHealthCheck,
+  createTransaction,
+  getTransactionById,
+  updateTransactionStatus,
+  searchTransactions,
+  getOutstandingFees,
+  getTransactionHistory,
+  getTransactionByNumber,
+  getMyFeeTransactions,
+  getMyChildrenFeeTransactions,
+  getMyOutstandingFees,
+  getChildOutstandingFees,
+  feeTransactionApi,
+} from './transactions';
 
 // Receipts - with renamed healthCheck
 export {

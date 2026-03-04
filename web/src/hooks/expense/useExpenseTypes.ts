@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { expenseTypesApi } from '@/api/expense';
+import { expenseApi } from '@/api/expense';
 import type {
     ExpenseType,
     ExpenseTypeCreateRequest,
@@ -21,7 +21,12 @@ export const expenseTypeKeys = {
 export function useExpenseTypes(params?: ExpenseTypeQueryParams) {
     return useQuery<ExpenseType[]>({
         queryKey: expenseTypeKeys.list(params),
-        queryFn: () => expenseTypesApi.getAllTypes(params),
+        queryFn: () => expenseApi.getTypes({
+            category_id: params?.category_id,
+            skip: params?.skip,
+            limit: params?.limit,
+            active_only: params?.is_active,
+        }),
         staleTime: 5 * 60 * 1000, // 5 minutes
     });
 }
@@ -30,7 +35,7 @@ export function useExpenseTypes(params?: ExpenseTypeQueryParams) {
 export function useExpenseType(id: string) {
     return useQuery<ExpenseType>({
         queryKey: expenseTypeKeys.detail(id),
-        queryFn: () => expenseTypesApi.getType(id),
+        queryFn: () => expenseApi.getTypeById(id),
         enabled: !!id,
         staleTime: 5 * 60 * 1000,
     });
@@ -41,7 +46,7 @@ export function useCreateExpenseType() {
     const queryClient = useQueryClient();
 
     return useMutation<ExpenseType, Error, ExpenseTypeCreateRequest>({
-        mutationFn: expenseTypesApi.createType,
+        mutationFn: (data) => expenseApi.createType(data),
         onSuccess: (data) => {
             // Invalidate and refetch types list
             queryClient.invalidateQueries({ queryKey: expenseTypeKeys.lists() });
@@ -62,7 +67,7 @@ export function useUpdateExpenseType() {
     const queryClient = useQueryClient();
 
     return useMutation<ExpenseType, Error, { id: string; data: ExpenseTypeUpdateRequest }>({
-        mutationFn: ({ id, data }) => expenseTypesApi.updateType(id, data),
+        mutationFn: ({ id, data }) => expenseApi.updateType(id, data),
         onSuccess: (data) => {
             // Update the specific type in cache
             queryClient.setQueryData(expenseTypeKeys.detail(data.id), data);
@@ -83,7 +88,7 @@ export function useDeleteExpenseType() {
     const queryClient = useQueryClient();
 
     return useMutation<void, Error, string>({
-        mutationFn: expenseTypesApi.deleteType,
+        mutationFn: (id) => expenseApi.deleteType(id),
         onSuccess: (_, id) => {
             // Remove from cache
             queryClient.removeQueries({ queryKey: expenseTypeKeys.detail(id) });

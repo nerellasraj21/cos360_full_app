@@ -143,7 +143,7 @@ const AdminProfile: React.FC = () => {
         <CardContent>
           {profileFields.map(renderField)}
           <div className="mt-4 space-x-2">
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} guardDirty={emailForm.formState.isDirty} onDirtyDiscard={() => emailForm.reset()}>
               <DialogTrigger asChild>
                 <Button variant="default" size="sm">
                   Edit Email
@@ -190,7 +190,7 @@ const AdminProfile: React.FC = () => {
               </DialogContent>
             </Dialog>
 
-            <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+            <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen} guardDirty={passwordForm.formState.isDirty} onDirtyDiscard={() => passwordForm.reset()}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm">
                   Change Password

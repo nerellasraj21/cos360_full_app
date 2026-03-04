@@ -4,7 +4,7 @@ import type {
     ExpenseReportQueryParams,
     BudgetAnalysis,
     BudgetAnalysisQueryParams
-} from '@/types/expense';
+} from '@/types/expense/report';
 
 export const expenseReportsApi = {
     // Generate expense summary report

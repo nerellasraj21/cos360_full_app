@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Eye, Edit, CheckCircle, XCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -41,6 +41,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
   const navigate = useNavigate();
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [isEditDirty, setIsEditDirty] = useState(false);
   const [selectedAdmission, setSelectedAdmission] = useState<StudentAdmissionResponse | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -258,6 +259,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       previous_class: admission.previous_class || '',
                       previous_school_remark: admission.previous_school_remark || ''
                     });
+                    setIsEditDirty(false);
                     setEditModalOpen(true);
                   }
                 }}
@@ -469,13 +471,13 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       </Dialog>
 
       {/* Edit Modal */}
-      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Admission - {selectedAdmission?.admission_number}</DialogTitle>
           </DialogHeader>
           {selectedAdmission && (
-            <div className="space-y-4">
+            <div className="space-y-4" onChange={() => setIsEditDirty(true)}>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-class">Current Class</Label>
@@ -609,9 +611,9 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditModalOpen(false)}>
-              Cancel
-            </Button>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
             <Button
               onClick={async () => {
                 if (selectedAdmission) {
@@ -639,6 +641,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       studentId: selectedAdmission.student.id,
                       data: updateData
                     });
+                    setIsEditDirty(false);
                     setEditModalOpen(false);
                   } catch (error) {
                     console.error('Error updating admission:', error);

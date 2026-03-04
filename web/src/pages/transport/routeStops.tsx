@@ -203,8 +203,7 @@ export default function RouteStopsPage() {
     >
       <MasterPage<RouteStop, RouteStopInput>
         config={{
-          title: 'Route Stops Management',
-          addButtonLabel: 'Add Route Stops Management',
+          title: 'Route Stops',
           columns,
           defaultValues,
           formFields,

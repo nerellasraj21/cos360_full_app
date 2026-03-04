@@ -1,3 +1,4 @@
+import axios from 'axios';
 import CAxios from '../index';
 import type { StudentTransportOut, StudentTransportCreate, StudentTransportUpdate } from '@/types/masters/studentTransport';
 
@@ -9,8 +10,14 @@ export const fetchStudentTransports = async (): Promise<StudentTransportOut[]> =
 };
 
 export const fetchStudentTransportsByStudent = async (studentId: string): Promise<StudentTransportOut[]> => {
-    const { data } = await CAxios.get(`${STUDENT_TRANSPORT_API_BASE}student/${studentId}`);
-    return data;
+    try {
+        const { data } = await CAxios.get(`${STUDENT_TRANSPORT_API_BASE}student/${studentId}`);
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        // Backend returns 404 when no transport is assigned — treat as empty list
+        if (axios.isAxiosError(error) && error.response?.status === 404) return [];
+        throw error;
+    }
 };
 
 export const createStudentTransport = async (transport: StudentTransportCreate): Promise<StudentTransportOut> => {

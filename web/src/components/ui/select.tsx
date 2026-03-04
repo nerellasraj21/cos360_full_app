@@ -22,6 +22,7 @@ interface SelectContentProps {
 interface SelectItemProps {
   value: string;
   children: React.ReactNode;
+  disabled?: boolean;
 }
 
 interface SelectValueProps {

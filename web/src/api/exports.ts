@@ -30,8 +30,7 @@ export * from './timetable';
 // Attendance Management
 export * from './attendance';
 
-// Academic Management (masters already exists)
-export * from './masters';
+// Academic Management (masters already exists - not re-exported here to avoid conflicts with transport)
 
 // Dropdown utilities
 export * from './dropdown';

@@ -1,5 +1,5 @@
-import { Fragment, useState } from 'react'
-import { Plus, Edit, Trash2, Loader2, MessageSquare, ChevronDown, ChevronRight, ChevronUp, Save, X, GripVertical } from 'lucide-react'
+import { Fragment, useState, useMemo } from 'react'
+import { Plus, Edit, Trash2, Loader2, MessageSquare, ChevronDown, ChevronRight, ChevronUp, Save, X, GripVertical, Filter, Search, ChevronsUpDown } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -27,6 +28,10 @@ export default function RemarkGradeSets() {
   const [showForm, setShowForm] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [isDirty, setIsDirty] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortKey, setSortKey] = useState<'name' | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const { data: sets = [], isLoading } = useRemarkGradeSets()
   const createMutation = useCreateRemarkGradeSet()
@@ -42,6 +47,35 @@ export default function RemarkGradeSets() {
   })
 
   const { fields, append, remove, move } = useFieldArray({ control: form.control, name: 'options' })
+
+  const handleSort = (key: typeof sortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }
+
+  const SortIcon = ({ col }: { col: typeof sortKey }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-50" />
+    return sortDir === 'asc'
+      ? <ChevronUp className="ml-1 inline h-3 w-3" />
+      : <ChevronDown className="ml-1 inline h-3 w-3" />
+  }
+
+  const filteredSets = useMemo(() => {
+    let result = sets.filter(s =>
+      s.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    if (sortKey === 'name') {
+      result = [...result].sort((a, b) => {
+        const cmp = a.name.localeCompare(b.name)
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+    }
+    return result
+  }, [sets, searchQuery, sortKey, sortDir])
 
   const handleOptionDragStart = (index: number) => {
     setDragIndex(index)
@@ -60,6 +94,7 @@ export default function RemarkGradeSets() {
     currentOptions.forEach((_, i) => {
       form.setValue(`options.${i}.sort_order`, i)
     })
+    setIsDirty(true)
   }
 
   const openCreate = () => {
@@ -68,6 +103,7 @@ export default function RemarkGradeSets() {
       options: [{ grade_letter: 'A', label: 'Excellent', sort_order: 0 }],
     })
     setEditTarget(null)
+    setIsDirty(false)
     setShowForm(true)
   }
 
@@ -81,6 +117,7 @@ export default function RemarkGradeSets() {
       })),
     })
     setEditTarget(set)
+    setIsDirty(false)
     setShowForm(true)
   }
 
@@ -88,10 +125,10 @@ export default function RemarkGradeSets() {
     if (editTarget) {
       updateMutation.mutate(
         { id: editTarget.id, data: { name: data.name, options: data.options } },
-        { onSuccess: () => setShowForm(false) }
+        { onSuccess: () => { setIsDirty(false); setShowForm(false) } }
       )
     } else {
-      createMutation.mutate(data, { onSuccess: () => setShowForm(false) })
+      createMutation.mutate(data, { onSuccess: () => { setIsDirty(false); setShowForm(false) } })
     }
   }
 
@@ -121,6 +158,21 @@ export default function RemarkGradeSets() {
         </Button>
       </div>
 
+      {/* Filter Bar */}
+      <div className="flex items-center gap-3">
+        <Filter className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium text-muted-foreground">Filters</span>
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search set name..."
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
+      </div>
+
       {sets.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
@@ -140,99 +192,112 @@ export default function RemarkGradeSets() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">
-                <th className="px-4 py-3 text-left font-medium">Set Name</th>
+                <th className="px-4 py-3 text-left font-medium w-12">S.No.</th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('name')}>
+                  Set Name <SortIcon col="name" />
+                </th>
                 <th className="px-4 py-3 text-left font-medium">Options</th>
                 <th className="px-4 py-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {sets.map((set) => (
-                <Fragment key={set.id}>
-                  <tr
-                    className="cursor-pointer border-b transition-colors hover:bg-muted/20"
-                    onClick={() => setExpandedId(expandedId === set.id ? null : set.id)}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {expandedId === set.id
-                          ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          : <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        }
-                        <span className="font-medium">{set.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {set.options.slice(0, 4).map((opt) => (
-                          <Badge key={opt.id} variant="outline" className="text-xs">
-                            {opt.grade_letter}: {opt.label}
-                          </Badge>
-                        ))}
-                        {set.options.length > 4 && (
-                          <Badge variant="secondary" className="text-xs">
-                            +{set.options.length - 4} more
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(set)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setDeleteTarget(set.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                  {expandedId === set.id && (
-                    <tr className="bg-muted/10">
-                      <td colSpan={3} className="px-8 py-4">
-                        <div className="overflow-hidden rounded border">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="border-b bg-muted/30">
-                                <th className="px-3 py-2 text-left">Grade Letter</th>
-                                <th className="px-3 py-2 text-left">Label</th>
-                                <th className="px-3 py-2 text-left">Order</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {set.options.map((opt) => (
-                                <tr key={opt.id} className="border-b last:border-0">
-                                  <td className="px-3 py-2">
-                                    <Badge variant="outline">{opt.grade_letter}</Badge>
-                                  </td>
-                                  <td className="px-3 py-2">{opt.label}</td>
-                                  <td className="px-3 py-2 text-muted-foreground">{opt.sort_order}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+              {filteredSets.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground text-sm">
+                    No sets match your search.
+                  </td>
+                </tr>
+              ) : (
+                filteredSets.map((set, idx) => (
+                  <Fragment key={set.id}>
+                    <tr
+                      className="cursor-pointer border-b transition-colors hover:bg-muted/20"
+                      style={{ height: '48px' }}
+                      onClick={() => setExpandedId(expandedId === set.id ? null : set.id)}
+                    >
+                      <td className="px-4 py-3 text-muted-foreground text-sm">{idx + 1}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {expandedId === set.id
+                            ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          }
+                          <span className="font-medium">{set.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {set.options.slice(0, 4).map((opt) => (
+                            <Badge key={opt.id} variant="outline" className="text-xs">
+                              {opt.grade_letter}: {opt.label}
+                            </Badge>
+                          ))}
+                          {set.options.length > 4 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{set.options.length - 4} more
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(set)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteTarget(set.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
-                  )}
-                </Fragment>
-              ))}
+                    {expandedId === set.id && (
+                      <tr className="bg-muted/10">
+                        <td colSpan={4} className="px-8 py-4">
+                          <div className="overflow-hidden rounded border">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b bg-muted/30">
+                                  <th className="px-3 py-2 text-left">Grade Letter</th>
+                                  <th className="px-3 py-2 text-left">Label</th>
+                                  <th className="px-3 py-2 text-left">Order</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {set.options.map((opt) => (
+                                  <tr key={opt.id} className="border-b last:border-0">
+                                    <td className="px-3 py-2">
+                                      <Badge variant="outline">{opt.grade_letter}</Badge>
+                                    </td>
+                                    <td className="px-3 py-2">{opt.label}</td>
+                                    <td className="px-3 py-2 text-muted-foreground">{opt.sort_order}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       )}
 
       {/* Create / Edit Dialog */}
-      <Dialog open={showForm} onOpenChange={setShowForm}>
+      <Dialog open={showForm} onOpenChange={setShowForm} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editTarget ? 'Edit Remark Grade Set' : 'Create Remark Grade Set'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" onChange={() => setIsDirty(true)}>
             <div className="space-y-1">
               <label className="text-sm font-medium">Set Name *</label>
               <Input {...form.register('name')} placeholder="Primary Remarks Set" />
@@ -248,7 +313,7 @@ export default function RemarkGradeSets() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => append({ grade_letter: '', label: '', sort_order: fields.length })}
+                  onClick={() => { append({ grade_letter: '', label: '', sort_order: fields.length }); setIsDirty(true) }}
                   className="gap-1"
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -275,6 +340,7 @@ export default function RemarkGradeSets() {
                           move(index, index - 1)
                           const opts = form.getValues('options')
                           opts.forEach((_, i) => form.setValue(`options.${i}.sort_order`, i))
+                          setIsDirty(true)
                         }}
                         className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
                       >
@@ -287,6 +353,7 @@ export default function RemarkGradeSets() {
                           move(index, index + 1)
                           const opts = form.getValues('options')
                           opts.forEach((_, i) => form.setValue(`options.${i}.sort_order`, i))
+                          setIsDirty(true)
                         }}
                         className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
                       >
@@ -308,7 +375,7 @@ export default function RemarkGradeSets() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => remove(index)}
+                      onClick={() => { remove(index); setIsDirty(true) }}
                       className="h-9 w-9 p-0 text-destructive hover:text-destructive"
                     >
                       <X className="h-4 w-4" />
@@ -322,9 +389,9 @@ export default function RemarkGradeSets() {
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                Cancel
-              </Button>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Cancel</Button>
+              </DialogClose>
               <Button
                 type="submit"
                 disabled={createMutation.isPending || updateMutation.isPending}

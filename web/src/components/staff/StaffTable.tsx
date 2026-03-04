@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,12 @@ import {
   Trash2,
   Eye,
   Plus,
-  MoreHorizontal
+  MoreHorizontal,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
+  Search,
+  Filter
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useStaffEnrollments, useUpdateStaffEnrollment, useDeleteStaffEnrollment, useDesignationsDropdown } from '@/hooks/masters/useStaff';
@@ -27,7 +32,12 @@ interface StaffTableProps {
 export function StaffTable({ searchQuery }: StaffTableProps) {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [isEditDirty, setIsEditDirty] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
+  const [localSearch, setLocalSearch] = useState('');
+
   const [editForm, setEditForm] = useState({
     first_name: '',
     last_name: '',
@@ -85,6 +95,7 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
       department: staffMember.department || '',
       is_active: staffMember.is_active
     });
+    setIsEditDirty(false);
     setEditModalOpen(true);
   };
 
@@ -108,10 +119,84 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
         id: selectedStaff.id,
         data: updateData
       });
+      setIsEditDirty(false);
       setEditModalOpen(false);
     } catch (error) {
       console.error('Error updating staff:', error);
     }
+  };
+
+
+  // Combined search: prop searchQuery OR local search bar
+  const effectiveSearch = (searchQuery || localSearch).toLowerCase();
+  const filteredData = useMemo(() => {
+    if (!effectiveSearch) return staff;
+    return staff.filter((s: any) => {
+      const name = `${s.first_name} ${s.last_name || ''}`.toLowerCase();
+      const email = (s.email || '').toLowerCase();
+      const designation = getDesignationName(s.designation_id || '').toLowerCase();
+      const department = (s.department || '').toLowerCase();
+      return (
+        name.includes(effectiveSearch) ||
+        email.includes(effectiveSearch) ||
+        designation.includes(effectiveSearch) ||
+        department.includes(effectiveSearch)
+      );
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staff, effectiveSearch, designations]);
+
+  const sortedData = useMemo(() => {
+    if (!sortKey || !sortDir) return filteredData;
+    return [...filteredData].sort((a: any, b: any) => {
+      let aVal: string;
+      let bVal: string;
+      switch (sortKey) {
+        case 'name':
+          aVal = `${a.first_name} ${a.last_name || ''}`.toLowerCase();
+          bVal = `${b.first_name} ${b.last_name || ''}`.toLowerCase();
+          break;
+        case 'email':
+          aVal = (a.email || '').toLowerCase();
+          bVal = (b.email || '').toLowerCase();
+          break;
+        case 'designation':
+          aVal = getDesignationName(a.designation_id || '').toLowerCase();
+          bVal = getDesignationName(b.designation_id || '').toLowerCase();
+          break;
+        case 'department':
+          aVal = (a.department || '').toLowerCase();
+          bVal = (b.department || '').toLowerCase();
+          break;
+        case 'joining_date':
+          aVal = a.joining_date || '';
+          bVal = b.joining_date || '';
+          break;
+        default:
+          return 0;
+      }
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredData, sortKey, sortDir, designations]);
+
+  const handleSort = (key: string) => {
+    if (editModalOpen) return;
+    if (sortKey === key) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else if (sortDir === 'desc') { setSortKey(null); setSortDir(null); }
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-50" />;
+    if (sortDir === 'asc') return <ChevronUp className="h-3 w-3 ml-1 inline" />;
+    return <ChevronDown className="h-3 w-3 ml-1 inline" />;
   };
 
   const getStaffDetails = (staffMember: any) => [
@@ -136,35 +221,75 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
 
   return (
     <div className="space-y-4">
+
+      {/* Filter bar */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+          <Filter className="h-3.5 w-3.5" />
+          <span>Filters</span>
+        </div>
+        <div className="relative max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input placeholder="Search staff..." value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} className="pl-8 h-8 text-sm" />
+        </div>
+      </div>
+
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Designation</TableHead>
-              <TableHead>Department</TableHead>
-              <TableHead>Joining Date</TableHead>
+              <TableHead className="px-3 py-2 text-left font-semibold border-b bg-muted w-14 text-xs text-muted-foreground">S.No.</TableHead>
+              <TableHead
+                className="cursor-pointer select-none"
+                onClick={() => handleSort('name')}
+              >
+                Name <SortIcon col="name" />
+              </TableHead>
+              <TableHead
+                className="cursor-pointer select-none"
+                onClick={() => handleSort('email')}
+              >
+                Email <SortIcon col="email" />
+              </TableHead>
+              <TableHead
+                className="cursor-pointer select-none"
+                onClick={() => handleSort('designation')}
+              >
+                Designation <SortIcon col="designation" />
+              </TableHead>
+              <TableHead
+                className="cursor-pointer select-none"
+                onClick={() => handleSort('department')}
+              >
+                Department <SortIcon col="department" />
+              </TableHead>
+              <TableHead
+                className="cursor-pointer select-none"
+                onClick={() => handleSort('joining_date')}
+              >
+                Joining Date <SortIcon col="joining_date" />
+              </TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {staff.map((staffMember: any) => (
-              <TableRow key={staffMember.id}>
-                <TableCell className="font-medium">
+            {sortedData.map((staffMember: any, index: number) => (
+              <TableRow key={staffMember.id} style={{ height: '48px' }}>
+                <TableCell className="px-3 align-middle text-xs text-muted-foreground">{index + 1}</TableCell>
+                <TableCell className="font-medium align-middle">
                   {`${staffMember.first_name} ${staffMember.last_name || ''}`.trim()}
                 </TableCell>
-                <TableCell>{staffMember.email || '-'}</TableCell>
-                <TableCell>{getDesignationName(staffMember.designation_id || '')}</TableCell>
-                <TableCell>{staffMember.department || '-'}</TableCell>
-                <TableCell>{new Date(staffMember.joining_date).toLocaleDateString()}</TableCell>
-                <TableCell>
+                <TableCell className="align-middle">{staffMember.email || '-'}</TableCell>
+                <TableCell className="align-middle">{getDesignationName(staffMember.designation_id || '')}</TableCell>
+                <TableCell className="align-middle">{staffMember.department || '-'}</TableCell>
+                <TableCell className="align-middle">{new Date(staffMember.joining_date).toLocaleDateString()}</TableCell>
+                <TableCell className="align-middle">
                   <Badge variant={staffMember.is_active ? "default" : "secondary"}>
                     {staffMember.is_active ? 'Active' : 'Inactive'}
                   </Badge>
                 </TableCell>
-                <TableCell>
+                <TableCell className="align-middle">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="h-8 w-8 p-0">
@@ -231,12 +356,12 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
       </Dialog>
 
       {/* Edit Modal */}
-      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Staff Member</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4" onChange={() => setIsEditDirty(true)}>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="edit-first-name">First Name *</Label>
@@ -375,9 +500,9 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditModalOpen(false)}>
-              Cancel
-            </Button>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
             <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
               {updateMutation.isPending ? 'Updating...' : 'Update'}
             </Button>

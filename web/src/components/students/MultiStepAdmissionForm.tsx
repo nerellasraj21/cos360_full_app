@@ -211,10 +211,10 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
         previous_class: data.is_previous_school ? (data.previous_class || undefined) : 'NA',
         previous_school_remark: data.is_previous_school ? (data.previous_school_remark || undefined) : 'NA',
         student: {
-          first_name: data.student_first_name,
-          last_name: data.student_last_name,
-          date_of_birth: data.student_date_of_birth,
-          gender: data.student_gender,
+          first_name: data.student_first_name ?? '',
+          last_name: data.student_last_name ?? '',
+          date_of_birth: data.student_date_of_birth ?? '',
+          gender: data.student_gender ?? '',
           is_primary: data.student_is_primary || 'not_primary',
           nationality: data.student_nationality || 'Indian',
           mother_tongue: data.student_mother_tongue || 'Telugu',
@@ -225,8 +225,8 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
           community: data.student_community || '',           // Required - send empty string if not provided
           identification_marks: data.student_identification_marks || '',  // Required - send empty string if not provided
           father: {
-            name: data.father_name,
-            email: data.father_email,
+            name: data.father_name || '',
+            email: data.father_email || '',
             phone: data.father_phone || '',                  // Required - send empty string if not provided
             occupation: data.father_occupation || '',        // Required - send empty string if not provided
             salary_range: data.father_salary_range || '',
@@ -235,8 +235,8 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
             relation_to_student: data.father_relation_to_student || 'Father',
           },
           mother: {
-            name: data.mother_name,
-            email: data.mother_email,
+            name: data.mother_name || '',
+            email: data.mother_email || '',
             phone: data.mother_phone || '',                  // Required - send empty string if not provided
             occupation: data.mother_occupation || '',        // Required - send empty string if not provided
             salary_range: data.mother_salary_range || '',

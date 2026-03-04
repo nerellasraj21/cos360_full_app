@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Edit, Trash2, Plus, Filter, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { Edit, Trash2, Plus, Filter, Download, FileText, FileSpreadsheet, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,8 +34,11 @@ export function SectionsManagement({
 }: SectionsManagementProps) {
   const updateSectionMutation = useUpdateSectionById();
   const deleteSectionMutation = useDeleteSectionById();
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [classFilter, setClassFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
@@ -66,6 +69,23 @@ export function SectionsManagement({
     );
   }, [data]);
 
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else if (sortDir === 'desc') { setSortKey(null); setSortDir(null); }
+      else setSortDir('asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 opacity-40 shrink-0 inline" />;
+    if (sortDir === 'asc') return <ChevronUp className="h-3 w-3 ml-1 shrink-0 inline" />;
+    return <ChevronDown className="h-3 w-3 ml-1 shrink-0 inline" />;
+  };
+
   // Filter sections
   const filteredSections = useMemo(() => {
     return allSections.filter(section => {
@@ -73,17 +93,33 @@ export function SectionsManagement({
       const matchesStatus = statusFilter === 'all' ||
                            (statusFilter === 'active' && section.is_active) ||
                            (statusFilter === 'inactive' && !section.is_active);
+      const matchesSearch = !searchQuery ||
+        section.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        section.className.toLowerCase().includes(searchQuery.toLowerCase());
 
-      return matchesClass && matchesStatus;
+      return matchesClass && matchesStatus && matchesSearch;
     });
-  }, [allSections, classFilter, statusFilter]);
+  }, [allSections, classFilter, statusFilter, searchQuery]);
 
-  // Paginated data
-  const paginatedSections = useMemo(() => {
+  const sortedSections = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
-    return filteredSections.slice(startIndex, endIndex);
-  }, [filteredSections, currentPage, pageSize]);
+    const pageData = filteredSections.slice(startIndex, endIndex);
+    if (!sortKey || !sortDir) return pageData;
+    return [...pageData].sort((a, b) => {
+      let aVal = '';
+      let bVal = '';
+      switch (sortKey) {
+        case 'name': aVal = a.name; bVal = b.name; break;
+        case 'className': aVal = a.className; bVal = b.className; break;
+        case 'classIsActive': aVal = String(a.classIsActive); bVal = String(b.classIsActive); break;
+        case 'is_active': aVal = String(a.is_active); bVal = String(b.is_active); break;
+      }
+      const cmp = aVal.localeCompare(bVal, undefined, { numeric: true });
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [filteredSections, currentPage, pageSize, sortKey, sortDir]);
+
 
   const totalPages = Math.ceil(filteredSections.length / pageSize);
 
@@ -190,7 +226,7 @@ export function SectionsManagement({
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle>Sections Management</CardTitle>
+          <CardTitle className="text-2xl font-bold">Sections Management</CardTitle>
           <div className="flex items-center gap-2">
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
@@ -247,45 +283,71 @@ export function SectionsManagement({
             </DropdownMenu>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-4 mt-4">
-          <Select value={classFilter} onValueChange={setClassFilter}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Filter by class" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Classes</SelectItem>
-              {classes.map(classItem => (
-                <SelectItem key={classItem.id} value={classItem.id}>
-                  {`${classItem.name} (${classItem.shortCode})`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-32">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </CardHeader>
       <CardContent>
+        {/* Filter bar */}
+        <div className="flex flex-col gap-2 mb-3">
+          <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filters</span>
+          </div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search section or class..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-8 text-sm"
+              />
+            </div>
+            <Select value={classFilter} onValueChange={setClassFilter}>
+              <SelectTrigger className="w-full sm:w-48 h-8 text-sm">
+                <SelectValue placeholder="Filter by class" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Classes</SelectItem>
+                {classes.map(classItem => (
+                  <SelectItem key={classItem.id} value={classItem.id}>
+                    {`${classItem.name} (${classItem.shortCode})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-32 h-8 text-sm">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12 text-xs text-muted-foreground">S.No.</TableHead>
               {filteredColumns.map(col => (
-                <TableHead key={col.key}>{col.label}</TableHead>
+                <TableHead
+                  key={col.key}
+                  className="cursor-pointer select-none hover:bg-muted/80"
+                  onClick={() => handleSort(col.key)}
+                >
+                  <div className="flex items-center">{col.label}<SortIcon col={col.key} /></div>
+                </TableHead>
               ))}
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedSections.map((section) => (
-              <TableRow key={section.id}>
+            {sortedSections.map((section, index) => (
+              <TableRow key={section.id} style={{ height: '48px' }}>
+                <TableCell className="text-muted-foreground text-sm">
+                  {(currentPage - 1) * pageSize + index + 1}
+                </TableCell>
                 {filteredColumns.map(col => (
                   <TableCell key={col.key}>
                     {col.key === 'name' && <span className="font-medium">{section.name}</span>}
@@ -332,8 +394,8 @@ export function SectionsManagement({
             ))}
             {filteredSections.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                  {classFilter !== 'all' || statusFilter !== 'all'
+                <TableCell colSpan={filteredColumns.length + 2} className="text-center py-8 text-gray-500">
+                  {classFilter !== 'all' || statusFilter !== 'all' || searchQuery
                     ? 'No sections match your filters'
                     : 'No sections found'
                   }
@@ -387,7 +449,7 @@ export function SectionsManagement({
         )}
 
         <div className="mt-4 text-sm text-gray-600">
-          Showing {paginatedSections.length} of {filteredSections.length} sections
+          Showing {sortedSections.length} of {filteredSections.length} sections
         </div>
       </CardContent>
     </Card>

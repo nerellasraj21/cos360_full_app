@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Edit, Trash2, Plus, Calendar, User, CheckCircle, XCircle, Clock, Search, Loader2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Edit, Trash2, Plus, Calendar, User, CheckCircle, XCircle, Clock, Search, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useStaffAttendance, useCreateStaffAttendance, useUpdateStaffAttendance, useDeleteStaffAttendance, useStaffEnrollments } from '@/hooks/staff/useStaff';
@@ -26,6 +26,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
         date: '',
         status: 'present'
     });
+    const [isFormDirty, setIsFormDirty] = useState(false);
 
     // Fetch attendance for selected date
     const { data: attendanceResponse, isLoading: attendanceLoading } = useStaffAttendance({
@@ -36,7 +37,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
 
     // Use API data
     const attendance: StaffAttendance[] = attendanceResponse?.items || [];
-    const staff = staffResponse?.items || [];
+    const staff: Staff[] = (Array.isArray(staffResponse) ? staffResponse : staffResponse?.items) || [];
 
     // Create a map of staff attendance for quick lookup
     const attendanceMap = new Map(attendance.map(att => [att.staff_id, att]));
@@ -49,6 +50,10 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
 
     const isLoading = attendanceLoading || staffLoading;
 
+    const [sortKey, setSortKey] = useState<string | null>(null);
+    const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
+    const [localSearch, setLocalSearch] = useState('');
+
     const createMutation = useCreateStaffAttendance();
     const updateMutation = useUpdateStaffAttendance();
     const deleteMutation = useDeleteStaffAttendance();
@@ -60,6 +65,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
             status: 'present'
         });
         setEditingAttendance(null);
+        setIsFormDirty(false);
         setShowCreateDialog(true);
     };
 
@@ -74,6 +80,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
             status: status
         });
         setEditingAttendance(null);
+        setIsFormDirty(false);
         setShowCreateDialog(true);
     };
 
@@ -84,6 +91,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
             status: attendance.status
         });
         setEditingAttendance(attendance);
+        setIsFormDirty(false);
         setShowCreateDialog(true);
     };
 
@@ -115,6 +123,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
             } else {
                 await createMutation.mutateAsync(formData);
             }
+            setIsFormDirty(false);
             setShowCreateDialog(false);
             setEditingAttendance(null);
         } catch (error) {
@@ -168,6 +177,59 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
         }
     };
 
+
+    // Search filter
+    const effectiveSearch = (localSearch).toLowerCase();
+
+    const filteredData = useMemo(() => {
+        if (!effectiveSearch) return staffWithAttendance;
+        return staffWithAttendance.filter((s: any) => {
+            const name = `${s.first_name} ${s.last_name || ''}`.toLowerCase();
+            const desig = (s.designation?.title || '').toLowerCase();
+            return name.includes(effectiveSearch) || desig.includes(effectiveSearch);
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [staffWithAttendance, effectiveSearch]);
+
+    const sortedData = useMemo(() => {
+        if (!sortKey || !sortDir) return filteredData;
+        return [...filteredData].sort((a: any, b: any) => {
+            let aVal: string;
+            let bVal: string;
+            switch (sortKey) {
+                case 'name':
+                    aVal = `${a.first_name} ${a.last_name || ''}`.toLowerCase();
+                    bVal = `${b.first_name} ${b.last_name || ''}`.toLowerCase();
+                    break;
+                case 'designation':
+                    aVal = (a.designation?.title || '').toLowerCase();
+                    bVal = (b.designation?.title || '').toLowerCase();
+                    break;
+                default: return 0;
+            }
+            if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+            return 0;
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filteredData, sortKey, sortDir]);
+
+    const handleSort = (key: string) => {
+        if (sortKey === key) {
+            if (sortDir === 'asc') setSortDir('desc');
+            else if (sortDir === 'desc') { setSortKey(null); setSortDir(null); }
+        } else {
+            setSortKey(key);
+            setSortDir('asc');
+        }
+    };
+
+    const SortIcon = ({ col }: { col: string }) => {
+        if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-50" />;
+        if (sortDir === 'asc') return <ChevronUp className="h-3 w-3 ml-1 inline" />;
+        return <ChevronDown className="h-3 w-3 ml-1 inline" />;
+    };
+
     if (isLoading) {
         return (
             <div className={cn("p-6", className)}>
@@ -202,17 +264,30 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
             </div>
 
             {/* Attendance Table */}
-            {staffWithAttendance.length > 0 ? (
+            {/* Filter bar */}
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                    <Filter className="h-3.5 w-3.5" />
+                    <span>Filters</span>
+                </div>
+                <div className="relative max-w-sm">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <Input placeholder="Search staff..." value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} className="pl-8 h-8 text-sm" />
+                </div>
+            </div>
+
+            {filteredData.length > 0 ? (
                 <div className="bg-card border border-border rounded-lg overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead className="bg-muted border-b border-border">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        Staff Member
+                                    <th className="px-3 py-2 text-left font-semibold border-b bg-muted w-14 text-xs text-muted-foreground">S.No.</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('name')}>
+                                        Staff Member <SortIcon col="name" />
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        Designation
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('designation')}>
+                                        Designation <SortIcon col="designation" />
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                         Attendance Status
@@ -223,18 +298,19 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                                 </tr>
                             </thead>
                             <tbody className="bg-card divide-y divide-border">
-                                {staffWithAttendance.map((staffMember) => (
-                                    <tr key={staffMember.id} className="hover:bg-accent/50">
-                                        <td className="px-4 py-3 text-sm font-medium text-foreground">
+                                {sortedData.map((staffMember, index) => (
+                                    <tr key={staffMember.id} className="hover:bg-accent/50" style={{ height: '48px' }}>
+                                        <td className="px-3 align-middle text-xs text-muted-foreground">{index + 1}</td>
+                                        <td className="px-4 py-3 text-sm font-medium text-foreground align-middle">
                                             <div className="flex items-center gap-2">
                                                 <User className="h-4 w-4" />
                                                 <span>{staffMember.first_name} {staffMember.last_name || ''}</span>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-foreground">
+                                        <td className="px-4 py-3 text-sm text-foreground align-middle">
                                             <span>{staffMember.designation?.title || 'N/A'}</span>
                                         </td>
-                                        <td className="px-4 py-3 text-sm">
+                                        <td className="px-4 py-3 text-sm align-middle">
                                             {staffMember.attendance ? (
                                                 <Badge
                                                     variant={getStatusBadgeVariant(staffMember.attendance.status)}
@@ -247,7 +323,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                                                 <span className="text-muted-foreground">Not marked</span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-sm">
+                                        <td className="px-4 py-3 text-sm align-middle">
                                             <div className="flex items-center gap-1">
                                                 {staffMember.attendance ? (
                                                     <>
@@ -309,7 +385,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
             )}
 
             {/* Create/Edit Dialog */}
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} guardDirty={isFormDirty} onDirtyDiscard={() => setIsFormDirty(false)}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle>
@@ -324,7 +400,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                             </label>
                             <Select
                                 value={formData.staff_id}
-                                onValueChange={(value) => setFormData({ ...formData, staff_id: value })}
+                                onValueChange={(value) => { setFormData({ ...formData, staff_id: value }); setIsFormDirty(true); }}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select staff member" />
@@ -346,7 +422,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                             <Input
                                 type="date"
                                 value={formData.date}
-                                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                                onChange={(e) => { setFormData({ ...formData, date: e.target.value }); setIsFormDirty(true); }}
                                 required
                             />
                         </div>
@@ -357,7 +433,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                             </label>
                             <Select
                                 value={formData.status}
-                                onValueChange={(value) => setFormData({ ...formData, status: value as 'present' | 'absent' | 'leave' | 'half-day' })}
+                                onValueChange={(value) => { setFormData({ ...formData, status: value as 'present' | 'absent' | 'leave' | 'half-day' }); setIsFormDirty(true); }}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select status" />
@@ -373,12 +449,9 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                     </div>
 
                     <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowCreateDialog(false)}
-                        >
-                            Cancel
-                        </Button>
+                        <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                        </DialogClose>
                         <Button
                             onClick={handleSubmit}
                             disabled={createMutation.isPending || updateMutation.isPending}

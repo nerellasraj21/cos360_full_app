@@ -1,4 +1,4 @@
-import  { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { MasterPage, type MasterPageConfig, type FormField } from '@/pages/masters/common/MasterPage';
 import type { TableColumn } from '@/components/common/table';
 import { useSubjectsPaginated, useCreateSubject, useUpdateSubject, useDeleteSubject } from '@/api/hooks/masters/subjects';
@@ -7,7 +7,6 @@ import type { Subject, SubjectInput } from '@/types/masters/subject';
 import { SubjectCategoriesDropdown } from '@/components/dropdown-system/components/SubjectCategoriesDropdown';
 import { SubjectCategoriesInfiniteDropdown, CreateCategoryPopover } from '@/components/dropdown';
 import { useAcademicYearStore } from "@/lib/academicYearStore";
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { usePermission } from '@/hooks/usePermission';
@@ -185,14 +184,7 @@ export default function SubjectPage() {
         </div>
       }
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>Subjects</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <MasterPage config={config} />
-        </CardContent>
-      </Card>
+      <MasterPage config={config} />
     </PermissionGuard>
   );
 }

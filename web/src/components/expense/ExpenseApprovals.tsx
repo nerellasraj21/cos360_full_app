@@ -1,14 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, XCircle, Eye, Clock, FileText, DollarSign, Calendar, User } from 'lucide-react';
+import { CheckCircle, XCircle, Eye, Clock, FileText, DollarSign, Calendar, User, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { usePendingExpenseApprovals, useApproveExpenseTransaction, useExpenseTransaction } from '@/hooks/expense';
 import { formatCurrency } from '@/lib/expenseValidation';
 import type { ExpenseTransaction } from '@/types/expense';
@@ -25,6 +25,18 @@ export function ExpenseApprovals() {
     transaction: null
   });
   const [approvalComment, setApprovalComment] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />;
+    return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />;
+  };
 
   const { data: pendingApprovals, isLoading, refetch } = usePendingExpenseApprovals();
   const { data: transactionDetails } = useExpenseTransaction(selectedTransaction?.id || '');
@@ -33,6 +45,26 @@ export function ExpenseApprovals() {
   const pendingTransactions = Array.isArray(pendingApprovals)
     ? pendingApprovals
     : pendingApprovals?.items || [];
+
+  const filteredTransactions = useMemo(() => {
+    let items = pendingTransactions;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      items = items.filter(t =>
+        (t.description ?? '').toLowerCase().includes(q) ||
+        (t.payment_method ?? '').toLowerCase().includes(q) ||
+        (t.status ?? '').toLowerCase().includes(q)
+      );
+    }
+    if (sortKey) {
+      items = [...items].sort((a, b) => {
+        const aVal = String((a as any)[sortKey] ?? '');
+        const bVal = String((b as any)[sortKey] ?? '');
+        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      });
+    }
+    return items;
+  }, [pendingTransactions, searchQuery, sortKey, sortDir]);
 
   const handleViewDetails = (transaction: ExpenseTransaction) => {
     setSelectedTransaction(transaction);
@@ -155,21 +187,35 @@ export function ExpenseApprovals() {
           <CardHeader>
             <CardTitle>Pending Expense Approvals</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                <Filter className="h-3.5 w-3.5" />
+                <span>Filters</span>
+              </div>
+              <div className="relative max-w-sm">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input placeholder="Search by description, type or status..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
+              </div>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Transaction</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="w-12">S.No.</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('description')}>Transaction <SortIcon col="description" /></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('amount')}>Amount <SortIcon col="amount" /></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('payment_method')}>Type <SortIcon col="payment_method" /></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('transaction_date')}>Submitted <SortIcon col="transaction_date" /></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('status')}>Status <SortIcon col="status" /></TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pendingTransactions.map((transaction) => (
-                  <TableRow key={transaction.id}>
+                {filteredTransactions.length === 0 ? (
+                  <TableRow><TableCell colSpan={7} className="px-4 py-8 text-center text-muted-foreground text-sm">{searchQuery ? 'No transactions match your search' : 'No pending approvals'}</TableCell></TableRow>
+                ) : filteredTransactions.map((transaction, index) => (
+                  <TableRow key={transaction.id} style={{ height: '48px' }}>
+                    <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
                     <TableCell>
                       <div>
                         <div className="font-medium">{transaction.description}</div>
@@ -312,7 +358,7 @@ export function ExpenseApprovals() {
       </Dialog>
 
       {/* Approval Confirmation Dialog */}
-      <Dialog open={approvalDialog.open} onOpenChange={() => setApprovalDialog({ open: false, action: 'approve', transaction: null })}>
+      <Dialog open={approvalDialog.open} onOpenChange={() => setApprovalDialog({ open: false, action: 'approve', transaction: null })} guardDirty={true} onDirtyDiscard={() => { setApprovalComment(''); setApprovalDialog({ open: false, action: 'approve', transaction: null }); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -365,12 +411,9 @@ export function ExpenseApprovals() {
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setApprovalDialog({ open: false, action: 'approve', transaction: null })}
-            >
-              Cancel
-            </Button>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
             <Button
               onClick={handleConfirmApproval}
               disabled={!approvalComment.trim() || approveMutation.isPending}

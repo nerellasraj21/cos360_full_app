@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Edit, Trash2, Plus, Calculator, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Edit, Trash2, Plus, Calculator, AlertCircle, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useFeeClassMappings, useCreateFeeClassMapping, useUpdateFeeClassMapping, useDeleteFeeClassMapping } from '@/hooks/fee/useFeeMappings';
@@ -26,6 +26,10 @@ interface MappingFormData {
     all_by_default: boolean;
 }
 
+
+type SortKey = 'class' | 'feeType' | 'totalFee' | 'termStatus' | 'assignmentType';
+type SortDir = 'asc' | 'desc';
+
 export function ClassMappingTable({ className }: ClassMappingTableProps) {
     const { selectedAcademicYearId } = useAcademicYearStore();
 
@@ -40,6 +44,12 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
         total_fee: 0,
         all_by_default: false
     });
+    const [isFormDirty, setIsFormDirty] = useState(false);
+
+    // Search and sort state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortKey, setSortKey] = useState<SortKey | null>(null);
+    const [sortDir, setSortDir] = useState<SortDir>('asc');
 
     const { data: mappingsResponse, isLoading, error } = useFeeClassMappings({
         academic_year_id: selectedAcademicYearId || undefined,
@@ -61,6 +71,23 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
     const updateMutation = useUpdateFeeClassMapping();
     const deleteMutation = useDeleteFeeClassMapping();
 
+    // Sort handler
+    const handleSort = (key: SortKey) => {
+        if (sortKey === key) {
+            setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortDir('asc');
+        }
+    };
+
+    const SortIcon = ({ colKey }: { colKey: SortKey }) => {
+        if (sortKey !== colKey) return <ChevronsUpDown className="inline h-3 w-3 ml-1 opacity-50" />;
+        return sortDir === 'asc'
+            ? <ChevronUp className="inline h-3 w-3 ml-1" />
+            : <ChevronDown className="inline h-3 w-3 ml-1" />;
+    };
+
     const handleCreate = () => {
         setFormData({
             class_id: '',
@@ -68,6 +95,7 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
             total_fee: 0,
             all_by_default: false
         });
+        setIsFormDirty(false);
         setEditingMapping(null);
         setShowCreateDialog(true);
     };
@@ -79,6 +107,7 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
             total_fee: mapping.total_fee,
             all_by_default: mapping.all_by_default
         });
+        setIsFormDirty(false);
         setEditingMapping(mapping);
         setShowCreateDialog(true);
     };
@@ -134,6 +163,7 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                 await createMutation.mutateAsync(createData);
             }
 
+            setIsFormDirty(false);
             setShowCreateDialog(false);
             setEditingMapping(null);
         } catch (error) {
@@ -197,6 +227,34 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
         return term.term_date_id || term.term_id || 'Unknown Term';
     };
 
+    // Filtered and sorted data
+    const processedMappings = useMemo(() => {
+        const q = searchQuery.toLowerCase().trim();
+        let filtered = q
+            ? mappings.filter(m => {
+                const cname = getClassName(m.class_id).toLowerCase();
+                const ftname = getFeeTypeName(m.fee_type_id).toLowerCase();
+                const totalFee = String(m.total_fee);
+                return cname.includes(q) || ftname.includes(q) || totalFee.includes(q);
+            })
+            : mappings;
+        if (sortKey) {
+            filtered = [...filtered].sort((a, b) => {
+                if (sortKey === 'totalFee') {
+                    const diff = a.total_fee - b.total_fee;
+                    return sortDir === 'asc' ? diff : -diff;
+                }
+                let aVal = '', bVal = '';
+                if (sortKey === 'class') { aVal = getClassName(a.class_id); bVal = getClassName(b.class_id); }
+                else if (sortKey === 'feeType') { aVal = getFeeTypeName(a.fee_type_id); bVal = getFeeTypeName(b.fee_type_id); }
+                else if (sortKey === 'termStatus') { aVal = getTermAmountStatus(a).status; bVal = getTermAmountStatus(b).status; }
+                else if (sortKey === 'assignmentType') { aVal = a.all_by_default ? 'Default' : 'Custom'; bVal = b.all_by_default ? 'Default' : 'Custom'; }
+                return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            });
+        }
+        return filtered;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mappings, searchQuery, sortKey, sortDir]);
     if (!selectedAcademicYearId) {
         return (
             <div className={cn("p-6", className)}>
@@ -277,6 +335,23 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                 </Button>
             </div>
 
+            {/* Search */}
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                    <Filter className="h-3.5 w-3.5" />
+                    <span>Filters</span>
+                </div>
+                <div className="relative max-w-sm">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                        placeholder="Search by class, fee type, or amount..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8 h-8 text-sm"
+                    />
+                </div>
+            </div>
+
             {/* Mappings Table */}
             {mappings.length > 0 ? (
                 <div className="bg-card border border-border rounded-lg overflow-hidden">
@@ -284,20 +359,38 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                         <table className="w-full">
                             <thead className="bg-muted border-b border-border">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        Class
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-12">
+                                        S.No.
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        Fee Type
+                                    <th
+                                        className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground"
+                                        onClick={() => handleSort('class')}
+                                    >
+                                        Class {<SortIcon colKey='class' />}
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        Total Fee
+                                    <th
+                                        className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground"
+                                        onClick={() => handleSort('feeType')}
+                                    >
+                                        Fee Type {<SortIcon colKey='feeType' />}
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        Term Distribution
+                                    <th
+                                        className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground"
+                                        onClick={() => handleSort('totalFee')}
+                                    >
+                                        Total Fee {<SortIcon colKey='totalFee' />}
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        Assignment Type
+                                    <th
+                                        className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground"
+                                        onClick={() => handleSort('termStatus')}
+                                    >
+                                        Term Distribution {<SortIcon colKey='termStatus' />}
+                                    </th>
+                                    <th
+                                        className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground"
+                                        onClick={() => handleSort('assignmentType')}
+                                    >
+                                        Assignment Type {<SortIcon colKey='assignmentType' />}
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                         Actions
@@ -305,16 +398,19 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                                 </tr>
                             </thead>
                             <tbody className="bg-card divide-y divide-border">
-                                {mappings.map((mapping) => {
+                                {processedMappings.map((mapping, index) => {
                                     const termStatus = getTermAmountStatus(mapping);
                                     const feeType = getFeeType(mapping.fee_type_id);
 
                                     return (
-                                        <tr key={mapping.id} className="hover:bg-accent/50">
-                                            <td className="px-4 py-3 text-sm font-medium text-foreground">
+                                        <tr key={mapping.id} className="hover:bg-accent/50" style={{ height: '48px' }}>
+                                            <td className="px-4 py-3 text-sm text-muted-foreground align-middle">
+                                                {index + 1}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm font-medium text-foreground align-middle">
                                                 {getClassName(mapping.class_id)}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-foreground">
+                                            <td className="px-4 py-3 text-sm text-foreground align-middle">
                                                 <div>
                                                     <div className="font-medium">{getFeeTypeName(mapping.fee_type_id)}</div>
                                                     {feeType?.fee_category_name && (
@@ -324,10 +420,10 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-foreground">
+                                            <td className="px-4 py-3 text-sm text-foreground align-middle">
                                                 ₹{mapping.total_fee.toLocaleString()}
                                             </td>
-                                            <td className="px-4 py-3 text-sm">
+                                            <td className="px-4 py-3 text-sm align-middle">
                                                 <div className="flex items-center gap-2">
                                                     <Badge
                                                         variant={
@@ -343,7 +439,7 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3 text-sm">
+                                            <td className="px-4 py-3 text-sm align-middle">
                                                 <Badge
                                                     variant={mapping.all_by_default ? 'default' : 'secondary'}
                                                     className="text-xs"
@@ -351,7 +447,7 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                                                     {mapping.all_by_default ? 'Default' : 'Custom'}
                                                 </Badge>
                                             </td>
-                                            <td className="px-4 py-3 text-sm">
+                                            <td className="px-4 py-3 text-sm align-middle">
                                                 <div className="flex items-center gap-1">
                                                     <Button
                                                         variant="ghost"
@@ -399,7 +495,7 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
             )}
 
             {/* Create/Edit Dialog */}
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} guardDirty={isFormDirty} onDirtyDiscard={() => setIsFormDirty(false)}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle>
@@ -407,14 +503,14 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                         </DialogTitle>
                     </DialogHeader>
 
-                    <div className="space-y-4">
+                    <div className="space-y-4" onChange={() => setIsFormDirty(true)}>
                         <div>
                             <label className="block text-sm font-medium text-foreground mb-1">
                                 Fee Type *
                             </label>
                             <Select
                                 value={formData.fee_type_id || ''}
-                                onValueChange={(value) => setFormData({ ...formData, fee_type_id: value })}
+                                onValueChange={(value) => { setFormData({ ...formData, fee_type_id: value }); setIsFormDirty(true); }}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select fee type" />
@@ -443,7 +539,7 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                             </label>
                             <Select
                                 value={formData.class_id || ''}
-                                onValueChange={(value) => setFormData({ ...formData, class_id: value })}
+                                onValueChange={(value) => { setFormData({ ...formData, class_id: value }); setIsFormDirty(true); }}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select class" />
@@ -487,12 +583,7 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                     </div>
 
                     <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowCreateDialog(false)}
-                        >
-                            Cancel
-                        </Button>
+                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                         <Button
                             onClick={handleSubmit}
                             disabled={createMutation.isPending || updateMutation.isPending}

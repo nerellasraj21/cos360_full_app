@@ -57,7 +57,7 @@ export interface StaffAttendance {
   id: string;
   staff_id: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'leave' | 'half-day';
   remarks?: string;
   staff?: Staff;
   created_at: string;
@@ -67,12 +67,12 @@ export interface StaffAttendance {
 export interface StaffAttendanceInput {
   staff_id: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'leave' | 'half-day';
   remarks?: string;
 }
 
 export interface StaffAttendanceUpdateRequest {
-  status?: 'present' | 'absent' | 'late';
+  status?: 'present' | 'absent' | 'late' | 'leave' | 'half-day';
   remarks?: string;
 }
 

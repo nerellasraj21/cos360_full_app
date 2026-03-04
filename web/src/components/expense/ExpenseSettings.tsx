@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,7 @@ import { PermissionGuard } from '@/components/PermissionGuard';
 export function ExpenseSettings() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingSetting, setEditingSetting] = useState<ExpenseSettings | null>(null);
+  const [isFormDirty, setIsFormDirty] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [formData, setFormData] = useState<ExpenseSettingsCreate>({
     setting_key: '',
@@ -102,6 +103,7 @@ export function ExpenseSettings() {
       effective_until: undefined
     });
     setEditingSetting(null);
+    setIsFormDirty(false);
     setShowCreateDialog(true);
   };
 
@@ -132,6 +134,7 @@ export function ExpenseSettings() {
       effective_until: setting.effective_until
     });
     setEditingSetting(setting);
+    setIsFormDirty(false);
     setShowCreateDialog(true);
   };
 
@@ -157,6 +160,7 @@ export function ExpenseSettings() {
       } else {
         await createMutation.mutateAsync(submitData);
       }
+      setIsFormDirty(false);
       setShowCreateDialog(false);
       setEditingSetting(null);
     } catch (error) {
@@ -364,7 +368,12 @@ export function ExpenseSettings() {
       </Card>
 
       {/* Create/Edit Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+      <Dialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        guardDirty={isFormDirty}
+        onDirtyDiscard={() => setIsFormDirty(false)}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -372,7 +381,7 @@ export function ExpenseSettings() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4" onChange={() => setIsFormDirty(true)}>
             {/* Basic Information */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -413,7 +422,7 @@ export function ExpenseSettings() {
                 <Label htmlFor="setting_category">Category *</Label>
                 <Select
                   value={formData.setting_category}
-                  onValueChange={(value: any) => handleInputChange('setting_category', value)}
+                  onValueChange={(value: any) => { handleInputChange('setting_category', value); setIsFormDirty(true); }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -433,7 +442,7 @@ export function ExpenseSettings() {
                 <Label htmlFor="compliance_level">Compliance Level</Label>
                 <Select
                   value={formData.compliance_level}
-                  onValueChange={(value: any) => handleInputChange('compliance_level', value)}
+                  onValueChange={(value: any) => { handleInputChange('compliance_level', value); setIsFormDirty(true); }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -479,7 +488,7 @@ export function ExpenseSettings() {
                   <Switch
                     id="boolean_value"
                     checked={formData.boolean_value || false}
-                    onCheckedChange={(checked) => handleInputChange('boolean_value', checked)}
+                    onCheckedChange={(checked) => { handleInputChange('boolean_value', checked); setIsFormDirty(true); }}
                   />
                   <Label htmlFor="boolean_value" className="text-xs">Boolean Value</Label>
                 </div>
@@ -492,7 +501,7 @@ export function ExpenseSettings() {
                 <Switch
                   id="is_user_configurable"
                   checked={formData.is_user_configurable}
-                  onCheckedChange={(checked) => handleInputChange('is_user_configurable', checked)}
+                  onCheckedChange={(checked) => { handleInputChange('is_user_configurable', checked); setIsFormDirty(true); }}
                 />
                 <Label htmlFor="is_user_configurable" className="text-xs">User Configurable</Label>
               </div>
@@ -501,7 +510,7 @@ export function ExpenseSettings() {
                 <Switch
                   id="requires_approval"
                   checked={formData.requires_approval}
-                  onCheckedChange={(checked) => handleInputChange('requires_approval', checked)}
+                  onCheckedChange={(checked) => { handleInputChange('requires_approval', checked); setIsFormDirty(true); }}
                 />
                 <Label htmlFor="requires_approval" className="text-xs">Requires Approval</Label>
               </div>
@@ -509,9 +518,9 @@ export function ExpenseSettings() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-              Cancel
-            </Button>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
             <Button
               onClick={handleSubmit}
               disabled={createMutation.isPending || updateMutation.isPending}

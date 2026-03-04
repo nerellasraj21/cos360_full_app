@@ -4,7 +4,7 @@ import type { TripOut, TripCreate, TripListResponse } from '@/types/masters/trip
 import { toast } from 'sonner';
 
 export function useTrips() {
-    return useQuery<TripOut[]>({
+    return useQuery<TripOut[] | TripListResponse>({
         queryKey: ['trips'],
         queryFn: getAllTrips,
     });

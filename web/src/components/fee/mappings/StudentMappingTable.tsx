@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, Search, Filter, Eye, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Filter, Eye, Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { feeStudentMappingsApi } from '@/api/fee/studentMappings';
 import type { FeeStudentMapping } from '@/types/fee/mapping';
@@ -26,6 +26,8 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
   const [mappings, setMappings] = useState<FeeStudentMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedSection, setSelectedSection] = useState<string>('');
   const [selectedFeeType, setSelectedFeeType] = useState<string>('');
@@ -33,6 +35,9 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
   const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [editingMapping, setEditingMapping] = useState<FeeStudentMapping | null>(null);
   const [deletingMapping, setDeletingMapping] = useState<FeeStudentMapping | null>(null);
+  const [isBulkDirty, setIsBulkDirty] = useState(false);
+  const [isCreateDirty, setIsCreateDirty] = useState(false);
+  const [isEditDirty, setIsEditDirty] = useState(false);
 
   // Fetch mappings
   const fetchMappings = async () => {
@@ -101,6 +106,19 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
     return feeType ? feeType.type_name : `Fee Type ${feeTypeId}`;
   };
 
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const SortIcon = ({ colKey }: { colKey: string }) => {
+    if (sortKey !== colKey) return <ChevronsUpDown className="inline h-3 w-3 ml-1 opacity-50" />;
+    return sortDir === 'asc'
+      ? <ChevronUp className="inline h-3 w-3 ml-1" />
+      : <ChevronDown className="inline h-3 w-3 ml-1" />;
+  };
+
   // Filter mappings based on search term
   const filteredMappings = mappings.filter(mapping => {
     const studentName = (getStudentName(mapping.student_id) || '').toLowerCase();
@@ -112,6 +130,22 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
            admissionNum.includes(searchLower) ||
            feeTypeName.includes(searchLower);
   });
+
+
+  // Sorted display data
+  const displayMappings = sortKey
+    ? [...filteredMappings].sort((a, b) => {
+        if (sortKey === 'totalFee') {
+          const diff = parseFloat(a.total_fee) - parseFloat(b.total_fee);
+          return sortDir === 'asc' ? diff : -diff;
+        }
+        let av = '', bv = '';
+        if (sortKey === 'student') { av = getStudentName(a.student_id); bv = getStudentName(b.student_id); }
+        else if (sortKey === 'class') { av = getClassName(a.class_id); bv = getClassName(b.class_id); }
+        else if (sortKey === 'feeType') { av = getFeeTypeName(a.fee_type_id); bv = getFeeTypeName(b.fee_type_id); }
+        return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      })
+    : filteredMappings;
 
   // Handle delete mapping
   const handleDeleteMapping = async (mapping: FeeStudentMapping) => {
@@ -128,6 +162,9 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
 
   // Handle create/update success
   const handleFormSuccess = () => {
+    setIsBulkDirty(false);
+    setIsCreateDirty(false);
+    setIsEditDirty(false);
     fetchMappings();
     setShowCreateDialog(false);
     setShowBulkDialog(false);
@@ -145,14 +182,14 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
           </p>
         </div>
         <div className="flex gap-2">
-          <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
+          <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog} guardDirty={isBulkDirty} onDirtyDiscard={() => setIsBulkDirty(false)}>
             <DialogTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => setIsBulkDirty(false)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Bulk Create
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl">
+            <DialogContent className="max-w-4xl" onChange={() => setIsBulkDirty(true)}>
               <DialogHeader>
                 <DialogTitle>Bulk Create Fee Student Mappings</DialogTitle>
               </DialogHeader>
@@ -163,14 +200,14 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
             </DialogContent>
           </Dialog>
 
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} guardDirty={isCreateDirty} onDirtyDiscard={() => setIsCreateDirty(false)}>
             <DialogTrigger asChild>
-              <Button>
+              <Button onClick={() => setIsCreateDirty(false)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Create Mapping
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl" onChange={() => setIsCreateDirty(true)}>
               <DialogHeader>
                 <DialogTitle>Create Fee Student Mapping</DialogTitle>
               </DialogHeader>
@@ -254,17 +291,26 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Class & Section</TableHead>
-                <TableHead>Fee Type</TableHead>
-                <TableHead>Total Fee</TableHead>
+                <TableHead>S.No.</TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('student')}>
+                  Student {<SortIcon colKey="student" />}
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('class')}>
+                  Class & Section {<SortIcon colKey="class" />}
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('feeType')}>
+                  Fee Type {<SortIcon colKey="feeType" />}
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('totalFee')}>
+                  Total Fee {<SortIcon colKey="totalFee" />}
+                </TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
+                  <TableCell colSpan={6} className="text-center py-8">
                     <div className="flex justify-center items-center py-8">
                       <Loader2 className="h-8 w-8 animate-spin" />
                       <span className="ml-2">Loading mappings...</span>
@@ -278,8 +324,9 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredMappings.map((mapping) => (
-                  <TableRow key={mapping.id}>
+                displayMappings.map((mapping, index) => (
+                  <TableRow key={mapping.id} style={{ height: "48px" }}>
+                    <TableCell>{index + 1}</TableCell>
                     <TableCell>
                       <div className="font-medium">
                         {getStudentName(mapping.student_id)}
@@ -308,7 +355,7 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setEditingMapping(mapping)}
+                          onClick={() => { setIsEditDirty(false); setEditingMapping(mapping); }}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -353,8 +400,8 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
 
       {/* Edit Dialog */}
       {editingMapping && (
-        <Dialog open={!!editingMapping} onOpenChange={() => setEditingMapping(null)}>
-          <DialogContent className="max-w-2xl">
+        <Dialog open={!!editingMapping} onOpenChange={() => setEditingMapping(null)} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
+          <DialogContent className="max-w-2xl" onChange={() => setIsEditDirty(true)}>
             <DialogHeader>
               <DialogTitle>Edit Fee Student Mapping</DialogTitle>
             </DialogHeader>

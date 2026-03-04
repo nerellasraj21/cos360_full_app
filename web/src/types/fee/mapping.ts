@@ -143,3 +143,17 @@ export interface FeeStudentMappingListResponse {
   skip?: number;
   limit?: number;
 }
+
+// Aliases used by API helpers and components
+export type FeeTermAmount = FeeClassMappingTermAmount;
+
+export interface FeeTermAmountCreateRequest {
+  term_date_id: string;
+  term_amount: number;
+}
+
+export interface FeeTermAmountUpdateRequest {
+  id: string;
+  term_id: string;
+  term_amount: number;
+}

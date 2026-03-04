@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Save, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClassSectionsDropdown, useStudentsByClassSection } from '@/api/hooks/masters/classesandsections';
+import { useStudentAttendance } from '@/api/hooks/students/attendance';
 import {
   createAttendance,
   updateAttendance,
@@ -23,6 +24,18 @@ import type {
 } from '@/types/attendance';
 import type { StudentAdmissionResponse } from '@/types/admission';
 import type { ClassRead } from '@/types/masters/classesandsections';
+import { useAuthStore } from '@/lib/authStore';
+import { useParentChildren } from '@/api/auth';
+
+// Returns { start, end } defaulting to 1st of current month → today
+function currentMonthRange() {
+  const today = new Date();
+  const first = new Date(today.getFullYear(), today.getMonth(), 1);
+  return {
+    start: first.toISOString().split('T')[0],
+    end: today.toISOString().split('T')[0],
+  };
+}
 
 interface StudentAttendanceState {
   student_id: string;
@@ -31,8 +44,273 @@ interface StudentAttendanceState {
   isModified: boolean;
 }
 
+// ─── Role router ─────────────────────────────────────────────────────────────
+
 const StudentAttendancePage: React.FC = () => {
-  // Selection state
+  const role = useAuthStore((s) => s.role);
+  const studentId = useAuthStore((s) => s.studentId);
+  const entityId = useAuthStore((s) => s.entityId);
+
+  const roleName = role?.name.toLowerCase() ?? '';
+
+  if (roleName === 'student') {
+    return <StudentOwnView studentId={studentId ?? ''} />;
+  }
+
+  if (roleName === 'parent') {
+    return <ParentView parentEntityId={entityId} />;
+  }
+
+  return <StaffView />;
+};
+
+export default StudentAttendancePage;
+
+// ─── Student own attendance view ─────────────────────────────────────────────
+
+function StudentOwnView({ studentId }: { studentId: string }) {
+  const [dateFrom, setDateFrom] = useState(() => currentMonthRange().start);
+  const [dateTo, setDateTo] = useState(() => currentMonthRange().end);
+
+  const { data: records = [], isLoading } = useStudentAttendance(studentId, {
+    start_date: dateFrom || undefined,
+    end_date: dateTo || undefined,
+  });
+
+  const summary = useMemo(() => ({
+    total: records.length,
+    present: records.filter((r) => r.status === 'present').length,
+    absent: records.filter((r) => r.status === 'absent').length,
+    late: records.filter((r) => r.status === 'late').length,
+  }), [records]);
+
+  return (
+    <div className="container mx-auto p-4 space-y-6">
+      <h1 className="text-2xl font-bold">My Attendance</h1>
+
+      {/* Date range filter */}
+      <Card>
+        <CardHeader><CardTitle>Filter by Date</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>From</Label>
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>To</Label>
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Summary */}
+      {!isLoading && records.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card><CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold">{summary.total}</p>
+            <p className="text-sm text-muted-foreground">Total Days</p>
+          </CardContent></Card>
+          <Card><CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-green-600">{summary.present}</p>
+            <p className="text-sm text-muted-foreground">Present</p>
+          </CardContent></Card>
+          <Card><CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-red-600">{summary.absent}</p>
+            <p className="text-sm text-muted-foreground">Absent</p>
+          </CardContent></Card>
+          <Card><CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-yellow-600">{summary.late}</p>
+            <p className="text-sm text-muted-foreground">Late</p>
+          </CardContent></Card>
+        </div>
+      )}
+
+      {/* Records */}
+      <AttendanceRecordList records={records} isLoading={isLoading} />
+    </div>
+  );
+}
+
+// ─── Parent child attendance view ─────────────────────────────────────────────
+
+function ParentView({ parentEntityId }: { parentEntityId: string | null }) {
+  const { data: children = [], isLoading: childrenLoading, error: childrenError } = useParentChildren(parentEntityId);
+  const [selectedChildId, setSelectedChildId] = useState('');
+  const [dateFrom, setDateFrom] = useState(() => currentMonthRange().start);
+  const [dateTo, setDateTo] = useState(() => currentMonthRange().end);
+
+  // Auto-select first child once loaded
+  useEffect(() => {
+    if (children.length > 0 && !selectedChildId) {
+      setSelectedChildId(children[0].id);
+    }
+  }, [children, selectedChildId]);
+
+  const { data: records = [], isLoading: attendanceLoading } = useStudentAttendance(selectedChildId, {
+    start_date: dateFrom || undefined,
+    end_date: dateTo || undefined,
+  });
+
+  const isLoading = attendanceLoading;
+  const selectedChild = children.find((s) => s.id === selectedChildId);
+
+  const summary = useMemo(() => ({
+    total: records.length,
+    present: records.filter((r) => r.status === 'present').length,
+    absent: records.filter((r) => r.status === 'absent').length,
+    late: records.filter((r) => r.status === 'late').length,
+  }), [records]);
+
+  return (
+    <div className="container mx-auto p-4 space-y-6">
+      <h1 className="text-2xl font-bold">Children's Attendance</h1>
+
+      {/* Child selector + date filter */}
+      <Card>
+        <CardHeader><CardTitle>Select Child & Date Range</CardTitle></CardHeader>
+        <CardContent>
+          {!parentEntityId ? (
+            <div className="text-center py-4 text-muted-foreground">
+              Session outdated. Please log out and log back in to view children.
+            </div>
+          ) : childrenLoading ? (
+            <div className="flex items-center gap-2 py-4">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Loading children...</span>
+            </div>
+          ) : childrenError ? (
+            <div className="text-center py-4 text-destructive">
+              Failed to load children: {(childrenError as Error).message}
+            </div>
+          ) : children.length === 0 ? (
+            <div className="text-center py-4 text-muted-foreground">
+              No children found for this account.
+            </div>
+          ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Child</Label>
+              <Select value={selectedChildId} onValueChange={setSelectedChildId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select child" />
+                </SelectTrigger>
+                <SelectContent>
+                  {children.map((child) => (
+                    <SelectItem key={child.id} value={child.id}>
+                      {child.name || `${child.first_name} ${child.last_name}`.trim()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>From</Label>
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>To</Label>
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </div>
+          </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {selectedChild && !isLoading && records.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card><CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold">{summary.total}</p>
+            <p className="text-sm text-muted-foreground">Total Days</p>
+          </CardContent></Card>
+          <Card><CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-green-600">{summary.present}</p>
+            <p className="text-sm text-muted-foreground">Present</p>
+          </CardContent></Card>
+          <Card><CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-red-600">{summary.absent}</p>
+            <p className="text-sm text-muted-foreground">Absent</p>
+          </CardContent></Card>
+          <Card><CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-yellow-600">{summary.late}</p>
+            <p className="text-sm text-muted-foreground">Late</p>
+          </CardContent></Card>
+        </div>
+      )}
+
+      <AttendanceRecordList
+        records={records}
+        isLoading={isLoading}
+        title={selectedChild ? `${selectedChild.name || `${selectedChild.first_name} ${selectedChild.last_name}`.trim()}'s Attendance` : 'Attendance'}
+      />
+    </div>
+  );
+}
+
+// ─── Shared read-only record list ─────────────────────────────────────────────
+
+function AttendanceRecordList({
+  records,
+  isLoading,
+  title = 'Attendance Records',
+}: {
+  records: StudentAttendanceOut[];
+  isLoading: boolean;
+  title?: string;
+}) {
+  const statusBadge = (status: string) => {
+    if (status === 'present') return <Badge variant="default" className="bg-green-500">Present</Badge>;
+    if (status === 'absent') return <Badge variant="destructive">Absent</Badge>;
+    return <Badge variant="secondary" className="bg-yellow-500 text-white">Late</Badge>;
+  };
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex justify-center items-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="ml-2">Loading attendance...</span>
+          </div>
+        ) : records.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            No attendance records found for the selected period.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {[...records]
+              .sort((a, b) => b.date.localeCompare(a.date))
+              .map((record) => (
+                <div
+                  key={record.id}
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                  style={{ height: '48px' }}
+                >
+                  <span className="font-medium">
+                    {new Date(record.date).toLocaleDateString('en-GB', {
+                      day: '2-digit', month: 'short', year: 'numeric',
+                    })}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    {record.remarks && (
+                      <span className="text-sm text-muted-foreground hidden md:block">{record.remarks}</span>
+                    )}
+                    {statusBadge(record.status)}
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Staff / Teacher attendance marking view (original behavior) ──────────────
+
+function StaffView() {
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedSection, setSelectedSection] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -40,43 +318,29 @@ const StudentAttendancePage: React.FC = () => {
     return today.toISOString().split('T')[0];
   });
 
-  // Data state
   const [studentAttendances, setStudentAttendances] = useState<Map<string, StudentAttendanceState>>(new Map());
   const [existingAttendances, setExistingAttendances] = useState<StudentAttendanceOut[]>([]);
 
-  // Loading states
-  const [isLoadingClasses, setIsLoadingClasses] = useState(false);
-  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Success/error states
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Data fetching
   const { data: classesData, isLoading: classesLoading } = useClassSectionsDropdown();
 
-  // Filter sections based on selected class
   const availableSections = useMemo(() => {
     if (!classesData || !selectedClass) return [];
     const selectedClassData = classesData.find(cls => cls.id === selectedClass);
     return selectedClassData?.sections || [];
   }, [classesData, selectedClass]);
 
-  // Fetch students by class and section
   const { data: studentsData, isLoading: studentsLoading } = useStudentsByClassSection(
     selectedClass,
     selectedSection
   );
 
-  // Students data from API
-  const students = useMemo(() => {
-    const result = studentsData || [];
-    return result;
-  }, [studentsData]);
+  const students = useMemo(() => studentsData || [], [studentsData]);
 
-  // Reset attendance states when date changes (before loading new data)
   useEffect(() => {
     if (selectedDate) {
       setStudentAttendances(new Map());
@@ -86,51 +350,34 @@ const StudentAttendancePage: React.FC = () => {
     }
   }, [selectedDate]);
 
-  // Load existing attendance data when date/class/section changes
   useEffect(() => {
     if (selectedDate && selectedClass && selectedSection) {
       loadExistingAttendance();
     }
   }, [selectedDate, selectedClass, selectedSection]);
 
-  // Initialize student attendance states when students change or date changes
   useEffect(() => {
     if (students.length > 0) {
       const newAttendances = new Map<string, StudentAttendanceState>();
-      const skippedStudents: string[] = [];
-
       students.forEach(student => {
-        // Skip students with missing student data
-        if (!student.student || !student.student.id) {
-          skippedStudents.push(`Admission ID: ${student.id}`);
-          return;
-        }
-
+        if (!student.student || !student.student.id) return;
         const existing = existingAttendances.find(att => att.student_id === student.student.id);
-        // Always default to 'present' unless there's an existing record for this specific date
         const status = existing ? existing.status : 'present';
         newAttendances.set(student.student.id, {
           student_id: student.student.id,
-          status: status,
+          status,
           existingRecord: existing,
-          isModified: false
+          isModified: false,
         });
       });
-
-      if (skippedStudents.length > 0) {
-        console.warn('Skipped students with missing data:', skippedStudents);
-      }
-
       setStudentAttendances(newAttendances);
     } else {
-      // Clear attendance states when no students
       setStudentAttendances(new Map());
     }
   }, [students, existingAttendances, selectedDate]);
 
   const loadExistingAttendance = async () => {
     if (!selectedDate) return;
-
     setIsLoadingAttendance(true);
     try {
       const dateAttendances = await getAttendanceByDate(selectedDate);
@@ -145,7 +392,7 @@ const StudentAttendancePage: React.FC = () => {
 
   const handleClassChange = (classId: string) => {
     setSelectedClass(classId);
-    setSelectedSection(''); // Reset section when class changes
+    setSelectedSection('');
     setStudentAttendances(new Map());
     setExistingAttendances([]);
   };
@@ -158,7 +405,6 @@ const StudentAttendancePage: React.FC = () => {
 
   const handleDateChange = (date: string) => {
     setSelectedDate(date);
-    // Clear existing state to ensure fresh load for new date
     setStudentAttendances(new Map());
     setExistingAttendances([]);
     setSaveMessage(null);
@@ -170,14 +416,12 @@ const StudentAttendancePage: React.FC = () => {
       const newMap = new Map(prev);
       const current = newMap.get(studentId);
       if (current) {
-        const wasStatus = current.status;
-        const isStatus = status;
         newMap.set(studentId, {
           ...current,
           status,
-          isModified: current.existingRecord ?
-            (wasStatus !== isStatus) :
-            (status !== 'present') // New records are modified if not marked present
+          isModified: current.existingRecord
+            ? current.existingRecord.status !== status
+            : status !== 'present',
         });
       }
       return newMap;
@@ -190,88 +434,61 @@ const StudentAttendancePage: React.FC = () => {
     setIsSaving(true);
     setSaveMessage(null);
     setSaveError(null);
-
     try {
-      // Prepare bulk update data for modified records
       const bulkUpdateData: BulkAttendanceUpdate[] = [];
       const individualUpdates: Promise<any>[] = [];
       const deletions: Promise<any>[] = [];
 
-      studentAttendances.forEach((attendance, studentId) => {
+      studentAttendances.forEach((attendance) => {
         if (!attendance.isModified) return;
-
         if (attendance.status === 'present') {
-          // Delete existing record if it exists (since present is default, no record needed)
           if (attendance.existingRecord) {
             deletions.push(deleteAttendance(attendance.existingRecord.id));
           }
         } else {
-          // For absent or late status, create/update record
           if (attendance.existingRecord) {
-            const updateData: StudentAttendanceUpdate = {
-              status: attendance.status,
-              remarks: ''
-            };
-            individualUpdates.push(updateAttendance(attendance.existingRecord.id, updateData));
+            individualUpdates.push(
+              updateAttendance(attendance.existingRecord.id, { status: attendance.status, remarks: '' })
+            );
           } else {
-            // Add to bulk update for new records
-            bulkUpdateData.push({
-              student_id: studentId,
-              status: attendance.status,
-              remarks: ''
-            });
+            bulkUpdateData.push({ student_id: attendance.student_id, status: attendance.status, remarks: '' });
           }
         }
       });
 
-      // Execute all operations
-      const promises: Promise<any>[] = [...individualUpdates, ...deletions];
       let bulkUpdateResponse: StudentAttendanceOut[] = [];
-
-      // Use bulk update for new records if any
       if (bulkUpdateData.length > 0) {
         bulkUpdateResponse = await bulkUpdateAttendanceByDate(selectedDate, bulkUpdateData);
       }
+      await Promise.all([...individualUpdates, ...deletions]);
 
-      await Promise.all(promises);
       setSaveMessage('Attendance saved successfully!');
       toast.success('Attendance saved successfully!');
 
-      // Update existing attendances with the bulk update response
       if (bulkUpdateResponse.length > 0) {
         setExistingAttendances(prev => {
           const updated = [...prev];
           bulkUpdateResponse.forEach(newRecord => {
-            const existingIndex = updated.findIndex(att => att.student_id === newRecord.student_id);
-            if (existingIndex >= 0) {
-              updated[existingIndex] = newRecord;
-            } else {
-              updated.push(newRecord);
-            }
+            const idx = updated.findIndex(att => att.student_id === newRecord.student_id);
+            if (idx >= 0) updated[idx] = newRecord;
+            else updated.push(newRecord);
           });
           return updated;
         });
       }
 
-      // Small delay to ensure data is saved before reloading
       await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Reload data to get updated records
       await loadExistingAttendance();
 
-      // Reset modification flags
       setStudentAttendances(prev => {
         const newMap = new Map(prev);
-        newMap.forEach(att => {
-          att.isModified = false;
-        });
+        newMap.forEach(att => { att.isModified = false; });
         return newMap;
       });
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save attendance';
-      setSaveError(errorMessage);
-      toast.error(errorMessage);
+      const msg = error instanceof Error ? error.message : 'Failed to save attendance';
+      setSaveError(msg);
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }
@@ -282,10 +499,6 @@ const StudentAttendancePage: React.FC = () => {
     return `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Unknown Student';
   };
 
-  const getAttendanceStatus = (studentId: string) => {
-    return studentAttendances.get(studentId);
-  };
-
   const hasUnsavedChanges = Array.from(studentAttendances.values()).some(att => att.isModified);
 
   return (
@@ -294,102 +507,57 @@ const StudentAttendancePage: React.FC = () => {
         <h1 className="text-2xl font-bold">Student Attendance</h1>
       </div>
 
-      {/* Selection Controls */}
       <Card>
-        <CardHeader>
-          <CardTitle>Select Class, Section & Date</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Select Class, Section & Date</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Class Selection */}
             <div className="space-y-2">
-              <Label htmlFor="class-select">Class</Label>
-              <Select
-                value={selectedClass}
-                onValueChange={handleClassChange}
-                disabled={classesLoading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Class" />
-                </SelectTrigger>
+              <Label>Class</Label>
+              <Select value={selectedClass} onValueChange={handleClassChange} disabled={classesLoading}>
+                <SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger>
                 <SelectContent>
                   {classesData?.map((cls: ClassRead) => (
-                    <SelectItem key={cls.id} value={cls.id}>
-                      {cls.name}
-                    </SelectItem>
+                    <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Section Selection */}
             <div className="space-y-2">
-              <Label htmlFor="section-select">Section</Label>
+              <Label>Section</Label>
               <Select
                 value={selectedSection}
                 onValueChange={handleSectionChange}
                 disabled={!selectedClass || availableSections.length === 0}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Section" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select Section" /></SelectTrigger>
                 <SelectContent>
                   {availableSections.map((section) => (
-                    <SelectItem key={section.id} value={section.id}>
-                      {section.name}
-                    </SelectItem>
+                    <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Date Selection */}
             <div className="space-y-2">
-              <Label htmlFor="date-select">Date</Label>
-              <Input
-                id="date-select"
-                type="date"
-                value={selectedDate}
-                onChange={(e) => handleDateChange(e.target.value)}
-              />
+              <Label>Date</Label>
+              <Input type="date" value={selectedDate} onChange={(e) => handleDateChange(e.target.value)} />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Student List */}
       {selectedClass && (
         <Card>
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
               <span>Student Attendance</span>
               <div className="flex items-center gap-2">
-                {hasUnsavedChanges && (
-                  <Badge variant="secondary">Unsaved Changes</Badge>
-                )}
-                <Button
-                  variant="outline"
-                  onClick={loadExistingAttendance}
-                  disabled={isLoadingAttendance}
-                  className="flex items-center gap-2"
-                >
-                  {isLoadingAttendance ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    '🔄'
-                  )}
+                {hasUnsavedChanges && <Badge variant="secondary">Unsaved Changes</Badge>}
+                <Button variant="outline" onClick={loadExistingAttendance} disabled={isLoadingAttendance}>
+                  {isLoadingAttendance ? <Loader2 className="h-4 w-4 animate-spin" /> : '🔄'}
                   Refresh
                 </Button>
-                <Button
-                  onClick={handleSave}
-                  disabled={isSaving || !hasUnsavedChanges}
-                  className="flex items-center gap-2"
-                >
-                  {isSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
+                <Button onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {isSaving ? 'Saving...' : 'Save Attendance'}
                 </Button>
               </div>
@@ -419,50 +587,25 @@ const StudentAttendancePage: React.FC = () => {
                     <span className="text-red-800">{saveError}</span>
                   </div>
                 )}
-
-
-
                 <div className="grid gap-4">
                   {students
-                    .filter(student => {
-                      if (!student.student || !student.student.id) {
-                        console.warn('Filtering out student with missing data:', student.id);
-                        return false;
-                      }
-                      return true;
-                    })
+                    .filter(student => student.student?.id)
                     .map((student) => {
-                      const attendance = getAttendanceStatus(student.student.id);
-                      const isExisting = !!attendance?.existingRecord;
-                      const isModified = attendance?.isModified || false;
-
+                      const attendance = studentAttendances.get(student.student.id);
                       return (
                         <div
                           key={student.id}
-                          className={`flex items-center justify-between p-4 border rounded-lg ${isModified ? 'border-blue-300 bg-blue-50' : 'border-gray-200'
-                            }`}
+                          className={`flex items-center justify-between p-4 border rounded-lg ${attendance?.isModified ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}
+                          style={{ height: '64px' }}
                         >
                           <div className="flex items-center gap-4">
                             <div>
-                              <div className="font-medium">
-                                {getStudentName(student.student)}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                Roll No: {student.admission_number || 'N/A'}
-                              </div>
+                              <div className="font-medium">{getStudentName(student.student)}</div>
+                              <div className="text-sm text-gray-500">Roll No: {student.admission_number || 'N/A'}</div>
                             </div>
-                            {isExisting && (
-                              <Badge variant="outline" className="text-xs">
-                                Existing
-                              </Badge>
-                            )}
-                            {isModified && (
-                              <Badge variant="secondary" className="text-xs">
-                                Modified
-                              </Badge>
-                            )}
+                            {attendance?.existingRecord && <Badge variant="outline" className="text-xs">Existing</Badge>}
+                            {attendance?.isModified && <Badge variant="secondary" className="text-xs">Modified</Badge>}
                           </div>
-
                           <div className="flex items-center gap-2">
                             <Label className="text-sm">Status:</Label>
                             <Select
@@ -471,9 +614,7 @@ const StudentAttendancePage: React.FC = () => {
                                 handleAttendanceChange(student.student.id, value as 'present' | 'absent' | 'late')
                               }
                             >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
+                              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="present">present</SelectItem>
                                 <SelectItem value="absent">absent</SelectItem>
@@ -492,6 +633,4 @@ const StudentAttendancePage: React.FC = () => {
       )}
     </div>
   );
-};
-
-export default StudentAttendancePage;
+}

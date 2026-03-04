@@ -185,7 +185,7 @@ export const DocumentUploadPage: React.FC = () => {
                                     <SelectContent>
                                         {students.map(student => (
                                             <SelectItem key={student.id} value={student.id}>
-                                                {student.first_name} {student.last_name} ({student.admission_number})
+                                                {student.display_name || student.name} {student.admission_number ? `(${student.admission_number})` : ''}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

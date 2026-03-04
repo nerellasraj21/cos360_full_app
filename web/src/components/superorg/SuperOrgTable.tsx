@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Table,
     TableBody,
@@ -19,13 +19,17 @@ import {
 import {
     MoreHorizontal,
     Search,
+    Filter,
     Edit,
     Trash2,
     Eye,
     Globe,
     Database,
     Building2,
-    Loader2
+    Loader2,
+    ChevronUp,
+    ChevronDown,
+    ChevronsUpDown,
 } from 'lucide-react';
 import { useOrganizations, useDeleteOrganization, useDeactivateOrganization } from '@/api/organizations';
 import type { OrganizationRead } from '@/types/organization';
@@ -43,6 +47,8 @@ interface SuperOrgTableProps {
 
 const SuperOrgTable: React.FC<SuperOrgTableProps> = ({ onRefresh, newOrganization }) => {
     const [searchTerm, setSearchTerm] = useState('');
+    const [sortKey, setSortKey] = useState<string | null>(null);
+    const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
 
     // Use the API hooks
     const { data: organizations = [], isLoading, error, refetch } = useOrganizations();
@@ -63,10 +69,36 @@ const SuperOrgTable: React.FC<SuperOrgTableProps> = ({ onRefresh, newOrganizatio
         }
     }, [newOrganization, refetch]);
 
-    const filteredOrganizations = organizations.filter(org =>
-        org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        org.subdomain.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const handleSort = (key: string) => {
+        if (sortKey === key) {
+            if (sortDir === 'asc') setSortDir('desc');
+            else if (sortDir === 'desc') { setSortKey(null); setSortDir(null); }
+            else setSortDir('asc');
+        } else {
+            setSortKey(key);
+            setSortDir('asc');
+        }
+    };
+
+    const SortIcon = ({ colKey }: { colKey: string }) => {
+        if (sortKey !== colKey) return <ChevronsUpDown className="h-3 w-3 ml-1 opacity-40 shrink-0" />;
+        if (sortDir === 'asc') return <ChevronUp className="h-3 w-3 ml-1 shrink-0" />;
+        return <ChevronDown className="h-3 w-3 ml-1 shrink-0" />;
+    };
+
+    const filteredOrganizations = useMemo(() => {
+        const base = organizations.filter(org =>
+            org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            org.subdomain.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        if (!sortKey || !sortDir) return base;
+        return [...base].sort((a, b) => {
+            const aVal = (a as any)[sortKey] ?? '';
+            const bVal = (b as any)[sortKey] ?? '';
+            const cmp = String(aVal).localeCompare(String(bVal), undefined, { numeric: true });
+            return sortDir === 'asc' ? cmp : -cmp;
+        });
+    }, [organizations, searchTerm, sortKey, sortDir]);
 
     const handleEdit = (org: OrganizationRead) => {
         console.log('Edit organization:', org);
@@ -128,7 +160,11 @@ const SuperOrgTable: React.FC<SuperOrgTableProps> = ({ onRefresh, newOrganizatio
                     <Badge variant="secondary">{filteredOrganizations.length}</Badge>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                        <Filter className="h-3.5 w-3.5" />
+                        <span>Filters</span>
+                    </div>
                     <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -145,18 +181,27 @@ const SuperOrgTable: React.FC<SuperOrgTableProps> = ({ onRefresh, newOrganizatio
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Organization</TableHead>
-                            <TableHead>Subdomain</TableHead>
-                            <TableHead>Schema</TableHead>
+                            <TableHead className="w-14 text-xs text-muted-foreground">S.No.</TableHead>
+                            <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('name')}>
+                                <div className="flex items-center">Organization <SortIcon colKey="name" /></div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('subdomain')}>
+                                <div className="flex items-center">Subdomain <SortIcon colKey="subdomain" /></div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('schema_name')}>
+                                <div className="flex items-center">Schema <SortIcon colKey="schema_name" /></div>
+                            </TableHead>
                             <TableHead>Plan</TableHead>
-                            <TableHead>Status</TableHead>
+                            <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('is_active')}>
+                                <div className="flex items-center">Status <SortIcon colKey="is_active" /></div>
+                            </TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-8">
+                                <TableCell colSpan={7} className="text-center py-8">
                                     <div className="flex flex-col items-center gap-2">
                                         <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
                                         <p className="text-muted-foreground">Loading organizations...</p>
@@ -165,7 +210,7 @@ const SuperOrgTable: React.FC<SuperOrgTableProps> = ({ onRefresh, newOrganizatio
                             </TableRow>
                         ) : filteredOrganizations.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-8">
+                                <TableCell colSpan={7} className="text-center py-8">
                                     <div className="flex flex-col items-center gap-2">
                                         <Building2 className="w-8 h-8 text-muted-foreground" />
                                         <p className="text-muted-foreground">
@@ -175,9 +220,10 @@ const SuperOrgTable: React.FC<SuperOrgTableProps> = ({ onRefresh, newOrganizatio
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            filteredOrganizations.map((org) => (
-                                <TableRow key={org.id}>
-                                    <TableCell>
+                            filteredOrganizations.map((org, idx) => (
+                                <TableRow key={org.id} style={{ height: '48px' }}>
+                                    <TableCell className="align-middle text-xs text-muted-foreground">{idx + 1}</TableCell>
+                                    <TableCell className="align-middle">
                                         <div className="space-y-1">
                                             <div className="font-medium">{org.name}</div>
                                             <div className="text-sm text-muted-foreground line-clamp-1">
@@ -185,29 +231,29 @@ const SuperOrgTable: React.FC<SuperOrgTableProps> = ({ onRefresh, newOrganizatio
                                             </div>
                                         </div>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="align-middle">
                                         <div className="flex items-center gap-1">
                                             <Globe className="w-4 h-4 text-muted-foreground" />
                                             <span className="font-mono text-sm">{org.subdomain}.yourapp.com</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="align-middle">
                                         <div className="flex items-center gap-1">
                                             <Database className="w-4 h-4 text-muted-foreground" />
                                             <span className="font-mono text-sm">{org.schema_name}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="align-middle">
                                         <Badge variant="outline">
                                             {planNames[org.plan_id as keyof typeof planNames] || 'Unknown'}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="align-middle">
                                         <Badge variant={org.is_active ? 'default' : 'secondary'}>
                                             {org.is_active ? 'Active' : 'Inactive'}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right align-middle">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" className="h-8 w-8 p-0">

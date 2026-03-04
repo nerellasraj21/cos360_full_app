@@ -65,7 +65,7 @@ export function usePermissionProtectedQuery<
     }
 
     // Call the original query function
-    if (queryOptions.queryFn) {
+    if (queryOptions.queryFn && typeof queryOptions.queryFn === 'function') {
       return queryOptions.queryFn(context)
     }
 

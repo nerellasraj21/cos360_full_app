@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -52,6 +53,8 @@ export default function ExamDetail() {
   const [cloneName, setCloneName] = useState('')
   const [showDelete, setShowDelete] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
+  const [isEditDirty, setIsEditDirty] = useState(false)
+  const [isCloneDirty, setIsCloneDirty] = useState(false)
   const [editForm, setEditForm] = useState({
     exam_name: '',
     mark_entry_deadline: '',
@@ -111,6 +114,7 @@ export default function ExamDetail() {
       { examId: exam.id, data: { new_name: cloneName } },
       {
         onSuccess: (data) => {
+          setIsCloneDirty(false)
           setShowClone(false)
           navigate({ to: `/exam/exams/${data.id}` as any })
         },
@@ -128,6 +132,7 @@ export default function ExamDetail() {
       publish_rank: !!exam.publish_rank,
       term: exam.term ?? '',
     })
+    setIsEditDirty(false)
     setShowEdit(true)
   }
 
@@ -142,7 +147,7 @@ export default function ExamDetail() {
         publish_rank: editForm.publish_rank,
         term: editForm.term || undefined,
       },
-      { onSuccess: () => setShowEdit(false) }
+      { onSuccess: () => { setIsEditDirty(false); setShowEdit(false) } }
     )
   }
 
@@ -197,7 +202,7 @@ export default function ExamDetail() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { setCloneName(`${exam.exam_name} (Copy)`); setShowClone(true) }}
+              onClick={() => { setCloneName(`${exam.exam_name} (Copy)`); setIsCloneDirty(false); setShowClone(true) }}
               className="gap-1"
             >
               <Copy className="h-4 w-4" />
@@ -560,7 +565,7 @@ export default function ExamDetail() {
       )}
 
       {/* Edit Dialog */}
-      <Dialog open={showEdit} onOpenChange={setShowEdit}>
+      <Dialog open={showEdit} onOpenChange={setShowEdit} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Exam</DialogTitle>
@@ -568,7 +573,7 @@ export default function ExamDetail() {
           <p className="text-xs text-muted-foreground">
             Board, level, nature, and academic year cannot be changed after creation.
           </p>
-          <div className="grid gap-3 py-1 md:grid-cols-2">
+          <div className="grid gap-3 py-1 md:grid-cols-2" onChange={() => setIsEditDirty(true)}>
             <div className="space-y-1 md:col-span-2">
               <label className="text-sm font-medium">Exam Name</label>
               <Input
@@ -632,7 +637,9 @@ export default function ExamDetail() {
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="outline" onClick={() => setShowEdit(false)}>Cancel</Button>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
             <Button
               disabled={updateMutation.isPending || !editForm.exam_name.trim()}
               onClick={handleEdit}
@@ -647,7 +654,7 @@ export default function ExamDetail() {
       </Dialog>
 
       {/* Clone Dialog */}
-      <Dialog open={showClone} onOpenChange={setShowClone}>
+      <Dialog open={showClone} onOpenChange={setShowClone} guardDirty={isCloneDirty} onDirtyDiscard={() => setIsCloneDirty(false)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Clone Exam</DialogTitle>
@@ -657,10 +664,12 @@ export default function ExamDetail() {
           </p>
           <div className="space-y-1">
             <label className="text-sm font-medium">New Exam Name</label>
-            <Input value={cloneName} onChange={(e) => setCloneName(e.target.value)} />
+            <Input value={cloneName} onChange={(e) => { setCloneName(e.target.value); setIsCloneDirty(true) }} />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowClone(false)}>Cancel</Button>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
             <Button disabled={cloneMutation.isPending} onClick={handleClone}>
               {cloneMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Clone

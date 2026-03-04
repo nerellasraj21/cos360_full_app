@@ -63,7 +63,7 @@ export default function ExamNotification() {
   const onSubmit = async (data: FormData) => {
     try {
       setSending(true)
-      await sendExamNotification(id, data)
+      await sendExamNotification(id, { ...data, notification_type: 'custom' })
       toast.success('Notification sent successfully')
       form.reset()
     } catch {

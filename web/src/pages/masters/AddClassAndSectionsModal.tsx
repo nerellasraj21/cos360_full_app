@@ -16,6 +16,7 @@ const defaultSection: SectionCreate = { name: '' };
 
 export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSectionsModalProps) {
    const [isOpen, setIsOpen] = useState(false);
+   const [isDirty, setIsDirty] = useState(false);
    const [step, setStep] = useState(0);
    const selectedAcademicYearId = useAcademicYearStore(state => state.selectedAcademicYearId);
 
@@ -41,6 +42,7 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
   const handleClassChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     const fieldName = name === 'class_name' ? 'name' : name === 'class_code' ? 'short_code' : name;
+    setIsDirty(true);
     setClassData((prev) => ({
       ...prev,
       [fieldName]: type === 'checkbox' ? checked : value,
@@ -49,6 +51,7 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
 
   const handleSectionChange = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
+    setIsDirty(true);
     setSections((prev) => prev.map((s, i) => (i === idx ? { ...s, name: value } : s)));
   };
 
@@ -110,6 +113,7 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
     console.log('AddClassAndSectionsModal: Submitting data:', submitData);
     onSubmit(submitData);
     setIsOpen(false);
+    setIsDirty(false);
     setStep(0);
     setClassData({ name: '', short_code: '', academic_year_id: selectedAcademicYearId || '', is_active: true });
     setSections([{ ...defaultSection }]);
@@ -126,8 +130,17 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
   const isClassStepValid = classData.name && classData.short_code ;
   const isSectionsStepValid = sections.every((s) => s.name.trim()) && sections.length > 0;
 
+  const handleDiscard = () => {
+    setIsDirty(false);
+    setStep(0);
+    setClassData({ name: '', short_code: '', academic_year_id: selectedAcademicYearId || '', is_active: true });
+    setSections([{ ...defaultSection }]);
+    setStartLetter('A');
+    setEndLetter('D');
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen} guardDirty={isDirty} onDirtyDiscard={handleDiscard}>
       <DialogTrigger asChild>
         <Button>Add Class & Sections</Button>
       </DialogTrigger>

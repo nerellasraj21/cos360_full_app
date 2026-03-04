@@ -1,4 +1,6 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
+import { Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useDrop, useDrag } from "react-dnd";
 import { addDays, startOfWeek, startOfMonth, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, addMonths, subMonths, isWithinInterval, parseISO } from "date-fns";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -77,6 +79,8 @@ export function Calendar() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [isAddDirty, setIsAddDirty] = useState(false);
+  const [isEditDirty, setIsEditDirty] = useState(false);
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventStart, setNewEventStart] = useState("");
   const [newEventEnd, setNewEventEnd] = useState("");
@@ -88,6 +92,11 @@ export function Calendar() {
   // Pagination state for All Events view
   const [page, setPage] = useState(0);
   const pageSize = 10;
+
+  // Search/sort state for All Events view
+  const [allEventsSearch, setAllEventsSearch] = useState("");
+  const [allEventsSortKey, setAllEventsSortKey] = useState<string | null>(null);
+  const [allEventsSortDir, setAllEventsSortDir] = useState<'asc' | 'desc'>('asc');
 
   const { selectedAcademicYearId, fetchAndSetAcademicYears } = useAcademicYearStore();
 
@@ -119,6 +128,27 @@ export function Calendar() {
 
   // Map holidays to events (no need to map, just use holidays as events)
   const events: HolidayRead[] = holidays?.items || [];
+
+  // Filtered and sorted events for All Events view (client-side)
+  const filteredAndSortedEvents = useMemo(() => {
+    let items = holidays?.items || [];
+    if (allEventsSearch.trim()) {
+      const q = allEventsSearch.toLowerCase();
+      items = items.filter(ev =>
+        ev.name.toLowerCase().includes(q) ||
+        (ev.description || '').toLowerCase().includes(q)
+      );
+    }
+    if (allEventsSortKey) {
+      items = [...items].sort((a, b) => {
+        const aVal = allEventsSortKey === 'name' ? a.name : allEventsSortKey === 'start_date' ? a.start_date : a.end_date;
+        const bVal = allEventsSortKey === 'name' ? b.name : allEventsSortKey === 'start_date' ? b.start_date : b.end_date;
+        const cmp = (aVal || '').localeCompare(bVal || '');
+        return allEventsSortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+    return items;
+  }, [holidays?.items, allEventsSearch, allEventsSortKey, allEventsSortDir]);
 
   const handleDrop = (event: HolidayRead, newStart: Date, newEnd: Date) => {
     if (!event.id || typeof event.id !== 'string' || event.id.trim() === '') {
@@ -194,7 +224,7 @@ export function Calendar() {
                     onClick={e => {
                       e.stopPropagation();
                       setSelectedEvent(ev);
-                      setShowEditDialog(true);
+                      setIsEditDirty(false); setShowEditDialog(true);
                     }}
                   />
                 );
@@ -224,6 +254,7 @@ export function Calendar() {
                       setSelectedDate(day);
                       setNewEventStart(format(day, "yyyy-MM-dd"));
                       setNewEventEnd(format(day, "yyyy-MM-dd"));
+                      setIsAddDirty(false);
                       setShowAddDialog(true);
                     }}
                     style={{ position: 'relative' }}
@@ -237,7 +268,7 @@ export function Calendar() {
                           onClick={e => {
                             e.stopPropagation();
                             setSelectedEvent(ev);
-                            setShowEditDialog(true);
+                            setIsEditDirty(false); setShowEditDialog(true);
                           }}
                         />
                       ))}
@@ -283,6 +314,7 @@ export function Calendar() {
                   setSelectedDate(day);
                   setNewEventStart(format(day, "yyyy-MM-dd"));
                   setNewEventEnd(format(day, "yyyy-MM-dd"));
+                  setIsAddDirty(false);
                   setShowAddDialog(true);
                 }}
                 style={{ position: 'relative' }}
@@ -299,7 +331,7 @@ export function Calendar() {
                         onClick={e => {
                           e.stopPropagation();
                           setSelectedEvent(ev);
-                          setShowEditDialog(true);
+                          setIsEditDirty(false); setShowEditDialog(true);
                         }}
                       />
                     ))
@@ -342,6 +374,7 @@ export function Calendar() {
                 setSelectedDate(day);
                 setNewEventStart(format(day, "yyyy-MM-dd"));
                 setNewEventEnd(format(day, "yyyy-MM-dd"));
+                setIsAddDirty(false);
                 setShowAddDialog(true);
               }}
             >
@@ -371,7 +404,7 @@ export function Calendar() {
                 onClick={e => {
                   e.stopPropagation();
                   setSelectedEvent(ev);
-                  setShowEditDialog(true);
+                  setIsEditDirty(false); setShowEditDialog(true);
                 }}
               />
             ))
@@ -402,6 +435,7 @@ export function Calendar() {
                 setSelectedDate(day);
                 setNewEventStart(format(day, "yyyy-MM-dd"));
                 setNewEventEnd(format(day, "yyyy-MM-dd"));
+                setIsAddDirty(false);
                 setShowAddDialog(true);
               }}
             >
@@ -418,6 +452,7 @@ export function Calendar() {
                       setSelectedDate(day);
                       setNewEventStart(format(day, "yyyy-MM-dd"));
                       setNewEventEnd(format(day, "yyyy-MM-dd"));
+                      setIsAddDirty(false);
                       setShowAddDialog(true);
                     }}
                   >
@@ -436,7 +471,7 @@ export function Calendar() {
                       onClick={e => {
                         e.stopPropagation();
                         setSelectedEvent(ev);
-                        setShowEditDialog(true);
+                        setIsEditDirty(false); setShowEditDialog(true);
                       }}
                     />
                   ))
@@ -456,59 +491,107 @@ export function Calendar() {
     if (isError) {
       return <div className="text-center text-destructive py-4">Failed to load events</div>;
     }
-    if (!holidays?.items || holidays.items.length === 0) {
-      return <div className="text-center text-muted-foreground py-4">No events</div>;
-    }
+
+    const handleSort = (key: string) => {
+      if (allEventsSortKey === key) {
+        setAllEventsSortDir(d => d === 'asc' ? 'desc' : 'asc');
+      } else {
+        setAllEventsSortKey(key);
+        setAllEventsSortDir('asc');
+      }
+    };
+
+    const SortIcon = ({ colKey }: { colKey: string }) => {
+      if (allEventsSortKey !== colKey) return <ChevronsUpDown className="h-3.5 w-3.5 ml-1 inline opacity-50" />;
+      return allEventsSortDir === 'asc'
+        ? <ChevronUp className="h-3.5 w-3.5 ml-1 inline" />
+        : <ChevronDown className="h-3.5 w-3.5 ml-1 inline" />;
+    };
+
     return (
-      <div className="overflow-x-auto">
-        <table className="min-w-full border rounded">
-          <thead>
-            <tr className="bg-muted">
-              <th className="px-4 py-2 text-left">Title</th>
-              <th className="px-4 py-2 text-left">Description</th>
-              <th className="px-4 py-2 text-left">Start Date</th>
-              <th className="px-4 py-2 text-left">End Date</th>
-              <th className="px-4 py-2 text-left">Color</th>
-              <th className="px-4 py-2 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {holidays.items.map(ev => (
-              <tr key={ev.id || ev.name + ev.start_date} className="border-b hover:bg-accent/20 cursor-pointer">
-                <td className="px-4 py-2" onClick={() => { setSelectedEvent(ev); setShowEditDialog(true); }}>{ev.name}</td>
-                <td className="px-4 py-2 text-xs text-muted-foreground" title={ev.description}>{ev.description ? (ev.description.length > 60 ? ev.description.slice(0, 60) + "..." : ev.description) : "-"}</td>
-                <td className="px-4 py-2">{ev.start_date}</td>
-                <td className="px-4 py-2">{ev.end_date}</td>
-                <td className="px-4 py-2">
-                  <span className="inline-block w-4 h-4 rounded" style={{ backgroundColor: ev.color || "#2563eb" }}></span>
-                </td>
-                <td className="px-4 py-2">
-                  {hasUpdatePermission && (
-                    <Button size="sm" variant="outline" onClick={() => { setSelectedEvent(ev); setShowEditDialog(true); }}>Edit</Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {/* Pagination controls: only show in 'All Events' view */}
-        {view === "all" && (
-          <div className="flex justify-between items-center mt-2">
-            <Button
-              onClick={() => setPage(p => Math.max(0, p - 1))}
-              disabled={page === 0}
-            >
-              Prev
-            </Button>
-            <span>Page {page + 1}</span>
-            <Button
-              onClick={() => setPage(p => p + 1)}
-              disabled={holidays.items.length < pageSize}
-            >
-              Next
-            </Button>
+      <div className="space-y-3">
+        {/* Filter bar */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filters</span>
           </div>
-        )}
+          <div className="relative max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Search events..."
+              value={allEventsSearch}
+              onChange={e => setAllEventsSearch(e.target.value)}
+              className="pl-8 h-8 text-sm"
+            />
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full border rounded">
+            <thead>
+              <tr className="bg-muted">
+                <th className="px-4 py-2 text-left text-sm font-medium w-12">S.No.</th>
+                <th className="px-4 py-2 text-left text-sm font-medium cursor-pointer select-none" onClick={() => handleSort('name')}>
+                  Title <SortIcon colKey="name" />
+                </th>
+                <th className="px-4 py-2 text-left text-sm font-medium">Description</th>
+                <th className="px-4 py-2 text-left text-sm font-medium cursor-pointer select-none" onClick={() => handleSort('start_date')}>
+                  Start Date <SortIcon colKey="start_date" />
+                </th>
+                <th className="px-4 py-2 text-left text-sm font-medium cursor-pointer select-none" onClick={() => handleSort('end_date')}>
+                  End Date <SortIcon colKey="end_date" />
+                </th>
+                <th className="px-4 py-2 text-left text-sm font-medium">Color</th>
+                <th className="px-4 py-2 text-left text-sm font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAndSortedEvents.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground text-sm">
+                    {allEventsSearch ? 'No events match your search' : 'No events'}
+                  </td>
+                </tr>
+              ) : (
+                filteredAndSortedEvents.map((ev, idx) => (
+                  <tr key={ev.id || ev.name + ev.start_date} className="border-b hover:bg-accent/20 cursor-pointer" style={{ height: '48px' }}>
+                    <td className="px-4 py-2 text-sm text-muted-foreground">{idx + 1 + page * pageSize}</td>
+                    <td className="px-4 py-2 text-sm" onClick={() => { setSelectedEvent(ev); setIsEditDirty(false); setShowEditDialog(true); }}>{ev.name}</td>
+                    <td className="px-4 py-2 text-xs text-muted-foreground" title={ev.description}>{ev.description ? (ev.description.length > 60 ? ev.description.slice(0, 60) + "..." : ev.description) : "-"}</td>
+                    <td className="px-4 py-2 text-sm">{ev.start_date}</td>
+                    <td className="px-4 py-2 text-sm">{ev.end_date}</td>
+                    <td className="px-4 py-2">
+                      <span className="inline-block w-4 h-4 rounded" style={{ backgroundColor: ev.color || "#2563eb" }}></span>
+                    </td>
+                    <td className="px-4 py-2">
+                      {hasUpdatePermission && (
+                        <Button size="sm" variant="outline" onClick={() => { setSelectedEvent(ev); setIsEditDirty(false); setShowEditDialog(true); }}>Edit</Button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+          {/* Pagination controls: only show in 'All Events' view */}
+          {view === "all" && (
+            <div className="flex justify-between items-center mt-2">
+              <Button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+              >
+                Prev
+              </Button>
+              <span>Page {page + 1}</span>
+              <Button
+                onClick={() => setPage(p => p + 1)}
+                disabled={(holidays?.items?.length || 0) < pageSize}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -524,6 +607,7 @@ export function Calendar() {
       is_active: true,
       academic_year_id: selectedAcademicYearId,
     });
+    setIsAddDirty(false);
     setShowAddDialog(false);
     setNewEventTitle("");
     setNewEventDescription("");
@@ -548,6 +632,7 @@ export function Calendar() {
         color: selectedEvent.color,
       },
     });
+    setIsEditDirty(false);
     setShowEditDialog(false);
     setSelectedEvent(null);
   };
@@ -608,6 +693,7 @@ export function Calendar() {
                 setSelectedDate(new Date());
                 setNewEventStart(today);
                 setNewEventEnd(today);
+                setIsAddDirty(false);
                 setShowAddDialog(true);
               }}
             >
@@ -623,7 +709,7 @@ export function Calendar() {
         {view === "vertical" && renderVertical()}
         {view === "all" && renderAllEvents()}
       </CardContent>
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog} guardDirty={isAddDirty} onDirtyDiscard={() => setIsAddDirty(false)}>
         <DialogContent>
           <DialogH>
             <DialogT>Add Event</DialogT>
@@ -635,6 +721,7 @@ export function Calendar() {
               handleAddEvent();
             }}
             className="space-y-4"
+            onChange={() => setIsAddDirty(true)}
           >
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium" htmlFor="event-title">Title<span className="text-destructive">*</span></label>
@@ -705,7 +792,7 @@ export function Calendar() {
           </form>
         </DialogContent>
       </Dialog>
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
         <DialogContent>
           <DialogH>
             <DialogT>Edit Event</DialogT>
@@ -718,6 +805,7 @@ export function Calendar() {
                 handleEditEvent();
               }}
               className="space-y-4"
+              onChange={() => setIsEditDirty(true)}
             >
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium" htmlFor="edit-title">Title<span className="text-destructive">*</span></label>

@@ -1,4 +1,4 @@
-import type { Subject, SubjectInput, BulkClassSubjectMappingRequest, BulkClassSubjectMappingResponse } from '@/types/masters';
+import type { Subject, SubjectInput, ClassSubjectMappingBulkCreate, ClassSubjectMappingBulkResponse } from '@/types/masters';
 import CAxios from '../index';
 import { SUBJECTS_API_BASE } from '@/constants/api/masters/subjects';
 
@@ -115,7 +115,7 @@ export const deleteSubject = async (id: string): Promise<void> => {
   await CAxios.delete(`${SUBJECTS_API_BASE}${id}`);
 };
 
-export const createBulkClassSubjectMappings = async (request: BulkClassSubjectMappingRequest): Promise<BulkClassSubjectMappingResponse> => {
+export const createBulkClassSubjectMappings = async (request: ClassSubjectMappingBulkCreate): Promise<ClassSubjectMappingBulkResponse> => {
   const { data } = await CAxios.post('/class-subject-mappings/', request);
   return data;
 };

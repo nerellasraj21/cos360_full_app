@@ -238,6 +238,9 @@ export interface ExamListItem {
   academic_year_id: string
   academic_year_title: string
   mark_entry_deadline: string | null
+  hall_ticket_min_attendance?: number | null
+  attendance_from_date?: string | null
+  attendance_to_date?: string | null
   created_at: string
   subject_config_count?: number
   class_section_count?: number

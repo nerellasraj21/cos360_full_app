@@ -1,12 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { expenseCategoriesApi } from '@/api/expense';
+import { expenseApi } from '@/api/expense';
 import type {
     ExpenseCategory,
     ExpenseCategoryCreateRequest,
-    ExpenseCategoryUpdateRequest,
-    ExpenseCategoryQueryParams
+    ExpenseCategoryUpdateRequest
 } from '@/types/expense';
+
+type ExpenseCategoryQueryParams = {
+    skip?: number;
+    limit?: number;
+    active_only?: boolean;
+};
 
 // Query keys for expense categories
 export const expenseCategoryKeys = {
@@ -21,7 +26,7 @@ export const expenseCategoryKeys = {
 export function useExpenseCategories(params?: ExpenseCategoryQueryParams) {
     return useQuery<ExpenseCategory[]>({
         queryKey: expenseCategoryKeys.list(params),
-        queryFn: () => expenseCategoriesApi.getAllCategories(params),
+        queryFn: () => expenseApi.getCategories(params),
         staleTime: 5 * 60 * 1000, // 5 minutes
     });
 }
@@ -30,7 +35,7 @@ export function useExpenseCategories(params?: ExpenseCategoryQueryParams) {
 export function useExpenseCategory(id: string) {
     return useQuery<ExpenseCategory>({
         queryKey: expenseCategoryKeys.detail(id),
-        queryFn: () => expenseCategoriesApi.getCategory(id),
+        queryFn: () => expenseApi.getCategoryById(id),
         enabled: !!id,
         staleTime: 5 * 60 * 1000,
     });
@@ -41,7 +46,7 @@ export function useCreateExpenseCategory() {
     const queryClient = useQueryClient();
 
     return useMutation<ExpenseCategory, Error, ExpenseCategoryCreateRequest>({
-        mutationFn: expenseCategoriesApi.createCategory,
+        mutationFn: (data) => expenseApi.createCategory(data),
         onSuccess: (data) => {
             // Invalidate and refetch categories list
             queryClient.invalidateQueries({ queryKey: expenseCategoryKeys.lists() });
@@ -62,7 +67,7 @@ export function useUpdateExpenseCategory() {
     const queryClient = useQueryClient();
 
     return useMutation<ExpenseCategory, Error, { id: string; data: ExpenseCategoryUpdateRequest }>({
-        mutationFn: ({ id, data }) => expenseCategoriesApi.updateCategory(id, data),
+        mutationFn: ({ id, data }) => expenseApi.updateCategory(id, data),
         onSuccess: (data) => {
             // Update the specific category in cache
             queryClient.setQueryData(expenseCategoryKeys.detail(data.id), data);
@@ -83,7 +88,7 @@ export function useDeleteExpenseCategory() {
     const queryClient = useQueryClient();
 
     return useMutation<void, Error, string>({
-        mutationFn: expenseCategoriesApi.deleteCategory,
+        mutationFn: (id) => expenseApi.deleteCategory(id),
         onSuccess: (_, id) => {
             // Remove from cache
             queryClient.removeQueries({ queryKey: expenseCategoryKeys.detail(id) });

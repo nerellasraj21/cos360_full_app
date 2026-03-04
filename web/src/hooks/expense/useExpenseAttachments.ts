@@ -1,25 +1,25 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { expenseAttachmentsApi } from '@/api/expense';
+import { expenseApi } from '@/api/expense';
 import type {
     ExpenseAttachment,
     ExpenseAttachmentUploadRequest,
-    ExpenseAttachmentUpdateRequest
 } from '@/types/expense';
 
 // Query keys for expense attachments
 export const expenseAttachmentKeys = {
     all: ['expense-attachments'] as const,
+    byTransaction: (transactionId: string) => [...expenseAttachmentKeys.all, 'transaction', transactionId] as const,
     details: () => [...expenseAttachmentKeys.all, 'detail'] as const,
     detail: (id: string) => [...expenseAttachmentKeys.details(), id] as const,
 };
 
-// Get attachment by ID
-export function useExpenseAttachment(id: string) {
-    return useQuery<ExpenseAttachment>({
-        queryKey: expenseAttachmentKeys.detail(id),
-        queryFn: () => expenseAttachmentsApi.getAttachment(id),
-        enabled: !!id,
+// Get attachments for a transaction
+export function useExpenseAttachmentsByTransaction(transactionId: string) {
+    return useQuery<ExpenseAttachment[]>({
+        queryKey: expenseAttachmentKeys.byTransaction(transactionId),
+        queryFn: () => expenseApi.getTransactionAttachments(transactionId),
+        enabled: !!transactionId,
         staleTime: 10 * 60 * 1000, // 10 minutes
     });
 }
@@ -29,10 +29,10 @@ export function useUploadExpenseAttachment() {
     const queryClient = useQueryClient();
 
     return useMutation<ExpenseAttachment, Error, ExpenseAttachmentUploadRequest>({
-        mutationFn: expenseAttachmentsApi.uploadAttachment,
+        mutationFn: (req) => expenseApi.uploadAttachment(req.transaction_id, req.file, req.document_type, req.department_id),
         onSuccess: (data) => {
-            // Add the new attachment to the cache
-            queryClient.setQueryData(expenseAttachmentKeys.detail(data.id), data);
+            // Invalidate transaction attachments list
+            queryClient.invalidateQueries({ queryKey: expenseAttachmentKeys.byTransaction(data.transaction_id) });
 
             toast.success('Attachment uploaded successfully');
         },
@@ -42,33 +42,16 @@ export function useUploadExpenseAttachment() {
     });
 }
 
-// Update attachment mutation
-export function useUpdateExpenseAttachment() {
-    const queryClient = useQueryClient();
-
-    return useMutation<ExpenseAttachment, Error, { id: string; data: ExpenseAttachmentUpdateRequest }>({
-        mutationFn: ({ id, data }) => expenseAttachmentsApi.updateAttachment(id, data),
-        onSuccess: (data) => {
-            // Update the attachment in cache
-            queryClient.setQueryData(expenseAttachmentKeys.detail(data.id), data);
-
-            toast.success('Attachment updated successfully');
-        },
-        onError: (error) => {
-            toast.error(`Failed to update attachment: ${error.message}`);
-        },
-    });
-}
-
 // Delete attachment mutation
 export function useDeleteExpenseAttachment() {
     const queryClient = useQueryClient();
 
-    return useMutation<void, Error, string>({
-        mutationFn: expenseAttachmentsApi.deleteAttachment,
-        onSuccess: (_, id) => {
-            // Remove from cache
-            queryClient.removeQueries({ queryKey: expenseAttachmentKeys.detail(id) });
+    return useMutation<void, Error, { transactionId: string; attachmentId: string }>({
+        mutationFn: ({ attachmentId }) =>
+            expenseApi.deleteAttachment(attachmentId),
+        onSuccess: (_, { transactionId }) => {
+            // Invalidate transaction attachments list
+            queryClient.invalidateQueries({ queryKey: expenseAttachmentKeys.byTransaction(transactionId) });
 
             toast.success('Attachment deleted successfully');
         },
@@ -80,8 +63,9 @@ export function useDeleteExpenseAttachment() {
 
 // Download attachment
 export function useDownloadExpenseAttachment() {
-    return useMutation<Blob, Error, string>({
-        mutationFn: expenseAttachmentsApi.downloadAttachment,
+    return useMutation<Blob, Error, { transactionId: string; attachmentId: string }>({
+        mutationFn: ({ attachmentId }) =>
+            expenseApi.downloadAttachment(attachmentId),
         onError: (error) => {
             toast.error(`Failed to download attachment: ${error.message}`);
         },

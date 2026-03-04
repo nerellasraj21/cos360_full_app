@@ -2,17 +2,20 @@ import './timetable.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchSubjects } from '@/api/masters/subjects';
-import type { Subject } from '@/types/masters';
+import type { Subject } from '@/types/masters/subject';
 import type { FrontendTimetableRead, FrontendTimetableCreate, TimetableSlotOut } from '@/types/masters/timetable';
 import { useFrontendTimetable, useCreateFrontendTimetableMutation, useUpdateFrontendTimetableMutation } from '@/api/timetable';
 import { useClassesDropdown, useSectionsByClassId } from '@/hooks/masters/useClassesAndSections';
+import { useMappingsByClass } from '@/api/hooks/masters/classsubjectmappings';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import Select, { type SingleValue } from 'react-select';
 import CreatableSelect from 'react-select/creatable';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Trash2, Save, Pencil, Download, ChevronDown } from 'lucide-react';
+import { Trash2, Save, Pencil, Download, ChevronDown, Copy } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as htmlToImage from 'html-to-image';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { toast } from 'sonner';
@@ -142,6 +145,10 @@ export default function TimeTableEditor() {
     const [includeSaturday, setIncludeSaturday] = useState(false);
     const [rows, setRows] = useState<any[]>([]);
     const [isEditing, setIsEditing] = useState(false);
+    const [showRepeatAllDialog, setShowRepeatAllDialog] = useState(false);
+    const [showRepeatOneDialog, setShowRepeatOneDialog] = useState(false);
+    const [repeatSourceDay, setRepeatSourceDay] = useState('Monday');
+    const [repeatSubjectId, setRepeatSubjectId] = useState('');
     const [savedTimetables, setSavedTimetables] = useState<Record<string, any>>({});
     const [timetableData, setTimetableData] = useState<FrontendTimetableRead | null>(null);
     const tableRef = useRef<HTMLTableElement>(null);
@@ -229,6 +236,7 @@ export default function TimeTableEditor() {
     const { data: classesData, isLoading: classesLoading } = useClassesDropdown();
     const { data: sectionsData, isLoading: sectionsLoading } = useSectionsByClassId(selectedClass?.value || '');
     const { data: frontendTimetableData, isLoading: frontendLoading, error: frontendError, isError: isFrontendError } = useFrontendTimetable(selectedSection?.value || '');
+    const { data: classMappings } = useMappingsByClass(selectedClass?.value || '', { active_only: true });
 
 
     useEffect(() => {
@@ -307,7 +315,17 @@ export default function TimeTableEditor() {
         return sectionsData.map(section => ({ value: section.id, label: section.name }));
     }, [sectionsData]);
 
-    const subjectOptions = (subjects || []).map((s) => ({ value: s.id, label: s.name }));
+    // Filter subjects to only those mapped to the selected class
+    const classSubjectIds = useMemo(() => {
+        if (!classMappings || !selectedClass) return null;
+        return new Set(classMappings.map((m) => m.subject_id));
+    }, [classMappings, selectedClass]);
+
+    const subjectOptions = useMemo(() => {
+        const all = (subjects || []).map((s) => ({ value: s.id, label: s.name }));
+        if (!classSubjectIds) return all;
+        return all.filter((s) => classSubjectIds.has(s.value));
+    }, [subjects, classSubjectIds]);
 
     const getSubjectNameById = (id: string) => {
         const subject = subjects.find(s => s.id === id);
@@ -373,6 +391,56 @@ export default function TimeTableEditor() {
 
     const deleteRow = (idx: number) => {
         setRows((prev) => prev.filter((_, i) => i !== idx));
+    };
+
+    // Days that have at least one subject filled in
+    const daysWithData = useMemo(() => {
+        return activeDays.filter(day =>
+            rows.some(r => r.type === 'subject' && r.subjects?.[day])
+        );
+    }, [rows, activeDays]);
+
+    // Subjects that currently appear in any row (for "Repeat One Subject" picker)
+    const subjectsInRows = useMemo(() => {
+        const ids = new Set<string>();
+        rows.forEach(row => {
+            if (row.type === 'subject') {
+                activeDays.forEach(day => {
+                    const val = row.subjects?.[day];
+                    if (val) ids.add(val);
+                });
+            }
+        });
+        return subjectOptions.filter(s => ids.has(s.value));
+    }, [rows, activeDays, subjectOptions]);
+
+    const handleRepeatAll = () => {
+        setRows((prev) => prev.map(row => {
+            if (row.type !== 'subject') return row;
+            const sourceValue = row.subjects?.[repeatSourceDay] || '';
+            const newSubjects = { ...row.subjects };
+            activeDays.forEach(day => {
+                if (day !== repeatSourceDay) newSubjects[day] = sourceValue;
+            });
+            return { ...row, subjects: newSubjects };
+        }));
+        setShowRepeatAllDialog(false);
+        toast.success(`${repeatSourceDay}'s schedule applied to all days`);
+    };
+
+    const handleRepeatOneSubject = () => {
+        if (!repeatSubjectId) return;
+        setRows((prev) => prev.map(row => {
+            if (row.type !== 'subject') return row;
+            const hasSubject = activeDays.some(day => row.subjects?.[day] === repeatSubjectId);
+            if (!hasSubject) return row;
+            const newSubjects = { ...row.subjects };
+            activeDays.forEach(day => { newSubjects[day] = repeatSubjectId; });
+            return { ...row, subjects: newSubjects };
+        }));
+        setShowRepeatOneDialog(false);
+        const label = subjectOptions.find(s => s.value === repeatSubjectId)?.label || '';
+        toast.success(`${label} applied to all days`);
     };
 
     const handleSaturdayToggle = (checked: boolean) => {
@@ -511,6 +579,10 @@ export default function TimeTableEditor() {
     console.log('Rendering component: isEditing:', isEditing, 'isClassAndSectionSelected:', isClassAndSectionSelected, 'rows length:', rows.length, 'frontendLoading:', frontendLoading, 'isFrontendError:', isFrontendError);
 
     return (
+        <>
+        <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold">Time Table Management</h1>
+        </div>
         <Card className="p-4">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
@@ -791,9 +863,96 @@ export default function TimeTableEditor() {
                     {isEditing && <>
                         <Button onClick={() => addRow('subject')}>+ Add Subject Row</Button>
                         <Button variant="secondary" onClick={() => addRow('special')}>+ Add Special Row</Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setRepeatSourceDay(daysWithData[0] || 'Monday');
+                                setShowRepeatAllDialog(true);
+                            }}
+                            disabled={daysWithData.length === 0}
+                            title="Copy a day's full schedule to all other days"
+                        >
+                            <Copy className="w-4 h-4 mr-1" />
+                            Repeat All for Week
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setRepeatSubjectId('');
+                                setShowRepeatOneDialog(true);
+                            }}
+                            disabled={subjectsInRows.length === 0}
+                            title="Repeat one subject across all days"
+                        >
+                            <Copy className="w-4 h-4 mr-1" />
+                            Repeat One Subject
+                        </Button>
                     </>}
                 </div>
             )}
         </Card>
+
+        {/* Repeat All Subjects Dialog */}
+        <Dialog open={showRepeatAllDialog} onOpenChange={setShowRepeatAllDialog}>
+            <DialogContent className="max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>Repeat All Subjects for Week</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                        Select the day to copy from. All its subject selections will be applied to every other active day.
+                    </p>
+                    <div>
+                        <label className="text-sm font-medium mb-1 block">Copy from day</label>
+                        <UiSelect value={repeatSourceDay} onValueChange={setRepeatSourceDay}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select day" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {daysWithData.map(day => (
+                                    <SelectItem key={day} value={day}>{day}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </UiSelect>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowRepeatAllDialog(false)}>Cancel</Button>
+                    <Button onClick={handleRepeatAll} disabled={!repeatSourceDay}>Apply to All Days</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        {/* Repeat One Subject Dialog */}
+        <Dialog open={showRepeatOneDialog} onOpenChange={setShowRepeatOneDialog}>
+            <DialogContent className="max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>Repeat One Subject for Week</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                        Select a subject. For every period that already has this subject on any day, it will be applied to all days in that period.
+                    </p>
+                    <div>
+                        <label className="text-sm font-medium mb-1 block">Subject</label>
+                        <UiSelect value={repeatSubjectId} onValueChange={setRepeatSubjectId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select subject" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {subjectsInRows.map(s => (
+                                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </UiSelect>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowRepeatOneDialog(false)}>Cancel</Button>
+                    <Button onClick={handleRepeatOneSubject} disabled={!repeatSubjectId}>Apply to All Days</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        </>
     );
 } 

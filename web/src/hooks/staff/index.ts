@@ -6,27 +6,29 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
+  fetchStaff as getAllStaff,
+  fetchStaffById as getStaffById,
   createStaff,
   updateStaff,
-  getAllStaff,
-  getStaffById,
   deleteStaff,
-  getStaffList,
-  getStaffByDesignation,
-  getDriversList,
-  createAttendance,
-  updateAttendance,
-  getAllAttendance,
-  getAttendanceById,
-  deleteAttendance,
-  getAttendanceByStaff,
+  fetchStaffDropdown as getStaffList,
+  fetchStaffByDesignation as getStaffByDesignation,
+  fetchDrivers as getDriversList,
+  createStaffAttendance as createAttendance,
+  fetchStaffAttendance as getAllAttendance,
   createDesignation,
-  getAllDesignations,
-  getDesignationsDropdown,
-  getDesignationById,
+  fetchDesignations as getAllDesignations,
+  fetchDesignationsDropdown as getDesignationsDropdown,
+  fetchDesignationById as getDesignationById,
   updateDesignation,
   deleteDesignation
 } from '@/api/staff';
+import {
+  updateAttendance,
+  getAttendanceById,
+  deleteAttendance,
+  getAttendanceByStaff
+} from '@/api/staff/index';
 
 // Temporarily use any for types until TypeScript issues are resolved
 type AnyType = any;
@@ -54,19 +56,19 @@ export function useStaffEnrollments(params?: AnyType) {
 }
 
 // Get staff list (alternative)
-export function useStaffList(params?: AnyType) {
+export function useStaffList(_params?: AnyType) {
   return useQuery<AnyType>({
-    queryKey: ['staff-list', params],
-    queryFn: () => getStaffList(params),
+    queryKey: ['staff-list'],
+    queryFn: () => getStaffList(),
     staleTime: 5 * 60 * 1000,
   });
 }
 
 // Get staff by ID
-export function useStaffById(staffId: string) {
+export function useStaffById(staffId: string | number) {
   return useQuery<AnyType>({
-    queryKey: staffKeys.detail(staffId),
-    queryFn: () => getStaffById(staffId),
+    queryKey: staffKeys.detail(String(staffId)),
+    queryFn: () => getStaffById(Number(staffId)),
     enabled: !!staffId,
     staleTime: 5 * 60 * 1000,
   });
@@ -76,7 +78,8 @@ export function useStaffById(staffId: string) {
 export function useStaffByDesignation(designationId?: string) {
   return useQuery<AnyType>({
     queryKey: ['staff-by-designation', designationId],
-    queryFn: () => getStaffByDesignation(designationId),
+    queryFn: () => getStaffByDesignation(designationId ?? ''),
+    enabled: !!designationId,
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -111,7 +114,7 @@ export function useCreateStaffEnrollment() {
 export function useUpdateStaffEnrollment() {
   const queryClient = useQueryClient();
 
-  return useMutation<AnyType, Error, { staffId: string; data: AnyType }>({
+  return useMutation<AnyType, Error, { staffId: number; data: AnyType }>({
     mutationFn: ({ staffId, data }) => updateStaff(staffId, data),
     onSuccess: (data) => {
       queryClient.setQueryData(staffKeys.detail(data.id), data);
@@ -128,10 +131,10 @@ export function useUpdateStaffEnrollment() {
 export function useDeleteStaffEnrollment() {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, string>({
+  return useMutation<void, Error, number>({
     mutationFn: deleteStaff,
     onSuccess: (_, staffId) => {
-      queryClient.removeQueries({ queryKey: staffKeys.detail(staffId) });
+      queryClient.removeQueries({ queryKey: staffKeys.detail(String(staffId)) });
       queryClient.invalidateQueries({ queryKey: staffKeys.lists() });
       toast.success('Staff enrollment deleted successfully');
     },

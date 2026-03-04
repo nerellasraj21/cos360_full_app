@@ -85,7 +85,7 @@ export interface StudentAdmissionBase {
   address_line1: string;
   address_line2?: string;
   city: string;
-  state: string;
+  state?: string;
   is_previous_school?: boolean;
   previous_school_name?: string;
   previous_class?: string;
@@ -94,6 +94,15 @@ export interface StudentAdmissionBase {
 
 export interface StudentAdmissionCreate extends StudentAdmissionBase {
   student?: StudentCreate; // Optional for backward compatibility
+
+  // Admission type
+  admission_type?: string;
+
+  // Address flat fields (supplements StudentAdmissionBase.state)
+  state_id?: string;
+  district_id?: string;
+  mandal_id?: string;
+  pincode?: string;
 
   // Flat fields for form handling
   student_first_name?: string;
@@ -109,11 +118,14 @@ export interface StudentAdmissionCreate extends StudentAdmissionBase {
   student_sub_caste?: string;
   student_community?: string;
   student_identification_marks?: string;
+  caste_id?: string;
+  sub_caste_id?: string;
 
   father_name?: string;
   father_email?: string;
   father_phone?: string;
   father_occupation?: string;
+  father_salary_range?: string;
   father_aadhar_number?: string;
   father_gender?: string;
   father_relation_to_student?: string;
@@ -122,6 +134,7 @@ export interface StudentAdmissionCreate extends StudentAdmissionBase {
   mother_email?: string;
   mother_phone?: string;
   mother_occupation?: string;
+  mother_salary_range?: string;
   mother_aadhar_number?: string;
   mother_gender?: string;
   mother_relation_to_student?: string;

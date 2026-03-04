@@ -66,7 +66,7 @@ export const expenseApi = {
 
       // Add attachments
       if (data.attachments) {
-        data.attachments.forEach((file, index) => {
+        data.attachments.forEach((file: File, _index: number) => {
           formData.append(`attachments`, file);
         });
       }

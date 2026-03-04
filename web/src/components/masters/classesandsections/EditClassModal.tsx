@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,7 @@ interface EditClassModalProps {
 
 export function EditClassModal({ isOpen, onClose, classData, onSubmit, isPending }: EditClassModalProps) {
   const { selectedAcademicYearId } = useAcademicYearStore();
+  const [isDirty, setIsDirty] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     short_code: '',
@@ -35,13 +36,14 @@ export function EditClassModal({ isOpen, onClose, classData, onSubmit, isPending
         is_active: classData.is_active ?? true,
         academic_year_id: classData.academic_year_id,
       });
+      setIsDirty(false);
     }
   }, [classData]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : undefined;
-
+    setIsDirty(true);
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
@@ -69,7 +71,7 @@ export function EditClassModal({ isOpen, onClose, classData, onSubmit, isPending
     }
   };
 
-  const handleClose = () => {
+  const resetForm = () => {
     setFormData({
       name: '',
       short_code: '',
@@ -77,11 +79,16 @@ export function EditClassModal({ isOpen, onClose, classData, onSubmit, isPending
       is_active: true,
       academic_year_id: selectedAcademicYearId || '',
     });
+    setIsDirty(false);
+  };
+
+  const handleClose = () => {
+    resetForm();
     onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }} guardDirty={isDirty} onDirtyDiscard={resetForm}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit Class</DialogTitle>
@@ -147,9 +154,9 @@ export function EditClassModal({ isOpen, onClose, classData, onSubmit, isPending
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>
-              Cancel
-            </Button>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">Cancel</Button>
+            </DialogClose>
             <Button type="submit" disabled={isPending}>
               {isPending ? 'Updating...' : 'Update Class'}
             </Button>

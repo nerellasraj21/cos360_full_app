@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Upload, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Upload, Loader2, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -43,6 +43,7 @@ export function ExpenseTransactionsPage() {
   const [transactionItems, setTransactionItems] = useState<TransactionItem[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [approvalComment, setApprovalComment] = useState('');
+  const [isFormDirty, setIsFormDirty] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<ExpenseTransactionCreate>({
@@ -125,6 +126,7 @@ export function ExpenseTransactionsPage() {
     setTransactionItems([]);
     setAttachments([]);
     setSelectedTransaction(null);
+    setIsFormDirty(false);
   };
 
   // Handle create
@@ -342,6 +344,10 @@ export function ExpenseTransactionsPage() {
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground mb-2">
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filters</span>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Select value={filters.status_filter} onValueChange={(value) => setFilters({ ...filters, status_filter: value })}>
               <SelectTrigger>
@@ -516,7 +522,7 @@ export function ExpenseTransactionsPage() {
           setShowEditDialog(false);
           resetForm();
         }
-      }}>
+      }} guardDirty={isFormDirty} onDirtyDiscard={() => setIsFormDirty(false)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -524,14 +530,14 @@ export function ExpenseTransactionsPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-6">
+          <div className="space-y-6" onChange={() => setIsFormDirty(true)}>
             {/* Basic Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Expense Type *</label>
                 <Select
                   value={formData.expense_type_id}
-                  onValueChange={(value) => setFormData({ ...formData, expense_type_id: value })}
+                  onValueChange={(value) => { setFormData({ ...formData, expense_type_id: value }); setIsFormDirty(true); }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select expense type" />
@@ -568,7 +574,7 @@ export function ExpenseTransactionsPage() {
                 <label className="block text-sm font-medium mb-1">Payment Method *</label>
                 <Select
                   value={formData.payment_method}
-                  onValueChange={(value) => setFormData({ ...formData, payment_method: value as any })}
+                  onValueChange={(value) => { setFormData({ ...formData, payment_method: value as any }); setIsFormDirty(true); }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -743,16 +749,9 @@ export function ExpenseTransactionsPage() {
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowCreateDialog(false);
-                setShowEditDialog(false);
-                resetForm();
-              }}
-            >
-              Cancel
-            </Button>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
             <Button
               onClick={handleSubmit}
               disabled={createMutation.isPending || updateMutation.isPending}

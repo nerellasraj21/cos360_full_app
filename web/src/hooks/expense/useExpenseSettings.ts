@@ -1,11 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { expenseSettingsApi } from '@/api/expense';
+import { expenseApi } from '@/api/expense';
 import type {
     ExpenseSettings,
     ExpenseSettingsCreateRequest,
     ExpenseSettingsUpdateRequest,
-    ExpenseSettingsListResponse
 } from '@/types/expense';
 
 // Query keys for expense settings
@@ -19,9 +18,9 @@ export const expenseSettingsKeys = {
 
 // Get all expense settings with filtering
 export function useExpenseSettings(params?: { skip?: number; limit?: number; department_id?: string }) {
-    return useQuery<ExpenseSettingsListResponse>({
+    return useQuery<ExpenseSettings[]>({
         queryKey: expenseSettingsKeys.list(params),
-        queryFn: () => expenseSettingsApi.getAllSettings(params),
+        queryFn: () => expenseApi.getSettings(),
         staleTime: 5 * 60 * 1000, // 5 minutes
     });
 }
@@ -30,7 +29,7 @@ export function useExpenseSettings(params?: { skip?: number; limit?: number; dep
 export function useExpenseSetting(id: string) {
     return useQuery<ExpenseSettings>({
         queryKey: expenseSettingsKeys.detail(id),
-        queryFn: () => expenseSettingsApi.getSettingById(id),
+        queryFn: () => expenseApi.getSettingById(id),
         enabled: !!id,
         staleTime: 5 * 60 * 1000,
     });
@@ -41,7 +40,7 @@ export function useCreateExpenseSetting() {
     const queryClient = useQueryClient();
 
     return useMutation<ExpenseSettings, Error, ExpenseSettingsCreateRequest>({
-        mutationFn: expenseSettingsApi.createSetting,
+        mutationFn: (data) => expenseApi.createSetting(data),
         onSuccess: (data) => {
             // Invalidate and refetch settings list
             queryClient.invalidateQueries({ queryKey: expenseSettingsKeys.lists() });
@@ -62,7 +61,7 @@ export function useUpdateExpenseSetting() {
     const queryClient = useQueryClient();
 
     return useMutation<ExpenseSettings, Error, { id: string; data: ExpenseSettingsUpdateRequest }>({
-        mutationFn: ({ id, data }) => expenseSettingsApi.updateSetting(id, data),
+        mutationFn: ({ id, data }) => expenseApi.updateSetting(id, data),
         onSuccess: (data) => {
             // Update the specific setting in cache
             queryClient.setQueryData(expenseSettingsKeys.detail(data.id), data);
@@ -83,7 +82,7 @@ export function useDeleteExpenseSetting() {
     const queryClient = useQueryClient();
 
     return useMutation<void, Error, string>({
-        mutationFn: expenseSettingsApi.deleteSetting,
+        mutationFn: (id) => expenseApi.deleteSetting(id),
         onSuccess: (_, id) => {
             // Remove from cache
             queryClient.removeQueries({ queryKey: expenseSettingsKeys.detail(id) });
@@ -103,7 +102,7 @@ export function useDeleteExpenseSetting() {
 export function useExpenseSettingsLegacy() {
     return useQuery<ExpenseSettings[]>({
         queryKey: ['expense-settings-legacy'],
-        queryFn: () => expenseSettingsApi.getSettings(),
+        queryFn: () => expenseApi.getSettings(),
         staleTime: 15 * 60 * 1000, // 15 minutes
     });
 }
@@ -111,8 +110,8 @@ export function useExpenseSettingsLegacy() {
 export function useUpdateExpenseSettingsLegacy() {
     const queryClient = useQueryClient();
 
-    return useMutation<ExpenseSettings, Error, ExpenseSettingsUpdateRequest>({
-        mutationFn: expenseSettingsApi.updateSettings,
+    return useMutation<ExpenseSettings, Error, { id: string; data: ExpenseSettingsUpdateRequest }>({
+        mutationFn: ({ id, data }) => expenseApi.updateSetting(id, data),
         onSuccess: (data) => {
             // Update the settings in cache
             queryClient.setQueryData(['expense-settings-legacy'], [data]);

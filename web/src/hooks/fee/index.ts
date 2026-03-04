@@ -1,9 +1,3 @@
-// Dashboard hooks
-export {
-    useFeeDashboardStats,
-    useFeeValidationWarnings,
-} from './useFeeDashboard';
-
 // Fee Categories hooks
 export {
     useFeeCategories,
@@ -22,9 +16,6 @@ export {
     useCreateFeeTerm,
     useUpdateFeeTerm,
     useDeleteFeeTerm,
-    useAddPaymentDate,
-    useUpdatePaymentDate,
-    useDeletePaymentDate,
     feeTermKeys,
     paymentDateKeys,
 } from './useFeeTerms';
@@ -41,15 +32,16 @@ export {
 
 // Fee Mappings hooks
 export {
-    useFeeMappings,
-    useFeeMapping,
-    useFeeTermAmounts,
-    useCreateFeeMapping,
-    useUpdateFeeMapping,
-    useDeleteFeeMapping,
-    useSetTermAmounts,
-    useUpdateTermAmount,
-    feeMappingKeys,
+    useFeeClassMappings,
+    useFeeClassMapping,
+    useCreateFeeClassMapping,
+    useUpdateFeeClassMapping,
+    useDeleteFeeClassMapping,
+    useBulkCreateFeeClassMappings,
+    useCreateClassMappingTermAmounts,
+    useUpdateClassMappingTermAmounts,
+    useDeleteClassMappingTermAmounts,
+    feeClassMappingKeys,
 } from './useFeeMappings';
 
 // Bulk Operations hooks

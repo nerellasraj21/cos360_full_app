@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Loader2, ChevronLeft, ChevronsLeft, ChevronRightIcon, ChevronsRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,7 @@ interface FeeCategoryTreeProps {
 
 interface CategoryNodeProps {
     category: FeeCategory;
+    serialNumber: number;
     onEdit: (category: FeeCategory) => void;
     onDelete: (category: FeeCategory) => void;
     onManageTypes: (category: FeeCategory) => void;
@@ -29,7 +30,7 @@ interface CategoryNodeProps {
     canViewTypes: boolean;
 }
 
-function CategoryNode({ category, onEdit, onDelete, onManageTypes, canUpdate, canDelete, canViewTypes }: CategoryNodeProps) {
+function CategoryNode({ category, serialNumber, onEdit, onDelete, onManageTypes, canUpdate, canDelete, canViewTypes }: CategoryNodeProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [showActions, setShowActions] = useState(false);
     const { data: feeTypes = [], isLoading: typesLoading } = useFeeCategoryTypes(category.id, canViewTypes);
@@ -50,6 +51,7 @@ function CategoryNode({ category, onEdit, onDelete, onManageTypes, canUpdate, ca
                 onMouseLeave={() => setShowActions(false)}
             >
                 <div className="flex items-center flex-1" onClick={canViewTypes ? toggleExpanded : undefined}>
+                    <span className="w-8 text-xs text-muted-foreground font-medium shrink-0 text-center">{serialNumber}</span>
                     <button className="mr-2 p-1 hover:bg-gray-200 rounded">
                         {isExpanded ? (
                             <ChevronDown className="h-4 w-4" />
@@ -186,6 +188,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
         category_status: 'active',
         academic_year_id: selectedAcademicYearId || ''
     });
+    const [isFormDirty, setIsFormDirty] = useState(false);
 
     // Check permissions
     const canCreate = checkPermission('fee_categories', 'create');
@@ -234,6 +237,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
             academic_year_id: selectedAcademicYearId || ''
         });
         setEditingCategory(null);
+        setIsFormDirty(false);
         setShowCreateDialog(true);
     };
 
@@ -244,6 +248,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
             academic_year_id: category.academic_year_id
         });
         setEditingCategory(category);
+        setIsFormDirty(false);
         setShowCreateDialog(true);
     };
 
@@ -370,10 +375,11 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
             {/* Categories List */}
             {categories.length > 0 ? (
                 <div className="space-y-2">
-                    {categories.map((category) => (
+                    {categories.map((category, index) => (
                         <CategoryNode
                             key={category.id}
                             category={category}
+                            serialNumber={skip + index + 1}
                             onEdit={handleEdit}
                             onDelete={handleDelete}
                             onManageTypes={handleManageTypes}
@@ -457,7 +463,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
             )}
 
             {/* Create/Edit Dialog */}
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} guardDirty={isFormDirty} onDirtyDiscard={() => setIsFormDirty(false)}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle>
@@ -472,7 +478,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
                             </label>
                             <Input
                                 value={formData.category_name}
-                                onChange={(e) => setFormData({ ...formData, category_name: e.target.value })}
+                                onChange={(e) => { setFormData({ ...formData, category_name: e.target.value }); setIsFormDirty(true); }}
                                 placeholder="Enter category name"
                             />
                         </div>
@@ -482,7 +488,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
                                 type="checkbox"
                                 id="category_status"
                                 checked={formData.category_status === 'active'}
-                                onChange={(e) => setFormData({ ...formData, category_status: e.target.checked ? 'active' : 'inactive' })}
+                                onChange={(e) => { setFormData({ ...formData, category_status: e.target.checked ? 'active' : 'inactive' }); setIsFormDirty(true); }}
                                 className="rounded border-gray-300"
                             />
                             <label htmlFor="category_status" className="text-sm font-medium text-gray-700">
@@ -492,12 +498,9 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
                     </div>
 
                     <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowCreateDialog(false)}
-                        >
-                            Cancel
-                        </Button>
+                        <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                        </DialogClose>
                         <Button
                             onClick={handleSubmit}
                             disabled={!formData.category_name.trim() || createMutation.isPending || updateMutation.isPending}

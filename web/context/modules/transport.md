@@ -1,8 +1,8 @@
 # Module Context – Transport
 
-Version: 1.1
+Version: 1.2
 Generated On: 2025-12-26
-Last Updated: 2026-02-27
+Last Updated: 2026-03-04
 Source: Codebase Analysis + Implementation Handovers
 Confidence Level: High
 
@@ -18,7 +18,7 @@ The Transport module manages school transportation:
 4. **Routes**: Transport route definitions with typed route/trip types
 5. **Route Stops**: Stops along each route
 6. **Trips**: Scheduled trip management
-7. **Student Transport**: Student-transport assignments
+7. **Student Transport**: Student-transport assignments (admin CRUD + student/parent self-service view)
 8. **Student Trips**: Student trip enrollment
 
 ---
@@ -29,12 +29,13 @@ The Transport module manages school transportation:
 
 | File | Purpose |
 |------|---------|
-| `src/routes/_app/transport/vehicles.tsx` | Vehicle management |
-| `src/routes/_app/transport/routes.tsx` | Route management |
-| `src/routes/_app/transport/routeStops.tsx` | Route stops |
-| `src/routes/_app/transport/trips.tsx` | Trip management |
-| `src/routes/_app/transport/studentTransport.tsx` | Student assignments |
-| `src/routes/_app/transport/studentTrips.tsx` | Student trips |
+| `src/routes/_app/transport/vehicles.tsx` | Vehicle management (admin) |
+| `src/routes/_app/transport/routes.tsx` | Route management (admin) |
+| `src/routes/_app/transport/routeStops.tsx` | Route stops (admin) |
+| `src/routes/_app/transport/trips.tsx` | Trip management (admin) |
+| `src/routes/_app/transport/studentTransport.tsx` | Student assignments (admin) |
+| `src/routes/_app/transport/studentTrips.tsx` | Student trips (admin) |
+| `src/routes/_app/students/studenttransport.tsx` | Student/Parent self-service view |
 
 ### API Hooks
 
@@ -252,6 +253,60 @@ DELETE /api/v1/masters/routes/{id}
 
 - **@tanstack/react-query**: Data fetching and caching
 - **react-select/creatable**: CreatableSelect for create-on-fly type dropdowns
+
+---
+
+## Student Transport — Self-Service (Mar 2026)
+
+### Overview
+
+Students and Parents access their transport assignment at `/_app/students/studenttransport` (NOT the admin transport pages).
+
+**Role routing** in `src/pages/students/StudentTransportPage.tsx`:
+
+- **Student** → shows own transport using `entity_id` from login
+- **Parent** → child selector dropdown + transport for selected child
+- **Admin/Staff/Teacher** → informational redirect to Transport section
+
+### Enriched API Response (Mar 2026)
+
+`GET /api/v1/students/student-transport/student/{student_id}` now returns nested details:
+
+```json
+{
+  "trip": {
+    "trip_number": 1,
+    "route": { "route_name": "zhb-hyd", "starting_stop": "hyd", "ending_stop": "tr", "start_time": "07:00:00", "end_time": "08:30:00" },
+    "vehicle": { "registration_number": "ap 29 cw 2569", "vehicle_type": "Van" }
+  },
+  "stop": { "name": "ZHB Bus Stand", "number": 1, "reaching_time": null, "fees": 500 },
+  "fee_per_term": 500.0
+}
+```
+
+**404 handling**: Backend returns 404 when no transport is assigned (instead of empty array). `fetchStudentTransportsByStudent` catches 404 and returns `[]` — the UI shows "No transport assignment found."
+
+### Updated Type Definitions (Mar 2026)
+
+`src/types/masters/studentTransport.ts` — updated to reflect enriched response:
+
+```typescript
+StudentTransportOut {
+  trip?: TransportTripDetail    // has .route and .vehicle nested
+  stop?: TransportStopDetail    // replaces old route_stop field
+  fee_per_term: number
+}
+```
+
+New interfaces: `TransportTripDetail`, `TransportRouteDetail`, `TransportVehicleDetail`, `TransportStopDetail`
+
+### Access Rules
+
+| Role | Endpoint | Restriction |
+| --- | --- | --- |
+| Student | `GET /students/student-transport/student/{entity_id}` | 403 if not own ID |
+| Parent | `GET /students/student-transport/student/{child_id}` | 403 if not linked child |
+| Admin | All transport endpoints | Requires `student_transport:read` |
 
 ---
 

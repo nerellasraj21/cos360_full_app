@@ -3,10 +3,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Edit, Trash2, Plus, Users, Mail, Phone, Calendar, Award, MapPin, Filter, Download, FileText, FileSpreadsheet, Eye, Loader2 } from 'lucide-react';
+import { Edit, Trash2, Plus, Users, Mail, Phone, Calendar, Award, MapPin, Filter, Download, FileText, FileSpreadsheet, Eye, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Search } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +34,7 @@ interface StaffFormData extends StaffInput {}
 export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
     const [showCreateDialog, setShowCreateDialog] = useState(false);
+    const [isFormDirty, setIsFormDirty] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState<Staff | null>(null);
     const [viewingStaff, setViewingStaff] = useState<Staff | null>(null);
     const [showViewDialog, setShowViewDialog] = useState(false);
@@ -42,6 +43,10 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
         new Set(['name', 'contact', 'designation', 'department', 'status'])
     );
+    const [sortKey, setSortKey] = useState<string | null>(null);
+    const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
+    const [localSearch, setLocalSearch] = useState('');
+
     const [formData, setFormData] = useState<StaffFormData>({
         first_name: '',
         last_name: '',
@@ -94,14 +99,62 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     // Filtered columns
     const filteredColumns = allColumns.filter(col => visibleColumns.has(col.key));
 
-    // Paginated data
+    const getDesignationTitle = (designationId?: string) => {
+        if (!designationId) return 'Not Assigned';
+        const designation = designations.find(d => d.id === designationId);
+        return designation ? designation.title : 'Unknown';
+    };
+
+    // Search filter and sort
+    const filteredData = useMemo(() => {
+        const q = localSearch.toLowerCase().trim();
+        let data = staff;
+        if (q) {
+            data = data.filter(s => {
+                const name = (s.first_name + ' ' + (s.last_name || '')).toLowerCase();
+                const desig = getDesignationTitle(s.designation_id).toLowerCase();
+                const dept = (s.department || '').toLowerCase();
+                const email = (s.email || '').toLowerCase();
+                return name.includes(q) || desig.includes(q) || dept.includes(q) || email.includes(q);
+            });
+        }
+        return data;
+    }, [staff, localSearch]);
+
+    const sortedData = useMemo(() => {
+        if (!sortKey || !sortDir) return filteredData;
+        return [...filteredData].sort((a, b) => {
+            const aVal = sortKey === 'name' ? a.first_name + ' ' + (a.last_name || '') : sortKey === 'designation' ? getDesignationTitle(a.designation_id) : sortKey === 'department' ? (a.department || '') : (a as any)[sortKey] || '';
+            const bVal = sortKey === 'name' ? b.first_name + ' ' + (b.last_name || '') : sortKey === 'designation' ? getDesignationTitle(b.designation_id) : sortKey === 'department' ? (b.department || '') : (b as any)[sortKey] || '';
+            const cmp = aVal.toString().localeCompare(bVal.toString());
+            return sortDir === 'asc' ? cmp : -cmp;
+        });
+    }, [filteredData, sortKey, sortDir]);
+
+    const handleSort = (key: string) => {
+        if (editingStaff) return;
+        if (sortKey === key) {
+            setSortDir(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc');
+            if (sortDir === 'desc') setSortKey(null);
+        } else {
+            setSortKey(key);
+            setSortDir('asc');
+        }
+    };
+
+    const SortIcon = ({ col }: { col: string }) => {
+        if (sortKey !== col) return <ChevronsUpDown className='h-3 w-3 ml-1 inline opacity-50' />;
+        if (sortDir === 'asc') return <ChevronUp className='h-3 w-3 ml-1 inline' />;
+        return <ChevronDown className='h-3 w-3 ml-1 inline' />;
+    };
+
     const paginatedData = useMemo(() => {
         const startIndex = (currentPage - 1) * pageSize;
         const endIndex = startIndex + pageSize;
-        return staff.slice(startIndex, endIndex);
-    }, [staff, currentPage, pageSize]);
+        return filteredData.slice(startIndex, endIndex);
+    }, [filteredData, currentPage, pageSize]);
 
-    const totalPages = Math.ceil(staff.length / pageSize);
+    const totalPages = Math.ceil(filteredData.length / pageSize);
 
     // Column management functions
     const handleColumnToggle = (columnKey: string) => {
@@ -212,6 +265,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
             is_active: true,
             role_id: ''
         });
+        setIsFormDirty(false);
         setEditingStaff(null);
         setShowCreateDialog(true);
     };
@@ -233,6 +287,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
             is_active: staff.is_active,
             role_id: '' // This would need to be fetched or set appropriately
         });
+        setIsFormDirty(false);
         setEditingStaff(staff);
         setShowCreateDialog(true);
     };
@@ -267,6 +322,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 await createMutation.mutateAsync(formData);
             }
             setShowCreateDialog(false);
+            setIsFormDirty(false);
             setEditingStaff(null);
         } catch (error) {
             // Error handling is done in the mutation hooks
@@ -297,21 +353,12 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
         }
     };
 
-    const getDesignationTitle = (designationId?: string) => {
-        if (!designationId) return 'Not Assigned';
-        const designation = designations.find(d => d.id === designationId);
-        return designation ? designation.title : 'Unknown';
-    };
-
     return (
         <>
             <Card className={className}>
                 <CardHeader>
                     <div className="flex justify-between items-center">
-                        <CardTitle className="flex items-center gap-2">
-                            <Users className="h-5 w-5" />
-                            Staff Enrollment Management
-                        </CardTitle>
+                        <CardTitle className="text-2xl font-bold">Staff Enrollment</CardTitle>
                         <div className="flex items-center gap-2">
                             <DropdownMenu modal={false}>
                                 <DropdownMenuTrigger asChild>
@@ -376,6 +423,16 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     </div>
                 </CardHeader>
                 <CardContent>
+                        <div className="flex items-center gap-2 mb-3">
+                            <Search className="h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search staff..."
+                                value={localSearch}
+                                onChange={(e) => setLocalSearch(e.target.value)}
+                                className="max-w-xs"
+                            />
+                        </div>
+
                     {isLoading ? (
                         <div className="flex justify-center items-center py-8">
                             <Loader2 className="h-8 w-8 animate-spin" />
@@ -386,17 +443,25 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
+                                        <TableHead className="px-3 py-2 text-left font-semibold border-b bg-muted w-14 text-xs text-muted-foreground">S.No.</TableHead>
                                         {filteredColumns.map(col => (
-                                            <TableHead key={col.key}>{col.label}</TableHead>
+                                            ['name', 'designation', 'department'].includes(col.key) ? (
+                                                <TableHead key={col.key} className="cursor-pointer select-none" onClick={() => handleSort(col.key)}>
+                                                    {col.label}<SortIcon col={col.key} />
+                                                </TableHead>
+                                            ) : (
+                                                <TableHead key={col.key}>{col.label}</TableHead>
+                                            )
                                         ))}
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {paginatedData.map((staffMember) => (
-                                        <TableRow key={staffMember.id} className="hover:bg-gray-50">
+                                    {paginatedData.map((staffMember, index) => (
+                                        <TableRow key={staffMember.id} className="hover:bg-gray-50" style={{ height: '48px' }}>
+                                            <TableCell className="px-3 align-middle text-xs text-muted-foreground">{index + 1}</TableCell>
                                             {filteredColumns.map(col => (
-                                                <TableCell key={col.key}>
+                                                <TableCell key={col.key} className="align-middle">
                                                     {col.key === 'name' && (
                                                         <div>
                                                             <div className="font-medium">
@@ -485,9 +550,9 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                             </TableCell>
                                         </TableRow>
                                     ))}
-                                    {staff.length === 0 && (
+                                    {filteredData.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={filteredColumns.length + 1} className="text-center py-8 text-gray-500">
+                                            <TableCell colSpan={filteredColumns.length + 2} className="text-center py-8 text-gray-500">
                                                 No staff enrollments found
                                             </TableCell>
                                         </TableRow>
@@ -496,7 +561,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                             </Table>
 
                             {/* Pagination Controls */}
-                            {staff.length > pageSize && (
+                            {filteredData.length > pageSize && (
                                 <div className="flex items-center justify-between mt-4">
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm text-gray-600">Rows per page:</span>
@@ -514,7 +579,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm text-gray-600">
-                                            {Math.min((currentPage - 1) * pageSize + 1, staff.length)}-{Math.min(currentPage * pageSize, staff.length)} of {staff.length}
+                                            {Math.min((currentPage - 1) * pageSize + 1, filteredData.length)}-{Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length}
                                         </span>
                                         <div className="flex gap-1">
                                             <Button
@@ -543,7 +608,12 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
             </Card>
 
             {/* Create/Edit Dialog */}
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <Dialog
+                open={showCreateDialog}
+                onOpenChange={setShowCreateDialog}
+                guardDirty={isFormDirty}
+                onDirtyDiscard={() => setIsFormDirty(false)}
+            >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
                 <DialogTitle>
@@ -551,7 +621,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 </DialogTitle>
             </DialogHeader>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" onChange={() => setIsFormDirty(true)}>
                 {/* Basic Information */}
                 <div className="md:col-span-2">
                     <h3 className="text-sm font-medium text-foreground mb-3">Basic Information</h3>
@@ -691,7 +761,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     <InfiniteScrollDropdown
                         data={designations.map(d => ({ id: d.id, value: d.id, label: d.title }))}
                         value={formData.designation_id || ''}
-                        onChange={(value) => setFormData({ ...formData, designation_id: String(value) })}
+                        onChange={(value) => { setIsFormDirty(true); setFormData({ ...formData, designation_id: String(value) }); }}
                         placeholder="Select designation"
                         searchable={true}
                     />
@@ -720,7 +790,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     <InfiniteScrollDropdown
                         data={roles.map(r => ({ id: r.id, value: r.id, label: r.name }))}
                         value={formData.role_id || ''}
-                        onChange={(value) => setFormData({ ...formData, role_id: String(value) })}
+                        onChange={(value) => { setIsFormDirty(true); setFormData({ ...formData, role_id: String(value) }); }}
                         placeholder="Select role"
                         searchable={true}
                     />
@@ -743,12 +813,9 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
             </div>
 
             <DialogFooter>
-                <Button
-                    variant="outline"
-                    onClick={() => setShowCreateDialog(false)}
-                >
-                    Cancel
-                </Button>
+                <DialogClose asChild>
+                    <Button variant="outline">Cancel</Button>
+                </DialogClose>
                 <Button
                     onClick={handleSubmit}
                     disabled={createMutation.isPending || updateMutation.isPending}

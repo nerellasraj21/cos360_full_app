@@ -29,6 +29,7 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
     const { selectedAcademicYearId } = useAcademicYearStore();
     const [editingType, setEditingType] = useState<FeeType | null>(null);
     const [showCreateForm, setShowCreateForm] = useState(false);
+    const [isFormDirty, setIsFormDirty] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState<FeeType | null>(null);
     const [formData, setFormData] = useState<FeeTypeFormData>({
         type_name: '',
@@ -56,6 +57,7 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
             fee_term_id: '',
             fee_status: 'active'
         });
+        setIsFormDirty(false);
         setEditingType(null);
         setShowCreateForm(false);
     };
@@ -66,6 +68,7 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
     };
 
     const handleEdit = (feeType: FeeType) => {
+        setIsFormDirty(false);
         setFormData({
             type_name: feeType.type_name,
             fee_term_id: feeType.fee_term_id,
@@ -136,12 +139,13 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
     };
 
     const handleTermChange = (value: string) => {
+        setIsFormDirty(true);
         setFormData({ ...formData, fee_term_id: value });
     };
 
     return (
         <>
-            <Dialog open={open} onOpenChange={onOpenChange}>
+            <Dialog open={open} onOpenChange={onOpenChange} guardDirty={showCreateForm && isFormDirty} onDirtyDiscard={() => setIsFormDirty(false)}>
                 <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center justify-between">
@@ -174,7 +178,7 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
                                     {editingType ? 'Edit Fee Type' : 'Create New Fee Type'}
                                 </h4>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4" onChange={() => setIsFormDirty(true)}>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Fee Type Name *
@@ -231,7 +235,7 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
                                             type="checkbox"
                                             id="fee_status_form"
                                             checked={formData.fee_status === 'active'}
-                                            onChange={(e) => setFormData({ ...formData, fee_status: e.target.checked ? 'active' : 'inactive' })}
+                                            onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, fee_status: e.target.checked ? 'active' : 'inactive' }); }}
                                             className="rounded border-gray-300"
                                         />
                                         <label htmlFor="fee_status_form" className="text-sm font-medium text-gray-700">

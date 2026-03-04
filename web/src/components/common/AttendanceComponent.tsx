@@ -77,7 +77,7 @@ const AttendanceComponent: React.FC<AttendanceComponentProps> = ({
   const initializeDefaultRecords = () => {
     const defaultRecords: AttendanceData = {};
     data.forEach((person) => {
-      defaultRecords[person.id] = { status: 'Present', remarks: '' };
+      defaultRecords[person.id] = { status: 'present', remarks: '' };
     });
     setAttendanceRecords(defaultRecords);
     setHasExistingData(false);
@@ -91,7 +91,7 @@ const AttendanceComponent: React.FC<AttendanceComponentProps> = ({
     }
   }, [selectedDate, selectedClass, selectedSection, data, type, useLocalStorage]);
 
-  const handleStatusChange = (personId: number, status: 'Present' | 'Absent') => {
+  const handleStatusChange = (personId: number, status: 'present' | 'absent') => {
     setAttendanceRecords(prev => ({
       ...prev,
       [personId]: { ...prev[personId], status }
@@ -116,7 +116,7 @@ const AttendanceComponent: React.FC<AttendanceComponentProps> = ({
 
 
         const recordsToSave = Object.entries(attendanceRecords)
-          .filter(([_, record]) => record.status === 'Absent' || record.remarks.trim() !== '')
+          .filter(([_, record]) => record.status === 'absent' || record.remarks.trim() !== '')
           .map(([personId, record]) => ({
             [type === 'student' ? 'student_id' : 'teacher_id']: parseInt(personId),
             date: selectedDate,
@@ -197,13 +197,13 @@ const AttendanceComponent: React.FC<AttendanceComponentProps> = ({
       key: 'attendance',
       render: (_: any, record: Student | Teacher) => (
         <Select
-          value={attendanceRecords[record.id]?.status || 'Present'}
+          value={attendanceRecords[record.id]?.status || 'present'}
           onChange={(value) => handleStatusChange(record.id, value)}
           disabled={!isEditing}
           style={{ width: 120 }}
           options={[
-            { value: 'Present', label: 'Present' },
-            { value: 'Absent', label: 'Absent' },
+            { value: 'present', label: 'Present' },
+            { value: 'absent', label: 'Absent' },
           ]}
         />
       ),

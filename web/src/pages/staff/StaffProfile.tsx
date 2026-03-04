@@ -119,7 +119,7 @@ const StaffProfile: React.FC = () => {
             <span className="text-muted-foreground">{profile.phone || 'N/A'}</span>
           </div>
           <div className="mt-2">
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} guardDirty={form.formState.isDirty} onDirtyDiscard={() => form.reset()}>
               <DialogTrigger asChild>
                 <Button variant="default" size="sm" className="text-xs">
                   edit email & phone

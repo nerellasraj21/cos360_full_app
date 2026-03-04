@@ -1,4 +1,4 @@
-import { ExpenseCategoriesList } from '@/components/expense';
+import { ExpenseCategories as ExpenseCategoriesComponent } from '@/components/expense';
 
 export default function ExpenseCategories() {
     return (
@@ -14,7 +14,7 @@ export default function ExpenseCategories() {
             </div>
 
             {/* Categories List */}
-            <ExpenseCategoriesList />
+            <ExpenseCategoriesComponent />
         </div>
     );
 }

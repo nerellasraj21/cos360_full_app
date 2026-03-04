@@ -69,6 +69,7 @@ export interface AuthState {
   selectedStudent: Student | null;
   availableStudents: Student[];
   studentId: string | null; // Current active student ID for API calls
+  entityId: string | null;  // entity_id from login response (student UUID for students, parent UUID for parents)
   permissions: Permission[];
   permissionsMap: PermissionMap;
   menuItems: MenuItem[];

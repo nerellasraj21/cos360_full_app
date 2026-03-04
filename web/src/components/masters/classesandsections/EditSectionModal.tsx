@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +23,7 @@ export function EditSectionModal({
   onSubmit,
   isPending
 }: EditSectionModalProps) {
+  const [isDirty, setIsDirty] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     is_active: true,
@@ -40,12 +41,13 @@ export function EditSectionModal({
         is_active: true,
       });
     }
+    setIsDirty(false);
   }, [sectionData]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : undefined;
-
+    setIsDirty(true);
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
@@ -65,16 +67,18 @@ export function EditSectionModal({
     }
   };
 
+  const resetForm = () => {
+    setFormData({ name: '', is_active: true });
+    setIsDirty(false);
+  };
+
   const handleClose = () => {
-    setFormData({
-      name: '',
-      is_active: true,
-    });
+    resetForm();
     onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }} guardDirty={isDirty} onDirtyDiscard={resetForm}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
@@ -118,9 +122,9 @@ export function EditSectionModal({
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>
-              Cancel
-            </Button>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">Cancel</Button>
+            </DialogClose>
             <Button type="submit" disabled={isPending}>
               {isPending ? 'Saving...' : (sectionData ? 'Update Section' : 'Add Section')}
             </Button>

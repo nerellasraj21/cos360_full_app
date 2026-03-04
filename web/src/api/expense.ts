@@ -89,6 +89,10 @@ class ExpenseService {
     });
   };
 
+  getCategoryById = async (id: string): Promise<ExpenseCategory> => {
+    return this.request(`${EXPENSE_ENDPOINTS.CATEGORIES}/${id}`);
+  };
+
   deleteCategory = async (id: string): Promise<void> => {
     return this.request(`${EXPENSE_ENDPOINTS.CATEGORIES}/${id}`, {
       method: 'DELETE',
@@ -128,6 +132,10 @@ class ExpenseService {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+  };
+
+  getTypeById = async (id: string): Promise<ExpenseType> => {
+    return this.request(`${EXPENSE_ENDPOINTS.TYPES}/${id}`);
   };
 
   deleteType = async (id: string): Promise<void> => {
@@ -251,6 +259,27 @@ class ExpenseService {
     return this.request(`${EXPENSE_ENDPOINTS.AUDIT}/transactions/${transactionId}/logs?${query}`);
   };
 
+  getAuditLogs = async (params?: {
+    transaction_id?: string;
+    action?: string;
+    actor_user_id?: string;
+    start_date?: string;
+    end_date?: string;
+    skip?: number;
+    limit?: number;
+  }): Promise<{ items: ExpenseAuditLog[]; total: number; skip: number; limit: number }> => {
+    const query = new URLSearchParams();
+    if (params?.transaction_id) query.set('transaction_id', params.transaction_id);
+    if (params?.action) query.set('action', params.action);
+    if (params?.actor_user_id) query.set('actor_user_id', params.actor_user_id);
+    if (params?.start_date) query.set('start_date', params.start_date);
+    if (params?.end_date) query.set('end_date', params.end_date);
+    if (params?.skip) query.set('skip', params.skip.toString());
+    if (params?.limit) query.set('limit', params.limit.toString());
+
+    return this.request(`${EXPENSE_ENDPOINTS.AUDIT}?${query}`);
+  };
+
   getAuditSummary = async (transactionId: string): Promise<ExpenseAuditLogSummary> => {
     return this.request(`${EXPENSE_ENDPOINTS.AUDIT}/transactions/${transactionId}/summary`);
   };
@@ -307,6 +336,10 @@ class ExpenseService {
     });
   };
 
+  getSettingById = async (id: string): Promise<ExpenseSettings> => {
+    return this.request(`${EXPENSE_ENDPOINTS.SETTINGS}/${id}`);
+  };
+
   deleteSetting = async (id: string): Promise<void> => {
     return this.request(`${EXPENSE_ENDPOINTS.SETTINGS}/${id}`, {
       method: 'DELETE',
@@ -361,6 +394,31 @@ class ExpenseService {
 
   getExpenseSummary = async (periodDays: number = 30): Promise<any> => {
     return this.request(`${EXPENSE_ENDPOINTS.REPORTS}/summary?period_days=${periodDays}`);
+  };
+
+  getSummaryReport = async (params: {
+    start_date?: string;
+    end_date?: string;
+    [key: string]: string | number | string[] | undefined;
+  }): Promise<any> => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (Array.isArray(value)) {
+          (value as string[]).forEach(v => query.append(key, v));
+        } else {
+          query.set(key, String(value));
+        }
+      }
+    });
+    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}/summary?${query}`);
+  };
+
+  generateReport = async (type: string, params?: Record<string, string | number | string[] | undefined>): Promise<any> => {
+    return this.request(EXPENSE_ENDPOINTS.REPORTS, {
+      method: 'POST',
+      body: JSON.stringify({ report_type: type, filters: params || {} }),
+    });
   };
 
   exportReport = async (exportRequest: ExpenseReportExport): Promise<ExpenseReportExportResponse> => {

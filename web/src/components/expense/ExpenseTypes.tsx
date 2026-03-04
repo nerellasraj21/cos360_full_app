@@ -1,26 +1,29 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Plus, Edit, Trash2, Search, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Loader2, Filter, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useExpenseTypes, useExpenseCategoryDropdown, useCreateExpenseType, useUpdateExpenseType, useDeleteExpenseType } from '@/hooks/expense';
 import { validateTypeForm } from '@/lib/expenseValidation';
 import { handleExpenseApiError } from '@/lib/expenseErrorHandler';
-import type { ExpenseType, ExpenseTypeCreate, ExpenseTypeUpdate } from '@/types/expense';
+import type { ExpenseType, ExpenseTypeCreate } from '@/types/expense';
 import { PermissionGuard } from '@/components/PermissionGuard';
 
 export function ExpenseTypes() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isFormDirty, setIsFormDirty] = useState(false);
   const [editingType, setEditingType] = useState<ExpenseType | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
   const [formData, setFormData] = useState<ExpenseTypeCreate>({
     name: '',
     category_id: '',
@@ -38,20 +41,55 @@ export function ExpenseTypes() {
 
   const types = typesResponse || [];
 
-  const filteredTypes = types.filter(type =>
+  const filteredTypes = useMemo(() => types.filter(type =>
     type.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     type.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ), [types, searchQuery]);
 
   const getCategoryName = (categoryId: string) => {
     const category = categories.find(c => c.id === categoryId);
     return category ? category.name : 'Unknown';
   };
 
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else if (sortDir === 'desc') { setSortKey(null); setSortDir(null); }
+      else setSortDir('asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 opacity-40 shrink-0 inline" />;
+    if (sortDir === 'asc') return <ChevronUp className="h-3 w-3 ml-1 shrink-0 inline" />;
+    return <ChevronDown className="h-3 w-3 ml-1 shrink-0 inline" />;
+  };
+
+  const sortedTypes = useMemo(() => {
+    const data = [...filteredTypes];
+    if (!sortKey || !sortDir) return data;
+    return data.sort((a, b) => {
+      let aVal = '';
+      let bVal = '';
+      switch (sortKey) {
+        case 'name': aVal = a.name; bVal = b.name; break;
+        case 'category': aVal = getCategoryName(a.category_id); bVal = getCategoryName(b.category_id); break;
+        case 'status': aVal = String(a.is_active); bVal = String(b.is_active); break;
+        case 'created_at': aVal = a.created_at || ''; bVal = b.created_at || ''; break;
+      }
+      const cmp = aVal.localeCompare(bVal, undefined, { numeric: true });
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [filteredTypes, sortKey, sortDir, categories]);
+
   const handleCreate = () => {
     setFormData({ name: '', category_id: '', description: '' });
     setEditingType(null);
     setErrors({});
+    setIsFormDirty(false);
     setShowCreateDialog(true);
   };
 
@@ -63,6 +101,7 @@ export function ExpenseTypes() {
     });
     setEditingType(type);
     setErrors({});
+    setIsFormDirty(false);
     setShowCreateDialog(true);
   };
 
@@ -88,6 +127,7 @@ export function ExpenseTypes() {
       } else {
         await createMutation.mutateAsync(formData);
       }
+      setIsFormDirty(false);
       setShowCreateDialog(false);
       setEditingType(null);
     } catch (error) {
@@ -96,6 +136,7 @@ export function ExpenseTypes() {
   };
 
   const handleInputChange = (field: string, value: string) => {
+    setIsFormDirty(true);
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => {
@@ -107,46 +148,37 @@ export function ExpenseTypes() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Expense Types</h2>
-          <p className="text-muted-foreground">Manage specific expense classifications within categories</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Each expense type must be linked to a category for proper organization
-          </p>
+    <Card>
+      <CardHeader>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-2xl font-bold">Expense Types</CardTitle>
+          <PermissionGuard resource="expense_types" action="create" fallback={null}>
+            <Button onClick={handleCreate} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              New Type
+            </Button>
+          </PermissionGuard>
         </div>
-        <PermissionGuard
-          resource="expense_types"
-          action="create"
-          fallback={null}
-        >
-          <Button onClick={handleCreate} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            New Type
-          </Button>
-        </PermissionGuard>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search types..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+      </CardHeader>
+      <CardContent>
+        {/* Filter bar */}
+        <div className="flex flex-col gap-2 mb-3">
+          <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filters</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search types..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-8 text-sm"
+              />
             </div>
-
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full sm:w-48">
+              <SelectTrigger className="w-48 h-8 text-sm">
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent>
@@ -159,95 +191,92 @@ export function ExpenseTypes() {
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Types Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12 text-xs text-muted-foreground">S.No.</TableHead>
+              <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('name')}>
+                <div className="flex items-center">Name<SortIcon col="name" /></div>
+              </TableHead>
+              <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('category')}>
+                <div className="flex items-center">Category<SortIcon col="category" /></div>
+              </TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('status')}>
+                <div className="flex items-center">Status<SortIcon col="status" /></div>
+              </TableHead>
+              <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('created_at')}>
+                <div className="flex items-center">Created<SortIcon col="created_at" /></div>
+              </TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableCell colSpan={7} className="text-center py-8">
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Loading expense types...</span>
+                  </div>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    <div className="flex justify-center items-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin" />
-                      <span className="ml-2">Loading expense types...</span>
+            ) : sortedTypes.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  No expense types found
+                </TableCell>
+              </TableRow>
+            ) : (
+              sortedTypes.map((type, index) => (
+                <TableRow key={type.id} style={{ height: '48px' }}>
+                  <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
+                  <TableCell className="font-medium">{type.name}</TableCell>
+                  <TableCell>{getCategoryName(type.category_id)}</TableCell>
+                  <TableCell>{type.description || '-'}</TableCell>
+                  <TableCell>
+                    <Badge variant={type.is_active ? 'default' : 'secondary'}>
+                      {type.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(type.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <PermissionGuard resource="expense_types" action="update" fallback={null}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(type)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </PermissionGuard>
+                      <PermissionGuard resource="expense_types" action="delete" fallback={null}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(type)}
+                          className="h-8 w-8 p-0 text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </PermissionGuard>
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredTypes.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No expense types found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredTypes.map((type) => (
-                  <TableRow key={type.id}>
-                    <TableCell className="font-medium">{type.name}</TableCell>
-                    <TableCell>{getCategoryName(type.category_id)}</TableCell>
-                    <TableCell>{type.description || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant={type.is_active ? 'default' : 'secondary'}>
-                        {type.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(type.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <PermissionGuard
-                          resource="expense_types"
-                          action="update"
-                          fallback={null}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(type)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </PermissionGuard>
-                        <PermissionGuard
-                          resource="expense_types"
-                          action="delete"
-                          fallback={null}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(type)}
-                            className="h-8 w-8 p-0 text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </PermissionGuard>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
 
       {/* Create/Edit Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} guardDirty={isFormDirty} onDirtyDiscard={() => setIsFormDirty(false)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -312,9 +341,9 @@ export function ExpenseTypes() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-              Cancel
-            </Button>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
             <Button
               onClick={handleSubmit}
               disabled={createMutation.isPending || updateMutation.isPending}
@@ -324,6 +353,6 @@ export function ExpenseTypes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </Card>
   );
 }

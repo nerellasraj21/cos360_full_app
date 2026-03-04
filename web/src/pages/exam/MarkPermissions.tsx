@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, UserPlus, Trash2, Loader2, Shield, Info } from 'lucide-react'
+import { ArrowLeft, UserPlus, Trash2, Loader2, Shield, Info, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -24,11 +24,41 @@ export default function MarkPermissions() {
 
   const [newUserId, setNewUserId] = useState('')
   const [revokeTarget, setRevokeTarget] = useState<{ permId: string; name: string } | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortKey, setSortKey] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
+  const handleSort = (key: string) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />
+    return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />
+  }
   const { data: exam } = useExamDetail(id)
   const { data: permissions = [], isLoading } = useMarkPermissions(id)
   const grantMutation = useGrantMarkPermission(id)
   const revokeMutation = useRevokeMarkPermission(id)
+
+  const filteredPerms = useMemo(() => {
+    let items = permissions
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      items = items.filter(p =>
+        (p.user_display_name ?? p.user_id).toLowerCase().includes(q) ||
+        (p.granted_by ?? '').toLowerCase().includes(q)
+      )
+    }
+    if (sortKey) {
+      items = [...items].sort((a, b) => {
+        const aVal = String((a as any)[sortKey] ?? '')
+        const bVal = String((b as any)[sortKey] ?? '')
+        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      })
+    }
+    return items
+  }, [permissions, searchQuery, sortKey, sortDir])
 
   const handleGrant = () => {
     if (!newUserId.trim()) return
@@ -70,20 +100,35 @@ export default function MarkPermissions() {
               </CardContent>
             </Card>
           ) : (
+            <div className="space-y-3">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                <Filter className="h-3.5 w-3.5" />
+                <span>Filters</span>
+              </div>
+              <div className="relative max-w-sm">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input placeholder="Search by user or granted by..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
+              </div>
+            </div>
             <div className="overflow-hidden rounded-lg border">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40">
-                    <th className="px-4 py-3 text-left font-medium">User</th>
-                    <th className="px-4 py-3 text-left font-medium">Granted By</th>
-                    <th className="px-4 py-3 text-left font-medium">Granted At</th>
-                    <th className="px-4 py-3 text-left font-medium">Status</th>
+                    <th className="px-4 py-3 text-left font-medium w-12">S.No.</th>
+                    <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('user_display_name')}>User <SortIcon col="user_display_name" /></th>
+                    <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('granted_by')}>Granted By <SortIcon col="granted_by" /></th>
+                    <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('granted_at')}>Granted At <SortIcon col="granted_at" /></th>
+                    <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('is_active')}>Status <SortIcon col="is_active" /></th>
                     <th className="px-4 py-3 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {permissions.map((perm) => (
-                    <tr key={perm.id} className="border-b transition-colors hover:bg-muted/20">
+                  {filteredPerms.length === 0 ? (
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-sm">{searchQuery ? 'No permissions match your search' : 'No permissions'}</td></tr>
+                  ) : filteredPerms.map((perm, idx) => (
+                    <tr key={perm.id} className="border-b transition-colors hover:bg-muted/20" style={{ height: '48px' }}>
+                      <td className="px-4 py-3 text-muted-foreground text-sm">{idx + 1}</td>
                       <td className="px-4 py-3 font-medium">
                         {perm.user_display_name ?? perm.user_id}
                       </td>
@@ -110,6 +155,7 @@ export default function MarkPermissions() {
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
 

@@ -8,7 +8,6 @@ import {
   useDeleteSubjectCategory
 } from '@/api/hooks/masters/subjectCategories';
 import type { SubjectCategory, SubjectCategoryInput } from '@/types/masters/subject';
-
 export default function SubjectCategoriesPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
@@ -83,5 +82,7 @@ export default function SubjectCategoriesPage() {
     },
   };
 
-  return <MasterPage config={config} />;
+  return (
+    <MasterPage config={config} />
+  );
 }

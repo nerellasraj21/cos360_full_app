@@ -14,8 +14,8 @@ export const AddressStepForm = () => {
   const districtId = watch('district_id');
 
   // Track previous values to detect actual changes
-  const prevStateIdRef = useRef<string>();
-  const prevDistrictIdRef = useRef<string>();
+  const prevStateIdRef = useRef<string | undefined>(undefined);
+  const prevDistrictIdRef = useRef<string | undefined>(undefined);
 
   // Clear dependent fields only when parent actually changes
   useEffect(() => {

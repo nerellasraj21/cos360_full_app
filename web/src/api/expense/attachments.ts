@@ -3,7 +3,7 @@ import type {
     ExpenseAttachment,
     ExpenseAttachmentUploadRequest,
     ExpenseAttachmentUpdateRequest
-} from '@/types/expense';
+} from '@/types/expense/attachment';
 
 export const expenseAttachmentsApi = {
     // Upload attachment

@@ -31,7 +31,7 @@ export function AcademicYearFilter({ value, onValueChange, className }: Academic
                 <SelectContent>
                     {academicYears.map((year) => (
                         <SelectItem key={year.id} value={year.id.toString()}>
-                            {year.name} {year.is_active && '(Active)'}
+                            {year.title} {year.is_active && '(Active)'}
                         </SelectItem>
                     ))}
                 </SelectContent>

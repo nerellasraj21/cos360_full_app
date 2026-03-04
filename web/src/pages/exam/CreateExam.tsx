@@ -241,7 +241,7 @@ export default function CreateExam() {
       attendance_from_date: raw.attendance_from_date || null,
       attendance_to_date: raw.attendance_to_date || null,
       hall_ticket_min_attendance:
-        raw.hall_ticket_min_attendance !== '' && raw.hall_ticket_min_attendance != null
+        raw.hall_ticket_min_attendance != null
           ? Number(raw.hall_ticket_min_attendance)
           : null,
       exam_grade_scheme_id: raw.exam_grade_scheme_id || null,

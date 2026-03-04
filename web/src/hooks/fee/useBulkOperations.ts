@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { feeCategoriesApi, feeTypesApi, feeMappingsApi, bulkCreateStudentMappings } from '@/api/fee';
+import { feeCategoriesApi, feeTypesApi, feeMappingsApi } from '@/api/fee';
+import { bulkCreateStudentMappings } from '@/api/fee/mappings';
 import { feeCategoryKeys } from './useFeeCategories';
 import { feeTypeKeys } from './useFeeTypes';
-import { feeMappingKeys } from './useFeeMappings';
+import { feeClassMappingKeys as feeMappingKeys } from './useFeeMappings';
 
 export interface BulkDeleteRequest {
     type: 'categories' | 'types' | 'mappings';
@@ -38,7 +39,7 @@ export function useBulkDelete() {
                 try {
                     switch (type) {
                         case 'categories':
-                            await feeCategoriesApi.deleteCategory(parseInt(id));
+                            await feeCategoriesApi.deleteCategory(id);
                             break;
                         case 'types':
                             await feeTypesApi.deleteType(id);
@@ -101,13 +102,13 @@ export function useBulkStatusChange() {
                 try {
                     switch (type) {
                         case 'categories':
-                            await feeCategoriesApi.updateCategory(parseInt(id), { is_active });
+                            await feeCategoriesApi.updateCategory(id, { category_status: is_active ? 'active' : 'inactive' });
                             break;
                         case 'types':
-                            await feeTypesApi.updateType(id, { fee_status: is_active });
+                            await feeTypesApi.updateType(id, { fee_status: is_active ? 'active' : 'inactive' });
                             break;
                         case 'mappings':
-                            await feeMappingsApi.updateMapping(parseInt(id), { is_active });
+                            await feeMappingsApi.updateMapping(parseInt(id), {});
                             break;
                     }
                     results.success++;
@@ -208,9 +209,10 @@ export function useAcademicYearTransfer() {
                     switch (type) {
                         case 'categories':
                             // Get the original category and create a copy with new academic year
-                            const category = await feeCategoriesApi.getCategory(parseInt(id));
+                            const category = await feeCategoriesApi.getCategory(id);
                             await feeCategoriesApi.createCategory({
                                 category_name: category.category_name,
+                                category_status: category.category_status,
                                 academic_year_id: target_academic_year_id,
                             });
                             break;
@@ -221,7 +223,6 @@ export function useAcademicYearTransfer() {
                                 type_name: feeType.type_name,
                                 fee_category_id: feeType.fee_category_id,
                                 fee_term_id: feeType.fee_term_id,
-                                is_mandatory: feeType.is_mandatory,
                                 fee_status: feeType.fee_status,
                                 academic_year_id: target_academic_year_id,
                             });
@@ -232,9 +233,8 @@ export function useAcademicYearTransfer() {
                             await feeMappingsApi.createMapping({
                                 fee_type_id: mapping.fee_type_id,
                                 class_id: mapping.class_id,
-                                total_amount: mapping.total_amount,
+                                total_fee: mapping.total_fee,
                                 academic_year_id: target_academic_year_id,
-                                is_active: mapping.is_active,
                             });
                             break;
                     }

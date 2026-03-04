@@ -123,12 +123,12 @@ export default function StaffPage() {
     return isValid;
   };
 
-  const handleUpdate = async (id: number, input: Partial<StaffInput>) => {
-    await updateStaffMutation.mutateAsync({ id, input });
+  const handleUpdate = async (id: string | number, input: Partial<StaffInput>) => {
+    await updateStaffMutation.mutateAsync({ id: Number(id), input });
   };
 
-  const handleDelete = async (id: number) => {
-    await deleteStaffMutation.mutateAsync(id);
+  const handleDelete = async (id: string | number) => {
+    await deleteStaffMutation.mutateAsync(Number(id));
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

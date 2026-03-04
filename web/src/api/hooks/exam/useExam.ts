@@ -608,7 +608,7 @@ export function useBulkUpsertMarks() {
     mutationFn: (marks: MarkEntryCreate[]) => {
       const examId = marks[0]?.exam_id ?? ''
       const rest = marks.map(({ exam_id: _, ...m }) => m)
-      return examApi.bulkUpsertMarks(examId, rest)
+      return examApi.upsertMarks(examId, rest[0])
     },
     onSuccess: (_data, variables) => {
       const examId = variables[0]?.exam_id

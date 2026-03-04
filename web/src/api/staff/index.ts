@@ -16,7 +16,7 @@ import type {
   StaffAttendanceFilters,
   StaffQueryParams,
   StaffAttendanceQueryParams
-} from '@/types/staff';
+} from '@/types/staff/index';
 
 // ============================================================================
 // STAFF ENROLLMENT API

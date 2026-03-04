@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Plus, Edit, Trash2, Calendar, AlertTriangle, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, AlertTriangle, Loader2, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useFeeTerms, useDeleteFeeTerm } from '@/hooks/fee/useFeeTerms';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
@@ -18,15 +19,49 @@ export function FeeTermsList() {
     const [selectedTerm, setSelectedTerm] = useState<FeeTerm | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isPaymentManagerOpen, setIsPaymentManagerOpen] = useState(false);
+    const [isDirty, setIsDirty] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortKey, setSortKey] = useState<string | null>(null);
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+    const handleSort = (key: string) => {
+        if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        else { setSortKey(key); setSortDir('asc'); }
+    };
+    const SortIcon = ({ col }: { col: string }) => {
+        if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />;
+        return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />;
+    };
 
     const { data: terms = [], isLoading, error } = useFeeTerms({
         academic_year_id: selectedAcademicYearId,
     });
 
+    const filteredTerms = useMemo(() => {
+        let items = terms;
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            items = items.filter(t => t.term_name.toLowerCase().includes(q));
+        }
+        if (sortKey) {
+            items = [...items].sort((a, b) => {
+                const aVal = sortKey === 'number_of_terms'
+                    ? String(a.number_of_terms)
+                    : String((a as any)[sortKey] ?? '');
+                const bVal = sortKey === 'number_of_terms'
+                    ? String(b.number_of_terms)
+                    : String((b as any)[sortKey] ?? '');
+                return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            });
+        }
+        return items;
+    }, [terms, searchQuery, sortKey, sortDir]);
+
     const deleteTermMutation = useDeleteFeeTerm();
 
     const handleEditTerm = (term: FeeTerm) => {
         setSelectedTerm(term);
+        setIsDirty(false);
         setIsFormOpen(true);
     };
 
@@ -47,6 +82,7 @@ export function FeeTermsList() {
 
     const handleCreateNew = () => {
         setSelectedTerm(null);
+        setIsDirty(false);
         setIsFormOpen(true);
     };
 
@@ -130,22 +166,37 @@ export function FeeTermsList() {
                             </Button>
                         </div>
                     ) : (
+                        <div className="space-y-3">
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                                <Filter className="h-3.5 w-3.5" />
+                                <span>Filters</span>
+                            </div>
+                            <div className="relative max-w-sm">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                                <Input placeholder="Search by term name..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
+                            </div>
+                        </div>
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Term Name</TableHead>
-                                    <TableHead>Number of Terms</TableHead>
+                                    <TableHead className="w-12">S.No.</TableHead>
+                                    <TableHead className="cursor-pointer select-none" onClick={() => handleSort('term_name')}>Term Name <SortIcon col="term_name" /></TableHead>
+                                    <TableHead className="cursor-pointer select-none" onClick={() => handleSort('number_of_terms')}>Number of Terms <SortIcon col="number_of_terms" /></TableHead>
                                     <TableHead>Payment Schedule</TableHead>
-                                    <TableHead>Status</TableHead>
+                                    <TableHead className="cursor-pointer select-none" onClick={() => handleSort('term_status')}>Status <SortIcon col="term_status" /></TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {terms.map((term) => {
+                                {filteredTerms.length === 0 ? (
+                                    <TableRow><TableCell colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-sm">{searchQuery ? 'No terms match your search' : 'No fee terms'}</TableCell></TableRow>
+                                ) : filteredTerms.map((term, index) => {
                                     const paymentSummary = getPaymentDatesSummary(term);
 
                                     return (
-                                        <TableRow key={term.id}>
+                                        <TableRow key={term.id} style={{ height: '48px' }}>
+                                            <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
                                             <TableCell className="font-medium">
                                                 {term.term_name}
                                             </TableCell>
@@ -204,13 +255,14 @@ export function FeeTermsList() {
                                 })}
                             </TableBody>
                         </Table>
+                        </div>
                     )}
                 </CardContent>
             </Card>
 
             {/* Fee Term Form Dialog */}
-            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                <DialogContent className="max-w-md">
+            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)}>
+                <DialogContent className="max-w-md" onChange={() => setIsDirty(true)}>
                     <DialogHeader>
                         <DialogTitle>
                             {selectedTerm ? 'Edit Fee Term' : 'Create New Fee Term'}
@@ -219,6 +271,7 @@ export function FeeTermsList() {
                     <FeeTermForm
                         term={selectedTerm}
                         onSuccess={() => {
+                            setIsDirty(false);
                             setIsFormOpen(false);
                             setSelectedTerm(null);
                         }}

@@ -11,6 +11,7 @@ export const useAuthStore = create<AuthState>()(
       selectedStudent: null,
       availableStudents: [],
       studentId: null,
+      entityId: null,
       permissions: [],
       permissionsMap: {},
       menuItems: [],
@@ -41,11 +42,11 @@ export const useAuthStore = create<AuthState>()(
         let studentId: string | null = null;
         const availableStudents = data.user.parent_profile?.students || [];
 
-        // For students, use user.id as student ID
+        // For students, use entity_id (student profile UUID) as the student ID
         // For parents, studentId will be set when they select a student
         if (data.role.name.toLowerCase() === 'student') {
-          // Student role - user.id is the student ID
-          studentId = data.user.id;
+          // Student role - entity_id is the student profile UUID
+          studentId = data.entity_id || data.user.id;
         } else if (data.role.name.toLowerCase() === 'parent' && availableStudents.length > 0) {
           // Parent role - set to first available student initially
           studentId = availableStudents[0].id;
@@ -61,6 +62,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken: data.access_token,
           refreshToken: data.refresh_token,
           isAuthenticated: true,
+          entityId: data.entity_id || null,
           // Reset student selection on new login
           selectedStudent: availableStudents.length > 0 ? availableStudents[0] : null,
           availableStudents,
@@ -75,6 +77,7 @@ export const useAuthStore = create<AuthState>()(
           selectedStudent: null,
           availableStudents: [],
           studentId: null,
+          entityId: null,
           permissions: [],
           permissionsMap: {},
           menuItems: [],
@@ -137,6 +140,7 @@ export const useAuthStore = create<AuthState>()(
         selectedStudent: state.selectedStudent,
         availableStudents: state.availableStudents,
         studentId: state.studentId,
+        entityId: state.entityId,
         permissions: state.permissions,
         permissionsMap: state.permissionsMap,
         menuItems: state.menuItems,

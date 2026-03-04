@@ -2,7 +2,7 @@ import CAxios from '../index';
 import type {
     ExpenseAuditEntry,
     ExpenseAuditQueryParams
-} from '@/types/expense';
+} from '@/types/expense/audit';
 
 export const expenseAuditApi = {
     // Get audit trail

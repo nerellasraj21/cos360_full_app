@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { expenseAuditApi } from '@/api/expense';
+import { expenseApi } from '@/api/expense';
 import type {
     ExpenseAuditEntry,
-    ExpenseAuditQueryParams
+    ExpenseAuditQueryParams,
+    ExpenseAuditLog,
 } from '@/types/expense';
 
 // Query keys for expense audit
@@ -15,7 +16,7 @@ export const expenseAuditKeys = {
 export function useExpenseAuditTrail(params?: ExpenseAuditQueryParams) {
     return useQuery<ExpenseAuditEntry[]>({
         queryKey: expenseAuditKeys.trail(params),
-        queryFn: () => expenseAuditApi.getAuditTrail(params),
+        queryFn: () => expenseApi.getAuditLogs(params).then((r: { items: ExpenseAuditLog[]; total: number; skip: number; limit: number }) => r.items),
         staleTime: 5 * 60 * 1000, // 5 minutes
     });
 }

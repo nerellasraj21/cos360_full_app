@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -41,6 +41,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
     offset: 0
   });
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+  const [isFormDirty, setIsFormDirty] = useState(false);
   const [selectedTransactionId, setSelectedTransactionId] = useState('');
 
   // Load receipts on component mount and when search params change
@@ -143,6 +144,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
     try {
       const newReceipt = await feeReceiptsApi.generateReceipt(selectedTransactionId);
       toast.success('Receipt generated successfully');
+      setIsFormDirty(false);
       setShowGenerateDialog(false);
       setSelectedTransactionId('');
       loadReceipts(); // Refresh the list
@@ -174,9 +176,14 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
             Generate, view, and manage fee receipts with integrity verification
           </p>
         </div>
-        <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
+        <Dialog
+          open={showGenerateDialog}
+          onOpenChange={setShowGenerateDialog}
+          guardDirty={isFormDirty}
+          onDirtyDiscard={() => setIsFormDirty(false)}
+        >
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => setIsFormDirty(false)}>
               <Plus className="w-4 h-4 mr-2" />
               Generate Receipt
             </Button>
@@ -188,7 +195,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                 Select a completed transaction to generate a receipt
               </p>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-4" onChange={() => setIsFormDirty(true)}>
               <div>
                 <Label htmlFor="transactionSelect">Select Transaction</Label>
                 {transactionsLoading ? (
@@ -200,7 +207,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                   <>
                     <Select
                       value={selectedTransactionId}
-                      onValueChange={setSelectedTransactionId}
+                      onValueChange={(value) => { setSelectedTransactionId(value); setIsFormDirty(true); }}
                       disabled={transactionsLoading}
                     >
                       <SelectTrigger>
@@ -212,7 +219,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                             <div className="flex flex-col">
                               <span className="font-medium">{transaction.transaction_number}</span>
                               <span className="text-sm text-muted-foreground">
-                                {transaction.student_name || 'N/A'} • ₹{transaction.total_amount.toLocaleString()} • {transaction.payment_method.toUpperCase()}
+                                {transaction.student_admission_num || 'N/A'} • ₹{transaction.total_amount.toLocaleString()} • {transaction.payment_method.toUpperCase()}
                               </span>
                             </div>
                           </SelectItem>
@@ -239,7 +246,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                           <Badge variant="default">₹{selectedTx.total_amount.toLocaleString()}</Badge>
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          <div>Student: {selectedTx.student_name || 'N/A'}</div>
+                          <div>Student: {selectedTx.student_admission_num || 'N/A'}</div>
                           <div>Payment: {selectedTx.payment_method.toUpperCase()}</div>
                           <div>Date: {new Date(selectedTx.transaction_date).toLocaleDateString()}</div>
                         </div>
@@ -250,12 +257,13 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
               )}
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => {
-                  setShowGenerateDialog(false);
-                  setSelectedTransactionId('');
-                }}>
-                  Cancel
-                </Button>
+                <DialogClose asChild>
+                  <Button variant="outline" onClick={() => {
+                    setSelectedTransactionId('');
+                  }}>
+                    Cancel
+                  </Button>
+                </DialogClose>
                 <Button
                   onClick={handleGenerateReceipt}
                   disabled={!selectedTransactionId || transactionsLoading}
@@ -492,26 +500,26 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Alert className={verification.is_valid ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
+            <Alert className={verification.is_integrity_valid ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
               <AlertDescription>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    {verification.is_valid ? (
+                    {verification.is_integrity_valid ? (
                       <Shield className="w-4 h-4 text-green-600" />
                     ) : (
                       <Shield className="w-4 h-4 text-red-600" />
                     )}
-                    <span className={`font-medium ${verification.is_valid ? 'text-green-800' : 'text-red-800'}`}>
-                      {verification.is_valid ? 'Receipt is valid and untampered' : 'Receipt integrity compromised'}
+                    <span className={`font-medium ${verification.is_integrity_valid ? 'text-green-800' : 'text-red-800'}`}>
+                      {verification.is_integrity_valid ? 'Receipt is valid and untampered' : 'Receipt integrity compromised'}
                     </span>
                   </div>
                   <div className="text-sm space-y-1">
                     <p><strong>Receipt:</strong> {verification.receipt_number}</p>
-                    <p><strong>Verification Date:</strong> {new Date(verification.verification_date).toLocaleString()}</p>
-                    {!verification.is_valid && (
+                    <p><strong>Verification Date:</strong> {new Date(verification.verified_at).toLocaleString()}</p>
+                    {!verification.is_integrity_valid && (
                       <div className="mt-2 p-2 bg-red-100 rounded text-red-800 text-xs">
-                        <p><strong>Stored Hash:</strong> {verification.stored_hash}</p>
-                        <p><strong>Current Hash:</strong> {verification.current_hash}</p>
+                        <p><strong>Stored Hash:</strong> {verification.verification_details.stored_hash}</p>
+                        <p><strong>Current Hash:</strong> {verification.verification_details.current_hash}</p>
                       </div>
                     )}
                   </div>
@@ -531,6 +539,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">S.No.</TableHead>
                 <TableHead>Receipt Number</TableHead>
                 <TableHead>Student</TableHead>
                 <TableHead>Generated At</TableHead>
@@ -541,7 +550,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
+                  <TableCell colSpan={6} className="text-center py-8">
                     <div className="flex justify-center items-center py-8">
                       <Loader2 className="h-8 w-8 animate-spin" />
                       <span className="ml-2">Loading receipts...</span>
@@ -550,13 +559,14 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                 </TableRow>
               ) : receipts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     No receipts found
                   </TableCell>
                 </TableRow>
               ) : (
-                receipts.map((receipt) => (
-                  <TableRow key={receipt.id}>
+                receipts.map((receipt, index) => (
+                  <TableRow key={receipt.id} style={{ height: '48px' }}>
+                    <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
                     <TableCell className="font-medium">{receipt.receipt_number}</TableCell>
                     <TableCell>
                       <div>

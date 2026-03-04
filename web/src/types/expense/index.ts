@@ -90,6 +90,7 @@ export interface ExpenseTransactionCreate {
   vendor_name?: string;
   idempotency_key: string;
   requires_approval_override?: boolean;
+  attachments?: File[];
 }
 
 export interface ExpenseTransactionUpdate {
@@ -482,6 +483,8 @@ export type ExpenseTypeUpdateRequest = ExpenseTypeUpdate;
 export type ExpenseTypeQueryParams = {
   category_id?: string;
   is_active?: boolean;
+  active_only?: boolean;
+  recurring_only?: boolean;
   search?: string;
   skip?: number;
   limit?: number;
@@ -498,12 +501,19 @@ export type ExpenseTransactionItemUpdateRequest = TransactionItem;
 export type ExpenseTransactionFilters = {
   start_date?: string;
   end_date?: string;
+  date_from?: string;
+  date_to?: string;
   category_ids?: string[];
   type_ids?: string[];
+  expense_type_id?: string;
   status_filter?: string;
+  status?: string[];
+  payment_method?: string[];
   department_id?: string;
   min_amount?: number;
   max_amount?: number;
+  amount_min?: number;
+  amount_max?: number;
   created_by_user_id?: string;
   skip?: number;
   limit?: number;
@@ -516,6 +526,15 @@ export type ExpenseAttachmentUpdateRequest = ExpenseAttachmentUpdate;
 // Audit types
 export type ExpenseAuditEntry = ExpenseAuditLog;
 export type ExpenseAuditQueryParams = {
+  transaction_id?: string;
+  action?: string;
+  actor_user_id?: string;
+  start_date?: string;
+  end_date?: string;
+  skip?: number;
+  limit?: number;
+};
+export type ExpenseAuditLogFilters = {
   transaction_id?: string;
   action?: string;
   actor_user_id?: string;

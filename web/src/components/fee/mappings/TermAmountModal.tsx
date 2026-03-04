@@ -15,7 +15,7 @@ import React, { useState, useEffect } from 'react';
 import { Calculator, AlertCircle, CheckCircle, DivideSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useCreateClassMappingTermAmounts, useUpdateClassMappingTermAmounts } from '@/hooks/fee/useFeeMappings';
@@ -42,6 +42,7 @@ interface TermAmountFormData {
 export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModalProps) {
     const [termAmounts, setTermAmounts] = useState<TermAmountFormData[]>([]);
     const [distributionMode, setDistributionMode] = useState<'equal' | 'manual'>('equal');
+    const [isFormDirty, setIsFormDirty] = useState(false);
 
     // Use hooks for API integration
     const createTermAmountsMutation = useCreateClassMappingTermAmounts();
@@ -146,6 +147,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
             // Reset state when modal closes
             setTermAmounts([]);
             setDistributionMode('equal');
+            setIsFormDirty(false);
         }
     }, [mapping.id, mapping.total_fee, open, feeTerm, termDates, existingTermAmounts, termAmountsLoading, feeType?.id]);
 
@@ -162,6 +164,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
 
         setTermAmounts(updatedTermAmounts);
         setDistributionMode('equal');
+        setIsFormDirty(true);
     };
 
     const handleManualAmountChange = (termNumber: number, term_amount: number) => {
@@ -170,6 +173,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
         );
         setTermAmounts(updatedTermAmounts);
         setDistributionMode('manual');
+        setIsFormDirty(true);
     };
 
     const getTotalTermAmount = () => {
@@ -269,6 +273,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                 });
             }
 
+            setIsFormDirty(false);
             onOpenChange(false);
         } catch (error) {
             console.error('TermAmountModal: Save error:', error);
@@ -354,7 +359,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
     }
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={onOpenChange} guardDirty={isFormDirty} onDirtyDiscard={() => setIsFormDirty(false)}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
@@ -496,12 +501,11 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                 </div>
 
                 <DialogFooter>
-                    <Button
-                        variant="outline"
-                        onClick={() => onOpenChange(false)}
-                    >
-                        Cancel
-                    </Button>
+                    <DialogClose asChild>
+                        <Button variant="outline">
+                            Cancel
+                        </Button>
+                    </DialogClose>
                     <Button
                         onClick={handleSave}
                         disabled={!isValidDistribution() || createTermAmountsMutation.isPending || updateTermAmountsMutation.isPending}

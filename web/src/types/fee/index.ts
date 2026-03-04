@@ -1,5 +1,5 @@
 // Export all fee-related types
-export type { FeeCategory, FeeCategoryInput, FeeCategoryCreateRequest, FeeCategoryUpdateRequest } from './category';
+export type { FeeCategory, FeeCategoryInput, FeeCategoryCreateRequest, FeeCategoryUpdateRequest, FeeCategorySearchParams, FeeCategoryListResponse, FeeCategoryHealthCheck } from './category';
 export type { FeeTerm, FeeTermInput, FeeTermCreateRequest, FeeTermUpdateRequest, FeeTermDate, FeeTermDateInput, FeeTermDropdown } from './term';
 export type { FeeType, FeeTypeCreateRequest, FeeTypeUpdateRequest, FeeTypeDropdown } from './type';
 export type {
@@ -7,12 +7,14 @@ export type {
     FeeClassMappingInput,
     FeeClassMappingCreateRequest,
     FeeClassMappingUpdateRequest,
+    FeeClassMappingTermAmount,
+    FeeStudentMapping,
+    FeeStudentMappingCreateRequest,
+    FeeStudentMappingUpdateRequest,
     FeeTermAmount,
-    FeeTermAmountInput,
     FeeTermAmountCreateRequest,
-    FeeTermAmountUpdateRequest,
-    Class
+    FeeTermAmountUpdateRequest
 } from './mapping';
-export type { FeeTransaction, FeeTransactionInput, FeeTransactionCreateRequest, FeeTransactionUpdateRequest, FeeTransactionWithDetails } from './transaction';
-export type { FeeReceipt, FeeReceiptInput, FeeReceiptCreateRequest, FeeReceiptUpdateRequest } from './receipt';
-export type { FeeRefund, FeeRefundInput, FeeRefundCreateRequest, FeeRefundUpdateRequest, FeeRefundWithDetails } from './refund';
+export type { FeeTransaction, FeeTransactionItem, FeeTransactionCreateRequest, FeeTransactionUpdateRequest, FeeTransactionDetail } from './transaction';
+export type { FeeReceipt, FeeReceiptCreate, FeeReceiptUpdate } from './receipt';
+export type { FeeRefund, FeeRefundCreateRequest, FeeRefundUpdateRequest, FeeRefundWithDetails } from './refund';

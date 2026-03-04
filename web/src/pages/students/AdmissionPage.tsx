@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Filter } from 'lucide-react';
 import MultiStepAdmissionForm from '@/components/students/MultiStepAdmissionForm';
 import AdmissionTable from '@/components/students/AdmissionTable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -51,13 +52,19 @@ const AdmissionPage = () => {
         </div>
 
         {hasListPermission && (
-          <div className="flex gap-4">
-            <Input
-              placeholder="Search students by name or admission number..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-md"
-            />
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+              <Filter className="h-3.5 w-3.5" />
+              <span>Filters</span>
+            </div>
+            <div className="flex gap-4">
+              <Input
+                placeholder="Search students by name or admission number..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="max-w-md"
+              />
+            </div>
           </div>
         )}
 

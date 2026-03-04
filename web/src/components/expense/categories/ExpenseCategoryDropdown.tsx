@@ -1,6 +1,6 @@
 import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useExpenseCategoriesDropdown } from '@/hooks/expense';
+import { useExpenseCategoryDropdown } from '@/hooks/expense';
 import type { ExpenseCategoryDropdown as ExpenseCategoryDropdownType } from '@/types/expense/index';
 
 interface ExpenseCategoryDropdownProps {
@@ -18,7 +18,7 @@ export function ExpenseCategoryDropdown({
   disabled = false,
   className
 }: ExpenseCategoryDropdownProps) {
-  const { data: categories = [], isLoading } = useExpenseCategoriesDropdown();
+  const { data: categories = [], isLoading } = useExpenseCategoryDropdown();
 
   return (
     <Select

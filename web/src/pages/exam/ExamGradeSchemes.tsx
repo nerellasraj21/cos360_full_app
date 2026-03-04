@@ -1,5 +1,5 @@
-import { Fragment, useState } from 'react'
-import { Plus, Edit, Trash2, Loader2, Award, ChevronDown, ChevronRight, Save } from 'lucide-react'
+import { Fragment, useState, useMemo } from 'react'
+import { Plus, Edit, Trash2, Loader2, Award, ChevronDown, ChevronRight, Save, Filter, Search, ChevronUp, ChevronsUpDown } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -27,11 +28,40 @@ export default function ExamGradeSchemes() {
   const [editTarget, setEditTarget] = useState<ExamGradeScheme | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [isDirty, setIsDirty] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortKey, setSortKey] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />
+    return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />
+  }
 
   const { data: schemes = [], isLoading } = useExamGradeSchemes()
   const createMutation = useCreateExamGradeScheme()
   const updateMutation = useUpdateExamGradeScheme()
   const deleteMutation = useDeleteExamGradeScheme()
+
+  const filteredSchemes = useMemo(() => {
+    let items = schemes
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      items = items.filter(s => s.name.toLowerCase().includes(q) || (s.description ?? '').toLowerCase().includes(q))
+    }
+    if (sortKey) {
+      items = [...items].sort((a, b) => {
+        const aVal = sortKey === 'bands' ? String(a.bands.length) : String((a as any)[sortKey] ?? '')
+        const bVal = sortKey === 'bands' ? String(b.bands.length) : String((b as any)[sortKey] ?? '')
+        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      })
+    }
+    return items
+  }, [schemes, searchQuery, sortKey, sortDir])
 
   const form = useForm<GradeSchemeFormData>({
     resolver: zodResolver(gradeSchemeSchema) as any,
@@ -41,6 +71,7 @@ export default function ExamGradeSchemes() {
   const openCreate = () => {
     form.reset({ name: '', description: '', is_default: false, bands: [] })
     setEditTarget(null)
+    setIsDirty(false)
     setShowForm(true)
   }
 
@@ -62,6 +93,7 @@ export default function ExamGradeSchemes() {
       })),
     })
     setEditTarget(scheme)
+    setIsDirty(false)
     setShowForm(true)
   }
 
@@ -69,10 +101,10 @@ export default function ExamGradeSchemes() {
     if (editTarget) {
       updateMutation.mutate(
         { id: editTarget.id, data },
-        { onSuccess: () => setShowForm(false) }
+        { onSuccess: () => { setIsDirty(false); setShowForm(false) } }
       )
     } else {
-      createMutation.mutate(data, { onSuccess: () => setShowForm(false) })
+      createMutation.mutate(data, { onSuccess: () => { setIsDirty(false); setShowForm(false) } })
     }
   }
 
@@ -117,23 +149,39 @@ export default function ExamGradeSchemes() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
+        <div className="space-y-3">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+              <Filter className="h-3.5 w-3.5" />
+              <span>Filters</span>
+            </div>
+            <div className="relative max-w-sm">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input placeholder="Search schemes..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-lg border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">
-                <th className="px-4 py-3 text-left font-medium">Name</th>
+                <th className="px-4 py-3 text-left font-medium w-12">S.No.</th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('name')}>Name <SortIcon col="name" /></th>
                 <th className="px-4 py-3 text-left font-medium">Default</th>
-                <th className="px-4 py-3 text-left font-medium">Bands</th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('bands')}>Bands <SortIcon col="bands" /></th>
                 <th className="px-4 py-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {schemes.map((scheme) => (
+              {filteredSchemes.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">{searchQuery ? 'No schemes match your search' : 'No grade schemes'}</td></tr>
+              ) : filteredSchemes.map((scheme, idx) => (
                 <Fragment key={scheme.id}>
                   <tr
                     className="cursor-pointer border-b transition-colors hover:bg-muted/20"
+                    style={{ height: '48px' }}
                     onClick={() => setExpandedId(expandedId === scheme.id ? null : scheme.id)}
                   >
+                    <td className="px-4 py-3 text-muted-foreground text-sm">{idx + 1}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {expandedId === scheme.id
@@ -172,7 +220,7 @@ export default function ExamGradeSchemes() {
                   </tr>
                   {expandedId === scheme.id && (
                     <tr className="bg-muted/10">
-                      <td colSpan={4} className="px-8 py-4">
+                      <td colSpan={5} className="px-8 py-4">
                         <GradeBandEditor bands={scheme.bands} onChange={() => {}} readOnly />
                       </td>
                     </tr>
@@ -181,16 +229,17 @@ export default function ExamGradeSchemes() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
       {/* Create / Edit Dialog */}
-      <Dialog open={showForm} onOpenChange={setShowForm}>
+      <Dialog open={showForm} onOpenChange={setShowForm} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editTarget ? 'Edit Exam Grade Scheme' : 'Create Exam Grade Scheme'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" onChange={() => setIsDirty(true)}>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-sm font-medium">Scheme Name *</label>
@@ -224,7 +273,7 @@ export default function ExamGradeSchemes() {
               </p>
               <GradeBandEditor
                 bands={form.watch('bands')}
-                onChange={(bands) => form.setValue('bands', bands)}
+                onChange={(bands) => { form.setValue('bands', bands); setIsDirty(true) }}
               />
               {form.formState.errors.bands && (
                 <p className="text-xs text-destructive">{form.formState.errors.bands.message}</p>
@@ -232,9 +281,9 @@ export default function ExamGradeSchemes() {
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                Cancel
-              </Button>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Cancel</Button>
+              </DialogClose>
               <Button
                 type="submit"
                 disabled={createMutation.isPending || updateMutation.isPending}

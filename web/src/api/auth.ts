@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import CAxios from './index';
 import { useAuthStore } from '../lib/authStore';
+import type { Student } from '@/types/auth';
 
 // Types for API responses
 export interface LoginRequest {
@@ -38,7 +39,61 @@ export interface LoginResponse {
     order: number;
     children: any[];
   }>;
+  entity_id?: string;
   permissions?: Record<string, string[]>;
+}
+
+export interface PasswordChangeRequiredResponse {
+  requires_password_change: true;
+  change_password_token: string;
+  message: string;
+}
+
+export type LoginApiResponse = LoginResponse | PasswordChangeRequiredResponse;
+
+export interface SetPasswordRequest {
+  change_password_token: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+export interface ParentChildItem {
+  id?: string;        // actual backend field
+  student_id?: string; // fallback alias
+  first_name: string;
+  last_name: string;
+  admission_number?: string;
+  class_name?: string;
+}
+
+export async function fetchParentChildren(parentEntityId: string): Promise<Student[]> {
+  const { data } = await CAxios.get<ParentChildItem[] | { data: ParentChildItem[] }>(
+    `/student-parent-links/parent/${parentEntityId}/students`
+  );
+  // Handle both raw array and wrapped { data: [...] } responses
+  const items: ParentChildItem[] = Array.isArray(data) ? data : (Array.isArray((data as any)?.data) ? (data as any).data : []);
+  return items.map(item => ({
+    id: item.id || item.student_id || '',
+    name: `${item.first_name} ${item.last_name}`.trim(),
+    first_name: item.first_name,
+    last_name: item.last_name,
+    admission_number: item.admission_number || '',
+    class_id: '',
+    class_name: item.class_name || '',
+    academic_year: '',
+    academic_year_id: '',
+    is_active: true,
+  }));
+}
+
+// Parent children hook — fetches directly so ParentView doesn't rely on login-time timing
+export function useParentChildren(parentEntityId: string | null) {
+  return useQuery<Student[]>({
+    queryKey: ['parent-children', parentEntityId],
+    queryFn: () => fetchParentChildren(parentEntityId!),
+    enabled: !!parentEntityId,
+    staleTime: 5 * 60 * 1000, // 5 min
+  });
 }
 
 // Role types - Updated to match API guide
@@ -162,13 +217,11 @@ export function useLoginMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (credentials: LoginRequest): Promise<LoginResponse> => {
-      console.log("credentials", credentials);
+    mutationFn: async (credentials: LoginRequest): Promise<LoginApiResponse> => {
       try {
-        const { data } = await CAxios.post<LoginResponse>('/auth/login', credentials);
+        const { data } = await CAxios.post<LoginApiResponse>('/auth/login', credentials);
         return data;
       } catch (error: any) {
-        // Extract error message from response
         const errorMessage = error.response?.data?.detail ||
                            error.response?.data?.message ||
                            error.message ||
@@ -177,28 +230,67 @@ export function useLoginMutation() {
       }
     },
     onSuccess: async (data) => {
-      // First, login the user
-      login(data);
+      // If password change is required, skip login — handled by the component
+      if ('requires_password_change' in data && data.requires_password_change) {
+        return;
+      }
 
-      // If user is a parent, fetch their students
-      if (data.user.parent_profile) {
+      const loginData = data as LoginResponse;
+      login(loginData);
+
+      if (loginData.role.name.toLowerCase() === 'parent' && loginData.entity_id) {
         try {
-          // Fetch parent students after successful login
-          const studentsResponse = await CAxios.get('/parent/students');
-          if (studentsResponse.data?.students) {
-            setAvailableStudents(studentsResponse.data.students);
-          }
+          const children = await fetchParentChildren(loginData.entity_id);
+          setAvailableStudents(children);
         } catch (error) {
-          console.error('Failed to fetch parent students:', error);
-          // Don't fail the login if student fetching fails
+          console.error('Failed to fetch parent children:', error);
         }
       }
 
       queryClient.clear();
     },
     onError: (error: any) => {
-      // Error handling is done in the component using the hook
       console.error('Login error:', error);
+    },
+  });
+}
+
+// Set password mutation hook (first-time login for Staff/Teacher)
+export function useSetPasswordMutation() {
+  const login = useAuthStore((s) => s.login);
+  const setAvailableStudents = useAuthStore((s) => s.setAvailableStudents);
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: SetPasswordRequest): Promise<LoginResponse> => {
+      try {
+        const { data } = await CAxios.post<LoginResponse>('/auth/staff/set-password', payload);
+        return data;
+      } catch (error: any) {
+        const errorMessage = error.response?.data?.detail ||
+                           error.response?.data?.message ||
+                           error.message ||
+                           'Failed to set password. Please try again.';
+        throw new Error(errorMessage);
+      }
+    },
+    onSuccess: async (data) => {
+      login(data);
+
+      if (data.role.name.toLowerCase() === 'parent' && data.entity_id) {
+        try {
+          const children = await fetchParentChildren(data.entity_id);
+          setAvailableStudents(children);
+        } catch (error) {
+          console.error('Failed to fetch parent children:', error);
+        }
+      }
+
+      queryClient.clear();
+      sessionStorage.removeItem('change_password_token');
+    },
+    onError: (error: any) => {
+      console.error('Set password error:', error);
     },
   });
 }

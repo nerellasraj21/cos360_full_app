@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Loader2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Loader2, RefreshCw, ChevronLeft, ChevronRight, Filter, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { useExamDetail } from '@/api/hooks/exam/useExam'
 import { useQuery } from '@tanstack/react-query'
 import { getAuditLog } from '@/api/exam'
@@ -28,6 +29,7 @@ export default function AuditLog() {
   const { id } = useParams({ strict: false }) as { id: string }
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const { data: exam } = useExamDetail(id)
   const { data, isLoading, isFetching, refetch } = useQuery({
@@ -38,6 +40,17 @@ export default function AuditLog() {
   const entries: AuditEntry[] = Array.isArray(data)
     ? data
     : (data as any)?.results ?? []
+
+  const filteredEntries = useMemo(() => {
+    const q = searchQuery.toLowerCase()
+    if (!q) return entries
+    return entries.filter(e =>
+      e.description.toLowerCase().includes(q) ||
+      e.action.toLowerCase().includes(q) ||
+      e.actor_name.toLowerCase().includes(q) ||
+      e.actor_role.toLowerCase().includes(q)
+    )
+  }, [entries, searchQuery])
 
   return (
     <div className="space-y-4">
@@ -67,6 +80,21 @@ export default function AuditLog() {
         </Button>
       </div>
 
+      {/* Filter Bar */}
+      <div className="flex items-center gap-3">
+        <Filter className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium text-muted-foreground">Filters</span>
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search action, actor, description..."
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
+      </div>
+
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -75,9 +103,13 @@ export default function AuditLog() {
         <div className="rounded-lg border bg-muted/20 p-8 text-center">
           <p className="text-muted-foreground">No audit entries found.</p>
         </div>
+      ) : filteredEntries.length === 0 ? (
+        <div className="rounded-lg border bg-muted/20 p-8 text-center">
+          <p className="text-muted-foreground">No entries match your search.</p>
+        </div>
       ) : (
         <div className="space-y-2">
-          {entries.map(entry => (
+          {filteredEntries.map(entry => (
             <div key={entry.id} className="rounded-lg border bg-card p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3">

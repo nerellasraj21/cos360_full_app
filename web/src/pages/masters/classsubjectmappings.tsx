@@ -15,9 +15,8 @@ import type {
   ClassSubjectMappingInput,
 } from "@/types/masters/subject";
 import { fetchSubjects } from "@/api/masters/subjects";
-import type { Subject } from "@/types/masters";
+import type { Subject } from "@/types/masters/subject";
 import { useAcademicYearStore } from "@/lib/academicYearStore";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { usePermission } from "@/hooks/usePermission";
@@ -290,14 +289,7 @@ export default function ClassSubjectMappingsPage() {
         </div>
       }
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>Class-Subject Mappings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <MasterPage config={config} />
-        </CardContent>
-      </Card>
+      <MasterPage config={config} />
     </PermissionGuard>
   );
 }

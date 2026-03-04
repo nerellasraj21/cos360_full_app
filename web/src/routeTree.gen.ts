@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AuthSetPasswordRouteImport } from './routes/_auth/set-password'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthForgotPasswordRouteImport } from './routes/_auth/forgot-password'
 import { Route as AuthAuthRouteImport } from './routes/_auth/auth'
@@ -25,16 +26,22 @@ import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
 import { Route as AppTimeTableRouteImport } from './routes/_app/TimeTable'
 import { Route as AppCalenderRouteImport } from './routes/_app/Calender'
+import { Route as AppTransportIndexRouteImport } from './routes/_app/transport/index'
+import { Route as AppStudentsIndexRouteImport } from './routes/_app/students/index'
 import { Route as AppStaffIndexRouteImport } from './routes/_app/staff/index'
+import { Route as AppReportsIndexRouteImport } from './routes/_app/reports/index'
+import { Route as AppMastersIndexRouteImport } from './routes/_app/masters/index'
 import { Route as AppFeeIndexRouteImport } from './routes/_app/fee/index'
 import { Route as AppExpenseIndexRouteImport } from './routes/_app/expense/index'
 import { Route as AppExamIndexRouteImport } from './routes/_app/exam/index'
+import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
 import { Route as AppTransportVehiclesRouteImport } from './routes/_app/transport/vehicles'
 import { Route as AppTransportTripsRouteImport } from './routes/_app/transport/trips'
 import { Route as AppTransportStudentTripsRouteImport } from './routes/_app/transport/studentTrips'
 import { Route as AppTransportStudentTransportRouteImport } from './routes/_app/transport/studentTransport'
 import { Route as AppTransportRoutesRouteImport } from './routes/_app/transport/routes'
 import { Route as AppTransportRouteStopsRouteImport } from './routes/_app/transport/routeStops'
+import { Route as AppStudentsStudenttransportRouteImport } from './routes/_app/students/studenttransport'
 import { Route as AppStudentsStudentdocumentsRouteImport } from './routes/_app/students/studentdocuments'
 import { Route as AppStudentsStudentcertificatesRouteImport } from './routes/_app/students/studentcertificates'
 import { Route as AppStudentsProfileRouteImport } from './routes/_app/students/profile'
@@ -128,6 +135,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
+const AuthSetPasswordRoute = AuthSetPasswordRouteImport.update({
+  id: '/set-password',
+  path: '/set-password',
+  getParentRoute: () => AuthRoute,
+} as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -193,9 +205,29 @@ const AppCalenderRoute = AppCalenderRouteImport.update({
   path: '/Calender',
   getParentRoute: () => AppRoute,
 } as any)
+const AppTransportIndexRoute = AppTransportIndexRouteImport.update({
+  id: '/transport/',
+  path: '/transport/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStudentsIndexRoute = AppStudentsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppStudentsRoute,
+} as any)
 const AppStaffIndexRoute = AppStaffIndexRouteImport.update({
   id: '/staff/',
   path: '/staff/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportsIndexRoute = AppReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMastersIndexRoute = AppMastersIndexRouteImport.update({
+  id: '/masters/',
+  path: '/masters/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppFeeIndexRoute = AppFeeIndexRouteImport.update({
@@ -212,6 +244,11 @@ const AppExamIndexRoute = AppExamIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppExamRoute,
+} as any)
+const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppTransportVehiclesRoute = AppTransportVehiclesRouteImport.update({
   id: '/transport/vehicles',
@@ -245,6 +282,12 @@ const AppTransportRouteStopsRoute = AppTransportRouteStopsRouteImport.update({
   path: '/transport/routeStops',
   getParentRoute: () => AppRoute,
 } as any)
+const AppStudentsStudenttransportRoute =
+  AppStudentsStudenttransportRouteImport.update({
+    id: '/studenttransport',
+    path: '/studenttransport',
+    getParentRoute: () => AppStudentsRoute,
+  } as any)
 const AppStudentsStudentdocumentsRoute =
   AppStudentsStudentdocumentsRouteImport.update({
     id: '/studentdocuments',
@@ -675,6 +718,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthAuthRoute
   '/forgot-password': typeof AuthForgotPasswordRoute
   '/login': typeof AuthLoginRoute
+  '/set-password': typeof AuthSetPasswordRoute
   '/': typeof AppIndexRoute
   '/admin/profile': typeof AppAdminProfileRoute
   '/exam/audit': typeof AppExamAuditRoute
@@ -731,16 +775,22 @@ export interface FileRoutesByFullPath {
   '/students/profile': typeof AppStudentsProfileRoute
   '/students/studentcertificates': typeof AppStudentsStudentcertificatesRoute
   '/students/studentdocuments': typeof AppStudentsStudentdocumentsRoute
+  '/students/studenttransport': typeof AppStudentsStudenttransportRoute
   '/transport/routeStops': typeof AppTransportRouteStopsRoute
   '/transport/routes': typeof AppTransportRoutesRoute
   '/transport/studentTransport': typeof AppTransportStudentTransportRoute
   '/transport/studentTrips': typeof AppTransportStudentTripsRoute
   '/transport/trips': typeof AppTransportTripsRoute
   '/transport/vehicles': typeof AppTransportVehiclesRoute
+  '/admin': typeof AppAdminIndexRoute
   '/exam/': typeof AppExamIndexRoute
   '/expense/': typeof AppExpenseIndexRoute
   '/fee/': typeof AppFeeIndexRoute
+  '/masters': typeof AppMastersIndexRoute
+  '/reports': typeof AppReportsIndexRoute
   '/staff': typeof AppStaffIndexRoute
+  '/students/': typeof AppStudentsIndexRoute
+  '/transport': typeof AppTransportIndexRoute
   '/exam/exams/$id': typeof AppExamExamsIdRouteWithChildren
   '/exam/exams/create': typeof AppExamExamsCreateRoute
   '/exam/grading/exam-schemes': typeof AppExamGradingExamSchemesRoute
@@ -772,11 +822,11 @@ export interface FileRoutesByTo {
   '/about': typeof AppAboutRoute
   '/dashboard': typeof AppDashboardRoute
   '/profile': typeof AppProfileRoute
-  '/students': typeof AppStudentsRouteWithChildren
   '/superorg': typeof AppSuperorgRoute
   '/auth': typeof AuthAuthRoute
   '/forgot-password': typeof AuthForgotPasswordRoute
   '/login': typeof AuthLoginRoute
+  '/set-password': typeof AuthSetPasswordRoute
   '/': typeof AppIndexRoute
   '/admin/profile': typeof AppAdminProfileRoute
   '/exam/audit': typeof AppExamAuditRoute
@@ -829,16 +879,22 @@ export interface FileRoutesByTo {
   '/students/profile': typeof AppStudentsProfileRoute
   '/students/studentcertificates': typeof AppStudentsStudentcertificatesRoute
   '/students/studentdocuments': typeof AppStudentsStudentdocumentsRoute
+  '/students/studenttransport': typeof AppStudentsStudenttransportRoute
   '/transport/routeStops': typeof AppTransportRouteStopsRoute
   '/transport/routes': typeof AppTransportRoutesRoute
   '/transport/studentTransport': typeof AppTransportStudentTransportRoute
   '/transport/studentTrips': typeof AppTransportStudentTripsRoute
   '/transport/trips': typeof AppTransportTripsRoute
   '/transport/vehicles': typeof AppTransportVehiclesRoute
+  '/admin': typeof AppAdminIndexRoute
   '/exam': typeof AppExamIndexRoute
   '/expense': typeof AppExpenseIndexRoute
   '/fee': typeof AppFeeIndexRoute
+  '/masters': typeof AppMastersIndexRoute
+  '/reports': typeof AppReportsIndexRoute
   '/staff': typeof AppStaffIndexRoute
+  '/students': typeof AppStudentsIndexRoute
+  '/transport': typeof AppTransportIndexRoute
   '/exam/exams/create': typeof AppExamExamsCreateRoute
   '/exam/grading/exam-schemes': typeof AppExamGradingExamSchemesRoute
   '/exam/grading/remarks': typeof AppExamGradingRemarksRoute
@@ -880,6 +936,7 @@ export interface FileRoutesById {
   '/_auth/auth': typeof AuthAuthRoute
   '/_auth/forgot-password': typeof AuthForgotPasswordRoute
   '/_auth/login': typeof AuthLoginRoute
+  '/_auth/set-password': typeof AuthSetPasswordRoute
   '/_app/': typeof AppIndexRoute
   '/_app/admin/profile': typeof AppAdminProfileRoute
   '/_app/exam/audit': typeof AppExamAuditRoute
@@ -936,16 +993,22 @@ export interface FileRoutesById {
   '/_app/students/profile': typeof AppStudentsProfileRoute
   '/_app/students/studentcertificates': typeof AppStudentsStudentcertificatesRoute
   '/_app/students/studentdocuments': typeof AppStudentsStudentdocumentsRoute
+  '/_app/students/studenttransport': typeof AppStudentsStudenttransportRoute
   '/_app/transport/routeStops': typeof AppTransportRouteStopsRoute
   '/_app/transport/routes': typeof AppTransportRoutesRoute
   '/_app/transport/studentTransport': typeof AppTransportStudentTransportRoute
   '/_app/transport/studentTrips': typeof AppTransportStudentTripsRoute
   '/_app/transport/trips': typeof AppTransportTripsRoute
   '/_app/transport/vehicles': typeof AppTransportVehiclesRoute
+  '/_app/admin/': typeof AppAdminIndexRoute
   '/_app/exam/': typeof AppExamIndexRoute
   '/_app/expense/': typeof AppExpenseIndexRoute
   '/_app/fee/': typeof AppFeeIndexRoute
+  '/_app/masters/': typeof AppMastersIndexRoute
+  '/_app/reports/': typeof AppReportsIndexRoute
   '/_app/staff/': typeof AppStaffIndexRoute
+  '/_app/students/': typeof AppStudentsIndexRoute
+  '/_app/transport/': typeof AppTransportIndexRoute
   '/_app/exam/exams/$id': typeof AppExamExamsIdRouteWithChildren
   '/_app/exam/exams/create': typeof AppExamExamsCreateRoute
   '/_app/exam/grading/exam-schemes': typeof AppExamGradingExamSchemesRoute
@@ -987,6 +1050,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/forgot-password'
     | '/login'
+    | '/set-password'
     | '/'
     | '/admin/profile'
     | '/exam/audit'
@@ -1043,16 +1107,22 @@ export interface FileRouteTypes {
     | '/students/profile'
     | '/students/studentcertificates'
     | '/students/studentdocuments'
+    | '/students/studenttransport'
     | '/transport/routeStops'
     | '/transport/routes'
     | '/transport/studentTransport'
     | '/transport/studentTrips'
     | '/transport/trips'
     | '/transport/vehicles'
+    | '/admin'
     | '/exam/'
     | '/expense/'
     | '/fee/'
+    | '/masters'
+    | '/reports'
     | '/staff'
+    | '/students/'
+    | '/transport'
     | '/exam/exams/$id'
     | '/exam/exams/create'
     | '/exam/grading/exam-schemes'
@@ -1084,11 +1154,11 @@ export interface FileRouteTypes {
     | '/about'
     | '/dashboard'
     | '/profile'
-    | '/students'
     | '/superorg'
     | '/auth'
     | '/forgot-password'
     | '/login'
+    | '/set-password'
     | '/'
     | '/admin/profile'
     | '/exam/audit'
@@ -1141,16 +1211,22 @@ export interface FileRouteTypes {
     | '/students/profile'
     | '/students/studentcertificates'
     | '/students/studentdocuments'
+    | '/students/studenttransport'
     | '/transport/routeStops'
     | '/transport/routes'
     | '/transport/studentTransport'
     | '/transport/studentTrips'
     | '/transport/trips'
     | '/transport/vehicles'
+    | '/admin'
     | '/exam'
     | '/expense'
     | '/fee'
+    | '/masters'
+    | '/reports'
     | '/staff'
+    | '/students'
+    | '/transport'
     | '/exam/exams/create'
     | '/exam/grading/exam-schemes'
     | '/exam/grading/remarks'
@@ -1191,6 +1267,7 @@ export interface FileRouteTypes {
     | '/_auth/auth'
     | '/_auth/forgot-password'
     | '/_auth/login'
+    | '/_auth/set-password'
     | '/_app/'
     | '/_app/admin/profile'
     | '/_app/exam/audit'
@@ -1247,16 +1324,22 @@ export interface FileRouteTypes {
     | '/_app/students/profile'
     | '/_app/students/studentcertificates'
     | '/_app/students/studentdocuments'
+    | '/_app/students/studenttransport'
     | '/_app/transport/routeStops'
     | '/_app/transport/routes'
     | '/_app/transport/studentTransport'
     | '/_app/transport/studentTrips'
     | '/_app/transport/trips'
     | '/_app/transport/vehicles'
+    | '/_app/admin/'
     | '/_app/exam/'
     | '/_app/expense/'
     | '/_app/fee/'
+    | '/_app/masters/'
+    | '/_app/reports/'
     | '/_app/staff/'
+    | '/_app/students/'
+    | '/_app/transport/'
     | '/_app/exam/exams/$id'
     | '/_app/exam/exams/create'
     | '/_app/exam/grading/exam-schemes'
@@ -1310,6 +1393,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_auth/set-password': {
+      id: '/_auth/set-password'
+      path: '/set-password'
+      fullPath: '/set-password'
+      preLoaderRoute: typeof AuthSetPasswordRouteImport
+      parentRoute: typeof AuthRoute
     }
     '/_auth/login': {
       id: '/_auth/login'
@@ -1402,11 +1492,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCalenderRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/transport/': {
+      id: '/_app/transport/'
+      path: '/transport'
+      fullPath: '/transport'
+      preLoaderRoute: typeof AppTransportIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/students/': {
+      id: '/_app/students/'
+      path: '/'
+      fullPath: '/students/'
+      preLoaderRoute: typeof AppStudentsIndexRouteImport
+      parentRoute: typeof AppStudentsRoute
+    }
     '/_app/staff/': {
       id: '/_app/staff/'
       path: '/staff'
       fullPath: '/staff'
       preLoaderRoute: typeof AppStaffIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/reports/': {
+      id: '/_app/reports/'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AppReportsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/masters/': {
+      id: '/_app/masters/'
+      path: '/masters'
+      fullPath: '/masters'
+      preLoaderRoute: typeof AppMastersIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/fee/': {
@@ -1429,6 +1547,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/exam/'
       preLoaderRoute: typeof AppExamIndexRouteImport
       parentRoute: typeof AppExamRoute
+    }
+    '/_app/admin/': {
+      id: '/_app/admin/'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AppAdminIndexRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/transport/vehicles': {
       id: '/_app/transport/vehicles'
@@ -1471,6 +1596,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/transport/routeStops'
       preLoaderRoute: typeof AppTransportRouteStopsRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/students/studenttransport': {
+      id: '/_app/students/studenttransport'
+      path: '/studenttransport'
+      fullPath: '/students/studenttransport'
+      preLoaderRoute: typeof AppStudentsStudenttransportRouteImport
+      parentRoute: typeof AppStudentsRoute
     }
     '/_app/students/studentdocuments': {
       id: '/_app/students/studentdocuments'
@@ -2291,6 +2423,8 @@ interface AppStudentsRouteChildren {
   AppStudentsProfileRoute: typeof AppStudentsProfileRoute
   AppStudentsStudentcertificatesRoute: typeof AppStudentsStudentcertificatesRoute
   AppStudentsStudentdocumentsRoute: typeof AppStudentsStudentdocumentsRoute
+  AppStudentsStudenttransportRoute: typeof AppStudentsStudenttransportRoute
+  AppStudentsIndexRoute: typeof AppStudentsIndexRoute
 }
 
 const AppStudentsRouteChildren: AppStudentsRouteChildren = {
@@ -2304,6 +2438,8 @@ const AppStudentsRouteChildren: AppStudentsRouteChildren = {
   AppStudentsProfileRoute: AppStudentsProfileRoute,
   AppStudentsStudentcertificatesRoute: AppStudentsStudentcertificatesRoute,
   AppStudentsStudentdocumentsRoute: AppStudentsStudentdocumentsRoute,
+  AppStudentsStudenttransportRoute: AppStudentsStudenttransportRoute,
+  AppStudentsIndexRoute: AppStudentsIndexRoute,
 }
 
 const AppStudentsRouteWithChildren = AppStudentsRoute._addFileChildren(
@@ -2346,7 +2482,11 @@ interface AppRouteChildren {
   AppTransportStudentTripsRoute: typeof AppTransportStudentTripsRoute
   AppTransportTripsRoute: typeof AppTransportTripsRoute
   AppTransportVehiclesRoute: typeof AppTransportVehiclesRoute
+  AppAdminIndexRoute: typeof AppAdminIndexRoute
+  AppMastersIndexRoute: typeof AppMastersIndexRoute
+  AppReportsIndexRoute: typeof AppReportsIndexRoute
   AppStaffIndexRoute: typeof AppStaffIndexRoute
+  AppTransportIndexRoute: typeof AppTransportIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -2385,7 +2525,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppTransportStudentTripsRoute: AppTransportStudentTripsRoute,
   AppTransportTripsRoute: AppTransportTripsRoute,
   AppTransportVehiclesRoute: AppTransportVehiclesRoute,
+  AppAdminIndexRoute: AppAdminIndexRoute,
+  AppMastersIndexRoute: AppMastersIndexRoute,
+  AppReportsIndexRoute: AppReportsIndexRoute,
   AppStaffIndexRoute: AppStaffIndexRoute,
+  AppTransportIndexRoute: AppTransportIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -2394,12 +2538,14 @@ interface AuthRouteChildren {
   AuthAuthRoute: typeof AuthAuthRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthLoginRoute: typeof AuthLoginRoute
+  AuthSetPasswordRoute: typeof AuthSetPasswordRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
   AuthAuthRoute: AuthAuthRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthLoginRoute: AuthLoginRoute,
+  AuthSetPasswordRoute: AuthSetPasswordRoute,
 }
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)

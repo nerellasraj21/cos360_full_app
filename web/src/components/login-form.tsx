@@ -35,8 +35,12 @@ export default function LoginForm({
     loginMutation.mutate(
       { username, password, client_name: "test_tenant" },
       {
-        onSuccess: () => {
-          // console.log("user12", isAuthenticated)
+        onSuccess: (data) => {
+          if ('requires_password_change' in data && data.requires_password_change) {
+            sessionStorage.setItem('change_password_token', data.change_password_token);
+            navigate({ to: '/set-password' });
+            return;
+          }
           navigate({ to: "/" });
         },
         onError: (error) => {

@@ -1,15 +1,41 @@
-import type { StudentOut } from '../admission';
-import type { TripOut } from './trip';
-import type { RouteStop } from './routeStop';
+// Nested types in enriched transport response (March 2026)
+export interface TransportRouteDetail {
+  id: string;
+  route_name: string;
+  starting_stop: string;
+  ending_stop: string;
+  start_time: string;  // HH:MM:SS
+  end_time: string;    // HH:MM:SS
+}
 
-// Updated to match backend schema (2026-02-09)
-// Backend now uses StudentTrip-like schema for student-transport endpoint
+export interface TransportVehicleDetail {
+  id: string;
+  name: string;
+  registration_number: string;
+  vehicle_type: string;
+}
+
+export interface TransportTripDetail {
+  id: string;
+  trip_number: number;
+  route?: TransportRouteDetail;
+  vehicle?: TransportVehicleDetail;
+}
+
+export interface TransportStopDetail {
+  id: string;
+  name: string;
+  number: number;
+  reaching_time: string | null;  // HH:MM:SS or null
+  fees: number;
+}
+
 export interface StudentTransportBase {
-    trip_id: string;          // UUID - Trip reference (required)
-    student_id: string;       // UUID - Student reference (required)
-    stop_id: string;          // UUID - Stop reference (required)
-    fee_term_id: string;      // UUID - Fee term reference (required)
-    fee_per_term: number;     // Fee amount per term (required)
+    trip_id: string;
+    student_id: string;
+    stop_id: string;
+    fee_term_id: string | null;
+    fee_per_term: number;
 }
 
 export interface StudentTransportCreate extends StudentTransportBase {}
@@ -28,7 +54,6 @@ export interface StudentTransportOut extends StudentTransportBase {
     is_active: boolean;
     created_at: string;
     updated_at: string;
-    student?: StudentOut;
-    trip?: TripOut;
-    route_stop?: RouteStop;
+    trip?: TransportTripDetail;
+    stop?: TransportStopDetail;
 }

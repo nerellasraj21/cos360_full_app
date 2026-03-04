@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,7 +32,7 @@ import type {
   PaymentMethod,
   TransactionStatus
 } from '@/types/fee/transaction';
-import { Plus, Search, Eye, Edit, DollarSign, Receipt, Loader2 } from 'lucide-react';
+import { Plus, Search, Eye, Edit, DollarSign, Receipt, Loader2, Filter, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { PermissionGuard } from '@/components/common';
 import { ShieldX } from 'lucide-react';
@@ -81,6 +81,8 @@ function FeeTransactionsContent() {
   const [dateTo, setDateTo] = useState<string>('');
   const [selectedStudent, setSelectedStudent] = useState<string>('');
   const [termDetailsCache, setTermDetailsCache] = useState<Record<string, any>>({});
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
 
   // Create transaction form state
   const [createForm, setCreateForm] = useState({
@@ -404,6 +406,47 @@ function FeeTransactionsContent() {
     }
   };
 
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else if (sortDir === 'desc') { setSortKey(null); setSortDir(null); }
+      else setSortDir('asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 opacity-40 shrink-0 inline" />;
+    if (sortDir === 'asc') return <ChevronUp className="h-3 w-3 ml-1 shrink-0 inline" />;
+    return <ChevronDown className="h-3 w-3 ml-1 shrink-0 inline" />;
+  };
+
+  const sortedTransactions = useMemo(() => {
+    const data = [...transactions];
+    if (!sortKey || !sortDir) return data;
+    return data.sort((a, b) => {
+      let aVal = '';
+      let bVal = '';
+      switch (sortKey) {
+        case 'transaction_number': aVal = a.transaction_number || ''; bVal = b.transaction_number || ''; break;
+        case 'student': {
+          const sA = students.find(s => s.id === a.student_id);
+          const sB = students.find(s => s.id === b.student_id);
+          aVal = sA ? getStudentDisplayName(sA) : a.student_admission_num || '';
+          bVal = sB ? getStudentDisplayName(sB) : b.student_admission_num || '';
+          break;
+        }
+        case 'amount': aVal = String(a.total_amount); bVal = String(b.total_amount); break;
+        case 'status': aVal = a.status; bVal = b.status; break;
+        case 'date': aVal = a.transaction_date; bVal = b.transaction_date; break;
+      }
+      const cmp = aVal.localeCompare(bVal, undefined, { numeric: true });
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [transactions, sortKey, sortDir, students]);
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -429,23 +472,8 @@ function FeeTransactionsContent() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Fee Transactions</h1>
-          <p className="text-muted-foreground">
-            Manage fee payments and transaction records
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Transaction
-              </Button>
-            </DialogTrigger>
+      {/* Create Transaction Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} guardDirty={true} onDirtyDiscard={() => { resetCreateForm(); setShowCreateDialog(false); }}>
             <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Create New Transaction</DialogTitle>
@@ -765,13 +793,9 @@ function FeeTransactionsContent() {
 
               {/* Action Buttons */}
               <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowCreateDialog(false)}
-                >
-                  Cancel
-                </Button>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Cancel</Button>
+                </DialogClose>
                 <Button
                   onClick={handleCreateTransaction}
                   disabled={!createForm.student_id || calculatedTotal <= 0}
@@ -781,15 +805,14 @@ function FeeTransactionsContent() {
               </div>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
 
       {/* Search and Filters */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Search & Filter</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground mb-3">
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filters</span>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Student</label>
@@ -926,36 +949,49 @@ function FeeTransactionsContent() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Transactions</CardTitle>
-              <CardDescription>
-                {transactions.length} transactions found
-              </CardDescription>
-            </div>
+            <CardTitle className="text-2xl font-bold">Fee Transactions</CardTitle>
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Transaction
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
-          {transactions.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No transactions found.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12 text-xs text-muted-foreground">S.No.</TableHead>
+                  <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('transaction_number')}>
+                    <div className="flex items-center">Transaction #<SortIcon col="transaction_number" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('student')}>
+                    <div className="flex items-center">Student<SortIcon col="student" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('amount')}>
+                    <div className="flex items-center">Total Amount<SortIcon col="amount" /></div>
+                  </TableHead>
+                  <TableHead>Payment Method</TableHead>
+                  <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('status')}>
+                    <div className="flex items-center">Status<SortIcon col="status" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('date')}>
+                    <div className="flex items-center">Date<SortIcon col="date" /></div>
+                  </TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedTransactions.length === 0 ? (
                   <TableRow>
-                    <TableHead>Transaction #</TableHead>
-                    <TableHead>Student Name/Admission</TableHead>
-                    <TableHead>Total Amount</TableHead>
-                    <TableHead>Payment Method</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Transaction Date</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No transactions found.
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((transaction) => (
-                    <TableRow key={transaction.id}>
+                ) : (
+                  sortedTransactions.map((transaction, index) => (
+                    <TableRow key={transaction.id} style={{ height: '48px' }}>
+                      <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
                       <TableCell className="font-medium">
                         {transaction.transaction_number}
                       </TableCell>
@@ -997,11 +1033,11 @@ function FeeTransactionsContent() {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

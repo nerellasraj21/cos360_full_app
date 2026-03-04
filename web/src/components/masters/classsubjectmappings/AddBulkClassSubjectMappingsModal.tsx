@@ -42,6 +42,7 @@ export function AddBulkClassSubjectMappingsModal({
   selectStyles,
 }: AddBulkClassSubjectMappingsModalProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isFormDirty, setIsFormDirty] = useState(false);
   const [selectedClass, setSelectedClass] = useState<SelectOption | null>(null);
   const [selectedSection, setSelectedSection] = useState<SelectOption | null>(null);
   const [selectedSubjects, setSelectedSubjects] = useState<SubjectWithSettings[]>([]);
@@ -85,10 +86,12 @@ export function AddBulkClassSubjectMappingsModal({
     setSelectedClass(option || null);
     // Reset section when class changes
     setSelectedSection(null);
+    setIsFormDirty(true);
   };
 
   const handleSectionChange = (option: SingleValue<SelectOption>) => {
     setSelectedSection(option || null);
+    setIsFormDirty(true);
   };
 
   const handleSubjectsChange = (options: MultiValue<SelectOption>) => {
@@ -107,6 +110,7 @@ export function AddBulkClassSubjectMappingsModal({
       };
     });
     setSelectedSubjects(newSubjects);
+    setIsFormDirty(true);
   };
 
   const handleRemoveSubject = (subjectId: string) => {
@@ -115,6 +119,7 @@ export function AddBulkClassSubjectMappingsModal({
       // Re-order remaining subjects
       return filtered.map((s, idx) => ({ ...s, order: idx + 1 }));
     });
+    setIsFormDirty(true);
   };
 
   const handleSubjectSettingChange = (
@@ -127,6 +132,7 @@ export function AddBulkClassSubjectMappingsModal({
         s.value === subjectId ? { ...s, [field]: value } : s
       )
     );
+    setIsFormDirty(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -166,6 +172,7 @@ export function AddBulkClassSubjectMappingsModal({
     setSelectedClass(null);
     setSelectedSection(null);
     setSelectedSubjects([]);
+    setIsFormDirty(false);
   };
 
   const handleModalOpenChange = (open: boolean) => {
@@ -178,15 +185,20 @@ export function AddBulkClassSubjectMappingsModal({
   const isFormValid = selectedClass && selectedSubjects.length > 0 && selectedAcademicYearId;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleModalOpenChange}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={handleModalOpenChange}
+      guardDirty={isFormDirty}
+      onDirtyDiscard={() => setIsFormDirty(false)}
+    >
       <DialogTrigger asChild>
-        <Button>Add Class-Subject Mappings</Button>
+        <Button onClick={() => setIsFormDirty(false)}>Add Class-Subject Mappings</Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Add Class-Subject Mappings</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+        <form onSubmit={handleSubmit} onChange={() => setIsFormDirty(true)} className="flex flex-col flex-1 overflow-hidden">
           <div className="space-y-4 flex-1 overflow-y-auto px-1">
             {/* Class Selection */}
             <div>
@@ -239,7 +251,7 @@ export function AddBulkClassSubjectMappingsModal({
               <Label htmlFor="subjects">Subjects</Label>
               <Select
                 isMulti
-                options={availableSubjectOptions}
+                options={availableSubjectOptions as any}
                 value={selectedSubjects}
                 onChange={handleSubjectsChange}
                 placeholder="Select multiple subjects..."

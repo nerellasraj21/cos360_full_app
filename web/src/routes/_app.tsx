@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { Navbar } from "../components/ui/navbar"
 import { Sidebar } from "../components/ui/sidebar"
+import { AppBreadcrumb } from "../components/ui/breadcrumb"
 import { useState, useEffect } from "react"
 import { useAuthStore } from "@/lib/authStore"
 import { useMenuData } from "@/lib/menuUtils"
@@ -67,12 +68,14 @@ export const Route = createFileRoute('/_app')({
               : 'ml-16' // Collapsed sidebar width
           }
         `}>
-          <Navbar 
-            sidebarOpen={sidebarOpen} 
+          <Navbar
+            sidebarOpen={sidebarOpen}
             onSidebarToggle={handleSidebarToggle}
             isMobile={isMobile}
           />
-          
+
+          <AppBreadcrumb />
+
           <main className="p-4 md:p-6 lg:p-8">
             {isLoading && (
               <div className="flex items-center justify-center h-64">

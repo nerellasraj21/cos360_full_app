@@ -34,9 +34,24 @@ export const deleteHoliday = async (id: number): Promise<void> => {
   await CAxios.delete(`${HOLIDAYS_API_BASE}${id}`);
 };
 */
-import type { Holiday, HolidayInput } from '@/types/masters/holiday';
 import { HOLIDAYS_API_BASE } from '@/constants';
 // import CAxios from '../index';
+
+// Local type definitions for mock data (calendar.ts uses a mocked implementation)
+interface Holiday {
+  id: number;
+  name: string;
+  description?: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  academic_year_id: string;
+  color?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+type HolidayInput = Omit<Holiday, 'id' | 'created_at' | 'updated_at'>;
 
 // Sample data for local dev
 let sampleHolidays: Holiday[] = [];

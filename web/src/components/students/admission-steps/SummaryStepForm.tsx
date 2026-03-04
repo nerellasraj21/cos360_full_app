@@ -14,8 +14,8 @@ export function SummaryStepForm() {
   // Fetch data to display names instead of IDs
   const { data: academicYears = [] } = useAcademicYearsDropdown();
   const { data: classes = [] } = useClassesDropdown(true);
-  const { data: admittedSections = [] } = useSectionsByClassId(formData.admitted_class_id || undefined);
-  const { data: currentSections = [] } = useSectionsByClassId(formData.current_class_id || undefined);
+  const { data: admittedSections = [] } = useSectionsByClassId(formData.admitted_class_id ?? '');
+  const { data: currentSections = [] } = useSectionsByClassId(formData.current_class_id ?? '');
   const { data: states = [] } = useStatesDropdown(true);
   const { data: castes = [] } = useCastesDropdown(true);
   const { data: subCastes = [] } = useSubCastesDropdown(formData.caste_id || undefined, true);

@@ -7,12 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
   DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -40,8 +40,16 @@ const getResourceName = (resource: PermissionResource): string => {
 
 export interface MasterPageConfig<T, TInput> {
   title: string;
+  /** When true, hides the CardTitle inside the card (use when page already has a top-level h1 heading) */
+  hideTitle?: boolean;
   /** Custom label for the add button (defaults to "Add {title minus last char}") */
   addButtonLabel?: string;
+  /** When true, hides the Add button inside the card header (use when button is rendered externally in the heading row) */
+  hideAddButton?: boolean;
+  /** Externally controlled open state for the Add dialog */
+  addOpen?: boolean;
+  /** Callback when the Add dialog open state changes */
+  onAddOpenChange?: (open: boolean) => void;
   columns: TableColumn<T>[];
   defaultValues: TInput;
   formFields: FormField[];
@@ -97,7 +105,12 @@ export function MasterPage<
   TInput extends Record<string, any>,
 >({ config }: MasterPageProps<T, TInput>) {
   const [formData, setFormData] = useState<TInput>(config.defaultValues);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [localModalOpen, setLocalModalOpen] = useState(false);
+  const isModalOpen = config.addOpen !== undefined ? config.addOpen : localModalOpen;
+  const setIsModalOpen = (open: boolean) => {
+    setLocalModalOpen(open);
+    config.onAddOpenChange?.(open);
+  };
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
     new Set(config.columns.map((col) => col.key as string))
   );
@@ -239,11 +252,12 @@ export function MasterPage<
     setIsModalOpen(false);
   };
 
-  const handleModalOpenChange = (open: boolean) => {
-    setIsModalOpen(open);
-    if (!open) {
-      setFormData(config.defaultValues);
-    }
+  const isFormDirty = JSON.stringify(formData) !== JSON.stringify(config.defaultValues);
+
+  const handleConfirmClose = () => {
+    setIsModalOpen(false);
+    setFormData(config.defaultValues);
+    config.resetForm();
   };
 
   const renderFormField = (field: FormField) => {
@@ -303,8 +317,8 @@ export function MasterPage<
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle>{config.title}</CardTitle>
-          <div className="flex items-center gap-2">
+          {!config.hideTitle && <CardTitle className="text-2xl font-bold">{config.title}</CardTitle>}
+          <div className="flex items-center gap-2 ml-auto">
             {config.showColumnSelector && (
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
@@ -404,10 +418,18 @@ export function MasterPage<
               {config.addModal ? (
                 config.addModal
               ) : (
-                <Dialog open={isModalOpen} onOpenChange={handleModalOpenChange} modal={false}>
-                  <DialogTrigger asChild>
-                    <Button>{config.addButtonLabel || `Add ${config.title.slice(0, -1)}`}</Button>
-                  </DialogTrigger>
+                <Dialog
+                  open={isModalOpen}
+                  onOpenChange={setIsModalOpen}
+                  modal={false}
+                  guardDirty={isFormDirty}
+                  onDirtyDiscard={handleConfirmClose}
+                >
+                  {!config.hideAddButton && (
+                    <DialogTrigger asChild>
+                      <Button>{config.addButtonLabel || `Add ${config.title.slice(0, -1)}`}</Button>
+                    </DialogTrigger>
+                  )}
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>
@@ -420,9 +442,7 @@ export function MasterPage<
                       </div>
                       <DialogFooter>
                         <DialogClose asChild>
-                          <Button type="button" variant="outline">
-                            Cancel
-                          </Button>
+                          <Button type="button" variant="outline">Cancel</Button>
                         </DialogClose>
                         <Button type="submit" disabled={config.isCreatePending}>
                           {config.addButtonLabel || `Add ${config.title.slice(0, -1)}`}

@@ -147,3 +147,6 @@ export interface SalaryRange {
   label: string;
   display: string;
 }
+
+// Re-export subject types from the masters directory so both import paths resolve correctly
+export * from './masters/subject';

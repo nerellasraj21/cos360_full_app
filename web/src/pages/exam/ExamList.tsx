@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Plus, Eye, Copy, Trash2, Loader2, ClipboardList, MoreHorizontal, Edit } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Plus, Eye, Copy, Trash2, Loader2, ClipboardList, MoreHorizontal, Edit, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -183,6 +183,18 @@ export default function ExamList() {
   const [cloneName, setCloneName] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<ExamListItem | null>(null)
   const [editTarget, setEditTarget] = useState<ExamListItem | null>(null)
+  const [isEditDirty, setIsEditDirty] = useState(false)
+  const [sortKey, setSortKey] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />
+    return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />
+  }
 
   const { data: exams = [], isLoading } = useExamList(
     selectedAcademicYearId
@@ -200,10 +212,19 @@ export default function ExamList() {
   const { data: subjectsList = [] } = useSubjectsDropdown()
   const subjectNameMap = Object.fromEntries(subjectsList.map(s => [s.id, s.name]))
 
-  const filtered = exams.filter(e =>
-    searchQuery === '' ||
-    e.exam_name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filtered = useMemo(() => {
+    let items = exams.filter(e =>
+      searchQuery === '' || e.exam_name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    if (sortKey) {
+      items = [...items].sort((a, b) => {
+        const aVal = String((a as any)[sortKey] ?? '')
+        const bVal = String((b as any)[sortKey] ?? '')
+        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      })
+    }
+    return items
+  }, [exams, searchQuery, sortKey, sortDir])
 
   const hasGradingSetup = gradeSchemes.length > 0
 
@@ -232,7 +253,7 @@ export default function ExamList() {
         <div className="flex items-center gap-3">
           <ClipboardList className="h-6 w-6 text-muted-foreground" />
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Exams</h1>
+            <h1 className="text-2xl font-bold">Exam Management</h1>
             <p className="text-sm text-muted-foreground">Manage all examinations for the academic year</p>
           </div>
         </div>
@@ -265,13 +286,21 @@ export default function ExamList() {
       )}
 
       {/* Filters */}
+      <div className="space-y-2">
+      <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+        <Filter className="h-3.5 w-3.5" />
+        <span>Filters</span>
+      </div>
       <div className="flex flex-wrap items-center gap-3">
-        <Input
-          placeholder="Search exams..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="max-w-60"
-        />
+        <div className="relative max-w-60">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search exams..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-36">
             <SelectValue placeholder="All Status" />
@@ -297,6 +326,7 @@ export default function ExamList() {
             <SelectItem value="custom">Custom</SelectItem>
           </SelectContent>
         </Select>
+      </div>
       </div>
 
       {/* List */}
@@ -333,24 +363,27 @@ export default function ExamList() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">
-                <th className="px-4 py-3 text-left font-medium">Exam Name</th>
-                <th className="px-4 py-3 text-left font-medium">Board</th>
-                <th className="px-4 py-3 text-left font-medium">Type</th>
+                <th className="px-4 py-3 text-left font-medium w-12">S.No.</th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('exam_name')}>Exam Name <SortIcon col="exam_name" /></th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('board')}>Board <SortIcon col="board" /></th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('exam_type')}>Type <SortIcon col="exam_type" /></th>
                 <th className="px-4 py-3 text-left font-medium">Subjects</th>
-                <th className="px-4 py-3 text-left font-medium">Level</th>
-                <th className="px-4 py-3 text-left font-medium">Nature</th>
-                <th className="px-4 py-3 text-left font-medium">Status</th>
-                <th className="px-4 py-3 text-left font-medium">Deadline</th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('level')}>Level <SortIcon col="level" /></th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('nature')}>Nature <SortIcon col="nature" /></th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('status')}>Status <SortIcon col="status" /></th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('mark_entry_deadline')}>Deadline <SortIcon col="mark_entry_deadline" /></th>
                 <th className="px-4 py-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((exam) => (
+              {filtered.map((exam, idx) => (
                 <tr
                   key={exam.id}
                   className="cursor-pointer border-b transition-colors hover:bg-muted/20"
+                  style={{ height: '48px' }}
                   onClick={() => navigate({ to: `/exam/exams/${exam.id}` as any })}
                 >
+                  <td className="px-4 py-3 text-muted-foreground text-sm">{idx + 1}</td>
                   <td className="px-4 py-3 font-medium">{exam.exam_name}</td>
                   <td className="px-4 py-3 text-muted-foreground">{exam.board}</td>
                   <td className="px-4 py-3 text-muted-foreground">{exam.exam_type}</td>
@@ -400,7 +433,7 @@ export default function ExamList() {
                         </DropdownMenuItem>
                         {isAdmin && (
                           <>
-                            <DropdownMenuItem onClick={() => setEditTarget(exam)}>
+                            <DropdownMenuItem onClick={() => { setIsEditDirty(false); setEditTarget(exam); }}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit Exam
                             </DropdownMenuItem>
@@ -438,13 +471,13 @@ export default function ExamList() {
       )}
 
       {/* Edit Dialog */}
-      <Dialog open={!!editTarget} onOpenChange={() => setEditTarget(null)}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null); }} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
+        <DialogContent className="max-w-lg" onChange={() => setIsEditDirty(true)}>
           <DialogHeader>
             <DialogTitle>Edit Exam</DialogTitle>
           </DialogHeader>
           {editTarget && (
-            <EditExamDialog exam={editTarget} onClose={() => setEditTarget(null)} />
+            <EditExamDialog exam={editTarget} onClose={() => { setIsEditDirty(false); setEditTarget(null); }} />
           )}
         </DialogContent>
       </Dialog>

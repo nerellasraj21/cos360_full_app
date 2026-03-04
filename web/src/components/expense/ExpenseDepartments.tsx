@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Plus, Edit, Trash2, Search, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Loader2, Filter, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useExpenseDepartments, useExpenseDepartmentDropdown } from '@/hooks/expense';
 import { validateDepartmentForm } from '@/lib/expenseValidation';
 import { handleExpenseApiError } from '@/lib/expenseErrorHandler';
@@ -18,6 +18,18 @@ export function ExpenseDepartments() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<ExpenseDepartment | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />;
+    return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />;
+  };
+
   const [formData, setFormData] = useState<ExpenseDepartmentCreate>({
     name: '',
     description: ''
@@ -30,10 +42,24 @@ export function ExpenseDepartments() {
 
   const departments = departmentsResponse || [];
 
-  const filteredDepartments = departments.filter(department =>
-    department.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    department.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredDepartments = useMemo(() => {
+    let items = departments;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      items = items.filter(d =>
+        d.name.toLowerCase().includes(q) ||
+        (d.description ?? '').toLowerCase().includes(q)
+      );
+    }
+    if (sortKey) {
+      items = [...items].sort((a, b) => {
+        const aVal = String((a as any)[sortKey] ?? '');
+        const bVal = String((b as any)[sortKey] ?? '');
+        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      });
+    }
+    return items;
+  }, [departments, searchQuery, sortKey, sortDir]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -56,20 +82,17 @@ export function ExpenseDepartments() {
         </div>
       </div>
 
-      {/* Search */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search departments..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Filters */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+          <Filter className="h-3.5 w-3.5" />
+          <span>Filters</span>
+        </div>
+        <div className="relative max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input placeholder="Search departments..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
+        </div>
+      </div>
 
       {/* Departments Table */}
       <Card>
@@ -77,17 +100,18 @@ export function ExpenseDepartments() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
+                <TableHead className="w-12">S.No.</TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('name')}>Name <SortIcon col="name" /></TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Updated</TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('is_active')}>Status <SortIcon col="is_active" /></TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('created_at')}>Created <SortIcon col="created_at" /></TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('updated_at')}>Updated <SortIcon col="updated_at" /></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
+                  <TableCell colSpan={6} className="text-center py-8">
                     <div className="flex justify-center items-center py-8">
                       <Loader2 className="h-8 w-8 animate-spin" />
                       <span className="ml-2">Loading departments...</span>
@@ -96,13 +120,14 @@ export function ExpenseDepartments() {
                 </TableRow>
               ) : filteredDepartments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    No departments found
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    {searchQuery ? 'No departments match your search' : 'No departments found'}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredDepartments.map((department) => (
-                  <TableRow key={department.id}>
+                filteredDepartments.map((department, index) => (
+                  <TableRow key={department.id} style={{ height: '48px' }}>
+                    <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
                     <TableCell className="font-medium">{department.name}</TableCell>
                     <TableCell>{department.description || '-'}</TableCell>
                     <TableCell>

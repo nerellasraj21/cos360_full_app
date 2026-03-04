@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,7 +30,7 @@ import type {
   FeeRefundCreateRequest
 } from '@/types/fee/refund';
 import type { FeeTransaction } from '@/types/fee/transaction';
-import { Plus, Search, Eye, CheckCircle, XCircle, RefreshCw, DollarSign, X } from 'lucide-react';
+import { Plus, Search, Eye, CheckCircle, XCircle, RefreshCw, DollarSign, X, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { PermissionGuard } from '@/components/common';
 import { ShieldX } from 'lucide-react';
@@ -499,6 +499,45 @@ function FeeRefundsContent() {
     });
   };
 
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else if (sortDir === 'desc') { setSortKey(null); setSortDir(null); }
+      else setSortDir('asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 opacity-40 shrink-0 inline" />;
+    if (sortDir === 'asc') return <ChevronUp className="h-3 w-3 ml-1 shrink-0 inline" />;
+    return <ChevronDown className="h-3 w-3 ml-1 shrink-0 inline" />;
+  };
+
+  const sortedRefunds = useMemo(() => {
+    const data = [...refunds];
+    if (!sortKey || !sortDir) return data;
+    return data.sort((a, b) => {
+      let aVal = '';
+      let bVal = '';
+      switch (sortKey) {
+        case 'refund_number': aVal = a.refund_number || ''; bVal = b.refund_number || ''; break;
+        case 'student': aVal = a.student_admission_num || ''; bVal = b.student_admission_num || ''; break;
+        case 'amount': aVal = String(a.refund_amount); bVal = String(b.refund_amount); break;
+        case 'reason': aVal = a.refund_reason; bVal = b.refund_reason; break;
+        case 'status': aVal = a.status; bVal = b.status; break;
+        case 'date': aVal = a.requested_date; bVal = b.requested_date; break;
+      }
+      const cmp = aVal.localeCompare(bVal, undefined, { numeric: true });
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [refunds, sortKey, sortDir]);
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
@@ -541,27 +580,8 @@ function FeeRefundsContent() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Fee Refunds</h1>
-          <p className="text-muted-foreground">
-            Manage fee refund requests and processing workflow
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Refund
-              </Button>
-            </DialogTrigger>
+      {/* Create Refund Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <div className="flex items-center justify-between">
@@ -743,8 +763,6 @@ function FeeRefundsContent() {
               </div>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
 
       {/* Statistics Cards */}
       {refundStats && (
@@ -798,10 +816,11 @@ function FeeRefundsContent() {
 
       {/* Search and Filters */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Search & Filter</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground mb-3">
+            <Search className="h-3.5 w-3.5" />
+            <span>Filters</span>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Student</label>
@@ -889,46 +908,62 @@ function FeeRefundsContent() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Refunds</CardTitle>
-              <CardDescription>
-                {refunds.length} refunds found
-              </CardDescription>
+            <CardTitle className="text-2xl font-bold">Fee Refunds</CardTitle>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => refetch()}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Refund
+              </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {refunds.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No refunds found.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12 text-xs text-muted-foreground">S.No.</TableHead>
+                  <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('refund_number')}>
+                    <div className="flex items-center">Refund Number<SortIcon col="refund_number" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('student')}>
+                    <div className="flex items-center">Student Admission<SortIcon col="student" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('amount')}>
+                    <div className="flex items-center">Refund Amount<SortIcon col="amount" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('reason')}>
+                    <div className="flex items-center">Reason<SortIcon col="reason" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('status')}>
+                    <div className="flex items-center">Status<SortIcon col="status" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('date')}>
+                    <div className="flex items-center">Requested Date<SortIcon col="date" /></div>
+                  </TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedRefunds.length === 0 ? (
                   <TableRow>
-                    <TableHead>Refund Number</TableHead>
-                    <TableHead>Student Admission Number</TableHead>
-                    <TableHead>Refund Amount</TableHead>
-                    <TableHead>Refund Reason</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Requested Date</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No refunds found.
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {refunds.map((refund) => (
-                    <TableRow key={refund.id}>
+                ) : (
+                  sortedRefunds.map((refund, index) => (
+                    <TableRow key={refund.id} style={{ height: '48px' }}>
+                      <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
                       <TableCell className="font-medium">
                         {refund.refund_number}
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">
-                          {refund.student_admission_num || 'N/A'}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {refund.student_admission_num || 'N/A'}
-                        </div>
+                        {refund.student_admission_num || 'N/A'}
                       </TableCell>
                       <TableCell className="font-medium">
                         ₹{Number(refund.refund_amount).toLocaleString()}
@@ -979,11 +1014,11 @@ function FeeRefundsContent() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

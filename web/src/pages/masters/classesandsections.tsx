@@ -23,7 +23,6 @@ import {
   EditSectionModal,
 } from "@/components/masters/classesandsections";
 import { useAcademicYearStore } from "@/lib/academicYearStore";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -240,36 +239,15 @@ export default function ClassesAndSectionsPage() {
       }
     >
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Classes & Sections Management</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {!hasClassesListPermission ? (
-                <div className="flex items-center justify-center h-32">
-                  <p className="text-gray-600">
-                    Permission not available for Classes.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="flex justify-end items-center">
-                    <PermissionGuard
-                      resource="classes"
-                      action="create"
-                      fallback={null}
-                    >
-                      <AddClassAndSectionsModal
-                        onSubmit={(data) => {
-                          createClassMutation.mutate(data);
-                        }}
-                        isPending={createClassMutation.status === "pending"}
-                      />
-                    </PermissionGuard>
-                  </div>
-
-                  {!shouldFetchData ? (
+        {!hasClassesListPermission ? (
+          <div className="flex items-center justify-center h-32">
+            <p className="text-gray-600">
+              Permission not available for Classes.
+            </p>
+          </div>
+        ) : (
+          <>
+            {!shouldFetchData ? (
                     <div className="flex items-center justify-center h-32">
                       <p className="text-gray-600">
                         You don't have permission to view class data.
@@ -290,13 +268,24 @@ export default function ClassesAndSectionsPage() {
                       onAddSection={handleAddSection}
                       isLoading={isLoading}
                       hasSectionsPermission={hasSectionsListPermission}
+                      addButton={
+                        <PermissionGuard
+                          resource="classes"
+                          action="create"
+                          fallback={null}
+                        >
+                          <AddClassAndSectionsModal
+                            onSubmit={(data) => {
+                              createClassMutation.mutate(data);
+                            }}
+                            isPending={createClassMutation.status === "pending"}
+                          />
+                        </PermissionGuard>
+                      }
                     />
-                  )}
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            )}
+          </>
+        )}
 
         {/* Edit Class Modal */}
         <EditClassModal

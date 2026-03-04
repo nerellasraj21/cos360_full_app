@@ -214,8 +214,7 @@ export default function RoutesPage() {
     const columns = createColumns(routeTypeOptions, tripTypeOptions);
 
     const config: MasterPageConfig<Route, RouteInput> = {
-        title: "Route Management",
-        addButtonLabel: "Add Route Management",
+        title: "Routes",
         columns,
         defaultValues,
         formFields,
