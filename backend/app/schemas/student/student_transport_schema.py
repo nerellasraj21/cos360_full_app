@@ -60,10 +60,18 @@ class StopInfo(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class StudentInfo(BaseModel):
+    id: UUID
+    first_name: str
+    last_name: str
+    model_config = {"from_attributes": True}
+
+
 class StudentTransportOut(StudentTransportBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
     trip: Optional[TripInfo] = None
     stop: Optional[StopInfo] = None
+    student: Optional[StudentInfo] = None
     model_config = {"from_attributes": True}

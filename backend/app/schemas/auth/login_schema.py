@@ -6,6 +6,12 @@ class LoginRequest(BaseModel):
     username: str = Field(..., description="User's username")
     password: str = Field(..., description="User's password")
     client_name: Optional[str] = Field(None, description="Client name (optional, can be detected from headers/subdomain)")
+    academic_year_id: UUID = Field(..., description="Academic year selected at login (required)")
+
+class AcademicYearOption(BaseModel):
+    id: UUID
+    title: str
+    is_active: bool
 
 class UserInfo(BaseModel):
     id: UUID
@@ -31,6 +37,8 @@ class LoginResponse(BaseModel):
     menu: List[MenuItemResponse]
     permissions: Dict[str, List[str]] = Field(default_factory=dict, description="User's resource permissions grouped by resource")
     entity_id: Optional[str] = Field(None, description="Entity ID (student_id, parent_id, or staff_id) based on role")
+    academic_year_id: UUID
+    academic_year_title: str
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -75,6 +83,8 @@ class PasswordChangeRequiredResponse(BaseModel):
     requires_password_change: bool = True
     change_password_token: str = Field(..., description="Short-lived token (15 min) to authorize the set-password call")
     message: str = "Please set a new password to continue"
+    academic_year_id: UUID
+    academic_year_title: str
 
 class SetPasswordRequest(BaseModel):
     change_password_token: str = Field(..., description="Token received from the first-login response")
@@ -88,6 +98,8 @@ class SetPasswordResponse(BaseModel):
     menu: List[MenuItemResponse]
     permissions: Dict[str, List[str]] = Field(default_factory=dict)
     entity_id: Optional[str] = None
+    academic_year_id: Optional[UUID] = None
+    academic_year_title: Optional[str] = None
     access_token: str
     refresh_token: str
     token_type: str = "bearer"

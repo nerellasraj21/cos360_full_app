@@ -11,6 +11,7 @@ from app.tools.password_util import verify_password
 from app.db.tenant_session import get_tenant_db, TenantService
 from app.middleware.tenant_middleware import get_client_name_from_request
 from typing import Dict, List, Any, Optional
+from uuid import UUID
 import logging
 
 logger = logging.getLogger("multi_tenant_auth_service")
@@ -257,7 +258,7 @@ class MultiTenantAuthService:
             return {}
     
     @staticmethod
-    async def login_user(request: Request, username: str, password: str, client_name: Optional[str] = None) -> Dict[str, Any]:
+    async def login_user(request: Request, username: str, password: str, client_name: Optional[str] = None, academic_year_id: Optional[UUID] = None) -> Dict[str, Any]:
         """
         Complete multi-tenant login process.
 
@@ -316,6 +317,17 @@ class MultiTenantAuthService:
                 permissions = await MultiTenantAuthService.get_user_permissions(db, user.role_id)
                 logger.info(f"DEBUG 10: Permissions fetched successfully, resource count: {len(permissions)}")
 
+                # ---- Validate academic year ----
+                if academic_year_id is None:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Academic year is required")
+
+                from app.models.masters.academic_year_model import AcademicYear
+                ay_result = await db.execute(select(AcademicYear).where(AcademicYear.id == academic_year_id))
+                academic_year = ay_result.scalar_one_or_none()
+                if not academic_year:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid academic year")
+                academic_year_title = academic_year.title
+
                 # ---- First-login check (Staff, Teacher, Student & Parent) ----
                 role_name = user.role.name if user.role else ""
                 if role_name in ("Staff", "Teacher", "Student", "Parent"):
@@ -336,12 +348,16 @@ class MultiTenantAuthService:
                             "sub": str(user.id),
                             "username": user.username,
                             "role": role_name,
-                            "client_name": final_client_name
+                            "client_name": final_client_name,
+                            "academic_year_id": str(academic_year_id),
+                            "academic_year_title": academic_year_title,
                         })
                         return {
                             "requires_password_change": True,
                             "change_password_token": change_token,
-                            "message": "Please set a new password to continue"
+                            "message": "Please set a new password to continue",
+                            "academic_year_id": academic_year_id,
+                            "academic_year_title": academic_year_title,
                         }
 
                 # Determine entity_id based on role
@@ -390,12 +406,14 @@ class MultiTenantAuthService:
                     "sub": str(user.id),
                     "username": user.username,
                     "role": user.role.name,
-                    "client_name": final_client_name
+                    "client_name": final_client_name,
+                    "academic_year_id": str(academic_year_id),
+                    "academic_year_title": academic_year_title,
                 }
-                
+
                 access_token = create_access_token(token_data)
                 refresh_token = create_refresh_token(token_data)
-                
+
                 # Prepare response
                 response_data = {
                     "user": {
@@ -412,6 +430,8 @@ class MultiTenantAuthService:
                     "menu": menu,
                     "permissions": permissions,
                     "entity_id": entity_id,
+                    "academic_year_id": academic_year_id,
+                    "academic_year_title": academic_year_title,
                     "access_token": access_token,
                     "refresh_token": refresh_token,
                     "token_type": "bearer"
@@ -455,6 +475,8 @@ class MultiTenantAuthService:
 
         user_id = payload.get("sub")
         final_client_name = client_name or payload.get("client_name") or get_client_name_from_request(request)
+        academic_year_id_str = payload.get("academic_year_id")
+        academic_year_title = payload.get("academic_year_title", "")
 
         schema_name = await TenantService.get_tenant_schema(final_client_name)
         if not schema_name:
@@ -517,6 +539,8 @@ class MultiTenantAuthService:
                     "username": user.username,
                     "role": user.role.name if user.role else "",
                     "client_name": final_client_name,
+                    "academic_year_id": academic_year_id_str,
+                    "academic_year_title": academic_year_title,
                 }
                 access_token = create_access_token(token_data)
                 refresh_token = create_refresh_token(token_data)
@@ -539,6 +563,8 @@ class MultiTenantAuthService:
                     "menu": menu,
                     "permissions": permissions,
                     "entity_id": entity_id,
+                    "academic_year_id": academic_year_id_str,
+                    "academic_year_title": academic_year_title,
                     "access_token": access_token,
                     "refresh_token": refresh_token,
                     "token_type": "bearer",

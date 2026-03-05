@@ -15,18 +15,30 @@ from app.schemas.auth.login_schema import (
     PasswordChangeRequiredResponse,
     SetPasswordRequest,
     SetPasswordResponse,
+    AcademicYearOption,
 )
 from app.service.auth.token_blacklist_service import TokenBlacklistService
 from app.service.auth.auth_service import login_user
 from app.service.auth.multi_tenant_auth_service import MultiTenantAuthService
 from app.tools.jwt_utils import verify_refresh_token, verify_access_token, create_access_token, create_refresh_token
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Union
+from typing import Union, List
 import logging
 
 logger = logging.getLogger("login_endpoints")
 
 router = APIRouter(prefix="/auth", tags=["Auth/Login"])
+
+
+@router.get("/academic-years", response_model=List[AcademicYearOption])
+async def list_academic_years(db: AsyncSession = Depends(get_tenant_db)):
+    """Return available academic years for the login screen (public, no auth required)."""
+    from sqlalchemy import select
+    from app.models.masters.academic_year_model import AcademicYear
+    result = await db.execute(select(AcademicYear).order_by(AcademicYear.start_date.desc()))
+    years = result.scalars().all()
+    return [{"id": y.id, "title": y.title, "is_active": y.is_active} for y in years]
+
 
 @router.post("/login",
              response_model=Union[LoginResponse, PasswordChangeRequiredResponse, LegacyLoginResponse],
@@ -62,6 +74,7 @@ async def login(request: LoginRequest, fastapi_request: Request, db: AsyncSessio
                     request.username,
                     request.password,
                     client_name_from_body,
+                    academic_year_id=request.academic_year_id,
                 )
                 # First-time staff login — return the password-change challenge
                 if login_result.get("requires_password_change"):
@@ -147,7 +160,7 @@ async def set_password_first_login(body: SetPasswordRequest, fastapi_request: Re
 async def refresh_token(request: RefreshTokenRequest, fastapi_request: Request):
     """
     Refresh access token using a valid refresh token.
-    
+
     Returns new access_token and refresh_token pair.
     Both tokens will have updated expiry times.
     """
@@ -173,27 +186,29 @@ async def refresh_token(request: RefreshTokenRequest, fastapi_request: Request):
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid connection"
                 )
-        
+
         # Create new token data (excluding exp and token_type)
         new_token_data = {
             "sub": payload.get("sub"),
             "username": payload.get("username"),
             "role": payload.get("role"),
-            "client_name": payload.get("client_name")
+            "client_name": payload.get("client_name"),
+            "academic_year_id": payload.get("academic_year_id"),
+            "academic_year_title": payload.get("academic_year_title"),
         }
-        
+
         # Generate new access token and refresh token
         new_access_token = create_access_token(new_token_data)
         new_refresh_token = create_refresh_token(new_token_data)
-        
+
         logger.info(f"Token refreshed successfully for user: {payload.get('username')}")
-        
+
         return RefreshTokenResponse(
             access_token=new_access_token,
             refresh_token=new_refresh_token,
             token_type="bearer"
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
