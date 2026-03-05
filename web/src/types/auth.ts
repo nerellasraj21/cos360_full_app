@@ -70,13 +70,15 @@ export interface AuthState {
   availableStudents: Student[];
   studentId: string | null; // Current active student ID for API calls
   entityId: string | null;  // entity_id from login response (student UUID for students, parent UUID for parents)
+  academicYearId: string | null;
+  academicYearTitle: string | null;
   permissions: Permission[];
   permissionsMap: PermissionMap;
   menuItems: MenuItem[];
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
-  
+
   // Actions
   login: (data: LoginResponse) => void;
   logout: () => void;
@@ -104,6 +106,8 @@ export interface LoginResponse {
   menu: MenuItem[];
   entity_id?: string; // For students, this is the student ID
   permissions?: PermissionMap;
+  academic_year_id?: string;
+  academic_year_title?: string;
 }
 
 export interface ParentStudentsResponse {

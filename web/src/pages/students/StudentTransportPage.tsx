@@ -2,12 +2,33 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Bus, MapPin, Clock, IndianRupee, Navigation2, Truck } from 'lucide-react';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Loader2, Bus, MapPin, Clock, IndianRupee, Navigation2, Truck,
+  Plus, Filter, Search, Edit, Trash2,
+} from 'lucide-react';
 import { useAuthStore } from '@/lib/authStore';
 import { useParentChildren } from '@/api/auth';
-import { useStudentTransportsByStudent } from '@/api/hooks/masters/studentTransport';
-import type { StudentTransportOut } from '@/types/masters/studentTransport';
+import {
+  useStudentTransports,
+  useStudentTransportsByStudent,
+  useCreateStudentTransport,
+  useUpdateStudentTransport,
+  useDeleteStudentTransport,
+} from '@/api/hooks/masters/studentTransport';
+import { useStudentsDropdownSimple } from '@/api/hooks/students/admissions';
+import { useTrips } from '@/api/hooks/masters/trips';
+import { useRouteStops } from '@/api/hooks/masters/routeStops';
+import type { StudentTransportOut, StudentTransportCreate, StudentTransportUpdate } from '@/types/masters/studentTransport';
+import type { TripOut, TripListResponse } from '@/types/masters/trip';
 
 // ─── Role router ─────────────────────────────────────────────────────────────
 
@@ -26,19 +47,282 @@ const StudentTransportPage: React.FC = () => {
     return <ParentView parentEntityId={entityId} />;
   }
 
-  // Staff/Admin/Teacher — transport management is in the Transport module
-  return (
-    <div className="container mx-auto p-4">
-      <Card>
-        <CardContent className="pt-6 text-center text-muted-foreground">
-          Full student transport management is available in the Transport section.
-        </CardContent>
-      </Card>
-    </div>
-  );
+  // Staff / Admin / Teacher — show management table
+  return <AdminView />;
 };
 
 export default StudentTransportPage;
+
+// ─── Admin management view ────────────────────────────────────────────────────
+
+function AdminView() {
+  const [search, setSearch] = useState('');
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editingTransport, setEditingTransport] = useState<StudentTransportOut | null>(null);
+
+  const { data: transports = [], isLoading } = useStudentTransports();
+  const deleteMutation = useDeleteStudentTransport();
+
+  const filtered = transports.filter((t) => {
+    const studentName = t.student
+      ? `${t.student.first_name} ${t.student.last_name}`.toLowerCase()
+      : '';
+    const route = (t.trip?.route?.route_name ?? '').toLowerCase();
+    const stop = (t.stop?.name ?? '').toLowerCase();
+    const q = search.toLowerCase();
+    return !q || studentName.includes(q) || route.includes(q) || stop.includes(q);
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading assignments...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-4 space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Student Transport Assignments</CardTitle>
+          <Button size="sm" onClick={() => setIsAddOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Assign Transport
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {/* Filter bar */}
+          <div className="flex items-center gap-2 mb-4">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Filters</span>
+            <div className="relative ml-2">
+              <Search className="h-4 w-4 absolute left-2 top-2 text-muted-foreground" />
+              <Input
+                placeholder="Search student, route, stop..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8 h-8 w-64"
+              />
+            </div>
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">S.No.</TableHead>
+                <TableHead>Student</TableHead>
+                <TableHead>Trip</TableHead>
+                <TableHead>Route</TableHead>
+                <TableHead>Stop</TableHead>
+                <TableHead>Fee / Term</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    No transport assignments found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((t, idx) => (
+                  <TableRow key={t.id} style={{ height: '48px' }}>
+                    <TableCell className="text-muted-foreground text-sm">{idx + 1}</TableCell>
+                    <TableCell className="font-medium">
+                      {t.student
+                        ? `${t.student.first_name} ${t.student.last_name}`
+                        : <span className="text-muted-foreground text-xs">{t.student_id}</span>}
+                    </TableCell>
+                    <TableCell>
+                      {t.trip ? `Trip #${t.trip.trip_number}` : '—'}
+                    </TableCell>
+                    <TableCell>
+                      {t.trip?.route ? (
+                        <div>
+                          <p>{t.trip.route.route_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {t.trip.route.starting_stop} → {t.trip.route.ending_stop}
+                          </p>
+                        </div>
+                      ) : '—'}
+                    </TableCell>
+                    <TableCell>
+                      {t.stop ? `${t.stop.name} (#${t.stop.number})` : '—'}
+                    </TableCell>
+                    <TableCell>₹{t.fee_per_term.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => setEditingTransport(t)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={deleteMutation.isPending}
+                        onClick={() => deleteMutation.mutate(t.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <AssignTransportDialog open={isAddOpen} onOpenChange={setIsAddOpen} />
+
+      {editingTransport && (
+        <AssignTransportDialog
+          open={!!editingTransport}
+          onOpenChange={(open) => { if (!open) setEditingTransport(null); }}
+          transport={editingTransport}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Assign / Edit transport dialog ──────────────────────────────────────────
+
+interface AssignTransportDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transport?: StudentTransportOut;
+}
+
+function AssignTransportDialog({ open, onOpenChange, transport }: AssignTransportDialogProps) {
+  const isEdit = !!transport;
+  const createMutation = useCreateStudentTransport();
+  const updateMutation = useUpdateStudentTransport();
+
+  const { data: students = [] } = useStudentsDropdownSimple();
+  const tripsQuery = useTrips();
+  const trips: TripOut[] = Array.isArray(tripsQuery.data)
+    ? (tripsQuery.data as TripOut[])
+    : ((tripsQuery.data as TripListResponse)?.items ?? []);
+  const { data: stops = [] } = useRouteStops(false);
+
+  const [studentId, setStudentId] = useState('');
+  const [tripId, setTripId] = useState('');
+  const [stopId, setStopId] = useState('');
+  const [feePerTerm, setFeePerTerm] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setStudentId(transport?.student_id ?? '');
+      setTripId(transport?.trip_id ?? '');
+      setStopId(transport?.stop_id ?? '');
+      setFeePerTerm(transport?.fee_per_term?.toString() ?? '');
+    }
+  }, [open, transport]);
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const canSubmit = tripId && stopId && feePerTerm && (isEdit || studentId);
+
+  const handleSubmit = () => {
+    const fee = parseFloat(feePerTerm);
+    if (!canSubmit || isNaN(fee) || fee <= 0) return;
+
+    if (isEdit && transport) {
+      const updateData: StudentTransportUpdate = {};
+      if (tripId !== transport.trip_id) updateData.trip_id = tripId;
+      if (stopId !== transport.stop_id) updateData.stop_id = stopId;
+      if (fee !== transport.fee_per_term) updateData.fee_per_term = fee;
+      updateMutation.mutate(
+        { id: transport.id, transport: updateData },
+        { onSuccess: () => onOpenChange(false) },
+      );
+    } else {
+      const createData: StudentTransportCreate = {
+        student_id: studentId,
+        trip_id: tripId,
+        stop_id: stopId,
+        fee_term_id: null,
+        fee_per_term: fee,
+      };
+      createMutation.mutate(createData, { onSuccess: () => onOpenChange(false) });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? 'Edit Assignment' : 'Assign Transport'}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          {!isEdit && (
+            <div className="space-y-2">
+              <Label>Student</Label>
+              <Select value={studentId} onValueChange={setStudentId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select student..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {students.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Trip</Label>
+            <Select value={tripId} onValueChange={setTripId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select trip..." />
+              </SelectTrigger>
+              <SelectContent>
+                {trips.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>Trip #{t.trip_number}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Stop</Label>
+            <Select value={stopId} onValueChange={setStopId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select stop..." />
+              </SelectTrigger>
+              <SelectContent>
+                {stops.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>#{s.number} – {s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Fee per Term (₹)</Label>
+            <Input
+              type="number"
+              min={0}
+              step={0.01}
+              value={feePerTerm}
+              onChange={(e) => setFeePerTerm(e.target.value)}
+              placeholder="e.g. 1500"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={isPending || !canSubmit}>
+            {isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            {isEdit ? 'Save Changes' : 'Assign'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // ─── Student own transport view ───────────────────────────────────────────────
 
@@ -124,7 +408,7 @@ function ParentView({ parentEntityId }: { parentEntityId: string | null }) {
   );
 }
 
-// ─── Shared transport record list ─────────────────────────────────────────────
+// ─── Shared transport record list (student / parent view) ─────────────────────
 
 function TransportList({
   transports,
@@ -177,7 +461,6 @@ function TransportList({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-              {/* Route */}
               {t.trip?.route && (
                 <div className="flex items-start gap-2">
                   <Navigation2 className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
@@ -191,7 +474,6 @@ function TransportList({
                 </div>
               )}
 
-              {/* Departure / Arrival */}
               {t.trip?.route && (
                 <div className="flex items-start gap-2">
                   <Clock className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
@@ -205,7 +487,6 @@ function TransportList({
                 </div>
               )}
 
-              {/* Vehicle */}
               {t.trip?.vehicle && (
                 <div className="flex items-start gap-2">
                   <Truck className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
@@ -217,7 +498,6 @@ function TransportList({
                 </div>
               )}
 
-              {/* Pickup Stop */}
               {t.stop && (
                 <div className="flex items-start gap-2">
                   <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
@@ -229,7 +509,6 @@ function TransportList({
                 </div>
               )}
 
-              {/* Pickup Time */}
               {t.stop?.reaching_time && (
                 <div className="flex items-start gap-2">
                   <Clock className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
@@ -240,7 +519,6 @@ function TransportList({
                 </div>
               )}
 
-              {/* Fee per term */}
               <div className="flex items-start gap-2">
                 <IndianRupee className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                 <div>

@@ -1,28 +1,46 @@
-import React, { useState } from "react";
-import { useLoginMutation } from "../api/auth";
+import React, { useState, useEffect } from "react";
+import { useLoginMutation, useAcademicYears } from "../api/auth";
 import { useAuthStore } from "../lib/authStore";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+
 
 export default function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string>("");
   const loginMutation = useLoginMutation();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const navigate = useNavigate();
+
+  const { data: academicYears = [], isLoading: yearsLoading } = useAcademicYears();
+
+  // Auto-select the active academic year once loaded
+  useEffect(() => {
+    if (academicYears.length > 0 && !selectedAcademicYearId) {
+      const activeYear = academicYears.find((y) => y.is_active);
+      setSelectedAcademicYearId(activeYear?.id ?? academicYears[0].id);
+    }
+  }, [academicYears, selectedAcademicYearId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,9 +49,9 @@ export default function LoginForm({
       .value;
     const password = (form.elements.namedItem("password") as HTMLInputElement)
       .value;
-    // console.log(username, password);
+
     loginMutation.mutate(
-      { username, password, client_name: "test_tenant" },
+      { username, password, client_name: "test_tenant", academic_year_id: selectedAcademicYearId || undefined },
       {
         onSuccess: (data) => {
           if ('requires_password_change' in data && data.requires_password_change) {
@@ -70,6 +88,31 @@ export default function LoginForm({
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 sm:gap-6">
               <div className="grid gap-4 sm:gap-6">
+                <div className="grid gap-2 sm:gap-3">
+                  <Label>Academic Year</Label>
+                  {yearsLoading ? (
+                    <div className="flex items-center gap-2 h-9 px-3 border rounded-md text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading years...
+                    </div>
+                  ) : (
+                    <Select
+                      value={selectedAcademicYearId}
+                      onValueChange={setSelectedAcademicYearId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select academic year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {academicYears.map((year) => (
+                          <SelectItem key={year.id} value={year.id}>
+                            {`${year.title}${year.is_active ? ' (Current)' : ''}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
                 <div className="grid gap-2 sm:gap-3">
                   <Label htmlFor="username">Username</Label>
                   <Input
@@ -108,7 +151,7 @@ export default function LoginForm({
                 <Button
                   type="submit"
                   className="w-full cursor-pointer"
-                  disabled={loginMutation.isPending}
+                  disabled={loginMutation.isPending || !selectedAcademicYearId}
                 >
                   {loginMutation.isPending ? "Logging in..." : "Login"}
                 </Button>
@@ -144,10 +187,6 @@ export default function LoginForm({
           </form>
         </CardContent>
       </Card>
-      {/* <div className="text-muted-foreground *:[a]:hover:text-primary text-center text-[10px] sm:text-xs text-balance *:[a]:underline *:[a]:underline-offset-4">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
-      </div> */}
     </div>
   );
 }

@@ -49,6 +49,12 @@ export interface StudentTransportUpdate {
     is_active?: boolean;
 }
 
+export interface StudentInfo {
+    id: string;
+    first_name: string;
+    last_name: string;
+}
+
 export interface StudentTransportOut extends StudentTransportBase {
     id: string;
     is_active: boolean;
@@ -56,4 +62,5 @@ export interface StudentTransportOut extends StudentTransportBase {
     updated_at: string;
     trip?: TransportTripDetail;
     stop?: TransportStopDetail;
+    student?: StudentInfo;
 }

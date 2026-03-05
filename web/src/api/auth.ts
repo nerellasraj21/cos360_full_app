@@ -1,13 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import CAxios from './index';
 import { useAuthStore } from '../lib/authStore';
+import { useAcademicYearStore } from '../lib/academicYearStore';
+import { updateAcademicYear } from '@/api/masters/academicyears';
 import type { Student } from '@/types/auth';
 
 // Types for API responses
+export interface AcademicYear {
+  id: string;
+  title: string;
+  is_active: boolean;
+}
+
 export interface LoginRequest {
   username: string;
   password: string;
   client_name?: string;
+  academic_year_id?: string;
 }
 
 export interface LoginResponse {
@@ -41,12 +50,16 @@ export interface LoginResponse {
   }>;
   entity_id?: string;
   permissions?: Record<string, string[]>;
+  academic_year_id?: string;
+  academic_year_title?: string;
 }
 
 export interface PasswordChangeRequiredResponse {
   requires_password_change: true;
   change_password_token: string;
   message: string;
+  academic_year_id?: string;
+  academic_year_title?: string;
 }
 
 export type LoginApiResponse = LoginResponse | PasswordChangeRequiredResponse;
@@ -93,6 +106,21 @@ export function useParentChildren(parentEntityId: string | null) {
     queryFn: () => fetchParentChildren(parentEntityId!),
     enabled: !!parentEntityId,
     staleTime: 5 * 60 * 1000, // 5 min
+  });
+}
+
+// Academic years (public endpoint — no auth required)
+// Response: [{ id, title, is_active }]
+export async function fetchAcademicYears(): Promise<AcademicYear[]> {
+  const { data } = await CAxios.get<AcademicYear[]>('/auth/academic-years');
+  return Array.isArray(data) ? data : [];
+}
+
+export function useAcademicYears() {
+  return useQuery<AcademicYear[]>({
+    queryKey: ['academic-years-login'],
+    queryFn: fetchAcademicYears,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -232,11 +260,37 @@ export function useLoginMutation() {
     onSuccess: async (data) => {
       // If password change is required, skip login — handled by the component
       if ('requires_password_change' in data && data.requires_password_change) {
+        // Store academic year so set-password page can use it if needed
+        if (data.academic_year_id) {
+          sessionStorage.setItem('change_password_academic_year_id', data.academic_year_id);
+        }
+        if (data.academic_year_title) {
+          sessionStorage.setItem('change_password_academic_year_title', data.academic_year_title);
+        }
         return;
       }
 
       const loginData = data as LoginResponse;
       login(loginData);
+
+      // Seed academicYearStore with the year the user selected at login,
+      // so fetchAndSetAcademicYears() won't override it with the active year.
+      if (loginData.academic_year_id) {
+        useAcademicYearStore.getState().setSelectedAcademicYearId(loginData.academic_year_id);
+      }
+
+      // For admin: activate the selected academic year on the backend
+      // (backend auto-deactivates all other years when is_active=true is set)
+      if (loginData.academic_year_id && loginData.role.name.toLowerCase() === 'admin') {
+        try {
+          await updateAcademicYear(loginData.academic_year_id, { is_active: true });
+          queryClient.invalidateQueries({ queryKey: ['academicYearsDropdown'] });
+          queryClient.invalidateQueries({ queryKey: ['academic-years-login'] });
+        } catch (error) {
+          // Non-critical — don't block login if activation fails
+          console.error('Failed to activate academic year:', error);
+        }
+      }
 
       if (loginData.role.name.toLowerCase() === 'parent' && loginData.entity_id) {
         try {
@@ -277,6 +331,11 @@ export function useSetPasswordMutation() {
     onSuccess: async (data) => {
       login(data);
 
+      // Seed academicYearStore with the year carried from the login step
+      if (data.academic_year_id) {
+        useAcademicYearStore.getState().setSelectedAcademicYearId(data.academic_year_id);
+      }
+
       if (data.role.name.toLowerCase() === 'parent' && data.entity_id) {
         try {
           const children = await fetchParentChildren(data.entity_id);
@@ -288,6 +347,8 @@ export function useSetPasswordMutation() {
 
       queryClient.clear();
       sessionStorage.removeItem('change_password_token');
+      sessionStorage.removeItem('change_password_academic_year_id');
+      sessionStorage.removeItem('change_password_academic_year_title');
     },
     onError: (error: any) => {
       console.error('Set password error:', error);
