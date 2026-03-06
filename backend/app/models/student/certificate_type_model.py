@@ -1,7 +1,10 @@
-from sqlalchemy import Column, Integer, String
-from app.db.base import BaseOrg
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import Column, String
+from sqlalchemy.dialects.postgresql import UUID
+
+from app.db.base import BaseOrg
+
 
 class CertificateType(BaseOrg):
     __tablename__ = "certificate_types"

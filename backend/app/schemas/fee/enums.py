@@ -1,19 +1,22 @@
 """
 Enums for fee management module
 """
-from enum import Enum
+
+from enum import StrEnum
 
 
-class TransactionStatus(str, Enum):
+class TransactionStatus(StrEnum):
     """Fee transaction status options"""
+
     PENDING = "pending"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
     BOUNCED = "bounced"
 
 
-class PaymentMethod(str, Enum):
+class PaymentMethod(StrEnum):
     """Payment method options"""
+
     CASH = "cash"
     CHEQUE = "cheque"
     BANK_TRANSFER = "bank_transfer"
@@ -21,16 +24,18 @@ class PaymentMethod(str, Enum):
     CARD = "card"
 
 
-class RefundStatus(str, Enum):
+class RefundStatus(StrEnum):
     """Refund status options"""
+
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
     PROCESSED = "processed"
 
 
-class RefundReason(str, Enum):
+class RefundReason(StrEnum):
     """Refund reason options"""
+
     ADJUSTMENT = "adjustment"
     WITHDRAWAL = "withdrawal"
     EXCESS_PAYMENT = "excess_payment"
@@ -38,15 +43,17 @@ class RefundReason(str, Enum):
     ERROR_CORRECTION = "error_correction"
 
 
-class CategoryStatus(str, Enum):
+class CategoryStatus(StrEnum):
     """Fee category status options"""
+
     ACTIVE = "active"
     INACTIVE = "inactive"
     ARCHIVED = "archived"
 
 
-class TypeStatus(str, Enum):
+class TypeStatus(StrEnum):
     """Fee type status options"""
+
     ACTIVE = "active"
     INACTIVE = "inactive"
     ARCHIVED = "archived"

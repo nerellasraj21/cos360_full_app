@@ -1,9 +1,12 @@
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey
-from sqlalchemy.orm import relationship
-from app.db.base import BaseOrg
-from sqlalchemy.dialects.postgresql import UUID
-import uuid
 import enum
+import uuid
+
+from sqlalchemy import Column, ForeignKey, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class SalaryRangeEnum(enum.Enum):
     below_1l = "below_1l"
@@ -11,6 +14,7 @@ class SalaryRangeEnum(enum.Enum):
     _3l_5l = "3l_5l"
     _5l_10l = "5l_10l"
     above_10l = "above_10l"
+
 
 class Parent(BaseOrg):
     __tablename__ = "parents"

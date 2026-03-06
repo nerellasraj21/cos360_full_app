@@ -1,21 +1,17 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
+
 from app.db.tenant_session import get_tenant_db
-from app.tools.enhanced_permissions import check_user_resource_access
+from app.schemas.profile.common_profile_schema import PasswordChangeRequest, PasswordChangeResponse
 from app.service.profile.base_profile_service import BaseProfileService
-from app.schemas.profile.common_profile_schema import (
-    PasswordChangeRequest,
-    PasswordChangeResponse
-)
+from app.tools.enhanced_permissions import check_user_resource_access
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
 
+
 @router.post("/change-password", response_model=PasswordChangeResponse)
 async def change_password(
-    password_data: PasswordChangeRequest,
-    request: Request,
-    db: AsyncSession = Depends(get_tenant_db)
+    password_data: PasswordChangeRequest, request: Request, db: AsyncSession = Depends(get_tenant_db)
 ):
     """
     Universal password change endpoint for all user types
@@ -24,12 +20,7 @@ async def change_password(
     Requires current password verification.
     """
     # Check permission (all users with profile:update_own can change password)
-    user_context = await check_user_resource_access(
-        db=db,
-        request=request,
-        resource="profile",
-        action="update_own"
-    )
+    user_context = await check_user_resource_access(db=db, request=request, resource="profile", action="update_own")
 
     # Determine profile type from role
     role_to_profile_type = {
@@ -37,7 +28,7 @@ async def change_password(
         "Staff": "staff",
         "Parent": "parent",
         "Admin": "admin",
-        "SuperAdmin": "superadmin"
+        "SuperAdmin": "superadmin",
     }
     profile_type = role_to_profile_type.get(user_context.role, "unknown")
 
@@ -52,7 +43,7 @@ async def change_password(
         actor_role=user_context.role,
         actor_username=user_context.username,
         profile_type=profile_type,
-        request=request
+        request=request,
     )
 
     return PasswordChangeResponse(**result)

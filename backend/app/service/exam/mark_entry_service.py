@@ -1,6 +1,6 @@
+from datetime import UTC, datetime
 import logging
 import uuid
-from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -8,8 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.exam.mark_permission_model import ExamMarkEntryPermission
 from app.models.exam.exam_subject_config_model import ExamSubjectConfig
+from app.models.exam.mark_permission_model import ExamMarkEntryPermission
 from app.models.exam.student_marks_model import StudentMark
 from app.schemas.exam.mark_entry_schema import MarkEntryCreate
 
@@ -49,7 +49,7 @@ async def authorize_mark_entry(db, exam_id, class_id, section_id, subject_config
         select(ExamMarkEntryPermission).where(
             ExamMarkEntryPermission.exam_id == exam_id,
             ExamMarkEntryPermission.user_id == user_id,
-            ExamMarkEntryPermission.is_active == True,
+            ExamMarkEntryPermission.is_active,
         )
     )
     perm = perm_result.scalar_one_or_none()
@@ -57,14 +57,18 @@ async def authorize_mark_entry(db, exam_id, class_id, section_id, subject_config
         return True
     # Allow if no permissions set (open access)
     count_result = await db.execute(
-        select(ExamMarkEntryPermission).where(
+        select(ExamMarkEntryPermission)
+        .where(
             ExamMarkEntryPermission.exam_id == exam_id,
-            ExamMarkEntryPermission.is_active == True,
-        ).limit(1)
+            ExamMarkEntryPermission.is_active,
+        )
+        .limit(1)
     )
     if count_result.scalar_one_or_none() is None:
         return True  # No permissions configured, allow all
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have mark entry permission for this exam")
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="You do not have mark entry permission for this exam"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -86,9 +90,7 @@ async def resolve_config_scope(
     Raises:
         HTTP 404 if the config does not exist.
     """
-    result = await db.execute(
-        select(ExamSubjectConfig).where(ExamSubjectConfig.id == subject_config_id)
-    )
+    result = await db.execute(select(ExamSubjectConfig).where(ExamSubjectConfig.id == subject_config_id))
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(
@@ -124,7 +126,9 @@ async def get_marks(
     except Exception as e:
         log.error(
             "Error fetching marks for exam %s / config %s: %s",
-            exam_id, subject_config_id, e,
+            exam_id,
+            subject_config_id,
+            e,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -155,6 +159,7 @@ async def get_marks_grid(
 
     # 1. Get components for this subject config
     from app.models.exam.exam_subject_config_model import ExamSubjectComponent
+
     comp_result = await db.execute(
         select(ExamSubjectComponent)
         .where(ExamSubjectComponent.subject_config_id == subject_config_id)
@@ -233,12 +238,14 @@ async def get_marks_grid(
                     "remark_grade": None,
                     "updated_at": None,
                 }
-        grid.append({
-            "student_id": sid_str,
-            "student_name": name or "—",
-            "admission_number": adm_no or "—",
-            "marks": marks_dict,
-        })
+        grid.append(
+            {
+                "student_id": sid_str,
+                "student_name": name or "—",
+                "admission_number": adm_no or "—",
+                "marks": marks_dict,
+            }
+        )
 
     return grid
 
@@ -269,7 +276,7 @@ async def upsert_marks(
     for committing the transaction after calling this service function.
     """
     entered_by = entered_by or uploaded_by
-    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    now_utc = datetime.now(UTC).replace(tzinfo=None)
     written = 0
 
     try:

@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
 from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class RemarkGradeOptionCreate(BaseModel):
@@ -17,16 +17,16 @@ class RemarkGradeOptionRead(RemarkGradeOptionCreate):
 
 class RemarkGradeSetCreate(BaseModel):
     name: str = Field(..., max_length=100)
-    options: List[RemarkGradeOptionCreate] = Field(default_factory=list)
+    options: list[RemarkGradeOptionCreate] = Field(default_factory=list)
 
 
 class RemarkGradeSetRead(BaseModel):
     model_config = {"from_attributes": True}
     id: UUID
     name: str
-    options: List[RemarkGradeOptionRead] = []
+    options: list[RemarkGradeOptionRead] = []
 
 
 class RemarkGradeSetUpdate(BaseModel):
-    name: Optional[str] = Field(None, max_length=100)
-    options: Optional[List[RemarkGradeOptionCreate]] = None
+    name: str | None = Field(None, max_length=100)
+    options: list[RemarkGradeOptionCreate] | None = None

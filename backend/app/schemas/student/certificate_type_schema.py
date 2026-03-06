@@ -1,21 +1,26 @@
-from pydantic import BaseModel
-from typing import Optional
 from uuid import UUID
+
+from pydantic import BaseModel
+
 
 class CertificateTypeBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
+
 
 class CertificateTypeCreate(CertificateTypeBase):
     pass
 
+
 class CertificateTypeUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
+
 
 class CertificateTypeRead(CertificateTypeBase):
     id: UUID
     model_config = {"from_attributes": True}
+
 
 class CertificateTypeDropdown(BaseModel):
     id: UUID

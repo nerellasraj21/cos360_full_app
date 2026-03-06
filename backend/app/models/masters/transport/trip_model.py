@@ -1,8 +1,11 @@
-from sqlalchemy import Column, Integer, String, Time, Boolean, ForeignKey, DateTime, func
-from app.db.base import BaseOrg
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class Trip(BaseOrg):
     __tablename__ = "trips"

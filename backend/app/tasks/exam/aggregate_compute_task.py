@@ -3,8 +3,8 @@
 Celery task to compute aggregated exam results (totals, grades, rank).
 Sprint 5 · BG-01: celery_app imported from app.celery_app
 """
+
 import logging
-from typing import Optional
 
 from app.celery_app import celery_app
 
@@ -22,9 +22,9 @@ def compute_exam_aggregates(
     self,
     *,
     exam_id: str,
-    class_id: Optional[str] = None,
-    section_id: Optional[str] = None,
-    tenant_schema: Optional[str] = None,
+    class_id: str | None = None,
+    section_id: str | None = None,
+    tenant_schema: str | None = None,
 ):
     """
     Compute total marks, grades, and ranks for an exam.
@@ -38,14 +38,18 @@ def compute_exam_aggregates(
         tenant_schema: PostgreSQL search_path schema for multi-tenant
     """
     import asyncio
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.orm import sessionmaker
+
     from app.core.config import settings
 
     try:
         logger.info(
             "Computing aggregates for exam=%s class=%s section=%s",
-            exam_id, class_id, section_id,
+            exam_id,
+            class_id,
+            section_id,
         )
 
         async def _run():

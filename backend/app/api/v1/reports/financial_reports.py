@@ -1,21 +1,25 @@
 """
 API endpoints for financial-related reports
 """
-import logging
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
-from typing import Optional
+
 from datetime import date
 from decimal import Decimal
+import logging
+from uuid import UUID
 
-from app.db.tenant_session import get_tenant_db, TenantService
-from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user
-from app.service.reports.financial_report_service import FinancialReportService
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.tenant_session import TenantService, get_tenant_db
 from app.schemas.reports.financial_report_schemas import (
-    ExpenditureReportFilter, LedgerReportFilter, FinancialSummaryFilter, FinancialSummary
+    ExpenditureReportFilter,
+    FinancialSummary,
+    FinancialSummaryFilter,
+    LedgerReportFilter,
 )
 from app.schemas.reports.report_schemas import ExportRequest, ReportResponse
+from app.service.reports.financial_report_service import FinancialReportService
+from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -25,39 +29,40 @@ router = APIRouter()
 @router.get("/expenditure", response_model=ReportResponse)
 async def get_expenditure_report(
     request: Request,
-    date_from: Optional[date] = Query(None),
-    date_to: Optional[date] = Query(None),
-    category_id: Optional[UUID] = Query(None),
-    type_id: Optional[UUID] = Query(None),
-    amount_min: Optional[Decimal] = Query(None),
-    amount_max: Optional[Decimal] = Query(None),
-    department: Optional[str] = Query(None),
-    month: Optional[int] = Query(None, ge=1, le=12),
-    year: Optional[int] = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    category_id: UUID | None = Query(None),
+    type_id: UUID | None = Query(None),
+    amount_min: Decimal | None = Query(None),
+    amount_max: Decimal | None = Query(None),
+    department: str | None = Query(None),
+    month: int | None = Query(None, ge=1, le=12),
+    year: int | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=1000),
-    sort_by: Optional[str] = Query(None),
+    sort_by: str | None = Query(None),
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     db: AsyncSession = Depends(get_tenant_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Get expenditure report with filters and pagination"""
     try:
         # Check permissions - handle SuperAdmin users
-        if current_user.get('is_superadmin'):
+        if current_user.get("is_superadmin"):
             # SuperAdmin bypasses permission checks
             pass
         else:
-            role = current_user.get('role')
-            await check_role_plan_permission_with_error(db, request, role, 'financial_reports', 'read')
+            role = current_user.get("role")
+            await check_role_plan_permission_with_error(db, request, role, "financial_reports", "read")
 
         # Get user info
-        user_id_str = current_user.get('sub')
-        client_name = getattr(request.state, 'client_name', None)
+        user_id_str = current_user.get("sub")
+        client_name = getattr(request.state, "client_name", None)
         tenant_id = await TenantService.get_tenant_schema(client_name)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport
+
         user_id = UUIDImport(user_id_str)
 
         # Create service
@@ -77,7 +82,7 @@ async def get_expenditure_report(
             page=page,
             page_size=page_size,
             sort_by=sort_by,
-            sort_order=sort_order
+            sort_order=sort_order,
         )
 
         # Get data
@@ -87,11 +92,7 @@ async def get_expenditure_report(
         total_pages = (total_count + page_size - 1) // page_size
 
         return ReportResponse(
-            data=data,
-            total_count=total_count,
-            page=page,
-            page_size=page_size,
-            total_pages=total_pages
+            data=data, total_count=total_count, page=page, page_size=page_size, total_pages=total_pages
         )
 
     except HTTPException:
@@ -104,39 +105,40 @@ async def get_expenditure_report(
 @router.get("/ledger", response_model=ReportResponse)
 async def get_ledger_report(
     request: Request,
-    date_from: Optional[date] = Query(None),
-    date_to: Optional[date] = Query(None),
-    account_type: Optional[str] = Query(None),
-    transaction_type: Optional[str] = Query(None),
-    reference_type: Optional[str] = Query(None),
-    amount_min: Optional[Decimal] = Query(None),
-    amount_max: Optional[Decimal] = Query(None),
-    month: Optional[int] = Query(None, ge=1, le=12),
-    year: Optional[int] = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    account_type: str | None = Query(None),
+    transaction_type: str | None = Query(None),
+    reference_type: str | None = Query(None),
+    amount_min: Decimal | None = Query(None),
+    amount_max: Decimal | None = Query(None),
+    month: int | None = Query(None, ge=1, le=12),
+    year: int | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=1000),
-    sort_by: Optional[str] = Query(None),
+    sort_by: str | None = Query(None),
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     db: AsyncSession = Depends(get_tenant_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Get ledger report with filters and pagination"""
     try:
         # Check permissions - handle SuperAdmin users
-        if current_user.get('is_superadmin'):
+        if current_user.get("is_superadmin"):
             # SuperAdmin bypasses permission checks
             pass
         else:
-            role = current_user.get('role')
-            await check_role_plan_permission_with_error(db, request, role, 'financial_reports', 'read')
+            role = current_user.get("role")
+            await check_role_plan_permission_with_error(db, request, role, "financial_reports", "read")
 
         # Get user info
-        user_id_str = current_user.get('sub')
-        client_name = getattr(request.state, 'client_name', None)
+        user_id_str = current_user.get("sub")
+        client_name = getattr(request.state, "client_name", None)
         tenant_id = await TenantService.get_tenant_schema(client_name)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport
+
         user_id = UUIDImport(user_id_str)
 
         # Create service
@@ -156,7 +158,7 @@ async def get_ledger_report(
             page=page,
             page_size=page_size,
             sort_by=sort_by,
-            sort_order=sort_order
+            sort_order=sort_order,
         )
 
         # Get data
@@ -166,11 +168,7 @@ async def get_ledger_report(
         total_pages = (total_count + page_size - 1) // page_size
 
         return ReportResponse(
-            data=data,
-            total_count=total_count,
-            page=page,
-            page_size=page_size,
-            total_pages=total_pages
+            data=data, total_count=total_count, page=page, page_size=page_size, total_pages=total_pages
         )
 
     except HTTPException:
@@ -183,33 +181,34 @@ async def get_ledger_report(
 @router.get("/summary", response_model=FinancialSummary)
 async def get_financial_summary(
     request: Request,
-    date_from: Optional[date] = Query(None),
-    date_to: Optional[date] = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
     period_type: str = Query("monthly", pattern="^(monthly|quarterly|yearly)$"),
     include_fees: bool = Query(True),
     include_expenses: bool = Query(True),
-    month: Optional[int] = Query(None, ge=1, le=12),
-    year: Optional[int] = Query(None),
+    month: int | None = Query(None, ge=1, le=12),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_tenant_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Get financial summary statistics"""
     try:
         # Check permissions - handle SuperAdmin users
-        if current_user.get('is_superadmin'):
+        if current_user.get("is_superadmin"):
             # SuperAdmin bypasses permission checks
             pass
         else:
-            role = current_user.get('role')
-            await check_role_plan_permission_with_error(db, request, role, 'financial_reports', 'read')
+            role = current_user.get("role")
+            await check_role_plan_permission_with_error(db, request, role, "financial_reports", "read")
 
         # Get user info
-        user_id_str = current_user.get('sub')
-        client_name = getattr(request.state, 'client_name', None)
+        user_id_str = current_user.get("sub")
+        client_name = getattr(request.state, "client_name", None)
         tenant_id = await TenantService.get_tenant_schema(client_name)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport
+
         user_id = UUIDImport(user_id_str)
 
         # Create service
@@ -223,7 +222,7 @@ async def get_financial_summary(
             include_fees=include_fees,
             include_expenses=include_expenses,
             month=month,
-            year=year
+            year=year,
         )
 
         # Get summary data
@@ -243,21 +242,22 @@ async def export_financial_report(
     export_request: ExportRequest,
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Export financial report in specified format"""
     try:
         # Check permissions
-        role = current_user.get('role')
-        await check_role_plan_permission_with_error(db, request, role, 'financial_reports', 'export')
+        role = current_user.get("role")
+        await check_role_plan_permission_with_error(db, request, role, "financial_reports", "export")
 
         # Get user info
-        user_id_str = current_user.get('sub')
-        client_name = getattr(request.state, 'client_name', None)
+        user_id_str = current_user.get("sub")
+        client_name = getattr(request.state, "client_name", None)
         tenant_id = await TenantService.get_tenant_schema(client_name)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport
+
         user_id = UUIDImport(user_id_str)
 
         # Create service
@@ -265,7 +265,9 @@ async def export_financial_report(
 
         # Support CSV, Excel, and PDF export
         if export_request.format not in ["csv", "xlsx", "pdf"]:
-            raise HTTPException(status_code=400, detail="Only CSV, Excel (.xlsx), and PDF export are currently supported")
+            raise HTTPException(
+                status_code=400, detail="Only CSV, Excel (.xlsx), and PDF export are currently supported"
+            )
 
         # Get data based on report type
         data = []
@@ -291,7 +293,7 @@ async def export_financial_report(
                 export_format=export_request.format,
                 filename=base_filename,
                 user_id=user_id,
-                tenant_id=tenant_id
+                tenant_id=tenant_id,
             )
 
             return {
@@ -300,7 +302,7 @@ async def export_financial_report(
                 "audit_id": audit_id,
                 "is_background": True,
                 "estimated_completion": "5-10 minutes",
-                "status_endpoint": f"/api/v1/reports/export-status/{audit_id}"
+                "status_endpoint": f"/api/v1/reports/export-status/{audit_id}",
             }
 
         # Generate export based on format (synchronous for small datasets)
@@ -311,9 +313,7 @@ async def export_financial_report(
             content_type = "text/csv"
         elif export_request.format == "xlsx":
             export_content, filename = await service.generate_excel_export(
-                data,
-                base_filename,
-                sheet_name=f"Financial {export_request.report_type.replace('_', ' ').title()}"
+                data, base_filename, sheet_name=f"Financial {export_request.report_type.replace('_', ' ').title()}"
             )
             content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         elif export_request.format == "pdf":
@@ -321,7 +321,7 @@ async def export_financial_report(
                 data,
                 base_filename,
                 title=f"Financial {export_request.report_type.replace('_', ' ').title()}",
-                subtitle=f"Report Type: {export_request.report_type.replace('_', ' ').title()}"
+                subtitle=f"Report Type: {export_request.report_type.replace('_', ' ').title()}",
             )
             content_type = "application/pdf"
 
@@ -333,8 +333,8 @@ async def export_financial_report(
             media_type=content_type,
             headers={
                 "Content-Disposition": f"attachment; filename={filename}",
-                "Content-Length": str(len(export_content))
-            }
+                "Content-Length": str(len(export_content)),
+            },
         )
 
     except HTTPException:

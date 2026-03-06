@@ -1,29 +1,34 @@
-from pydantic import BaseModel
-from typing import Optional, List
 from datetime import date, datetime
 from uuid import UUID
 
+from pydantic import BaseModel
+
+
 class HolidayBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     start_date: date
     end_date: date
     is_active: bool = False
     academic_year_id: UUID
-    
+
+
 class HolidayCreate(HolidayBase):
     pass
 
+
 class HolidayUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    is_active: Optional[bool] = None
-    
+    name: str | None = None
+    description: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    is_active: bool | None = None
+
+
 class HolidayRead(HolidayBase):
     id: UUID
     model_config = {"from_attributes": True}
+
 
 class HolidayDropdown(BaseModel):
     id: UUID

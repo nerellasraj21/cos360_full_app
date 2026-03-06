@@ -9,21 +9,21 @@ Hall ticket workflow:
   GET  /exams/{id}/hall-tickets/download      ?student_id=UUID
   GET  /exams/{id}/hall-tickets/download-all
 """
-from fastapi import APIRouter, Depends, Query, Request, status
-from fastapi.responses import Response
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+
 import uuid
 
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import Response
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.tenant_session import get_tenant_db
-from app.tools.simple_permissions import check_role_plan_permission_with_error
-from app.tools.simple_permissions import get_current_user_token
 from app.schemas.exam.hall_ticket_schema import (
     ComputeEligibilityResponse,
-    HallTicketEligibilityRead,
     EligibilityOverrideRequest,
+    HallTicketEligibilityRead,
     PublishHallTicketsResponse,
 )
+from app.service.exam.audit_service import log_action
 from app.service.exam.hall_ticket_service import (
     compute_eligibility,
     get_eligible_students,
@@ -31,8 +31,8 @@ from app.service.exam.hall_ticket_service import (
     override_eligibility,
     publish_hall_tickets,
 )
-from app.service.exam.audit_service import log_action
-from app.tasks.exam.hall_ticket_pdf import generate_hall_ticket_pdf, generate_all_hall_tickets_zip
+from app.tasks.exam.hall_ticket_pdf import generate_all_hall_tickets_zip, generate_hall_ticket_pdf
+from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
 router = APIRouter(prefix="/exams", tags=["Hall Tickets"])
 
@@ -45,13 +45,15 @@ async def compute_hall_ticket_eligibility(
 ):
     """Evaluate each student's attendance and fee eligibility for hall tickets."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'update')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "update")
 
     summary = await compute_eligibility(db, exam_id)
     await log_action(
-        db, exam_id, action="hall_tickets_computed",
-        performed_by=uuid.UUID(current_user.get('sub') or current_user.get('id')),
+        db,
+        exam_id,
+        action="hall_tickets_computed",
+        performed_by=uuid.UUID(current_user.get("sub") or current_user.get("id")),
         metadata={
             "total_students": summary["total_students"],
             "eligible": summary["eligible"],
@@ -62,7 +64,7 @@ async def compute_hall_ticket_eligibility(
     return summary
 
 
-@router.get("/{exam_id}/hall-tickets/eligible", response_model=List[HallTicketEligibilityRead])
+@router.get("/{exam_id}/hall-tickets/eligible", response_model=list[HallTicketEligibilityRead])
 async def list_eligible_students(
     exam_id: uuid.UUID,
     request: Request,
@@ -70,12 +72,12 @@ async def list_eligible_students(
 ):
     """List students who are eligible for a hall ticket."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     return await get_eligible_students(db, exam_id)
 
 
-@router.get("/{exam_id}/hall-tickets/ineligible", response_model=List[HallTicketEligibilityRead])
+@router.get("/{exam_id}/hall-tickets/ineligible", response_model=list[HallTicketEligibilityRead])
 async def list_ineligible_students(
     exam_id: uuid.UUID,
     request: Request,
@@ -83,8 +85,8 @@ async def list_ineligible_students(
 ):
     """List students who are NOT eligible for a hall ticket."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     return await get_ineligible_students(db, exam_id)
 
 
@@ -101,17 +103,21 @@ async def override_student_eligibility(
 ):
     """Admin manually overrides attendance or fee check for a student."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'update')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "update")
 
     row = await override_eligibility(
-        db, exam_id, student_id,
+        db,
+        exam_id,
+        student_id,
         attendance_override=payload.attendance_override,
         fee_override=payload.fee_override,
     )
     await log_action(
-        db, exam_id, action="eligibility_overridden",
-        performed_by=uuid.UUID(current_user.get('sub') or current_user.get('id')),
+        db,
+        exam_id,
+        action="eligibility_overridden",
+        performed_by=uuid.UUID(current_user.get("sub") or current_user.get("id")),
         student_id=student_id,
         metadata={
             "attendance_override": payload.attendance_override,
@@ -131,13 +137,15 @@ async def publish_hall_tickets_endpoint(
 ):
     """Make hall tickets visible to eligible students."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'update')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "update")
 
     exam = await publish_hall_tickets(db, exam_id)
     await log_action(
-        db, exam_id, action="hall_tickets_published",
-        performed_by=uuid.UUID(current_user.get('sub') or current_user.get('id')),
+        db,
+        exam_id,
+        action="hall_tickets_published",
+        performed_by=uuid.UUID(current_user.get("sub") or current_user.get("id")),
     )
     await db.commit()
     return PublishHallTicketsResponse(
@@ -156,16 +164,14 @@ async def download_hall_ticket(
 ):
     """Download a single student's hall ticket as PDF."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
 
     pdf_bytes = await generate_hall_ticket_pdf(db, exam_id, student_id)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f"attachment; filename=\"hall-ticket-{student_id}.pdf\""
-        },
+        headers={"Content-Disposition": f'attachment; filename="hall-ticket-{student_id}.pdf"'},
     )
 
 
@@ -177,14 +183,12 @@ async def download_all_hall_tickets(
 ):
     """Download all eligible hall tickets as a ZIP file."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
 
     zip_bytes = await generate_all_hall_tickets_zip(db, exam_id)
     return Response(
         content=zip_bytes,
         media_type="application/zip",
-        headers={
-            "Content-Disposition": f"attachment; filename=\"hall-tickets-{exam_id}.zip\""
-        },
+        headers={"Content-Disposition": f'attachment; filename="hall-tickets-{exam_id}.zip"'},
     )

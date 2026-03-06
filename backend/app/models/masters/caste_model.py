@@ -1,8 +1,11 @@
-from sqlalchemy import Column, String, Boolean, ForeignKey
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
-from app.db.base import BaseOrg
 import uuid
+
+from sqlalchemy import Boolean, Column, ForeignKey, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class Caste(BaseOrg):
     __tablename__ = "castes"
@@ -15,6 +18,7 @@ class Caste(BaseOrg):
     # Relationships
     sub_castes = relationship("SubCaste", back_populates="caste", cascade="all, delete-orphan")
     students = relationship("Student", back_populates="caste_obj", foreign_keys="Student.caste_id")
+
 
 class SubCaste(BaseOrg):
     __tablename__ = "sub_castes"

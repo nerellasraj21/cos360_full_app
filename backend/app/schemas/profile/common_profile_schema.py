@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+
 
 class PasswordChangeRequest(BaseModel):
     current_password: str = Field(..., min_length=1, description="Current password")
@@ -11,18 +11,14 @@ class PasswordChangeRequest(BaseModel):
             "example": {
                 "current_password": "oldPassword123",
                 "new_password": "newPassword456!",
-                "confirm_password": "newPassword456!"
+                "confirm_password": "newPassword456!",
             }
         }
+
 
 class PasswordChangeResponse(BaseModel):
     message: str
     success: bool
 
     class Config:
-        json_schema_extra = {
-            "example": {
-                "message": "Password changed successfully",
-                "success": True
-            }
-        }
+        json_schema_extra = {"example": {"message": "Password changed successfully", "success": True}}

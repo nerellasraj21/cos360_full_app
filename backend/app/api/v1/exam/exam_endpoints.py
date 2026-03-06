@@ -1,39 +1,39 @@
 # app/api/v1/exam/exam_endpoints.py
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError
-from typing import List, Optional
 import uuid
 
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.tenant_session import get_tenant_db
-from app.tools.simple_permissions import check_role_plan_permission_with_error
-from app.tools.simple_permissions import get_current_user_token
-from app.schemas.exam.exam_create_full_schema import ExamCreateFull, ExamCreateFullResponse
-from app.schemas.exam.exam_schema import ExamUpdate, ExamRead, ExamListItem
 from app.schemas.exam.exam_class_section_schema import ExamClassSectionRead
-from app.schemas.exam.exam_subject_config_schema import ExamSubjectConfigUpdate, ExamSubjectConfigRead
-from app.service.exam.exam_service import (
-    create_full_exam,
-    list_exams,
-    get_exam_or_404,
-    update_exam,
-    delete_exam,
-    clone_exam,
-    get_class_sections_for_exam,
-)
-from app.service.exam.result_service import unlock_exam
-from app.service.exam.audit_service import log_action
+from app.schemas.exam.exam_create_full_schema import ExamCreateFull, ExamCreateFullResponse
+from app.schemas.exam.exam_schema import ExamListItem, ExamRead, ExamUpdate
+from app.schemas.exam.exam_subject_config_schema import ExamSubjectConfigRead, ExamSubjectConfigUpdate
 from app.schemas.exam.result_schema import UnlockExamRequest, UnlockExamResponse
+from app.service.exam.audit_service import log_action
+from app.service.exam.exam_service import (
+    clone_exam,
+    create_full_exam,
+    delete_exam,
+    get_class_sections_for_exam,
+    get_exam_or_404,
+    list_exams,
+    update_exam,
+)
 from app.service.exam.exam_subject_config_service import (
-    get_configs_for_exam,
     get_config_or_404,
+    get_configs_for_exam,
     update_config,
 )
+from app.service.exam.result_service import unlock_exam
+from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
 router = APIRouter(prefix="/exams", tags=["Exams"])
 
 
 # ── Sprint 2 · Exam CRUD ──────────────────────────────────────────────────────
+
 
 @router.post("", response_model=ExamCreateFullResponse, status_code=status.HTTP_201_CREATED)
 async def create_exam(
@@ -43,35 +43,35 @@ async def create_exam(
 ):
     """Create a new exam with class-sections, subject configs, and exam dates."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'create')
-    user_id = uuid.UUID(current_user.get('sub') or current_user.get('id'))
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "create")
+    user_id = uuid.UUID(current_user.get("sub") or current_user.get("id"))
     try:
         result = await create_full_exam(db, payload, created_by=user_id)
         await db.commit()
     except IntegrityError as e:
         await db.rollback()
-        if 'uq_exam_name_academic_year' in str(e.orig):
+        if "uq_exam_name_academic_year" in str(e.orig):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"An exam named '{payload.exam.exam_name}' already exists for this academic year."
+                detail=f"An exam named '{payload.exam.exam_name}' already exists for this academic year.",
             )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e.orig))
     return result
 
 
-@router.get("", response_model=List[ExamListItem])
+@router.get("", response_model=list[ExamListItem])
 async def list_exams_endpoint(
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
-    academic_year_id: Optional[uuid.UUID] = None,
-    exam_status: Optional[str] = None,
-    nature: Optional[str] = None,
+    academic_year_id: uuid.UUID | None = None,
+    exam_status: str | None = None,
+    nature: str | None = None,
 ):
     """List exams with optional filters."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     results = await list_exams(
         db,
         academic_year_id=academic_year_id,
@@ -89,8 +89,8 @@ async def get_exam(
 ):
     """Get full exam detail including class-sections, subject configs, dates."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     result = await get_exam_or_404(db, exam_id)
     return result
 
@@ -104,8 +104,8 @@ async def update_exam_endpoint(
 ):
     """Update exam header fields (draft or active exams only)."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'update')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "update")
     result = await update_exam(db, exam_id, payload)
     await db.commit()
     await db.refresh(result)
@@ -120,8 +120,8 @@ async def delete_exam_endpoint(
 ):
     """Delete an exam (draft status only)."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'delete')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "delete")
     await delete_exam(db, exam_id)
     await db.commit()
 
@@ -134,9 +134,9 @@ async def clone_exam_endpoint(
 ):
     """Clone an existing exam (creates a new draft copying all configs)."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'create')
-    user_id = uuid.UUID(current_user.get('sub') or current_user.get('id'))
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "create")
+    user_id = uuid.UUID(current_user.get("sub") or current_user.get("id"))
     result = await clone_exam(db, exam_id, created_by=user_id)
     await db.commit()
     await db.refresh(result)
@@ -145,7 +145,8 @@ async def clone_exam_endpoint(
 
 # ── Class Sections ────────────────────────────────────────────────────────────
 
-@router.get("/{exam_id}/class-sections", response_model=List[ExamClassSectionRead])
+
+@router.get("/{exam_id}/class-sections", response_model=list[ExamClassSectionRead])
 async def list_class_sections(
     exam_id: uuid.UUID,
     request: Request,
@@ -153,22 +154,23 @@ async def list_class_sections(
 ):
     """List all class-section rows for an exam (used by mark entry page)."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     return await get_class_sections_for_exam(db, exam_id)
 
 
 # ── Subject Configs ───────────────────────────────────────────────────────────
 
-@router.get("/{exam_id}/subject-configs", response_model=List[ExamSubjectConfigRead])
+
+@router.get("/{exam_id}/subject-configs", response_model=list[ExamSubjectConfigRead])
 async def list_subject_configs(
     exam_id: uuid.UUID,
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     results = await get_configs_for_exam(db, exam_id)
     return results
 
@@ -181,8 +183,8 @@ async def get_subject_config(
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     result = await get_config_or_404(db, config_id)
     return result
 
@@ -196,14 +198,15 @@ async def update_subject_config(
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'update')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "update")
     result = await update_config(db, config_id, payload)
     await db.commit()
     return result
 
 
 # ── Exam Lifecycle ────────────────────────────────────────────────────────────
+
 
 @router.post("/{exam_id}/unlock", response_model=UnlockExamResponse)
 async def unlock_exam_endpoint(
@@ -214,13 +217,15 @@ async def unlock_exam_endpoint(
 ):
     """Revert a locked/published exam to active for mark correction."""
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'update')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "update")
 
     exam = await unlock_exam(db, exam_id, reason=payload.reason)
     await log_action(
-        db, exam_id, action="exam_unlocked",
-        performed_by=uuid.UUID(current_user.get('sub') or current_user.get('id')),
+        db,
+        exam_id,
+        action="exam_unlocked",
+        performed_by=uuid.UUID(current_user.get("sub") or current_user.get("id")),
         reason=payload.reason,
     )
     await db.commit()

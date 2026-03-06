@@ -1,14 +1,18 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date, TIMESTAMP, func, Enum
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
-from app.db.base import BaseOrg
 import enum
 import uuid
+
+from sqlalchemy import Column, Date, ForeignKey, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class GenderEnum(enum.Enum):
     Male = "Male"
     Female = "Female"
     Other = "Other"
+
 
 class Student(BaseOrg):
     __tablename__ = "students"
@@ -47,7 +51,7 @@ class Student(BaseOrg):
 
     @property
     def father(self):
-        if hasattr(self, '_father'):
+        if hasattr(self, "_father"):
             return self._father
         return None
 
@@ -57,7 +61,7 @@ class Student(BaseOrg):
 
     @property
     def mother(self):
-        if hasattr(self, '_mother'):
+        if hasattr(self, "_mother"):
             return self._mother
         return None
 

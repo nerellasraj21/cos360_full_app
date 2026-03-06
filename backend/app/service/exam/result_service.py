@@ -1,9 +1,8 @@
 from uuid import UUID
-from typing import Optional
 
 from fastapi import HTTPException, status
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
 
 from app.models.exam.exam_model import Exam
 from app.service.exam.exam_service import get_exam_or_404
@@ -12,9 +11,9 @@ from app.service.exam.exam_service import get_exam_or_404
 async def get_exam_results(
     db: AsyncSession,
     exam_id: UUID,
-    student_id: Optional[UUID] = None,
-    class_id: Optional[UUID] = None,
-    section_id: Optional[UUID] = None,
+    student_id: UUID | None = None,
+    class_id: UUID | None = None,
+    section_id: UUID | None = None,
 ) -> list[dict]:
     """
     Return exam results enriched with student_name, admission_number,
@@ -137,23 +136,23 @@ async def get_student_result_or_404(
 
 async def publish_exam(db: AsyncSession, exam_id: UUID) -> Exam:
     exam = await get_exam_or_404(db, exam_id)
-    if exam.status not in ('locked', 'active', 'finalized'):
+    if exam.status not in ("locked", "active", "finalized"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Exam status '{exam.status}' cannot be published. Must be locked or active.",
         )
-    exam.status = 'published'
+    exam.status = "published"
     await db.flush()
     return exam
 
 
 async def unlock_exam(db: AsyncSession, exam_id: UUID, reason: str) -> Exam:
     exam = await get_exam_or_404(db, exam_id)
-    if exam.status not in ('locked', 'published', 'finalized'):
+    if exam.status not in ("locked", "published", "finalized"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Exam status '{exam.status}' cannot be unlocked. Must be locked, published, or finalized.",
         )
-    exam.status = 'active'
+    exam.status = "active"
     await db.flush()
     return exam

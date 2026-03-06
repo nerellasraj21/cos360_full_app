@@ -1,8 +1,10 @@
-from sqlalchemy import Column, String, DateTime, Text, Integer, Boolean
-from sqlalchemy.dialects.postgresql import UUID
-from app.db.base import BasePublic
-import uuid
 from datetime import datetime
+import uuid
+
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
+
+from app.db.base import BasePublic
 
 
 class ReportAudit(BasePublic):
@@ -22,4 +24,3 @@ class ReportAudit(BasePublic):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime)
     is_background_job = Column(Boolean, default=False)
-

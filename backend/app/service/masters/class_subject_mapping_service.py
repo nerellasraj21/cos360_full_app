@@ -1,22 +1,23 @@
+import logging
+from uuid import UUID
+
 from fastapi import HTTPException
-from sqlalchemy import select, delete, func, update
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from app.models.masters.class_subject_mapping_model import ClassSubjectMap
+
+from app.models.masters.academic_year_model import AcademicYear
 from app.models.masters.class_model import Class
+from app.models.masters.class_subject_mapping_model import ClassSubjectMap
 from app.models.masters.sections_model import Section
 from app.models.masters.subject_model import Subject
-from app.models.masters.academic_year_model import AcademicYear
 from app.schemas.masters.class_subject_mapping_schema import (
     ClassSubjectMapCreate,
     ClassSubjectMapUpdate,
-    ClassSubjectMapRead
 )
-from typing import List, Optional
-from uuid import UUID
-import logging
 
 log = logging.getLogger("masters.class_subject_mapping_service")
+
 
 async def create_class_subject_mapping(db: AsyncSession, mapping_data: ClassSubjectMapCreate) -> ClassSubjectMap:
     """Create a single class-subject mapping"""
@@ -31,7 +32,7 @@ async def create_class_subject_mapping(db: AsyncSession, mapping_data: ClassSubj
                 selectinload(ClassSubjectMap.class_),
                 selectinload(ClassSubjectMap.section),
                 selectinload(ClassSubjectMap.subject),
-                selectinload(ClassSubjectMap.academic_year)
+                selectinload(ClassSubjectMap.academic_year),
             )
             .where(ClassSubjectMap.id == mapping.id)
         )
@@ -44,12 +45,9 @@ async def create_class_subject_mapping(db: AsyncSession, mapping_data: ClassSubj
         log.error(f"Failed to create class-subject mapping: {e}")
         raise HTTPException(status_code=400, detail="Class-subject mapping creation failed.")
 
+
 async def _process_section_mappings(
-    db: AsyncSession,
-    class_id: UUID,
-    section_id: UUID,
-    academic_year_id: UUID,
-    mappings_data: List[dict]
+    db: AsyncSession, class_id: UUID, section_id: UUID, academic_year_id: UUID, mappings_data: list[dict]
 ) -> dict:
     """
     Internal helper to process mappings for a single section.
@@ -60,13 +58,13 @@ async def _process_section_mappings(
         select(ClassSubjectMap).where(
             ClassSubjectMap.class_id == class_id,
             ClassSubjectMap.section_id == section_id,
-            ClassSubjectMap.academic_year_id == academic_year_id
+            ClassSubjectMap.academic_year_id == academic_year_id,
         )
     )
     existing_mappings = {m.subject_id: m for m in existing_result.scalars().all()}
 
     # Extract subject_ids from the incoming request
-    incoming_subject_ids = {mapping_data['subject_id'] for mapping_data in mappings_data}
+    incoming_subject_ids = {mapping_data["subject_id"] for mapping_data in mappings_data}
 
     # Mark mappings as inactive if their subject_id is NOT in the incoming request
     deactivated_count = 0
@@ -81,12 +79,10 @@ async def _process_section_mappings(
     processed_mapping_ids = []
 
     for mapping_data in mappings_data:
-        subject_id = mapping_data['subject_id']
+        subject_id = mapping_data["subject_id"]
 
         # Verify subject exists
-        subject_result = await db.execute(
-            select(Subject).where(Subject.id == subject_id)
-        )
+        subject_result = await db.execute(select(Subject).where(Subject.id == subject_id))
         subject = subject_result.scalar_one_or_none()
         if not subject:
             log.warning(f"Subject {subject_id} not found, skipping")
@@ -95,9 +91,9 @@ async def _process_section_mappings(
         if subject_id in existing_mappings:
             # Update existing mapping
             existing_mapping = existing_mappings[subject_id]
-            existing_mapping.exclude_marks = mapping_data.get('exclude_marks', False)
-            existing_mapping.order = mapping_data.get('order', None)
-            existing_mapping.is_active = mapping_data.get('is_active', True)
+            existing_mapping.exclude_marks = mapping_data.get("exclude_marks", False)
+            existing_mapping.order = mapping_data.get("order", None)
+            existing_mapping.is_active = mapping_data.get("is_active", True)
             updated_count += 1
             processed_mapping_ids.append(existing_mapping.id)
         else:
@@ -107,9 +103,9 @@ async def _process_section_mappings(
                 section_id=section_id,
                 subject_id=subject_id,
                 academic_year_id=academic_year_id,
-                exclude_marks=mapping_data.get('exclude_marks', False),
-                order=mapping_data.get('order', None),
-                is_active=mapping_data.get('is_active', True)
+                exclude_marks=mapping_data.get("exclude_marks", False),
+                order=mapping_data.get("order", None),
+                is_active=mapping_data.get("is_active", True),
             )
             db.add(new_mapping)
             await db.flush()
@@ -120,16 +116,12 @@ async def _process_section_mappings(
         "created_count": created_count,
         "updated_count": updated_count,
         "deactivated_count": deactivated_count,
-        "processed_mapping_ids": processed_mapping_ids
+        "processed_mapping_ids": processed_mapping_ids,
     }
 
 
 async def bulk_create_or_update_class_subject_mappings(
-    db: AsyncSession,
-    class_id: UUID,
-    section_id: Optional[UUID],
-    academic_year_id: UUID,
-    mappings_data: List[dict]
+    db: AsyncSession, class_id: UUID, section_id: UUID | None, academic_year_id: UUID, mappings_data: list[dict]
 ) -> dict:
     """
     Bulk create or update class-subject mappings for a specific class and section.
@@ -165,13 +157,13 @@ async def bulk_create_or_update_class_subject_mappings(
             )
             section_obj = section_result.scalar_one_or_none()
             if not section_obj:
-                raise HTTPException(status_code=404, detail="Section not found or does not belong to the specified class")
+                raise HTTPException(
+                    status_code=404, detail="Section not found or does not belong to the specified class"
+                )
             sections_to_process = [section_obj]
         else:
             # Get ALL active sections for this class
-            sections_result = await db.execute(
-                select(Section).where(Section.class_id == class_id, Section.is_active == True)
-            )
+            sections_result = await db.execute(select(Section).where(Section.class_id == class_id, Section.is_active))
             sections_to_process = sections_result.scalars().all()
             if not sections_to_process:
                 raise HTTPException(status_code=404, detail="No active sections found for this class")
@@ -184,9 +176,7 @@ async def bulk_create_or_update_class_subject_mappings(
 
         # Process each section
         for section in sections_to_process:
-            result = await _process_section_mappings(
-                db, class_id, section.id, academic_year_id, mappings_data
-            )
+            result = await _process_section_mappings(db, class_id, section.id, academic_year_id, mappings_data)
             total_created += result["created_count"]
             total_updated += result["updated_count"]
             total_deactivated += result["deactivated_count"]
@@ -201,7 +191,7 @@ async def bulk_create_or_update_class_subject_mappings(
                     selectinload(ClassSubjectMap.class_),
                     selectinload(ClassSubjectMap.section),
                     selectinload(ClassSubjectMap.subject),
-                    selectinload(ClassSubjectMap.academic_year)
+                    selectinload(ClassSubjectMap.academic_year),
                 )
                 .where(ClassSubjectMap.id.in_(all_processed_ids))
             )
@@ -223,7 +213,7 @@ async def bulk_create_or_update_class_subject_mappings(
             "updated_count": total_updated,
             "deactivated_count": total_deactivated,
             "sections_processed": sections_count,
-            "mappings": processed_mappings
+            "mappings": processed_mappings,
         }
 
     except HTTPException:
@@ -234,6 +224,7 @@ async def bulk_create_or_update_class_subject_mappings(
         log.error(f"Failed to bulk create/update class-subject mappings: {e}")
         raise HTTPException(status_code=400, detail=f"Bulk operation failed: {str(e)}")
 
+
 async def get_class_subject_mapping_by_id(db: AsyncSession, mapping_id: UUID) -> ClassSubjectMap:
     """Get a single class-subject mapping by ID"""
     result = await db.execute(
@@ -242,7 +233,7 @@ async def get_class_subject_mapping_by_id(db: AsyncSession, mapping_id: UUID) ->
             selectinload(ClassSubjectMap.class_),
             selectinload(ClassSubjectMap.section),
             selectinload(ClassSubjectMap.subject),
-            selectinload(ClassSubjectMap.academic_year)
+            selectinload(ClassSubjectMap.academic_year),
         )
         .where(ClassSubjectMap.id == mapping_id)
     )
@@ -251,20 +242,25 @@ async def get_class_subject_mapping_by_id(db: AsyncSession, mapping_id: UUID) ->
         raise HTTPException(status_code=404, detail="Class-subject mapping not found")
     return mapping
 
+
 async def get_class_subject_mappings_by_class(
     db: AsyncSession,
     class_id: UUID,
-    section_id: Optional[UUID] = None,
-    academic_year_id: Optional[UUID] = None,
-    active_only: bool = True
-) -> List[ClassSubjectMap]:
+    section_id: UUID | None = None,
+    academic_year_id: UUID | None = None,
+    active_only: bool = True,
+) -> list[ClassSubjectMap]:
     """Get all subject mappings for a specific class and optionally section"""
-    query = select(ClassSubjectMap).options(
-        selectinload(ClassSubjectMap.class_),
-        selectinload(ClassSubjectMap.section),
-        selectinload(ClassSubjectMap.subject),
-        selectinload(ClassSubjectMap.academic_year)
-    ).where(ClassSubjectMap.class_id == class_id)
+    query = (
+        select(ClassSubjectMap)
+        .options(
+            selectinload(ClassSubjectMap.class_),
+            selectinload(ClassSubjectMap.section),
+            selectinload(ClassSubjectMap.subject),
+            selectinload(ClassSubjectMap.academic_year),
+        )
+        .where(ClassSubjectMap.class_id == class_id)
+    )
 
     if section_id:
         query = query.where(ClassSubjectMap.section_id == section_id)
@@ -273,7 +269,7 @@ async def get_class_subject_mappings_by_class(
         query = query.where(ClassSubjectMap.academic_year_id == academic_year_id)
 
     if active_only:
-        query = query.where(ClassSubjectMap.is_active == True)
+        query = query.where(ClassSubjectMap.is_active)
 
     # Order by the 'order' field
     query = query.order_by(ClassSubjectMap.order.asc().nullsfirst())
@@ -281,14 +277,15 @@ async def get_class_subject_mappings_by_class(
     result = await db.execute(query)
     return result.scalars().all()
 
+
 async def get_all_class_subject_mappings(
     db: AsyncSession,
     skip: int = 0,
     limit: int = 100,
-    class_id: Optional[UUID] = None,
-    section_id: Optional[UUID] = None,
-    academic_year_id: Optional[UUID] = None,
-    active_only: bool = True
+    class_id: UUID | None = None,
+    section_id: UUID | None = None,
+    academic_year_id: UUID | None = None,
+    active_only: bool = True,
 ):
     """Get all class-subject mappings with pagination metadata"""
     # Build base query with filters
@@ -296,7 +293,7 @@ async def get_all_class_subject_mappings(
         selectinload(ClassSubjectMap.class_),
         selectinload(ClassSubjectMap.section),
         selectinload(ClassSubjectMap.subject),
-        selectinload(ClassSubjectMap.academic_year)
+        selectinload(ClassSubjectMap.academic_year),
     )
 
     # Build count query with same filters
@@ -315,18 +312,20 @@ async def get_all_class_subject_mappings(
         count_query = count_query.where(ClassSubjectMap.academic_year_id == academic_year_id)
 
     if active_only:
-        base_query = base_query.where(ClassSubjectMap.is_active == True)
-        count_query = count_query.where(ClassSubjectMap.is_active == True)
+        base_query = base_query.where(ClassSubjectMap.is_active)
+        count_query = count_query.where(ClassSubjectMap.is_active)
 
     total_count_result = await db.execute(count_query)
     total_count = total_count_result.scalar()
 
     # Get paginated items
-    items_query = base_query.order_by(
-        ClassSubjectMap.class_id,
-        ClassSubjectMap.section_id,
-        ClassSubjectMap.order.asc().nullsfirst()
-    ).offset(skip).limit(limit)
+    items_query = (
+        base_query.order_by(
+            ClassSubjectMap.class_id, ClassSubjectMap.section_id, ClassSubjectMap.order.asc().nullsfirst()
+        )
+        .offset(skip)
+        .limit(limit)
+    )
 
     items_result = await db.execute(items_query)
     items = items_result.unique().scalars().all()
@@ -334,22 +333,15 @@ async def get_all_class_subject_mappings(
     # Calculate has_next
     has_next = (skip + limit) < total_count
 
-    return {
-        "items": items,
-        "total_count": total_count,
-        "has_next": has_next
-    }
+    return {"items": items, "total_count": total_count, "has_next": has_next}
+
 
 async def update_class_subject_mapping(
-    db: AsyncSession,
-    mapping_id: UUID,
-    mapping_update: ClassSubjectMapUpdate
+    db: AsyncSession, mapping_id: UUID, mapping_update: ClassSubjectMapUpdate
 ) -> ClassSubjectMap:
     """Update a single class-subject mapping"""
     try:
-        result = await db.execute(
-            select(ClassSubjectMap).where(ClassSubjectMap.id == mapping_id)
-        )
+        result = await db.execute(select(ClassSubjectMap).where(ClassSubjectMap.id == mapping_id))
         mapping = result.scalar_one_or_none()
 
         if not mapping:
@@ -369,7 +361,7 @@ async def update_class_subject_mapping(
                 selectinload(ClassSubjectMap.class_),
                 selectinload(ClassSubjectMap.section),
                 selectinload(ClassSubjectMap.subject),
-                selectinload(ClassSubjectMap.academic_year)
+                selectinload(ClassSubjectMap.academic_year),
             )
             .where(ClassSubjectMap.id == mapping_id)
         )
@@ -386,21 +378,20 @@ async def update_class_subject_mapping(
         log.error(f"Failed to update class-subject mapping: {e}")
         raise HTTPException(status_code=400, detail="Update failed")
 
+
 async def delete_class_subject_mapping(db: AsyncSession, mapping_id: UUID) -> bool:
     """Delete a class-subject mapping"""
     try:
-        result = await db.execute(
-            select(ClassSubjectMap).where(ClassSubjectMap.id == mapping_id)
-        )
+        result = await db.execute(select(ClassSubjectMap).where(ClassSubjectMap.id == mapping_id))
         mapping = result.scalar_one_or_none()
-        
+
         if not mapping:
             raise HTTPException(status_code=404, detail="Class-subject mapping not found")
-        
+
         await db.delete(mapping)
         await db.commit()
         return True
-        
+
     except HTTPException:
         await db.rollback()
         raise
@@ -409,18 +400,20 @@ async def delete_class_subject_mapping(db: AsyncSession, mapping_id: UUID) -> bo
         log.error(f"Failed to delete class-subject mapping: {e}")
         raise HTTPException(status_code=400, detail="Delete failed")
 
+
 async def get_class_subject_mappings_dropdown(
-    db: AsyncSession,
-    class_id: Optional[UUID] = None,
-    section_id: Optional[UUID] = None,
-    academic_year_id: Optional[UUID] = None
-) -> List[dict]:
+    db: AsyncSession, class_id: UUID | None = None, section_id: UUID | None = None, academic_year_id: UUID | None = None
+) -> list[dict]:
     """Get class-subject mappings for dropdown"""
-    query = select(ClassSubjectMap).options(
-        selectinload(ClassSubjectMap.class_),
-        selectinload(ClassSubjectMap.section),
-        selectinload(ClassSubjectMap.subject)
-    ).where(ClassSubjectMap.is_active == True)
+    query = (
+        select(ClassSubjectMap)
+        .options(
+            selectinload(ClassSubjectMap.class_),
+            selectinload(ClassSubjectMap.section),
+            selectinload(ClassSubjectMap.subject),
+        )
+        .where(ClassSubjectMap.is_active)
+    )
 
     if class_id:
         query = query.where(ClassSubjectMap.class_id == class_id)
@@ -443,7 +436,7 @@ async def get_class_subject_mappings_dropdown(
             "section_name": mapping.section.name if mapping.section else None,
             "subject_name": mapping.subject.name if mapping.subject else None,
             "exclude_marks": mapping.exclude_marks,
-            "order": mapping.order
+            "order": mapping.order,
         }
         for mapping in mappings
     ]

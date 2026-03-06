@@ -1,8 +1,11 @@
-from sqlalchemy import Column, Integer, String, Boolean, Date
-from app.db.base import BaseOrg
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import Boolean, Column, Date, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class Vehicle(BaseOrg):
     __tablename__ = "vehicles"

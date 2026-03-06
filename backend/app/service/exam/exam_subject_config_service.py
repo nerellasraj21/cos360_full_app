@@ -1,10 +1,11 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
-from fastapi import HTTPException, status
 from uuid import UUID
 
-from app.models.exam.exam_subject_config_model import ExamSubjectConfig, ExamSubjectComponent
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.exam.exam_subject_config_model import ExamSubjectConfig
 from app.schemas.exam.exam_subject_config_schema import ExamSubjectConfigUpdate
 
 

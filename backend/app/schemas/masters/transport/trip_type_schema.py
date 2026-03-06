@@ -1,22 +1,26 @@
-from pydantic import BaseModel
-from typing import Optional
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel
+
 
 class TripTypeBase(BaseModel):
     type_name: str
-    description: Optional[str] = None
+    description: str | None = None
     is_active: bool = True
+
 
 class TripTypeCreate(TripTypeBase):
     pass
 
+
 class TripTypeUpdate(BaseModel):
-    type_name: Optional[str] = None
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
+    type_name: str | None = None
+    description: str | None = None
+    is_active: bool | None = None
 
     model_config = {"from_attributes": True}
+
 
 class TripTypeOut(TripTypeBase):
     id: UUID
@@ -25,6 +29,7 @@ class TripTypeOut(TripTypeBase):
 
     class Config:
         from_attributes = True
+
 
 class TripTypeDropdown(BaseModel):
     id: UUID

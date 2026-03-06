@@ -1,24 +1,24 @@
-from app.db.base import BaseOrg
-from sqlalchemy import TIMESTAMP, Column, String, func, Boolean, Numeric, Integer, Text, JSON, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import JSON, TIMESTAMP, Boolean, Column, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import UUID
+
+from app.db.base import BaseOrg
 
 
 class ExpenseSettings(BaseOrg):
     __tablename__ = "expense_settings"
 
     # Ensure one setting per tenant per setting key
-    __table_args__ = (
-        UniqueConstraint('setting_key', name='uq_expense_setting_key'),
-    )
+    __table_args__ = (UniqueConstraint("setting_key", name="uq_expense_setting_key"),)
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     org_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
     # Setting Identification
     setting_key = Column(String(100), nullable=False, index=True)  # auto_approval_limit, require_receipts, etc.
-    setting_name = Column(String(200), nullable=False)            # Human-readable name
-    setting_description = Column(Text, nullable=True)             # Description of what this setting controls
+    setting_name = Column(String(200), nullable=False)  # Human-readable name
+    setting_description = Column(Text, nullable=True)  # Description of what this setting controls
     setting_category = Column(String(50), nullable=False, index=True)  # approval, workflow, security, compliance
 
     # Setting Values (flexible storage)
@@ -35,7 +35,7 @@ class ExpenseSettings(BaseOrg):
 
     # Validation Rules
     validation_rules = Column(JSON, nullable=True)  # JSON schema for validation
-    allowed_values = Column(JSON, nullable=True)   # Array of allowed values for enum-type settings
+    allowed_values = Column(JSON, nullable=True)  # Array of allowed values for enum-type settings
 
     # Approval & Workflow Settings
     requires_approval = Column(Boolean, default=False)  # Whether changing this setting requires approval
@@ -46,8 +46,8 @@ class ExpenseSettings(BaseOrg):
     applies_to_all_departments = Column(Boolean, default=True)
 
     # Compliance & Security
-    is_audit_required = Column(Boolean, default=True)    # Whether changes should be audited
-    is_sensitive = Column(Boolean, default=False)        # Whether this is a sensitive setting
+    is_audit_required = Column(Boolean, default=True)  # Whether changes should be audited
+    is_sensitive = Column(Boolean, default=False)  # Whether this is a sensitive setting
     compliance_level = Column(String(20), default="standard")  # standard, high, critical
 
     # Concurrency Control (Security)
@@ -56,7 +56,7 @@ class ExpenseSettings(BaseOrg):
     # Activation & Status
     is_active = Column(Boolean, default=True)
     effective_from = Column(TIMESTAMP, nullable=True)  # When this setting becomes effective
-    effective_until = Column(TIMESTAMP, nullable=True) # When this setting expires
+    effective_until = Column(TIMESTAMP, nullable=True)  # When this setting expires
 
     # Audit (Security)
     created_by_user_id = Column(UUID(as_uuid=True), nullable=False, index=True)

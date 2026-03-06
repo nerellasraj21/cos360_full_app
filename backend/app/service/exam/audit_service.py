@@ -1,8 +1,9 @@
+from typing import Any
 import uuid
-from typing import Optional, Any
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
+
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.exam.audit_log_model import ExamAuditLog
 
@@ -12,14 +13,14 @@ async def log_action(
     exam_id: UUID,
     action: str,
     performed_by: UUID,
-    student_id: Optional[UUID] = None,
-    subject_id: Optional[UUID] = None,
-    component_id: Optional[UUID] = None,
-    old_value: Optional[str] = None,
-    new_value: Optional[str] = None,
-    reason: Optional[str] = None,
-    entry_source: Optional[str] = None,
-    metadata: Optional[Any] = None,
+    student_id: UUID | None = None,
+    subject_id: UUID | None = None,
+    component_id: UUID | None = None,
+    old_value: str | None = None,
+    new_value: str | None = None,
+    reason: str | None = None,
+    entry_source: str | None = None,
+    metadata: Any | None = None,
 ) -> ExamAuditLog:
     """Append-only audit log insert. Never update or delete rows from this table."""
     entry = ExamAuditLog(

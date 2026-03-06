@@ -1,18 +1,19 @@
-from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional
 from datetime import time
 from uuid import UUID
 
+from pydantic import BaseModel, Field, model_validator
 
 # ----------------------------
 # Subject Option Schema
 # ----------------------------
 
+
 class TimetableSubjectOptionCreate(BaseModel):
     subject_id: UUID
 
+
 class TimetableSubjectOptionUpdate(BaseModel):
-    subject_ids: Optional[List[UUID]] = Field(None, description="Updated list of subject IDs")
+    subject_ids: list[UUID] | None = Field(None, description="Updated list of subject IDs")
 
     class Config:
         from_attributes = True
@@ -20,7 +21,7 @@ class TimetableSubjectOptionUpdate(BaseModel):
 
 class TimetableSubjectOptionOut(BaseModel):
     id: UUID
-    subject_id: Optional[UUID]
+    subject_id: UUID | None
 
     class Config:
         from_attributes = True
@@ -30,14 +31,15 @@ class TimetableSubjectOptionOut(BaseModel):
 # Timetable Slot Schemas
 # ----------------------------
 
+
 class TimetableSlotBase(BaseModel):
     day: str = Field(..., description="Day of the week (e.g., Monday)")
     is_break: bool = False
-    break_label: Optional[str] = Field(None, description="e.g., LUNCH")
+    break_label: str | None = Field(None, description="e.g., LUNCH")
 
 
 class TimetableSlotCreate(TimetableSlotBase):
-    subject_options: Optional[List[TimetableSubjectOptionCreate]] = []
+    subject_options: list[TimetableSubjectOptionCreate] | None = []
 
     @model_validator(mode="after")
     def validate_fields(cls, values):
@@ -52,25 +54,27 @@ class TimetableSlotCreate(TimetableSlotBase):
             if not values.subject_options or len(values.subject_options) == 0:
                 raise ValueError("`subject_options` must be provided when `is_break` is False.")
         return values
-    
+
+
 class TimetableSlotCreateGrouped(BaseModel):
     slot_time_id: UUID
-    slots: List[TimetableSlotCreate]
+    slots: list[TimetableSlotCreate]
 
-    
+
 class FullTimetableCreate(BaseModel):
     section_id: UUID
-    slot_time_data: List[TimetableSlotCreateGrouped]
-    
+    slot_time_data: list[TimetableSlotCreateGrouped]
+
+
 class TimetableSlotUpdate(BaseModel):
     pass
 
 
 class TimetableSlotPartialUpdate(BaseModel):
-    day: Optional[str] = None
-    is_break: Optional[bool] = None
-    break_label: Optional[str] = Field(None, description="e.g., LUNCH")
-    subject_options: Optional[List[TimetableSubjectOptionCreate]] = []
+    day: str | None = None
+    is_break: bool | None = None
+    break_label: str | None = Field(None, description="e.g., LUNCH")
+    subject_options: list[TimetableSubjectOptionCreate] | None = []
 
     @model_validator(mode="after")
     def validate_fields(cls, values):
@@ -85,16 +89,17 @@ class TimetableSlotPartialUpdate(BaseModel):
             if not values.subject_options or len(values.subject_options) == 0:
                 raise ValueError("`subject_options` must be provided when `is_break` is False.")
         return values
-    
+
     model_config = {"from_attributes": True}
 
 
 class TimetableSlotOut(TimetableSlotBase):
     id: UUID
-    subject_options: List[TimetableSubjectOptionOut]
+    subject_options: list[TimetableSubjectOptionOut]
 
     class Config:
         from_attributes = True
+
 
 class SlotTimeCreate(BaseModel):
     section_id: UUID
@@ -102,14 +107,17 @@ class SlotTimeCreate(BaseModel):
     start_time: time
     end_time: time
 
+
 class SlotTimeUpdate(SlotTimeCreate):
     pass
 
+
 class SlotTimePartialUpdate(BaseModel):
-    section_id: Optional[int] = None
-    label: Optional[str] = None
-    start_time: Optional[time] = None
-    end_time: Optional[time] = None
+    section_id: int | None = None
+    label: str | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+
 
 class SlotTimeOut(SlotTimeCreate):
     id: UUID
@@ -117,33 +125,36 @@ class SlotTimeOut(SlotTimeCreate):
     class Config:
         from_attributes = True
 
+
 class GroupedSlotOut(BaseModel):
     slot_time_id: UUID
-    slots: List[TimetableSlotOut]
+    slots: list[TimetableSlotOut]
+
 
 class GroupedSectionTimetableOut(BaseModel):
     section_id: UUID
-    slot_time_data: List[GroupedSlotOut]
-
+    slot_time_data: list[GroupedSlotOut]
 
 
 # ----------------------------
 # Bulk Output for a Section's Timetable
 # ----------------------------
 
+
 class SectionTimetableOut(BaseModel):
     section_id: UUID
-    slots: List[TimetableSlotOut]
+    slots: list[TimetableSlotOut]
 
 
 SectionTimetableOut.model_rebuild()
 
+
 class TimetableSlotBulkUpdateItem(BaseModel):
     id: UUID  # Required to identify which slot to update
-    day: Optional[str] = None
-    is_break: Optional[bool] = None
-    break_label: Optional[str] = None
-    subject_options: Optional[List[TimetableSubjectOptionCreate]] = None
+    day: str | None = None
+    is_break: bool | None = None
+    break_label: str | None = None
+    subject_options: list[TimetableSubjectOptionCreate] | None = None
 
     @model_validator(mode="after")
     def validate_fields(cls, values):
@@ -159,13 +170,15 @@ class TimetableSlotBulkUpdateItem(BaseModel):
                 raise ValueError("`subject_options` must be provided when `is_break` is False.")
         return values
 
+
 class TimetableSlotBulkUpdateRequest(BaseModel):
-    slots: List[TimetableSlotBulkUpdateItem]
+    slots: list[TimetableSlotBulkUpdateItem]
 
 
 # ----------------------------
 # Frontend-Compatible Schemas
 # ----------------------------
+
 
 class FrontendTimeRange(BaseModel):
     from_time: str = Field(..., alias="from", description="Start time in HH:MM format")
@@ -178,8 +191,8 @@ class FrontendTimeRange(BaseModel):
 class FrontendTimetableSlot(BaseModel):
     time: FrontendTimeRange
     type: str = Field(..., description="Either 'subject' or 'special'")
-    subjects: Optional[dict[str, UUID]] = Field(None, description="Day-wise subject mapping (Monday: subject_id)")
-    label: Optional[str] = Field(None, description="Label for special periods like 'SNACKS', 'LUNCH'")
+    subjects: dict[str, UUID] | None = Field(None, description="Day-wise subject mapping (Monday: subject_id)")
+    label: str | None = Field(None, description="Label for special periods like 'SNACKS', 'LUNCH'")
 
     @model_validator(mode="after")
     def validate_slot_type(cls, values):
@@ -200,7 +213,7 @@ class FrontendTimetableSlot(BaseModel):
 
 class FrontendTimetableCreate(BaseModel):
     section_id: UUID
-    timetable_data: List[FrontendTimetableSlot]
+    timetable_data: list[FrontendTimetableSlot]
 
 
 class FrontendTimetableResponse(BaseModel):
@@ -212,4 +225,4 @@ class FrontendTimetableResponse(BaseModel):
 
 class FrontendTimetableRead(BaseModel):
     section_id: UUID
-    timetable_data: List[FrontendTimetableSlot]
+    timetable_data: list[FrontendTimetableSlot]

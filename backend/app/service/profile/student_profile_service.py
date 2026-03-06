@@ -1,18 +1,16 @@
+from uuid import UUID
+
+from fastapi import HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from fastapi import HTTPException, status, Request
-from uuid import UUID
-from typing import Optional
-from app.models.student.student_model import Student
-from app.models.masters.admission_model import Admission
+
 from app.models.masters.class_model import Class
 from app.models.masters.sections_model import Section
-from app.models.masters.attendance_model import StudentAttendance
-from app.models.student.student_certificate_model import CertificateIssue
-from app.models.student.student_document_model import StudentDocument
+from app.models.student.student_model import Student
 from app.schemas.profile.student_profile_schema import StudentProfileOut, StudentProfileUpdate
 from app.service.profile.profile_audit_service import ProfileAuditService
+
 
 class StudentProfileService:
     """Service for student profile operations"""
@@ -24,7 +22,7 @@ class StudentProfileService:
         actor_user_id: UUID,
         actor_role: str,
         actor_username: str,
-        request: Optional[Request] = None
+        request: Request | None = None,
     ) -> StudentProfileOut:
         """
         Get student profile by user_id
@@ -47,42 +45,34 @@ class StudentProfileService:
                 selectinload(Student.admissions),
                 selectinload(Student.attendances),
                 selectinload(Student.certificates),
-                selectinload(Student.documents)
+                selectinload(Student.documents),
             )
             .where(Student.user_id == user_id)
         )
         student = result.scalar_one_or_none()
 
         if not student:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Student profile not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student profile not found")
 
         # Get admission details
         admission = student.admissions
         class_name = None
         section_name = None
         admission_number = None
-        roll_number = None
 
         if admission:
             admission_number = admission.admission_number
 
             # Get class name from current_class_id
             if admission.current_class_id:
-                class_result = await db.execute(
-                    select(Class).where(Class.id == admission.current_class_id)
-                )
+                class_result = await db.execute(select(Class).where(Class.id == admission.current_class_id))
                 class_obj = class_result.scalar_one_or_none()
                 if class_obj:
                     class_name = class_obj.name
 
             # Get section name from current_section_id
             if admission.current_section_id:
-                section_result = await db.execute(
-                    select(Section).where(Section.id == admission.current_section_id)
-                )
+                section_result = await db.execute(select(Section).where(Section.id == admission.current_section_id))
                 section_obj = section_result.scalar_one_or_none()
                 if section_obj:
                     section_name = section_obj.name
@@ -107,7 +97,7 @@ class StudentProfileService:
             actor_role=actor_role,
             actor_username=actor_username,
             request=request,
-            org_id=user_id
+            org_id=user_id,
         )
         await db.commit()
 
@@ -127,7 +117,7 @@ class StudentProfileService:
             profile_photo_url=None,
             attendance_percentage=attendance_percentage,
             total_certificates=total_certificates,
-            total_documents=total_documents
+            total_documents=total_documents,
         )
 
     @staticmethod
@@ -138,7 +128,7 @@ class StudentProfileService:
         actor_user_id: UUID,
         actor_role: str,
         actor_username: str,
-        request: Optional[Request] = None
+        request: Request | None = None,
     ) -> StudentProfileOut:
         """
         Update student profile
@@ -155,18 +145,11 @@ class StudentProfileService:
             HTTPException: If student not found
         """
         # Get student
-        result = await db.execute(
-            select(Student)
-            .options(selectinload(Student.user))
-            .where(Student.user_id == user_id)
-        )
+        result = await db.execute(select(Student).options(selectinload(Student.user)).where(Student.user_id == user_id))
         student = result.scalar_one_or_none()
 
         if not student:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Student profile not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student profile not found")
 
         # Track changes for audit log
         changes = {}
@@ -190,7 +173,7 @@ class StudentProfileService:
                 actor_role=actor_role,
                 actor_username=actor_username,
                 request=request,
-                org_id=user_id
+                org_id=user_id,
             )
 
         await db.commit()
@@ -203,5 +186,5 @@ class StudentProfileService:
             actor_user_id=actor_user_id,
             actor_role=actor_role,
             actor_username=actor_username,
-            request=request
+            request=request,
         )

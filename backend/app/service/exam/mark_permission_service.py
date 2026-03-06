@@ -19,9 +19,7 @@ log = logging.getLogger("exam.mark_permission_service")
 
 
 async def _get_permission_or_404(perm_id: UUID, db: AsyncSession) -> ExamMarkEntryPermission:
-    result = await db.execute(
-        select(ExamMarkEntryPermission).where(ExamMarkEntryPermission.id == perm_id)
-    )
+    result = await db.execute(select(ExamMarkEntryPermission).where(ExamMarkEntryPermission.id == perm_id))
     perm = result.scalar_one_or_none()
     if not perm:
         raise HTTPException(
@@ -64,10 +62,7 @@ async def grant_permission(
             if existing.is_active:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=(
-                        "An active mark-entry permission already exists for this "
-                        "user and exam combination."
-                    ),
+                    detail=("An active mark-entry permission already exists for this " "user and exam combination."),
                 )
             # Reactivate the existing (inactive) permission
             existing.is_active = True

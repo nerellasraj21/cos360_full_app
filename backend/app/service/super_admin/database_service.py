@@ -1,13 +1,14 @@
-from fastapi import Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
-from typing import AsyncGenerator, Optional, Dict, Any
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 import logging
+from typing import Any
+
+from fastapi import Request
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_public_db
 from app.db.tenant_session import AsyncSessionLocal
-from app.middleware.tenant_middleware import get_client_name_from_request
 
 logger = logging.getLogger("super_admin_database")
 
@@ -15,25 +16,25 @@ logger = logging.getLogger("super_admin_database")
 class SuperAdminDatabaseService:
     """
     Service to handle database context switching for SuperAdmin operations.
-    
+
     SuperAdmin can access:
     - Public schema (system-wide data)
     - Any tenant schema (using X-SuperAdmin-Target-Tenant header)
     """
-    
+
     @staticmethod
     async def get_database_context(request: Request) -> AsyncGenerator[AsyncSession, None]:
         """
         Get appropriate database context for SuperAdmin based on request state.
-        
+
         Args:
             request: FastAPI request object with SuperAdmin context
-            
+
         Yields:
             AsyncSession: Database session configured for target schema
         """
-        target_schema = getattr(request.state, 'target_schema', 'public')
-        
+        target_schema = getattr(request.state, "target_schema", "public")
+
         if target_schema == "public":
             # SuperAdmin accessing public schema
             async for db in get_public_db():
@@ -44,38 +45,38 @@ class SuperAdminDatabaseService:
                 try:
                     # Set search path for target tenant schema
                     await session.execute(text(f'SET search_path TO "{target_schema}"'))
-                    
+
                     logger.debug(f"SuperAdmin database session created for schema: {target_schema}")
                     yield session
-                    
+
                 except Exception as e:
                     await session.rollback()
                     logger.error(f"Error in SuperAdmin database session for schema '{target_schema}': {str(e)}")
                     raise
                 finally:
                     await session.close()
-    
+
     @staticmethod
-    async def execute_tenant_query(request: Request, query, params: Optional[Dict[str, Any]] = None) -> Any:
+    async def execute_tenant_query(request: Request, query, params: dict[str, Any] | None = None) -> Any:
         """
         Execute query in target tenant schema for SuperAdmin.
-        
+
         Args:
             request: FastAPI request object with SuperAdmin context
             query: SQLAlchemy query object
             params: Optional query parameters
-            
+
         Returns:
             Query result
         """
         async with SuperAdminDatabaseService.get_database_context(request) as db:
             return await db.execute(query, params or {})
-    
+
     @staticmethod
     async def get_tenant_schemas() -> list[str]:
         """
         Get list of all available tenant schemas for SuperAdmin selection.
-        
+
         Returns:
             List of tenant schema names
         """
@@ -88,30 +89,33 @@ class SuperAdminDatabaseService:
                 AND schema_name LIKE '%_schema'
                 ORDER BY schema_name
             """))
-            
+
             schemas = [row[0] for row in result.fetchall()]
             logger.debug(f"Found {len(schemas)} tenant schemas for SuperAdmin")
             return schemas
-    
+
     @staticmethod
-    async def get_tenant_info(schema_name: str) -> Optional[Dict[str, Any]]:
+    async def get_tenant_info(schema_name: str) -> dict[str, Any] | None:
         """
         Get information about a specific tenant schema.
-        
+
         Args:
             schema_name: Name of the tenant schema
-            
+
         Returns:
             Dictionary with tenant information or None if not found
         """
         async with get_public_db() as db:
             # Query tenant information from public schema
-            result = await db.execute(text("""
+            result = await db.execute(
+                text("""
                 SELECT t.id, t.client_name, t.schema_name, t.is_active, t.created_at
                 FROM tenants t
                 WHERE t.schema_name = :schema_name
-            """), {"schema_name": schema_name})
-            
+            """),
+                {"schema_name": schema_name},
+            )
+
             row = result.fetchone()
             if row:
                 return {
@@ -119,10 +123,10 @@ class SuperAdminDatabaseService:
                     "client_name": row[1],
                     "schema_name": row[2],
                     "is_active": row[3],
-                    "created_at": row[4]
+                    "created_at": row[4],
                 }
             return None
-    
+
     @staticmethod
     async def validate_tenant_schema(schema_name: str) -> bool:
         """

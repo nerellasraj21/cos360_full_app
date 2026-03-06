@@ -1,12 +1,14 @@
-from app.db.base import BaseOrg
-from sqlalchemy import TIMESTAMP, Column, Integer, String, func, Boolean, Date
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import TIMESTAMP, Boolean, Column, Date, String, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
 
 
 class AcademicYear(BaseOrg):
-    __tablename__ = 'academic_years'
+    __tablename__ = "academic_years"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     title = Column(String(50), nullable=False, unique=True)
@@ -15,7 +17,7 @@ class AcademicYear(BaseOrg):
     end_date = Column(Date, nullable=False)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
-    
+
     # # class relationship
     # class_ = relationship("Class", back_populates="academic_year")
     # subject relationship

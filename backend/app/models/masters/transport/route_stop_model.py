@@ -1,8 +1,11 @@
-from sqlalchemy import Column, Integer, String, Time, Boolean, ForeignKey
-from app.db.base import BaseOrg
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Time
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class RouteStop(BaseOrg):
     __tablename__ = "route_stops"

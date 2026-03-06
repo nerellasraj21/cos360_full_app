@@ -1,21 +1,21 @@
-from pydantic import BaseModel, Field, model_validator
-from typing import Optional, List
-from uuid import UUID
 from decimal import Decimal
+from uuid import UUID
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class GradeBandBase(BaseModel):
     from_percent: Decimal = Field(..., ge=0, le=100)
     to_percent: Decimal = Field(..., ge=0, le=100)
-    from_marks: Optional[Decimal] = None
-    to_marks: Optional[Decimal] = None
+    from_marks: Decimal | None = None
+    to_marks: Decimal | None = None
     grade_label: str = Field(..., max_length=10)
     gpa: Decimal = Field(default=Decimal("0.00"), ge=0)
-    remarks: Optional[str] = Field(None, max_length=100)
+    remarks: str | None = Field(None, max_length=100)
     is_pass: bool = True
     sort_order: int = 0
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_percent_range(self):
         if self.from_percent > self.to_percent:
             raise ValueError("from_percent must be <= to_percent")
@@ -32,29 +32,29 @@ class GradeBandRead(GradeBandBase):
     scheme_id: UUID
     from_percent: float
     to_percent: float
-    from_marks: Optional[float] = None
-    to_marks: Optional[float] = None
+    from_marks: float | None = None
+    to_marks: float | None = None
     gpa: float
 
 
 class ExamGradeSchemeBase(BaseModel):
     name: str = Field(..., max_length=100)
-    description: Optional[str] = None
+    description: str | None = None
     is_default: bool = False
 
 
 class ExamGradeSchemeCreate(ExamGradeSchemeBase):
-    bands: List[GradeBandCreate] = Field(default_factory=list)
+    bands: list[GradeBandCreate] = Field(default_factory=list)
 
 
 class ExamGradeSchemeUpdate(ExamGradeSchemeBase):
-    bands: List[GradeBandCreate] = Field(default_factory=list)
+    bands: list[GradeBandCreate] = Field(default_factory=list)
 
 
 class ExamGradeSchemeRead(ExamGradeSchemeBase):
     model_config = {"from_attributes": True}
     id: UUID
-    bands: List[GradeBandRead] = []
+    bands: list[GradeBandRead] = []
 
 
 # SubjectGradeScheme uses identical structure — just different table FK
@@ -68,8 +68,8 @@ class SubjectGradeBandRead(GradeBandBase):
     scheme_id: UUID
     from_percent: float
     to_percent: float
-    from_marks: Optional[float] = None
-    to_marks: Optional[float] = None
+    from_marks: float | None = None
+    to_marks: float | None = None
     gpa: float
 
 
@@ -78,7 +78,7 @@ class SubjectGradeSchemeCreate(ExamGradeSchemeCreate):
 
 
 class SubjectGradeSchemeUpdate(ExamGradeSchemeBase):
-    bands: List[GradeBandCreate] = Field(default_factory=list)
+    bands: list[GradeBandCreate] = Field(default_factory=list)
 
 
 class SubjectGradeSchemeRead(ExamGradeSchemeRead):

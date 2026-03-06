@@ -1,6 +1,7 @@
-from pydantic import BaseModel
-from typing import Optional, List
 from uuid import UUID
+
+from pydantic import BaseModel
+
 
 class UserContext(BaseModel):
     """
@@ -8,39 +9,42 @@ class UserContext(BaseModel):
     This schema provides complete user context including entity relationships
     and access scope for proper data filtering.
     """
+
     user_id: UUID
     username: str
     role: str
-    department_id: Optional[UUID] = None
+    department_id: UUID | None = None
 
     # Entity-specific IDs (populated dynamically based on user type)
-    student_id: Optional[UUID] = None
-    staff_id: Optional[UUID] = None
-    parent_id: Optional[UUID] = None
+    student_id: UUID | None = None
+    staff_id: UUID | None = None
+    parent_id: UUID | None = None
 
     # Access scope determination for permission filtering
-    access_scope: Optional[str] = None  # "all", "own", "related", "department", "denied"
-    allowed_entity_ids: Optional[List[UUID]] = None  # For "related" access scope
+    access_scope: str | None = None  # "all", "own", "related", "department", "denied"
+    allowed_entity_ids: list[UUID] | None = None  # For "related" access scope
 
     # Additional context for specific use cases
-    tenant_schema: Optional[str] = None
-    plan_limitations: Optional[dict] = None
+    tenant_schema: str | None = None
+    plan_limitations: dict | None = None
 
     class Config:
-        json_encoders = {
-            UUID: str
-        }
+        json_encoders = {UUID: str}
         from_attributes = True
+
 
 class UserContextRequest(BaseModel):
     """Schema for requesting user context resolution"""
+
     resource: str
     action: str
-    target_entity_id: Optional[UUID] = None
+    target_entity_id: UUID | None = None
+
 
 class UserContextResponse(BaseModel):
     """Response schema for user context with resolved permissions"""
+
     context: UserContext
     has_access: bool
     access_type: str  # "full", "own", "related", "denied"
-    message: Optional[str] = None
+    message: str | None = None

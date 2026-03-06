@@ -1,9 +1,11 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Date
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from sqlalchemy.dialects.postgresql import UUID
-from app.db.base import BaseOrg
 import uuid
+
+from sqlalchemy import Column, Date, ForeignKey, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class CertificateIssue(BaseOrg):
     __tablename__ = "student_certificates"

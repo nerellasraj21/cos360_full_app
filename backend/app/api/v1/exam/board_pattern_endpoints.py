@@ -1,19 +1,23 @@
 import uuid
+
 # app/api/v1/exam/board_pattern_endpoints.py
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
 
 from app.db.tenant_session import get_tenant_db
-from app.tools.simple_permissions import check_role_plan_permission_with_error
-from app.tools.simple_permissions import get_current_user_token
 from app.schemas.exam.board_pattern_schema import (
-    BoardPatternCreate, BoardPatternRead, BoardPatternUpdate,
+    BoardPatternCreate,
+    BoardPatternRead,
+    BoardPatternUpdate,
 )
 from app.service.exam.board_pattern_service import (
-    create_board_pattern, list_board_patterns, get_board_pattern_or_404,
-    update_board_pattern, delete_board_pattern,
+    create_board_pattern,
+    delete_board_pattern,
+    get_board_pattern_or_404,
+    list_board_patterns,
+    update_board_pattern,
 )
+from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
 router = APIRouter(prefix="/board-patterns", tags=["Board Patterns"])
 
@@ -25,20 +29,20 @@ async def create_pattern(
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'create')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "create")
     result = await create_board_pattern(db, payload)
     return result
 
 
-@router.get("", response_model=List[BoardPatternRead])
+@router.get("", response_model=list[BoardPatternRead])
 async def list_patterns(
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     results = await list_board_patterns(db)
     return results
 
@@ -50,8 +54,8 @@ async def get_pattern(
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     result = await get_board_pattern_or_404(db, pattern_id)
     return result
 
@@ -64,8 +68,8 @@ async def update_pattern(
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'update')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "update")
     result = await update_board_pattern(db, pattern_id, payload)
     return result
 
@@ -77,6 +81,6 @@ async def delete_pattern(
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'delete')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "delete")
     await delete_board_pattern(db, pattern_id)

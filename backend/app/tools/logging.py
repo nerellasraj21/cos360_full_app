@@ -1,7 +1,8 @@
-import logging
 from enum import Enum
+import logging
 
 LOG_FORMAT_DEBUG = "%(levelname)s:%(message)s:%(pathname)s:%(funcName)s:%(lineno)d"
+
 
 class LogLevel(Enum):
     DEBUG = logging.DEBUG
@@ -9,6 +10,7 @@ class LogLevel(Enum):
     WARNING = logging.WARNING
     ERROR = logging.ERROR
     CRITICAL = logging.CRITICAL
+
 
 # Function to configure logging
 def configure_logging(level: LogLevel = LogLevel.INFO, log_format: str = LOG_FORMAT_DEBUG, log_file: str = None):

@@ -1,8 +1,11 @@
-from sqlalchemy import Column, Integer, String, Time, Boolean
-from app.db.base import BaseOrg
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import Boolean, Column, Integer, String, Time
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class Route(BaseOrg):
     __tablename__ = "routes"
@@ -13,7 +16,7 @@ class Route(BaseOrg):
     ending_stop = Column(String, nullable=False)
     number_of_stops = Column(Integer)
     route_type = Column(String)  # String field - no foreign key
-    trip_type = Column(String)   # String field - no foreign key
+    trip_type = Column(String)  # String field - no foreign key
     start_time = Column(Time)
     end_time = Column(Time)
     is_active = Column(Boolean, default=True)

@@ -3,7 +3,7 @@ import uuid
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, literal
+from sqlalchemy import literal, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -20,9 +20,7 @@ log = logging.getLogger("exam.board_pattern_service")
 # ---------------------------------------------------------------------------
 
 
-async def _get_board_pattern_or_404(
-    pattern_id: UUID, db: AsyncSession
-) -> BoardExamPattern:
+async def _get_board_pattern_or_404(pattern_id: UUID, db: AsyncSession) -> BoardExamPattern:
     result = await db.execute(
         select(BoardExamPattern)
         .options(selectinload(BoardExamPattern.exam_types))
@@ -37,9 +35,7 @@ async def _get_board_pattern_or_404(
     return pattern
 
 
-async def _check_board_pattern_not_in_use(
-    pattern: BoardExamPattern, db: AsyncSession
-) -> None:
+async def _check_board_pattern_not_in_use(pattern: BoardExamPattern, db: AsyncSession) -> None:
     """
     Raise 409 if any exam uses the same board+level combination as this pattern.
     The exam table stores board and level directly (not a FK to board_exam_patterns),
@@ -69,9 +65,7 @@ async def _check_board_pattern_not_in_use(
 # ---------------------------------------------------------------------------
 
 
-async def create_board_pattern(
-    db: AsyncSession, payload: BoardPatternCreate
-) -> BoardExamPattern:
+async def create_board_pattern(db: AsyncSession, payload: BoardPatternCreate) -> BoardExamPattern:
     """Insert parent pattern, flush to get id, then bulk-insert exam_types."""
     try:
         pattern = BoardExamPattern(
@@ -118,8 +112,7 @@ async def create_board_pattern(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    f"A BoardExamPattern for board='{payload.board}' / "
-                    f"level='{payload.level}' already exists."
+                    f"A BoardExamPattern for board='{payload.board}' / " f"level='{payload.level}' already exists."
                 ),
             )
         raise HTTPException(
@@ -137,9 +130,7 @@ async def create_board_pattern(
 
 async def list_board_patterns(db: AsyncSession) -> list[BoardExamPattern]:
     try:
-        result = await db.execute(
-            select(BoardExamPattern).options(selectinload(BoardExamPattern.exam_types))
-        )
+        result = await db.execute(select(BoardExamPattern).options(selectinload(BoardExamPattern.exam_types)))
         return result.scalars().all()
     except Exception as e:
         log.error("Error listing BoardExamPatterns: %s", e)
@@ -162,9 +153,7 @@ async def get_board_pattern_or_404(db: AsyncSession, pattern_id: UUID) -> BoardE
         )
 
 
-async def update_board_pattern(
-    db: AsyncSession, pattern_id: UUID, payload: BoardPatternUpdate
-) -> BoardExamPattern:
+async def update_board_pattern(db: AsyncSession, pattern_id: UUID, payload: BoardPatternUpdate) -> BoardExamPattern:
     """Update scalar fields and optionally replace exam_types (delete-all + re-insert)."""
     try:
         pattern = await _get_board_pattern_or_404(pattern_id, db)
@@ -183,15 +172,17 @@ async def update_board_pattern(
                 await db.delete(et)
             await db.flush()
             for et_payload in payload.exam_types:
-                db.add(BoardPatternExamType(
-                    id=uuid.uuid4(),
-                    pattern_id=pattern.id,
-                    exam_type_name=et_payload.exam_type_name,
-                    nature=et_payload.nature,
-                    weightage_percent=et_payload.weightage_percent,
-                    count_per_year=et_payload.count_per_year,
-                    sort_order=et_payload.sort_order,
-                ))
+                db.add(
+                    BoardPatternExamType(
+                        id=uuid.uuid4(),
+                        pattern_id=pattern.id,
+                        exam_type_name=et_payload.exam_type_name,
+                        nature=et_payload.nature,
+                        weightage_percent=et_payload.weightage_percent,
+                        count_per_year=et_payload.count_per_year,
+                        sort_order=et_payload.sort_order,
+                    )
+                )
 
         await db.flush()
 

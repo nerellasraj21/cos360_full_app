@@ -1,14 +1,18 @@
-from sqlalchemy import Column, Integer, String, Date, Boolean, ForeignKey, Enum
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
-from app.db.base import BaseOrg
 import enum
 import uuid
+
+from sqlalchemy import Boolean, Column, Date, Enum, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class GenderEnum(enum.Enum):
     Male = "Male"
     Female = "Female"
     Other = "Other"
+
 
 class Staff(BaseOrg):
     __tablename__ = "staff"
@@ -18,7 +22,7 @@ class Staff(BaseOrg):
     last_name = Column(String(100), nullable=True)
     email = Column(String(100), nullable=True, unique=True)
     phone = Column(String(15), nullable=True)
-    gender = Column(Enum(GenderEnum, name='genderenum', create_type=False), nullable=True)
+    gender = Column(Enum(GenderEnum, name="genderenum", create_type=False), nullable=True)
     date_of_birth = Column(Date, nullable=True)
     joining_date = Column(Date, nullable=False)
     qualification = Column(String(100), nullable=True)

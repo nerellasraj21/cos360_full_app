@@ -1,15 +1,18 @@
-from pydantic import BaseModel
-from typing import Optional
 from uuid import UUID
+
+from pydantic import BaseModel
+
 
 class MenuBase(BaseModel):
     name: str
-    url: Optional[str] = None
+    url: str | None = None
     level: str  # L0, L1, L2
-    parent_id: Optional[UUID] = None
+    parent_id: UUID | None = None
+
 
 class MenuCreate(MenuBase):
     pass
+
 
 class MenuRead(MenuBase):
     id: UUID

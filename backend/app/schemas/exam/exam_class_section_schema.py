@@ -1,14 +1,14 @@
-from pydantic import BaseModel, field_validator
-from typing import Optional, List
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel
 
 
 class ExamClassSectionCreate(BaseModel):
     exam_id: UUID
     class_id: UUID
-    section_id: Optional[UUID] = None
-    stream_id: Optional[UUID] = None
+    section_id: UUID | None = None
+    stream_id: UUID | None = None
 
 
 class ExamClassSectionRead(BaseModel):
@@ -17,6 +17,6 @@ class ExamClassSectionRead(BaseModel):
     id: UUID
     exam_id: UUID
     class_id: UUID
-    section_id: Optional[UUID] = None
-    stream_id: Optional[UUID] = None
+    section_id: UUID | None = None
+    stream_id: UUID | None = None
     created_at: datetime

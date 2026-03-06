@@ -3,21 +3,20 @@ Master Schema Service for COS360
 Creates and manages the master schema as single source of truth
 """
 
-from typing import Dict, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
-import subprocess
-import asyncio
-import os
 import logging
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.service.schema.schema_analysis_service import SchemaAnalysisService
 
 logger = logging.getLogger(__name__)
 
+
 class MasterSchemaService:
 
     @staticmethod
-    async def create_master_schema_from_source(db: AsyncSession, source_schema: str = "cos360_masters") -> Dict:
+    async def create_master_schema_from_source(db: AsyncSession, source_schema: str = "cos360_masters") -> dict:
         """
         Create master schema from source schema with complete validation
         """
@@ -28,12 +27,12 @@ class MasterSchemaService:
             logger.info("Phase 1: Validating source schema...")
             analysis = await SchemaAnalysisService.analyze_schema_completeness(db, source_schema)
 
-            if not analysis.get('readiness_assessment', {}).get('is_ready_for_master', False):
+            if not analysis.get("readiness_assessment", {}).get("is_ready_for_master", False):
                 return {
-                    'success': False,
-                    'error': f'Source schema {source_schema} is not ready for master creation',
-                    'details': analysis.get('recommendations', []),
-                    'completeness_score': analysis.get('completeness_scores', {}).get('overall_completeness', 0)
+                    "success": False,
+                    "error": f"Source schema {source_schema} is not ready for master creation",
+                    "details": analysis.get("recommendations", []),
+                    "completeness_score": analysis.get("completeness_scores", {}).get("overall_completeness", 0),
                 }
 
             # Step 2: Check if master schema already exists
@@ -49,30 +48,30 @@ class MasterSchemaService:
 
             if master_exists:
                 return {
-                    'success': False,
-                    'error': 'Master schema cos360_master already exists',
-                    'action_required': 'Use rollback_master_schema_creation() to remove existing master schema'
+                    "success": False,
+                    "error": "Master schema cos360_master already exists",
+                    "action_required": "Use rollback_master_schema_creation() to remove existing master schema",
                 }
 
             # Step 3: Create master schema structure
             logger.info("Phase 3: Creating master schema structure...")
             copy_result = await MasterSchemaService._copy_schema_structure(db, source_schema)
 
-            if not copy_result['success']:
+            if not copy_result["success"]:
                 return copy_result
 
             # Step 4: Apply master schema protection
             logger.info("Phase 4: Applying master schema protection...")
             protection_result = await MasterSchemaService.apply_master_schema_protection(db)
 
-            if not protection_result['success']:
+            if not protection_result["success"]:
                 # Rollback on protection failure
                 await MasterSchemaService.rollback_master_schema_creation(db)
                 return {
-                    'success': False,
-                    'error': 'Failed to apply master schema protection',
-                    'details': protection_result.get('error', ''),
-                    'rollback_completed': True
+                    "success": False,
+                    "error": "Failed to apply master schema protection",
+                    "details": protection_result.get("error", ""),
+                    "rollback_completed": True,
                 }
 
             # Step 5: Set migration version to match source
@@ -80,14 +79,14 @@ class MasterSchemaService:
             version_result = await MasterSchemaService._set_master_schema_migration_version(db, source_schema)
 
             return {
-                'success': True,
-                'message': 'Master schema created successfully from source',
-                'source_schema': source_schema,
-                'master_schema': 'cos360_master',
-                'tables_copied': copy_result.get('tables_copied', 0),
-                'protection_applied': protection_result['success'],
-                'migration_version_set': version_result['success'],
-                'completeness_score': analysis.get('completeness_scores', {}).get('overall_completeness', 0)
+                "success": True,
+                "message": "Master schema created successfully from source",
+                "source_schema": source_schema,
+                "master_schema": "cos360_master",
+                "tables_copied": copy_result.get("tables_copied", 0),
+                "protection_applied": protection_result["success"],
+                "migration_version_set": version_result["success"],
+                "completeness_score": analysis.get("completeness_scores", {}).get("overall_completeness", 0),
             }
 
         except Exception as e:
@@ -95,16 +94,12 @@ class MasterSchemaService:
             # Attempt rollback on any failure
             try:
                 await MasterSchemaService.rollback_master_schema_creation(db)
-            except:
+            except Exception:
                 pass
-            return {
-                'success': False,
-                'error': f'Master schema creation failed: {str(e)}',
-                'rollback_attempted': True
-            }
+            return {"success": False, "error": f"Master schema creation failed: {str(e)}", "rollback_attempted": True}
 
     @staticmethod
-    async def _copy_schema_structure(db: AsyncSession, source_schema: str) -> Dict:
+    async def _copy_schema_structure(db: AsyncSession, source_schema: str) -> dict:
         """
         Copy schema structure using SQL-based approach for reliable operations
         """
@@ -227,29 +222,19 @@ class MasterSchemaService:
             table_count = result.scalar()
 
             if table_count == 0:
-                return {
-                    'success': False,
-                    'error': 'Master schema created but no tables found'
-                }
+                return {"success": False, "error": "Master schema created but no tables found"}
 
             logger.info(f"Master schema created successfully with {table_count} tables")
 
-            return {
-                'success': True,
-                'tables_copied': table_count,
-                'statements_executed': len(table_statements)
-            }
+            return {"success": True, "tables_copied": table_count, "statements_executed": len(table_statements)}
 
         except Exception as e:
             logger.error(f"Schema structure copy failed: {str(e)}")
             await db.rollback()
-            return {
-                'success': False,
-                'error': f'Schema copy failed: {str(e)}'
-            }
+            return {"success": False, "error": f"Schema copy failed: {str(e)}"}
 
     @staticmethod
-    async def apply_master_schema_protection(db: AsyncSession) -> Dict:
+    async def apply_master_schema_protection(db: AsyncSession) -> dict:
         """
         Apply READ-ONLY protection to master schema while preserving system management
         """
@@ -260,7 +245,7 @@ class MasterSchemaService:
             protection_queries = [
                 'GRANT USAGE ON SCHEMA "cos360_master" TO PUBLIC;',
                 'GRANT SELECT ON ALL TABLES IN SCHEMA "cos360_master" TO PUBLIC;',
-                'ALTER DEFAULT PRIVILEGES IN SCHEMA "cos360_master" GRANT SELECT ON TABLES TO PUBLIC;'
+                'ALTER DEFAULT PRIVILEGES IN SCHEMA "cos360_master" GRANT SELECT ON TABLES TO PUBLIC;',
             ]
 
             for query in protection_queries:
@@ -271,20 +256,17 @@ class MasterSchemaService:
             logger.info("Master schema protection applied successfully")
 
             return {
-                'success': True,
-                'message': 'Master schema protected with READ-ONLY access',
-                'protection_level': 'READ_ONLY_PUBLIC_SYSTEM_WRITE'
+                "success": True,
+                "message": "Master schema protected with READ-ONLY access",
+                "protection_level": "READ_ONLY_PUBLIC_SYSTEM_WRITE",
             }
 
         except Exception as e:
             logger.error(f"Master schema protection failed: {str(e)}")
-            return {
-                'success': False,
-                'error': f'Protection application failed: {str(e)}'
-            }
+            return {"success": False, "error": f"Protection application failed: {str(e)}"}
 
     @staticmethod
-    async def _set_master_schema_migration_version(db: AsyncSession, source_schema: str) -> Dict:
+    async def _set_master_schema_migration_version(db: AsyncSession, source_schema: str) -> dict:
         """
         Set master schema migration version to match source schema
         """
@@ -312,21 +294,18 @@ class MasterSchemaService:
 
                 logger.info(f"Master schema migration version set to: {source_version}")
 
-            return {
-                'success': True,
-                'version_set': source_version
-            }
+            return {"success": True, "version_set": source_version}
 
         except Exception as e:
             logger.warning(f"Could not set master schema migration version: {str(e)}")
             return {
-                'success': False,
-                'error': str(e),
-                'warning': 'Migration version not set - manual alembic upgrade may be needed'
+                "success": False,
+                "error": str(e),
+                "warning": "Migration version not set - manual alembic upgrade may be needed",
             }
 
     @staticmethod
-    async def rollback_master_schema_creation(db: AsyncSession) -> Dict:
+    async def rollback_master_schema_creation(db: AsyncSession) -> dict:
         """
         Rollback master schema creation (removes only master schema, preserves all tenant data)
         """
@@ -341,21 +320,18 @@ class MasterSchemaService:
             logger.info("Master schema rollback completed successfully")
 
             return {
-                'success': True,
-                'message': 'Master schema removed successfully',
-                'action': 'cos360_master schema dropped',
-                'tenant_data_preserved': True
+                "success": True,
+                "message": "Master schema removed successfully",
+                "action": "cos360_master schema dropped",
+                "tenant_data_preserved": True,
             }
 
         except Exception as e:
             logger.error(f"Master schema rollback failed: {str(e)}")
-            return {
-                'success': False,
-                'error': f'Rollback failed: {str(e)}'
-            }
+            return {"success": False, "error": f"Rollback failed: {str(e)}"}
 
     @staticmethod
-    async def get_master_schema_info(db: AsyncSession) -> Dict:
+    async def get_master_schema_info(db: AsyncSession) -> dict:
         """
         Get comprehensive information about master schema status
         """
@@ -372,10 +348,7 @@ class MasterSchemaService:
             exists = result.scalar()
 
             if not exists:
-                return {
-                    'exists': False,
-                    'message': 'Master schema does not exist'
-                }
+                return {"exists": False, "message": "Master schema does not exist"}
 
             # Get table count
             table_count_query = text("""
@@ -397,20 +370,17 @@ class MasterSchemaService:
                 """)
                 result = await db.execute(version_query)
                 migration_version = result.scalar()
-            except:
+            except Exception:
                 migration_version = None
 
             return {
-                'exists': True,
-                'table_count': table_count,
-                'migration_version': migration_version,
-                'status': 'operational' if table_count > 0 else 'empty',
-                'ready_for_tenant_creation': table_count >= 30
+                "exists": True,
+                "table_count": table_count,
+                "migration_version": migration_version,
+                "status": "operational" if table_count > 0 else "empty",
+                "ready_for_tenant_creation": table_count >= 30,
             }
 
         except Exception as e:
             logger.error(f"Failed to get master schema info: {str(e)}")
-            return {
-                'exists': False,
-                'error': str(e)
-            }
+            return {"exists": False, "error": str(e)}

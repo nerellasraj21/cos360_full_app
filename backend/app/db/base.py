@@ -1,5 +1,5 @@
-from sqlalchemy.orm import declarative_base
 from sqlalchemy import MetaData
+from sqlalchemy.orm import declarative_base
 
 # For public schema (fixed schema name)
 public_metadata = MetaData(schema="public")

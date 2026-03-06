@@ -21,6 +21,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -31,8 +32,8 @@ from app.tools.password_util import hash_password
 SCHEMA = "test_tenant_schema"
 
 # --- Configure target user here ---
-TARGET_EMAIL    = "Ganesh1@gmail.com"
-NEW_PASSWORD    = "Ganesh@123"
+TARGET_EMAIL = "Ganesh1@gmail.com"
+NEW_PASSWORD = "Ganesh@123"
 # ----------------------------------
 
 
@@ -46,7 +47,7 @@ async def run():
         # Verify user exists
         result = await db.execute(
             text("SELECT id, username FROM users WHERE email = :email OR username = :username"),
-            {"email": TARGET_EMAIL, "username": TARGET_EMAIL}
+            {"email": TARGET_EMAIL, "username": TARGET_EMAIL},
         )
         row = result.fetchone()
         if not row:
@@ -64,7 +65,7 @@ async def run():
                 SET password_hash = :pwd, is_first_login = FALSE
                 WHERE id = :id
             """),
-            {"pwd": pwd_hash, "id": user_id}
+            {"pwd": pwd_hash, "id": user_id},
         )
 
         await db.commit()

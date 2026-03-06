@@ -1,21 +1,20 @@
+from uuid import UUID
+
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from fastapi import HTTPException
-from typing import List
-from uuid import UUID
 
-from app.models.masters.student_parent_association_model import StudentParentLink
 from app.models.masters.parent_model import Parent
+from app.models.masters.student_parent_association_model import StudentParentLink
 from app.models.student.student_model import Student
-from app.schemas.masters.student_parent_link_schema import StudentParentLinkCreate, StudentParentLinkOut
+
 
 async def link_student_to_parent(student_id: UUID, parent_id: UUID, db: AsyncSession) -> StudentParentLink:
     try:
         existing_link = await db.execute(
             select(StudentParentLink).where(
-                StudentParentLink.student_id == student_id,
-                StudentParentLink.parent_id == parent_id
+                StudentParentLink.student_id == student_id, StudentParentLink.parent_id == parent_id
             )
         )
         if existing_link.scalar_one_or_none():
@@ -35,10 +34,7 @@ async def link_student_to_parent(student_id: UUID, parent_id: UUID, db: AsyncSes
 
         result = await db.execute(
             select(StudentParentLink)
-            .options(
-                selectinload(StudentParentLink.student),
-                selectinload(StudentParentLink.parent)
-            )
+            .options(selectinload(StudentParentLink.student), selectinload(StudentParentLink.parent))
             .where(StudentParentLink.id == new_link.id)
         )
         created_link = result.scalar_one()
@@ -52,12 +48,12 @@ async def link_student_to_parent(student_id: UUID, parent_id: UUID, db: AsyncSes
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating student-parent link: {str(e)}")
 
+
 async def unlink_student_from_parent(student_id: UUID, parent_id: UUID, db: AsyncSession) -> bool:
     try:
         result = await db.execute(
             select(StudentParentLink).where(
-                StudentParentLink.student_id == student_id,
-                StudentParentLink.parent_id == parent_id
+                StudentParentLink.student_id == student_id, StudentParentLink.parent_id == parent_id
             )
         )
         link = result.scalar_one_or_none()
@@ -74,7 +70,8 @@ async def unlink_student_from_parent(student_id: UUID, parent_id: UUID, db: Asyn
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error removing student-parent link: {str(e)}")
 
-async def get_parents_for_student(student_id: UUID, db: AsyncSession) -> List[Parent]:
+
+async def get_parents_for_student(student_id: UUID, db: AsyncSession) -> list[Parent]:
     try:
         result = await db.execute(
             select(Parent)
@@ -85,22 +82,23 @@ async def get_parents_for_student(student_id: UUID, db: AsyncSession) -> List[Pa
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching parents for student: {str(e)}")
 
-async def get_students_for_parent(parent_id: UUID, db: AsyncSession) -> List[Student]:
+
+async def get_students_for_parent(parent_id: UUID, db: AsyncSession) -> list[Student]:
     try:
         import logging
+
         logger = logging.getLogger("student_parent_service")
         logger.error(f"DEBUG: get_students_for_parent called with parent_id={parent_id}")
 
         # Check current schema
         from sqlalchemy import text
+
         schema_result = await db.execute(text("SELECT current_schema()"))
         current_schema = schema_result.scalar()
         logger.error(f"DEBUG: Current schema = {current_schema}")
 
         # First, let's check if the link exists
-        link_check = await db.execute(
-            select(StudentParentLink).where(StudentParentLink.parent_id == parent_id)
-        )
+        link_check = await db.execute(select(StudentParentLink).where(StudentParentLink.parent_id == parent_id))
         links = link_check.scalars().all()
         logger.error(f"DEBUG: Found {len(links)} links for parent")
         for link in links:
@@ -108,10 +106,7 @@ async def get_students_for_parent(parent_id: UUID, db: AsyncSession) -> List[Stu
 
         result = await db.execute(
             select(Student)
-            .options(
-                selectinload(Student.parent_links)
-                .selectinload(StudentParentLink.parent)
-            )
+            .options(selectinload(Student.parent_links).selectinload(StudentParentLink.parent))
             .join(StudentParentLink, Student.id == StudentParentLink.student_id)
             .where(StudentParentLink.parent_id == parent_id)
         )
@@ -145,13 +140,12 @@ async def get_students_for_parent(parent_id: UUID, db: AsyncSession) -> List[Stu
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching students for parent: {str(e)}")
 
-async def get_all_student_parent_links(db: AsyncSession) -> List[StudentParentLink]:
+
+async def get_all_student_parent_links(db: AsyncSession) -> list[StudentParentLink]:
     try:
         result = await db.execute(
-            select(StudentParentLink)
-            .options(
-                selectinload(StudentParentLink.student),
-                selectinload(StudentParentLink.parent)
+            select(StudentParentLink).options(
+                selectinload(StudentParentLink.student), selectinload(StudentParentLink.parent)
             )
         )
         return result.scalars().all()

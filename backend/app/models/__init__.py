@@ -1,21 +1,21 @@
 # Import all models for proper discovery by Alembic
 
 # Public schema models
-from .public import *
-
 # Authentication models
-from .auth import *
+from .auth import *  # noqa: F403
 
-# Masters models
-from .masters import *
-
-# Fee models
-from .fee import *
-
-# Student models
-from .student import *
+# Exam module models
+from .exam import *  # noqa: F403
 
 # Expense models (new)
-from .expense import *
-# Exam module models
-from .exam import *
+from .expense import *  # noqa: F403
+
+# Fee models
+from .fee import *  # noqa: F403
+
+# Masters models
+from .masters import *  # noqa: F403
+from .public import *  # noqa: F403
+
+# Student models
+from .student import *  # noqa: F403

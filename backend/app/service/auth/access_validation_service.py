@@ -6,27 +6,28 @@ Combines role-based permissions with plan-based permissions to determine
 if a user has access to perform a specific action on a resource.
 """
 
-from typing import Optional, Tuple
 import logging
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from fastapi import Request
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.auth.user_model import User
+from app.middleware.tenant_middleware import get_client_name_from_request
 from app.models.auth.role_model import Role
+from app.models.auth.user_model import User
 from app.schemas.auth.access_validation_schema import AccessValidationRequest, AccessValidationResponse
 from app.tools.endpoint_resource_mapping import get_resource_from_endpoint, get_resource_from_menu
 from app.tools.simple_permissions import check_role_plan_permission
-from app.middleware.tenant_middleware import get_client_name_from_request
-from fastapi import Request
 
 logger = logging.getLogger("access_validation_service")
+
 
 class AccessValidationService:
     """Service for validating user access to endpoints and menu items"""
 
     @staticmethod
-    async def get_user_with_role(db: AsyncSession, user_id: str) -> Optional[Tuple[User, Role]]:
+    async def get_user_with_role(db: AsyncSession, user_id: str) -> tuple[User, Role] | None:
         """
         Get user and their role from database.
 
@@ -40,9 +41,7 @@ class AccessValidationService:
         try:
             # Query user with role relationship
             result = await db.execute(
-                select(User)
-                .options(selectinload(User.role))
-                .where(User.id == user_id, User.is_active == True)
+                select(User).options(selectinload(User.role)).where(User.id == user_id, User.is_active)
             )
             user = result.scalar_one_or_none()
 
@@ -63,9 +62,8 @@ class AccessValidationService:
 
     @staticmethod
     def resolve_resource_action(
-        request_data: AccessValidationRequest,
-        http_method: str = "GET"
-    ) -> Optional[Tuple[str, str]]:
+        request_data: AccessValidationRequest, http_method: str = "GET"
+    ) -> tuple[str, str] | None:
         """
         Resolve resource and action from the request data.
 
@@ -97,7 +95,9 @@ class AccessValidationService:
                         action = request_data.action
                     return (resource, action)
 
-            logger.warning(f"Could not resolve resource for endpoint: {request_data.endpoint}, menu: {request_data.menu_item}")
+            logger.warning(
+                f"Could not resolve resource for endpoint: {request_data.endpoint}, menu: {request_data.menu_item}"
+            )
             return None
 
         except Exception as e:
@@ -106,10 +106,7 @@ class AccessValidationService:
 
     @staticmethod
     async def validate_user_access(
-        db: AsyncSession,
-        request: Request,
-        request_data: AccessValidationRequest,
-        http_method: str = "GET"
+        db: AsyncSession, request: Request, request_data: AccessValidationRequest, http_method: str = "GET"
     ) -> AccessValidationResponse:
         """
         Main method to validate user access to a resource.
@@ -125,25 +122,17 @@ class AccessValidationService:
         """
         try:
             # Step 1: Get user and role
-            user_role_data = await AccessValidationService.get_user_with_role(
-                db, str(request_data.user_id)
-            )
+            user_role_data = await AccessValidationService.get_user_with_role(db, str(request_data.user_id))
 
             if not user_role_data:
                 return AccessValidationResponse(
-                    has_access=False,
-                    reason="User not found or inactive",
-                    user_role=None,
-                    resource=None,
-                    action=None
+                    has_access=False, reason="User not found or inactive", user_role=None, resource=None, action=None
                 )
 
             user, role = user_role_data
 
             # Step 2: Resolve resource and action
-            resource_action = AccessValidationService.resolve_resource_action(
-                request_data, http_method
-            )
+            resource_action = AccessValidationService.resolve_resource_action(request_data, http_method)
 
             if not resource_action:
                 return AccessValidationResponse(
@@ -151,7 +140,7 @@ class AccessValidationService:
                     reason="Could not resolve resource from endpoint or menu item",
                     user_role=role.name,
                     resource=None,
-                    action=request_data.action
+                    action=request_data.action,
                 )
 
             resource, action = resource_action
@@ -160,11 +149,7 @@ class AccessValidationService:
             client_name = get_client_name_from_request(request)
 
             has_access = await check_role_plan_permission(
-                db=db,
-                client_name=client_name,
-                role=role.name,
-                resource=resource,
-                action=action
+                db=db, client_name=client_name, role=role.name, resource=resource, action=action
             )
 
             # Step 4: Determine reason for denial
@@ -178,11 +163,7 @@ class AccessValidationService:
             )
 
             return AccessValidationResponse(
-                has_access=has_access,
-                reason=reason,
-                user_role=role.name,
-                resource=resource,
-                action=action
+                has_access=has_access, reason=reason, user_role=role.name, resource=resource, action=action
             )
 
         except Exception as e:
@@ -192,17 +173,12 @@ class AccessValidationService:
                 reason=f"Internal error during validation: {str(e)}",
                 user_role=None,
                 resource=None,
-                action=request_data.action
+                action=request_data.action,
             )
 
     @staticmethod
     async def validate_user_endpoint_access(
-        db: AsyncSession,
-        request: Request,
-        user_id: str,
-        endpoint: str,
-        http_method: str = "GET",
-        action: str = "read"
+        db: AsyncSession, request: Request, user_id: str, endpoint: str, http_method: str = "GET", action: str = "read"
     ) -> bool:
         """
         Simplified method to validate user access to a specific endpoint.
@@ -219,15 +195,9 @@ class AccessValidationService:
             bool: True if user has access, False otherwise
         """
         try:
-            request_data = AccessValidationRequest(
-                user_id=user_id,
-                endpoint=endpoint,
-                action=action
-            )
+            request_data = AccessValidationRequest(user_id=user_id, endpoint=endpoint, action=action)
 
-            result = await AccessValidationService.validate_user_access(
-                db, request, request_data, http_method
-            )
+            result = await AccessValidationService.validate_user_access(db, request, request_data, http_method)
 
             return result.has_access
 
@@ -237,11 +207,7 @@ class AccessValidationService:
 
     @staticmethod
     async def validate_user_menu_access(
-        db: AsyncSession,
-        request: Request,
-        user_id: str,
-        menu_item: str,
-        action: str = "read"
+        db: AsyncSession, request: Request, user_id: str, menu_item: str, action: str = "read"
     ) -> bool:
         """
         Simplified method to validate user access to a specific menu item.
@@ -257,15 +223,9 @@ class AccessValidationService:
             bool: True if user has access, False otherwise
         """
         try:
-            request_data = AccessValidationRequest(
-                user_id=user_id,
-                menu_item=menu_item,
-                action=action
-            )
+            request_data = AccessValidationRequest(user_id=user_id, menu_item=menu_item, action=action)
 
-            result = await AccessValidationService.validate_user_access(
-                db, request, request_data
-            )
+            result = await AccessValidationService.validate_user_access(db, request, request_data)
 
             return result.has_access
 

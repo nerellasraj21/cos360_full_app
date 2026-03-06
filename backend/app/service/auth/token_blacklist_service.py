@@ -1,9 +1,8 @@
+from datetime import UTC, datetime
 import hashlib
 import logging
-from datetime import datetime, timezone
 
 from sqlalchemy import text
-from fastapi import HTTPException, status
 
 logger = logging.getLogger("token_blacklist_service")
 
@@ -61,14 +60,15 @@ class TokenBlacklistService:
         token_hash = _hash_token(token)
         exp = payload.get("exp")
         if exp:
-            expires_at = datetime.fromtimestamp(exp, tz=timezone.utc).replace(tzinfo=None)
+            expires_at = datetime.fromtimestamp(exp, tz=UTC).replace(tzinfo=None)
         else:
             # Fallback: 24 h from now (matches access-token default)
             from datetime import timedelta
+
             expires_at = datetime.utcnow() + timedelta(hours=24)
 
-        user_id     = str(payload.get("sub", ""))
-        username    = payload.get("username", "")
+        user_id = str(payload.get("sub", ""))
+        username = payload.get("username", "")
         client_name = payload.get("client_name", "")
 
         async with PublicAsyncSessionLocal() as session:
@@ -84,10 +84,10 @@ class TokenBlacklistService:
                     """),
                     {
                         "token_hash": token_hash,
-                        "user_id":     user_id,
-                        "username":    username,
+                        "user_id": user_id,
+                        "username": username,
                         "client_name": client_name,
-                        "expires_at":  expires_at,
+                        "expires_at": expires_at,
                     },
                 )
                 await session.commit()
@@ -143,9 +143,7 @@ class TokenBlacklistService:
         async with PublicAsyncSessionLocal() as session:
             try:
                 await session.execute(text("SET search_path TO public"))
-                await session.execute(
-                    text("DELETE FROM public.token_blacklist WHERE expires_at <= NOW()")
-                )
+                await session.execute(text("DELETE FROM public.token_blacklist WHERE expires_at <= NOW()"))
                 await session.commit()
                 logger.info("Cleaned up expired blacklist entries")
             except Exception as e:

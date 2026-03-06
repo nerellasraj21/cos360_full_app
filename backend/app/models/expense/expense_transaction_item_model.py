@@ -1,8 +1,10 @@
-from app.db.base import BaseOrg
-from sqlalchemy import TIMESTAMP, Column, String, func, ForeignKey, Numeric, Text, Integer
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import TIMESTAMP, Column, ForeignKey, Numeric, String, Text, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
 
 
 class ExpenseTransactionItem(BaseOrg):

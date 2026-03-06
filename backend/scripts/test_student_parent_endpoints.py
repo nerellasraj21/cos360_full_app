@@ -82,9 +82,7 @@ async def run():
         print("STUDENT ROLE — lambodhar.vinayak")
         print("=" * 60)
 
-        token_s, student_id, role_s, menus_s = await login(
-            client, "lambodhar.vinayak", "Lambodhar@123"
-        )
+        token_s, student_id, role_s, menus_s = await login(client, "lambodhar.vinayak", "Lambodhar@123")
 
         if not token_s:
             print("  Cannot proceed — student login failed.")
@@ -155,9 +153,7 @@ async def run():
             # 6. Transport
             print("\n[6] Student Transport")
             if student_id:
-                r = await client.get(
-                    f"{BASE}/students/student-transport/student/{student_id}", headers=h
-                )
+                r = await client.get(f"{BASE}/students/student-transport/student/{student_id}", headers=h)
                 if r.status_code == 200:
                     ok("GET /student-transport/student/{own_id} -> 200", r.status_code, 200)
                 elif r.status_code == 404:
@@ -174,9 +170,7 @@ async def run():
         print("PARENT ROLE — sita.sharma")
         print("=" * 60)
 
-        token_p, parent_id, role_p, menus_p = await login(
-            client, "sita.sharma", "Sita@123"
-        )
+        token_p, parent_id, role_p, menus_p = await login(client, "sita.sharma", "Sita@123")
 
         if not token_p:
             print("  Cannot proceed — parent login failed.")
@@ -228,9 +222,7 @@ async def run():
             # 10. Parent child transport
             print("\n[10] Parent — Child Transport")
             if child_id:
-                r = await client.get(
-                    f"{BASE}/students/student-transport/student/{child_id}", headers=h
-                )
+                r = await client.get(f"{BASE}/students/student-transport/student/{child_id}", headers=h)
                 if r.status_code in (200, 404):
                     label = "200 (assigned)" if r.status_code == 200 else "404 (no assignment)"
                     print(f"  [PASS] GET /student-transport/student/{{child_id}} -> {label}")

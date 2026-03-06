@@ -1,11 +1,13 @@
+from uuid import UUID
+
+from fastapi import HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from fastapi import HTTPException, status, Request
-from uuid import UUID
-from typing import Optional
+
 from app.models.auth.user_model import User
-from app.tools.password_util import hash_password, verify_password
 from app.service.profile.profile_audit_service import ProfileAuditService
+from app.tools.password_util import hash_password, verify_password
+
 
 class BaseProfileService:
     """Base service for profile operations common to all user types"""
@@ -21,7 +23,7 @@ class BaseProfileService:
         actor_role: str,
         actor_username: str,
         profile_type: str,
-        request: Optional[Request] = None
+        request: Request | None = None,
     ) -> dict:
         """
         Change user password
@@ -47,28 +49,19 @@ class BaseProfileService:
         # Validate new password matches confirmation
         if new_password != confirm_password:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="New password and confirmation do not match"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="New password and confirmation do not match"
             )
 
         # Get user
-        result = await db.execute(
-            select(User).where(User.id == user_id)
-        )
+        result = await db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
 
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
         # Verify current password
         if not verify_password(current_password, user.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is incorrect"
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
 
         # Hash and update new password
         user.password_hash = hash_password(new_password)
@@ -84,15 +77,12 @@ class BaseProfileService:
             actor_role=actor_role,
             actor_username=actor_username,
             request=request,
-            org_id=user_id
+            org_id=user_id,
         )
 
         await db.commit()
 
-        return {
-            "message": "Password changed successfully",
-            "success": True
-        }
+        return {"message": "Password changed successfully", "success": True}
 
     @staticmethod
     async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User:
@@ -109,15 +99,10 @@ class BaseProfileService:
         Raises:
             HTTPException: If user not found
         """
-        result = await db.execute(
-            select(User).where(User.id == user_id)
-        )
+        result = await db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
 
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
         return user

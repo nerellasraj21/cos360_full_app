@@ -3,20 +3,21 @@ Schema Synchronization Service for COS360
 Manages schema drift detection and synchronization across tenants
 """
 
-import logging
-from typing import Dict, Any, List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 from datetime import datetime
-import asyncio
+import logging
+from typing import Any
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
 
 class SchemaSynchronizationService:
     """Service for detecting and managing schema drift across tenants"""
 
     @staticmethod
-    async def detect_schema_drift(db: AsyncSession, tenant_schemas: Optional[List[str]] = None) -> Dict[str, Any]:
+    async def detect_schema_drift(db: AsyncSession, tenant_schemas: list[str] | None = None) -> dict[str, Any]:
         """
         Detect schema drift between tenant schemas and master schema
 
@@ -34,11 +35,7 @@ class SchemaSynchronizationService:
             master_structure = await SchemaSynchronizationService._get_schema_structure(db, "cos360_master")
 
             if not master_structure["success"]:
-                return {
-                    "success": False,
-                    "error": "Failed to get master schema structure",
-                    "details": master_structure
-                }
+                return {"success": False, "error": "Failed to get master schema structure", "details": master_structure}
 
             # Get list of tenant schemas to check
             if not tenant_schemas:
@@ -55,11 +52,13 @@ class SchemaSynchronizationService:
                     tenant_structure = await SchemaSynchronizationService._get_schema_structure(db, schema_name)
 
                     if not tenant_structure["success"]:
-                        drift_results.append({
-                            "schema_name": schema_name,
-                            "accessible": False,
-                            "error": tenant_structure.get("error", "Unknown error")
-                        })
+                        drift_results.append(
+                            {
+                                "schema_name": schema_name,
+                                "accessible": False,
+                                "error": tenant_structure.get("error", "Unknown error"),
+                            }
+                        )
                         continue
 
                     # Compare structures
@@ -71,25 +70,23 @@ class SchemaSynchronizationService:
                     if comparison["has_drift"]:
                         schemas_with_drift += 1
 
-                    drift_results.append({
-                        "schema_name": schema_name,
-                        "accessible": True,
-                        "has_drift": comparison["has_drift"],
-                        "drift_severity": comparison["drift_severity"],
-                        "missing_tables": comparison["missing_tables"],
-                        "extra_tables": comparison["extra_tables"],
-                        "table_count": tenant_structure["table_count"],
-                        "version_mismatch": comparison.get("version_mismatch", False),
-                        "recommendations": comparison.get("recommendations", [])
-                    })
+                    drift_results.append(
+                        {
+                            "schema_name": schema_name,
+                            "accessible": True,
+                            "has_drift": comparison["has_drift"],
+                            "drift_severity": comparison["drift_severity"],
+                            "missing_tables": comparison["missing_tables"],
+                            "extra_tables": comparison["extra_tables"],
+                            "table_count": tenant_structure["table_count"],
+                            "version_mismatch": comparison.get("version_mismatch", False),
+                            "recommendations": comparison.get("recommendations", []),
+                        }
+                    )
 
                 except Exception as e:
                     logger.error(f"Error checking schema {schema_name}: {str(e)}")
-                    drift_results.append({
-                        "schema_name": schema_name,
-                        "accessible": False,
-                        "error": str(e)
-                    })
+                    drift_results.append({"schema_name": schema_name, "accessible": False, "error": str(e)})
 
             # Generate summary
             drift_summary = {
@@ -102,22 +99,22 @@ class SchemaSynchronizationService:
                 "schemas_with_drift": schemas_with_drift,
                 "drift_percentage": round((schemas_with_drift / max(total_schemas_checked, 1)) * 100, 1),
                 "system_status": "HEALTHY" if schemas_with_drift == 0 else "DRIFT_DETECTED",
-                "drift_results": drift_results
+                "drift_results": drift_results,
             }
 
-            logger.info(f"Schema drift detection completed: {schemas_with_drift}/{total_schemas_checked} schemas have drift")
+            logger.info(
+                f"Schema drift detection completed: {schemas_with_drift}/{total_schemas_checked} schemas have drift"
+            )
             return drift_summary
 
         except Exception as e:
             logger.error(f"Schema drift detection failed: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            }
+            return {"success": False, "error": str(e), "timestamp": datetime.now().isoformat()}
 
     @staticmethod
-    async def synchronize_schema_with_master(db: AsyncSession, tenant_schema: str, sync_mode: str = "safe") -> Dict[str, Any]:
+    async def synchronize_schema_with_master(
+        db: AsyncSession, tenant_schema: str, sync_mode: str = "safe"
+    ) -> dict[str, Any]:
         """
         Synchronize a tenant schema with master schema
 
@@ -135,11 +132,7 @@ class SchemaSynchronizationService:
             # Verify master schema exists
             master_structure = await SchemaSynchronizationService._get_schema_structure(db, "cos360_master")
             if not master_structure["success"]:
-                return {
-                    "success": False,
-                    "error": "Master schema not accessible",
-                    "details": master_structure
-                }
+                return {"success": False, "error": "Master schema not accessible", "details": master_structure}
 
             # Verify tenant schema exists
             tenant_structure = await SchemaSynchronizationService._get_schema_structure(db, tenant_schema)
@@ -147,7 +140,7 @@ class SchemaSynchronizationService:
                 return {
                     "success": False,
                     "error": f"Tenant schema {tenant_schema} not accessible",
-                    "details": tenant_structure
+                    "details": tenant_structure,
                 }
 
             # Detect what needs to be synchronized
@@ -163,10 +156,10 @@ class SchemaSynchronizationService:
             for table_name in comparison["missing_tables"]:
                 try:
                     # Clone missing table from master
-                    await db.execute(text(f'''
+                    await db.execute(text(f"""
                         CREATE TABLE "{tenant_schema}"."{table_name}"
                         (LIKE "cos360_master"."{table_name}" INCLUDING ALL)
-                    '''))
+                    """))
 
                     sync_actions.append(f"Added table: {table_name}")
                     tables_added += 1
@@ -187,13 +180,18 @@ class SchemaSynchronizationService:
 
             # Update migration version
             version_updated = False
-            if master_structure.get("migration_version") and master_structure["migration_version"] != tenant_structure.get("migration_version"):
+            if master_structure.get("migration_version") and master_structure[
+                "migration_version"
+            ] != tenant_structure.get("migration_version"):
                 try:
                     await db.execute(text(f'DELETE FROM "{tenant_schema}".alembic_version'))
-                    await db.execute(text(f'''
+                    await db.execute(
+                        text(f"""
                         INSERT INTO "{tenant_schema}".alembic_version (version_num)
                         VALUES (:version)
-                    '''), {"version": master_structure["migration_version"]})
+                    """),
+                        {"version": master_structure["migration_version"]},
+                    )
 
                     sync_actions.append(f"Updated migration version to: {master_structure['migration_version']}")
                     version_updated = True
@@ -214,7 +212,7 @@ class SchemaSynchronizationService:
                 "tables_removed": tables_removed,
                 "version_updated": version_updated,
                 "schema_now_synchronized": tables_added > 0 or tables_removed > 0 or version_updated,
-                "recommendations": []
+                "recommendations": [],
             }
 
             if sync_results["schema_now_synchronized"]:
@@ -232,36 +230,39 @@ class SchemaSynchronizationService:
                 "success": False,
                 "error": str(e),
                 "tenant_schema": tenant_schema,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     @staticmethod
-    async def _get_schema_structure(db: AsyncSession, schema_name: str) -> Dict[str, Any]:
+    async def _get_schema_structure(db: AsyncSession, schema_name: str) -> dict[str, Any]:
         """Get comprehensive structure information for a schema"""
         try:
             # Check if schema exists
-            result = await db.execute(text("""
+            result = await db.execute(
+                text("""
                 SELECT EXISTS(
                     SELECT 1 FROM information_schema.schemata
                     WHERE schema_name = :schema_name
                 )
-            """), {"schema_name": schema_name})
+            """),
+                {"schema_name": schema_name},
+            )
             schema_exists = result.scalar()
 
             if not schema_exists:
-                return {
-                    "success": False,
-                    "error": f"Schema {schema_name} does not exist"
-                }
+                return {"success": False, "error": f"Schema {schema_name} does not exist"}
 
             # Get table list
-            result = await db.execute(text("""
+            result = await db.execute(
+                text("""
                 SELECT table_name
                 FROM information_schema.tables
                 WHERE table_schema = :schema_name
                   AND table_type = 'BASE TABLE'
                 ORDER BY table_name
-            """), {"schema_name": schema_name})
+            """),
+                {"schema_name": schema_name},
+            )
 
             tables = result.fetchall()
             table_names = [row.table_name for row in tables]
@@ -269,11 +270,11 @@ class SchemaSynchronizationService:
             # Get migration version if available
             migration_version = None
             try:
-                result = await db.execute(text(f'''
+                result = await db.execute(text(f"""
                     SELECT version_num FROM "{schema_name}".alembic_version LIMIT 1
-                '''))
+                """))
                 migration_version = result.scalar()
-            except:
+            except Exception:
                 pass
 
             return {
@@ -281,18 +282,14 @@ class SchemaSynchronizationService:
                 "schema_name": schema_name,
                 "table_count": len(table_names),
                 "table_names": table_names,
-                "migration_version": migration_version
+                "migration_version": migration_version,
             }
 
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "schema_name": schema_name
-            }
+            return {"success": False, "error": str(e), "schema_name": schema_name}
 
     @staticmethod
-    async def _get_tenant_schemas(db: AsyncSession) -> List[str]:
+    async def _get_tenant_schemas(db: AsyncSession) -> list[str]:
         """Get list of all tenant schemas from public.tenants"""
         try:
             result = await db.execute(text("""
@@ -310,7 +307,7 @@ class SchemaSynchronizationService:
             return []
 
     @staticmethod
-    async def _compare_schema_structures(master_structure: Dict, tenant_structure: Dict) -> Dict[str, Any]:
+    async def _compare_schema_structures(master_structure: dict, tenant_structure: dict) -> dict[str, Any]:
         """Compare two schema structures and identify differences"""
         try:
             master_tables = set(master_structure.get("table_names", []))
@@ -356,13 +353,9 @@ class SchemaSynchronizationService:
                 "version_mismatch": version_mismatch,
                 "master_version": master_version,
                 "tenant_version": tenant_version,
-                "recommendations": recommendations
+                "recommendations": recommendations,
             }
 
         except Exception as e:
             logger.error(f"Schema comparison failed: {str(e)}")
-            return {
-                "has_drift": True,
-                "drift_severity": "UNKNOWN",
-                "error": str(e)
-            }
+            return {"has_drift": True, "drift_severity": "UNKNOWN", "error": str(e)}

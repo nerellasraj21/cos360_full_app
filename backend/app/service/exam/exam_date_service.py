@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.exam.exam_date_model import ExamDate
-from app.schemas.exam.exam_date_schema import ExamDateCreate, ExamDateBulkCreate, ExamDateUpdate
+from app.schemas.exam.exam_date_schema import ExamDateBulkCreate, ExamDateCreate, ExamDateUpdate
 
 log = logging.getLogger("exam.exam_date_service")
 
@@ -19,9 +19,7 @@ log = logging.getLogger("exam.exam_date_service")
 
 
 async def _get_exam_date_or_404(date_id: UUID, db: AsyncSession) -> ExamDate:
-    result = await db.execute(
-        select(ExamDate).where(ExamDate.id == date_id)
-    )
+    result = await db.execute(select(ExamDate).where(ExamDate.id == date_id))
     exam_date = result.scalar_one_or_none()
     if not exam_date:
         raise HTTPException(
@@ -135,9 +133,7 @@ async def get_dates_for_exam(db: AsyncSession, exam_id: UUID) -> list[ExamDate]:
     """Return all exam date rows for the given exam, ordered by date then subject."""
     try:
         result = await db.execute(
-            select(ExamDate)
-            .where(ExamDate.exam_id == exam_id)
-            .order_by(ExamDate.exam_date, ExamDate.subject_id)
+            select(ExamDate).where(ExamDate.exam_id == exam_id).order_by(ExamDate.exam_date, ExamDate.subject_id)
         )
         return list(result.scalars().all())
     except Exception as e:

@@ -1,10 +1,11 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
-from typing import Optional, Dict, Any
-from fastapi import Request
-from app.models.profile.profile_audit_log_model import ProfileAuditLog
-import json
 import logging
+from typing import Any
+from uuid import UUID
+
+from fastapi import Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.profile.profile_audit_log_model import ProfileAuditLog
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +21,8 @@ class ProfileAuditService:
         actor_user_id: UUID,
         actor_role: str,
         actor_username: str,
-        request: Optional[Request] = None,
-        org_id: Optional[UUID] = None
+        request: Request | None = None,
+        org_id: UUID | None = None,
     ):
         """Log profile view action"""
         try:
@@ -39,7 +40,7 @@ class ProfileAuditService:
                 request_user_agent=request.headers.get("user-agent") if request else None,
                 api_endpoint=str(request.url.path) if request else None,
                 http_method=request.method if request else None,
-                is_sensitive_change="FALSE"
+                is_sensitive_change="FALSE",
             )
 
             db.add(audit_log)
@@ -59,9 +60,9 @@ class ProfileAuditService:
         actor_user_id: UUID,
         actor_role: str,
         actor_username: str,
-        request: Optional[Request] = None,
-        org_id: Optional[UUID] = None,
-        is_sensitive: bool = False
+        request: Request | None = None,
+        org_id: UUID | None = None,
+        is_sensitive: bool = False,
     ):
         """Log profile update action"""
         try:
@@ -88,7 +89,7 @@ class ProfileAuditService:
                 request_user_agent=request.headers.get("user-agent") if request else None,
                 api_endpoint=str(request.url.path) if request else None,
                 http_method=request.method if request else None,
-                is_sensitive_change="TRUE" if is_sensitive else "FALSE"
+                is_sensitive_change="TRUE" if is_sensitive else "FALSE",
             )
 
             db.add(audit_log)
@@ -103,9 +104,9 @@ class ProfileAuditService:
         actor_user_id: UUID,
         actor_role: str,
         actor_username: str,
-        request: Optional[Request] = None,
-        org_id: Optional[UUID] = None,
-        success: bool = True
+        request: Request | None = None,
+        org_id: UUID | None = None,
+        success: bool = True,
     ):
         """Log password change action (highly sensitive)"""
         try:
@@ -127,7 +128,7 @@ class ProfileAuditService:
                 api_endpoint=str(request.url.path) if request else None,
                 http_method=request.method if request else None,
                 is_sensitive_change="TRUE",
-                requires_verification="FALSE"
+                requires_verification="FALSE",
             )
 
             db.add(audit_log)
@@ -140,12 +141,12 @@ class ProfileAuditService:
         db: AsyncSession,
         user_id: UUID,
         profile_type: str,
-        changes: Dict[str, tuple],
+        changes: dict[str, tuple],
         actor_user_id: UUID,
         actor_role: str,
         actor_username: str,
-        request: Optional[Request] = None,
-        org_id: Optional[UUID] = None
+        request: Request | None = None,
+        org_id: UUID | None = None,
     ):
         """Log multiple field updates in a single transaction"""
         sensitive_fields = {"password_hash", "password", "email"}
@@ -165,5 +166,5 @@ class ProfileAuditService:
                 actor_username=actor_username,
                 request=request,
                 org_id=org_id,
-                is_sensitive=is_sensitive
+                is_sensitive=is_sensitive,
             )

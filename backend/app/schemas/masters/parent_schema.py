@@ -1,31 +1,36 @@
 from __future__ import annotations
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List, Literal, ForwardRef, TYPE_CHECKING
-from pydantic import ConfigDict
+
+from typing import Literal
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, EmailStr
+
 
 class ParentBase(BaseModel):
     name: str
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
-    occupation: Optional[str] = None
-    aadhar_number: Optional[str] = None
-    gender: Optional[str] = None
+    email: EmailStr | None = None
+    phone: str | None = None
+    occupation: str | None = None
+    aadhar_number: str | None = None
+    gender: str | None = None
     relation_to_student: Literal["Father", "Mother", "Guardian"]
-    salary_range: Optional[Literal["below_1l", "1l_3l", "3l_5l", "5l_10l", "above_10l"]] = None
+    salary_range: Literal["below_1l", "1l_3l", "3l_5l", "5l_10l", "above_10l"] | None = None
+
 
 class ParentCreate(ParentBase):
     pass
 
+
 class ParentUpdate(BaseModel):
-    name: Optional[str] = None
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
-    occupation: Optional[str] = None
-    aadhar_number: Optional[str] = None
-    gender: Optional[Literal["Male", "Female", "Other"]] = None
-    relation_to_student: Optional[Literal["Father", "Mother", "Guardian"]] = None
-    salary_range: Optional[Literal["below_1l", "1l_3l", "3l_5l", "5l_10l", "above_10l"]] = None
+    name: str | None = None
+    email: EmailStr | None = None
+    phone: str | None = None
+    occupation: str | None = None
+    aadhar_number: str | None = None
+    gender: Literal["Male", "Female", "Other"] | None = None
+    relation_to_student: Literal["Father", "Mother", "Guardian"] | None = None
+    salary_range: Literal["below_1l", "1l_3l", "3l_5l", "5l_10l", "above_10l"] | None = None
+
 
 # Simple student schema for parent responses (avoids circular reference)
 class StudentSimpleOut(BaseModel):
@@ -35,9 +40,10 @@ class StudentSimpleOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class ParentOut(ParentBase):
     id: UUID
-    students: List[StudentSimpleOut] = []
+    students: list[StudentSimpleOut] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -53,15 +59,17 @@ class ParentOut(ParentBase):
             gender=parent.gender,
             relation_to_student=parent.relation_to_student,
             salary_range=parent.salary_range.value if parent.salary_range else None,
-            students=[StudentSimpleOut(
-                id=link.student.id,
-                first_name=link.student.first_name,
-                last_name=link.student.last_name
-            ) for link in parent.student_links]
+            students=[
+                StudentSimpleOut(
+                    id=link.student.id, first_name=link.student.first_name, last_name=link.student.last_name
+                )
+                for link in parent.student_links
+            ],
         )
 
+
 class ParentListResponse(BaseModel):
-    items: List[ParentOut]
+    items: list[ParentOut]
     total_count: int
     has_next: bool
     skip: int

@@ -1,0 +1,59 @@
+# Environment & secrets — NEVER in Docker image
+.env
+.env.*
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Development tools
+requirements-dev.txt
+pyproject.toml
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+
+# Docs & scripts (not needed at runtime)
+docs/
+scripts/
+tests/
+test_scripts/
+
+# Logs & temp files
+*.log
+cos360_errors.log
+student_documents/
+uploaded_certificates/
+context/
+archive/
+Implimentations/
+
+# OS
+.DS_Store
+Thumbs.db

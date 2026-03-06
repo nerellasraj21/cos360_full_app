@@ -1,12 +1,12 @@
-from pydantic import AnyHttpUrl, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings
-from typing import List, Optional, Union
+
 
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str
-    SYNC_DATABASE_URL: Optional[str] = Field(None, alias="SYNC_DATABASE_URL")
-    ASYNC_DATABASE_URL: Optional[str] = Field(None, alias="ASYNC_DATABASE_URL")
+    SYNC_DATABASE_URL: str | None = Field(None, alias="SYNC_DATABASE_URL")
+    ASYNC_DATABASE_URL: str | None = Field(None, alias="ASYNC_DATABASE_URL")
 
     # Secrets
     SECRET_KEY: str
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # default expiry
 
     # CORS settings - accepts both "*" or list of URLs
-    ALLOWED_ORIGINS: List[str] = ["*"]
+    ALLOWED_ORIGINS: list[str] = ["*"]
 
     # Debugging & environment
     DEBUG: bool = False

@@ -1,21 +1,19 @@
+from uuid import UUID
+
+from fastapi import HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from fastapi import HTTPException, status, Request
-from uuid import UUID
-from typing import List, Optional
-from app.models.masters.parent_model import Parent
-from app.models.masters.student_parent_association_model import StudentParentLink
-from app.models.student.student_model import Student
+
 from app.models.masters.admission_model import Admission
 from app.models.masters.class_model import Class
+from app.models.masters.parent_model import Parent
 from app.models.masters.sections_model import Section
-from app.schemas.profile.parent_profile_schema import (
-    ParentProfileOut,
-    ParentProfileUpdate,
-    ChildProfileOut
-)
+from app.models.masters.student_parent_association_model import StudentParentLink
+from app.models.student.student_model import Student
+from app.schemas.profile.parent_profile_schema import ChildProfileOut, ParentProfileOut, ParentProfileUpdate
 from app.service.profile.profile_audit_service import ProfileAuditService
+
 
 class ParentProfileService:
     """Service for parent profile operations"""
@@ -27,7 +25,7 @@ class ParentProfileService:
         actor_user_id: UUID,
         actor_role: str,
         actor_username: str,
-        request: Optional[Request] = None
+        request: Request | None = None,
     ) -> ParentProfileOut:
         """
         Get parent profile by user_id with children information
@@ -50,30 +48,24 @@ class ParentProfileService:
         result = await db.execute(
             select(Parent)
             .options(
-                selectinload(Parent.user),
-                selectinload(Parent.student_links).selectinload(StudentParentLink.student)
+                selectinload(Parent.user), selectinload(Parent.student_links).selectinload(StudentParentLink.student)
             )
             .where(Parent.user_id == user_id)
         )
         parent = result.scalar_one_or_none()
 
         if not parent:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Parent profile not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent profile not found")
 
         # Build children list
-        children: List[ChildProfileOut] = []
+        children: list[ChildProfileOut] = []
         for link in parent.student_links:
             student = link.student
             if not student:
                 continue
 
             # Get admission details
-            admission_result = await db.execute(
-                select(Admission).where(Admission.student_id == student.id)
-            )
+            admission_result = await db.execute(select(Admission).where(Admission.student_id == student.id))
             admission = admission_result.scalar_one_or_none()
 
             class_name = None
@@ -85,27 +77,21 @@ class ParentProfileService:
 
                 # Get class name from current_class_id
                 if admission.current_class_id:
-                    class_result = await db.execute(
-                        select(Class).where(Class.id == admission.current_class_id)
-                    )
+                    class_result = await db.execute(select(Class).where(Class.id == admission.current_class_id))
                     class_obj = class_result.scalar_one_or_none()
                     if class_obj:
                         class_name = class_obj.name
 
                 # Get section name from current_section_id
                 if admission.current_section_id:
-                    section_result = await db.execute(
-                        select(Section).where(Section.id == admission.current_section_id)
-                    )
+                    section_result = await db.execute(select(Section).where(Section.id == admission.current_section_id))
                     section_obj = section_result.scalar_one_or_none()
                     if section_obj:
                         section_name = section_obj.name
 
             # Get student user to check is_active
             student_user_result = await db.execute(
-                select(Student)
-                .options(selectinload(Student.user))
-                .where(Student.id == student.id)
+                select(Student).options(selectinload(Student.user)).where(Student.id == student.id)
             )
             student_with_user = student_user_result.scalar_one_or_none()
             is_active = student_with_user.user.is_active if student_with_user and student_with_user.user else False
@@ -118,7 +104,7 @@ class ParentProfileService:
                     admission_number=admission_number,
                     class_name=class_name,
                     section_name=section_name,
-                    is_active=is_active
+                    is_active=is_active,
                 )
             )
 
@@ -131,7 +117,7 @@ class ParentProfileService:
             actor_role=actor_role,
             actor_username=actor_username,
             request=request,
-            org_id=user_id
+            org_id=user_id,
         )
         await db.commit()
 
@@ -145,7 +131,7 @@ class ParentProfileService:
             occupation=parent.occupation,
             relation_to_student=parent.relation_to_student,
             profile_photo_url=None,  # TODO: Implement photo upload
-            children=children
+            children=children,
         )
 
     @staticmethod
@@ -156,7 +142,7 @@ class ParentProfileService:
         actor_user_id: UUID,
         actor_role: str,
         actor_username: str,
-        request: Optional[Request] = None
+        request: Request | None = None,
     ) -> ParentProfileOut:
         """
         Update parent profile
@@ -177,18 +163,11 @@ class ParentProfileService:
             HTTPException: If parent not found
         """
         # Get parent
-        result = await db.execute(
-            select(Parent)
-            .options(selectinload(Parent.user))
-            .where(Parent.user_id == user_id)
-        )
+        result = await db.execute(select(Parent).options(selectinload(Parent.user)).where(Parent.user_id == user_id))
         parent = result.scalar_one_or_none()
 
         if not parent:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Parent profile not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent profile not found")
 
         # Track changes for audit log
         changes = {}
@@ -222,7 +201,7 @@ class ParentProfileService:
                 actor_role=actor_role,
                 actor_username=actor_username,
                 request=request,
-                org_id=user_id
+                org_id=user_id,
             )
 
         await db.commit()
@@ -235,5 +214,5 @@ class ParentProfileService:
             actor_user_id=actor_user_id,
             actor_role=actor_role,
             actor_username=actor_username,
-            request=request
+            request=request,
         )

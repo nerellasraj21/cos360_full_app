@@ -1,7 +1,9 @@
 """
 Celery application configuration for background jobs
 """
+
 from celery import Celery
+
 from app.config import get_settings
 
 settings = get_settings()
@@ -17,7 +19,7 @@ celery_app = Celery(
         "app.tasks.exam.pdf_generation_task",
         "app.tasks.exam.aggregate_compute_task",
         "app.tasks.exam.notification_task",
-    ]
+    ],
 )
 
 # Celery configuration

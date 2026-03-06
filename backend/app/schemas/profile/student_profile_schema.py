@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import Optional
 from datetime import date
 from uuid import UUID
+
+from pydantic import BaseModel, Field
+
 
 class StudentProfileOut(BaseModel):
     student_id: UUID
@@ -9,17 +10,17 @@ class StudentProfileOut(BaseModel):
     first_name: str
     last_name: str
     date_of_birth: date
-    gender: Optional[str]
-    email: Optional[str]
-    admission_number: Optional[str] = None
-    class_name: Optional[str] = None
-    section_name: Optional[str] = None
+    gender: str | None
+    email: str | None
+    admission_number: str | None = None
+    class_name: str | None = None
+    section_name: str | None = None
     is_active: bool
-    profile_photo_url: Optional[str] = None
+    profile_photo_url: str | None = None
 
-    attendance_percentage: Optional[float] = None
-    total_certificates: Optional[int] = 0
-    total_documents: Optional[int] = 0
+    attendance_percentage: float | None = None
+    total_certificates: int | None = 0
+    total_documents: int | None = 0
 
     class Config:
         from_attributes = True
@@ -40,16 +41,13 @@ class StudentProfileOut(BaseModel):
                 "is_active": True,
                 "attendance_percentage": 92.5,
                 "total_certificates": 3,
-                "total_documents": 5
+                "total_documents": 5,
             }
         }
+
 
 class StudentProfileUpdate(BaseModel):
-    email: Optional[str] = Field(None, description="Email address (editable)")
+    email: str | None = Field(None, description="Email address (editable)")
 
     class Config:
-        json_schema_extra = {
-            "example": {
-                "email": "newemail@school.com"
-            }
-        }
+        json_schema_extra = {"example": {"email": "newemail@school.com"}}

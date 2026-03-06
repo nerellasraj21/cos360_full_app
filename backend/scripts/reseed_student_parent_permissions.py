@@ -38,6 +38,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -48,43 +49,67 @@ SCHEMA = "test_tenant_schema"
 
 STUDENT_PERMISSIONS = [
     # Own profile
-    ("profile",              "read_own"),  ("profile",              "update_own"),
+    ("profile", "read_own"),
+    ("profile", "update_own"),
     # Reference data
-    ("academic_years",       "read"),      ("academic_years",       "list"),
-    ("classes",              "read"),      ("classes",              "list"),
-    ("subjects",             "read"),      ("subjects",             "list"),
-    ("certificate_types",    "read"),      ("certificate_types",    "list"),
+    ("academic_years", "read"),
+    ("academic_years", "list"),
+    ("classes", "read"),
+    ("classes", "list"),
+    ("subjects", "read"),
+    ("subjects", "list"),
+    ("certificate_types", "read"),
+    ("certificate_types", "list"),
     # Exam (own results & hall tickets)
-    ("exams",                "read"),      ("exams",                "list"),
-    ("exam_marks",           "read_own"),  ("exam_marks",           "list_own"),
-    ("exam_hall_tickets",    "read_own"),  ("exam_hall_tickets",    "list_own"),
+    ("exams", "read"),
+    ("exams", "list"),
+    ("exam_marks", "read_own"),
+    ("exam_marks", "list_own"),
+    ("exam_hall_tickets", "read_own"),
+    ("exam_hall_tickets", "list_own"),
     # Own student data only
-    ("student_admissions",   "read_own"),  ("student_admissions",   "list_own"),
-    ("student_attendance",   "read_own"),  ("student_attendance",   "list_own"),
-    ("student_certificates", "read_own"),  ("student_certificates", "list_own"),
-    ("student_documents",    "read_own"),  ("student_documents",    "list_own"),
-    ("student_transport",    "read_own"),
+    ("student_admissions", "read_own"),
+    ("student_admissions", "list_own"),
+    ("student_attendance", "read_own"),
+    ("student_attendance", "list_own"),
+    ("student_certificates", "read_own"),
+    ("student_certificates", "list_own"),
+    ("student_documents", "read_own"),
+    ("student_documents", "list_own"),
+    ("student_transport", "read_own"),
     # Fee (own only)
-    ("fee_receipts",         "read_own"),  ("fee_receipts",         "list_own"),
-    ("fee_transactions",     "read_own"),  ("fee_transactions",     "list_own"),
+    ("fee_receipts", "read_own"),
+    ("fee_receipts", "list_own"),
+    ("fee_transactions", "read_own"),
+    ("fee_transactions", "list_own"),
 ]
 
 PARENT_PERMISSIONS = [
     # Reference data
-    ("academic_years",       "read"),           ("academic_years",       "list"),
-    ("classes",              "read"),           ("classes",              "list"),
-    ("subjects",             "read"),           ("subjects",             "list"),
+    ("academic_years", "read"),
+    ("academic_years", "list"),
+    ("classes", "read"),
+    ("classes", "list"),
+    ("subjects", "read"),
+    ("subjects", "list"),
     # Children's details (related = only linked children)
-    ("student_admissions",   "read_related"),   ("student_admissions",   "list_related"),
-    ("student_attendance",   "read_related"),   ("student_attendance",   "list_related"),
-    ("student_certificates", "read_related"),   ("student_certificates", "list_related"),
-    ("student_documents",    "read_related"),   ("student_documents",    "list_related"),
-    ("student_transport",    "read_related"),
+    ("student_admissions", "read_related"),
+    ("student_admissions", "list_related"),
+    ("student_attendance", "read_related"),
+    ("student_attendance", "list_related"),
+    ("student_certificates", "read_related"),
+    ("student_certificates", "list_related"),
+    ("student_documents", "read_related"),
+    ("student_documents", "list_related"),
+    ("student_transport", "read_related"),
     # Marks & Exam results (children only)
-    ("exams",                "read"),           ("exams",                "list"),
-    ("exam_marks",           "read_related"),   ("exam_marks",           "list_related"),
+    ("exams", "read"),
+    ("exams", "list"),
+    ("exam_marks", "read_related"),
+    ("exam_marks", "list_related"),
     # Hall tickets (children only)
-    ("exam_hall_tickets",    "read_related"),   ("exam_hall_tickets",    "list_related"),
+    ("exam_hall_tickets", "read_related"),
+    ("exam_hall_tickets", "list_related"),
 ]
 
 
@@ -105,18 +130,20 @@ async def run():
 
             # Delete existing permissions for this role
             del_result = await db.execute(
-                text("DELETE FROM resource_permissions WHERE role_id = :rid"),
-                {"rid": role_id}
+                text("DELETE FROM resource_permissions WHERE role_id = :rid"), {"rid": role_id}
             )
             print(f"[OK] Deleted existing permissions for {role_name} role")
 
             # Insert new permissions
             inserted = 0
             for resource, action in new_permissions:
-                await db.execute(text("""
+                await db.execute(
+                    text("""
                     INSERT INTO resource_permissions (id, role_id, resource, action, is_granted)
                     VALUES (gen_random_uuid(), :role_id, :res, :act, true)
-                """), {"role_id": role_id, "res": resource, "act": action})
+                """),
+                    {"role_id": role_id, "res": resource, "act": action},
+                )
                 inserted += 1
 
             await db.flush()

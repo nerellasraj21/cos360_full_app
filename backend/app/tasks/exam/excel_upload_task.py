@@ -3,9 +3,9 @@
 Celery task for async Excel mark upload processing.
 Sprint 4 · BG-01: celery_app imported from app.celery_app
 """
+
 import io
 import logging
-from typing import Optional
 
 from app.celery_app import celery_app
 
@@ -28,7 +28,7 @@ def process_excel_upload(
     subject_config_id: str,
     teacher_user_id: str,
     file_bytes: bytes,
-    tenant_schema: Optional[str] = None,
+    tenant_schema: str | None = None,
 ):
     """
     Parse an uploaded Excel file and persist marks for each student row.
@@ -43,17 +43,22 @@ def process_excel_upload(
         tenant_schema: PostgreSQL search_path schema for multi-tenant
     """
     import asyncio
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+    import uuid
+
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.orm import sessionmaker
+
     from app.core.config import settings
     from app.service.exam.excel_service import parse_excel_upload
     from app.service.exam.mark_entry_service import upsert_marks
-    import uuid
 
     try:
         logger.info(
             "Processing Excel upload for exam=%s class=%s section=%s subject_config=%s",
-            exam_id, class_id, section_id, subject_config_id,
+            exam_id,
+            class_id,
+            section_id,
+            subject_config_id,
         )
 
         async def _run():

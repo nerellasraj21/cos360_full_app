@@ -1,13 +1,17 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date, Text, Enum
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
-from app.db.base import BaseOrg
-import uuid
 import enum
+import uuid
+
+from sqlalchemy import Boolean, Column, Date, Enum, ForeignKey, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class AdmissionTypeEnum(enum.Enum):
     primary = "primary"
     non_primary = "non_primary"
+
 
 class Admission(BaseOrg):
     __tablename__ = "student_admissions"
@@ -15,7 +19,7 @@ class Admission(BaseOrg):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
     admission_number = Column(String(50), nullable=True, unique=True)
-    admission_type = Column(Enum(AdmissionTypeEnum, name='admissiontypeenum', create_type=False), nullable=True)
+    admission_type = Column(Enum(AdmissionTypeEnum, name="admissiontypeenum", create_type=False), nullable=True)
 
     admission_date = Column(Date, nullable=False)
     academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"))

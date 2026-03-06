@@ -7,31 +7,28 @@ Eligibility check logic:
          if not configured → treat all students as fee-paid.
   - Upserts into hall_ticket_eligibility (one row per exam+student).
 """
-import uuid
+
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+import uuid
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.exam.exam_model import Exam
-from app.models.exam.exam_class_section_model import ExamClassSection
 from app.models.exam.exam_settings_model import ExamSettings
 from app.models.exam.hall_ticket_model import HallTicketEligibility
 from app.service.exam.exam_service import get_exam_or_404
 
 
-async def _get_settings(db: AsyncSession) -> Optional[ExamSettings]:
+async def _get_settings(db: AsyncSession) -> ExamSettings | None:
     result = await db.execute(select(ExamSettings).limit(1))
     return result.scalar_one_or_none()
 
 
-async def _get_enrolled_students(
-    db: AsyncSession, exam_id: UUID
-) -> list[dict]:
+async def _get_enrolled_students(db: AsyncSession, exam_id: UUID) -> list[dict]:
     """
     Return [{student_id, class_id, section_id}] for all students enrolled
     in the exam's class-sections via student_admissions.
@@ -56,7 +53,7 @@ async def _get_attendance_percent(
     student_id: UUID,
     from_date,
     to_date,
-) -> Optional[Decimal]:
+) -> Decimal | None:
     """Raw SQL against student_attendance. Returns percent or None if no records."""
     if not from_date or not to_date:
         return None
@@ -68,11 +65,16 @@ async def _get_attendance_percent(
         WHERE student_id = :sid
           AND date BETWEEN :from_date AND :to_date
     """)
-    row = (await db.execute(sql, {
-        "sid": str(student_id),
-        "from_date": from_date,
-        "to_date": to_date,
-    })).fetchone()
+    row = (
+        await db.execute(
+            sql,
+            {
+                "sid": str(student_id),
+                "from_date": from_date,
+                "to_date": to_date,
+            },
+        )
+    ).fetchone()
     if row and row[0] is not None:
         return Decimal(str(row[0]))
     return None
@@ -81,11 +83,11 @@ async def _get_attendance_percent(
 async def _check_fee_paid(
     db: AsyncSession,
     student_id: UUID,
-    exam_fee_type_id: Optional[UUID],
+    exam_fee_type_id: UUID | None,
 ) -> bool:
     """Returns True if fee_type is not configured or if fee is paid."""
     if not exam_fee_type_id:
-        return True   # No exam fee configured → treat as paid
+        return True  # No exam fee configured → treat as paid
     sql = text("""
         SELECT COUNT(*)
         FROM fee_transactions ft
@@ -94,16 +96,19 @@ async def _check_fee_paid(
           AND fti.fee_type_id = :fee_type_id
           AND ft.status = 'paid'
     """)
-    row = (await db.execute(sql, {
-        "sid": str(student_id),
-        "fee_type_id": str(exam_fee_type_id),
-    })).fetchone()
+    row = (
+        await db.execute(
+            sql,
+            {
+                "sid": str(student_id),
+                "fee_type_id": str(exam_fee_type_id),
+            },
+        )
+    ).fetchone()
     return bool(row and row[0] > 0)
 
 
-async def _generate_hall_ticket_number(
-    exam_id: UUID, sequence: int, academic_year: str = "2025"
-) -> str:
+async def _generate_hall_ticket_number(exam_id: UUID, sequence: int, academic_year: str = "2025") -> str:
     return f"HT-{academic_year}-{sequence:04d}"
 
 
@@ -114,9 +119,7 @@ async def compute_eligibility(
     exam = await get_exam_or_404(db, exam_id)
     settings = await _get_settings(db)
     min_attendance = (
-        settings.hall_ticket_min_attendance
-        if settings and settings.hall_ticket_min_attendance
-        else Decimal("75.00")
+        settings.hall_ticket_min_attendance if settings and settings.hall_ticket_min_attendance else Decimal("75.00")
     )
     exam_fee_type_id = settings.exam_fee_type_id if settings else None
 
@@ -139,11 +142,12 @@ async def compute_eligibility(
             attendance_ok = True
         else:
             att_pct = await _get_attendance_percent(
-                db, student_id,
+                db,
+                student_id,
                 exam.attendance_from_date,
                 exam.attendance_to_date,
             )
-            attendance_ok = (att_pct is not None and att_pct >= min_attendance)
+            attendance_ok = att_pct is not None and att_pct >= min_attendance
 
         # Check fee
         fee_paid = await _check_fee_paid(db, student_id, exam_fee_type_id)
@@ -256,10 +260,19 @@ async def _get_eligibility_with_students(
           AND hte.is_eligible = :is_eligible
         ORDER BY hte.hall_ticket_number NULLS LAST, student_name
     """)
-    rows = (await db.execute(sql, {
-        "exam_id": str(exam_id),
-        "is_eligible": is_eligible,
-    })).mappings().all()
+    rows = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "exam_id": str(exam_id),
+                    "is_eligible": is_eligible,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]
 
 
@@ -309,6 +322,7 @@ async def override_eligibility(
 
 async def publish_hall_tickets(db: AsyncSession, exam_id: UUID) -> Exam:
     from app.service.exam.exam_service import get_exam_or_404
+
     exam = await get_exam_or_404(db, exam_id)
     exam.hall_ticket_published = True
     exam.hall_ticket_published_at = datetime.utcnow()

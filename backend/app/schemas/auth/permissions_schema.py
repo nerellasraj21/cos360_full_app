@@ -1,5 +1,7 @@
-from pydantic import BaseModel
 from uuid import UUID
+
+from pydantic import BaseModel
+
 
 class RoleMenuPermissionBase(BaseModel):
     role_id: UUID
@@ -7,8 +9,10 @@ class RoleMenuPermissionBase(BaseModel):
     can_view: bool = True
     can_edit: bool = False
 
+
 class RoleMenuPermissionCreate(RoleMenuPermissionBase):
     pass
+
 
 class RoleMenuPermissionRead(RoleMenuPermissionBase):
     id: UUID

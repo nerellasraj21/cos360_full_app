@@ -1,14 +1,18 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date, Text, Enum, UniqueConstraint
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
-from app.db.base import BaseOrg
-import uuid
 import enum
+import uuid
+
+from sqlalchemy import Column, Date, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class AttendanceStatusEnum(enum.Enum):
     present = "present"
     absent = "absent"
     late = "late"
+
 
 class StudentAttendance(BaseOrg):
     __tablename__ = "student_attendance"
@@ -20,5 +24,5 @@ class StudentAttendance(BaseOrg):
     remarks = Column(Text, nullable=True)
 
     student = relationship("Student", back_populates="attendances")
-    
-    __table_args__ = (UniqueConstraint('student_id', 'date', name='uq_student_date'),)
+
+    __table_args__ = (UniqueConstraint("student_id", "date", name="uq_student_date"),)

@@ -33,6 +33,7 @@ from datetime import date
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -44,37 +45,51 @@ SCHEMA = "test_tenant_schema"
 TEMP_PASSWORD = "Welcome@123"
 
 STUDENT = {
-    "first_name":  "Lambodhar",
-    "last_name":   "Vinayak",
-    "username":    "lambodhar.vinayak",
-    "email":       "lambodhar.vinayak@school.com",
-    "date_of_birth": date(2010, 6, 15),   # placeholder DOB
-    "gender":      "Male",
+    "first_name": "Lambodhar",
+    "last_name": "Vinayak",
+    "username": "lambodhar.vinayak",
+    "email": "lambodhar.vinayak@school.com",
+    "date_of_birth": date(2010, 6, 15),  # placeholder DOB
+    "gender": "Male",
     "nationality": "Indian",
     "mother_tongue": "Telugu",
-    "class_name":  "ABC",
+    "class_name": "ABC",
     "section_name": "A",
 }
 
 _STUDENT_PERMISSIONS = [
-    ("academic_years",       "read"),  ("academic_years",       "list"),
-    ("classes",              "read"),  ("classes",              "list"),
-    ("subjects",             "read"),  ("subjects",             "list"),
-    ("holiday_management",   "read"),  ("holiday_management",   "list"),
-    ("locations",            "read"),  ("locations",            "list"),
-    ("certificate_types",    "read"),  ("certificate_types",    "list"),
-    ("exams",                "read"),  ("exams",                "list"),
-    ("student_admissions",   "read"),
-    ("student_attendance",   "read"),  ("student_attendance",   "list"),
-    ("student_certificates", "read"),  ("student_certificates", "list"),
-    ("student_documents",    "read"),  ("student_documents",    "list"),
-    ("fee_receipts",         "read"),  ("fee_receipts",         "list"),
-    ("fee_transactions",     "read"),  ("fee_transactions",     "list"),
-    ("routes",               "read"),  ("routes",               "list"),
-    ("transport_trips",      "read"),  ("transport_trips",      "list"),
-    ("student_reports",      "read"),
-    ("attendance_reports",   "read"),
-    ("reports",              "read"),
+    ("academic_years", "read"),
+    ("academic_years", "list"),
+    ("classes", "read"),
+    ("classes", "list"),
+    ("subjects", "read"),
+    ("subjects", "list"),
+    ("holiday_management", "read"),
+    ("holiday_management", "list"),
+    ("locations", "read"),
+    ("locations", "list"),
+    ("certificate_types", "read"),
+    ("certificate_types", "list"),
+    ("exams", "read"),
+    ("exams", "list"),
+    ("student_admissions", "read"),
+    ("student_attendance", "read"),
+    ("student_attendance", "list"),
+    ("student_certificates", "read"),
+    ("student_certificates", "list"),
+    ("student_documents", "read"),
+    ("student_documents", "list"),
+    ("fee_receipts", "read"),
+    ("fee_receipts", "list"),
+    ("fee_transactions", "read"),
+    ("fee_transactions", "list"),
+    ("routes", "read"),
+    ("routes", "list"),
+    ("transport_trips", "read"),
+    ("transport_trips", "list"),
+    ("student_reports", "read"),
+    ("attendance_reports", "read"),
+    ("reports", "read"),
 ]
 
 
@@ -119,17 +134,24 @@ async def run():
         # ------------------------------------------------------------------ #
         seeded = 0
         for resource, action in _STUDENT_PERMISSIONS:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO resource_permissions (id, role_id, resource, action, is_granted)
                 SELECT gen_random_uuid(), :role_id, :res, :act, true
                 WHERE NOT EXISTS (
                     SELECT 1 FROM resource_permissions
                     WHERE role_id = :role_id2 AND resource = :res2 AND action = :act2
                 )
-            """), {
-                "role_id": student_role_id, "res": resource, "act": action,
-                "role_id2": student_role_id, "res2": resource, "act2": action,
-            })
+            """),
+                {
+                    "role_id": student_role_id,
+                    "res": resource,
+                    "act": action,
+                    "role_id2": student_role_id,
+                    "res2": resource,
+                    "act2": action,
+                },
+            )
             seeded += 1
         await db.flush()
         print(f"[OK] {seeded} resource_permissions ensured for Student role")
@@ -140,15 +162,17 @@ async def run():
         menus_result = await db.execute(text("SELECT id FROM menus"))
         menu_rows = menus_result.fetchall()
         for (menu_id,) in menu_rows:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO role_menu_permissions (id, role_id, menu_id, can_view, can_edit)
                 SELECT gen_random_uuid(), :role_id, :menu_id, true, false
                 WHERE NOT EXISTS (
                     SELECT 1 FROM role_menu_permissions
                     WHERE role_id = :role_id2 AND menu_id = :menu_id2
                 )
-            """), {"role_id": student_role_id, "menu_id": menu_id,
-                   "role_id2": student_role_id, "menu_id2": menu_id})
+            """),
+                {"role_id": student_role_id, "menu_id": menu_id, "role_id2": student_role_id, "menu_id2": menu_id},
+            )
         await db.flush()
         print(f"[OK] role_menu_permissions ensured for {len(menu_rows)} menus")
 
@@ -159,39 +183,44 @@ async def run():
 
         existing = await db.execute(
             text("SELECT id FROM users WHERE email = :email OR username = :username"),
-            {"email": STUDENT["email"], "username": STUDENT["username"]}
+            {"email": STUDENT["email"], "username": STUDENT["username"]},
         )
         existing_id = existing.scalar_one_or_none()
 
         if existing_id:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 UPDATE users
                 SET password_hash = :pwd, is_first_login = true,
                     username = :username, email = :email,
                     role_id = :role_id, is_active = true
                 WHERE id = :id
-            """), {
-                "pwd":      pwd_hash,
-                "username": STUDENT["username"],
-                "email":    STUDENT["email"],
-                "role_id":  student_role_id,
-                "id":       existing_id,
-            })
+            """),
+                {
+                    "pwd": pwd_hash,
+                    "username": STUDENT["username"],
+                    "email": STUDENT["email"],
+                    "role_id": student_role_id,
+                    "id": existing_id,
+                },
+            )
             user_id = existing_id
             print(f"[OK] Existing user updated — user_id: {user_id}")
         else:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO users (id, username, email, password_hash, is_active, is_first_login, role_id)
                 VALUES (gen_random_uuid(), :username, :email, :pwd, true, true, :role_id)
-            """), {
-                "username": STUDENT["username"],
-                "email":    STUDENT["email"],
-                "pwd":      pwd_hash,
-                "role_id":  student_role_id,
-            })
+            """),
+                {
+                    "username": STUDENT["username"],
+                    "email": STUDENT["email"],
+                    "pwd": pwd_hash,
+                    "role_id": student_role_id,
+                },
+            )
             result = await db.execute(
-                text("SELECT id FROM users WHERE username = :username"),
-                {"username": STUDENT["username"]}
+                text("SELECT id FROM users WHERE username = :username"), {"username": STUDENT["username"]}
             )
             user_id = result.scalar_one()
             print(f"[OK] New user created — user_id: {user_id}")
@@ -199,31 +228,32 @@ async def run():
         # ------------------------------------------------------------------ #
         # 6. Create or update Student record                                   #
         # ------------------------------------------------------------------ #
-        existing_stu = await db.execute(
-            text("SELECT id FROM students WHERE user_id = :user_id"),
-            {"user_id": user_id}
-        )
+        existing_stu = await db.execute(text("SELECT id FROM students WHERE user_id = :user_id"), {"user_id": user_id})
         existing_stu_id = existing_stu.scalar_one_or_none()
 
         if existing_stu_id:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 UPDATE students
                 SET first_name = :first_name, last_name = :last_name,
                     gender = :gender, nationality = :nationality,
                     mother_tongue = :mother_tongue
                 WHERE user_id = :user_id
-            """), {
-                "first_name":    STUDENT["first_name"],
-                "last_name":     STUDENT["last_name"],
-                "gender":        STUDENT["gender"],
-                "nationality":   STUDENT["nationality"],
-                "mother_tongue": STUDENT["mother_tongue"],
-                "user_id":       user_id,
-            })
+            """),
+                {
+                    "first_name": STUDENT["first_name"],
+                    "last_name": STUDENT["last_name"],
+                    "gender": STUDENT["gender"],
+                    "nationality": STUDENT["nationality"],
+                    "mother_tongue": STUDENT["mother_tongue"],
+                    "user_id": user_id,
+                },
+            )
             student_id = existing_stu_id
             print(f"[OK] Student record updated — student_id: {student_id}")
         else:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO students (
                     id, first_name, last_name, date_of_birth, gender,
                     nationality, mother_tongue, user_id
@@ -232,19 +262,18 @@ async def run():
                     gen_random_uuid(), :first_name, :last_name, :dob, :gender,
                     :nationality, :mother_tongue, :user_id
                 )
-            """), {
-                "first_name":    STUDENT["first_name"],
-                "last_name":     STUDENT["last_name"],
-                "dob":           STUDENT["date_of_birth"],
-                "gender":        STUDENT["gender"],
-                "nationality":   STUDENT["nationality"],
-                "mother_tongue": STUDENT["mother_tongue"],
-                "user_id":       user_id,
-            })
-            result2 = await db.execute(
-                text("SELECT id FROM students WHERE user_id = :user_id"),
-                {"user_id": user_id}
+            """),
+                {
+                    "first_name": STUDENT["first_name"],
+                    "last_name": STUDENT["last_name"],
+                    "dob": STUDENT["date_of_birth"],
+                    "gender": STUDENT["gender"],
+                    "nationality": STUDENT["nationality"],
+                    "mother_tongue": STUDENT["mother_tongue"],
+                    "user_id": user_id,
+                },
             )
+            result2 = await db.execute(text("SELECT id FROM students WHERE user_id = :user_id"), {"user_id": user_id})
             student_id = result2.scalar_one()
             print(f"[OK] Student record created — student_id: {student_id}")
 
@@ -252,8 +281,7 @@ async def run():
         # 7. Create admission with class ABC / section A (if they exist)      #
         # ------------------------------------------------------------------ #
         class_result = await db.execute(
-            text("SELECT id FROM classes WHERE name = :name"),
-            {"name": STUDENT["class_name"]}
+            text("SELECT id FROM classes WHERE name = :name"), {"name": STUDENT["class_name"]}
         )
         class_id = class_result.scalar_one_or_none()
 
@@ -261,7 +289,7 @@ async def run():
         if class_id:
             sec_result = await db.execute(
                 text("SELECT id FROM sections WHERE name = :name AND class_id = :class_id"),
-                {"name": STUDENT["section_name"], "class_id": class_id}
+                {"name": STUDENT["section_name"], "class_id": class_id},
             )
             section_id = sec_result.scalar_one_or_none()
 
@@ -273,29 +301,32 @@ async def run():
 
         # Check if admission already exists for this student
         existing_adm = await db.execute(
-            text("SELECT id FROM student_admissions WHERE student_id = :sid"),
-            {"sid": student_id}
+            text("SELECT id FROM student_admissions WHERE student_id = :sid"), {"sid": student_id}
         )
         existing_adm_id = existing_adm.scalar_one_or_none()
 
         if existing_adm_id:
             # Update class/section if found
             if class_id:
-                await db.execute(text("""
+                await db.execute(
+                    text("""
                     UPDATE student_admissions
                     SET current_class_id = :class_id,
                         current_section_id = :section_id,
                         academic_year_id = :ay_id
                     WHERE id = :id
-                """), {
-                    "class_id":  class_id,
-                    "section_id": section_id,
-                    "ay_id":     academic_year_id,
-                    "id":        existing_adm_id,
-                })
+                """),
+                    {
+                        "class_id": class_id,
+                        "section_id": section_id,
+                        "ay_id": academic_year_id,
+                        "id": existing_adm_id,
+                    },
+                )
             print(f"[OK] Admission record updated — admission_id: {existing_adm_id}")
         else:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO student_admissions (
                     id, student_id, admission_date,
                     current_class_id, current_section_id, academic_year_id
@@ -304,22 +335,25 @@ async def run():
                     gen_random_uuid(), :student_id, :adm_date,
                     :class_id, :section_id, :ay_id
                 )
-            """), {
-                "student_id":  student_id,
-                "adm_date":    date.today(),
-                "class_id":    class_id,
-                "section_id":  section_id,
-                "ay_id":       academic_year_id,
-            })
+            """),
+                {
+                    "student_id": student_id,
+                    "adm_date": date.today(),
+                    "class_id": class_id,
+                    "section_id": section_id,
+                    "ay_id": academic_year_id,
+                },
+            )
             adm_result = await db.execute(
-                text("SELECT id FROM student_admissions WHERE student_id = :sid"),
-                {"sid": student_id}
+                text("SELECT id FROM student_admissions WHERE student_id = :sid"), {"sid": student_id}
             )
             adm_id = adm_result.scalar_one()
             if class_id:
                 print(f"[OK] Admission created (class=ABC, section=A) — admission_id: {adm_id}")
             else:
-                print(f"[OK] Admission created (class 'ABC' not found — class/section set to NULL) — admission_id: {adm_id}")
+                print(
+                    f"[OK] Admission created (class 'ABC' not found — class/section set to NULL) — admission_id: {adm_id}"
+                )
                 print("     To assign class: seed a class named 'ABC' and run this script again.")
 
         await db.commit()
@@ -336,11 +370,15 @@ async def run():
         print()
         print("Next steps:")
         print("  1. POST /auth/login")
-        print(f"       Body: {{ \"username\": \"{STUDENT['username']}\", \"password\": \"{TEMP_PASSWORD}\", \"client_name\": \"test_tenant\" }}")
-        print("       -> receives { \"requires_password_change\": true, \"change_password_token\": \"...\" }")
+        print(
+            f"       Body: {{ \"username\": \"{STUDENT['username']}\", \"password\": \"{TEMP_PASSWORD}\", \"client_name\": \"test_tenant\" }}"
+        )
+        print('       -> receives { "requires_password_change": true, "change_password_token": "..." }')
         print()
         print("  2. POST /auth/staff/set-password")
-        print("       Body: { \"change_password_token\": \"<token>\", \"new_password\": \"NewPass@123\", \"confirm_password\": \"NewPass@123\" }")
+        print(
+            '       Body: { "change_password_token": "<token>", "new_password": "NewPass@123", "confirm_password": "NewPass@123" }'
+        )
         print("       -> receives full access_token, refresh_token, menu, permissions, entity_id")
         print()
         print("  If username does NOT exist in DB -> login returns 401 Invalid Credentials")

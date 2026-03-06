@@ -1,27 +1,29 @@
 """
 Service for generating financial-related reports
 """
-import logging
-from typing import List, Dict, Any, Tuple, Optional
-from datetime import datetime, date, timedelta
-from uuid import UUID
-from decimal import Decimal
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func, desc, asc, case, cast, Integer
-from sqlalchemy.orm import selectinload
-from calendar import monthrange
 
-from app.service.reports.base_report_service import BaseReportService
-from app.schemas.reports.financial_report_schemas import (
-    ExpenditureReportFilter, LedgerReportFilter, FinancialSummaryFilter,
-    ExpenditureData, LedgerData, FinancialSummaryData, FinancialSummary
-)
-from app.models.expense.expense_transaction_model import ExpenseTransaction
+from calendar import monthrange
+from datetime import date
+from decimal import Decimal
+import logging
+from typing import Any
+
+from sqlalchemy import asc, desc, func, select
+
 from app.models.expense.expense_category_model import ExpenseCategory
+from app.models.expense.expense_transaction_model import ExpenseTransaction
 from app.models.expense.expense_type_model import ExpenseType
 from app.models.fee.fee_transaction_model import FeeTransaction
-from app.models.student.student_model import Student
 from app.models.masters.staff_model import Staff
+from app.models.student.student_model import Student
+from app.schemas.reports.financial_report_schemas import (
+    ExpenditureReportFilter,
+    FinancialSummary,
+    FinancialSummaryData,
+    FinancialSummaryFilter,
+    LedgerReportFilter,
+)
+from app.service.reports.base_report_service import BaseReportService
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +31,7 @@ logger = logging.getLogger(__name__)
 class FinancialReportService(BaseReportService):
     """Service for generating financial-related reports"""
 
-    async def get_expenditure_report(
-        self,
-        filters: ExpenditureReportFilter
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    async def get_expenditure_report(self, filters: ExpenditureReportFilter) -> tuple[list[dict[str, Any]], int]:
         """Get expenditure report data"""
         try:
             # Base query with joins
@@ -47,10 +46,10 @@ class FinancialReportService(BaseReportService):
                     ExpenseTransaction.approved_by_staff_id,
                     ExpenseTransaction.approved_at,
                     ExpenseTransaction.created_at,
-                    ExpenseCategory.name.label('category_name'),
-                    ExpenseType.name.label('type_name'),
+                    ExpenseCategory.name.label("category_name"),
+                    ExpenseType.name.label("type_name"),
                     ExpenseTransaction.department,
-                    func.concat(Staff.first_name, ' ', Staff.last_name).label('approved_by_name')
+                    func.concat(Staff.first_name, " ", Staff.last_name).label("approved_by_name"),
                 )
                 .join(ExpenseCategory, ExpenseTransaction.category_id == ExpenseCategory.id)
                 .join(ExpenseType, ExpenseTransaction.type_id == ExpenseType.id)
@@ -84,8 +83,8 @@ class FinancialReportService(BaseReportService):
 
             if filters.month and filters.year:
                 query = query.where(
-                    func.extract('month', ExpenseTransaction.transaction_date) == filters.month,
-                    func.extract('year', ExpenseTransaction.transaction_date) == filters.year
+                    func.extract("month", ExpenseTransaction.transaction_date) == filters.month,
+                    func.extract("year", ExpenseTransaction.transaction_date) == filters.year,
                 )
 
             # Get total count
@@ -114,21 +113,23 @@ class FinancialReportService(BaseReportService):
             # Format data
             data = []
             for i, row in enumerate(rows, 1):
-                data.append({
-                    "sl_no": i + ((filters.page - 1) * filters.page_size),
-                    "transaction_id": str(row.id),
-                    "date": row.transaction_date.isoformat() if row.transaction_date else None,
-                    "category_name": row.category_name,
-                    "type_name": row.type_name,
-                    "description": row.description,
-                    "amount": float(row.amount) if row.amount else 0.0,
-                    "department": row.department,
-                    "approved_by": row.approved_by_name,
-                    "approved_at": row.approved_at.isoformat() if row.approved_at else None,
-                    "receipt_number": row.receipt_number,
-                    "vendor_name": row.vendor_name,
-                    "created_at": row.created_at.isoformat() if row.created_at else None
-                })
+                data.append(
+                    {
+                        "sl_no": i + ((filters.page - 1) * filters.page_size),
+                        "transaction_id": str(row.id),
+                        "date": row.transaction_date.isoformat() if row.transaction_date else None,
+                        "category_name": row.category_name,
+                        "type_name": row.type_name,
+                        "description": row.description,
+                        "amount": float(row.amount) if row.amount else 0.0,
+                        "department": row.department,
+                        "approved_by": row.approved_by_name,
+                        "approved_at": row.approved_at.isoformat() if row.approved_at else None,
+                        "receipt_number": row.receipt_number,
+                        "vendor_name": row.vendor_name,
+                        "created_at": row.created_at.isoformat() if row.created_at else None,
+                    }
+                )
 
             return data, total_count or 0
 
@@ -136,40 +137,34 @@ class FinancialReportService(BaseReportService):
             logger.error(f"Error in get_expenditure_report: {str(e)}")
             raise
 
-    async def get_ledger_report(
-        self,
-        filters: LedgerReportFilter
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    async def get_ledger_report(self, filters: LedgerReportFilter) -> tuple[list[dict[str, Any]], int]:
         """Get ledger report data combining income and expenses"""
         try:
             # Create subquery for expenses (Debit entries)
-            expense_query = (
-                select(
-                    ExpenseTransaction.id,
-                    ExpenseTransaction.transaction_date.label('date'),
-                    func.cast('Expense', func.text("VARCHAR")).label('account_type'),
-                    func.cast('Debit', func.text("VARCHAR")).label('transaction_type'),
-                    func.cast('Expense Payment', func.text("VARCHAR")).label('reference_type'),
-                    func.cast(ExpenseTransaction.id, func.text("VARCHAR")).label('reference_id'),
-                    ExpenseTransaction.amount,
-                    ExpenseTransaction.description,
-                    ExpenseTransaction.created_at
-                )
-                .where(ExpenseTransaction.deleted_at.is_(None))
-            )
+            expense_query = select(
+                ExpenseTransaction.id,
+                ExpenseTransaction.transaction_date.label("date"),
+                func.cast("Expense", func.text("VARCHAR")).label("account_type"),
+                func.cast("Debit", func.text("VARCHAR")).label("transaction_type"),
+                func.cast("Expense Payment", func.text("VARCHAR")).label("reference_type"),
+                func.cast(ExpenseTransaction.id, func.text("VARCHAR")).label("reference_id"),
+                ExpenseTransaction.amount,
+                ExpenseTransaction.description,
+                ExpenseTransaction.created_at,
+            ).where(ExpenseTransaction.deleted_at.is_(None))
 
             # Create subquery for fee collections (Credit entries)
             fee_query = (
                 select(
                     FeeTransaction.id,
-                    FeeTransaction.transaction_date.label('date'),
-                    func.cast('Income', func.text("VARCHAR")).label('account_type'),
-                    func.cast('Credit', func.text("VARCHAR")).label('transaction_type'),
-                    func.cast('Fee Payment', func.text("VARCHAR")).label('reference_type'),
-                    func.cast(FeeTransaction.id, func.text("VARCHAR")).label('reference_id'),
-                    FeeTransaction.amount_paid.label('amount'),
-                    func.concat('Fee payment for ', Student.first_name, ' ', Student.last_name).label('description'),
-                    FeeTransaction.created_at
+                    FeeTransaction.transaction_date.label("date"),
+                    func.cast("Income", func.text("VARCHAR")).label("account_type"),
+                    func.cast("Credit", func.text("VARCHAR")).label("transaction_type"),
+                    func.cast("Fee Payment", func.text("VARCHAR")).label("reference_type"),
+                    func.cast(FeeTransaction.id, func.text("VARCHAR")).label("reference_id"),
+                    FeeTransaction.amount_paid.label("amount"),
+                    func.concat("Fee payment for ", Student.first_name, " ", Student.last_name).label("description"),
+                    FeeTransaction.created_at,
                 )
                 .join(Student, FeeTransaction.student_id == Student.id)
                 .where(FeeTransaction.deleted_at.is_(None))
@@ -193,7 +188,7 @@ class FinancialReportService(BaseReportService):
                     subquery.c.reference_id,
                     subquery.c.amount,
                     subquery.c.description,
-                    subquery.c.created_at
+                    subquery.c.created_at,
                 ).select_from(subquery)
 
                 if filters.date_from:
@@ -211,8 +206,8 @@ class FinancialReportService(BaseReportService):
 
                 if filters.month and filters.year:
                     query = query.where(
-                        func.extract('month', subquery.c.date) == filters.month,
-                        func.extract('year', subquery.c.date) == filters.year
+                        func.extract("month", subquery.c.date) == filters.month,
+                        func.extract("year", subquery.c.date) == filters.year,
                     )
             else:
                 query = combined_query
@@ -242,28 +237,30 @@ class FinancialReportService(BaseReportService):
 
             # Calculate running balance and format data
             data = []
-            running_balance = Decimal('0.00')
+            running_balance = Decimal("0.00")
 
             for i, row in enumerate(rows, 1):
                 # Update running balance
-                if row.transaction_type == 'Credit':
+                if row.transaction_type == "Credit":
                     running_balance += Decimal(str(row.amount))
                 else:
                     running_balance -= Decimal(str(row.amount))
 
-                data.append({
-                    "sl_no": i + ((filters.page - 1) * filters.page_size),
-                    "transaction_id": str(row.id),
-                    "date": row.date.isoformat() if row.date else None,
-                    "account_type": row.account_type,
-                    "transaction_type": row.transaction_type,
-                    "reference_type": row.reference_type,
-                    "reference_id": row.reference_id,
-                    "amount": float(row.amount) if row.amount else 0.0,
-                    "balance": float(running_balance),
-                    "description": row.description,
-                    "created_at": row.created_at.isoformat() if row.created_at else None
-                })
+                data.append(
+                    {
+                        "sl_no": i + ((filters.page - 1) * filters.page_size),
+                        "transaction_id": str(row.id),
+                        "date": row.date.isoformat() if row.date else None,
+                        "account_type": row.account_type,
+                        "transaction_type": row.transaction_type,
+                        "reference_type": row.reference_type,
+                        "reference_id": row.reference_id,
+                        "amount": float(row.amount) if row.amount else 0.0,
+                        "balance": float(running_balance),
+                        "description": row.description,
+                        "created_at": row.created_at.isoformat() if row.created_at else None,
+                    }
+                )
 
             return data, total_count or 0
 
@@ -271,10 +268,7 @@ class FinancialReportService(BaseReportService):
             logger.error(f"Error in get_ledger_report: {str(e)}")
             raise
 
-    async def get_financial_summary(
-        self,
-        filters: FinancialSummaryFilter
-    ) -> FinancialSummary:
+    async def get_financial_summary(self, filters: FinancialSummaryFilter) -> FinancialSummary:
         """Get financial summary statistics"""
         try:
             # Calculate date range
@@ -293,10 +287,10 @@ class FinancialReportService(BaseReportService):
                 date_to = date(today.year, today.month, last_day)
 
             # Initialize totals
-            total_income = Decimal('0.00')
-            total_expenses = Decimal('0.00')
-            fee_collections = Decimal('0.00')
-            fee_pending = Decimal('0.00')
+            total_income = Decimal("0.00")
+            total_expenses = Decimal("0.00")
+            fee_collections = Decimal("0.00")
+            fee_pending = Decimal("0.00")
 
             # Get fee collections (income)
             if filters.include_fees:
@@ -306,7 +300,7 @@ class FinancialReportService(BaseReportService):
                     .where(FeeTransaction.transaction_date >= date_from)
                     .where(FeeTransaction.transaction_date <= date_to)
                 )
-                fee_collections = await self.db.scalar(fee_income_query) or Decimal('0.00')
+                fee_collections = await self.db.scalar(fee_income_query) or Decimal("0.00")
                 total_income += fee_collections
 
             # Get total expenses
@@ -317,16 +311,13 @@ class FinancialReportService(BaseReportService):
                     .where(ExpenseTransaction.transaction_date >= date_from)
                     .where(ExpenseTransaction.transaction_date <= date_to)
                 )
-                total_expenses = await self.db.scalar(expense_query) or Decimal('0.00')
+                total_expenses = await self.db.scalar(expense_query) or Decimal("0.00")
 
             # Get expense breakdown by category
             expense_by_category = {}
             if filters.include_expenses:
                 category_query = (
-                    select(
-                        ExpenseCategory.name,
-                        func.sum(ExpenseTransaction.amount)
-                    )
+                    select(ExpenseCategory.name, func.sum(ExpenseTransaction.amount))
                     .join(ExpenseTransaction, ExpenseCategory.id == ExpenseTransaction.category_id)
                     .where(ExpenseTransaction.deleted_at.is_(None))
                     .where(ExpenseTransaction.transaction_date >= date_from)
@@ -341,10 +332,7 @@ class FinancialReportService(BaseReportService):
             expense_by_type = {}
             if filters.include_expenses:
                 type_query = (
-                    select(
-                        ExpenseType.name,
-                        func.sum(ExpenseTransaction.amount)
-                    )
+                    select(ExpenseType.name, func.sum(ExpenseTransaction.amount))
                     .join(ExpenseTransaction, ExpenseType.id == ExpenseTransaction.type_id)
                     .where(ExpenseTransaction.deleted_at.is_(None))
                     .where(ExpenseTransaction.transaction_date >= date_from)
@@ -368,7 +356,7 @@ class FinancialReportService(BaseReportService):
                 fee_pending=fee_pending,  # This would need additional query for pending fees
                 expense_by_category=expense_by_category,
                 expense_by_type=expense_by_type,
-                monthly_trends=[]  # Can be implemented later
+                monthly_trends=[],  # Can be implemented later
             )
 
             return FinancialSummary(
@@ -376,7 +364,7 @@ class FinancialReportService(BaseReportService):
                 income_breakdown=[],  # Can be implemented later
                 expense_breakdown=[],  # Can be implemented later
                 budget_comparison=[],  # Can be implemented later
-                cash_flow_trends=[]  # Can be implemented later
+                cash_flow_trends=[],  # Can be implemented later
             )
 
         except Exception as e:

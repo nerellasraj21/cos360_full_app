@@ -5,30 +5,27 @@ Handles full schema creation with migrations, permissions, and data setup
 
 import logging
 import subprocess
-import os
-from typing import Dict, Any, List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, select
+from typing import Any
 from uuid import UUID
 
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.session import get_public_db
-from app.models.public.tenant_model import Tenant
-from app.models.public.plan_model import Plan
 from app.models.public.menu_model import Menu as PublicMenu
 from app.models.public.plan_menu_model import PlanMenuAccess
+from app.models.public.plan_model import Plan
 
 logger = logging.getLogger("tenant_schema_service")
+
 
 class TenantSchemaService:
     """Service for complete tenant schema initialization and management"""
 
     @staticmethod
     async def initialize_complete_tenant_schema(
-        schema_name: str,
-        plan_id: UUID,
-        client_name: str,
-        super_admin_id: UUID
-    ) -> Dict[str, Any]:
+        schema_name: str, plan_id: UUID, client_name: str, super_admin_id: UUID
+    ) -> dict[str, Any]:
         """
         Complete tenant schema initialization with:
         1. Schema creation
@@ -55,7 +52,7 @@ class TenantSchemaService:
             "menus_synced": 0,
             "roles_created": 0,
             "permissions_assigned": 0,
-            "errors": []
+            "errors": [],
         }
 
         try:
@@ -84,9 +81,7 @@ class TenantSchemaService:
                     return initialization_summary
 
                 # Step 4: Set up plan-based menus
-                menus_result = await TenantSchemaService._setup_plan_menus(
-                    db, schema_name, plan_id
-                )
+                menus_result = await TenantSchemaService._setup_plan_menus(db, schema_name, plan_id)
                 initialization_summary["menus_synced"] = menus_result["menus_synced"]
                 initialization_summary["steps_completed"].append("menus_synced")
 
@@ -113,18 +108,18 @@ class TenantSchemaService:
             return initialization_summary
 
     @staticmethod
-    async def _run_schema_migrations(schema_name: str) -> Dict[str, Any]:
+    async def _run_schema_migrations(schema_name: str) -> dict[str, Any]:
         """
         Run full Alembic migrations on tenant schema
         """
         try:
             # Use the migrate_tenants.py script for consistent migration handling
-            result = subprocess.run([
-                "python", "migrate_tenants.py",
-                "--schema", schema_name,
-                "--action", "upgrade",
-                "--target", "head"
-            ], capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                ["python", "migrate_tenants.py", "--schema", schema_name, "--action", "upgrade", "--target", "head"],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
 
             if result.returncode == 0:
                 # Count tables created (approximate from migration output)
@@ -132,41 +127,25 @@ class TenantSchemaService:
                 return {
                     "success": True,
                     "tables_count": max(tables_count, 30),  # Minimum expected tables
-                    "output": result.stdout
+                    "output": result.stdout,
                 }
             else:
-                return {
-                    "success": False,
-                    "error": result.stderr or result.stdout,
-                    "tables_count": 0
-                }
+                return {"success": False, "error": result.stderr or result.stdout, "tables_count": 0}
 
         except subprocess.TimeoutExpired:
-            return {
-                "success": False,
-                "error": "Migration timeout - schema creation took too long",
-                "tables_count": 0
-            }
+            return {"success": False, "error": "Migration timeout - schema creation took too long", "tables_count": 0}
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "tables_count": 0
-            }
+            return {"success": False, "error": str(e), "tables_count": 0}
 
     @staticmethod
-    async def _setup_plan_menus(db: AsyncSession, schema_name: str, plan_id: UUID) -> Dict[str, Any]:
+    async def _setup_plan_menus(db: AsyncSession, schema_name: str, plan_id: UUID) -> dict[str, Any]:
         """
         Set up plan-based menus in tenant schema
         """
         try:
             # Get plan's allowed menus
             menu_access_result = await db.execute(
-                select(PlanMenuAccess.menu_id)
-                .where(
-                    PlanMenuAccess.plan_id == plan_id,
-                    PlanMenuAccess.is_active == True
-                )
+                select(PlanMenuAccess.menu_id).where(PlanMenuAccess.plan_id == plan_id, PlanMenuAccess.is_active)
             )
             allowed_menu_ids = [row.menu_id for row in menu_access_result.fetchall()]
 
@@ -184,17 +163,20 @@ class TenantSchemaService:
             # Create menus in tenant schema
             menus_synced = 0
             for menu in public_menus:
-                await db.execute(text(f'''
+                await db.execute(
+                    text(f"""
                     INSERT INTO "{schema_name}".menus (name, url, level, parent_id, display_order)
                     VALUES (:name, :url, :level, :parent_id, :display_order)
                     ON CONFLICT (name) DO NOTHING
-                '''), {
-                    "name": menu.name,
-                    "url": menu.url,
-                    "level": menu.level,
-                    "parent_id": None,  # TODO: Handle parent relationships properly
-                    "display_order": menu.display_order or menus_synced
-                })
+                """),
+                    {
+                        "name": menu.name,
+                        "url": menu.url,
+                        "level": menu.level,
+                        "parent_id": None,  # TODO: Handle parent relationships properly
+                        "display_order": menu.display_order or menus_synced,
+                    },
+                )
                 menus_synced += 1
 
             return {"menus_synced": menus_synced}
@@ -205,11 +187,8 @@ class TenantSchemaService:
 
     @staticmethod
     async def _setup_roles_and_permissions(
-        db: AsyncSession,
-        schema_name: str,
-        plan_id: UUID,
-        plan_name: str
-    ) -> Dict[str, Any]:
+        db: AsyncSession, schema_name: str, plan_id: UUID, plan_name: str
+    ) -> dict[str, Any]:
         """
         Set up default roles and assign permissions based on plan
         """
@@ -220,24 +199,30 @@ class TenantSchemaService:
                 ("Teacher", "Teaching staff - Student and academic management"),
                 ("Staff", "Administrative staff - Limited administrative access"),
                 ("Student", "Student users - Read-only access to their data"),
-                ("Parent", "Parent/Guardian - Access to their children's data")
+                ("Parent", "Parent/Guardian - Access to their children's data"),
             ]
 
             roles_created = 0
             for role_name, role_description in default_roles:
-                await db.execute(text(f'''
+                await db.execute(
+                    text(f"""
                     INSERT INTO "{schema_name}".roles (name, description, is_active)
                     VALUES (:name, :description, true)
                     ON CONFLICT (name) DO NOTHING
-                '''), {"name": role_name, "description": role_description})
+                """),
+                    {"name": role_name, "description": role_description},
+                )
                 roles_created += 1
 
             # Get plan resources for Admin role permissions
-            plan_resources_result = await db.execute(text("""
+            plan_resources_result = await db.execute(
+                text("""
                 SELECT resource_name, actions
                 FROM public.plan_resource_access
                 WHERE plan_id = :plan_id AND is_active = true
-            """), {"plan_id": plan_id})
+            """),
+                {"plan_id": plan_id},
+            )
 
             plan_resources = plan_resources_result.fetchall()
 
@@ -248,39 +233,39 @@ class TenantSchemaService:
                 actions = resource.actions  # PostgreSQL array
 
                 for action in actions:
-                    await db.execute(text(f'''
+                    await db.execute(
+                        text(f"""
                         INSERT INTO "{schema_name}".resource_permissions
                         (role_id, resource_name, action_name, is_granted)
                         SELECT r.id, :resource_name, :action_name, true
                         FROM "{schema_name}".roles r
                         WHERE r.name = 'Admin'
                         ON CONFLICT (role_id, resource_name, action_name) DO UPDATE SET is_granted = true
-                    '''), {
-                        "resource_name": resource_name,
-                        "action_name": action
-                    })
+                    """),
+                        {"resource_name": resource_name, "action_name": action},
+                    )
                     permissions_assigned += 1
 
             # CRITICAL: Add role_management permissions to Admin role
             # These are essential for tenant admin functionality
-            role_management_actions = ['create', 'read', 'update', 'delete', 'list']
+            role_management_actions = ["create", "read", "update", "delete", "list"]
             for action in role_management_actions:
-                await db.execute(text(f'''
+                await db.execute(
+                    text(f"""
                     INSERT INTO "{schema_name}".resource_permissions
                     (role_id, resource_name, action_name, is_granted)
                     SELECT r.id, 'role_management', :action_name, true
                     FROM "{schema_name}".roles r
                     WHERE r.name = 'Admin'
                     ON CONFLICT (role_id, resource_name, action_name) DO UPDATE SET is_granted = true
-                '''), {"action_name": action})
+                """),
+                    {"action_name": action},
+                )
                 permissions_assigned += 1
 
             logger.info(f"Added role_management permissions to Admin role in {schema_name}")
 
-            return {
-                "roles_created": roles_created,
-                "permissions_assigned": permissions_assigned
-            }
+            return {"roles_created": roles_created, "permissions_assigned": permissions_assigned}
 
         except Exception as e:
             logger.error(f"Error setting up roles/permissions for {schema_name}: {str(e)}")
@@ -288,10 +273,7 @@ class TenantSchemaService:
 
     @staticmethod
     async def _create_initialization_audit(
-        db: AsyncSession,
-        super_admin_id: UUID,
-        schema_name: str,
-        summary: Dict[str, Any]
+        db: AsyncSession, super_admin_id: UUID, schema_name: str, summary: dict[str, Any]
     ):
         """
         Create audit log entry for schema initialization
@@ -313,9 +295,9 @@ class TenantSchemaService:
                     "menus_synced": summary["menus_synced"],
                     "roles_created": summary["roles_created"],
                     "permissions_assigned": summary["permissions_assigned"],
-                    "success": len(summary["errors"]) == 0
+                    "success": len(summary["errors"]) == 0,
                 },
-                ip_address="system"
+                ip_address="system",
             )
         except Exception as e:
             logger.error(f"Error creating audit log: {str(e)}")

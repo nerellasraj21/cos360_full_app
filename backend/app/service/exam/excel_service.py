@@ -1,15 +1,14 @@
 from io import BytesIO
 from uuid import UUID
 
-import openpyxl
 from fastapi import HTTPException
+import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.exam.exam_subject_config_model import ExamSubjectComponent, ExamSubjectConfig
-from app.models.exam.student_marks_model import StudentMark
+from app.models.exam.exam_subject_config_model import ExamSubjectConfig
 
 
 async def generate_excel_template(
@@ -139,16 +138,18 @@ async def parse_excel_upload(
                 continue
 
             # Map component header → raw cell value for this row
-            component_data = dict(zip(component_headers, row[3:3 + len(component_headers)]))
+            component_data = dict(zip(component_headers, row[3 : 3 + len(component_headers)], strict=False))
             remarks_value = row[3 + len(component_headers)] if len(row) > 3 + len(component_headers) else None
 
-            marks.append({
-                "student_id": str(student_id),
-                "roll_no": row[1],
-                "student_name": row[2],
-                "row_data": component_data,
-                "remarks": remarks_value,
-            })
+            marks.append(
+                {
+                    "student_id": str(student_id),
+                    "roll_no": row[1],
+                    "student_name": row[2],
+                    "row_data": component_data,
+                    "remarks": remarks_value,
+                }
+            )
         except Exception as e:
             errors.append(f"Row {row_idx}: {str(e)}")
 
