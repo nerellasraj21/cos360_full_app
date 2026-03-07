@@ -15,7 +15,10 @@ import type {
   DesignationUpdateRequest,
   DesignationListResponse,
   DesignationDropdown,
-  StaffDriver
+  StaffDriver,
+  StaffQualification,
+  StaffQualificationInput,
+  StaffQualificationUpdate,
 } from '@/types/staff/staff';
 
 // Query keys for staff
@@ -34,6 +37,7 @@ export const staffKeys = {
   designationList: (params?: any) => [...staffKeys.designations(), 'list', params] as const,
   designationDetail: (id: string) => [...staffKeys.designations(), 'detail', id] as const,
   designationDropdown: () => [...staffKeys.designations(), 'dropdown'] as const,
+  qualifications: (staffId: string) => [...staffKeys.detail(staffId), 'qualifications'] as const,
 };
 
 // Staff Enrollment Hooks
@@ -317,6 +321,61 @@ export function useDeleteDesignation() {
     },
     onError: (error) => {
       toast.error(`Failed to delete designation: ${error.message}`);
+    },
+  });
+}
+
+// Staff Qualification Hooks
+export function useStaffQualifications(staffId: string) {
+  return useQuery<StaffQualification[]>({
+    queryKey: staffKeys.qualifications(staffId),
+    queryFn: () => staffApi.getQualifications(staffId),
+    enabled: !!staffId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useAddQualification() {
+  const queryClient = useQueryClient();
+
+  return useMutation<StaffQualification, Error, { staffId: string; data: StaffQualificationInput }>({
+    mutationFn: ({ staffId, data }) => staffApi.addQualification(staffId, data),
+    onSuccess: (_, { staffId }) => {
+      queryClient.invalidateQueries({ queryKey: staffKeys.qualifications(staffId) });
+      queryClient.invalidateQueries({ queryKey: staffKeys.lists() });
+    },
+    onError: (error) => {
+      toast.error(`Failed to add qualification: ${error.message}`);
+    },
+  });
+}
+
+export function useUpdateQualification() {
+  const queryClient = useQueryClient();
+
+  return useMutation<StaffQualification, Error, { staffId: string; qualificationId: string; data: StaffQualificationUpdate }>({
+    mutationFn: ({ staffId, qualificationId, data }) => staffApi.updateQualification(staffId, qualificationId, data),
+    onSuccess: (_, { staffId }) => {
+      queryClient.invalidateQueries({ queryKey: staffKeys.qualifications(staffId) });
+      queryClient.invalidateQueries({ queryKey: staffKeys.lists() });
+    },
+    onError: (error) => {
+      toast.error(`Failed to update qualification: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteQualification() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, { staffId: string; qualificationId: string }>({
+    mutationFn: ({ staffId, qualificationId }) => staffApi.deleteQualification(staffId, qualificationId),
+    onSuccess: (_, { staffId }) => {
+      queryClient.invalidateQueries({ queryKey: staffKeys.qualifications(staffId) });
+      queryClient.invalidateQueries({ queryKey: staffKeys.lists() });
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete qualification: ${error.message}`);
     },
   });
 }

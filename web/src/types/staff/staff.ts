@@ -1,3 +1,31 @@
+export type QualificationLevel = 'Below Graduation' | 'Graduation' | 'Post Graduation' | 'PhD';
+
+export interface StaffQualification {
+  id: string;
+  staff_id: string;
+  level: QualificationLevel;
+  name: string;
+  passed_out_year?: number;
+  percentage?: string; // Decimal serialized as string by backend — use Number(percentage) for arithmetic
+  university?: string;
+}
+
+export interface StaffQualificationInput {
+  level: QualificationLevel;
+  name: string;
+  passed_out_year?: number;
+  percentage?: number;
+  university?: string;
+}
+
+export interface StaffQualificationUpdate {
+  level?: QualificationLevel;
+  name?: string;
+  passed_out_year?: number;
+  percentage?: number;
+  university?: string;
+}
+
 export interface Staff {
   id: string;
   first_name: string;
@@ -16,6 +44,25 @@ export interface Staff {
   user_id: string;
   designation?: Designation;
   attendances?: StaffAttendance[];
+  qualifications?: StaffQualification[];
+  // Work experience
+  work_org?: string;
+  work_from_date?: string;
+  work_to_date?: string;
+  subjects_dealt?: string;
+  work_remarks?: string;
+  // Bank details
+  bank_name?: string;
+  bank_branch?: string;
+  account_number?: string;
+  ifsc_code?: string;
+  account_holder_name?: string;
+  account_type?: 'Savings' | 'Current';
+  // Salary & PF
+  last_drawn_salary?: string; // Decimal serialized as string by backend
+  current_salary?: string;    // Decimal serialized as string by backend
+  pf_account_number?: string;
+  uan_number?: string;
   created_at: string;
   updated_at: string;
 }
@@ -51,6 +98,24 @@ export interface StaffUpdateRequest {
   designation_id?: string;
   department?: string;
   is_active?: boolean;
+  // Work experience
+  work_org?: string;
+  work_from_date?: string;
+  work_to_date?: string;
+  subjects_dealt?: string;
+  work_remarks?: string;
+  // Bank details
+  bank_name?: string;
+  bank_branch?: string;
+  account_number?: string;
+  ifsc_code?: string;
+  account_holder_name?: string;
+  account_type?: 'Savings' | 'Current';
+  // Salary & PF
+  last_drawn_salary?: number;
+  current_salary?: number;
+  pf_account_number?: string;
+  uan_number?: string;
 }
 
 export interface StaffAttendance {

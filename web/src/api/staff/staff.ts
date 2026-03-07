@@ -14,7 +14,10 @@ import type {
   DesignationListResponse,
   DesignationDropdown,
   StaffDriver,
-  StaffProfile
+  StaffProfile,
+  StaffQualification,
+  StaffQualificationInput,
+  StaffQualificationUpdate,
 } from '@/types/staff/staff';
 
 export const staffApi = {
@@ -245,6 +248,26 @@ export const staffApi = {
     const response = await CAxios.put('/profile/staff/me', data);
     console.log('[DEBUG] staffApi.updateStaffProfile updated:', response.data);
     return response.data;
+  },
+
+  // Staff Qualification APIs
+  getQualifications: async (staffId: string): Promise<StaffQualification[]> => {
+    const response = await CAxios.get(`/staff/${staffId}/qualifications`);
+    return response.data;
+  },
+
+  addQualification: async (staffId: string, data: StaffQualificationInput): Promise<StaffQualification> => {
+    const response = await CAxios.post(`/staff/${staffId}/qualifications`, data);
+    return response.data;
+  },
+
+  updateQualification: async (staffId: string, qualificationId: string, data: StaffQualificationUpdate): Promise<StaffQualification> => {
+    const response = await CAxios.put(`/staff/${staffId}/qualifications/${qualificationId}`, data);
+    return response.data;
+  },
+
+  deleteQualification: async (staffId: string, qualificationId: string): Promise<void> => {
+    await CAxios.delete(`/staff/${staffId}/qualifications/${qualificationId}`);
   },
 };
 

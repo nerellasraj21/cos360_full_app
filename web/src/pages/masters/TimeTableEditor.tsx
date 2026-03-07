@@ -315,11 +315,15 @@ export default function TimeTableEditor() {
         return sectionsData.map(section => ({ value: section.id, label: section.name }));
     }, [sectionsData]);
 
-    // Filter subjects to only those mapped to the selected class
+    // Filter subjects to those mapped to the selected class (and section if selected).
+    // Mappings with no section_id are class-wide; mappings with a section_id are section-specific.
     const classSubjectIds = useMemo(() => {
         if (!classMappings || !selectedClass) return null;
-        return new Set(classMappings.map((m) => m.subject_id));
-    }, [classMappings, selectedClass]);
+        const sectionFiltered = classMappings.filter(
+            (m) => !m.section_id || !selectedSection || m.section_id === selectedSection.value
+        );
+        return new Set(sectionFiltered.map((m) => m.subject_id));
+    }, [classMappings, selectedClass, selectedSection]);
 
     const subjectOptions = useMemo(() => {
         const all = (subjects || []).map((s) => ({ value: s.id, label: s.name }));

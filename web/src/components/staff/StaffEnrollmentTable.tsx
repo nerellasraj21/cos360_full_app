@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import CreatableSelect from 'react-select/creatable';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Edit, Trash2, Plus, Users, Mail, Phone, Calendar, Award, MapPin, Filter, Download, FileText, FileSpreadsheet, Eye, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Search } from 'lucide-react';
+import { Edit, Trash2, Plus, Users, Mail, Phone, Calendar, Award, MapPin, Filter, Download, FileText, FileSpreadsheet, Eye, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Search, GraduationCap, Briefcase, Landmark, Wallet } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,13 +16,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { useQuery } from '@tanstack/react-query';
-import { useStaffEnrollments, useCreateStaffEnrollment, useUpdateStaffEnrollment, useDeleteStaffEnrollment } from '@/hooks/staff/useStaff';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useStaffEnrollments, useStaffEnrollment, useCreateStaffEnrollment, useUpdateStaffEnrollment, useDeleteStaffEnrollment, staffKeys } from '@/hooks/staff/useStaff';
 import { useRoles } from '@/api/auth';
-import { getAllDesignations } from '@/api/staff/staff';
+import { getAllDesignations, staffApi } from '@/api/staff/staff';
 import { InfiniteScrollDropdown } from '@/components/dropdown';
 import { usePermission } from '@/hooks/usePermission';
-import type { Staff, StaffInput, DesignationListResponse } from '@/types/staff/staff';
+import type { Staff, StaffInput, DesignationListResponse, QualificationLevel } from '@/types/staff/staff';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -29,7 +30,98 @@ interface StaffEnrollmentTableProps {
     className?: string;
 }
 
-interface StaffFormData extends StaffInput {}
+interface StaffFormData {
+    // Basic info (sent on POST)
+    first_name: string;
+    last_name?: string;
+    email?: string;
+    phone?: string;
+    gender?: 'Male' | 'Female' | 'Other';
+    date_of_birth?: string;
+    joining_date: string;
+    qualification?: string;
+    experience_years?: number;
+    address?: string;
+    designation_id?: string;
+    department?: string;
+    is_active?: boolean;
+    role_id?: string;
+    // Work experience (sent on PATCH)
+    work_org?: string;
+    work_from_date?: string;
+    work_to_date?: string;
+    subjects_dealt?: string;
+    work_remarks?: string;
+    // Bank details (sent on PATCH)
+    bank_name?: string;
+    bank_branch?: string;
+    account_number?: string;
+    ifsc_code?: string;
+    account_holder_name?: string;
+    account_type?: 'Savings' | 'Current';
+    // Salary & PF (sent on PATCH)
+    last_drawn_salary?: string; // string in form state, converted to number on submit
+    current_salary?: string;    // string in form state, converted to number on submit
+    pf_account_number?: string;
+    uan_number?: string;
+}
+
+interface LocalQual {
+    id?: string;
+    level: string;
+    name: string;
+    passed_out_year: string;
+    percentage: string;
+    university: string;
+}
+
+const QUALIFICATION_LEVELS: { value: QualificationLevel; label: string }[] = [
+    { value: 'Below Graduation', label: 'Below Graduation (Inter / Diploma)' },
+    { value: 'Graduation', label: 'Graduation (B.Tech / B.Sc / B.Com)' },
+    { value: 'Post Graduation', label: 'Post Graduation (M.Tech / MBA)' },
+    { value: 'PhD', label: 'PhD (Doctorate)' },
+];
+
+type DegreeOption = { value: string; label: string };
+
+const DEFAULT_DEGREES_BY_LEVEL: Record<string, DegreeOption[]> = {
+    'Below Graduation': [
+        { value: '10th (SSC)', label: '10th (SSC)' },
+        { value: '12th (HSC)', label: '12th (HSC)' },
+        { value: 'Inter', label: 'Inter' },
+        { value: 'Diploma', label: 'Diploma' },
+        { value: 'ITI', label: 'ITI' },
+        { value: 'Polytechnic', label: 'Polytechnic' },
+    ],
+    'Graduation': [
+        { value: 'B.Tech', label: 'B.Tech' },
+        { value: 'B.E.', label: 'B.E.' },
+        { value: 'B.Sc', label: 'B.Sc' },
+        { value: 'B.Com', label: 'B.Com' },
+        { value: 'B.A.', label: 'B.A.' },
+        { value: 'B.Ed.', label: 'B.Ed.' },
+        { value: 'B.Pharm', label: 'B.Pharm' },
+        { value: 'BCA', label: 'BCA' },
+        { value: 'BBA', label: 'BBA' },
+        { value: 'B.Arch', label: 'B.Arch' },
+    ],
+    'Post Graduation': [
+        { value: 'M.Tech', label: 'M.Tech' },
+        { value: 'M.E.', label: 'M.E.' },
+        { value: 'M.Sc', label: 'M.Sc' },
+        { value: 'M.Com', label: 'M.Com' },
+        { value: 'M.A.', label: 'M.A.' },
+        { value: 'MBA', label: 'MBA' },
+        { value: 'M.Ed.', label: 'M.Ed.' },
+        { value: 'M.Pharm', label: 'M.Pharm' },
+        { value: 'MCA', label: 'MCA' },
+    ],
+    'PhD': [
+        { value: 'Ph.D', label: 'Ph.D' },
+        { value: 'D.Sc', label: 'D.Sc' },
+        { value: 'D.Litt', label: 'D.Litt' },
+    ],
+};
 
 export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
@@ -38,6 +130,9 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const [showDeleteDialog, setShowDeleteDialog] = useState<Staff | null>(null);
     const [viewingStaff, setViewingStaff] = useState<Staff | null>(null);
     const [showViewDialog, setShowViewDialog] = useState(false);
+    const [localQuals, setLocalQuals] = useState<LocalQual[]>([]);
+    const [removedQualIds, setRemovedQualIds] = useState<string[]>([]);
+    const [customDegreeOptions, setCustomDegreeOptions] = useState<DegreeOption[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
@@ -61,10 +156,27 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
         designation_id: '',
         department: '',
         is_active: true,
-        role_id: ''
+        role_id: '',
+        work_org: '',
+        work_from_date: '',
+        work_to_date: '',
+        subjects_dealt: '',
+        work_remarks: '',
+        bank_name: '',
+        bank_branch: '',
+        account_number: '',
+        ifsc_code: '',
+        account_holder_name: '',
+        account_type: undefined,
+        last_drawn_salary: '',
+        current_salary: '',
+        pf_account_number: '',
+        uan_number: '',
     });
 
     const { data: staffResponse, isLoading } = useStaffEnrollments();
+    // Fetch full detail (with qualifications & new fields) when view dialog is open
+    const { data: viewStaffDetail, isLoading: viewDetailLoading } = useStaffEnrollment(viewingStaff?.id || '');
     const { data: designationsResponse } = useQuery<DesignationListResponse>({
         queryKey: ['designations'],
         queryFn: () => getAllDesignations(),
@@ -79,6 +191,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const createMutation = useCreateStaffEnrollment();
     const updateMutation = useUpdateStaffEnrollment();
     const deleteMutation = useDeleteStaffEnrollment();
+    const queryClient = useQueryClient();
 
     // Permission checks for UI elements
     const { checkPermission } = usePermission();
@@ -263,8 +376,25 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
             designation_id: '',
             department: '',
             is_active: true,
-            role_id: ''
+            role_id: '',
+            work_org: '',
+            work_from_date: '',
+            work_to_date: '',
+            subjects_dealt: '',
+            work_remarks: '',
+            bank_name: '',
+            bank_branch: '',
+            account_number: '',
+            ifsc_code: '',
+            account_holder_name: '',
+            account_type: undefined,
+            last_drawn_salary: '',
+            current_salary: '',
+            pf_account_number: '',
+            uan_number: '',
         });
+        setLocalQuals([]);
+        setRemovedQualIds([]);
         setIsFormDirty(false);
         setEditingStaff(null);
         setShowCreateDialog(true);
@@ -285,8 +415,32 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
             designation_id: staff.designation_id || '',
             department: staff.department || '',
             is_active: staff.is_active,
-            role_id: '' // This would need to be fetched or set appropriately
+            role_id: '',
+            work_org: staff.work_org || '',
+            work_from_date: staff.work_from_date || '',
+            work_to_date: staff.work_to_date || '',
+            subjects_dealt: staff.subjects_dealt || '',
+            work_remarks: staff.work_remarks || '',
+            bank_name: staff.bank_name || '',
+            bank_branch: staff.bank_branch || '',
+            account_number: staff.account_number || '',
+            ifsc_code: staff.ifsc_code || '',
+            account_holder_name: staff.account_holder_name || '',
+            account_type: staff.account_type,
+            last_drawn_salary: staff.last_drawn_salary || '',
+            current_salary: staff.current_salary || '',
+            pf_account_number: staff.pf_account_number || '',
+            uan_number: staff.uan_number || '',
         });
+        setLocalQuals((staff.qualifications || []).map(q => ({
+            id: q.id,
+            level: q.level,
+            name: q.name,
+            passed_out_year: q.passed_out_year?.toString() || '',
+            percentage: q.percentage || '',
+            university: q.university || '',
+        })));
+        setRemovedQualIds([]);
         setIsFormDirty(false);
         setEditingStaff(staff);
         setShowCreateDialog(true);
@@ -312,18 +466,67 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
             return;
         }
 
-        try {
-            if (editingStaff) {
-                await updateMutation.mutateAsync({
-                    id: editingStaff.id,
-                    data: formData
-                });
-            } else {
-                await createMutation.mutateAsync(formData);
+        // Validate qualifications
+        for (const q of localQuals) {
+            if (!q.level || !q.name.trim()) {
+                toast.error('Each qualification must have a level and degree name');
+                return;
             }
+        }
+
+        try {
+            let staffId: string;
+
+            if (editingStaff) {
+                await updateMutation.mutateAsync({ id: editingStaff.id, data: formData });
+                staffId = editingStaff.id;
+
+                // Delete removed qualifications
+                for (const qid of removedQualIds) {
+                    await staffApi.deleteQualification(staffId, qid);
+                }
+
+                // Update existing / add new qualifications
+                for (const q of localQuals) {
+                    const payload = {
+                        level: q.level as QualificationLevel,
+                        name: q.name.trim(),
+                        passed_out_year: q.passed_out_year ? parseInt(q.passed_out_year) : undefined,
+                        percentage: q.percentage ? parseFloat(q.percentage) : undefined,
+                        university: q.university.trim() || undefined,
+                    };
+                    if (q.id) {
+                        await staffApi.updateQualification(staffId, q.id, payload);
+                    } else {
+                        await staffApi.addQualification(staffId, payload);
+                    }
+                }
+            } else {
+                const created = await createMutation.mutateAsync(formData);
+                staffId = created.id;
+
+                // Add all qualifications after staff is created
+                for (const q of localQuals) {
+                    if (q.level && q.name.trim()) {
+                        await staffApi.addQualification(staffId, {
+                            level: q.level as QualificationLevel,
+                            name: q.name.trim(),
+                            passed_out_year: q.passed_out_year ? parseInt(q.passed_out_year) : undefined,
+                            percentage: q.percentage ? parseFloat(q.percentage) : undefined,
+                            university: q.university.trim() || undefined,
+                        });
+                    }
+                }
+            }
+
+            // Refresh list so qualifications appear immediately
+            queryClient.invalidateQueries({ queryKey: staffKeys.lists() });
+
             setShowCreateDialog(false);
             setIsFormDirty(false);
             setEditingStaff(null);
+            setLocalQuals([]);
+            setRemovedQualIds([]);
         } catch (error) {
             // Error handling is done in the mutation hooks
         }
@@ -352,6 +555,26 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 return 'secondary';
         }
     };
+
+    const handleAddQual = () => {
+        setLocalQuals(prev => [...prev, { level: '', name: '', passed_out_year: '', percentage: '', university: '' }]);
+        setIsFormDirty(true);
+    };
+
+    const handleRemoveQual = (idx: number) => {
+        const q = localQuals[idx];
+        if (q.id) setRemovedQualIds(prev => [...prev, q.id!]);
+        setLocalQuals(prev => prev.filter((_, i) => i !== idx));
+        setIsFormDirty(true);
+    };
+
+    const handleQualChange = (idx: number, field: keyof LocalQual, value: string) => {
+        setLocalQuals(prev => prev.map((q, i) => i === idx ? { ...q, [field]: value } : q));
+        setIsFormDirty(true);
+    };
+
+    // Use fresh detail fetch for view dialog; fall back to list data while loading
+    const displayStaff = viewStaffDetail ?? viewingStaff;
 
     return (
         <>
@@ -613,6 +836,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 onOpenChange={setShowCreateDialog}
                 guardDirty={isFormDirty}
                 onDirtyDiscard={() => setIsFormDirty(false)}
+                modal={false}
             >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -749,6 +973,102 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     />
                 </div>
 
+                {/* Qualifications */}
+                <div className="md:col-span-2 space-y-2">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                            <GraduationCap className="h-4 w-4" />
+                            Qualifications
+                        </h3>
+                        <Button type="button" variant="outline" size="sm" onClick={handleAddQual}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Qualification
+                        </Button>
+                    </div>
+                    {localQuals.length === 0 && (
+                        <p className="text-xs text-muted-foreground">No qualifications added yet.</p>
+                    )}
+                    {localQuals.map((qual, idx) => (
+                        <div key={idx} className="border rounded-lg p-3 space-y-2 bg-muted/20">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-medium text-muted-foreground">Qualification {idx + 1}</span>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveQual(idx)} className="h-6 w-6 p-0">
+                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium mb-1">Level *</label>
+                                    <Select value={qual.level} onValueChange={(v) => handleQualChange(idx, 'level', v)}>
+                                        <SelectTrigger className="h-8 text-xs">
+                                            <SelectValue placeholder="Select level" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {QUALIFICATION_LEVELS.map(l => (
+                                                <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium mb-1">Degree / Course *</label>
+                                    <CreatableSelect
+                                        isClearable
+                                        placeholder="e.g. B.Tech, MBA"
+                                        value={qual.name ? { value: qual.name, label: qual.name } : null}
+                                        options={[
+                                            ...(qual.level && DEFAULT_DEGREES_BY_LEVEL[qual.level]
+                                                ? DEFAULT_DEGREES_BY_LEVEL[qual.level]
+                                                : Object.values(DEFAULT_DEGREES_BY_LEVEL).flat()),
+                                            ...customDegreeOptions.filter(
+                                                o => !Object.values(DEFAULT_DEGREES_BY_LEVEL).flat().some(d => d.value === o.value)
+                                            ),
+                                        ]}
+                                        onChange={(opt) => {
+                                            handleQualChange(idx, 'name', opt?.value ?? '');
+                                            setIsFormDirty(true);
+                                        }}
+                                        onCreateOption={(inputValue) => {
+                                            const newOpt = { value: inputValue, label: inputValue };
+                                            setCustomDegreeOptions(prev =>
+                                                prev.some(o => o.value === inputValue) ? prev : [...prev, newOpt]
+                                            );
+                                            handleQualChange(idx, 'name', inputValue);
+                                            setIsFormDirty(true);
+                                        }}
+                                        formatCreateLabel={(input) => `Add "${input}"`}
+                                        menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                                        styles={{
+                                            control: (base) => ({ ...base, minHeight: '32px', height: '32px', fontSize: '12px' }),
+                                            valueContainer: (base) => ({ ...base, padding: '0 8px' }),
+                                            input: (base) => ({ ...base, fontSize: '12px', margin: 0, padding: 0 }),
+                                            menuPortal: (base) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                                            menu: (base) => ({ ...base, pointerEvents: 'auto', fontSize: '12px' }),
+                                        }}
+                                        menuShouldBlockScroll={false}
+                                        closeMenuOnScroll={false}
+                                        tabSelectsValue={false}
+                                        openMenuOnFocus={true}
+                                        blurInputOnSelect={true}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium mb-1">Pass-out Year</label>
+                                    <Input className="h-8 text-xs" type="number" min="1950" max="2100" value={qual.passed_out_year} onChange={(e) => handleQualChange(idx, 'passed_out_year', e.target.value)} placeholder="e.g. 2018" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium mb-1">Percentage / CGPA</label>
+                                    <Input className="h-8 text-xs" type="number" step="0.01" min="0" max="100" value={qual.percentage} onChange={(e) => handleQualChange(idx, 'percentage', e.target.value)} placeholder="e.g. 78.50" />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-medium mb-1">University / Board</label>
+                                    <Input className="h-8 text-xs" value={qual.university} onChange={(e) => handleQualChange(idx, 'university', e.target.value)} placeholder="e.g. Osmania University" />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
                 {/* Professional Information */}
                 <div className="md:col-span-2">
                     <h3 className="text-sm font-medium text-foreground mb-3">Professional Information</h3>
@@ -810,6 +1130,98 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                         </label>
                     </div>
                 </div>
+
+                {/* Work Experience */}
+                <div className="md:col-span-2">
+                    <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2 border-t pt-3">
+                        <Briefcase className="h-4 w-4" />
+                        Work Experience
+                    </h3>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Previous Organization</label>
+                    <Input value={formData.work_org || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, work_org: e.target.value }); }} placeholder="e.g. ABC School" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Subjects Dealt</label>
+                    <Input value={formData.subjects_dealt || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, subjects_dealt: e.target.value }); }} placeholder="e.g. Maths, Physics" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">From Date</label>
+                    <Input type="date" value={formData.work_from_date || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, work_from_date: e.target.value }); }} />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">To Date</label>
+                    <Input type="date" value={formData.work_to_date || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, work_to_date: e.target.value }); }} />
+                </div>
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-foreground mb-1">Remarks</label>
+                    <Input value={formData.work_remarks || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, work_remarks: e.target.value }); }} placeholder="Additional remarks about work experience" />
+                </div>
+
+                {/* Bank Details */}
+                <div className="md:col-span-2">
+                    <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2 border-t pt-3">
+                        <Landmark className="h-4 w-4" />
+                        Bank Details
+                    </h3>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Bank Name</label>
+                    <Input value={formData.bank_name || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, bank_name: e.target.value }); }} placeholder="e.g. State Bank of India" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Branch</label>
+                    <Input value={formData.bank_branch || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, bank_branch: e.target.value }); }} placeholder="e.g. Hyderabad Main" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Account Number</label>
+                    <Input value={formData.account_number || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, account_number: e.target.value }); }} placeholder="Enter account number" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">IFSC Code</label>
+                    <Input value={formData.ifsc_code || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, ifsc_code: e.target.value.toUpperCase() }); }} placeholder="e.g. SBIN0001234" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Account Holder Name</label>
+                    <Input value={formData.account_holder_name || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, account_holder_name: e.target.value }); }} placeholder="Name as per bank records" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Account Type</label>
+                    <Select value={formData.account_type || ''} onValueChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, account_type: v as 'Savings' | 'Current' }); }}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select account type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Savings">Savings</SelectItem>
+                            <SelectItem value="Current">Current</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Salary & PF */}
+                <div className="md:col-span-2">
+                    <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2 border-t pt-3">
+                        <Wallet className="h-4 w-4" />
+                        Salary & PF
+                    </h3>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Last Drawn Salary (₹)</label>
+                    <Input type="number" step="0.01" min="0" value={formData.last_drawn_salary || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, last_drawn_salary: e.target.value }); }} placeholder="e.g. 45000.00" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Current Salary (₹)</label>
+                    <Input type="number" step="0.01" min="0" value={formData.current_salary || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, current_salary: e.target.value }); }} placeholder="e.g. 50000.00" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">PF Account Number</label>
+                    <Input value={formData.pf_account_number || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, pf_account_number: e.target.value }); }} placeholder="e.g. AP/HYD/12345" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">UAN Number</label>
+                    <Input value={formData.uan_number || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, uan_number: e.target.value }); }} placeholder="12-digit UAN" />
+                </div>
             </div>
 
             <DialogFooter>
@@ -836,7 +1248,12 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     </DialogTitle>
                 </DialogHeader>
 
-                {viewingStaff && (
+                {viewDetailLoading ? (
+                    <div className="flex justify-center items-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <span className="ml-2">Loading staff details...</span>
+                    </div>
+                ) : displayStaff && (
                     <div className="space-y-6">
                         {/* Basic Information */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -845,21 +1262,21 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                 <div className="space-y-3">
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Full Name:</span>
-                                        <span className="text-foreground">{viewingStaff.first_name} {viewingStaff.last_name || ''}</span>
+                                        <span className="text-foreground">{displayStaff.first_name} {displayStaff.last_name || ''}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Gender:</span>
-                                        <span className="text-foreground">{viewingStaff.gender || 'Not specified'}</span>
+                                        <span className="text-foreground">{displayStaff.gender || 'Not specified'}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Date of Birth:</span>
                                         <span className="text-foreground">
-                                            {viewingStaff.date_of_birth ? new Date(viewingStaff.date_of_birth).toLocaleDateString() : 'Not specified'}
+                                            {displayStaff.date_of_birth ? new Date(displayStaff.date_of_birth).toLocaleDateString() : 'Not specified'}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Joining Date:</span>
-                                        <span className="text-foreground">{new Date(viewingStaff.joining_date).toLocaleDateString()}</span>
+                                        <span className="text-foreground">{new Date(displayStaff.joining_date).toLocaleDateString()}</span>
                                     </div>
                                 </div>
                             </div>
@@ -872,21 +1289,21 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                             <Mail className="h-4 w-4" />
                                             Email:
                                         </span>
-                                        <span className="text-foreground">{viewingStaff.email || 'Not provided'}</span>
+                                        <span className="text-foreground">{displayStaff.email || 'Not provided'}</span>
                                     </div>
                                     <div className="flex justify-between items-center">
                                         <span className="font-medium text-muted-foreground flex items-center gap-2">
                                             <Phone className="h-4 w-4" />
                                             Phone:
                                         </span>
-                                        <span className="text-foreground">{viewingStaff.phone || 'Not provided'}</span>
+                                        <span className="text-foreground">{displayStaff.phone || 'Not provided'}</span>
                                     </div>
                                     <div className="flex justify-between items-start">
                                         <span className="font-medium text-muted-foreground flex items-center gap-2">
                                             <MapPin className="h-4 w-4" />
                                             Address:
                                         </span>
-                                        <span className="text-foreground text-right max-w-48">{viewingStaff.address || 'Not provided'}</span>
+                                        <span className="text-foreground text-right max-w-48">{displayStaff.address || 'Not provided'}</span>
                                     </div>
                                 </div>
                             </div>
@@ -899,23 +1316,23 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                 <div className="space-y-3">
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Designation:</span>
-                                        <span className="text-foreground">{getDesignationTitle(viewingStaff.designation_id)}</span>
+                                        <span className="text-foreground">{getDesignationTitle(displayStaff.designation_id)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Department:</span>
-                                        <span className="text-foreground">{viewingStaff.department || 'Not assigned'}</span>
+                                        <span className="text-foreground">{displayStaff.department || 'Not assigned'}</span>
                                     </div>
                                     <div className="flex justify-between items-center">
                                         <span className="font-medium text-muted-foreground flex items-center gap-2">
                                             <Award className="h-4 w-4" />
                                             Qualification:
                                         </span>
-                                        <span className="text-foreground">{viewingStaff.qualification || 'Not specified'}</span>
+                                        <span className="text-foreground">{displayStaff.qualification || 'Not specified'}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Experience:</span>
                                         <span className="text-foreground">
-                                            {viewingStaff.experience_years ? `${viewingStaff.experience_years} years` : 'Not specified'}
+                                            {displayStaff.experience_years ? `${displayStaff.experience_years} years` : 'Not specified'}
                                         </span>
                                     </div>
                                 </div>
@@ -926,50 +1343,201 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                 <div className="space-y-3">
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">User ID:</span>
-                                        <span className="text-foreground font-mono text-sm">{viewingStaff.user_id}</span>
+                                        <span className="text-foreground font-mono text-sm">{displayStaff.user_id}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Status:</span>
-                                        <Badge variant={viewingStaff.is_active ? "default" : "secondary"}>
-                                            {viewingStaff.is_active ? 'Active' : 'Inactive'}
+                                        <Badge variant={displayStaff.is_active ? "default" : "secondary"}>
+                                            {displayStaff.is_active ? 'Active' : 'Inactive'}
                                         </Badge>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Created:</span>
                                         <span className="text-foreground text-sm">
-                                            {new Date(viewingStaff.created_at).toLocaleDateString()} {new Date(viewingStaff.created_at).toLocaleTimeString()}
+                                            {displayStaff.created_at ? new Date(displayStaff.created_at).toLocaleString() : '—'}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Last Updated:</span>
                                         <span className="text-foreground text-sm">
-                                            {new Date(viewingStaff.updated_at).toLocaleDateString()} {new Date(viewingStaff.updated_at).toLocaleTimeString()}
+                                            {displayStaff.updated_at ? new Date(displayStaff.updated_at).toLocaleString() : '—'}
                                         </span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
+                        {/* Qualifications */}
+                        {displayStaff.qualifications && displayStaff.qualifications.length > 0 && (
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-semibold text-foreground border-b pb-2 flex items-center gap-2">
+                                    <GraduationCap className="h-5 w-5" />
+                                    Qualifications
+                                </h3>
+                                <div className="space-y-2">
+                                    {displayStaff.qualifications.map((q, idx) => (
+                                        <div key={q.id || idx} className="flex items-start justify-between border rounded-lg p-3 bg-muted/20">
+                                            <div className="space-y-0.5">
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant="outline" className="text-xs">{q.level}</Badge>
+                                                    <span className="font-medium text-sm">{q.name}</span>
+                                                </div>
+                                                <div className="text-xs text-muted-foreground flex gap-3">
+                                                    {q.university && <span>{q.university}</span>}
+                                                    {q.passed_out_year && <span>Year: {q.passed_out_year}</span>}
+                                                    {q.percentage && <span>{Number(q.percentage).toFixed(2)}%</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Work Experience */}
+                        {(displayStaff.work_org || displayStaff.work_from_date || displayStaff.subjects_dealt || displayStaff.work_remarks) && (
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-semibold text-foreground border-b pb-2 flex items-center gap-2">
+                                    <Briefcase className="h-5 w-5" />
+                                    Work Experience
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {displayStaff.work_org && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">Organization:</span>
+                                            <span className="text-foreground">{displayStaff.work_org}</span>
+                                        </div>
+                                    )}
+                                    {(displayStaff.work_from_date || displayStaff.work_to_date) && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">Period:</span>
+                                            <span className="text-foreground">
+                                                {displayStaff.work_from_date ? new Date(displayStaff.work_from_date).toLocaleDateString() : '—'}
+                                                {' → '}
+                                                {displayStaff.work_to_date ? new Date(displayStaff.work_to_date).toLocaleDateString() : 'Present'}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {displayStaff.subjects_dealt && (
+                                        <div className="flex justify-between md:col-span-2">
+                                            <span className="font-medium text-muted-foreground">Subjects:</span>
+                                            <span className="text-foreground">{displayStaff.subjects_dealt}</span>
+                                        </div>
+                                    )}
+                                    {displayStaff.work_remarks && (
+                                        <div className="flex justify-between md:col-span-2">
+                                            <span className="font-medium text-muted-foreground">Remarks:</span>
+                                            <span className="text-foreground">{displayStaff.work_remarks}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Bank Details */}
+                        {(displayStaff.bank_name || displayStaff.account_number || displayStaff.ifsc_code) && (
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-semibold text-foreground border-b pb-2 flex items-center gap-2">
+                                    <Landmark className="h-5 w-5" />
+                                    Bank Details
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {displayStaff.bank_name && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">Bank:</span>
+                                            <span className="text-foreground">{displayStaff.bank_name}</span>
+                                        </div>
+                                    )}
+                                    {displayStaff.bank_branch && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">Branch:</span>
+                                            <span className="text-foreground">{displayStaff.bank_branch}</span>
+                                        </div>
+                                    )}
+                                    {displayStaff.account_holder_name && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">Account Holder:</span>
+                                            <span className="text-foreground">{displayStaff.account_holder_name}</span>
+                                        </div>
+                                    )}
+                                    {displayStaff.account_type && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">Account Type:</span>
+                                            <Badge variant="outline">{displayStaff.account_type}</Badge>
+                                        </div>
+                                    )}
+                                    {displayStaff.account_number && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">Account No.:</span>
+                                            <span className="text-foreground font-mono text-sm">{displayStaff.account_number}</span>
+                                        </div>
+                                    )}
+                                    {displayStaff.ifsc_code && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">IFSC Code:</span>
+                                            <span className="text-foreground font-mono text-sm">{displayStaff.ifsc_code}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Salary & PF */}
+                        {(displayStaff.last_drawn_salary || displayStaff.current_salary || displayStaff.pf_account_number || displayStaff.uan_number) && (
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-semibold text-foreground border-b pb-2 flex items-center gap-2">
+                                    <Wallet className="h-5 w-5" />
+                                    Salary & PF
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {displayStaff.last_drawn_salary && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">Last Drawn Salary:</span>
+                                            <span className="text-foreground">₹{Number(displayStaff.last_drawn_salary).toLocaleString('en-IN')}</span>
+                                        </div>
+                                    )}
+                                    {displayStaff.current_salary && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">Current Salary:</span>
+                                            <span className="text-foreground">₹{Number(displayStaff.current_salary).toLocaleString('en-IN')}</span>
+                                        </div>
+                                    )}
+                                    {displayStaff.pf_account_number && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">PF Account No.:</span>
+                                            <span className="text-foreground font-mono text-sm">{displayStaff.pf_account_number}</span>
+                                        </div>
+                                    )}
+                                    {displayStaff.uan_number && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">UAN:</span>
+                                            <span className="text-foreground font-mono text-sm">{displayStaff.uan_number}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Attendance Summary (if available) */}
-                        {viewingStaff.attendances && viewingStaff.attendances.length > 0 && (
+                        {displayStaff.attendances && displayStaff.attendances.length > 0 && (
                             <div className="space-y-4">
                                 <h3 className="text-lg font-semibold text-foreground border-b pb-2">Recent Attendance</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="bg-muted/50 p-4 rounded-lg">
                                         <div className="text-2xl font-bold text-green-600">
-                                            {viewingStaff.attendances.filter(a => a.status === 'present').length}
+                                            {displayStaff.attendances.filter(a => a.status === 'present').length}
                                         </div>
                                         <div className="text-sm text-muted-foreground">Present</div>
                                     </div>
                                     <div className="bg-muted/50 p-4 rounded-lg">
                                         <div className="text-2xl font-bold text-red-600">
-                                            {viewingStaff.attendances.filter(a => a.status === 'absent').length}
+                                            {displayStaff.attendances.filter(a => a.status === 'absent').length}
                                         </div>
                                         <div className="text-sm text-muted-foreground">Absent</div>
                                     </div>
                                     <div className="bg-muted/50 p-4 rounded-lg">
                                         <div className="text-2xl font-bold text-yellow-600">
-                                            {viewingStaff.attendances.filter(a => a.status === 'leave' || a.status === 'half-day').length}
+                                            {displayStaff.attendances.filter(a => a.status === 'leave' || a.status === 'half-day').length}
                                         </div>
                                         <div className="text-sm text-muted-foreground">Leave/Half-day</div>
                                     </div>
@@ -986,7 +1554,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     {hasUpdatePermission && (
                         <Button onClick={() => {
                             setShowViewDialog(false);
-                            if (viewingStaff) handleEdit(viewingStaff);
+                            if (displayStaff) handleEdit(displayStaff);
                         }}>
                             Edit Staff
                         </Button>
