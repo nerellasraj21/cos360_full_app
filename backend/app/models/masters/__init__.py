@@ -16,7 +16,7 @@ from .parent_model import Parent
 from .sections_model import Section
 from .slot_time_model import SlotTime
 from .staff_attendance_model import StaffAttendance
-from .staff_model import Staff
+from .staff_model import Staff, StaffQualification
 from .student_parent_association_model import StudentParentLink
 from .subject_category_model import SubjectCategory
 from .subject_model import Subject
@@ -48,6 +48,7 @@ __all__ = [
     "Parent",
     "StaffAttendance",
     "Staff",
+    "StaffQualification",
     "CertificateIssue",
     "StudentDocument",
     "StudentHomework",

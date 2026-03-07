@@ -12,9 +12,9 @@ from app.models.auth.role_model import Role
 from app.models.auth.user_model import User
 from app.models.masters.designations_model import Designation
 from app.models.masters.staff_attendance_model import StaffAttendance
-from app.models.masters.staff_model import GenderEnum, Staff
+from app.models.masters.staff_model import GenderEnum, Staff, StaffQualification
 from app.schemas.masters.staff_attendance_schema import StaffAttendanceCreate, StaffAttendanceOut, StaffAttendanceUpdate
-from app.schemas.masters.staff_schema import StaffEnrollmentCreate, StaffEnrollmentUpdate
+from app.schemas.masters.staff_schema import StaffEnrollmentCreate, StaffEnrollmentUpdate, StaffQualificationCreate, StaffQualificationUpdate
 from app.tools.password_util import hash_password
 
 # -------------------- Staff Enrollment --------------------
@@ -86,7 +86,7 @@ async def create_staff_enrollment(data: StaffEnrollmentCreate, db: AsyncSession)
         # Fetch the created staff with all relationships before commit
         result = await db.execute(
             select(Staff)
-            .options(selectinload(Staff.designation_obj), selectinload(Staff.user))
+            .options(selectinload(Staff.designation_obj), selectinload(Staff.user), selectinload(Staff.qualifications))
             .where(Staff.id == new_staff.id)
         )
         staff_out = result.scalar_one()
@@ -99,13 +99,19 @@ async def create_staff_enrollment(data: StaffEnrollmentCreate, db: AsyncSession)
 
 
 async def get_all_staff_enrollments(db: AsyncSession):
-    result = await db.execute(select(Staff).options(selectinload(Staff.designation_obj), selectinload(Staff.user)))
+    result = await db.execute(
+        select(Staff).options(
+            selectinload(Staff.designation_obj), selectinload(Staff.user), selectinload(Staff.qualifications)
+        )
+    )
     return result.scalars().all()
 
 
 async def get_staff_enrollment_by_id(staff_id: UUID, db: AsyncSession):
     result = await db.execute(
-        select(Staff).options(selectinload(Staff.designation_obj), selectinload(Staff.user)).where(Staff.id == staff_id)
+        select(Staff)
+        .options(selectinload(Staff.designation_obj), selectinload(Staff.user), selectinload(Staff.qualifications))
+        .where(Staff.id == staff_id)
     )
     staff = result.scalar_one_or_none()
     if not staff:
@@ -128,7 +134,7 @@ async def update_staff_enrollment(staff_id: UUID, data: StaffEnrollmentUpdate, d
         # Fetch the updated staff with all relationships before commit
         result = await db.execute(
             select(Staff)
-            .options(selectinload(Staff.designation_obj), selectinload(Staff.user))
+            .options(selectinload(Staff.designation_obj), selectinload(Staff.user), selectinload(Staff.qualifications))
             .where(Staff.id == staff.id)
         )
         staff_out = result.scalar_one()
@@ -294,7 +300,9 @@ async def get_staff_attendance_by_date(attendance_date: date, db: AsyncSession):
 
 
 async def get_staff_list_by_gender(gender: GenderEnum | None, db: AsyncSession):
-    stmt = select(Staff).options(selectinload(Staff.designation_obj), selectinload(Staff.user))
+    stmt = select(Staff).options(
+        selectinload(Staff.designation_obj), selectinload(Staff.user), selectinload(Staff.qualifications)
+    )
     if gender:
         stmt = stmt.where(Staff.gender == gender)
     result = await db.execute(stmt)
@@ -302,11 +310,74 @@ async def get_staff_list_by_gender(gender: GenderEnum | None, db: AsyncSession):
 
 
 async def get_staff_details_by_designation(designation_id: UUID | None, db: AsyncSession):
-    stmt = select(Staff).options(selectinload(Staff.designation_obj), selectinload(Staff.user))
+    stmt = select(Staff).options(
+        selectinload(Staff.designation_obj), selectinload(Staff.user), selectinload(Staff.qualifications)
+    )
     if designation_id:
         stmt = stmt.where(Staff.designation_id == designation_id)
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+# -------------------- Staff Qualification CRUD --------------------
+
+
+async def add_staff_qualification(staff_id: UUID, data: StaffQualificationCreate, db: AsyncSession):
+    result = await db.execute(select(Staff).where(Staff.id == staff_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Staff not found")
+
+    new_qual = StaffQualification(staff_id=staff_id, **data.dict())
+    db.add(new_qual)
+    await db.commit()
+    await db.refresh(new_qual)
+    return new_qual
+
+
+async def get_staff_qualifications(staff_id: UUID, db: AsyncSession):
+    result = await db.execute(select(Staff).where(Staff.id == staff_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Staff not found")
+
+    result = await db.execute(
+        select(StaffQualification).where(StaffQualification.staff_id == staff_id)
+    )
+    return result.scalars().all()
+
+
+async def update_staff_qualification(staff_id: UUID, qualification_id: UUID, data: StaffQualificationUpdate, db: AsyncSession):
+    result = await db.execute(
+        select(StaffQualification).where(
+            StaffQualification.id == qualification_id,
+            StaffQualification.staff_id == staff_id,
+        )
+    )
+    qual = result.scalar_one_or_none()
+    if not qual:
+        raise HTTPException(status_code=404, detail="Qualification not found")
+
+    for field, value in data.dict(exclude_unset=True).items():
+        setattr(qual, field, value)
+
+    await db.commit()
+    await db.refresh(qual)
+    return qual
+
+
+async def delete_staff_qualification(staff_id: UUID, qualification_id: UUID, db: AsyncSession):
+    result = await db.execute(
+        select(StaffQualification).where(
+            StaffQualification.id == qualification_id,
+            StaffQualification.staff_id == staff_id,
+        )
+    )
+    qual = result.scalar_one_or_none()
+    if not qual:
+        raise HTTPException(status_code=404, detail="Qualification not found")
+
+    await db.delete(qual)
+    await db.commit()
+    return {"detail": "Qualification deleted successfully"}
 
 
 async def get_all_designations_list(db: AsyncSession):

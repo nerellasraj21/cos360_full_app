@@ -16,3 +16,7 @@ class TimetableSubjectOption(BaseOrg):
 
     slot = relationship("TimetableSlot", back_populates="subject_options")
     subject = relationship("Subject", lazy="joined")
+
+    @property
+    def subject_name(self) -> str | None:
+        return self.subject.name if self.subject else None

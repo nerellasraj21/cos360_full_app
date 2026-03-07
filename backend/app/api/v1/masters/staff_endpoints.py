@@ -22,6 +22,9 @@ from app.schemas.masters.staff_schema import (
     StaffEnrollmentOut,
     StaffEnrollmentUpdate,
     StaffOut,
+    StaffQualificationCreate,
+    StaffQualificationOut,
+    StaffQualificationUpdate,
 )
 from app.service.masters.designation_service import (
     create_designation,
@@ -32,10 +35,12 @@ from app.service.masters.designation_service import (
     update_designation,
 )
 from app.service.masters.staff_service import (
+    add_staff_qualification,
     create_staff_attendance,
     create_staff_enrollment,
     delete_staff_attendance,
     delete_staff_enrollment,
+    delete_staff_qualification,
     get_all_designations_list,
     get_all_drivers_list,
     get_all_staff_attendance,
@@ -46,8 +51,10 @@ from app.service.masters.staff_service import (
     get_staff_details_by_designation,
     get_staff_enrollment_by_id,
     get_staff_list_by_gender,
+    get_staff_qualifications,
     update_staff_attendance,
     update_staff_enrollment,
+    update_staff_qualification,
 )
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
@@ -245,6 +252,51 @@ async def get_staff_by_designation(
     await check_role_plan_permission_with_error(db, request, role, "staff", "list")
 
     return await get_staff_details_by_designation(designation_id, db)
+
+
+# ===== STAFF QUALIFICATION ENDPOINTS =====
+
+
+@router.post("/{staff_id}/qualifications", response_model=StaffQualificationOut, status_code=status.HTTP_201_CREATED)
+async def add_qualification(
+    request: Request, staff_id: UUID, data: StaffQualificationCreate, db: AsyncSession = Depends(get_tenant_db)
+):
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "staff", "update")
+    return await add_staff_qualification(staff_id, data, db)
+
+
+@router.get("/{staff_id}/qualifications", response_model=list[StaffQualificationOut])
+async def list_qualifications(request: Request, staff_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "staff", "read")
+    return await get_staff_qualifications(staff_id, db)
+
+
+@router.put("/{staff_id}/qualifications/{qualification_id}", response_model=StaffQualificationOut)
+async def update_qualification(
+    request: Request,
+    staff_id: UUID,
+    qualification_id: UUID,
+    data: StaffQualificationUpdate,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "staff", "update")
+    return await update_staff_qualification(staff_id, qualification_id, data, db)
+
+
+@router.delete("/{staff_id}/qualifications/{qualification_id}")
+async def remove_qualification(
+    request: Request, staff_id: UUID, qualification_id: UUID, db: AsyncSession = Depends(get_tenant_db)
+):
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "staff", "delete")
+    return await delete_staff_qualification(staff_id, qualification_id, db)
 
 
 # ===== DESIGNATION CRUD ENDPOINTS =====

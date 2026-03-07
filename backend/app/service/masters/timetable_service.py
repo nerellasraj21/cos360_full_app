@@ -6,6 +6,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.masters.class_model import Class
+from app.models.masters.sections_model import Section
 from app.models.masters.slot_time_model import SlotTime
 from app.models.masters.timetable_model import Timetable
 from app.models.masters.timetable_slot_model import TimetableSlot
@@ -282,7 +284,14 @@ async def get_timetable_by_section(section_id: UUID, db: AsyncSession):
     if not timetable:
         raise HTTPException(status_code=404, detail="Timetable not found for section")
 
-    # Step 2: Fetch all slots for this timetable, including subject options
+    # Step 2: Load section + class names
+    section_stmt = select(Section).options(selectinload(Section.class_)).where(Section.id == section_id)
+    section_result = await db.execute(section_stmt)
+    section = section_result.scalar_one_or_none()
+    section_name = section.name if section else None
+    class_name = section.class_.name if section and section.class_ else None
+
+    # Step 3: Fetch all slots for this timetable, including subject options
     slot_stmt = (
         select(TimetableSlot)
         .options(selectinload(TimetableSlot.subject_options))
@@ -291,14 +300,16 @@ async def get_timetable_by_section(section_id: UUID, db: AsyncSession):
     result = await db.execute(slot_stmt)
     all_slots = result.scalars().all()
 
-    # Step 3: Group by slot_time_id
+    # Step 4: Group by slot_time_id
     grouped = defaultdict(list)
     for slot in all_slots:
         grouped[slot.slot_time_id].append(TimetableSlotOut.from_orm(slot))
 
-    # Step 4: Structure output
+    # Step 5: Structure output
     return {
         "section_id": section_id,
+        "section_name": section_name,
+        "class_name": class_name,
         "slot_time_data": [{"slot_time_id": slot_time_id, "slots": slots} for slot_time_id, slots in grouped.items()],
     }
 
@@ -437,6 +448,13 @@ async def get_frontend_timetable_by_section(section_id: UUID, db: AsyncSession) 
         if not timetable:
             raise HTTPException(status_code=404, detail="Timetable not found for section")
 
+        # Step 1b: Load section + class names
+        section_stmt = select(Section).options(selectinload(Section.class_)).where(Section.id == section_id)
+        section_result = await db.execute(section_stmt)
+        section = section_result.scalar_one_or_none()
+        section_name = section.name if section else None
+        class_name = section.class_.name if section and section.class_ else None
+
         # Step 2: Get slots with slot_times and subject_options
         slots_stmt = (
             select(TimetableSlot)
@@ -458,7 +476,12 @@ async def get_frontend_timetable_by_section(section_id: UUID, db: AsyncSession) 
             frontend_slot = transform_slots_to_frontend_format(slots)
             frontend_slots.append(frontend_slot)
 
-        return FrontendTimetableRead(section_id=section_id, timetable_data=frontend_slots)
+        return FrontendTimetableRead(
+            section_id=section_id,
+            section_name=section_name,
+            class_name=class_name,
+            timetable_data=frontend_slots,
+        )
 
     except HTTPException:
         raise

@@ -12,7 +12,7 @@ class ClassSubjectMap(BaseOrg):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False)
-    section_id = Column(UUID(as_uuid=True), ForeignKey("sections.id"), nullable=False)
+    section_id = Column(UUID(as_uuid=True), ForeignKey("sections.id"), nullable=True)
     subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.id"), nullable=False)
     exclude_marks = Column(Boolean, default=False, nullable=False)
     order = Column(Integer, nullable=True)

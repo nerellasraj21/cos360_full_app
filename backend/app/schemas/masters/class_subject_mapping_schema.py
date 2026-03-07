@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 class ClassSubjectMapBase(BaseModel):
     class_id: UUID
-    section_id: UUID
+    section_id: UUID | None = None
     subject_id: UUID
     academic_year_id: UUID
     exclude_marks: bool = False

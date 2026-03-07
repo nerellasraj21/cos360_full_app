@@ -22,6 +22,7 @@ class TimetableSubjectOptionUpdate(BaseModel):
 class TimetableSubjectOptionOut(BaseModel):
     id: UUID
     subject_id: UUID | None
+    subject_name: str | None = None
 
     class Config:
         from_attributes = True
@@ -133,6 +134,8 @@ class GroupedSlotOut(BaseModel):
 
 class GroupedSectionTimetableOut(BaseModel):
     section_id: UUID
+    section_name: str | None = None
+    class_name: str | None = None
     slot_time_data: list[GroupedSlotOut]
 
 
@@ -225,4 +228,6 @@ class FrontendTimetableResponse(BaseModel):
 
 class FrontendTimetableRead(BaseModel):
     section_id: UUID
+    section_name: str | None = None
+    class_name: str | None = None
     timetable_data: list[FrontendTimetableSlot]
