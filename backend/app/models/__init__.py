@@ -1,5 +1,8 @@
 # Import all models for proper discovery by Alembic
 
+# Communication models
+from .communication import *  # noqa: F403
+
 # Public schema models
 # Authentication models
 from .auth import *  # noqa: F403

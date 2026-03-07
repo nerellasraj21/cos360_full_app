@@ -77,6 +77,7 @@ from app.api.v1.student.student_parent_endpoints import router as student_parent
 
 # from app.api.v1.masters.student_homework_endpoints import router as student_homework_router
 from app.api.v1.student.student_transport_endpoints import router as student_transport_router
+from app.api.v1.communication.communication_endpoints import router as communication_router
 from app.api.v1.super_admin.auth_endpoints import router as super_admin_auth_router
 from app.api.v1.super_admin.plan_endpoints import router as super_admin_plan_router
 from app.api.v1.super_admin.setup_endpoints import router as super_admin_setup_router
@@ -166,3 +167,6 @@ router.include_router(exam_result_router)
 router.include_router(hall_ticket_router)
 router.include_router(exam_audit_router)
 router.include_router(exam_notification_router)
+
+# ── Communication Module ──────────────────────────────────────────────────────
+router.include_router(communication_router)

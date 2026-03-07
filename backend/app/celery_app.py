@@ -20,6 +20,7 @@ celery_app = Celery(
         "app.tasks.exam.aggregate_compute_task",
         "app.tasks.exam.notification_task",
         "app.tasks.students.certificate_tasks",
+        "app.tasks.communication.send_tasks",
     ],
 )
 
