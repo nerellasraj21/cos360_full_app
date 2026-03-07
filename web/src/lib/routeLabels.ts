@@ -88,6 +88,9 @@ export const ROUTE_SEGMENT_LABELS: Record<string, string> = {
   parents: 'Parents',
   rolespermissions: 'Roles & Permissions',
 
+  // Communication
+  communication: 'Communication',
+
   // Admin / Administration
   admin: 'Administration',
   administration: 'Administration',
@@ -107,6 +110,7 @@ export const MODULE_COLORS: Record<string, string> = {
   masters: 'text-gray-600 dark:text-gray-400',
   admin: 'text-slate-600 dark:text-slate-400',
   reports: 'text-indigo-600 dark:text-indigo-400',
+  communication: 'text-teal-600 dark:text-teal-400',
   dashboard: 'text-primary',
 };
 

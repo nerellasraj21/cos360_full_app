@@ -23,6 +23,7 @@ import { Route as AppFeeRouteImport } from './routes/_app/fee'
 import { Route as AppExpenseRouteImport } from './routes/_app/expense'
 import { Route as AppExamRouteImport } from './routes/_app/exam'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppCommunicationRouteImport } from './routes/_app/communication'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
 import { Route as AppTimeTableRouteImport } from './routes/_app/TimeTable'
 import { Route as AppCalenderRouteImport } from './routes/_app/Calender'
@@ -189,6 +190,11 @@ const AppExamRoute = AppExamRouteImport.update({
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCommunicationRoute = AppCommunicationRouteImport.update({
+  id: '/communication',
+  path: '/communication',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAboutRoute = AppAboutRouteImport.update({
@@ -714,6 +720,7 @@ export interface FileRoutesByFullPath {
   '/Calender': typeof AppCalenderRoute
   '/TimeTable': typeof AppTimeTableRoute
   '/about': typeof AppAboutRoute
+  '/communication': typeof AppCommunicationRoute
   '/dashboard': typeof AppDashboardRoute
   '/exam': typeof AppExamRouteWithChildren
   '/expense': typeof AppExpenseRouteWithChildren
@@ -827,6 +834,7 @@ export interface FileRoutesByTo {
   '/Calender': typeof AppCalenderRoute
   '/TimeTable': typeof AppTimeTableRoute
   '/about': typeof AppAboutRoute
+  '/communication': typeof AppCommunicationRoute
   '/dashboard': typeof AppDashboardRoute
   '/profile': typeof AppProfileRoute
   '/superorg': typeof AppSuperorgRoute
@@ -934,6 +942,7 @@ export interface FileRoutesById {
   '/_app/Calender': typeof AppCalenderRoute
   '/_app/TimeTable': typeof AppTimeTableRoute
   '/_app/about': typeof AppAboutRoute
+  '/_app/communication': typeof AppCommunicationRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/exam': typeof AppExamRouteWithChildren
   '/_app/expense': typeof AppExpenseRouteWithChildren
@@ -1049,6 +1058,7 @@ export interface FileRouteTypes {
     | '/Calender'
     | '/TimeTable'
     | '/about'
+    | '/communication'
     | '/dashboard'
     | '/exam'
     | '/expense'
@@ -1162,6 +1172,7 @@ export interface FileRouteTypes {
     | '/Calender'
     | '/TimeTable'
     | '/about'
+    | '/communication'
     | '/dashboard'
     | '/profile'
     | '/superorg'
@@ -1268,6 +1279,7 @@ export interface FileRouteTypes {
     | '/_app/Calender'
     | '/_app/TimeTable'
     | '/_app/about'
+    | '/_app/communication'
     | '/_app/dashboard'
     | '/_app/exam'
     | '/_app/expense'
@@ -1481,6 +1493,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/communication': {
+      id: '/_app/communication'
+      path: '/communication'
+      fullPath: '/communication'
+      preLoaderRoute: typeof AppCommunicationRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/about': {
@@ -2471,6 +2490,7 @@ interface AppRouteChildren {
   AppCalenderRoute: typeof AppCalenderRoute
   AppTimeTableRoute: typeof AppTimeTableRoute
   AppAboutRoute: typeof AppAboutRoute
+  AppCommunicationRoute: typeof AppCommunicationRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppExamRoute: typeof AppExamRouteWithChildren
   AppExpenseRoute: typeof AppExpenseRouteWithChildren
@@ -2514,6 +2534,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCalenderRoute: AppCalenderRoute,
   AppTimeTableRoute: AppTimeTableRoute,
   AppAboutRoute: AppAboutRoute,
+  AppCommunicationRoute: AppCommunicationRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppExamRoute: AppExamRouteWithChildren,
   AppExpenseRoute: AppExpenseRouteWithChildren,

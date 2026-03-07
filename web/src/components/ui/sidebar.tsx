@@ -86,6 +86,7 @@ const getIconForMenuItem = (name: string) => {
         "Exam Settings": Settings,
         "Audit Log": BarChart3,
         "Notifications": MessageSquare,
+        "Communication": MessageSquare,
     };
 
     return iconMap[name] || Folder;
