@@ -19,6 +19,7 @@ export const ROUTE_SEGMENT_LABELS: Record<string, string> = {
   admission: 'Admission',
   attendance: 'Attendance',
   profile: 'Profile',
+  certificates: 'Certificates',
   certificatesupload: 'Upload Certificates',
   certificatetypes: 'Certificate Types',
   mycertificates: 'My Certificates',

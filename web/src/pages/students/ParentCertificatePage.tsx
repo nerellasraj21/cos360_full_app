@@ -1,21 +1,39 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
 import { FileText, Download, Loader2 } from "lucide-react";
-import { useMyCertificates, useDownloadCertificateDocument } from "@/api/hooks/students/certificates";
-import { useAuthStore } from "@/lib/authStore";
+import { useMyChildCertificates, useDownloadCertificateDocument } from "@/api/hooks/students/certificates";
+import { useParentChildren } from "@/api/auth";
 import type { CertificateRead } from "@/api/hooks/students/certificates";
 
-export const MyCertificatesPage: React.FC = () => {
-  const { isAuthenticated } = useAuthStore();
+interface ParentCertificatePageProps {
+  parentEntityId: string | null;
+}
 
-  const { data: certificatesData, isLoading } = useMyCertificates();
+export const ParentCertificatePage: React.FC<ParentCertificatePageProps> = ({
+  parentEntityId,
+}) => {
+  const { data: children = [], isLoading: childrenLoading } =
+    useParentChildren(parentEntityId);
+  const [selectedChildId, setSelectedChildId] = useState<string>("");
+
+  // Auto-select first child
+  useEffect(() => {
+    if (children.length > 0 && !selectedChildId) {
+      setSelectedChildId(children[0].id);
+    }
+  }, [children, selectedChildId]);
+
+  const { data: certificatesData, isLoading: certsLoading } =
+    useMyChildCertificates(selectedChildId);
   const downloadCertificate = useDownloadCertificateDocument();
 
   const certificates = certificatesData?.items || [];
+  const selectedChild = children.find((c) => c.id === selectedChildId);
 
   const handleDownload = async (certificateId: string) => {
     try {
@@ -85,13 +103,23 @@ export const MyCertificatesPage: React.FC = () => {
     },
   ];
 
-  if (!isAuthenticated) {
+  if (childrenLoading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading children...</span>
+      </div>
+    );
+  }
+
+  if (children.length === 0) {
     return (
       <div className="container mx-auto p-6">
         <Card>
           <CardContent className="p-6">
             <div className="text-center text-muted-foreground">
-              Please log in to view your certificates.
+              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No children linked to your account.</p>
             </div>
           </CardContent>
         </Card>
@@ -101,21 +129,49 @@ export const MyCertificatesPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      {children.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Select Child</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedChildId} onValueChange={setSelectedChildId}>
+              <SelectTrigger className="max-w-xs">
+                <SelectValue placeholder="Select child" />
+              </SelectTrigger>
+              <SelectContent>
+                {children.map((child) => (
+                  <SelectItem key={child.id} value={child.id}>
+                    {child.first_name} {child.last_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle>Your Certificates</CardTitle>
+          <CardTitle>
+            {selectedChild
+              ? `Certificates — ${selectedChild.first_name} ${selectedChild.last_name}`
+              : "Certificates"}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {certsLoading ? (
             <div className="flex justify-center items-center py-8">
               <Loader2 className="h-8 w-8 animate-spin" />
-              <span className="ml-2">Loading your certificates...</span>
+              <span className="ml-2">Loading certificates...</span>
             </div>
           ) : certificates.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No certificates found.</p>
-              <p className="text-sm">Certificates issued to you will appear here.</p>
+              <p className="text-sm">
+                Certificates issued to your child will appear here.
+              </p>
             </div>
           ) : (
             <Table

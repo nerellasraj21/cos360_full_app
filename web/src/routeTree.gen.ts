@@ -50,6 +50,7 @@ import { Route as AppStudentsMycertificatesRouteImport } from './routes/_app/stu
 import { Route as AppStudentsDocumentsuploadRouteImport } from './routes/_app/students/documentsupload'
 import { Route as AppStudentsCertificatetypesRouteImport } from './routes/_app/students/certificatetypes'
 import { Route as AppStudentsCertificatesuploadRouteImport } from './routes/_app/students/certificatesupload'
+import { Route as AppStudentsCertificatesRouteImport } from './routes/_app/students/certificates'
 import { Route as AppStudentsAttendanceRouteImport } from './routes/_app/students/attendance'
 import { Route as AppStudentsAdmissionRouteImport } from './routes/_app/students/admission'
 import { Route as AppStaffStaffRouteImport } from './routes/_app/staff/staff'
@@ -334,6 +335,11 @@ const AppStudentsCertificatesuploadRoute =
     path: '/certificatesupload',
     getParentRoute: () => AppStudentsRoute,
   } as any)
+const AppStudentsCertificatesRoute = AppStudentsCertificatesRouteImport.update({
+  id: '/certificates',
+  path: '/certificates',
+  getParentRoute: () => AppStudentsRoute,
+} as any)
 const AppStudentsAttendanceRoute = AppStudentsAttendanceRouteImport.update({
   id: '/attendance',
   path: '/attendance',
@@ -767,6 +773,7 @@ export interface FileRoutesByFullPath {
   '/staff/staff': typeof AppStaffStaffRoute
   '/students/admission': typeof AppStudentsAdmissionRouteWithChildren
   '/students/attendance': typeof AppStudentsAttendanceRoute
+  '/students/certificates': typeof AppStudentsCertificatesRoute
   '/students/certificatesupload': typeof AppStudentsCertificatesuploadRoute
   '/students/certificatetypes': typeof AppStudentsCertificatetypesRoute
   '/students/documentsupload': typeof AppStudentsDocumentsuploadRoute
@@ -871,6 +878,7 @@ export interface FileRoutesByTo {
   '/staff/staff': typeof AppStaffStaffRoute
   '/students/admission': typeof AppStudentsAdmissionRouteWithChildren
   '/students/attendance': typeof AppStudentsAttendanceRoute
+  '/students/certificates': typeof AppStudentsCertificatesRoute
   '/students/certificatesupload': typeof AppStudentsCertificatesuploadRoute
   '/students/certificatetypes': typeof AppStudentsCertificatetypesRoute
   '/students/documentsupload': typeof AppStudentsDocumentsuploadRoute
@@ -985,6 +993,7 @@ export interface FileRoutesById {
   '/_app/staff/staff': typeof AppStaffStaffRoute
   '/_app/students/admission': typeof AppStudentsAdmissionRouteWithChildren
   '/_app/students/attendance': typeof AppStudentsAttendanceRoute
+  '/_app/students/certificates': typeof AppStudentsCertificatesRoute
   '/_app/students/certificatesupload': typeof AppStudentsCertificatesuploadRoute
   '/_app/students/certificatetypes': typeof AppStudentsCertificatetypesRoute
   '/_app/students/documentsupload': typeof AppStudentsDocumentsuploadRoute
@@ -1099,6 +1108,7 @@ export interface FileRouteTypes {
     | '/staff/staff'
     | '/students/admission'
     | '/students/attendance'
+    | '/students/certificates'
     | '/students/certificatesupload'
     | '/students/certificatetypes'
     | '/students/documentsupload'
@@ -1203,6 +1213,7 @@ export interface FileRouteTypes {
     | '/staff/staff'
     | '/students/admission'
     | '/students/attendance'
+    | '/students/certificates'
     | '/students/certificatesupload'
     | '/students/certificatetypes'
     | '/students/documentsupload'
@@ -1316,6 +1327,7 @@ export interface FileRouteTypes {
     | '/_app/staff/staff'
     | '/_app/students/admission'
     | '/_app/students/attendance'
+    | '/_app/students/certificates'
     | '/_app/students/certificatesupload'
     | '/_app/students/certificatetypes'
     | '/_app/students/documentsupload'
@@ -1658,6 +1670,13 @@ declare module '@tanstack/react-router' {
       path: '/certificatesupload'
       fullPath: '/students/certificatesupload'
       preLoaderRoute: typeof AppStudentsCertificatesuploadRouteImport
+      parentRoute: typeof AppStudentsRoute
+    }
+    '/_app/students/certificates': {
+      id: '/_app/students/certificates'
+      path: '/certificates'
+      fullPath: '/students/certificates'
+      preLoaderRoute: typeof AppStudentsCertificatesRouteImport
       parentRoute: typeof AppStudentsRoute
     }
     '/_app/students/attendance': {
@@ -2415,6 +2434,7 @@ const AppStudentsAdmissionRouteWithChildren =
 interface AppStudentsRouteChildren {
   AppStudentsAdmissionRoute: typeof AppStudentsAdmissionRouteWithChildren
   AppStudentsAttendanceRoute: typeof AppStudentsAttendanceRoute
+  AppStudentsCertificatesRoute: typeof AppStudentsCertificatesRoute
   AppStudentsCertificatesuploadRoute: typeof AppStudentsCertificatesuploadRoute
   AppStudentsCertificatetypesRoute: typeof AppStudentsCertificatetypesRoute
   AppStudentsDocumentsuploadRoute: typeof AppStudentsDocumentsuploadRoute
@@ -2430,6 +2450,7 @@ interface AppStudentsRouteChildren {
 const AppStudentsRouteChildren: AppStudentsRouteChildren = {
   AppStudentsAdmissionRoute: AppStudentsAdmissionRouteWithChildren,
   AppStudentsAttendanceRoute: AppStudentsAttendanceRoute,
+  AppStudentsCertificatesRoute: AppStudentsCertificatesRoute,
   AppStudentsCertificatesuploadRoute: AppStudentsCertificatesuploadRoute,
   AppStudentsCertificatetypesRoute: AppStudentsCertificatetypesRoute,
   AppStudentsDocumentsuploadRoute: AppStudentsDocumentsuploadRoute,

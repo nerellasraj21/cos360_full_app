@@ -1,3 +1,3 @@
 // Certificate Management API endpoints
-export const CERTIFICATES_BASE = '/student/certificates';
-export const CERTIFICATE_TYPES_BASE = '/student/certificate-types';
+export const CERTIFICATES_BASE = '/certificates';
+export const CERTIFICATE_TYPES_BASE = '/certificates/types';

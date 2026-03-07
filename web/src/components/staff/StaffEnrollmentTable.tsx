@@ -478,7 +478,14 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
             let staffId: string;
 
             if (editingStaff) {
-                await updateMutation.mutateAsync({ id: editingStaff.id, data: formData });
+                await updateMutation.mutateAsync({
+                    id: editingStaff.id,
+                    data: {
+                        ...formData,
+                        current_salary: formData.current_salary ? Number(formData.current_salary) : undefined,
+                        last_drawn_salary: formData.last_drawn_salary ? Number(formData.last_drawn_salary) : undefined,
+                    },
+                });
                 staffId = editingStaff.id;
 
                 // Delete removed qualifications

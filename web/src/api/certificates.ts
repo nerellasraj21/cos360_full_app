@@ -33,7 +33,7 @@ export function useCertificateCreateMutation() {
 
   return useMutation({
     mutationFn: async (data: CertificateCreateRequest): Promise<CertificateCreateResponse> => {
-      const { data: response } = await CAxios.post<CertificateCreateResponse>('/student/certificates/', data);
+      const { data: response } = await CAxios.post<CertificateCreateResponse>('/certificates/', data);
       return response;
     },
     onSuccess: (data) => {

@@ -3,85 +3,52 @@ import { toast } from 'sonner';
 import CAxios from '@/api';
 import { CERTIFICATES_BASE, CERTIFICATE_TYPES_BASE } from '@/constants/api/certificates';
 import { useAuthStore } from '@/lib/authStore';
+import type {
+  CertificateRead,
+  CertificateTypeRead,
+  CertificateTypeCreate,
+  CertificateTypeUpdate,
+  CertificateTypeDropdown,
+  PresignedUrlResponse,
+  PaginatedResponse,
+} from '@/types/certificates/types';
 
-// Certificate Types
+// Re-export CertificateRead as CertificateResponse for backward-compat
+export type CertificateResponse = CertificateRead;
+export type { CertificateRead };
+
+// ─── Type interfaces kept inline for hook consumers ───────────────────────────
+
 export interface CertificateTypeBase {
   name: string;
   description?: string;
 }
 
-export interface CertificateTypeCreate extends CertificateTypeBase {}
+export type { CertificateTypeCreate, CertificateTypeUpdate, CertificateTypeDropdown };
 
-export interface CertificateTypeUpdate {
-  name?: string;
-  description?: string;
-}
-
-export interface CertificateTypeRead extends CertificateTypeBase {
-  id: string;
-}
-
-export interface CertificateTypeDropdown {
-  id: string;
-  name: string;
-}
-
-// Certificate Types Response
 export interface CertificateTypesResponse {
   items: CertificateTypeRead[];
-  total_count: number;
+  total: number;
   has_next: boolean;
 }
 
-// Certificates
-export interface CertificateIssueBase {
-  student_id: string;
-  certificate_type_id: string;
-  issue_date?: string;
-  description?: string;
-  certificate_file?: string;
-}
-
-export interface CertificateIssueCreate extends CertificateIssueBase {}
-
-export interface CertificateIssueUpdate {
-  certificate_type_id: string;
-  issue_date?: string;
-  description?: string;
-  certificate_file?: File;
-}
-
-export interface CertificateIssueOut extends CertificateIssueBase {
-  id: string;
-  student?: any; // StudentAdmissionResponse
-}
-
-export interface CertificateFileResponse {
-  certificate_type_id: string;
-  issue_date?: string;
-  file_path?: string;
-  exists_on_disk: boolean;
-}
-
-// Legacy types for backward compatibility
 export interface CertificateCreateRequest {
   student_id: string;
   certificate_type_id: string;
   issue_date?: string;
-  description?: string;
+  remarks?: string;
   certificate_file?: File;
 }
 
-export interface CertificateUpdateRequest extends CertificateIssueUpdate {}
-
-export interface CertificateResponse extends CertificateIssueOut {
-  remarks?: string; // For backward compatibility
-  file_path?: string; // For backward compatibility
+export interface CertificateUpdateRequest {
+  certificate_type_id: string;
+  issue_date?: string;
+  remarks?: string;
+  certificate_file?: File;
 }
 
-export interface CertificateType extends CertificateTypeRead {}
+// ─── Certificate Type Hooks ────────────────────────────────────────────────────
 
-// Certificate Type Hooks
 export function useCertificateTypesList(params?: { skip?: number; limit?: number }) {
   return useQuery<CertificateTypesResponse>({
     queryKey: ['certificate-types-list', params],
@@ -161,59 +128,75 @@ export function useDeleteCertificateType() {
   });
 }
 
-// Query hooks
+// ─── Certificate Query Hooks ───────────────────────────────────────────────────
+
+// Admin/Staff — list all certificates, optionally filtered by student
 export function useCertificates(params?: {
   student_id?: string;
   skip?: number;
   limit?: number;
 }) {
-  return useQuery<{
-    items: CertificateResponse[];
-    total_count: number;
-    has_next: boolean;
-  }>({
+  return useQuery<PaginatedResponse<CertificateRead>>({
     queryKey: ['certificates', params],
     queryFn: async () => {
       const queryParams = new URLSearchParams();
+      if (params?.student_id) queryParams.append('student_id', params.student_id);
       if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString());
       if (params?.limit !== undefined) queryParams.append('limit', params.limit.toString());
 
-      const response = await CAxios.get(`/student/certificates/?${queryParams.toString()}`);
+      const response = await CAxios.get(`${CERTIFICATES_BASE}/?${queryParams.toString()}`);
       return response.data;
     },
   });
 }
 
+// Admin/Staff — list certificates for a specific student
 export function useStudentCertificates(studentId: string) {
-  console.log(studentId, "studentId in useStudentCertificates");
-  return useQuery<CertificateResponse[]>({
+  return useQuery<PaginatedResponse<CertificateRead>>({
     queryKey: ['student-certificates', studentId],
     queryFn: async () => {
-      const response = await CAxios.get(`/student/certificates/student/${studentId}`);
+      const response = await CAxios.get(`${CERTIFICATES_BASE}/?student_id=${studentId}`);
       return response.data;
     },
     enabled: !!studentId,
   });
 }
 
-// Hook that automatically uses studentId from auth store
+// Student — own certificates via /certificates/my
 export function useMyCertificates() {
-  // Import here to avoid circular dependency
-  const { studentId } = useAuthStore();
-  return useStudentCertificates(studentId || "");
+  return useQuery<PaginatedResponse<CertificateRead>>({
+    queryKey: ['my-certificates'],
+    queryFn: async () => {
+      const response = await CAxios.get(`${CERTIFICATES_BASE}/my`);
+      return response.data;
+    },
+  });
+}
+
+// Parent — child's certificates via /certificates/my-child/{student_id}
+export function useMyChildCertificates(studentId: string) {
+  return useQuery<PaginatedResponse<CertificateRead>>({
+    queryKey: ['my-child-certificates', studentId],
+    queryFn: async () => {
+      const response = await CAxios.get(`${CERTIFICATES_BASE}/my-child/${studentId}`);
+      return response.data;
+    },
+    enabled: !!studentId,
+  });
 }
 
 export function useCertificate(id: string) {
-  return useQuery<CertificateResponse>({
+  return useQuery<CertificateRead>({
     queryKey: ['certificate', id],
     queryFn: async () => {
-      const response = await CAxios.get(`${CERTIFICATES_BASE}/certificateid/${id}`);
+      const response = await CAxios.get(`${CERTIFICATES_BASE}/${id}`);
       return response.data;
     },
     enabled: !!id,
   });
 }
 
+// Dropdown of certificate types (for form selects)
 export function useCertificateTypes() {
   return useQuery<CertificateTypeDropdown[]>({
     queryKey: ['certificate-types'],
@@ -224,32 +207,21 @@ export function useCertificateTypes() {
   });
 }
 
-export function useCertificateTypesAlternative() {
-  return useQuery<CertificateTypeRead[]>({
-    queryKey: ['certificate-types-alternative'],
-    queryFn: async () => {
-      const response = await CAxios.get(`${CERTIFICATES_BASE}/certificate-types`);
-      return response.data;
-    },
-  });
-}
+// ─── Certificate Mutation Hooks ────────────────────────────────────────────────
 
-// Mutation hooks
 export function useCreateCertificate() {
   const queryClient = useQueryClient();
-  return useMutation<CertificateResponse, Error, CertificateCreateRequest>({
+  return useMutation<CertificateRead, Error, CertificateCreateRequest>({
     mutationFn: async (data) => {
       const formData = new FormData();
       formData.append('student_id', data.student_id);
       formData.append('certificate_type_id', data.certificate_type_id);
       if (data.issue_date) formData.append('issue_date', data.issue_date);
-      if (data.description) formData.append('description', data.description);
+      if (data.remarks) formData.append('remarks', data.remarks);
       if (data.certificate_file) formData.append('certificate_file', data.certificate_file);
 
-      const response = await CAxios.post('/student/certificates/', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      const response = await CAxios.post(`${CERTIFICATES_BASE}/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       return response.data;
     },
@@ -266,18 +238,16 @@ export function useCreateCertificate() {
 
 export function useUpdateCertificate() {
   const queryClient = useQueryClient();
-  return useMutation<CertificateResponse, Error, { id: string; data: CertificateUpdateRequest }>({
+  return useMutation<CertificateRead, Error, { id: string; data: CertificateUpdateRequest }>({
     mutationFn: async ({ id, data }) => {
       const formData = new FormData();
       formData.append('certificate_type_id', data.certificate_type_id);
       if (data.issue_date) formData.append('issue_date', data.issue_date);
-      if (data.description) formData.append('description', data.description);
+      if (data.remarks) formData.append('remarks', data.remarks);
       if (data.certificate_file) formData.append('certificate_file', data.certificate_file);
 
       const response = await CAxios.patch(`${CERTIFICATES_BASE}/${id}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       return response.data;
     },
@@ -297,11 +267,12 @@ export function useDeleteCertificate() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, string>({
     mutationFn: async (id) => {
-      await CAxios.delete(`/student/certificates/${id}`);
+      await CAxios.delete(`${CERTIFICATES_BASE}/${id}`);
     },
     onSuccess: () => {
       toast.success('Certificate deleted successfully!');
       queryClient.invalidateQueries({ queryKey: ['certificates'] });
+      queryClient.invalidateQueries({ queryKey: ['my-certificates'] });
     },
     onError: (error) => {
       toast.error(`Failed to delete certificate: ${error.message}`);
@@ -309,17 +280,15 @@ export function useDeleteCertificate() {
   });
 }
 
-
+// Download — returns presigned S3 URL; caller does window.location = presigned_url
 export function useDownloadCertificateDocument() {
-  return useMutation<Blob, Error, string>({
+  return useMutation<PresignedUrlResponse, Error, string>({
     mutationFn: async (id) => {
-      const response = await CAxios.get(`/student/certificates/certificates/${id}/download`, {
-        responseType: 'blob',
-      });
+      const response = await CAxios.get(`${CERTIFICATES_BASE}/${id}/download`);
       return response.data;
     },
     onError: (error) => {
-      toast.error(`Failed to download document: ${error.message}`);
+      toast.error(`Failed to get download link: ${error.message}`);
     },
   });
 }

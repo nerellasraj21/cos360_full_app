@@ -23,9 +23,30 @@ export interface CertificateTypeDropdown {
   name: string;           // Certificate type name
 }
 
+// CertificateRead — new backend model (Mar 2026)
+export interface CertificateRead {
+  id: string;
+  student_id: string;
+  certificate_type_id: string;
+  type_name: string;          // Populated from type JOIN
+  file_path: string | null;   // S3 key (not local path)
+  issue_date: string;
+  remarks: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Presigned URL download response — replaces binary blob stream
+export interface PresignedUrlResponse {
+  presigned_url: string;
+  expires_in_seconds: number;
+  certificate_id: string;
+  filename: string;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
-  total_count: number;
+  total: number;
   has_next: boolean;
 }
 
