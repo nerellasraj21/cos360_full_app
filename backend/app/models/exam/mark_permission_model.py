@@ -1,7 +1,9 @@
-from app.db.base import BaseOrg
-from sqlalchemy import TIMESTAMP, Column, String, Boolean, func, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import TIMESTAMP, Boolean, Column, ForeignKey, String, func
+from sqlalchemy.dialects.postgresql import UUID
+
+from app.db.base import BaseOrg
 
 
 class ExamMarkEntryPermission(BaseOrg):
@@ -9,6 +11,7 @@ class ExamMarkEntryPermission(BaseOrg):
     Grants a specific user (clerk/CA/data entry operator) permission
     to enter marks for a specific exam. Managed by Admin.
     """
+
     __tablename__ = "exam_mark_entry_permissions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)

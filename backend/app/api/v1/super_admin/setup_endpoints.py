@@ -1,23 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import JSONResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 import bcrypt
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import text
 
 from app.db.session import get_public_db
 
 router = APIRouter(prefix="/super_admin/setup", tags=["Super Admin/Setup"])
 
+
 @router.post("/initialize", status_code=status.HTTP_201_CREATED)
 async def initialize_super_admin_system():
     """
     Initialize Super Admin system - Create tables and default user
-    
+
     **One-time setup endpoint** - Creates:
     - Super Admin tables (users, audit)
     - Initial Super Admin user
     - Security indexes
-    
+
     **Warning**: This should only be run once during system setup
     """
     try:
@@ -40,7 +39,7 @@ async def initialize_super_admin_system():
                 requires_password_change BOOLEAN NOT NULL DEFAULT false
             );
         """))
-        
+
         # 2. Create indexes for super_admin_users
         await db.execute(text("""
             CREATE INDEX IF NOT EXISTS ix_public_super_admin_users_username 
@@ -50,7 +49,7 @@ async def initialize_super_admin_system():
             CREATE INDEX IF NOT EXISTS ix_public_super_admin_users_email 
             ON public.super_admin_users (email);
         """))
-        
+
         # 3. Create super_admin_audit table
         await db.execute(text("""
             CREATE TABLE IF NOT EXISTS public.super_admin_audit (
@@ -66,26 +65,27 @@ async def initialize_super_admin_system():
                 timestamp TIMESTAMP NOT NULL DEFAULT NOW()
             );
         """))
-        
+
         # 4. Create indexes for super_admin_audit
         indexes = [
             "CREATE INDEX IF NOT EXISTS ix_public_super_admin_audit_super_admin_id ON public.super_admin_audit (super_admin_id);",
             "CREATE INDEX IF NOT EXISTS ix_public_super_admin_audit_action ON public.super_admin_audit (action);",
             "CREATE INDEX IF NOT EXISTS ix_public_super_admin_audit_resource ON public.super_admin_audit (resource);",
-            "CREATE INDEX IF NOT EXISTS ix_public_super_admin_audit_timestamp ON public.super_admin_audit (timestamp);"
+            "CREATE INDEX IF NOT EXISTS ix_public_super_admin_audit_timestamp ON public.super_admin_audit (timestamp);",
         ]
-        
+
         for index_sql in indexes:
             await db.execute(text(index_sql))
-        
+
         # 5. Hash password for initial Super Admin
         password = "SuperAdmin123!"
-        password_bytes = password.encode('utf-8')
+        password_bytes = password.encode("utf-8")
         salt = bcrypt.gensalt()
-        hashed_password = bcrypt.hashpw(password_bytes, salt).decode('utf-8')
-        
+        hashed_password = bcrypt.hashpw(password_bytes, salt).decode("utf-8")
+
         # 6. Insert initial Super Admin user
-        await db.execute(text("""
+        await db.execute(
+            text("""
             INSERT INTO public.super_admin_users (
                 id,
                 username, 
@@ -105,16 +105,19 @@ async def initialize_super_admin_system():
                 0,
                 true
             ) ON CONFLICT (username) DO NOTHING;
-        """), {"hashed_password": hashed_password})
-        
+        """),
+            {"hashed_password": hashed_password},
+        )
+
         # 7. Get super admin ID for audit log
         result = await db.execute(text("""
             SELECT id FROM public.super_admin_users WHERE username = 'superadmin'
         """))
         super_admin_id = result.scalar_one()
-        
+
         # 8. Create audit log entry
-        await db.execute(text("""
+        await db.execute(
+            text("""
             INSERT INTO public.super_admin_audit (
                 id,
                 super_admin_id,
@@ -128,38 +131,41 @@ async def initialize_super_admin_system():
                 'super_admin_user',
                 'Initial Super Admin user created via API'
             );
-        """), {"super_admin_id": super_admin_id})
-        
+        """),
+            {"super_admin_id": super_admin_id},
+        )
+
         await db.commit()
-        
+
         return {
             "message": "Super Admin system initialized successfully",
             "initial_credentials": {
                 "username": "superadmin",
-                "email": "superadmin@cos360.com", 
+                "email": "superadmin@cos360.com",
                 "password": password,
-                "warning": "CHANGE PASSWORD IMMEDIATELY AFTER FIRST LOGIN"
+                "warning": "CHANGE PASSWORD IMMEDIATELY AFTER FIRST LOGIN",
             },
             "login_endpoint": "POST /api/v1/super_admin/auth/login",
             "next_steps": [
                 "1. Login with provided credentials",
                 "2. Change password immediately",
                 "3. Create additional Super Admin users if needed",
-                "4. Setup tenant management"
-            ]
+                "4. Setup tenant management",
+            ],
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to initialize Super Admin system: {str(e)}"
+            detail=f"Failed to initialize Super Admin system: {str(e)}",
         )
+
 
 @router.get("/status")
 async def check_super_admin_status():
     """
     Check Super Admin system status
-    
+
     Returns information about Super Admin setup state
     """
     try:
@@ -172,25 +178,24 @@ async def check_super_admin_status():
             ORDER BY table_name;
             """))
             existing_tables = [row[0] for row in tables_result.fetchall()]
-            
+
             super_admin_count = 0
-            if 'super_admin_users' in existing_tables:
+            if "super_admin_users" in existing_tables:
                 # Count Super Admin users
                 count_result = await db.execute(text("""
                     SELECT COUNT(*) FROM public.super_admin_users;
                 """))
                 super_admin_count = count_result.scalar()
-            
+
             return {
                 "system_status": "initialized" if len(existing_tables) == 2 else "not_initialized",
                 "tables_exist": existing_tables,
-                "missing_tables": [t for t in ['super_admin_users', 'super_admin_audit'] if t not in existing_tables],
+                "missing_tables": [t for t in ["super_admin_users", "super_admin_audit"] if t not in existing_tables],
                 "super_admin_count": super_admin_count,
-                "ready_for_login": len(existing_tables) == 2 and super_admin_count > 0
+                "ready_for_login": len(existing_tables) == 2 and super_admin_count > 0,
             }
-        
+
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to check Super Admin status: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to check Super Admin status: {str(e)}"
         )

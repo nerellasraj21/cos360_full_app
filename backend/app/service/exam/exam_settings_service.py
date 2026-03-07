@@ -1,6 +1,5 @@
 import logging
 import uuid
-from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -18,7 +17,7 @@ log = logging.getLogger("exam.exam_settings_service")
 # ---------------------------------------------------------------------------
 
 
-async def get_settings(db: AsyncSession) -> Optional[ExamSettings]:
+async def get_settings(db: AsyncSession) -> ExamSettings | None:
     """Return the singleton ExamSettings row, or None if it has not been created yet."""
     try:
         result = await db.execute(select(ExamSettings).limit(1))
@@ -31,9 +30,7 @@ async def get_settings(db: AsyncSession) -> Optional[ExamSettings]:
         )
 
 
-async def upsert_settings(
-    db: AsyncSession, payload: ExamSettingsUpdate
-) -> ExamSettings:
+async def upsert_settings(db: AsyncSession, payload: ExamSettingsUpdate) -> ExamSettings:
     """
     If a settings row already exists, update its fields.
     If not, create a new row with a generated UUID.

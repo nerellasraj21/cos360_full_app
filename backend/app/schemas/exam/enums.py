@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class ExamStatus(str, Enum):
+class ExamStatus(StrEnum):
     draft = "draft"
     active = "active"
     published = "published"
@@ -9,14 +9,14 @@ class ExamStatus(str, Enum):
     finalized = "finalized"
 
 
-class ExamNature(str, Enum):
+class ExamNature(StrEnum):
     formative = "formative"
     summative = "summative"
     cumulative = "cumulative"
     custom = "custom"
 
 
-class ExamLevel(str, Enum):
+class ExamLevel(StrEnum):
     pre_primary = "pre_primary"
     primary = "primary"
     upper_primary = "upper_primary"
@@ -29,7 +29,7 @@ class ExamLevel(str, Enum):
     others = "others"
 
 
-class ExamBoard(str, Enum):
+class ExamBoard(StrEnum):
     cbse = "CBSE"
     icse = "ICSE"
     state = "State"
@@ -37,19 +37,21 @@ class ExamBoard(str, Enum):
     custom = "Custom"
 
 
-class EntryType(str, Enum):
+class EntryType(StrEnum):
     """Component scoring type — marks-based or remarks/grade-based."""
+
     marks = "marks"
     remarks = "remarks"
 
 
-class UploadMethod(str, Enum):
+class UploadMethod(StrEnum):
     """How marks were entered — online UI or Excel upload."""
+
     online = "online"
     excel_upload = "excel_upload"
 
 
-class AuditAction(str, Enum):
+class AuditAction(StrEnum):
     mark_entered = "mark_entered"
     mark_updated = "mark_updated"
     bulk_uploaded = "bulk_uploaded"
@@ -61,7 +63,7 @@ class AuditAction(str, Enum):
     result_released = "result_released"
 
 
-class IneligibilityReason(str, Enum):
+class IneligibilityReason(StrEnum):
     fee_pending = "FEE_PENDING"
     low_attendance = "LOW_ATTENDANCE"
     both = "BOTH"

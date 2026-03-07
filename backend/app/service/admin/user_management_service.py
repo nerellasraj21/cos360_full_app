@@ -8,22 +8,21 @@ Created: 2025-10-04
 Module: Tenant Admin - User Management
 """
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_, and_
-from sqlalchemy.orm import selectinload, joinedload
-from typing import Optional, List
-from uuid import UUID
-from fastapi import HTTPException, status
 import logging
+from uuid import UUID
 
-from app.models.auth.user_model import User
+from fastapi import HTTPException, status
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from app.models.auth.role_model import Role
-from app.models.student.student_model import Student
-from app.models.masters.staff_model import Staff
-from app.models.masters.parent_model import Parent
+from app.models.auth.user_model import User
 from app.schemas.admin.user_management_schema import (
-    UserWithDetailsResponse, UserListResponse,
-    UserUpdateRequest, UserPasswordResetRequest
+    UserListResponse,
+    UserPasswordResetRequest,
+    UserUpdateRequest,
+    UserWithDetailsResponse,
 )
 from app.tools.password_util import hash_password
 
@@ -42,9 +41,9 @@ class UserManagementService:
         db: AsyncSession,
         page: int = 1,
         limit: int = 50,
-        role_filter: Optional[str] = None,
-        search_query: Optional[str] = None,
-        is_active_filter: Optional[bool] = None
+        role_filter: str | None = None,
+        search_query: str | None = None,
+        is_active_filter: bool | None = None,
     ) -> UserListResponse:
         """
         Get all users in tenant with their entity details
@@ -66,10 +65,7 @@ class UserManagementService:
         try:
             # Build base query
             query = select(User).options(
-                selectinload(User.role),
-                selectinload(User.student),
-                selectinload(User.staff),
-                selectinload(User.parent)
+                selectinload(User.role), selectinload(User.student), selectinload(User.staff), selectinload(User.parent)
             )
 
             # Apply filters
@@ -83,10 +79,7 @@ class UserManagementService:
                 conditions.append(User.is_active == is_active_filter)
 
             if search_query:
-                search_conditions = [
-                    User.username.ilike(f"%{search_query}%"),
-                    User.email.ilike(f"%{search_query}%")
-                ]
+                search_conditions = [User.username.ilike(f"%{search_query}%"), User.email.ilike(f"%{search_query}%")]
                 conditions.append(or_(*search_conditions))
 
             if conditions:
@@ -124,7 +117,7 @@ class UserManagementService:
                         "date_of_birth": user.student.date_of_birth.isoformat() if user.student.date_of_birth else None,
                         "gender": user.student.gender,
                         "aadhar_number": user.student.aadhar_number,
-                        "nationality": user.student.nationality
+                        "nationality": user.student.nationality,
                     }
                 elif user.staff:
                     entity_type = "staff"
@@ -135,7 +128,7 @@ class UserManagementService:
                         "joining_date": user.staff.joining_date.isoformat() if user.staff.joining_date else None,
                         "phone": user.staff.phone,
                         "qualification": user.staff.qualification,
-                        "experience_years": user.staff.experience_years
+                        "experience_years": user.staff.experience_years,
                     }
                 elif user.parent:
                     entity_type = "parent"
@@ -145,41 +138,36 @@ class UserManagementService:
                         "phone": user.parent.phone,
                         "occupation": user.parent.occupation,
                         "relation": user.parent.relation_to_student,
-                        "aadhar_number": user.parent.aadhar_number
+                        "aadhar_number": user.parent.aadhar_number,
                     }
 
-                user_responses.append(UserWithDetailsResponse(
-                    id=user.id,
-                    username=user.username,
-                    email=user.email,
-                    is_active=user.is_active,
-                    role_id=user.role_id,
-                    role_name=user.role.name if user.role else "No Role",
-                    entity_type=entity_type,
-                    entity_id=entity_id,
-                    entity_name=entity_name,
-                    entity_details=entity_details,
-                    created_at=None,  # Add if you have timestamp columns
-                    updated_at=None
-                ))
+                user_responses.append(
+                    UserWithDetailsResponse(
+                        id=user.id,
+                        username=user.username,
+                        email=user.email,
+                        is_active=user.is_active,
+                        role_id=user.role_id,
+                        role_name=user.role.name if user.role else "No Role",
+                        entity_type=entity_type,
+                        entity_id=entity_id,
+                        entity_name=entity_name,
+                        entity_details=entity_details,
+                        created_at=None,  # Add if you have timestamp columns
+                        updated_at=None,
+                    )
+                )
 
             total_pages = (total + limit - 1) // limit
 
             logger.info(f"Retrieved {len(user_responses)} users (page {page}/{total_pages}, total: {total})")
 
-            return UserListResponse(
-                users=user_responses,
-                total=total,
-                page=page,
-                limit=limit,
-                total_pages=total_pages
-            )
+            return UserListResponse(users=user_responses, total=total, page=page, limit=limit, total_pages=total_pages)
 
         except Exception as e:
             logger.error(f"Error retrieving users: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to retrieve users: {str(e)}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve users: {str(e)}"
             )
 
     @staticmethod
@@ -198,21 +186,22 @@ class UserManagementService:
             HTTPException: If user not found or database error
         """
         try:
-            query = select(User).options(
-                selectinload(User.role),
-                selectinload(User.student),
-                selectinload(User.staff),
-                selectinload(User.parent)
-            ).where(User.id == user_id)
+            query = (
+                select(User)
+                .options(
+                    selectinload(User.role),
+                    selectinload(User.student),
+                    selectinload(User.staff),
+                    selectinload(User.parent),
+                )
+                .where(User.id == user_id)
+            )
 
             result = await db.execute(query)
             user = result.scalar_one_or_none()
 
             if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"User with ID {user_id} not found"
-                )
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User with ID {user_id} not found")
 
             # Build entity details
             entity_type = None
@@ -231,7 +220,7 @@ class UserManagementService:
                     "caste": user.student.caste,
                     "community": user.student.community,
                     "nationality": user.student.nationality,
-                    "mother_tongue": user.student.mother_tongue
+                    "mother_tongue": user.student.mother_tongue,
                 }
             elif user.staff:
                 entity_type = "staff"
@@ -244,7 +233,7 @@ class UserManagementService:
                     "qualification": user.staff.qualification,
                     "experience_years": user.staff.experience_years,
                     "address": user.staff.address,
-                    "gender": user.staff.gender.value if user.staff.gender else None
+                    "gender": user.staff.gender.value if user.staff.gender else None,
                 }
             elif user.parent:
                 entity_type = "parent"
@@ -255,7 +244,7 @@ class UserManagementService:
                     "occupation": user.parent.occupation,
                     "relation": user.parent.relation_to_student,
                     "aadhar_number": user.parent.aadhar_number,
-                    "gender": user.parent.gender
+                    "gender": user.parent.gender,
                 }
 
             logger.info(f"Retrieved user {user.username} (ID: {user_id}) with entity type: {entity_type}")
@@ -270,7 +259,7 @@ class UserManagementService:
                 entity_type=entity_type,
                 entity_id=entity_id,
                 entity_name=entity_name,
-                entity_details=entity_details
+                entity_details=entity_details,
             )
 
         except HTTPException:
@@ -278,16 +267,11 @@ class UserManagementService:
         except Exception as e:
             logger.error(f"Error retrieving user {user_id}: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to retrieve user: {str(e)}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve user: {str(e)}"
             )
 
     @staticmethod
-    async def update_user(
-        db: AsyncSession,
-        user_id: UUID,
-        update_data: UserUpdateRequest
-    ) -> UserWithDetailsResponse:
+    async def update_user(db: AsyncSession, user_id: UUID, update_data: UserUpdateRequest) -> UserWithDetailsResponse:
         """
         Update user basic information
 
@@ -309,10 +293,7 @@ class UserManagementService:
             user = result.scalar_one_or_none()
 
             if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"User with ID {user_id} not found"
-                )
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User with ID {user_id} not found")
 
             changes_made = []
 
@@ -325,7 +306,7 @@ class UserManagementService:
                 if existing.scalar_one_or_none():
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Username '{update_data.username}' already exists"
+                        detail=f"Username '{update_data.username}' already exists",
                     )
                 old_username = user.username
                 user.username = update_data.username
@@ -333,13 +314,10 @@ class UserManagementService:
 
             if update_data.email is not None and update_data.email != user.email:
                 # Check email uniqueness
-                existing = await db.execute(
-                    select(User).where(User.email == update_data.email, User.id != user_id)
-                )
+                existing = await db.execute(select(User).where(User.email == update_data.email, User.id != user_id))
                 if existing.scalar_one_or_none():
                     raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Email '{update_data.email}' already exists"
+                        status_code=status.HTTP_400_BAD_REQUEST, detail=f"Email '{update_data.email}' already exists"
                     )
                 old_email = user.email
                 user.email = update_data.email
@@ -366,16 +344,11 @@ class UserManagementService:
             await db.rollback()
             logger.error(f"Error updating user {user_id}: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to update user: {str(e)}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update user: {str(e)}"
             )
 
     @staticmethod
-    async def reset_user_password(
-        db: AsyncSession,
-        user_id: UUID,
-        password_data: UserPasswordResetRequest
-    ) -> dict:
+    async def reset_user_password(db: AsyncSession, user_id: UUID, password_data: UserPasswordResetRequest) -> dict:
         """
         Admin reset user password
 
@@ -396,10 +369,7 @@ class UserManagementService:
             user = result.scalar_one_or_none()
 
             if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"User with ID {user_id} not found"
-                )
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User with ID {user_id} not found")
 
             user.password_hash = hash_password(password_data.new_password)
             await db.commit()
@@ -409,7 +379,7 @@ class UserManagementService:
             return {
                 "message": f"Password reset successfully for user {user.username}",
                 "user_id": str(user_id),
-                "username": user.username
+                "username": user.username,
             }
 
         except HTTPException:
@@ -418,16 +388,11 @@ class UserManagementService:
             await db.rollback()
             logger.error(f"Error resetting password for user {user_id}: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to reset password: {str(e)}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to reset password: {str(e)}"
             )
 
     @staticmethod
-    async def update_user_role(
-        db: AsyncSession,
-        user_id: UUID,
-        new_role_id: UUID
-    ) -> dict:
+    async def update_user_role(db: AsyncSession, user_id: UUID, new_role_id: UUID) -> dict:
         """
         Change user's role
 
@@ -449,10 +414,7 @@ class UserManagementService:
             user = result.scalar_one_or_none()
 
             if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"User with ID {user_id} not found"
-                )
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User with ID {user_id} not found")
 
             # Verify role exists
             role_query = select(Role).where(Role.id == new_role_id)
@@ -461,8 +423,7 @@ class UserManagementService:
 
             if not role:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Role with ID {new_role_id} not found"
+                    status_code=status.HTTP_404_NOT_FOUND, detail=f"Role with ID {new_role_id} not found"
                 )
 
             # Update role
@@ -474,17 +435,11 @@ class UserManagementService:
             logger.info(f"User {user.username} (ID: {user_id}) role changed from {old_role_name} to {role.name}")
 
             return {
-                "message": f"User role updated successfully",
+                "message": "User role updated successfully",
                 "user_id": str(user_id),
                 "username": user.username,
-                "old_role": {
-                    "id": str(old_role_id),
-                    "name": old_role_name
-                },
-                "new_role": {
-                    "id": str(new_role_id),
-                    "name": role.name
-                }
+                "old_role": {"id": str(old_role_id), "name": old_role_name},
+                "new_role": {"id": str(new_role_id), "name": role.name},
             }
 
         except HTTPException:
@@ -493,6 +448,5 @@ class UserManagementService:
             await db.rollback()
             logger.error(f"Error updating role for user {user_id}: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to update user role: {str(e)}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update user role: {str(e)}"
             )

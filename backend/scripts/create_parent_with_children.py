@@ -41,6 +41,7 @@ from datetime import date
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -52,43 +53,52 @@ SCHEMA = "test_tenant_schema"
 TEMP_PASSWORD = "Welcome@123"
 
 PARENT = {
-    "username":            "sita.sharma",
-    "email":               "sita.sharma@school.com",
-    "name":                "Sita Sharma",
-    "gender":              "Female",
-    "phone":               "9876543210",
-    "occupation":          "Teacher",
+    "username": "sita.sharma",
+    "email": "sita.sharma@school.com",
+    "name": "Sita Sharma",
+    "gender": "Female",
+    "phone": "9876543210",
+    "occupation": "Teacher",
     "relation_to_student": "Mother",
-    "salary_range":        "3l_5l",
+    "salary_range": "3l_5l",
 }
 
 CHILD_2 = {
-    "first_name":    "Arjun",
-    "last_name":     "Sharma",
-    "username":      "arjun.sharma",
-    "email":         None,
+    "first_name": "Arjun",
+    "last_name": "Sharma",
+    "username": "arjun.sharma",
+    "email": None,
     "date_of_birth": date(2011, 3, 10),
-    "gender":        "Male",
-    "nationality":   "Indian",
+    "gender": "Male",
+    "nationality": "Indian",
     "mother_tongue": "Telugu",
 }
 
 # Restricted permissions: children's details, marks, hall tickets only
 _PARENT_PERMISSIONS = [
     # Reference data (needed to display class/section names)
-    ("academic_years",       "read"),  ("academic_years",       "list"),
-    ("classes",              "read"),  ("classes",              "list"),
-    ("subjects",             "read"),  ("subjects",             "list"),
+    ("academic_years", "read"),
+    ("academic_years", "list"),
+    ("classes", "read"),
+    ("classes", "list"),
+    ("subjects", "read"),
+    ("subjects", "list"),
     # Child's details
-    ("student_admissions",   "read"),
-    ("student_attendance",   "read"),  ("student_attendance",   "list"),
-    ("student_certificates", "read"),  ("student_certificates", "list"),
-    ("student_documents",    "read"),  ("student_documents",    "list"),
+    ("student_admissions", "read"),
+    ("student_attendance", "read"),
+    ("student_attendance", "list"),
+    ("student_certificates", "read"),
+    ("student_certificates", "list"),
+    ("student_documents", "read"),
+    ("student_documents", "list"),
     # Marks & Exam results
-    ("exams",                "read"),  ("exams",                "list"),
-    ("exam_marks",           "read"),  ("exam_marks",           "list"),
+    ("exams", "read"),
+    ("exams", "list"),
+    ("exam_marks", "read"),
+    ("exam_marks", "list"),
     # Hall tickets (part of exam module)
-    ("exam_hall_tickets",    "read"),  ("exam_hall_tickets",    "list"),
+    ("exam_hall_tickets", "read"),
+    ("exam_hall_tickets", "list"),
 ]
 
 
@@ -130,17 +140,24 @@ async def run():
         # ------------------------------------------------------------------ #
         seeded = 0
         for resource, action in _PARENT_PERMISSIONS:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO resource_permissions (id, role_id, resource, action, is_granted)
                 SELECT gen_random_uuid(), :role_id, :res, :act, true
                 WHERE NOT EXISTS (
                     SELECT 1 FROM resource_permissions
                     WHERE role_id = :role_id2 AND resource = :res2 AND action = :act2
                 )
-            """), {
-                "role_id": parent_role_id, "res": resource, "act": action,
-                "role_id2": parent_role_id, "res2": resource, "act2": action,
-            })
+            """),
+                {
+                    "role_id": parent_role_id,
+                    "res": resource,
+                    "act": action,
+                    "role_id2": parent_role_id,
+                    "res2": resource,
+                    "act2": action,
+                },
+            )
             seeded += 1
         await db.flush()
         print(f"[OK] {seeded} resource_permissions ensured for Parent role")
@@ -151,15 +168,17 @@ async def run():
         menus_result = await db.execute(text("SELECT id FROM menus"))
         menu_rows = menus_result.fetchall()
         for (menu_id,) in menu_rows:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO role_menu_permissions (id, role_id, menu_id, can_view, can_edit)
                 SELECT gen_random_uuid(), :role_id, :menu_id, true, false
                 WHERE NOT EXISTS (
                     SELECT 1 FROM role_menu_permissions
                     WHERE role_id = :role_id2 AND menu_id = :menu_id2
                 )
-            """), {"role_id": parent_role_id, "menu_id": menu_id,
-                   "role_id2": parent_role_id, "menu_id2": menu_id})
+            """),
+                {"role_id": parent_role_id, "menu_id": menu_id, "role_id2": parent_role_id, "menu_id2": menu_id},
+            )
         await db.flush()
         print(f"[OK] role_menu_permissions ensured for {len(menu_rows)} menus")
 
@@ -170,39 +189,44 @@ async def run():
 
         existing = await db.execute(
             text("SELECT id FROM users WHERE email = :email OR username = :username"),
-            {"email": PARENT["email"], "username": PARENT["username"]}
+            {"email": PARENT["email"], "username": PARENT["username"]},
         )
         existing_user_id = existing.scalar_one_or_none()
 
         if existing_user_id:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 UPDATE users
                 SET password_hash = :pwd, is_first_login = true,
                     username = :username, email = :email,
                     role_id = :role_id, is_active = true
                 WHERE id = :id
-            """), {
-                "pwd":      pwd_hash,
-                "username": PARENT["username"],
-                "email":    PARENT["email"],
-                "role_id":  parent_role_id,
-                "id":       existing_user_id,
-            })
+            """),
+                {
+                    "pwd": pwd_hash,
+                    "username": PARENT["username"],
+                    "email": PARENT["email"],
+                    "role_id": parent_role_id,
+                    "id": existing_user_id,
+                },
+            )
             user_id = existing_user_id
             print(f"[OK] Existing user updated -- user_id: {user_id}")
         else:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO users (id, username, email, password_hash, is_active, is_first_login, role_id)
                 VALUES (gen_random_uuid(), :username, :email, :pwd, true, true, :role_id)
-            """), {
-                "username": PARENT["username"],
-                "email":    PARENT["email"],
-                "pwd":      pwd_hash,
-                "role_id":  parent_role_id,
-            })
+            """),
+                {
+                    "username": PARENT["username"],
+                    "email": PARENT["email"],
+                    "pwd": pwd_hash,
+                    "role_id": parent_role_id,
+                },
+            )
             r = await db.execute(
-                text("SELECT id FROM users WHERE username = :username"),
-                {"username": PARENT["username"]}
+                text("SELECT id FROM users WHERE username = :username"), {"username": PARENT["username"]}
             )
             user_id = r.scalar_one()
             print(f"[OK] New user created -- user_id: {user_id}")
@@ -210,49 +234,51 @@ async def run():
         # ------------------------------------------------------------------ #
         # 6. Create or update Parent record                                    #
         # ------------------------------------------------------------------ #
-        existing_par = await db.execute(
-            text("SELECT id FROM parents WHERE user_id = :uid"), {"uid": user_id}
-        )
+        existing_par = await db.execute(text("SELECT id FROM parents WHERE user_id = :uid"), {"uid": user_id})
         existing_par_id = existing_par.scalar_one_or_none()
 
         if existing_par_id:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 UPDATE parents
                 SET name = :name, email = :email, phone = :phone,
                     occupation = :occupation, gender = :gender,
                     relation_to_student = :relation, salary_range = :salary
                 WHERE user_id = :uid
-            """), {
-                "name":       PARENT["name"],
-                "email":      PARENT["email"],
-                "phone":      PARENT["phone"],
-                "occupation": PARENT["occupation"],
-                "gender":     PARENT["gender"],
-                "relation":   PARENT["relation_to_student"],
-                "salary":     PARENT["salary_range"],
-                "uid":        user_id,
-            })
+            """),
+                {
+                    "name": PARENT["name"],
+                    "email": PARENT["email"],
+                    "phone": PARENT["phone"],
+                    "occupation": PARENT["occupation"],
+                    "gender": PARENT["gender"],
+                    "relation": PARENT["relation_to_student"],
+                    "salary": PARENT["salary_range"],
+                    "uid": user_id,
+                },
+            )
             parent_id = existing_par_id
             print(f"[OK] Parent record updated -- parent_id: {parent_id}")
         else:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO parents (id, name, email, phone, occupation, gender,
                                      relation_to_student, salary_range, user_id)
                 VALUES (gen_random_uuid(), :name, :email, :phone, :occupation, :gender,
                         :relation, :salary, :uid)
-            """), {
-                "name":       PARENT["name"],
-                "email":      PARENT["email"],
-                "phone":      PARENT["phone"],
-                "occupation": PARENT["occupation"],
-                "gender":     PARENT["gender"],
-                "relation":   PARENT["relation_to_student"],
-                "salary":     PARENT["salary_range"],
-                "uid":        user_id,
-            })
-            r2 = await db.execute(
-                text("SELECT id FROM parents WHERE user_id = :uid"), {"uid": user_id}
+            """),
+                {
+                    "name": PARENT["name"],
+                    "email": PARENT["email"],
+                    "phone": PARENT["phone"],
+                    "occupation": PARENT["occupation"],
+                    "gender": PARENT["gender"],
+                    "relation": PARENT["relation_to_student"],
+                    "salary": PARENT["salary_range"],
+                    "uid": user_id,
+                },
             )
+            r2 = await db.execute(text("SELECT id FROM parents WHERE user_id = :uid"), {"uid": user_id})
             parent_id = r2.scalar_one()
             print(f"[OK] Parent record created -- parent_id: {parent_id}")
 
@@ -276,48 +302,44 @@ async def run():
         student_role_id = sr.scalar_one_or_none()
 
         # Check if arjun.sharma user already exists
-        c2u = await db.execute(
-            text("SELECT id FROM users WHERE username = :uname"),
-            {"uname": CHILD_2["username"]}
-        )
+        c2u = await db.execute(text("SELECT id FROM users WHERE username = :uname"), {"uname": CHILD_2["username"]})
         child2_user_id = c2u.scalar_one_or_none()
 
         if not child2_user_id:
             child2_pwd = hash_password(TEMP_PASSWORD)
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO users (id, username, password_hash, is_active, is_first_login, role_id)
                 VALUES (gen_random_uuid(), :username, :pwd, true, true, :role_id)
-            """), {"username": CHILD_2["username"], "pwd": child2_pwd, "role_id": student_role_id})
-            r3 = await db.execute(
-                text("SELECT id FROM users WHERE username = :uname"),
-                {"uname": CHILD_2["username"]}
+            """),
+                {"username": CHILD_2["username"], "pwd": child2_pwd, "role_id": student_role_id},
             )
+            r3 = await db.execute(text("SELECT id FROM users WHERE username = :uname"), {"uname": CHILD_2["username"]})
             child2_user_id = r3.scalar_one()
             print(f"[OK] Child 2 user created (Arjun Sharma) -- user_id: {child2_user_id}")
 
         # Check if student record exists for arjun
-        c2s = await db.execute(
-            text("SELECT id FROM students WHERE user_id = :uid"), {"uid": child2_user_id}
-        )
+        c2s = await db.execute(text("SELECT id FROM students WHERE user_id = :uid"), {"uid": child2_user_id})
         child2_id = c2s.scalar_one_or_none()
 
         if not child2_id:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO students (id, first_name, last_name, date_of_birth, gender,
                                       nationality, mother_tongue, user_id)
                 VALUES (gen_random_uuid(), :fn, :ln, :dob, :gender, :nat, :mt, :uid)
-            """), {
-                "fn":     CHILD_2["first_name"],
-                "ln":     CHILD_2["last_name"],
-                "dob":    CHILD_2["date_of_birth"],
-                "gender": CHILD_2["gender"],
-                "nat":    CHILD_2["nationality"],
-                "mt":     CHILD_2["mother_tongue"],
-                "uid":    child2_user_id,
-            })
-            r4 = await db.execute(
-                text("SELECT id FROM students WHERE user_id = :uid"), {"uid": child2_user_id}
+            """),
+                {
+                    "fn": CHILD_2["first_name"],
+                    "ln": CHILD_2["last_name"],
+                    "dob": CHILD_2["date_of_birth"],
+                    "gender": CHILD_2["gender"],
+                    "nat": CHILD_2["nationality"],
+                    "mt": CHILD_2["mother_tongue"],
+                    "uid": child2_user_id,
+                },
             )
+            r4 = await db.execute(text("SELECT id FROM students WHERE user_id = :uid"), {"uid": child2_user_id})
             child2_id = r4.scalar_one()
             print(f"[OK] Child 2 student record created (Arjun Sharma) -- student_id: {child2_id}")
         else:
@@ -331,13 +353,16 @@ async def run():
                 continue
             existing_link = await db.execute(
                 text("SELECT id FROM student_parent_links WHERE student_id = :sid AND parent_id = :pid"),
-                {"sid": child_id, "pid": parent_id}
+                {"sid": child_id, "pid": parent_id},
             )
             if not existing_link.scalar_one_or_none():
-                await db.execute(text("""
+                await db.execute(
+                    text("""
                     INSERT INTO student_parent_links (id, student_id, parent_id)
                     VALUES (gen_random_uuid(), :sid, :pid)
-                """), {"sid": child_id, "pid": parent_id})
+                """),
+                    {"sid": child_id, "pid": parent_id},
+                )
                 print(f"[OK] Linked {label} to parent")
             else:
                 print(f"[OK] {label} already linked to parent")
@@ -357,12 +382,16 @@ async def run():
         print()
         print("Login flow:")
         print("  Step 1 -- POST /auth/login")
-        print(f'    Body: {{ "username": "{PARENT["username"]}", "password": "{TEMP_PASSWORD}", "client_name": "test_tenant" }}')
+        print(
+            f'    Body: {{ "username": "{PARENT["username"]}", "password": "{TEMP_PASSWORD}", "client_name": "test_tenant" }}'
+        )
         print('    -> { "requires_password_change": true, "change_password_token": "..." }')
         print()
         print("  Step 2 -- POST /auth/staff/set-password")
-        print('    Body: { "change_password_token": "<token>", "new_password": "NewPass@123", "confirm_password": "NewPass@123" }')
-        print('    -> full login response with entity_id = parent UUID')
+        print(
+            '    Body: { "change_password_token": "<token>", "new_password": "NewPass@123", "confirm_password": "NewPass@123" }'
+        )
+        print("    -> full login response with entity_id = parent UUID")
         print()
         print("After login -- fetch children list:")
         print(f"  GET /student-parent-links/parent/{{entity_id}}/students")

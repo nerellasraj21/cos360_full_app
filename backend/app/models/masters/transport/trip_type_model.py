@@ -1,7 +1,10 @@
-from sqlalchemy import Column, String, Boolean, DateTime, func
-from app.db.base import BaseOrg
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import Boolean, Column, DateTime, String, func
+from sqlalchemy.dialects.postgresql import UUID
+
+from app.db.base import BaseOrg
+
 
 class TripType(BaseOrg):
     __tablename__ = "trip_types"

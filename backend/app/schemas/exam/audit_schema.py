@@ -1,7 +1,8 @@
-from pydantic import BaseModel
-from typing import Optional, Any
-from uuid import UUID
 from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from pydantic import BaseModel
 
 
 class AuditLogRead(BaseModel):
@@ -9,13 +10,12 @@ class AuditLogRead(BaseModel):
 
     id: UUID
     exam_id: UUID
-    student_id: Optional[UUID] = None
-    subject_id: Optional[UUID] = None
+    student_id: UUID | None = None
+    subject_id: UUID | None = None
     action: str
-    old_value: Optional[str] = None
-    new_value: Optional[str] = None
-    reason: Optional[str] = None
+    old_value: str | None = None
+    new_value: str | None = None
+    reason: str | None = None
     performed_by: UUID
     performed_at: datetime
-    metadata_: Optional[Any] = None
-
+    metadata_: Any | None = None

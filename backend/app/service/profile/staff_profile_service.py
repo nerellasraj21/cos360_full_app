@@ -1,13 +1,16 @@
+from uuid import UUID
+
+from fastapi import HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from fastapi import HTTPException, status, Request
-from uuid import UUID
-from typing import Optional
+
 from app.models.masters.staff_model import Staff
+
 # Designation model removed - not needed
 from app.schemas.profile.staff_profile_schema import StaffProfileOut, StaffProfileUpdate
 from app.service.profile.profile_audit_service import ProfileAuditService
+
 
 class StaffProfileService:
     """Service for staff profile operations"""
@@ -19,7 +22,7 @@ class StaffProfileService:
         actor_user_id: UUID,
         actor_role: str,
         actor_username: str,
-        request: Optional[Request] = None
+        request: Request | None = None,
     ) -> StaffProfileOut:
         """
         Get staff profile by user_id
@@ -41,19 +44,13 @@ class StaffProfileService:
         # Get staff with related data
         result = await db.execute(
             select(Staff)
-            .options(
-                selectinload(Staff.user),
-                selectinload(Staff.designation_obj)
-            )
+            .options(selectinload(Staff.user), selectinload(Staff.designation_obj))
             .where(Staff.user_id == user_id)
         )
         staff = result.scalar_one_or_none()
 
         if not staff:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Staff profile not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff profile not found")
 
         # Get designation name
         designation = None
@@ -72,7 +69,7 @@ class StaffProfileService:
             actor_role=actor_role,
             actor_username=actor_username,
             request=request,
-            org_id=user_id
+            org_id=user_id,
         )
         await db.commit()
 
@@ -88,7 +85,7 @@ class StaffProfileService:
             employee_id=employee_id,
             date_of_joining=staff.joining_date,
             is_active=staff.is_active,
-            profile_photo_url=None  # TODO: Implement photo upload
+            profile_photo_url=None,  # TODO: Implement photo upload
         )
 
     @staticmethod
@@ -99,7 +96,7 @@ class StaffProfileService:
         actor_user_id: UUID,
         actor_role: str,
         actor_username: str,
-        request: Optional[Request] = None
+        request: Request | None = None,
     ) -> StaffProfileOut:
         """
         Update staff profile
@@ -120,18 +117,11 @@ class StaffProfileService:
             HTTPException: If staff not found
         """
         # Get staff
-        result = await db.execute(
-            select(Staff)
-            .options(selectinload(Staff.user))
-            .where(Staff.user_id == user_id)
-        )
+        result = await db.execute(select(Staff).options(selectinload(Staff.user)).where(Staff.user_id == user_id))
         staff = result.scalar_one_or_none()
 
         if not staff:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Staff profile not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff profile not found")
 
         # Track changes for audit log
         changes = {}
@@ -160,7 +150,7 @@ class StaffProfileService:
                 actor_role=actor_role,
                 actor_username=actor_username,
                 request=request,
-                org_id=user_id
+                org_id=user_id,
             )
 
         await db.commit()
@@ -173,5 +163,5 @@ class StaffProfileService:
             actor_user_id=actor_user_id,
             actor_role=actor_role,
             actor_username=actor_username,
-            request=request
+            request=request,
         )

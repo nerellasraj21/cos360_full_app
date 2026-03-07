@@ -1,20 +1,21 @@
-from pydantic import BaseModel, Field
-from typing import Optional
 from datetime import date
 from uuid import UUID
+
+from pydantic import BaseModel, Field
+
 
 class StaffProfileOut(BaseModel):
     staff_id: UUID
     user_id: UUID
-    first_name: Optional[str]
-    last_name: Optional[str]
-    email: Optional[str]
-    phone: Optional[str]
-    designation: Optional[str]
-    employee_id: Optional[str]
-    date_of_joining: Optional[date]
+    first_name: str | None
+    last_name: str | None
+    email: str | None
+    phone: str | None
+    designation: str | None
+    employee_id: str | None
+    date_of_joining: date | None
     is_active: bool
-    profile_photo_url: Optional[str] = None
+    profile_photo_url: str | None = None
 
     class Config:
         from_attributes = True
@@ -29,18 +30,14 @@ class StaffProfileOut(BaseModel):
                 "designation": "Teacher",
                 "employee_id": "EMP2024001",
                 "date_of_joining": "2020-06-01",
-                "is_active": True
+                "is_active": True,
             }
         }
+
 
 class StaffProfileUpdate(BaseModel):
-    email: Optional[str] = Field(None, description="Email address (editable)")
-    phone: Optional[str] = Field(None, description="Phone number (editable)")
+    email: str | None = Field(None, description="Email address (editable)")
+    phone: str | None = Field(None, description="Phone number (editable)")
 
     class Config:
-        json_schema_extra = {
-            "example": {
-                "email": "newemail@school.com",
-                "phone": "+91-9999999999"
-            }
-        }
+        json_schema_extra = {"example": {"email": "newemail@school.com", "phone": "+91-9999999999"}}

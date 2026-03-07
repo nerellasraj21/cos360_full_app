@@ -3,25 +3,26 @@ System Health Monitoring Service for COS360
 Comprehensive monitoring of multi-tenant system health and performance
 """
 
+from datetime import datetime
 import logging
-from typing import Dict, Any, List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
-from datetime import datetime, timedelta
-import asyncio
-import psutil
 import time
+from typing import Any
+
+import psutil
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.service.schema.master_schema_service import MasterSchemaService
 from app.service.schema.schema_synchronization_service import SchemaSynchronizationService
 
 logger = logging.getLogger(__name__)
 
+
 class SystemHealthMonitoringService:
     """Service for comprehensive system health monitoring and alerting"""
 
     @staticmethod
-    async def perform_comprehensive_health_check(db: AsyncSession) -> Dict[str, Any]:
+    async def perform_comprehensive_health_check(db: AsyncSession) -> dict[str, Any]:
         """
         Perform comprehensive system health check across all components
 
@@ -39,7 +40,7 @@ class SystemHealthMonitoringService:
                 "alerts": [],
                 "recommendations": [],
                 "system_capacity": {},
-                "tenant_statistics": {}
+                "tenant_statistics": {},
             }
 
             # Component 1: Master Schema Health
@@ -64,7 +65,7 @@ class SystemHealthMonitoringService:
                 "status": "HEALTHY" if drift_analysis.get("schemas_with_drift", 0) == 0 else "DRIFT_DETECTED",
                 "schemas_with_drift": drift_analysis.get("schemas_with_drift", 0),
                 "total_schemas": drift_analysis.get("schemas_checked", 0),
-                "drift_percentage": drift_analysis.get("drift_percentage", 0)
+                "drift_percentage": drift_analysis.get("drift_percentage", 0),
             }
 
             # Component 5: System Resources
@@ -112,11 +113,11 @@ class SystemHealthMonitoringService:
                 "overall_status": "CRITICAL_ERROR",
                 "error": str(e),
                 "components": {},
-                "alerts": [f"Health check system failure: {str(e)}"]
+                "alerts": [f"Health check system failure: {str(e)}"],
             }
 
     @staticmethod
-    async def _check_master_schema_health(db: AsyncSession) -> Dict[str, Any]:
+    async def _check_master_schema_health(db: AsyncSession) -> dict[str, Any]:
         """Check master schema health and readiness"""
         try:
             master_info = await MasterSchemaService.get_master_schema_info(db)
@@ -142,18 +143,14 @@ class SystemHealthMonitoringService:
                 "table_count": master_info.get("table_count", 0),
                 "migration_version": master_info.get("migration_version"),
                 "ready_for_tenant_creation": master_info.get("ready_for_tenant_creation", False),
-                "issues": issues
+                "issues": issues,
             }
 
         except Exception as e:
-            return {
-                "status": "CRITICAL",
-                "error": str(e),
-                "issues": [f"Master schema check failed: {str(e)}"]
-            }
+            return {"status": "CRITICAL", "error": str(e), "issues": [f"Master schema check failed: {str(e)}"]}
 
     @staticmethod
-    async def _check_tenant_schemas_health(db: AsyncSession) -> Dict[str, Any]:
+    async def _check_tenant_schemas_health(db: AsyncSession) -> dict[str, Any]:
         """Check health of all tenant schemas"""
         try:
             # Get all tenant schemas
@@ -174,32 +171,40 @@ class SystemHealthMonitoringService:
                 schema_name = tenant.schema_name
                 try:
                     # Check if schema exists
-                    schema_result = await db.execute(text("""
+                    schema_result = await db.execute(
+                        text("""
                         SELECT EXISTS(
                             SELECT 1 FROM information_schema.schemata
                             WHERE schema_name = :schema_name
                         )
-                    """), {"schema_name": schema_name})
+                    """),
+                        {"schema_name": schema_name},
+                    )
 
                     schema_exists = schema_result.scalar()
 
                     if not schema_exists:
                         critical_tenants += 1
-                        tenant_details.append({
-                            "schema_name": schema_name,
-                            "client_name": tenant.client_name,
-                            "status": "CRITICAL",
-                            "issue": "Schema does not exist"
-                        })
+                        tenant_details.append(
+                            {
+                                "schema_name": schema_name,
+                                "client_name": tenant.client_name,
+                                "status": "CRITICAL",
+                                "issue": "Schema does not exist",
+                            }
+                        )
                         continue
 
                     # Check table count
-                    table_result = await db.execute(text("""
+                    table_result = await db.execute(
+                        text("""
                         SELECT COUNT(*)
                         FROM information_schema.tables
                         WHERE table_schema = :schema_name
                           AND table_type = 'BASE TABLE'
-                    """), {"schema_name": schema_name})
+                    """),
+                        {"schema_name": schema_name},
+                    )
 
                     table_count = table_result.scalar()
 
@@ -216,22 +221,26 @@ class SystemHealthMonitoringService:
                         status = "CRITICAL"
                         issue = f"Very low table count: {table_count}"
 
-                    tenant_details.append({
-                        "schema_name": schema_name,
-                        "client_name": tenant.client_name,
-                        "status": status,
-                        "table_count": table_count,
-                        "issue": issue
-                    })
+                    tenant_details.append(
+                        {
+                            "schema_name": schema_name,
+                            "client_name": tenant.client_name,
+                            "status": status,
+                            "table_count": table_count,
+                            "issue": issue,
+                        }
+                    )
 
                 except Exception as e:
                     critical_tenants += 1
-                    tenant_details.append({
-                        "schema_name": schema_name,
-                        "client_name": tenant.client_name,
-                        "status": "CRITICAL",
-                        "error": str(e)
-                    })
+                    tenant_details.append(
+                        {
+                            "schema_name": schema_name,
+                            "client_name": tenant.client_name,
+                            "status": "CRITICAL",
+                            "error": str(e),
+                        }
+                    )
 
             # Determine overall tenant health status
             if critical_tenants > 0:
@@ -248,18 +257,14 @@ class SystemHealthMonitoringService:
                 "warning_tenants": warning_tenants,
                 "critical_tenants": critical_tenants,
                 "health_percentage": round((healthy_tenants / max(total_tenants, 1)) * 100, 1),
-                "tenant_details": tenant_details[:10]  # Limit to first 10 for summary
+                "tenant_details": tenant_details[:10],  # Limit to first 10 for summary
             }
 
         except Exception as e:
-            return {
-                "status": "CRITICAL",
-                "error": str(e),
-                "total_tenants": 0
-            }
+            return {"status": "CRITICAL", "error": str(e), "total_tenants": 0}
 
     @staticmethod
-    async def _check_database_performance(db: AsyncSession) -> Dict[str, Any]:
+    async def _check_database_performance(db: AsyncSession) -> dict[str, Any]:
         """Check database performance metrics"""
         try:
             # Test query performance
@@ -277,7 +282,7 @@ class SystemHealthMonitoringService:
                 size_info = size_result.fetchone()
                 database_size = size_info.database_size
                 database_size_bytes = size_info.database_size_bytes
-            except:
+            except Exception:
                 database_size = "Unknown"
                 database_size_bytes = 0
 
@@ -289,7 +294,7 @@ class SystemHealthMonitoringService:
                     WHERE state = 'active'
                 """))
                 active_connections = conn_result.scalar()
-            except:
+            except Exception:
                 active_connections = 0
 
             # Performance assessment
@@ -310,18 +315,14 @@ class SystemHealthMonitoringService:
                 "database_size": database_size,
                 "database_size_bytes": database_size_bytes,
                 "active_connections": active_connections,
-                "issues": issues
+                "issues": issues,
             }
 
         except Exception as e:
-            return {
-                "status": "CRITICAL",
-                "error": str(e),
-                "query_response_time_ms": 0
-            }
+            return {"status": "CRITICAL", "error": str(e), "query_response_time_ms": 0}
 
     @staticmethod
-    async def _check_system_resources() -> Dict[str, Any]:
+    async def _check_system_resources() -> dict[str, Any]:
         """Check system resource utilization"""
         try:
             # CPU usage
@@ -332,7 +333,7 @@ class SystemHealthMonitoringService:
             memory_percent = memory.percent
 
             # Disk usage
-            disk = psutil.disk_usage('/')
+            disk = psutil.disk_usage("/")
             disk_percent = (disk.used / disk.total) * 100
 
             # Resource assessment
@@ -358,20 +359,14 @@ class SystemHealthMonitoringService:
                 "disk_percent": round(disk_percent, 1),
                 "available_memory_gb": round(memory.available / (1024**3), 2),
                 "available_disk_gb": round(disk.free / (1024**3), 2),
-                "issues": issues
+                "issues": issues,
             }
 
         except Exception as e:
-            return {
-                "status": "CRITICAL",
-                "error": str(e),
-                "cpu_percent": 0,
-                "memory_percent": 0,
-                "disk_percent": 0
-            }
+            return {"status": "CRITICAL", "error": str(e), "cpu_percent": 0, "memory_percent": 0, "disk_percent": 0}
 
     @staticmethod
-    async def _check_public_schema_health(db: AsyncSession) -> Dict[str, Any]:
+    async def _check_public_schema_health(db: AsyncSession) -> dict[str, Any]:
         """Check public schema health and integrity"""
         try:
             # Check critical public tables
@@ -400,18 +395,14 @@ class SystemHealthMonitoringService:
                 "status": public_status,
                 "critical_tables_status": table_status,
                 "missing_tables": missing_tables,
-                "issues": issues
+                "issues": issues,
             }
 
         except Exception as e:
-            return {
-                "status": "CRITICAL",
-                "error": str(e),
-                "issues": [f"Public schema check failed: {str(e)}"]
-            }
+            return {"status": "CRITICAL", "error": str(e), "issues": [f"Public schema check failed: {str(e)}"]}
 
     @staticmethod
-    async def _generate_performance_metrics(db: AsyncSession, components: Dict) -> Dict[str, Any]:
+    async def _generate_performance_metrics(db: AsyncSession, components: dict) -> dict[str, Any]:
         """Generate performance metrics summary"""
         try:
             # Extract key metrics
@@ -432,18 +423,15 @@ class SystemHealthMonitoringService:
                 "system_utilization": {
                     "cpu": components.get("system_resources", {}).get("cpu_percent", 0),
                     "memory": components.get("system_resources", {}).get("memory_percent", 0),
-                    "disk": components.get("system_resources", {}).get("disk_percent", 0)
-                }
+                    "disk": components.get("system_resources", {}).get("disk_percent", 0),
+                },
             }
 
         except Exception as e:
-            return {
-                "error": str(e),
-                "tenant_health_percentage": 0
-            }
+            return {"error": str(e), "tenant_health_percentage": 0}
 
     @staticmethod
-    async def _generate_tenant_statistics(db: AsyncSession) -> Dict[str, Any]:
+    async def _generate_tenant_statistics(db: AsyncSession) -> dict[str, Any]:
         """Generate comprehensive tenant statistics"""
         try:
             # Get tenant count by status
@@ -476,19 +464,15 @@ class SystemHealthMonitoringService:
                 "active_tenants": tenant_counts.active_tenants,
                 "inactive_tenants": tenant_counts.inactive_tenants,
                 "recent_creations_7_days": [
-                    {"date": str(row.creation_date), "count": row.tenants_created}
-                    for row in recent_creations
-                ]
+                    {"date": str(row.creation_date), "count": row.tenants_created} for row in recent_creations
+                ],
             }
 
         except Exception as e:
-            return {
-                "error": str(e),
-                "total_tenants": 0
-            }
+            return {"error": str(e), "total_tenants": 0}
 
     @staticmethod
-    async def _assess_system_capacity(components: Dict, tenant_stats: Dict) -> Dict[str, Any]:
+    async def _assess_system_capacity(components: dict, tenant_stats: dict) -> dict[str, Any]:
         """Assess current system capacity and growth potential"""
         try:
             # System resource capacity
@@ -500,7 +484,7 @@ class SystemHealthMonitoringService:
 
             # Rough estimates (can be refined based on actual usage patterns)
             estimated_memory_per_tenant_mb = 50  # MB per tenant schema
-            estimated_disk_per_tenant_mb = 100   # MB per tenant schema
+            estimated_disk_per_tenant_mb = 100  # MB per tenant schema
 
             max_tenants_by_memory = int((memory_available_gb * 1024) / estimated_memory_per_tenant_mb)
             max_tenants_by_disk = int((disk_available_gb * 1024) / estimated_disk_per_tenant_mb)
@@ -519,22 +503,21 @@ class SystemHealthMonitoringService:
                 "status": capacity_status,
                 "current_tenants": total_tenants,
                 "estimated_max_additional_tenants": estimated_max_additional_tenants,
-                "capacity_utilization_percentage": round((total_tenants / max(estimated_max_additional_tenants, 1)) * 100, 1),
+                "capacity_utilization_percentage": round(
+                    (total_tenants / max(estimated_max_additional_tenants, 1)) * 100, 1
+                ),
                 "resource_constraints": {
                     "memory_limited_max_tenants": max_tenants_by_memory,
                     "disk_limited_max_tenants": max_tenants_by_disk,
-                    "primary_constraint": "memory" if max_tenants_by_memory < max_tenants_by_disk else "disk"
-                }
+                    "primary_constraint": "memory" if max_tenants_by_memory < max_tenants_by_disk else "disk",
+                },
             }
 
         except Exception as e:
-            return {
-                "status": "UNKNOWN",
-                "error": str(e)
-            }
+            return {"status": "UNKNOWN", "error": str(e)}
 
     @staticmethod
-    def _generate_alerts_and_recommendations(components: Dict) -> tuple[List[str], List[str]]:
+    def _generate_alerts_and_recommendations(components: dict) -> tuple[list[str], list[str]]:
         """Generate alerts and recommendations based on component status"""
         alerts = []
         recommendations = []
@@ -588,7 +571,7 @@ class SystemHealthMonitoringService:
         return alerts, recommendations
 
     @staticmethod
-    def _determine_overall_status(components: Dict, alerts: List[str]) -> str:
+    def _determine_overall_status(components: dict, alerts: list[str]) -> str:
         """Determine overall system health status"""
         # Check for critical alerts
         critical_alerts = [alert for alert in alerts if alert.startswith("CRITICAL")]
@@ -601,7 +584,7 @@ class SystemHealthMonitoringService:
             components.get("tenant_schemas", {}).get("status", "UNKNOWN"),
             components.get("database_performance", {}).get("status", "UNKNOWN"),
             components.get("system_resources", {}).get("status", "UNKNOWN"),
-            components.get("public_schema", {}).get("status", "UNKNOWN")
+            components.get("public_schema", {}).get("status", "UNKNOWN"),
         ]
 
         if "CRITICAL" in component_statuses:

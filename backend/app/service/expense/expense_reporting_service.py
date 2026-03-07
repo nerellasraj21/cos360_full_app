@@ -1,30 +1,23 @@
-from typing import List, Optional, Dict, Any
-from uuid import UUID
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc, and_, or_
-from sqlalchemy.orm import selectinload, joinedload
-from fastapi import HTTPException, status
+from uuid import UUID
 
-from app.models.expense import (
-    ExpenseTransaction,
-    ExpenseType,
-    ExpenseCategory,
-    ExpenseTransactionItem
-)
+from sqlalchemy import desc, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
+
+from app.models.expense import ExpenseCategory, ExpenseTransaction, ExpenseType
 from app.schemas.expense.expense_report_schema import (
+    CategorySummary,
+    ExpenseCategoryReport,
     ExpenseReportFilter,
     ExpenseReportSummary,
-    CategorySummary,
-    TypeSummary,
-    DepartmentSummary,
-    MonthlyTrend,
-    ExpenseCategoryReport,
+    ExpenseTrendReport,
     ExpenseTypeReport,
-    ExpenseDepartmentReport,
-    ExpenseTrendReport
+    MonthlyTrend,
+    TypeSummary,
 )
+
 from .base_expense_service import BaseExpenseService
 
 
@@ -37,29 +30,29 @@ class ExpenseReportingService(BaseExpenseService):
     async def generate_category_report(
         self,
         filters: ExpenseReportFilter,
-        user_department_id: Optional[UUID] = None,
+        user_department_id: UUID | None = None,
         user_role: str = "user",
-        username: str = "system"
+        username: str = "system",
     ) -> ExpenseCategoryReport:
         """Generate category-based expense report"""
 
         # Build base query with filters
-        query = self._build_base_query(filters, user_department_id, user_role)
+        self._build_base_query(filters, user_department_id, user_role)
 
         # Get category summary data
         category_query = (
             select(
                 ExpenseCategory.id,
                 ExpenseCategory.name,
-                func.sum(ExpenseTransaction.amount).label('total_amount'),
-                func.count(ExpenseTransaction.id).label('transaction_count'),
-                func.avg(ExpenseTransaction.amount).label('average_amount')
+                func.sum(ExpenseTransaction.amount).label("total_amount"),
+                func.count(ExpenseTransaction.id).label("transaction_count"),
+                func.avg(ExpenseTransaction.amount).label("average_amount"),
             )
             .select_from(ExpenseTransaction)
             .join(ExpenseType, ExpenseTransaction.expense_type_id == ExpenseType.id)
             .join(ExpenseCategory, ExpenseType.category_id == ExpenseCategory.id)
             .group_by(ExpenseCategory.id, ExpenseCategory.name)
-            .order_by(desc('total_amount'))
+            .order_by(desc("total_amount"))
         )
 
         # Apply same filters to category query
@@ -67,10 +60,7 @@ class ExpenseReportingService(BaseExpenseService):
 
         # Get total for percentage calculation
         total_query = select(func.sum(ExpenseTransaction.amount)).select_from(
-            self._apply_filters_to_query(
-                select(ExpenseTransaction),
-                filters, user_department_id, user_role
-            ).subquery()
+            self._apply_filters_to_query(select(ExpenseTransaction), filters, user_department_id, user_role).subquery()
         )
 
         # Execute queries
@@ -78,37 +68,37 @@ class ExpenseReportingService(BaseExpenseService):
         total_result = await self.db.execute(total_query)
 
         categories_data = category_result.all()
-        total_amount = total_result.scalar() or Decimal('0')
+        total_amount = total_result.scalar() or Decimal("0")
 
         # Build category summaries
         categories = []
         for cat_data in categories_data:
-            percentage = (cat_data.total_amount / total_amount * 100) if total_amount > 0 else Decimal('0')
+            percentage = (cat_data.total_amount / total_amount * 100) if total_amount > 0 else Decimal("0")
 
-            categories.append(CategorySummary(
-                category_id=cat_data.id,
-                category_name=cat_data.name,
-                total_amount=cat_data.total_amount,
-                transaction_count=cat_data.transaction_count,
-                average_amount=cat_data.average_amount,
-                percentage_of_total=percentage.quantize(Decimal('0.01'))
-            ))
+            categories.append(
+                CategorySummary(
+                    category_id=cat_data.id,
+                    category_name=cat_data.name,
+                    total_amount=cat_data.total_amount,
+                    transaction_count=cat_data.transaction_count,
+                    average_amount=cat_data.average_amount,
+                    percentage_of_total=percentage.quantize(Decimal("0.01")),
+                )
+            )
 
         # Generate report summary
-        summary = await self._generate_report_summary(filters, total_amount, sum(c.transaction_count for c in categories))
-
-        return ExpenseCategoryReport(
-            summary=summary,
-            categories=categories,
-            generated_by=username
+        summary = await self._generate_report_summary(
+            filters, total_amount, sum(c.transaction_count for c in categories)
         )
+
+        return ExpenseCategoryReport(summary=summary, categories=categories, generated_by=username)
 
     async def generate_type_report(
         self,
         filters: ExpenseReportFilter,
-        user_department_id: Optional[UUID] = None,
+        user_department_id: UUID | None = None,
         user_role: str = "user",
-        username: str = "system"
+        username: str = "system",
     ) -> ExpenseTypeReport:
         """Generate type-based expense report"""
 
@@ -117,16 +107,16 @@ class ExpenseReportingService(BaseExpenseService):
             select(
                 ExpenseType.id,
                 ExpenseType.name,
-                ExpenseCategory.name.label('category_name'),
-                func.sum(ExpenseTransaction.amount).label('total_amount'),
-                func.count(ExpenseTransaction.id).label('transaction_count'),
-                func.avg(ExpenseTransaction.amount).label('average_amount')
+                ExpenseCategory.name.label("category_name"),
+                func.sum(ExpenseTransaction.amount).label("total_amount"),
+                func.count(ExpenseTransaction.id).label("transaction_count"),
+                func.avg(ExpenseTransaction.amount).label("average_amount"),
             )
             .select_from(ExpenseTransaction)
             .join(ExpenseType, ExpenseTransaction.expense_type_id == ExpenseType.id)
             .join(ExpenseCategory, ExpenseType.category_id == ExpenseCategory.id)
             .group_by(ExpenseType.id, ExpenseType.name, ExpenseCategory.name)
-            .order_by(desc('total_amount'))
+            .order_by(desc("total_amount"))
         )
 
         # Apply filters
@@ -134,10 +124,7 @@ class ExpenseReportingService(BaseExpenseService):
 
         # Get total amount
         total_query = select(func.sum(ExpenseTransaction.amount)).select_from(
-            self._apply_filters_to_query(
-                select(ExpenseTransaction),
-                filters, user_department_id, user_role
-            ).subquery()
+            self._apply_filters_to_query(select(ExpenseTransaction), filters, user_department_id, user_role).subquery()
         )
 
         # Execute queries
@@ -145,48 +132,46 @@ class ExpenseReportingService(BaseExpenseService):
         total_result = await self.db.execute(total_query)
 
         types_data = type_result.all()
-        total_amount = total_result.scalar() or Decimal('0')
+        total_amount = total_result.scalar() or Decimal("0")
 
         # Build type summaries
         types = []
         for type_data in types_data:
-            types.append(TypeSummary(
-                type_id=type_data.id,
-                type_name=type_data.name,
-                category_name=type_data.category_name,
-                total_amount=type_data.total_amount,
-                transaction_count=type_data.transaction_count,
-                average_amount=type_data.average_amount
-            ))
+            types.append(
+                TypeSummary(
+                    type_id=type_data.id,
+                    type_name=type_data.name,
+                    category_name=type_data.category_name,
+                    total_amount=type_data.total_amount,
+                    transaction_count=type_data.transaction_count,
+                    average_amount=type_data.average_amount,
+                )
+            )
 
         # Generate report summary
         summary = await self._generate_report_summary(filters, total_amount, sum(t.transaction_count for t in types))
 
-        return ExpenseTypeReport(
-            summary=summary,
-            types=types,
-            generated_by=username
-        )
+        return ExpenseTypeReport(summary=summary, types=types, generated_by=username)
 
     async def generate_trend_report(
         self,
         filters: ExpenseReportFilter,
-        user_department_id: Optional[UUID] = None,
+        user_department_id: UUID | None = None,
         user_role: str = "user",
-        username: str = "system"
+        username: str = "system",
     ) -> ExpenseTrendReport:
         """Generate time-based trend report"""
 
         # Build monthly trend query
         trend_query = (
             select(
-                func.date_trunc('month', ExpenseTransaction.transaction_date).label('month'),
-                func.sum(ExpenseTransaction.amount).label('total_amount'),
-                func.count(ExpenseTransaction.id).label('transaction_count'),
-                func.avg(ExpenseTransaction.amount).label('average_per_transaction')
+                func.date_trunc("month", ExpenseTransaction.transaction_date).label("month"),
+                func.sum(ExpenseTransaction.amount).label("total_amount"),
+                func.count(ExpenseTransaction.id).label("transaction_count"),
+                func.avg(ExpenseTransaction.amount).label("average_per_transaction"),
             )
-            .group_by(func.date_trunc('month', ExpenseTransaction.transaction_date))
-            .order_by('month')
+            .group_by(func.date_trunc("month", ExpenseTransaction.transaction_date))
+            .order_by("month")
         )
 
         # Apply filters
@@ -198,34 +183,29 @@ class ExpenseReportingService(BaseExpenseService):
 
         # Build monthly trends
         monthly_trends = []
-        total_amount = Decimal('0')
+        total_amount = Decimal("0")
         total_transactions = 0
 
         for trend_data in trends_data:
-            month_str = trend_data.month.strftime('%Y-%m')
-            monthly_trends.append(MonthlyTrend(
-                month=month_str,
-                total_amount=trend_data.total_amount,
-                transaction_count=trend_data.transaction_count,
-                average_per_transaction=trend_data.average_per_transaction
-            ))
+            month_str = trend_data.month.strftime("%Y-%m")
+            monthly_trends.append(
+                MonthlyTrend(
+                    month=month_str,
+                    total_amount=trend_data.total_amount,
+                    transaction_count=trend_data.transaction_count,
+                    average_per_transaction=trend_data.average_per_transaction,
+                )
+            )
             total_amount += trend_data.total_amount
             total_transactions += trend_data.transaction_count
 
         # Generate report summary
         summary = await self._generate_report_summary(filters, total_amount, total_transactions)
 
-        return ExpenseTrendReport(
-            summary=summary,
-            monthly_trends=monthly_trends,
-            generated_by=username
-        )
+        return ExpenseTrendReport(summary=summary, monthly_trends=monthly_trends, generated_by=username)
 
     def _build_base_query(
-        self,
-        filters: ExpenseReportFilter,
-        user_department_id: Optional[UUID] = None,
-        user_role: str = "user"
+        self, filters: ExpenseReportFilter, user_department_id: UUID | None = None, user_role: str = "user"
     ):
         """Build base query with common joins"""
 
@@ -236,11 +216,7 @@ class ExpenseReportingService(BaseExpenseService):
         return query
 
     def _apply_filters_to_query(
-        self,
-        query,
-        filters: ExpenseReportFilter,
-        user_department_id: Optional[UUID] = None,
-        user_role: str = "user"
+        self, query, filters: ExpenseReportFilter, user_department_id: UUID | None = None, user_role: str = "user"
     ):
         """Apply filters to any query"""
 
@@ -275,13 +251,13 @@ class ExpenseReportingService(BaseExpenseService):
         # Department scoping
         if filters.department_id:
             query = query.where(ExpenseTransaction.department_id == filters.department_id)
-        elif user_role.lower() not in ['super_admin', 'tenant_admin', 'admin']:
+        elif user_role.lower() not in ["super_admin", "tenant_admin", "admin"]:
             # Apply department scoping for non-admin users
             if user_department_id:
                 query = query.where(
                     or_(
                         ExpenseTransaction.department_id == user_department_id,
-                        ExpenseTransaction.department_id.is_(None)
+                        ExpenseTransaction.department_id.is_(None),
                     )
                 )
             else:
@@ -290,10 +266,7 @@ class ExpenseReportingService(BaseExpenseService):
         return query
 
     async def _generate_report_summary(
-        self,
-        filters: ExpenseReportFilter,
-        total_amount: Decimal,
-        total_transactions: int
+        self, filters: ExpenseReportFilter, total_amount: Decimal, total_transactions: int
     ) -> ExpenseReportSummary:
         """Generate report summary information"""
 
@@ -306,7 +279,7 @@ class ExpenseReportingService(BaseExpenseService):
             period = f"Custom ({filters.start_date} to {filters.end_date})"
 
         # Calculate averages
-        avg_transaction = total_amount / total_transactions if total_transactions > 0 else Decimal('0')
+        avg_transaction = total_amount / total_transactions if total_transactions > 0 else Decimal("0")
 
         return ExpenseReportSummary(
             report_period=period,
@@ -314,7 +287,7 @@ class ExpenseReportingService(BaseExpenseService):
             end_date=end_date,
             total_amount=total_amount,
             total_transactions=total_transactions,
-            average_transaction=avg_transaction.quantize(Decimal('0.01')),
+            average_transaction=avg_transaction.quantize(Decimal("0.01")),
             categories_count=0,  # TODO: Calculate actual counts
-            departments_count=0  # TODO: Calculate actual counts
+            departments_count=0,  # TODO: Calculate actual counts
         )

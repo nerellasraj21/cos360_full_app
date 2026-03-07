@@ -3,17 +3,18 @@ Schema Analysis Service for COS360 Master Schema System
 Validates schema completeness and readiness for master schema creation
 """
 
-from typing import Dict, List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 import logging
 
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 logger = logging.getLogger(__name__)
+
 
 class SchemaAnalysisService:
 
     @staticmethod
-    async def analyze_schema_completeness(db: AsyncSession, schema_name: str) -> Dict:
+    async def analyze_schema_completeness(db: AsyncSession, schema_name: str) -> dict:
         """
         Analyze schema completeness for master schema creation
         Returns detailed analysis of schema readiness
@@ -22,17 +23,34 @@ class SchemaAnalysisService:
             logger.info(f"Analyzing schema completeness for: {schema_name}")
 
             essential_tables = [
-                'users', 'roles', 'menus', 'classes', 'students',
-                'fee_categories', 'fee_types', 'academic_years',
-                'subjects', 'staff', 'designations', 'sections',
-                'fee_transactions', 'fee_receipts', 'parents',
-                'student_admissions', 'expense_categories'
+                "users",
+                "roles",
+                "menus",
+                "classes",
+                "students",
+                "fee_categories",
+                "fee_types",
+                "academic_years",
+                "subjects",
+                "staff",
+                "designations",
+                "sections",
+                "fee_transactions",
+                "fee_receipts",
+                "parents",
+                "student_admissions",
+                "expense_categories",
             ]
 
             business_critical_tables = [
-                'fee_class_mappings', 'fee_student_mappings', 'fee_terms',
-                'student_attendance', 'staff_attendance', 'routes',
-                'vehicles', 'student_transport_assignments'
+                "fee_class_mappings",
+                "fee_student_mappings",
+                "fee_terms",
+                "student_attendance",
+                "staff_attendance",
+                "routes",
+                "vehicles",
+                "student_transport_assignments",
             ]
 
             # Get all tables in schema
@@ -54,14 +72,14 @@ class SchemaAnalysisService:
 
             # Calculate completeness scores
             essential_score = (len(essential_tables) - len(missing_essential)) / len(essential_tables) * 100
-            business_score = (len(business_critical_tables) - len(missing_business_critical)) / len(business_critical_tables) * 100
+            business_score = (
+                (len(business_critical_tables) - len(missing_business_critical)) / len(business_critical_tables) * 100
+            )
             overall_score = (essential_score * 0.7) + (business_score * 0.3)
 
             # Determine readiness
             is_ready_for_master = (
-                len(missing_essential) == 0 and
-                overall_score >= 85.0 and
-                len(existing_table_names) >= 30
+                len(missing_essential) == 0 and overall_score >= 85.0 and len(existing_table_names) >= 30
             )
 
             # Get table counts and sizes
@@ -87,24 +105,24 @@ class SchemaAnalysisService:
                     "essential_tables_present": list(set(essential_tables) & set(existing_table_names)),
                     "missing_essential_tables": list(missing_essential),
                     "business_critical_present": list(set(business_critical_tables) & set(existing_table_names)),
-                    "missing_business_critical": list(missing_business_critical)
+                    "missing_business_critical": list(missing_business_critical),
                 },
                 "completeness_scores": {
                     "essential_completeness": round(essential_score, 2),
                     "business_critical_completeness": round(business_score, 2),
-                    "overall_completeness": round(overall_score, 2)
+                    "overall_completeness": round(overall_score, 2),
                 },
                 "readiness_assessment": {
                     "is_ready_for_master": is_ready_for_master,
                     "minimum_tables_met": len(existing_table_names) >= 30,
                     "essential_tables_complete": len(missing_essential) == 0,
-                    "business_score_adequate": business_score >= 70.0
+                    "business_score_adequate": business_score >= 70.0,
                 },
                 "schema_statistics": {
                     "table_count": stats.table_count if stats else len(existing_table_names),
-                    "total_operations": stats.total_operations if stats else 0
+                    "total_operations": stats.total_operations if stats else 0,
                 },
-                "recommendations": []
+                "recommendations": [],
             }
 
             # Add recommendations
@@ -127,11 +145,11 @@ class SchemaAnalysisService:
                 "schema_name": schema_name,
                 "error": str(e),
                 "is_ready_for_master": False,
-                "recommendations": ["Fix schema analysis errors before proceeding"]
+                "recommendations": ["Fix schema analysis errors before proceeding"],
             }
 
     @staticmethod
-    async def compare_schemas(db: AsyncSession, source_schema: str, target_schema: str) -> Dict:
+    async def compare_schemas(db: AsyncSession, source_schema: str, target_schema: str) -> dict:
         """
         Compare two schemas to identify differences
         """
@@ -164,17 +182,16 @@ class SchemaAnalysisService:
                 ORDER BY table_name;
             """)
 
-            result = await db.execute(table_comparison_query, {
-                "source_schema": source_schema,
-                "target_schema": target_schema
-            })
+            result = await db.execute(
+                table_comparison_query, {"source_schema": source_schema, "target_schema": target_schema}
+            )
 
             comparison_data = result.fetchall()
 
             # Process comparison results
-            common_tables = [row.table_name for row in comparison_data if row.presence == 'both']
-            source_only = [row.table_name for row in comparison_data if row.presence == 'source_only']
-            target_only = [row.table_name for row in comparison_data if row.presence == 'target_only']
+            common_tables = [row.table_name for row in comparison_data if row.presence == "both"]
+            source_only = [row.table_name for row in comparison_data if row.presence == "source_only"]
+            target_only = [row.table_name for row in comparison_data if row.presence == "target_only"]
 
             similarity_score = len(common_tables) / max(len(comparison_data), 1) * 100
 
@@ -185,18 +202,18 @@ class SchemaAnalysisService:
                     "common_tables": common_tables,
                     "source_only_tables": source_only,
                     "target_only_tables": target_only,
-                    "total_compared": len(comparison_data)
+                    "total_compared": len(comparison_data),
                 },
                 "similarity_metrics": {
                     "table_similarity_percentage": round(similarity_score, 2),
                     "common_table_count": len(common_tables),
-                    "difference_count": len(source_only) + len(target_only)
+                    "difference_count": len(source_only) + len(target_only),
                 },
                 "assessment": {
                     "schemas_identical": len(source_only) == 0 and len(target_only) == 0,
                     "high_similarity": similarity_score >= 90.0,
-                    "sync_recommended": len(source_only) > 0 or len(target_only) > 0
-                }
+                    "sync_recommended": len(source_only) > 0 or len(target_only) > 0,
+                },
             }
 
             logger.info(f"Schema comparison completed: {similarity_score:.2f}% similar")
@@ -208,11 +225,11 @@ class SchemaAnalysisService:
                 "source_schema": source_schema,
                 "target_schema": target_schema,
                 "error": str(e),
-                "assessment": {"schemas_identical": False}
+                "assessment": {"schemas_identical": False},
             }
 
     @staticmethod
-    async def validate_schema_structure(db: AsyncSession, schema_name: str) -> Dict:
+    async def validate_schema_structure(db: AsyncSession, schema_name: str) -> dict:
         """
         Validate schema structure for integrity and consistency
         """
@@ -263,10 +280,10 @@ class SchemaAnalysisService:
                     "foreign_key_count": len(foreign_keys),
                     "index_count": len(indexes),
                     "has_referential_integrity": len(foreign_keys) > 0,
-                    "has_performance_indexes": len(indexes) > 0
+                    "has_performance_indexes": len(indexes) > 0,
                 },
                 "integrity_score": min(100, (len(foreign_keys) * 5) + (len(indexes) * 2)),
-                "validation_status": "PASSED" if len(foreign_keys) > 5 else "WARNING"
+                "validation_status": "PASSED" if len(foreign_keys) > 5 else "WARNING",
             }
 
             logger.info(f"Schema validation completed: {validation['validation_status']}")
@@ -274,8 +291,4 @@ class SchemaAnalysisService:
 
         except Exception as e:
             logger.error(f"Schema validation failed for {schema_name}: {str(e)}")
-            return {
-                "schema_name": schema_name,
-                "error": str(e),
-                "validation_status": "FAILED"
-            }
+            return {"schema_name": schema_name, "error": str(e), "validation_status": "FAILED"}

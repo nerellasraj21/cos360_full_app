@@ -3,8 +3,8 @@
 Celery task for exam-related notifications (result published, hall ticket ready).
 Sprint 5 · BG-01: celery_app imported from app.celery_app
 """
+
 import logging
-from typing import Optional, List
 
 from app.celery_app import celery_app
 
@@ -23,11 +23,11 @@ def send_exam_notification(
     *,
     exam_id: str,
     notification_type: str,  # "result_published" | "hall_ticket_ready" | "mark_entry_reminder"
-    recipient_user_ids: Optional[List[str]] = None,  # None = auto-resolve all relevant users
-    class_id: Optional[str] = None,
-    section_id: Optional[str] = None,
-    tenant_schema: Optional[str] = None,
-    extra_data: Optional[dict] = None,
+    recipient_user_ids: list[str] | None = None,  # None = auto-resolve all relevant users
+    class_id: str | None = None,
+    section_id: str | None = None,
+    tenant_schema: str | None = None,
+    extra_data: dict | None = None,
 ):
     """
     Send notifications related to exam events.
@@ -44,7 +44,8 @@ def send_exam_notification(
     try:
         logger.info(
             "Sending %s notification for exam=%s",
-            notification_type, exam_id,
+            notification_type,
+            exam_id,
         )
 
         # TODO Sprint 5: Implement notification dispatch.

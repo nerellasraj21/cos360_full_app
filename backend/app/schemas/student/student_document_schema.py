@@ -1,18 +1,22 @@
-from pydantic import BaseModel, Field
-from typing import Optional
 from datetime import datetime
 from uuid import UUID
+
+from pydantic import BaseModel, Field
+
 
 class StudentDocumentBase(BaseModel):
     document_type: str = Field(..., max_length=100)
     file_path: str = Field(...)
 
+
 class StudentDocumentCreate(StudentDocumentBase):
     student_id: UUID
 
+
 class StudentDocumentUpdate(BaseModel):
-    document_type: Optional[str] = Field(None, max_length=100)
-    file_path: Optional[str] = None
+    document_type: str | None = Field(None, max_length=100)
+    file_path: str | None = None
+
 
 class StudentDocumentOut(StudentDocumentBase):
     id: UUID

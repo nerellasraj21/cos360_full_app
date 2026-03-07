@@ -5,9 +5,11 @@ Stub notification service. Counts eligible recipients and queues
 notifications for delivery via the school's notification infrastructure.
 Real push/SMS/email dispatch is handled by background tasks.
 """
+
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
+
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def queue_notifications(

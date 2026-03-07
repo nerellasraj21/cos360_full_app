@@ -1,14 +1,14 @@
-from pydantic import BaseModel
-from typing import Optional, List
-from uuid import UUID
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+from uuid import UUID
+
+from pydantic import BaseModel
 
 
 class ComponentMarkRead(BaseModel):
     component_name: str
-    marks_obtained: Optional[Decimal] = None
-    max_marks: Optional[Decimal] = None
+    marks_obtained: Decimal | None = None
+    max_marks: Decimal | None = None
     is_absent: bool = False
 
 
@@ -17,15 +17,15 @@ class SubjectResultRead(BaseModel):
 
     id: UUID
     subject_config_id: UUID
-    subject_name: Optional[str] = None
-    marks_obtained: Optional[Decimal] = None
-    max_marks: Optional[Decimal] = None
-    percentage: Optional[Decimal] = None
-    grade_label: Optional[str] = None
-    gpa: Optional[Decimal] = None
-    remark_grade: Optional[str] = None
+    subject_name: str | None = None
+    marks_obtained: Decimal | None = None
+    max_marks: Decimal | None = None
+    percentage: Decimal | None = None
+    grade_label: str | None = None
+    gpa: Decimal | None = None
+    remark_grade: str | None = None
     is_absent: bool = False
-    is_passed: Optional[bool] = None
+    is_passed: bool | None = None
 
 
 class StudentExamResultRead(BaseModel):
@@ -34,17 +34,17 @@ class StudentExamResultRead(BaseModel):
     id: UUID
     exam_id: UUID
     student_id: UUID
-    student_name: Optional[str] = None
-    admission_number: Optional[str] = None
-    total_marks_obtained: Optional[Decimal] = None
-    total_max_marks: Optional[Decimal] = None
-    percentage: Optional[Decimal] = None
-    grade_label: Optional[str] = None
-    gpa: Optional[Decimal] = None
-    rank: Optional[int] = None
-    is_passed: Optional[bool] = None
-    computed_at: Optional[datetime] = None
-    subject_results: List[SubjectResultRead] = []
+    student_name: str | None = None
+    admission_number: str | None = None
+    total_marks_obtained: Decimal | None = None
+    total_max_marks: Decimal | None = None
+    percentage: Decimal | None = None
+    grade_label: str | None = None
+    gpa: Decimal | None = None
+    rank: int | None = None
+    is_passed: bool | None = None
+    computed_at: datetime | None = None
+    subject_results: list[SubjectResultRead] = []
 
 
 class ComputeResultResponse(BaseModel):
@@ -56,7 +56,7 @@ class ComputeResultResponse(BaseModel):
 class PublishResultResponse(BaseModel):
     exam_id: UUID
     status: str
-    published_at: Optional[datetime] = None
+    published_at: datetime | None = None
 
 
 class UnlockExamRequest(BaseModel):

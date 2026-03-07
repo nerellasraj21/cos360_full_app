@@ -1,8 +1,11 @@
-from sqlalchemy import TIMESTAMP, Column, Integer, String, func, Boolean, ForeignKey, Time
-from sqlalchemy.orm import relationship
-from app.db.base import BaseOrg
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import Boolean, Column, ForeignKey, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class TimetableSlot(BaseOrg):
     __tablename__ = "timetable_slots"
@@ -14,6 +17,8 @@ class TimetableSlot(BaseOrg):
     is_break = Column(Boolean, default=False)
     break_label = Column(String, nullable=True)
 
-    subject_options = relationship("TimetableSubjectOption", back_populates="slot", cascade="all, delete-orphan", lazy="selectin")
+    subject_options = relationship(
+        "TimetableSubjectOption", back_populates="slot", cascade="all, delete-orphan", lazy="selectin"
+    )
     slot_time = relationship("SlotTime")
     timetable = relationship("Timetable", back_populates="slots")

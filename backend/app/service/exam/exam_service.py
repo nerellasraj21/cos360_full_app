@@ -1,18 +1,19 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, func
-from fastapi import HTTPException, status
 from uuid import UUID
 
-from app.models.exam.exam_model import Exam
-from app.models.exam.exam_class_section_model import ExamClassSection
-from app.models.exam.exam_subject_config_model import ExamSubjectConfig, ExamSubjectComponent
-from app.models.exam.exam_date_model import ExamDate
-from app.models.masters.class_subject_mapping_model import ClassSubjectMap
-from app.schemas.exam.exam_schema import ExamUpdate
-from app.schemas.exam.exam_create_full_schema import ExamCreateFull, ExamCreateFullResponse
+from fastapi import HTTPException, status
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.exam.exam_class_section_model import ExamClassSection
+from app.models.exam.exam_date_model import ExamDate
+from app.models.exam.exam_model import Exam
+from app.models.exam.exam_subject_config_model import ExamSubjectComponent, ExamSubjectConfig
+from app.models.masters.class_subject_mapping_model import ClassSubjectMap
+from app.schemas.exam.exam_create_full_schema import ExamCreateFull, ExamCreateFullResponse
+from app.schemas.exam.exam_schema import ExamUpdate
 
 # ── Private helpers ────────────────────────────────────────────────────────────
+
 
 async def _load_class_subjects(
     class_ids: list[UUID],
@@ -52,6 +53,7 @@ async def _load_class_subjects(
 
 # ── create_full ────────────────────────────────────────────────────────────────
 
+
 async def create_full_exam(
     db: AsyncSession,
     payload: ExamCreateFull,
@@ -70,11 +72,11 @@ async def create_full_exam(
     # ── Step 1: Insert exam record ─────────────────────────────────────────────
     exam = Exam(
         **payload.exam.model_dump(),
-        status='active',
+        status="active",
         created_by=created_by,
     )
     db.add(exam)
-    await db.flush()          # Generates exam.id without committing
+    await db.flush()  # Generates exam.id without committing
 
     # ── Step 2: Insert class_sections (bulk) ───────────────────────────────────
     cs_objects = []
@@ -93,19 +95,14 @@ async def create_full_exam(
     # This gives the canonical subject list; subject_configs payload may OVERRIDE
     # or extend it.  The rule: every subject in the payload must exist in
     # ClassSubjectMap for that (class_id, section_id) combination.
-    loaded_subject_ids = await _load_class_subjects(
-        [cs.class_id for cs in payload.class_sections], db
-    )
+    loaded_subject_ids = await _load_class_subjects([cs.class_id for cs in payload.class_sections], db)
 
     # ── Step 4 + 5: Insert subject_config + components ─────────────────────────
     config_count = 0
     for sc_payload in payload.subject_configs:
         key = (sc_payload.class_id, sc_payload.section_id)
         # Also check the (class_id, None) key for subjects assigned to all sections
-        valid_subjects = (
-            loaded_subject_ids.get(key, set())
-            | loaded_subject_ids.get((sc_payload.class_id, None), set())
-        )
+        valid_subjects = loaded_subject_ids.get(key, set()) | loaded_subject_ids.get((sc_payload.class_id, None), set())
         if sc_payload.subject_id not in valid_subjects:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -131,7 +128,7 @@ async def create_full_exam(
             sort_order=sc_payload.sort_order,
         )
         db.add(config)
-        await db.flush()      # Need config.id for components FK
+        await db.flush()  # Need config.id for components FK
 
         for idx, comp_payload in enumerate(sc_payload.components):
             comp = ExamSubjectComponent(
@@ -184,6 +181,7 @@ async def create_full_exam(
 
 # ── list_exams ─────────────────────────────────────────────────────────────────
 
+
 async def list_exams(
     db: AsyncSession,
     academic_year_id: UUID | None = None,
@@ -207,14 +205,16 @@ async def list_exams(
 
     if exams:
         exam_ids = [e.id for e in exams]
-        count_rows = (await db.execute(
-            select(
-                ExamSubjectConfig.exam_id,
-                func.count(ExamSubjectConfig.id).label("cnt"),
+        count_rows = (
+            await db.execute(
+                select(
+                    ExamSubjectConfig.exam_id,
+                    func.count(ExamSubjectConfig.id).label("cnt"),
+                )
+                .where(ExamSubjectConfig.exam_id.in_(exam_ids))
+                .group_by(ExamSubjectConfig.exam_id)
             )
-            .where(ExamSubjectConfig.exam_id.in_(exam_ids))
-            .group_by(ExamSubjectConfig.exam_id)
-        )).all()
+        ).all()
         counts = {row.exam_id: row.cnt for row in count_rows}
         for exam in exams:
             exam.subject_config_count = counts.get(exam.id, 0)
@@ -223,6 +223,7 @@ async def list_exams(
 
 
 # ── get_exam_or_404 ────────────────────────────────────────────────────────────
+
 
 async def get_exam_or_404(db: AsyncSession, exam_id: UUID) -> Exam:
     """Fetch a single exam by id; raise HTTP 404 if not found."""
@@ -241,16 +242,15 @@ async def get_class_sections_for_exam(
     exam_id: UUID,
 ) -> list[ExamClassSection]:
     """Return all class-section rows for a given exam."""
-    await get_exam_or_404(db, exam_id)   # 404 if exam doesn't exist
+    await get_exam_or_404(db, exam_id)  # 404 if exam doesn't exist
     result = await db.execute(
-        select(ExamClassSection)
-        .where(ExamClassSection.exam_id == exam_id)
-        .order_by(ExamClassSection.created_at)
+        select(ExamClassSection).where(ExamClassSection.exam_id == exam_id).order_by(ExamClassSection.created_at)
     )
     return result.scalars().all()
 
 
 # ── update_exam ────────────────────────────────────────────────────────────────
+
 
 async def update_exam(db: AsyncSession, exam_id: UUID, payload: ExamUpdate) -> Exam:
     """
@@ -268,6 +268,7 @@ async def update_exam(db: AsyncSession, exam_id: UUID, payload: ExamUpdate) -> E
 
 # ── delete_exam ────────────────────────────────────────────────────────────────
 
+
 async def delete_exam(db: AsyncSession, exam_id: UUID) -> None:
     """
     Hard-delete an exam.  Only permitted when status == 'draft'.
@@ -275,7 +276,7 @@ async def delete_exam(db: AsyncSession, exam_id: UUID) -> None:
     Caller commits.
     """
     exam = await get_exam_or_404(db, exam_id)
-    if exam.status != 'draft':
+    if exam.status != "draft":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
@@ -288,6 +289,7 @@ async def delete_exam(db: AsyncSession, exam_id: UUID) -> None:
 
 
 # ── clone_exam ─────────────────────────────────────────────────────────────────
+
 
 async def clone_exam(
     db: AsyncSession,
@@ -316,10 +318,7 @@ async def clone_exam(
     if conflict_result.scalar_one_or_none() is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"An exam named '{new_name}' already exists in academic year "
-                f"{source.academic_year_id}."
-            ),
+            detail=(f"An exam named '{new_name}' already exists in academic year " f"{source.academic_year_id}."),
         )
 
     cloned = Exam(
@@ -333,7 +332,7 @@ async def clone_exam(
         weightage_percent=source.weightage_percent,
         academic_year_id=source.academic_year_id,
         exam_grade_scheme_id=source.exam_grade_scheme_id,
-        status='draft',
+        status="draft",
         mark_entry_deadline=source.mark_entry_deadline,
         publish_rank=source.publish_rank,
         hall_ticket_min_attendance=source.hall_ticket_min_attendance,

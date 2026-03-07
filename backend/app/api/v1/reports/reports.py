@@ -1,51 +1,50 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+import logging
 from uuid import UUID
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.tenant_session import get_tenant_db
-from app.service.reports.base_report_service import BaseReportService
 from app.schemas.reports.report_schemas import ReportAuditResponse
-from app.tools.simple_permissions import RequireRead, RequireCreate, RequireUpdate, RequireDelete, RequireList, get_current_user, check_role_plan_permission_with_error
-import logging
+from app.service.reports.base_report_service import BaseReportService
+from app.tools.simple_permissions import (
+    check_role_plan_permission_with_error,
+    get_current_user,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/audit", response_model=List[ReportAuditResponse])
+@router.get("/audit", response_model=list[ReportAuditResponse])
 async def get_export_history(
     request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
-    status: Optional[str] = Query(None),
-    report_type: Optional[str] = Query(None),
+    status: str | None = Query(None),
+    report_type: str | None = Query(None),
     db: AsyncSession = Depends(get_tenant_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Get export history for the current user"""
     try:
         # Get current user and check permissions
-        role = current_user.get('role')
-        await check_role_plan_permission_with_error(db, request, role, 'reports', 'read')
-        
+        role = current_user.get("role")
+        await check_role_plan_permission_with_error(db, request, role, "reports", "read")
+
         # Get user info from current_user
-        user_id = current_user.get('sub')
-        tenant_id = getattr(request.state, 'schema_name', None)
+        user_id = current_user.get("sub")
+        tenant_id = getattr(request.state, "schema_name", None)
 
         # Create service
         service = BaseReportService(db, user_id, tenant_id)
 
         # Build query
-        from sqlalchemy import select, and_
+        from sqlalchemy import and_, select
+
         from app.models.reports.report_audit import ReportAudit
 
-        query = select(ReportAudit).where(
-            and_(
-                ReportAudit.user_id == user_id,
-                ReportAudit.tenant_id == tenant_id
-            )
-        )
+        query = select(ReportAudit).where(and_(ReportAudit.user_id == user_id, ReportAudit.tenant_id == tenant_id))
 
         if status:
             query = query.where(ReportAudit.status == status)
@@ -68,27 +67,30 @@ async def get_export_history(
             filters_dict = None
             if record.filters_applied:
                 import json
+
                 try:
                     filters_dict = json.loads(record.filters_applied)
-                except:
+                except Exception:
                     filters_dict = None
 
-            response_data.append(ReportAuditResponse(
-                id=record.id,
-                user_id=record.user_id,
-                tenant_id=record.tenant_id,
-                report_type=record.report_type,
-                filters_applied=filters_dict,
-                export_format=record.export_format,
-                file_path=record.file_path,
-                file_size=record.file_size,
-                status=record.status,
-                error_message=record.error_message,
-                created_at=record.created_at,
-                updated_at=record.updated_at,
-                completed_at=record.completed_at,
-                is_background_job=record.is_background_job
-            ))
+            response_data.append(
+                ReportAuditResponse(
+                    id=record.id,
+                    user_id=record.user_id,
+                    tenant_id=record.tenant_id,
+                    report_type=record.report_type,
+                    filters_applied=filters_dict,
+                    export_format=record.export_format,
+                    file_path=record.file_path,
+                    file_size=record.file_size,
+                    status=record.status,
+                    error_message=record.error_message,
+                    created_at=record.created_at,
+                    updated_at=record.updated_at,
+                    completed_at=record.completed_at,
+                    is_background_job=record.is_background_job,
+                )
+            )
 
         return response_data
 
@@ -102,31 +104,28 @@ async def get_export_status(
     audit_id: UUID,
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Get specific export status by audit ID"""
     try:
         # Get current user and check permissions
-        role = current_user.get('role')
-        await check_role_plan_permission_with_error(db, request, role, 'reports', 'read')
-        
+        role = current_user.get("role")
+        await check_role_plan_permission_with_error(db, request, role, "reports", "read")
+
         # Get user info from current_user
-        user_id = current_user.get('sub')
-        tenant_id = getattr(request.state, 'schema_name', None)
+        user_id = current_user.get("sub")
+        tenant_id = getattr(request.state, "schema_name", None)
 
         # Create service
-        service = BaseReportService(db, user_id, tenant_id)
+        BaseReportService(db, user_id, tenant_id)
 
         # Query for specific audit record
-        from sqlalchemy import select, and_
+        from sqlalchemy import and_, select
+
         from app.models.reports.report_audit import ReportAudit
 
         query = select(ReportAudit).where(
-            and_(
-                ReportAudit.id == audit_id,
-                ReportAudit.user_id == user_id,
-                ReportAudit.tenant_id == tenant_id
-            )
+            and_(ReportAudit.id == audit_id, ReportAudit.user_id == user_id, ReportAudit.tenant_id == tenant_id)
         )
 
         result = await db.execute(query)
@@ -139,9 +138,10 @@ async def get_export_status(
         filters_dict = None
         if record.filters_applied:
             import json
+
             try:
                 filters_dict = json.loads(record.filters_applied)
-            except:
+            except Exception:
                 filters_dict = None
 
         return ReportAuditResponse(
@@ -158,7 +158,7 @@ async def get_export_status(
             created_at=record.created_at,
             updated_at=record.updated_at,
             completed_at=record.completed_at,
-            is_background_job=record.is_background_job
+            is_background_job=record.is_background_job,
         )
 
     except HTTPException:
@@ -173,28 +173,25 @@ async def download_export_file(
     audit_id: UUID,
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Download completed export file"""
     try:
         # Get current user and check permissions
-        role = current_user.get('role')
-        await check_role_plan_permission_with_error(db, request, role, 'reports', 'read')
-        
+        role = current_user.get("role")
+        await check_role_plan_permission_with_error(db, request, role, "reports", "read")
+
         # Get user info from current_user
-        user_id = current_user.get('sub')
-        tenant_id = getattr(request.state, 'schema_name', None)
+        user_id = current_user.get("sub")
+        tenant_id = getattr(request.state, "schema_name", None)
 
         # Query for specific audit record
-        from sqlalchemy import select, and_
+        from sqlalchemy import and_, select
+
         from app.models.reports.report_audit import ReportAudit
 
         query = select(ReportAudit).where(
-            and_(
-                ReportAudit.id == audit_id,
-                ReportAudit.user_id == user_id,
-                ReportAudit.tenant_id == tenant_id
-            )
+            and_(ReportAudit.id == audit_id, ReportAudit.user_id == user_id, ReportAudit.tenant_id == tenant_id)
         )
 
         result = await db.execute(query)
@@ -202,18 +199,16 @@ async def download_export_file(
 
         if not record:
             raise HTTPException(status_code=404, detail="Export record not found")
-        
+
         if record.status != "completed":
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Export is not completed. Current status: {record.status}"
-            )
-        
+            raise HTTPException(status_code=400, detail=f"Export is not completed. Current status: {record.status}")
+
         if not record.file_path:
             raise HTTPException(status_code=404, detail="Export file not found")
 
         # Read file and return
         import os
+
         if not os.path.exists(record.file_path):
             raise HTTPException(status_code=404, detail="Export file not found on disk")
 
@@ -224,9 +219,9 @@ async def download_export_file(
         content_type_map = {
             "csv": "text/csv",
             "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "pdf": "application/pdf"
+            "pdf": "application/pdf",
         }
-        
+
         file_ext = record.export_format
         content_type = content_type_map.get(file_ext, "application/octet-stream")
 
@@ -234,13 +229,14 @@ async def download_export_file(
         filename = os.path.basename(record.file_path)
 
         from fastapi.responses import Response
+
         return Response(
             content=file_content,
             media_type=content_type,
             headers={
                 "Content-Disposition": f"attachment; filename={filename}",
-                "Content-Length": str(len(file_content))
-            }
+                "Content-Length": str(len(file_content)),
+            },
         )
 
     except HTTPException:

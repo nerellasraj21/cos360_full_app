@@ -1,22 +1,26 @@
-from pydantic import BaseModel
-from typing import Optional
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel
+
 
 class RouteTypeBase(BaseModel):
     type_name: str
-    description: Optional[str] = None
+    description: str | None = None
     is_active: bool = True
+
 
 class RouteTypeCreate(RouteTypeBase):
     pass
 
+
 class RouteTypeUpdate(BaseModel):
-    type_name: Optional[str] = None
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
+    type_name: str | None = None
+    description: str | None = None
+    is_active: bool | None = None
 
     model_config = {"from_attributes": True}
+
 
 class RouteTypeOut(RouteTypeBase):
     id: UUID
@@ -25,6 +29,7 @@ class RouteTypeOut(RouteTypeBase):
 
     class Config:
         from_attributes = True
+
 
 class RouteTypeDropdown(BaseModel):
     id: UUID

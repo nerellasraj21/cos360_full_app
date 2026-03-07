@@ -1,7 +1,9 @@
 """
 Celery application configuration for background jobs
 """
+
 from celery import Celery
+
 from app.config import get_settings
 
 settings = get_settings()
@@ -17,7 +19,9 @@ celery_app = Celery(
         "app.tasks.exam.pdf_generation_task",
         "app.tasks.exam.aggregate_compute_task",
         "app.tasks.exam.notification_task",
-    ]
+        "app.tasks.students.certificate_tasks",
+        "app.tasks.communication.send_tasks",
+    ],
 )
 
 # Celery configuration
@@ -41,3 +45,14 @@ celery_app.conf.update(
     task_ignore_result=False,
     task_store_eager_result=True,
 )
+
+# Beat scheduler for periodic tasks
+from celery.schedules import crontab
+
+celery_app.conf.beat_schedule = {
+    "cleanup-stale-files-daily": {
+        "task": "cleanup_stale_files",
+        "schedule": crontab(hour=2, minute=0),  # Daily at 2 AM UTC
+        "options": {"expires": 60 * 60},  # Task expires after 1 hour if not executed
+    },
+}

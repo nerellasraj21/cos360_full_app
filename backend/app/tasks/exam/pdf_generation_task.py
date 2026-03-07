@@ -3,8 +3,8 @@
 Celery task for async PDF generation (result reports, hall tickets).
 Sprint 5 · BG-01: celery_app imported from app.celery_app
 """
+
 import logging
-from typing import Optional
 
 from app.celery_app import celery_app
 
@@ -23,10 +23,10 @@ def generate_exam_pdf(
     *,
     exam_id: str,
     report_type: str,  # "result_card" | "hall_ticket" | "marksheet"
-    student_ids: Optional[list] = None,  # None = all students
-    class_id: Optional[str] = None,
-    section_id: Optional[str] = None,
-    tenant_schema: Optional[str] = None,
+    student_ids: list | None = None,  # None = all students
+    class_id: str | None = None,
+    section_id: str | None = None,
+    tenant_schema: str | None = None,
 ):
     """
     Generate PDF reports for an exam.
@@ -42,7 +42,10 @@ def generate_exam_pdf(
     try:
         logger.info(
             "Generating %s PDF for exam=%s class=%s section=%s",
-            report_type, exam_id, class_id, section_id,
+            report_type,
+            exam_id,
+            class_id,
+            section_id,
         )
 
         # TODO Sprint 5: Implement PDF generation using reportlab or weasyprint.

@@ -1,26 +1,31 @@
-from pydantic import BaseModel
 from datetime import date
-from typing import Optional
 from uuid import UUID
+
+from pydantic import BaseModel
+
 
 class AcademicYearBase(BaseModel):
     title: str
     start_date: date
     end_date: date
     is_active: bool = True
-    
+
+
 class AcademicYearCreate(AcademicYearBase):
     pass
 
+
 class AcademicYearUpdate(BaseModel):
-    title: Optional[str] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    is_active: Optional[bool] = None
+    title: str | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    is_active: bool | None = None
+
 
 class AcademicYearRead(AcademicYearBase):
-    id: UUID    
+    id: UUID
     model_config = {"from_attributes": True}
+
 
 class AcademicYearDropdown(BaseModel):
     id: UUID

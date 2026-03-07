@@ -1,8 +1,8 @@
-from typing import Any, List, Optional
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import or_, and_, select, func
+
 from fastapi import HTTPException, status
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.auth.user_context_schema import UserContext
 
@@ -19,11 +19,7 @@ class UserScopedService:
         self.db = db
 
     async def get_user_scoped_query(
-        self,
-        base_query,
-        user_context: UserContext,
-        model_class,
-        access_type: str = "read"
+        self, base_query, user_context: UserContext, model_class, access_type: str = "read"
     ):
         """
         Apply user-specific scoping to queries - extends existing department logic
@@ -39,7 +35,7 @@ class UserScopedService:
         """
 
         # Admin roles see everything (existing pattern from expense module)
-        if user_context.role.lower() in ['super_admin', 'tenant_admin', 'admin']:
+        if user_context.role.lower() in ["super_admin", "tenant_admin", "admin"]:
             return await self._apply_department_filtering(base_query, user_context, model_class)
 
         # Apply filtering based on access scope
@@ -67,18 +63,18 @@ class UserScopedService:
         """Apply department filtering (existing pattern from expense module)"""
 
         # Admin roles bypass department filtering
-        if user_context.role.lower() in ['super_admin', 'tenant_admin', 'admin']:
+        if user_context.role.lower() in ["super_admin", "tenant_admin", "admin"]:
             return query
 
         # Apply department filtering if model has department_id and user has department
-        if hasattr(model_class, 'department_id') and user_context.department_id:
+        if hasattr(model_class, "department_id") and user_context.department_id:
             return query.where(
                 or_(
                     model_class.department_id == user_context.department_id,
-                    model_class.department_id.is_(None)  # Include unrestricted records
+                    model_class.department_id.is_(None),  # Include unrestricted records
                 )
             )
-        elif hasattr(model_class, 'department_id'):
+        elif hasattr(model_class, "department_id"):
             # User has no department, only show unrestricted records
             return query.where(model_class.department_id.is_(None))
 
@@ -90,25 +86,25 @@ class UserScopedService:
         conditions = []
 
         # Records created by user (audit pattern from expense module)
-        if hasattr(model_class, 'created_by_user_id'):
+        if hasattr(model_class, "created_by_user_id"):
             conditions.append(model_class.created_by_user_id == user_context.user_id)
 
         # Entity ownership patterns
-        if model_class.__tablename__ == 'students' and user_context.student_id:
+        if model_class.__tablename__ == "students" and user_context.student_id:
             conditions.append(model_class.id == user_context.student_id)
-        elif model_class.__tablename__ == 'staff' and user_context.staff_id:
+        elif model_class.__tablename__ == "staff" and user_context.staff_id:
             conditions.append(model_class.id == user_context.staff_id)
-        elif model_class.__tablename__ == 'parents' and user_context.parent_id:
+        elif model_class.__tablename__ == "parents" and user_context.parent_id:
             conditions.append(model_class.id == user_context.parent_id)
-        elif model_class.__tablename__ == 'users':
+        elif model_class.__tablename__ == "users":
             conditions.append(model_class.id == user_context.user_id)
 
         # Student-related records ownership
-        elif hasattr(model_class, 'student_id') and user_context.student_id:
+        elif hasattr(model_class, "student_id") and user_context.student_id:
             conditions.append(model_class.student_id == user_context.student_id)
-        elif hasattr(model_class, 'staff_id') and user_context.staff_id:
+        elif hasattr(model_class, "staff_id") and user_context.staff_id:
             conditions.append(model_class.staff_id == user_context.staff_id)
-        elif hasattr(model_class, 'parent_id') and user_context.parent_id:
+        elif hasattr(model_class, "parent_id") and user_context.parent_id:
             conditions.append(model_class.parent_id == user_context.parent_id)
 
         if conditions:
@@ -126,11 +122,11 @@ class UserScopedService:
         conditions = []
 
         # Student-related records (admissions, fees, attendance, certificates, etc.)
-        if hasattr(model_class, 'student_id'):
+        if hasattr(model_class, "student_id"):
             conditions.append(model_class.student_id.in_(user_context.allowed_entity_ids))
 
         # Direct student records
-        elif model_class.__tablename__ == 'students':
+        elif model_class.__tablename__ == "students":
             conditions.append(model_class.id.in_(user_context.allowed_entity_ids))
 
         # Handle other relationship patterns as needed
@@ -141,12 +137,7 @@ class UserScopedService:
         else:
             return query.where(False)
 
-    async def validate_entity_access(
-        self,
-        user_context: UserContext,
-        resource_type: str,
-        entity_id: UUID
-    ) -> bool:
+    async def validate_entity_access(self, user_context: UserContext, resource_type: str, entity_id: UUID) -> bool:
         """
         Validate if user can access a specific entity
 
@@ -160,7 +151,7 @@ class UserScopedService:
         """
 
         # Admin access
-        if user_context.role.lower() in ['super_admin', 'tenant_admin', 'admin']:
+        if user_context.role.lower() in ["super_admin", "tenant_admin", "admin"]:
             return True
 
         # Full access scope
@@ -185,12 +176,7 @@ class UserScopedService:
 
         return False
 
-    async def count_user_scoped_records(
-        self,
-        user_context: UserContext,
-        model_class,
-        additional_filters=None
-    ) -> int:
+    async def count_user_scoped_records(self, user_context: UserContext, model_class, additional_filters=None) -> int:
         """
         Count records with user-specific filtering applied
 
@@ -211,18 +197,13 @@ class UserScopedService:
             count_query = count_query.where(additional_filters)
 
         # Apply user scoping
-        scoped_query = await self.get_user_scoped_query(
-            count_query, user_context, model_class, "list"
-        )
+        scoped_query = await self.get_user_scoped_query(count_query, user_context, model_class, "list")
 
         result = await self.db.execute(scoped_query)
         return result.scalar() or 0
 
     def validate_department_access(
-        self,
-        user_department_id: Optional[UUID],
-        resource_department_id: Optional[UUID],
-        user_role: str
+        self, user_department_id: UUID | None, resource_department_id: UUID | None, user_role: str
     ) -> bool:
         """
         Validate department-level access control (from expense module)
@@ -231,7 +212,7 @@ class UserScopedService:
         """
 
         # Super admin and tenant admin have access to all departments
-        if user_role.lower() in ['super_admin', 'tenant_admin', 'admin']:
+        if user_role.lower() in ["super_admin", "tenant_admin", "admin"]:
             return True
 
         # If resource has no department restriction, allow access
@@ -246,10 +227,7 @@ class UserScopedService:
         return user_department_id == resource_department_id
 
     def build_access_denied_error(
-        self,
-        resource_type: str,
-        action: str,
-        reason: str = "insufficient_permissions"
+        self, resource_type: str, action: str, reason: str = "insufficient_permissions"
     ) -> HTTPException:
         """Build standardized access denied error responses"""
 
@@ -260,15 +238,11 @@ class UserScopedService:
                 "message": f"Access denied: Cannot {action} {resource_type}",
                 "reason": reason,
                 "resource_type": resource_type,
-                "action": action
-            }
+                "action": action,
+            },
         )
 
-    def build_not_found_error(
-        self,
-        resource_type: str,
-        entity_id: Optional[UUID] = None
-    ) -> HTTPException:
+    def build_not_found_error(self, resource_type: str, entity_id: UUID | None = None) -> HTTPException:
         """Build standardized not found error responses"""
 
         message = f"{resource_type.replace('_', ' ').title()} not found"
@@ -281,6 +255,6 @@ class UserScopedService:
                 "error": "not_found",
                 "message": message,
                 "resource_type": resource_type,
-                "entity_id": str(entity_id) if entity_id else None
-            }
+                "entity_id": str(entity_id) if entity_id else None,
+            },
         )

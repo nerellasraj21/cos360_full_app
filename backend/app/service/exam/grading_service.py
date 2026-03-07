@@ -1,12 +1,12 @@
-import logging
-import uuid
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional
+import logging
+import uuid
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, literal, delete as sa_delete
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import literal, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -37,7 +37,7 @@ log = logging.getLogger("exam.grading_service")
 class GradeResult:
     grade_label: str
     gpa: Decimal
-    remarks: Optional[str]
+    remarks: str | None
     is_pass: bool
 
 
@@ -45,7 +45,7 @@ def lookup_grade(
     marks_obtained: Decimal,
     max_marks: Decimal,
     bands: list,  # list of ExamGradeBand or SubjectGradeBand
-) -> Optional[GradeResult]:
+) -> GradeResult | None:
     """
     Grade lookup is always percentage-based — max_marks-agnostic.
     Bands are sorted descending so the first match wins.
@@ -89,13 +89,9 @@ ABSENT_GRADE = GradeResult(
 # ---------------------------------------------------------------------------
 
 
-async def _get_exam_grade_scheme_or_404(
-    scheme_id: UUID, db: AsyncSession
-) -> ExamGradeScheme:
+async def _get_exam_grade_scheme_or_404(scheme_id: UUID, db: AsyncSession) -> ExamGradeScheme:
     result = await db.execute(
-        select(ExamGradeScheme)
-        .options(selectinload(ExamGradeScheme.bands))
-        .where(ExamGradeScheme.id == scheme_id)
+        select(ExamGradeScheme).options(selectinload(ExamGradeScheme.bands)).where(ExamGradeScheme.id == scheme_id)
     )
     scheme = result.scalar_one_or_none()
     if not scheme:
@@ -106,9 +102,7 @@ async def _get_exam_grade_scheme_or_404(
     return scheme
 
 
-async def _get_subject_grade_scheme_or_404(
-    scheme_id: UUID, db: AsyncSession
-) -> SubjectGradeScheme:
+async def _get_subject_grade_scheme_or_404(scheme_id: UUID, db: AsyncSession) -> SubjectGradeScheme:
     result = await db.execute(
         select(SubjectGradeScheme)
         .options(selectinload(SubjectGradeScheme.bands))
@@ -123,23 +117,15 @@ async def _get_subject_grade_scheme_or_404(
     return scheme
 
 
-async def _check_exam_grade_scheme_not_in_use(
-    scheme_id: UUID, db: AsyncSession
-) -> None:
+async def _check_exam_grade_scheme_not_in_use(scheme_id: UUID, db: AsyncSession) -> None:
     """Raise 409 if any exam references this grade scheme."""
     result = await db.execute(
-        select(literal(1))
-        .select_from(Exam)
-        .where(Exam.exam_grade_scheme_id == scheme_id)
-        .limit(1)
+        select(literal(1)).select_from(Exam).where(Exam.exam_grade_scheme_id == scheme_id).limit(1)
     )
     if result.scalar_one_or_none() is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"ExamGradeScheme {scheme_id} is referenced by one or more exams "
-                "and cannot be deleted."
-            ),
+            detail=(f"ExamGradeScheme {scheme_id} is referenced by one or more exams " "and cannot be deleted."),
         )
 
 
@@ -148,9 +134,7 @@ async def _check_exam_grade_scheme_not_in_use(
 # ---------------------------------------------------------------------------
 
 
-async def create_exam_grade_scheme(
-    db: AsyncSession, payload: ExamGradeSchemeCreate
-) -> ExamGradeScheme:
+async def create_exam_grade_scheme(db: AsyncSession, payload: ExamGradeSchemeCreate) -> ExamGradeScheme:
     """Insert the parent scheme first, flush to get id, then bulk-insert bands."""
     try:
         scheme = ExamGradeScheme(
@@ -182,9 +166,7 @@ async def create_exam_grade_scheme(
 
         # Reload with bands before commit so the returned object is fully populated
         result = await db.execute(
-            select(ExamGradeScheme)
-            .options(selectinload(ExamGradeScheme.bands))
-            .where(ExamGradeScheme.id == scheme.id)
+            select(ExamGradeScheme).options(selectinload(ExamGradeScheme.bands)).where(ExamGradeScheme.id == scheme.id)
         )
         scheme = result.scalar_one()
 
@@ -212,9 +194,7 @@ async def create_exam_grade_scheme(
 
 async def list_exam_grade_schemes(db: AsyncSession) -> list[ExamGradeScheme]:
     try:
-        result = await db.execute(
-            select(ExamGradeScheme).options(selectinload(ExamGradeScheme.bands))
-        )
+        result = await db.execute(select(ExamGradeScheme).options(selectinload(ExamGradeScheme.bands)))
         return result.scalars().all()
     except Exception as e:
         log.error("Error listing ExamGradeSchemes: %s", e)
@@ -224,9 +204,7 @@ async def list_exam_grade_schemes(db: AsyncSession) -> list[ExamGradeScheme]:
         )
 
 
-async def get_exam_grade_scheme_or_404(
-    db: AsyncSession, scheme_id: UUID
-) -> ExamGradeScheme:
+async def get_exam_grade_scheme_or_404(db: AsyncSession, scheme_id: UUID) -> ExamGradeScheme:
     try:
         return await _get_exam_grade_scheme_or_404(scheme_id, db)
     except HTTPException:
@@ -271,9 +249,7 @@ async def update_exam_grade_scheme(
         await db.flush()
 
         result = await db.execute(
-            select(ExamGradeScheme)
-            .options(selectinload(ExamGradeScheme.bands))
-            .where(ExamGradeScheme.id == scheme.id)
+            select(ExamGradeScheme).options(selectinload(ExamGradeScheme.bands)).where(ExamGradeScheme.id == scheme.id)
         )
         scheme = result.scalar_one()
 
@@ -325,9 +301,7 @@ async def delete_exam_grade_scheme(db: AsyncSession, scheme_id: UUID) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def create_subject_grade_scheme(
-    db: AsyncSession, payload: SubjectGradeSchemeCreate
-) -> SubjectGradeScheme:
+async def create_subject_grade_scheme(db: AsyncSession, payload: SubjectGradeSchemeCreate) -> SubjectGradeScheme:
     """Insert the parent scheme first, flush to get id, then bulk-insert bands."""
     try:
         scheme = SubjectGradeScheme(
@@ -388,9 +362,7 @@ async def create_subject_grade_scheme(
 
 async def list_subject_grade_schemes(db: AsyncSession) -> list[SubjectGradeScheme]:
     try:
-        result = await db.execute(
-            select(SubjectGradeScheme).options(selectinload(SubjectGradeScheme.bands))
-        )
+        result = await db.execute(select(SubjectGradeScheme).options(selectinload(SubjectGradeScheme.bands)))
         return result.scalars().all()
     except Exception as e:
         log.error("Error listing SubjectGradeSchemes: %s", e)
@@ -400,9 +372,7 @@ async def list_subject_grade_schemes(db: AsyncSession) -> list[SubjectGradeSchem
         )
 
 
-async def get_subject_grade_scheme_or_404(
-    db: AsyncSession, scheme_id: UUID
-) -> SubjectGradeScheme:
+async def get_subject_grade_scheme_or_404(db: AsyncSession, scheme_id: UUID) -> SubjectGradeScheme:
     try:
         return await _get_subject_grade_scheme_or_404(scheme_id, db)
     except HTTPException:
@@ -458,11 +428,16 @@ async def update_subject_grade_scheme(
     except IntegrityError as e:
         await db.rollback()
         log.error("IntegrityError updating SubjectGradeScheme %s: %s", scheme_id, e)
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A SubjectGradeScheme with these details already exists.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="A SubjectGradeScheme with these details already exists."
+        )
     except Exception as e:
         await db.rollback()
         log.error("Error updating SubjectGradeScheme %s: %s", scheme_id, e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An error occurred while updating the subject grade scheme.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while updating the subject grade scheme.",
+        )
 
 
 async def delete_subject_grade_scheme(db: AsyncSession, scheme_id: UUID) -> None:

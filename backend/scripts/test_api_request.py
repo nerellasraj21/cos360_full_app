@@ -1,6 +1,7 @@
 """
 Simple HTTP request to test the designation endpoint
 """
+
 import requests
 import json
 
@@ -8,10 +9,7 @@ import json
 url = "http://localhost:8000/api/v1/staff/designations/"
 
 # Query parameters
-params = {
-    "skip": 0,
-    "limit": 10
-}
+params = {"skip": 0, "limit": 10}
 
 # Headers - you'll need to add your auth token
 headers = {
@@ -44,10 +42,10 @@ try:
         print("=" * 80)
 
         # Show sample item structure
-        if data.get('items'):
+        if data.get("items"):
             print()
             print("Sample Item Structure:")
-            print(json.dumps(data['items'][0], indent=2))
+            print(json.dumps(data["items"][0], indent=2))
     else:
         print("Error Response:")
         print(json.dumps(response.json(), indent=2))

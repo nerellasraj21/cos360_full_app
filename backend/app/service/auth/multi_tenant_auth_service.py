@@ -1,29 +1,31 @@
+import logging
+from typing import Any
+from uuid import UUID
+
+from fastapi import HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
-from fastapi import HTTPException, status, Request
-from app.models.auth.user_model import User
-from app.models.auth.role_model import Role
+
+from app.db.tenant_session import TenantService, get_tenant_db
+from app.middleware.tenant_middleware import get_client_name_from_request
 from app.models.auth.menu_model import Menu
 from app.models.auth.permissions_model import RoleMenuPermission
 from app.models.auth.resource_permission_model import ResourcePermission
-from app.tools.jwt_utils import create_access_token, create_refresh_token, create_change_password_token
+from app.models.auth.role_model import Role
+from app.models.auth.user_model import User
+from app.tools.jwt_utils import create_access_token, create_change_password_token, create_refresh_token
 from app.tools.password_util import verify_password
-from app.db.tenant_session import get_tenant_db, TenantService
-from app.middleware.tenant_middleware import get_client_name_from_request
-from typing import Dict, List, Any, Optional
-import logging
 
 logger = logging.getLogger("multi_tenant_auth_service")
 
+
 class MultiTenantAuthService:
     """Service for multi-tenant authentication and menu management"""
-    
+
     @staticmethod
     async def _attach_role(db: AsyncSession, user: User) -> User:
         """Fetch and attach the role object to a user."""
-        role_result = await db.execute(
-            select(Role).where(Role.id == user.role_id)
-        )
+        role_result = await db.execute(select(Role).where(Role.id == user.role_id))
         user.role = role_result.scalar_one_or_none()
         return user
 
@@ -63,33 +65,23 @@ class MultiTenantAuthService:
             # 3. Try phone via Staff table
             if not user:
                 from app.models.masters.staff_model import Staff
+
                 result = await db.execute(
-                    select(User)
-                    .join(Staff, Staff.user_id == User.id)
-                    .where(Staff.phone == identifier)
+                    select(User).join(Staff, Staff.user_id == User.id).where(Staff.phone == identifier)
                 )
                 user = result.scalar_one_or_none()
 
             if not user:
                 logger.warning(f"User not found for identifier: {identifier}")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid Credentials"
-                )
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Credentials")
 
             if not user.is_active:
                 logger.warning(f"Inactive user attempted login: {identifier}")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid Credentials"
-                )
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Credentials")
 
             if not verify_password(password, user.password_hash):
                 logger.warning(f"Invalid password for identifier: {identifier}")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid Credentials"
-                )
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Credentials")
 
             await MultiTenantAuthService._attach_role(db, user)
             logger.info(f"User authenticated successfully: {identifier}")
@@ -99,21 +91,18 @@ class MultiTenantAuthService:
             raise
         except Exception as e:
             logger.error(f"Error during user authentication: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Authentication error"
-            )
-    
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Authentication error")
+
     @staticmethod
-    async def build_hierarchical_menu(db: AsyncSession, role_id: int, max_depth: int = 4) -> List[Dict[str, Any]]:
+    async def build_hierarchical_menu(db: AsyncSession, role_id: int, max_depth: int = 4) -> list[dict[str, Any]]:
         """
         Build hierarchical menu structure based on user's role permissions.
-        
+
         Args:
             db: Database session (already configured for tenant schema)
             role_id: User's role ID
             max_depth: Maximum menu depth to support (default: 4 for L0-L3)
-            
+
         Returns:
             List[Dict]: Nested menu structure
         """
@@ -124,10 +113,7 @@ class MultiTenantAuthService:
                 result = await db.execute(
                     select(Menu, RoleMenuPermission.can_view)
                     .join(RoleMenuPermission, Menu.id == RoleMenuPermission.menu_id)
-                    .where(
-                        RoleMenuPermission.role_id == role_id,
-                        RoleMenuPermission.can_view == True
-                    )
+                    .where(RoleMenuPermission.role_id == role_id, RoleMenuPermission.can_view)
                     .order_by(Menu.display_order, Menu.id)
                 )
                 accessible_menus = result.fetchall()
@@ -136,14 +122,14 @@ class MultiTenantAuthService:
                 logger.warning(f"DEBUG MENU 2: Menu query failed (tables may not exist): {str(db_error)}")
                 logger.info("DEBUG MENU 3: Returning empty menu for tenant without menu setup")
                 return []
-            
+
             if not accessible_menus:
                 logger.warning(f"No accessible menus found for role_id: {role_id}")
                 return []
-            
+
             # Convert to dictionary for easier processing
             menu_dict = {}
-            for menu, can_view in accessible_menus:
+            for menu, _can_view in accessible_menus:
                 menu_dict[menu.id] = {
                     "id": menu.id,
                     "name": menu.name,
@@ -151,14 +137,14 @@ class MultiTenantAuthService:
                     "parent_id": menu.parent_id,
                     "display_order": menu.display_order,
                     "level": menu.level,
-                    "children": []
+                    "children": [],
                 }
-            
+
             # Build hierarchical structure
             root_menus = []
-            
+
             # First, organize menus by parent-child relationship
-            for menu_id, menu_data in menu_dict.items():
+            for _menu_id, menu_data in menu_dict.items():
                 if menu_data["parent_id"] is None:
                     # Root level menu
                     root_menus.append(menu_data)
@@ -167,32 +153,32 @@ class MultiTenantAuthService:
                     parent_id = menu_data["parent_id"]
                     if parent_id in menu_dict:
                         menu_dict[parent_id]["children"].append(menu_data)
-            
+
             # Sort menus by display_order at each level
             def sort_menu_recursive(menu_list):
                 menu_list.sort(key=lambda x: x["display_order"])
                 for menu in menu_list:
                     if menu["children"]:
                         sort_menu_recursive(menu["children"])
-            
+
             sort_menu_recursive(root_menus)
-            
+
             # Clean up unnecessary fields for API response
             def clean_menu_structure(menu_list):
                 for menu in menu_list:
                     # Remove internal fields
                     menu.pop("parent_id", None)
                     menu.pop("level", None)
-                    
+
                     # Recursively clean children
                     if menu["children"]:
                         clean_menu_structure(menu["children"])
                     # Remove empty children arrays for cleaner response
                     elif "children" in menu:
                         menu.pop("children", None)
-            
+
             clean_menu_structure(root_menus)
-            
+
             logger.info(f"Built hierarchical menu with {len(root_menus)} root items for role_id: {role_id}")
             return root_menus
 
@@ -201,7 +187,7 @@ class MultiTenantAuthService:
             return []
 
     @staticmethod
-    async def get_user_permissions(db: AsyncSession, role_id: int) -> Dict[str, List[str]]:
+    async def get_user_permissions(db: AsyncSession, role_id: int) -> dict[str, list[str]]:
         """
         Fetch user's resource permissions from tenant schema only.
 
@@ -226,10 +212,7 @@ class MultiTenantAuthService:
             # Query resource permissions for the role from tenant schema
             result = await db.execute(
                 select(ResourcePermission.resource, ResourcePermission.action)
-                .where(
-                    ResourcePermission.role_id == role_id,
-                    ResourcePermission.is_granted == True
-                )
+                .where(ResourcePermission.role_id == role_id, ResourcePermission.is_granted)
                 .order_by(ResourcePermission.resource, ResourcePermission.action)
             )
             permissions = result.fetchall()
@@ -255,9 +238,15 @@ class MultiTenantAuthService:
         except Exception as e:
             logger.error(f"Error fetching permissions for role_id {role_id}: {str(e)}")
             return {}
-    
+
     @staticmethod
-    async def login_user(request: Request, username: str, password: str, client_name: Optional[str] = None) -> Dict[str, Any]:
+    async def login_user(
+        request: Request,
+        username: str,
+        password: str,
+        client_name: str | None = None,
+        academic_year_id: UUID | None = None,
+    ) -> dict[str, Any]:
         """
         Complete multi-tenant login process.
 
@@ -290,18 +279,15 @@ class MultiTenantAuthService:
                 logger.info(f"DEBUG 3: Using default schema: {schema_name}")
             else:
                 logger.warning(f"DEBUG 3: Tenant not found or inactive: {final_client_name}")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid connection"
-                )
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid connection")
         else:
             logger.info(f"DEBUG 3: Found tenant schema: {schema_name}")
-        
+
         # Get tenant database session
-        logger.info(f"DEBUG 4: Getting tenant database session")
+        logger.info("DEBUG 4: Getting tenant database session")
         async for db in get_tenant_db(request):
             try:
-                logger.info(f"DEBUG 5: Starting user authentication")
+                logger.info("DEBUG 5: Starting user authentication")
                 # Authenticate user
                 user = await MultiTenantAuthService.authenticate_user(db, username, password)
                 logger.info(f"DEBUG 6: User authenticated successfully, role_id: {user.role_id}")
@@ -316,15 +302,27 @@ class MultiTenantAuthService:
                 permissions = await MultiTenantAuthService.get_user_permissions(db, user.role_id)
                 logger.info(f"DEBUG 10: Permissions fetched successfully, resource count: {len(permissions)}")
 
+                # ---- Validate academic year ----
+                if academic_year_id is None:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Academic year is required")
+
+                from app.models.masters.academic_year_model import AcademicYear
+
+                ay_result = await db.execute(select(AcademicYear).where(AcademicYear.id == academic_year_id))
+                academic_year = ay_result.scalar_one_or_none()
+                if not academic_year:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid academic year")
+                academic_year_title = academic_year.title
+
                 # ---- First-login check (Staff, Teacher, Student & Parent) ----
                 role_name = user.role.name if user.role else ""
                 if role_name in ("Staff", "Teacher", "Student", "Parent"):
                     # Check via raw SQL — graceful if column not yet added to DB
                     try:
                         from sqlalchemy import text as _text
+
                         fl_result = await db.execute(
-                            _text("SELECT is_first_login FROM users WHERE id = :id"),
-                            {"id": str(user.id)}
+                            _text("SELECT is_first_login FROM users WHERE id = :id"), {"id": str(user.id)}
                         )
                         is_first_login_val = fl_result.scalar_one_or_none()
                     except Exception:
@@ -332,16 +330,22 @@ class MultiTenantAuthService:
 
                     if is_first_login_val is True:
                         logger.info(f"First-time login detected for staff user: {user.username}")
-                        change_token = create_change_password_token({
-                            "sub": str(user.id),
-                            "username": user.username,
-                            "role": role_name,
-                            "client_name": final_client_name
-                        })
+                        change_token = create_change_password_token(
+                            {
+                                "sub": str(user.id),
+                                "username": user.username,
+                                "role": role_name,
+                                "client_name": final_client_name,
+                                "academic_year_id": str(academic_year_id),
+                                "academic_year_title": academic_year_title,
+                            }
+                        )
                         return {
                             "requires_password_change": True,
                             "change_password_token": change_token,
-                            "message": "Please set a new password to continue"
+                            "message": "Please set a new password to continue",
+                            "academic_year_id": academic_year_id,
+                            "academic_year_title": academic_year_title,
                         }
 
                 # Determine entity_id based on role
@@ -352,9 +356,8 @@ class MultiTenantAuthService:
                     if role_name == "Student":
                         # Query student entity
                         from app.models.student.student_model import Student
-                        student_result = await db.execute(
-                            select(Student).where(Student.user_id == user.id)
-                        )
+
+                        student_result = await db.execute(select(Student).where(Student.user_id == user.id))
                         student = student_result.scalar_one_or_none()
                         if student:
                             entity_id = str(student.id)
@@ -362,9 +365,8 @@ class MultiTenantAuthService:
                     elif role_name == "Parent":
                         # Query parent entity
                         from app.models.masters.parent_model import Parent
-                        parent_result = await db.execute(
-                            select(Parent).where(Parent.user_id == user.id)
-                        )
+
+                        parent_result = await db.execute(select(Parent).where(Parent.user_id == user.id))
                         parent = parent_result.scalar_one_or_none()
                         if parent:
                             entity_id = str(parent.id)
@@ -372,9 +374,8 @@ class MultiTenantAuthService:
                     elif role_name == "Staff":
                         # Query staff entity
                         from app.models.masters.staff_model import Staff
-                        staff_result = await db.execute(
-                            select(Staff).where(Staff.user_id == user.id)
-                        )
+
+                        staff_result = await db.execute(select(Staff).where(Staff.user_id == user.id))
                         staff = staff_result.scalar_one_or_none()
                         if staff:
                             entity_id = str(staff.id)
@@ -390,52 +391,49 @@ class MultiTenantAuthService:
                     "sub": str(user.id),
                     "username": user.username,
                     "role": user.role.name,
-                    "client_name": final_client_name
+                    "client_name": final_client_name,
+                    "academic_year_id": str(academic_year_id),
+                    "academic_year_title": academic_year_title,
                 }
-                
+
                 access_token = create_access_token(token_data)
                 refresh_token = create_refresh_token(token_data)
-                
+
                 # Prepare response
                 response_data = {
                     "user": {
                         "id": user.id,
                         "username": user.username,
                         "email": user.email,
-                        "is_active": user.is_active
+                        "is_active": user.is_active,
                     },
-                    "role": {
-                        "id": user.role.id,
-                        "name": user.role.name,
-                        "description": user.role.description
-                    },
+                    "role": {"id": user.role.id, "name": user.role.name, "description": user.role.description},
                     "menu": menu,
                     "permissions": permissions,
                     "entity_id": entity_id,
+                    "academic_year_id": academic_year_id,
+                    "academic_year_title": academic_year_title,
                     "access_token": access_token,
                     "refresh_token": refresh_token,
-                    "token_type": "bearer"
+                    "token_type": "bearer",
                 }
-                
+
                 logger.info(f"Successful login for user '{username}' on tenant '{final_client_name}'")
                 return response_data
-                
+
             except HTTPException:
                 raise
             except Exception as e:
                 logger.error(f"Unexpected error during login: {str(e)}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Login error"
-                )
-    
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Login error")
+
     @staticmethod
     async def set_password_first_login(
         request: Request,
         change_password_token: str,
         new_password: str,
-        client_name: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        client_name: str | None = None,
+    ) -> dict[str, Any]:
         """
         Complete the first-time password change flow.
 
@@ -455,6 +453,8 @@ class MultiTenantAuthService:
 
         user_id = payload.get("sub")
         final_client_name = client_name or payload.get("client_name") or get_client_name_from_request(request)
+        academic_year_id_str = payload.get("academic_year_id")
+        academic_year_title = payload.get("academic_year_title", "")
 
         schema_name = await TenantService.get_tenant_schema(final_client_name)
         if not schema_name:
@@ -463,6 +463,7 @@ class MultiTenantAuthService:
         async for db in get_tenant_db(request):
             try:
                 from uuid import UUID as _UUID
+
                 result = await db.execute(select(User).where(User.id == _UUID(user_id)))
                 user = result.scalar_one_or_none()
                 if not user:
@@ -474,9 +475,9 @@ class MultiTenantAuthService:
                 # Clear first-login flag via raw SQL (graceful if column doesn't exist)
                 try:
                     from sqlalchemy import text as _text
+
                     await db.execute(
-                        _text("UPDATE users SET is_first_login = FALSE WHERE id = :id"),
-                        {"id": str(user.id)}
+                        _text("UPDATE users SET is_first_login = FALSE WHERE id = :id"), {"id": str(user.id)}
                     )
                 except Exception:
                     pass
@@ -493,18 +494,21 @@ class MultiTenantAuthService:
                 try:
                     if role_name_sp == "Student":
                         from app.models.student.student_model import Student
+
                         stu_result = await db.execute(select(Student).where(Student.user_id == user.id))
                         stu = stu_result.scalar_one_or_none()
                         if stu:
                             entity_id = str(stu.id)
                     elif role_name_sp == "Parent":
                         from app.models.masters.parent_model import Parent
+
                         par_result = await db.execute(select(Parent).where(Parent.user_id == user.id))
                         par = par_result.scalar_one_or_none()
                         if par:
                             entity_id = str(par.id)
                     else:
                         from app.models.masters.staff_model import Staff
+
                         staff_result = await db.execute(select(Staff).where(Staff.user_id == user.id))
                         staff = staff_result.scalar_one_or_none()
                         if staff:
@@ -517,6 +521,8 @@ class MultiTenantAuthService:
                     "username": user.username,
                     "role": user.role.name if user.role else "",
                     "client_name": final_client_name,
+                    "academic_year_id": academic_year_id_str,
+                    "academic_year_title": academic_year_title,
                 }
                 access_token = create_access_token(token_data)
                 refresh_token = create_refresh_token(token_data)
@@ -539,6 +545,8 @@ class MultiTenantAuthService:
                     "menu": menu,
                     "permissions": permissions,
                     "entity_id": entity_id,
+                    "academic_year_id": academic_year_id_str,
+                    "academic_year_title": academic_year_title,
                     "access_token": access_token,
                     "refresh_token": refresh_token,
                     "token_type": "bearer",
@@ -550,18 +558,17 @@ class MultiTenantAuthService:
                 await db.rollback()
                 logger.error(f"Error in set_password_first_login: {str(e)}")
                 raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to update password"
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update password"
                 )
 
     @staticmethod
     async def validate_tenant(client_name: str) -> bool:
         """
         Validate if tenant exists and is active.
-        
+
         Args:
             client_name: Client identifier
-            
+
         Returns:
             bool: True if tenant is valid and active
         """
@@ -574,4 +581,3 @@ class MultiTenantAuthService:
 
 
 # Import selectinload here to avoid circular imports
-from sqlalchemy.orm import selectinload

@@ -1,8 +1,11 @@
-from sqlalchemy import Column, Integer, func, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
-from app.db.base import BaseOrg
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import Column, DateTime, ForeignKey, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class Timetable(BaseOrg):
     __tablename__ = "timetables"

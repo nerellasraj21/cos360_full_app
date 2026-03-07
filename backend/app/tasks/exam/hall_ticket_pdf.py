@@ -4,28 +4,23 @@ hall_ticket_pdf.py
 Synchronous (non-Celery) hall ticket PDF generation using ReportLab.
 Called directly from hall_ticket_endpoints for immediate download response.
 """
+
 import io
-import zipfile
 from uuid import UUID
-from typing import Optional
+import zipfile
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
 from fastapi import HTTPException, status
-
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import cm
 from reportlab.lib.colors import HexColor, black, white
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer, HRFlowable
-)
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import cm
+from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.exam.hall_ticket_model import HallTicketEligibility
 from app.models.exam.exam_model import Exam
-from app.models.exam.exam_date_model import ExamDate
-
+from app.models.exam.hall_ticket_model import HallTicketEligibility
 
 # ── Color palette ──────────────────────────────────────────────────────────────
 PRIMARY = HexColor("#1a3a6b")
@@ -33,17 +28,17 @@ ACCENT = HexColor("#e8f0fe")
 BORDER = HexColor("#cccccc")
 
 
-async def _load_hall_ticket_data(
-    db: AsyncSession, exam_id: UUID, student_id: UUID
-) -> dict:
+async def _load_hall_ticket_data(db: AsyncSession, exam_id: UUID, student_id: UUID) -> dict:
     """Load all data needed to render a hall ticket."""
     # Hall ticket eligibility row
-    ht = (await db.execute(
-        select(HallTicketEligibility).where(
-            HallTicketEligibility.exam_id == exam_id,
-            HallTicketEligibility.student_id == student_id,
+    ht = (
+        await db.execute(
+            select(HallTicketEligibility).where(
+                HallTicketEligibility.exam_id == exam_id,
+                HallTicketEligibility.student_id == student_id,
+            )
         )
-    )).scalar_one_or_none()
+    ).scalar_one_or_none()
 
     if not ht:
         raise HTTPException(
@@ -57,12 +52,12 @@ async def _load_hall_ticket_data(
         )
 
     # Exam
-    exam = (await db.execute(
-        select(Exam).where(Exam.id == exam_id)
-    )).scalar_one_or_none()
+    exam = (await db.execute(select(Exam).where(Exam.id == exam_id))).scalar_one_or_none()
 
     # Student info via raw SQL (cross-module)
-    student_row = (await db.execute(text("""
+    student_row = (
+        await db.execute(
+            text("""
         SELECT
             s.id,
             COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '') AS student_name,
@@ -75,7 +70,10 @@ async def _load_hall_ticket_data(
         LEFT JOIN sections sec ON sec.id = sa.current_section_id
         WHERE s.id = :sid
         LIMIT 1
-    """), {"sid": str(student_id)})).fetchone()
+    """),
+            {"sid": str(student_id)},
+        )
+    ).fetchone()
 
     if not student_row:
         raise HTTPException(
@@ -84,7 +82,9 @@ async def _load_hall_ticket_data(
         )
 
     # Exam dates for student's class
-    dates_rows = (await db.execute(text("""
+    dates_rows = (
+        await db.execute(
+            text("""
         SELECT
             ed.exam_date,
             ed.start_time,
@@ -97,16 +97,17 @@ async def _load_hall_ticket_data(
           AND ed.class_id = :cid
           AND (:sec_id IS NULL OR ed.section_id = :sec_id OR ed.section_id IS NULL)
         ORDER BY ed.exam_date, ed.start_time
-    """), {
-        "eid": str(exam_id),
-        "cid": str(ht.class_id),
-        "sec_id": str(ht.section_id) if ht.section_id else None,
-    })).fetchall()
+    """),
+            {
+                "eid": str(exam_id),
+                "cid": str(ht.class_id),
+                "sec_id": str(ht.section_id) if ht.section_id else None,
+            },
+        )
+    ).fetchall()
 
     # School name: try organizations table, fall back to generic label
-    school_row = (await db.execute(text(
-        "SELECT name FROM organizations LIMIT 1"
-    ))).fetchone()
+    school_row = (await db.execute(text("SELECT name FROM organizations LIMIT 1"))).fetchone()
     school_name = school_row[0] if school_row and school_row[0] else "School"
 
     return {
@@ -141,7 +142,7 @@ def _build_pdf(data: dict) -> bytes:
         topMargin=2 * cm,
         bottomMargin=2 * cm,
     )
-    styles = getSampleStyleSheet()
+    getSampleStyleSheet()
     h1 = ParagraphStyle("h1", fontSize=16, textColor=PRIMARY, alignment=TA_CENTER, spaceAfter=4)
     h2 = ParagraphStyle("h2", fontSize=12, textColor=PRIMARY, alignment=TA_CENTER, spaceAfter=4)
     normal = ParagraphStyle("normal", fontSize=10, alignment=TA_LEFT, spaceAfter=4)
@@ -151,7 +152,7 @@ def _build_pdf(data: dict) -> bytes:
 
     # Header
     story.append(Paragraph(data["school_name"], h1))
-    story.append(Paragraph(f"<b>HALL TICKET</b>", h2))
+    story.append(Paragraph("<b>HALL TICKET</b>", h2))
     story.append(Paragraph(data["exam_name"], h2))
     story.append(HRFlowable(width="100%", thickness=2, color=PRIMARY))
     story.append(Spacer(1, 0.4 * cm))
@@ -164,15 +165,19 @@ def _build_pdf(data: dict) -> bytes:
         ["Class & Section", f"{data['class_name']} — {data['section_name']}"],
     ]
     info_table = Table(info_data, colWidths=[5 * cm, 12 * cm])
-    info_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, -1), ACCENT),
-        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("GRID", (0, 0), (-1, -1), 0.5, BORDER),
-        ("PADDING", (0, 0), (-1, -1), 6),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    ]))
+    info_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (0, -1), ACCENT),
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER),
+                ("PADDING", (0, 0), (-1, -1), 6),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(info_table)
     story.append(Spacer(1, 0.6 * cm))
 
@@ -184,8 +189,11 @@ def _build_pdf(data: dict) -> bytes:
         sched_header = [["Subject", "Date", "Start", "End", "Venue"]]
         sched_rows = [
             [
-                d["subject"], d["date"],
-                d["start_time"], d["end_time"], d["venue"],
+                d["subject"],
+                d["date"],
+                d["start_time"],
+                d["end_time"],
+                d["venue"],
             ]
             for d in data["dates"]
         ]
@@ -193,18 +201,22 @@ def _build_pdf(data: dict) -> bytes:
             sched_header + sched_rows,
             colWidths=[6 * cm, 3 * cm, 2 * cm, 2 * cm, 4 * cm],
         )
-        sched_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
-            ("TEXTCOLOR", (0, 0), (-1, 0), white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [white, ACCENT]),
-            ("GRID", (0, 0), (-1, -1), 0.5, BORDER),
-            ("ALIGN", (1, 0), (-1, -1), "CENTER"),
-            ("PADDING", (0, 0), (-1, -1), 5),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ]))
+        sched_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [white, ACCENT]),
+                    ("GRID", (0, 0), (-1, -1), 0.5, BORDER),
+                    ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+                    ("PADDING", (0, 0), (-1, -1), 5),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
+        )
         story.append(sched_table)
     else:
         story.append(Paragraph("No exam dates configured yet.", normal))
@@ -226,32 +238,32 @@ def _build_pdf(data: dict) -> bytes:
     story.append(Spacer(1, 1 * cm))
     sig_data = [["Principal's Signature", "", "Invigilator's Signature"]]
     sig_table = Table(sig_data, colWidths=[6 * cm, 5 * cm, 6 * cm])
-    sig_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("ALIGN", (0, 0), (0, 0), "LEFT"),
-        ("ALIGN", (2, 0), (2, 0), "RIGHT"),
-        ("TOPPADDING", (0, 0), (-1, -1), 30),
-        ("LINEABOVE", (0, 0), (0, 0), 1, black),
-        ("LINEABOVE", (2, 0), (2, 0), 1, black),
-    ]))
+    sig_table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("ALIGN", (0, 0), (0, 0), "LEFT"),
+                ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                ("TOPPADDING", (0, 0), (-1, -1), 30),
+                ("LINEABOVE", (0, 0), (0, 0), 1, black),
+                ("LINEABOVE", (2, 0), (2, 0), 1, black),
+            ]
+        )
+    )
     story.append(sig_table)
 
     doc.build(story)
     return buf.getvalue()
 
 
-async def generate_hall_ticket_pdf(
-    db: AsyncSession, exam_id: UUID, student_id: UUID
-) -> bytes:
+async def generate_hall_ticket_pdf(db: AsyncSession, exam_id: UUID, student_id: UUID) -> bytes:
     """Entry point called from hall_ticket_endpoints."""
     data = await _load_hall_ticket_data(db, exam_id, student_id)
     return _build_pdf(data)
 
 
-async def generate_all_hall_tickets_zip(
-    db: AsyncSession, exam_id: UUID
-) -> bytes:
+async def generate_all_hall_tickets_zip(db: AsyncSession, exam_id: UUID) -> bytes:
     """Generate ZIP of all eligible students' hall tickets."""
     from app.service.exam.hall_ticket_service import get_eligible_students
 
@@ -266,8 +278,8 @@ async def generate_all_hall_tickets_zip(
     with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         for row in eligible:
             try:
-                sid = row['student_id']
-                ht_num = row.get('hall_ticket_number') or sid
+                sid = row["student_id"]
+                ht_num = row.get("hall_ticket_number") or sid
                 pdf_bytes = await generate_hall_ticket_pdf(db, exam_id, sid)
                 filename = f"hall-ticket-{ht_num}.pdf"
                 zf.writestr(filename, pdf_bytes)

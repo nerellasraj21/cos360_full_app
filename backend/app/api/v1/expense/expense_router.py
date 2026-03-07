@@ -1,12 +1,12 @@
 from fastapi import APIRouter
 
-from .expense_category_endpoints import router as category_router
-from .expense_type_endpoints import router as type_router
-from .expense_transaction_endpoints import router as transaction_router
 from .expense_attachment_endpoints import router as attachment_router
 from .expense_audit_endpoints import router as audit_router
-from .expense_settings_endpoints import router as settings_router
+from .expense_category_endpoints import router as category_router
 from .expense_reporting_endpoints import router as reporting_router
+from .expense_settings_endpoints import router as settings_router
+from .expense_transaction_endpoints import router as transaction_router
+from .expense_type_endpoints import router as type_router
 
 # Main expense router
 expense_router = APIRouter(prefix="/expense", tags=["Expense Management"])

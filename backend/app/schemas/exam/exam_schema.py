@@ -1,29 +1,30 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List
-from uuid import UUID
-from decimal import Decimal
 from datetime import date, datetime
-from app.schemas.exam.enums import ExamStatus, ExamNature, ExamLevel
+from decimal import Decimal
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+from app.schemas.exam.enums import ExamLevel, ExamNature, ExamStatus
 
 
 class ExamBase(BaseModel):
     exam_name: str = Field(..., max_length=150)
     board: str = Field(..., max_length=50)
-    custom_board_name: Optional[str] = Field(None, max_length=100)
+    custom_board_name: str | None = Field(None, max_length=100)
     level: ExamLevel
     exam_type: str = Field(..., max_length=50)
     nature: ExamNature = ExamNature.formative
     is_internal: bool = True
-    weightage_percent: Optional[Decimal] = None
+    weightage_percent: Decimal | None = None
     academic_year_id: UUID
-    exam_grade_scheme_id: Optional[UUID] = None
-    mark_entry_deadline: Optional[date] = None
+    exam_grade_scheme_id: UUID | None = None
+    mark_entry_deadline: date | None = None
     publish_rank: bool = False
-    hall_ticket_min_attendance: Optional[Decimal] = Field(None, ge=0, le=100)
-    attendance_from_date: Optional[date] = None
-    attendance_to_date: Optional[date] = None
-    attendance_mode: Optional[str] = Field(None, max_length=20)
-    term: Optional[str] = Field(None, max_length=20)
+    hall_ticket_min_attendance: Decimal | None = Field(None, ge=0, le=100)
+    attendance_from_date: date | None = None
+    attendance_to_date: date | None = None
+    attendance_mode: str | None = Field(None, max_length=20)
+    term: str | None = Field(None, max_length=20)
 
 
 class ExamCreate(ExamBase):
@@ -31,13 +32,13 @@ class ExamCreate(ExamBase):
 
 
 class ExamUpdate(BaseModel):
-    exam_name: Optional[str] = Field(None, max_length=150)
-    mark_entry_deadline: Optional[date] = None
-    hall_ticket_min_attendance: Optional[Decimal] = Field(None, ge=0, le=100)
-    attendance_from_date: Optional[date] = None
-    attendance_to_date: Optional[date] = None
-    publish_rank: Optional[bool] = None
-    term: Optional[str] = None
+    exam_name: str | None = Field(None, max_length=150)
+    mark_entry_deadline: date | None = None
+    hall_ticket_min_attendance: Decimal | None = Field(None, ge=0, le=100)
+    attendance_from_date: date | None = None
+    attendance_to_date: date | None = None
+    publish_rank: bool | None = None
+    term: str | None = None
 
 
 class ExamRead(ExamBase):
@@ -46,8 +47,8 @@ class ExamRead(ExamBase):
     id: UUID
     status: ExamStatus
     hall_ticket_published: bool
-    hall_ticket_published_at: Optional[datetime] = None
-    cloned_from_exam_id: Optional[UUID] = None
+    hall_ticket_published_at: datetime | None = None
+    cloned_from_exam_id: UUID | None = None
     created_by: UUID
     created_at: datetime
     updated_at: datetime
@@ -64,6 +65,6 @@ class ExamListItem(BaseModel):
     nature: str
     status: ExamStatus
     academic_year_id: UUID
-    mark_entry_deadline: Optional[date] = None
+    mark_entry_deadline: date | None = None
     created_at: datetime
-    subject_config_count: Optional[int] = None
+    subject_config_count: int | None = None

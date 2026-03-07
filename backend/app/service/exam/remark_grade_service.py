@@ -3,7 +3,8 @@ import uuid
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, delete as sa_delete
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -19,13 +20,9 @@ log = logging.getLogger("exam.remark_grade_service")
 # ---------------------------------------------------------------------------
 
 
-async def _get_remark_grade_set_or_404(
-    set_id: UUID, db: AsyncSession
-) -> RemarkGradeSet:
+async def _get_remark_grade_set_or_404(set_id: UUID, db: AsyncSession) -> RemarkGradeSet:
     result = await db.execute(
-        select(RemarkGradeSet)
-        .options(selectinload(RemarkGradeSet.options))
-        .where(RemarkGradeSet.id == set_id)
+        select(RemarkGradeSet).options(selectinload(RemarkGradeSet.options)).where(RemarkGradeSet.id == set_id)
     )
     grade_set = result.scalar_one_or_none()
     if not grade_set:
@@ -41,9 +38,7 @@ async def _get_remark_grade_set_or_404(
 # ---------------------------------------------------------------------------
 
 
-async def create_remark_grade_set(
-    db: AsyncSession, payload: RemarkGradeSetCreate
-) -> RemarkGradeSet:
+async def create_remark_grade_set(db: AsyncSession, payload: RemarkGradeSetCreate) -> RemarkGradeSet:
     """Insert the parent set first, flush to get id, then bulk-insert options."""
     try:
         grade_set = RemarkGradeSet(
@@ -96,9 +91,7 @@ async def create_remark_grade_set(
 
 async def list_remark_grade_sets(db: AsyncSession) -> list[RemarkGradeSet]:
     try:
-        result = await db.execute(
-            select(RemarkGradeSet).options(selectinload(RemarkGradeSet.options))
-        )
+        result = await db.execute(select(RemarkGradeSet).options(selectinload(RemarkGradeSet.options)))
         return result.scalars().all()
     except Exception as e:
         log.error("Error listing RemarkGradeSets: %s", e)
@@ -121,9 +114,7 @@ async def get_remark_grade_set_or_404(db: AsyncSession, set_id: UUID) -> RemarkG
         )
 
 
-async def update_remark_grade_set(
-    db: AsyncSession, set_id: UUID, payload: "RemarkGradeSetUpdate"
-) -> RemarkGradeSet:
+async def update_remark_grade_set(db: AsyncSession, set_id: UUID, payload: "RemarkGradeSetUpdate") -> RemarkGradeSet:
     """Update name and replace all options of a remark grade set."""
     try:
         grade_set = await _get_remark_grade_set_or_404(set_id, db)

@@ -1,9 +1,12 @@
-from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
-from app.db.base import Base
-from sqlalchemy.sql import func
 import uuid
+
+from sqlalchemy import Column, DateTime, Float, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
+from app.db.base import Base
+
 
 class StudentTransportAssignment(Base):
     __tablename__ = "student_transport_assignments"

@@ -26,6 +26,7 @@ from datetime import date
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -38,7 +39,7 @@ SCHEMA = "test_tenant_schema"
 ARJUN_USERNAME = "arjun.sharma"
 
 # Preferred class/section for Arjun (different section from Lambodhar who is ABC/A)
-PREFERRED_CLASS   = "ABC"
+PREFERRED_CLASS = "ABC"
 PREFERRED_SECTION = "B"
 
 
@@ -52,20 +53,14 @@ async def run():
         # ------------------------------------------------------------------ #
         # 1. Find Arjun's user and student records                            #
         # ------------------------------------------------------------------ #
-        u = await db.execute(
-            text("SELECT id FROM users WHERE username = :uname"),
-            {"uname": ARJUN_USERNAME}
-        )
+        u = await db.execute(text("SELECT id FROM users WHERE username = :uname"), {"uname": ARJUN_USERNAME})
         arjun_user_id = u.scalar_one_or_none()
         if not arjun_user_id:
             print(f"[ERROR] User '{ARJUN_USERNAME}' not found.")
             print("        Run scripts/create_parent_with_children.py first.")
             return
 
-        s = await db.execute(
-            text("SELECT id FROM students WHERE user_id = :uid"),
-            {"uid": arjun_user_id}
-        )
+        s = await db.execute(text("SELECT id FROM students WHERE user_id = :uid"), {"uid": arjun_user_id})
         arjun_student_id = s.scalar_one_or_none()
         if not arjun_student_id:
             print(f"[ERROR] Student record for '{ARJUN_USERNAME}' not found.")
@@ -78,18 +73,13 @@ async def run():
         # 2. Find class and section                                           #
         # ------------------------------------------------------------------ #
         # Try preferred class first
-        c = await db.execute(
-            text("SELECT id FROM classes WHERE name = :name"),
-            {"name": PREFERRED_CLASS}
-        )
+        c = await db.execute(text("SELECT id FROM classes WHERE name = :name"), {"name": PREFERRED_CLASS})
         class_id = c.scalar_one_or_none()
         class_name_used = PREFERRED_CLASS
 
         if not class_id:
             # Fallback: use any available class
-            c2 = await db.execute(
-                text("SELECT id, name FROM classes ORDER BY name LIMIT 1")
-            )
+            c2 = await db.execute(text("SELECT id, name FROM classes ORDER BY name LIMIT 1"))
             row = c2.fetchone()
             if row:
                 class_id, class_name_used = row
@@ -104,7 +94,7 @@ async def run():
         if class_id:
             sec = await db.execute(
                 text("SELECT id FROM sections WHERE name = :name AND class_id = :cid"),
-                {"name": PREFERRED_SECTION, "cid": class_id}
+                {"name": PREFERRED_SECTION, "cid": class_id},
             )
             section_id = sec.scalar_one_or_none()
             section_name_used = PREFERRED_SECTION if section_id else "None"
@@ -112,13 +102,14 @@ async def run():
             if not section_id:
                 # Fallback: any section in this class
                 sec2 = await db.execute(
-                    text("SELECT id, name FROM sections WHERE class_id = :cid ORDER BY name LIMIT 1"),
-                    {"cid": class_id}
+                    text("SELECT id, name FROM sections WHERE class_id = :cid ORDER BY name LIMIT 1"), {"cid": class_id}
                 )
                 sec_row = sec2.fetchone()
                 if sec_row:
                     section_id, section_name_used = sec_row
-                    print(f"[INFO] Section '{PREFERRED_SECTION}' not found in class '{class_name_used}' -- using '{section_name_used}'")
+                    print(
+                        f"[INFO] Section '{PREFERRED_SECTION}' not found in class '{class_name_used}' -- using '{section_name_used}'"
+                    )
                 else:
                     print(f"[WARN] No sections found for class '{class_name_used}' -- section_id=NULL")
 
@@ -140,29 +131,32 @@ async def run():
         # 4. Check if admission already exists                                #
         # ------------------------------------------------------------------ #
         existing_adm = await db.execute(
-            text("SELECT id FROM student_admissions WHERE student_id = :sid"),
-            {"sid": arjun_student_id}
+            text("SELECT id FROM student_admissions WHERE student_id = :sid"), {"sid": arjun_student_id}
         )
         existing_adm_id = existing_adm.scalar_one_or_none()
 
         if existing_adm_id:
             # Update class/section to ensure latest values
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 UPDATE student_admissions
                 SET current_class_id   = :class_id,
                     current_section_id = :section_id,
                     academic_year_id   = :ay_id
                 WHERE id = :id
-            """), {
-                "class_id":   class_id,
-                "section_id": section_id,
-                "ay_id":      academic_year_id,
-                "id":         existing_adm_id,
-            })
+            """),
+                {
+                    "class_id": class_id,
+                    "section_id": section_id,
+                    "ay_id": academic_year_id,
+                    "id": existing_adm_id,
+                },
+            )
             print(f"[OK] Admission record updated -- admission_id: {existing_adm_id}")
             adm_id = existing_adm_id
         else:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO student_admissions (
                     id, student_id, admission_date,
                     current_class_id, current_section_id, academic_year_id
@@ -171,16 +165,17 @@ async def run():
                     gen_random_uuid(), :student_id, :adm_date,
                     :class_id, :section_id, :ay_id
                 )
-            """), {
-                "student_id": arjun_student_id,
-                "adm_date":   date.today(),
-                "class_id":   class_id,
-                "section_id": section_id,
-                "ay_id":      academic_year_id,
-            })
+            """),
+                {
+                    "student_id": arjun_student_id,
+                    "adm_date": date.today(),
+                    "class_id": class_id,
+                    "section_id": section_id,
+                    "ay_id": academic_year_id,
+                },
+            )
             adm_result = await db.execute(
-                text("SELECT id FROM student_admissions WHERE student_id = :sid"),
-                {"sid": arjun_student_id}
+                text("SELECT id FROM student_admissions WHERE student_id = :sid"), {"sid": arjun_student_id}
             )
             adm_id = adm_result.scalar_one()
             print(f"[OK] Admission record created -- admission_id: {adm_id}")

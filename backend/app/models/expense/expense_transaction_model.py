@@ -1,17 +1,28 @@
-from app.db.base import BaseOrg
-from sqlalchemy import TIMESTAMP, Column, String, func, Boolean, ForeignKey, Numeric, Date, Integer, Text, UniqueConstraint
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import (
+    TIMESTAMP,
+    Boolean,
+    Column,
+    Date,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
 
 
 class ExpenseTransaction(BaseOrg):
     __tablename__ = "expense_transactions"
 
     # Ensure unique idempotency key per tenant
-    __table_args__ = (
-        UniqueConstraint('idempotency_key', name='uq_expense_transaction_idempotency'),
-    )
+    __table_args__ = (UniqueConstraint("idempotency_key", name="uq_expense_transaction_idempotency"),)
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     org_id = Column(UUID(as_uuid=True), nullable=False, index=True)
@@ -53,7 +64,9 @@ class ExpenseTransaction(BaseOrg):
 
     # Relationships
     expense_type = relationship("ExpenseType", back_populates="transactions")
-    transaction_items = relationship("ExpenseTransactionItem", back_populates="transaction", cascade="all, delete-orphan")
+    transaction_items = relationship(
+        "ExpenseTransactionItem", back_populates="transaction", cascade="all, delete-orphan"
+    )
     attachments = relationship("ExpenseAttachment", back_populates="transaction", cascade="all, delete-orphan")
     audit_logs = relationship("ExpenseAuditLog", back_populates="transaction", cascade="all, delete-orphan")
 

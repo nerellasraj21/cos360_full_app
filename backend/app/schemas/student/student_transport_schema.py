@@ -1,14 +1,15 @@
-from pydantic import BaseModel, Field, confloat
-from typing import Optional, Annotated
 from datetime import datetime, time
+from typing import Annotated
 from uuid import UUID
+
+from pydantic import BaseModel, Field, confloat
 
 
 class StudentTransportBase(BaseModel):
     student_id: UUID
     trip_id: UUID
     stop_id: UUID
-    fee_term_id: Optional[UUID] = None
+    fee_term_id: UUID | None = None
     fee_per_term: Annotated[float, confloat(gt=0)] = Field(..., description="Fee must be positive")
 
 
@@ -17,19 +18,20 @@ class StudentTransportCreate(StudentTransportBase):
 
 
 class StudentTransportUpdate(BaseModel):
-    trip_id: Optional[UUID] = None
-    stop_id: Optional[UUID] = None
-    fee_term_id: Optional[UUID] = None
-    fee_per_term: Optional[Annotated[float, confloat(gt=0)]] = None
+    trip_id: UUID | None = None
+    stop_id: UUID | None = None
+    fee_term_id: UUID | None = None
+    fee_per_term: Annotated[float, confloat(gt=0)] | None = None
 
 
 # --- Nested detail schemas for enriched response ---
 
+
 class VehicleInfo(BaseModel):
     id: UUID
-    name: Optional[str] = None
-    registration_number: Optional[str] = None
-    vehicle_type: Optional[str] = None
+    name: str | None = None
+    registration_number: str | None = None
+    vehicle_type: str | None = None
     model_config = {"from_attributes": True}
 
 
@@ -38,25 +40,32 @@ class RouteInfo(BaseModel):
     route_name: str
     starting_stop: str
     ending_stop: str
-    start_time: Optional[time] = None
-    end_time: Optional[time] = None
+    start_time: time | None = None
+    end_time: time | None = None
     model_config = {"from_attributes": True}
 
 
 class TripInfo(BaseModel):
     id: UUID
-    trip_number: Optional[int] = None
-    route: Optional[RouteInfo] = None
-    vehicle: Optional[VehicleInfo] = None
+    trip_number: int | None = None
+    route: RouteInfo | None = None
+    vehicle: VehicleInfo | None = None
     model_config = {"from_attributes": True}
 
 
 class StopInfo(BaseModel):
     id: UUID
     name: str
-    number: Optional[int] = None
-    reaching_time: Optional[time] = None
-    fees: Optional[int] = None
+    number: int | None = None
+    reaching_time: time | None = None
+    fees: int | None = None
+    model_config = {"from_attributes": True}
+
+
+class StudentInfo(BaseModel):
+    id: UUID
+    first_name: str
+    last_name: str
     model_config = {"from_attributes": True}
 
 
@@ -64,6 +73,7 @@ class StudentTransportOut(StudentTransportBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
-    trip: Optional[TripInfo] = None
-    stop: Optional[StopInfo] = None
+    trip: TripInfo | None = None
+    stop: StopInfo | None = None
+    student: StudentInfo | None = None
     model_config = {"from_attributes": True}

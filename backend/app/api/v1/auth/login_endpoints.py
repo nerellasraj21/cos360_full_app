@@ -1,39 +1,56 @@
-from fastapi import APIRouter, Depends, Request, HTTPException, status
-from sqlalchemy.orm import Session
+import logging
+from typing import Union
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.tenant_session import get_tenant_db
 from app.schemas.auth.login_schema import (
-    LoginRequest,
-    LoginResponse,
+    AcademicYearOption,
     LegacyLoginResponse,
     LoginErrorResponse,
-    RefreshTokenRequest,
-    RefreshTokenResponse,
-    LogoutRequest,
-    LogoutResponse,
+    LoginRequest,
+    LoginResponse,
     LogoutErrorResponse,
     LogoutInstructions,
+    LogoutRequest,
+    LogoutResponse,
     PasswordChangeRequiredResponse,
+    RefreshTokenRequest,
+    RefreshTokenResponse,
     SetPasswordRequest,
     SetPasswordResponse,
 )
-from app.service.auth.token_blacklist_service import TokenBlacklistService
 from app.service.auth.auth_service import login_user
 from app.service.auth.multi_tenant_auth_service import MultiTenantAuthService
-from app.tools.jwt_utils import verify_refresh_token, verify_access_token, create_access_token, create_refresh_token
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Union
-import logging
+from app.service.auth.token_blacklist_service import TokenBlacklistService
+from app.tools.jwt_utils import create_access_token, create_refresh_token, verify_access_token, verify_refresh_token
 
 logger = logging.getLogger("login_endpoints")
 
 router = APIRouter(prefix="/auth", tags=["Auth/Login"])
 
-@router.post("/login",
-             response_model=Union[LoginResponse, PasswordChangeRequiredResponse, LegacyLoginResponse],
-             responses={
-                 401: {"model": LoginErrorResponse, "description": "Invalid connection or credentials"},
-                 500: {"model": LoginErrorResponse, "description": "Server error"}
-             })
+
+@router.get("/academic-years", response_model=list[AcademicYearOption])
+async def list_academic_years(db: AsyncSession = Depends(get_tenant_db)):
+    """Return available academic years for the login screen (public, no auth required)."""
+    from sqlalchemy import select
+
+    from app.models.masters.academic_year_model import AcademicYear
+
+    result = await db.execute(select(AcademicYear).order_by(AcademicYear.start_date.desc()))
+    years = result.scalars().all()
+    return [{"id": y.id, "title": y.title, "is_active": y.is_active} for y in years]
+
+
+@router.post(
+    "/login",
+    response_model=Union[LoginResponse, PasswordChangeRequiredResponse, LegacyLoginResponse],
+    responses={
+        401: {"model": LoginErrorResponse, "description": "Invalid connection or credentials"},
+        500: {"model": LoginErrorResponse, "description": "Server error"},
+    },
+)
 async def login(request: LoginRequest, fastapi_request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """
     Multi-tenant login endpoint.
@@ -47,7 +64,7 @@ async def login(request: LoginRequest, fastapi_request: Request, db: AsyncSessio
         logger.info(f"DEBUG LOGIN 1: Login request for user: {request.username}")
 
         # Determine if this is a multi-tenant request
-        client_name_from_request = getattr(fastapi_request.state, 'client_name', None)
+        client_name_from_request = getattr(fastapi_request.state, "client_name", None)
         client_name_from_body = request.client_name
 
         logger.info(f"DEBUG LOGIN 2: client_name_from_request: {client_name_from_request}")
@@ -62,6 +79,7 @@ async def login(request: LoginRequest, fastapi_request: Request, db: AsyncSessio
                     request.username,
                     request.password,
                     client_name_from_body,
+                    academic_year_id=request.academic_year_id,
                 )
                 # First-time staff login — return the password-change challenge
                 if login_result.get("requires_password_change"):
@@ -138,16 +156,19 @@ async def set_password_first_login(body: SetPasswordRequest, fastapi_request: Re
             detail="Password update service unavailable",
         )
 
-@router.post("/refresh",
-             response_model=RefreshTokenResponse,
-             responses={
-                 401: {"model": LoginErrorResponse, "description": "Invalid refresh token"},
-                 500: {"model": LoginErrorResponse, "description": "Server error"}
-             })
+
+@router.post(
+    "/refresh",
+    response_model=RefreshTokenResponse,
+    responses={
+        401: {"model": LoginErrorResponse, "description": "Invalid refresh token"},
+        500: {"model": LoginErrorResponse, "description": "Server error"},
+    },
+)
 async def refresh_token(request: RefreshTokenRequest, fastapi_request: Request):
     """
     Refresh access token using a valid refresh token.
-    
+
     Returns new access_token and refresh_token pair.
     Both tokens will have updated expiry times.
     """
@@ -169,46 +190,43 @@ async def refresh_token(request: RefreshTokenRequest, fastapi_request: Request):
             # Validate tenant is still active
             is_valid_tenant = await MultiTenantAuthService.validate_tenant(client_name)
             if not is_valid_tenant:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid connection"
-                )
-        
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid connection")
+
         # Create new token data (excluding exp and token_type)
         new_token_data = {
             "sub": payload.get("sub"),
             "username": payload.get("username"),
             "role": payload.get("role"),
-            "client_name": payload.get("client_name")
+            "client_name": payload.get("client_name"),
+            "academic_year_id": payload.get("academic_year_id"),
+            "academic_year_title": payload.get("academic_year_title"),
         }
-        
+
         # Generate new access token and refresh token
         new_access_token = create_access_token(new_token_data)
         new_refresh_token = create_refresh_token(new_token_data)
-        
+
         logger.info(f"Token refreshed successfully for user: {payload.get('username')}")
-        
-        return RefreshTokenResponse(
-            access_token=new_access_token,
-            refresh_token=new_refresh_token,
-            token_type="bearer"
-        )
-        
+
+        return RefreshTokenResponse(access_token=new_access_token, refresh_token=new_refresh_token, token_type="bearer")
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Unexpected error during token refresh: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Token refresh service unavailable"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token refresh service unavailable"
         )
 
-@router.post("/logout",
-             response_model=LogoutResponse,
-             responses={
-                 401: {"model": LogoutErrorResponse, "description": "Invalid or expired token"},
-                 500: {"model": LogoutErrorResponse, "description": "Server error"}
-             })
+
+@router.post(
+    "/logout",
+    response_model=LogoutResponse,
+    responses={
+        401: {"model": LogoutErrorResponse, "description": "Invalid or expired token"},
+        500: {"model": LogoutErrorResponse, "description": "Server error"},
+    },
+)
 async def logout(request: Request, body: LogoutRequest = None):
     """
     Server-side logout endpoint.
@@ -231,7 +249,7 @@ async def logout(request: Request, body: LogoutRequest = None):
         # Verify the access token (raises 401 if invalid/expired)
         payload = verify_access_token(access_token)
 
-        username    = payload.get("username", "unknown")
+        username = payload.get("username", "unknown")
         client_name = payload.get("client_name", "unknown")
 
         # Blacklist the access token
@@ -261,7 +279,4 @@ async def logout(request: Request, body: LogoutRequest = None):
         raise
     except Exception as e:
         logger.error(f"Unexpected error during logout: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Logout service unavailable"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Logout service unavailable")

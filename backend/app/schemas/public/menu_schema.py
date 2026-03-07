@@ -1,23 +1,26 @@
 from pydantic import BaseModel
-from typing import Optional
+
 
 class MenuBase(BaseModel):
     name: str
     url: str
     level: str
-    parent_id: Optional[int] = None
-    
+    parent_id: int | None = None
+
+
 class MenuCreate(MenuBase):
     pass
 
+
 class MenuUpdate(MenuBase):
     id: int
-    name: Optional[str] = None
-    url: Optional[str] = None
-    level: Optional[str] = None
-    parent_id: Optional[int] = None
-    
+    name: str | None = None
+    url: str | None = None
+    level: str | None = None
+    parent_id: int | None = None
+
+
 class MenuRead(MenuBase):
     id: int
-    
-    model_config = {"from_attributes": True} 
+
+    model_config = {"from_attributes": True}

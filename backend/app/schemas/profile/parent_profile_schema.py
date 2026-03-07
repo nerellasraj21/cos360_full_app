@@ -1,29 +1,31 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
 from uuid import UUID
+
+from pydantic import BaseModel, Field
+
 
 class ChildProfileOut(BaseModel):
     student_id: UUID
     first_name: str
     last_name: str
-    admission_number: Optional[str]
-    class_name: Optional[str]
-    section_name: Optional[str]
+    admission_number: str | None
+    class_name: str | None
+    section_name: str | None
     is_active: bool
 
     class Config:
         from_attributes = True
 
+
 class ParentProfileOut(BaseModel):
     parent_id: UUID
     user_id: UUID
     name: str
-    email: Optional[str]
-    phone: Optional[str]
-    occupation: Optional[str]
-    relation_to_student: Optional[str]
-    profile_photo_url: Optional[str] = None
-    children: List[ChildProfileOut] = []
+    email: str | None
+    phone: str | None
+    occupation: str | None
+    relation_to_student: str | None
+    profile_photo_url: str | None = None
+    children: list[ChildProfileOut] = []
 
     class Config:
         from_attributes = True
@@ -44,22 +46,19 @@ class ParentProfileOut(BaseModel):
                         "admission_number": "ADM2024001",
                         "class_name": "Grade 10",
                         "section_name": "A",
-                        "is_active": True
+                        "is_active": True,
                     }
-                ]
+                ],
             }
         }
 
+
 class ParentProfileUpdate(BaseModel):
-    email: Optional[str] = Field(None, description="Email address (editable)")
-    phone: Optional[str] = Field(None, description="Phone number (editable)")
-    occupation: Optional[str] = Field(None, description="Occupation (editable)")
+    email: str | None = Field(None, description="Email address (editable)")
+    phone: str | None = Field(None, description="Phone number (editable)")
+    occupation: str | None = Field(None, description="Occupation (editable)")
 
     class Config:
         json_schema_extra = {
-            "example": {
-                "email": "newemail@email.com",
-                "phone": "+91-9999999999",
-                "occupation": "Business Owner"
-            }
+            "example": {"email": "newemail@email.com", "phone": "+91-9999999999", "occupation": "Business Owner"}
         }

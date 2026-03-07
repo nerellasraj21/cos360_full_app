@@ -1,21 +1,24 @@
-from pydantic import BaseModel, field_validator
-from typing import Optional, Literal
 from datetime import datetime
-from uuid import UUID
 from decimal import Decimal
+from typing import Literal
+from uuid import UUID
+
+from pydantic import BaseModel, field_validator
+
 
 class FeeRefundBase(BaseModel):
     fee_transaction_id: UUID
     refund_amount: Decimal
     refund_reason: Literal["fee_adjustment", "student_withdrawal", "excess_payment", "other"]
-    detailed_reason: Optional[str] = None
-    
-    @field_validator('refund_amount')
+    detailed_reason: str | None = None
+
+    @field_validator("refund_amount")
     @classmethod
     def validate_positive_amount(cls, v):
         if v <= 0:
-            raise ValueError('Refund amount must be positive')
+            raise ValueError("Refund amount must be positive")
         return v
+
 
 class FeeRefundCreate(FeeRefundBase):
     student_id: UUID
@@ -23,14 +26,16 @@ class FeeRefundCreate(FeeRefundBase):
     academic_year_id: UUID
     requested_by_user_id: UUID
 
+
 class FeeRefundUpdate(BaseModel):
-    status: Optional[Literal["pending", "approved", "rejected", "processed"]] = None
-    approved_by_user_id: Optional[UUID] = None
-    processed_by_user_id: Optional[UUID] = None
-    refund_method: Optional[Literal["cash", "bank_transfer", "cheque"]] = None
-    refund_reference: Optional[str] = None
-    approval_remarks: Optional[str] = None
-    processing_remarks: Optional[str] = None
+    status: Literal["pending", "approved", "rejected", "processed"] | None = None
+    approved_by_user_id: UUID | None = None
+    processed_by_user_id: UUID | None = None
+    refund_method: Literal["cash", "bank_transfer", "cheque"] | None = None
+    refund_reference: str | None = None
+    approval_remarks: str | None = None
+    processing_remarks: str | None = None
+
 
 class FeeRefundRead(FeeRefundBase):
     id: UUID
@@ -40,22 +45,24 @@ class FeeRefundRead(FeeRefundBase):
     academic_year_id: UUID
     status: str
     requested_by_user_id: UUID
-    approved_by_user_id: Optional[UUID] = None
-    processed_by_user_id: Optional[UUID] = None
-    refund_method: Optional[str] = None
-    refund_reference: Optional[str] = None
-    approval_remarks: Optional[str] = None
-    processing_remarks: Optional[str] = None
+    approved_by_user_id: UUID | None = None
+    processed_by_user_id: UUID | None = None
+    refund_method: str | None = None
+    refund_reference: str | None = None
+    approval_remarks: str | None = None
+    processing_remarks: str | None = None
     requested_date: datetime
-    approved_date: Optional[datetime] = None
-    processed_date: Optional[datetime] = None
+    approved_date: datetime | None = None
+    processed_date: datetime | None = None
     created_at: datetime
     updated_at: datetime
-    
+
     model_config = {"from_attributes": True}
+
 
 class FeeRefundSummary(BaseModel):
     """Lightweight refund summary for list views"""
+
     id: UUID
     refund_number: str
     student_admission_num: str
@@ -63,20 +70,24 @@ class FeeRefundSummary(BaseModel):
     refund_reason: str
     status: str
     requested_date: datetime
-    
+
     model_config = {"from_attributes": True}
+
 
 class FeeRefundApproval(BaseModel):
     """Schema for refund approval/rejection"""
+
     refund_id: UUID
     action: Literal["approve", "reject"]
     approval_remarks: str
     approved_by_user_id: UUID
 
+
 class FeeRefundProcessing(BaseModel):
     """Schema for refund processing"""
+
     refund_id: UUID
     refund_method: Literal["cash", "bank_transfer", "cheque"]
-    refund_reference: Optional[str] = None
-    processing_remarks: Optional[str] = None
+    refund_reference: str | None = None
+    processing_remarks: str | None = None
     processed_by_user_id: UUID

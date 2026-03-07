@@ -1,45 +1,47 @@
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any
 from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExpenseAuditLogRead(BaseModel):
     """Schema for reading ExpenseAuditLog (read-only, immutable)"""
+
     id: UUID = Field(..., description="Unique identifier")
     transaction_id: UUID = Field(..., description="Transaction ID")
 
     # Action details
     action: str = Field(..., description="Action performed")
     action_category: str = Field(..., description="Action category")
-    field_name: Optional[str] = Field(None, description="Field that was changed")
-    old_value: Optional[str] = Field(None, description="Previous value")
-    new_value: Optional[str] = Field(None, description="New value")
+    field_name: str | None = Field(None, description="Field that was changed")
+    old_value: str | None = Field(None, description="Previous value")
+    new_value: str | None = Field(None, description="New value")
 
     # Complete state snapshots
-    full_record_before: Optional[Dict[str, Any]] = Field(None, description="Complete record before change")
-    full_record_after: Optional[Dict[str, Any]] = Field(None, description="Complete record after change")
+    full_record_before: dict[str, Any] | None = Field(None, description="Complete record before change")
+    full_record_after: dict[str, Any] | None = Field(None, description="Complete record after change")
 
     # Action context
-    action_reason: Optional[str] = Field(None, description="Reason for action")
-    action_notes: Optional[str] = Field(None, description="Additional notes")
+    action_reason: str | None = Field(None, description="Reason for action")
+    action_notes: str | None = Field(None, description="Additional notes")
 
     # Request details
-    request_ip_address: Optional[str] = Field(None, description="Request IP address")
-    request_user_agent: Optional[str] = Field(None, description="Request user agent")
-    request_session_id: Optional[str] = Field(None, description="Request session ID")
+    request_ip_address: str | None = Field(None, description="Request IP address")
+    request_user_agent: str | None = Field(None, description="Request user agent")
+    request_session_id: str | None = Field(None, description="Request session ID")
 
     # System context
-    api_endpoint: Optional[str] = Field(None, description="API endpoint called")
-    http_method: Optional[str] = Field(None, description="HTTP method")
-    request_id: Optional[str] = Field(None, description="Request correlation ID")
+    api_endpoint: str | None = Field(None, description="API endpoint called")
+    http_method: str | None = Field(None, description="HTTP method")
+    request_id: str | None = Field(None, description="Request correlation ID")
 
     # Workflow and compliance
-    workflow_stage: Optional[str] = Field(None, description="Workflow stage")
-    compliance_flags: Optional[Dict[str, Any]] = Field(None, description="Compliance flags")
+    workflow_stage: str | None = Field(None, description="Workflow stage")
+    compliance_flags: dict[str, Any] | None = Field(None, description="Compliance flags")
 
     # Department scoping
-    department_id: Optional[UUID] = Field(None, description="Department ID")
+    department_id: UUID | None = Field(None, description="Department ID")
 
     # Actor information (immutable)
     actor_user_id: UUID = Field(..., description="User who performed action")
@@ -54,6 +56,7 @@ class ExpenseAuditLogRead(BaseModel):
 
 class ExpenseAuditLogSummary(BaseModel):
     """Schema for audit log summary/overview"""
+
     transaction_id: UUID = Field(..., description="Transaction ID")
     total_logs: int = Field(..., description="Total audit log entries")
     last_action: str = Field(..., description="Last action performed")

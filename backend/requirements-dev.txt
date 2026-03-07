@@ -1,0 +1,16 @@
+# Development & CI tools — NOT installed in production Docker image
+# Install with: pip install -r requirements-dev.txt
+
+# Linting
+ruff==0.4.4
+
+# Formatting
+black==24.4.2
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.8
+pytest-cov==5.0.0
+
+# HTTP client for integration tests (already in requirements.txt — pinned here for dev)
+httpx==0.25.2

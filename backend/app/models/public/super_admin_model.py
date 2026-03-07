@@ -1,11 +1,14 @@
-from sqlalchemy import Column, String, Boolean, TIMESTAMP, func, Text, Integer
-from sqlalchemy.dialects.postgresql import UUID
-from app.db.base import BasePublic
 import uuid
 
+from sqlalchemy import TIMESTAMP, Boolean, Column, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import UUID
+
+from app.db.base import BasePublic
+
+
 class SuperAdmin(BasePublic):
-    __tablename__ = 'super_admin_users'
-    
+    __tablename__ = "super_admin_users"
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username = Column(String(100), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
@@ -16,18 +19,21 @@ class SuperAdmin(BasePublic):
     password_changed_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
-    
+
     # Security fields
     failed_login_attempts = Column(Integer, nullable=False, default=0)
     account_locked_until = Column(TIMESTAMP, nullable=True)
     requires_password_change = Column(Boolean, nullable=False, default=False)
-    
+
     def __repr__(self):
-        return f"<SuperAdmin(id={self.id}, username='{self.username}', email='{self.email}', is_active={self.is_active})>"
+        return (
+            f"<SuperAdmin(id={self.id}, username='{self.username}', email='{self.email}', is_active={self.is_active})>"
+        )
+
 
 class SuperAdminAudit(BasePublic):
-    __tablename__ = 'super_admin_audit'
-    
+    __tablename__ = "super_admin_audit"
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     super_admin_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     action = Column(String(100), nullable=False, index=True)
@@ -38,6 +44,6 @@ class SuperAdminAudit(BasePublic):
     ip_address = Column(String(45), nullable=True)
     user_agent = Column(Text, nullable=True)
     timestamp = Column(TIMESTAMP, nullable=False, server_default=func.now(), index=True)
-    
+
     def __repr__(self):
         return f"<SuperAdminAudit(id={self.id}, action='{self.action}', resource='{self.resource}', timestamp={self.timestamp})>"

@@ -1,16 +1,15 @@
+from uuid import UUID
+
+from fastapi import HTTPException
+from sqlalchemy import func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy import func, or_
-from fastapi import HTTPException
-from typing import List, Optional
-from uuid import UUID
 
 from app.models.masters.parent_model import Parent
 from app.models.masters.student_parent_association_model import StudentParentLink
-from app.schemas.masters.parent_schema import (
-    ParentCreate, ParentUpdate
-)
+from app.schemas.masters.parent_schema import ParentCreate, ParentUpdate
+
 
 async def create_parent(parent_data: ParentCreate, db: AsyncSession) -> Parent:
     try:
@@ -23,6 +22,7 @@ async def create_parent(parent_data: ParentCreate, db: AsyncSession) -> Parent:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating parent: {str(e)}")
 
+
 async def get_parent_by_id(parent_id: UUID, db: AsyncSession) -> Parent:
     result = await db.execute(
         select(Parent)
@@ -33,6 +33,7 @@ async def get_parent_by_id(parent_id: UUID, db: AsyncSession) -> Parent:
     if not parent:
         raise HTTPException(status_code=404, detail="Parent not found")
     return parent
+
 
 async def get_all_parents(db: AsyncSession, skip: int = 0, limit: int = 100):
     count_stmt = select(func.count(Parent.id))
@@ -50,22 +51,17 @@ async def get_all_parents(db: AsyncSession, skip: int = 0, limit: int = 100):
 
     has_next = (skip + limit) < total_count
 
-    return {
-        "items": parents,
-        "total_count": total_count,
-        "has_next": has_next,
-        "skip": skip,
-        "limit": limit
-    }
+    return {"items": parents, "total_count": total_count, "has_next": has_next, "skip": skip, "limit": limit}
+
 
 async def search_parents(
     db: AsyncSession,
-    search_query: Optional[str] = None,
-    email: Optional[str] = None,
-    phone: Optional[str] = None,
-    relation_to_student: Optional[str] = None,
+    search_query: str | None = None,
+    email: str | None = None,
+    phone: str | None = None,
+    relation_to_student: str | None = None,
     skip: int = 0,
-    limit: int = 10
+    limit: int = 10,
 ):
     filters = []
 
@@ -74,7 +70,7 @@ async def search_parents(
             or_(
                 Parent.name.ilike(f"%{search_query}%"),
                 Parent.email.ilike(f"%{search_query}%"),
-                Parent.phone.ilike(f"%{search_query}%")
+                Parent.phone.ilike(f"%{search_query}%"),
             )
         )
 
@@ -87,9 +83,7 @@ async def search_parents(
     if relation_to_student:
         filters.append(Parent.relation_to_student == relation_to_student)
 
-    stmt = select(Parent).options(
-        selectinload(Parent.student_links).selectinload(StudentParentLink.student)
-    )
+    stmt = select(Parent).options(selectinload(Parent.student_links).selectinload(StudentParentLink.student))
 
     if filters:
         stmt = stmt.where(or_(*filters))
@@ -108,13 +102,7 @@ async def search_parents(
 
     has_next = (skip + limit) < total_count
 
-    return {
-        "items": parents,
-        "total_count": total_count,
-        "has_next": has_next,
-        "skip": skip,
-        "limit": limit
-    }
+    return {"items": parents, "total_count": total_count, "has_next": has_next, "skip": skip, "limit": limit}
 
 
 async def update_parent(parent_id: UUID, parent_data: ParentUpdate, db: AsyncSession) -> Parent:
@@ -136,6 +124,7 @@ async def update_parent(parent_id: UUID, parent_data: ParentUpdate, db: AsyncSes
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error updating parent: {str(e)}")
+
 
 async def delete_parent(parent_id: UUID, db: AsyncSession):
     result = await db.execute(select(Parent).where(Parent.id == parent_id))

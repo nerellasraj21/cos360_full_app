@@ -10,43 +10,36 @@ Algorithm per student:
   6. Compute class_rank per class-section after all students processed.
   7. Upsert StudentExamResult.
 """
-import uuid
+
 from decimal import Decimal
+import uuid
 from uuid import UUID
-from typing import Optional
 
 from fastapi import HTTPException, status
+from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, text
 from sqlalchemy.orm import selectinload
 
 from app.models.exam.exam_model import Exam
-from app.models.exam.exam_subject_config_model import ExamSubjectConfig, ExamSubjectComponent
-from app.models.exam.exam_class_section_model import ExamClassSection
+from app.models.exam.exam_subject_config_model import ExamSubjectConfig
+from app.models.exam.grading_model import ExamGradeBand, SubjectGradeBand
 from app.models.exam.student_marks_model import StudentMark
 from app.models.exam.student_result_model import StudentExamResult, StudentSubjectResult
-from app.models.exam.grading_model import ExamGradeScheme, ExamGradeBand, SubjectGradeScheme, SubjectGradeBand
-from app.service.exam.grading_service import lookup_grade, ABSENT_GRADE
+from app.service.exam.grading_service import ABSENT_GRADE, lookup_grade
 
 
 async def _get_exam_bands(exam: Exam, db: AsyncSession) -> list:
     """Load ExamGradeScheme bands for the exam, or [] if not configured."""
     if not exam.exam_grade_scheme_id:
         return []
-    result = await db.execute(
-        select(ExamGradeBand)
-        .where(ExamGradeBand.scheme_id == exam.exam_grade_scheme_id)
-    )
+    result = await db.execute(select(ExamGradeBand).where(ExamGradeBand.scheme_id == exam.exam_grade_scheme_id))
     return result.scalars().all()
 
 
-async def _get_subject_bands(subject_grade_scheme_id: Optional[UUID], db: AsyncSession) -> list:
+async def _get_subject_bands(subject_grade_scheme_id: UUID | None, db: AsyncSession) -> list:
     if not subject_grade_scheme_id:
         return []
-    result = await db.execute(
-        select(SubjectGradeBand)
-        .where(SubjectGradeBand.scheme_id == subject_grade_scheme_id)
-    )
+    result = await db.execute(select(SubjectGradeBand).where(SubjectGradeBand.scheme_id == subject_grade_scheme_id))
     return result.scalars().all()
 
 
@@ -64,17 +57,13 @@ async def compute_exam_aggregate(
     exam_result = await db.execute(select(Exam).where(Exam.id == exam_id))
     exam = exam_result.scalar_one_or_none()
     if not exam:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Exam {exam_id} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Exam {exam_id} not found")
 
     if not force:
-        existing = await db.execute(
-            select(StudentExamResult).where(StudentExamResult.exam_id == exam_id).limit(1)
-        )
+        existing = await db.execute(select(StudentExamResult).where(StudentExamResult.exam_id == exam_id).limit(1))
         if existing.scalar_one_or_none():
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Results already computed. Pass force=true to recompute."
+                status_code=status.HTTP_409_CONFLICT, detail="Results already computed. Pass force=true to recompute."
             )
 
     # 2. Load subject configs with components
@@ -85,19 +74,16 @@ async def compute_exam_aggregate(
     )
     configs: list[ExamSubjectConfig] = sc_result.scalars().all()
     if not configs:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            detail="No subject configs found for this exam.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No subject configs found for this exam."
+        )
 
     # 3. Load all marks for the exam
-    marks_result = await db.execute(
-        select(StudentMark).where(StudentMark.exam_id == exam_id)
-    )
+    marks_result = await db.execute(select(StudentMark).where(StudentMark.exam_id == exam_id))
     all_marks: list[StudentMark] = marks_result.scalars().all()
 
     # Index marks: {(student_id, component_id): StudentMark}
-    mark_index: dict[tuple, StudentMark] = {
-        (m.student_id, m.component_id): m for m in all_marks
-    }
+    mark_index: dict[tuple, StudentMark] = {(m.student_id, m.component_id): m for m in all_marks}
 
     # 4. Collect all student_ids from marks
     student_ids: set[UUID] = {m.student_id for m in all_marks}
@@ -114,7 +100,7 @@ async def compute_exam_aggregate(
         await db.flush()
 
     # 7. Load class-section map: config_id -> (class_id, section_id)
-    config_map = {c.id: c for c in configs}
+    {c.id: c for c in configs}
 
     # 8. Build student → (class_id, section_id) map via student_admissions JOIN exam_class_sections.
     # This correctly assigns each student to their class-section within this exam,
@@ -195,8 +181,7 @@ async def compute_exam_aggregate(
                 total_max += sub_max
 
         overall_percent = (total_obtained / total_max * 100) if total_max > 0 else Decimal("0")
-        overall_grade = (lookup_grade(total_obtained, total_max, exam_bands)
-                         if exam_bands and total_max > 0 else None)
+        overall_grade = lookup_grade(total_obtained, total_max, exam_bands) if exam_bands and total_max > 0 else None
 
         # Look up this student's actual class-section for per-class ranking
         cls_sec = student_class_map.get(student_id)
@@ -221,14 +206,15 @@ async def compute_exam_aggregate(
 
     # 9. Compute ranks per class-section and update
     from itertools import groupby
+
     ranking_data.sort(key=lambda r: (str(r[2]), str(r[3])))
-    for (cls, sec), group in groupby(ranking_data, key=lambda r: (r[2], r[3])):
+    for (_cls, _sec), group in groupby(ranking_data, key=lambda r: (r[2], r[3])):
         sorted_group = sorted(group, key=lambda r: r[1], reverse=True)
         for rank, (sid, _, _, _) in enumerate(sorted_group, start=1):
             row = await db.execute(
-                select(StudentExamResult)
-                .where(StudentExamResult.exam_id == exam_id,
-                       StudentExamResult.student_id == sid)
+                select(StudentExamResult).where(
+                    StudentExamResult.exam_id == exam_id, StudentExamResult.student_id == sid
+                )
             )
             r = row.scalar_one_or_none()
             if r:

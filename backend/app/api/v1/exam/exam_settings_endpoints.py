@@ -3,10 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
-from app.tools.simple_permissions import check_role_plan_permission_with_error
-from app.tools.simple_permissions import get_current_user_token
-from app.schemas.exam.exam_settings_schema import ExamSettingsUpdate, ExamSettingsRead
+from app.schemas.exam.exam_settings_schema import ExamSettingsRead, ExamSettingsUpdate
 from app.service.exam.exam_settings_service import get_settings, upsert_settings
+from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
 router = APIRouter(prefix="/exam-settings", tags=["Exam Settings"])
 

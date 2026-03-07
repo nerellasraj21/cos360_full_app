@@ -1,10 +1,13 @@
-from sqlalchemy import Column, Integer, Time, String, ForeignKey
-from sqlalchemy.orm import relationship
-from app.db.base import BaseOrg
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
-class SlotTime(BaseOrg): 
+from sqlalchemy import Column, ForeignKey, String, Time
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
+
+class SlotTime(BaseOrg):
     __tablename__ = "slot_times"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)

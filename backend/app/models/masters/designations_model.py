@@ -1,10 +1,13 @@
 # models/designation.py
 
-from sqlalchemy import Column, Integer, String, TIMESTAMP, func
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
-from app.db.base import BaseOrg
 import uuid
+
+from sqlalchemy import TIMESTAMP, Column, String, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
+
 
 class Designation(BaseOrg):
     __tablename__ = "designations"

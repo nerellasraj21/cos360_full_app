@@ -1,8 +1,10 @@
-from app.db.base import BaseOrg
-from sqlalchemy import TIMESTAMP, Column, String, func, ForeignKey, Text, JSON
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import JSON, TIMESTAMP, Column, ForeignKey, String, Text, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import BaseOrg
 
 
 class ExpenseAuditLog(BaseOrg):
@@ -26,7 +28,7 @@ class ExpenseAuditLog(BaseOrg):
 
     # Complete state snapshots for critical actions
     full_record_before = Column(JSON, nullable=True)  # Complete record state before change
-    full_record_after = Column(JSON, nullable=True)   # Complete record state after change
+    full_record_after = Column(JSON, nullable=True)  # Complete record state after change
 
     # Action Context
     action_reason = Column(String(500), nullable=True)  # Why the action was taken
@@ -39,20 +41,20 @@ class ExpenseAuditLog(BaseOrg):
 
     # System Context
     api_endpoint = Column(String(200), nullable=True)  # Which API endpoint was called
-    http_method = Column(String(10), nullable=True)   # GET, POST, PUT, DELETE
-    request_id = Column(String(100), nullable=True)   # Correlation ID for tracking
+    http_method = Column(String(10), nullable=True)  # GET, POST, PUT, DELETE
+    request_id = Column(String(100), nullable=True)  # Correlation ID for tracking
 
     # Compliance & Workflow
     workflow_stage = Column(String(50), nullable=True)  # pending, approval, payment, completion
-    compliance_flags = Column(JSON, nullable=True)      # Any compliance-related flags
+    compliance_flags = Column(JSON, nullable=True)  # Any compliance-related flags
 
     # Department & Scoping (Security)
     department_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # For department-level audit isolation
 
     # Audit Actor (Security) - IMMUTABLE
     actor_user_id = Column(UUID(as_uuid=True), nullable=False, index=True)  # Who performed the action
-    actor_role = Column(String(50), nullable=False, index=True)             # What role they had
-    actor_username = Column(String(100), nullable=False)                    # Username at time of action
+    actor_role = Column(String(50), nullable=False, index=True)  # What role they had
+    actor_username = Column(String(100), nullable=False)  # Username at time of action
 
     # Timing (Security) - IMMUTABLE
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), index=True)

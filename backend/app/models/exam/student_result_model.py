@@ -1,9 +1,10 @@
 # app/models/exam/student_result_model.py
-from app.db.base import BaseOrg
-from sqlalchemy import (TIMESTAMP, Column, String, Boolean, Numeric, Integer,
-                        ForeignKey, DateTime, func)
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy.dialects.postgresql import UUID
+
+from app.db.base import BaseOrg
 
 
 class StudentExamResult(BaseOrg):

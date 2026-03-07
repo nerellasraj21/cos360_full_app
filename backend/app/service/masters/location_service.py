@@ -1,22 +1,28 @@
-from fastapi import HTTPException, status
 import logging as log
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+
+from fastapi import HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from app.models.masters.location import State, District, Mandal
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.masters.location import District, Mandal, State
 from app.schemas.masters.location_schema import (
-    StateCreate, StateUpdate, DistrictCreate, DistrictUpdate,
-    MandalCreate, MandalUpdate
+    DistrictCreate,
+    DistrictUpdate,
+    MandalCreate,
+    MandalUpdate,
+    StateCreate,
+    StateUpdate,
 )
 from app.tools.cache_utils import cache_dropdown, invalidate_cache
-from typing import Optional
-from uuid import UUID
 
 log = log.getLogger("masters.location_service")
 
 # ===== STATE CRUD OPERATIONS =====
 
-async def check_state_name_unique(db: AsyncSession, name: str, exclude_id: Optional[UUID] = None):
+
+async def check_state_name_unique(db: AsyncSession, name: str, exclude_id: UUID | None = None):
     """Check if state name is unique"""
     query = select(State).where(State.name == name)
 
@@ -27,10 +33,8 @@ async def check_state_name_unique(db: AsyncSession, name: str, exclude_id: Optio
     existing_state = result.scalar_one_or_none()
 
     if existing_state:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"State name '{name}' already exists"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"State name '{name}' already exists")
+
 
 async def create_state(db: AsyncSession, state_data: StateCreate):
     """Create a new state"""
@@ -61,17 +65,12 @@ async def create_state(db: AsyncSession, state_data: StateCreate):
     except IntegrityError as e:
         await db.rollback()
         log.error(f"Database integrity error creating state: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="State name must be unique"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="State name must be unique")
     except Exception as e:
         await db.rollback()
         log.error(f"Error creating state: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating state: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error creating state: {str(e)}")
+
 
 async def get_state_by_id(db: AsyncSession, state_id: UUID):
     """Get state by ID"""
@@ -80,10 +79,7 @@ async def get_state_by_id(db: AsyncSession, state_id: UUID):
         state = result.scalar_one_or_none()
 
         if not state:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"State with id {state_id} not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"State with id {state_id} not found")
 
         return state
 
@@ -91,17 +87,15 @@ async def get_state_by_id(db: AsyncSession, state_id: UUID):
         raise
     except Exception as e:
         log.error(f"Error fetching state {state_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching state: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching state: {str(e)}")
+
 
 async def get_all_states(db: AsyncSession, active_only: bool = False, skip: int = 0, limit: int = 100):
     """Get all states with pagination"""
     try:
         query = select(State)
         if active_only:
-            query = query.where(State.is_active == True)
+            query = query.where(State.is_active)
 
         # Get total count
         total_result = await db.execute(query)
@@ -114,18 +108,14 @@ async def get_all_states(db: AsyncSession, active_only: bool = False, skip: int 
 
         has_next = (skip + limit) < total_count
 
-        return {
-            "items": states,
-            "total_count": total_count,
-            "has_next": has_next
-        }
+        return {"items": states, "total_count": total_count, "has_next": has_next}
 
     except Exception as e:
         log.error(f"Error fetching states: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching states: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching states: {str(e)}"
         )
+
 
 @cache_dropdown(ttl=300)
 async def get_states_dropdown(db: AsyncSession, active_only: bool = True):
@@ -133,7 +123,7 @@ async def get_states_dropdown(db: AsyncSession, active_only: bool = True):
     try:
         query = select(State)
         if active_only:
-            query = query.where(State.is_active == True)
+            query = query.where(State.is_active)
         query = query.order_by(State.name)
 
         result = await db.execute(query)
@@ -142,9 +132,9 @@ async def get_states_dropdown(db: AsyncSession, active_only: bool = True):
     except Exception as e:
         log.error(f"Error fetching states dropdown: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching states dropdown: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching states dropdown: {str(e)}"
         )
+
 
 async def update_state(db: AsyncSession, state_id: UUID, state_update: StateUpdate):
     """Update state"""
@@ -180,10 +170,8 @@ async def update_state(db: AsyncSession, state_id: UUID, state_update: StateUpda
     except Exception as e:
         await db.rollback()
         log.error(f"Error updating state {state_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating state: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error updating state: {str(e)}")
+
 
 async def delete_state(db: AsyncSession, state_id: UUID):
     """Delete state with dependency check"""
@@ -192,15 +180,13 @@ async def delete_state(db: AsyncSession, state_id: UUID):
         state = await get_state_by_id(db, state_id)
 
         # Check for districts
-        district_count = await db.execute(
-            select(func.count(District.id)).where(District.state_id == state_id)
-        )
+        district_count = await db.execute(select(func.count(District.id)).where(District.state_id == state_id))
         district_dependencies = district_count.scalar()
 
         if district_dependencies > 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot delete state '{state.name}' because it has {district_dependencies} district(s). Please delete districts first."
+                detail=f"Cannot delete state '{state.name}' because it has {district_dependencies} district(s). Please delete districts first.",
             )
 
         await db.delete(state)
@@ -218,12 +204,11 @@ async def delete_state(db: AsyncSession, state_id: UUID):
     except Exception as e:
         await db.rollback()
         log.error(f"Error deleting state {state_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting state: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error deleting state: {str(e)}")
+
 
 # ===== DISTRICT CRUD OPERATIONS =====
+
 
 async def create_district(db: AsyncSession, district_data: DistrictCreate):
     """Create a new district"""
@@ -255,9 +240,9 @@ async def create_district(db: AsyncSession, district_data: DistrictCreate):
         await db.rollback()
         log.error(f"Error creating district: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating district: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error creating district: {str(e)}"
         )
+
 
 async def get_district_by_id(db: AsyncSession, district_id: UUID):
     """Get district by ID"""
@@ -267,8 +252,7 @@ async def get_district_by_id(db: AsyncSession, district_id: UUID):
 
         if not district:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"District with id {district_id} not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"District with id {district_id} not found"
             )
 
         return district
@@ -278,9 +262,9 @@ async def get_district_by_id(db: AsyncSession, district_id: UUID):
     except Exception as e:
         log.error(f"Error fetching district {district_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching district: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching district: {str(e)}"
         )
+
 
 async def get_districts_by_state(db: AsyncSession, state_id: UUID, active_only: bool = False):
     """Get all districts for a specific state (cascading level 1)"""
@@ -290,7 +274,7 @@ async def get_districts_by_state(db: AsyncSession, state_id: UUID, active_only: 
 
         query = select(District).where(District.state_id == state_id)
         if active_only:
-            query = query.where(District.is_active == True)
+            query = query.where(District.is_active)
         query = query.order_by(District.name)
 
         result = await db.execute(query)
@@ -301,9 +285,9 @@ async def get_districts_by_state(db: AsyncSession, state_id: UUID, active_only: 
     except Exception as e:
         log.error(f"Error fetching districts for state {state_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching districts: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching districts: {str(e)}"
         )
+
 
 @cache_dropdown(ttl=300)
 async def get_districts_dropdown(db: AsyncSession, state_id: UUID, active_only: bool = True):
@@ -311,7 +295,7 @@ async def get_districts_dropdown(db: AsyncSession, state_id: UUID, active_only: 
     try:
         query = select(District).where(District.state_id == state_id)
         if active_only:
-            query = query.where(District.is_active == True)
+            query = query.where(District.is_active)
         query = query.order_by(District.name)
 
         result = await db.execute(query)
@@ -320,9 +304,9 @@ async def get_districts_dropdown(db: AsyncSession, state_id: UUID, active_only: 
     except Exception as e:
         log.error(f"Error fetching districts dropdown for state {state_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching districts dropdown: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching districts dropdown: {str(e)}"
         )
+
 
 async def update_district(db: AsyncSession, district_id: UUID, district_update: DistrictUpdate):
     """Update district"""
@@ -359,9 +343,9 @@ async def update_district(db: AsyncSession, district_id: UUID, district_update: 
         await db.rollback()
         log.error(f"Error updating district {district_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating district: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error updating district: {str(e)}"
         )
+
 
 async def delete_district(db: AsyncSession, district_id: UUID):
     """Delete district with dependency check"""
@@ -370,15 +354,13 @@ async def delete_district(db: AsyncSession, district_id: UUID):
         district = await get_district_by_id(db, district_id)
 
         # Check for mandals
-        mandal_count = await db.execute(
-            select(func.count(Mandal.id)).where(Mandal.district_id == district_id)
-        )
+        mandal_count = await db.execute(select(func.count(Mandal.id)).where(Mandal.district_id == district_id))
         mandal_dependencies = mandal_count.scalar()
 
         if mandal_dependencies > 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot delete district '{district.name}' because it has {mandal_dependencies} mandal(s). Please delete mandals first."
+                detail=f"Cannot delete district '{district.name}' because it has {mandal_dependencies} mandal(s). Please delete mandals first.",
             )
 
         state_id = district.state_id
@@ -399,11 +381,12 @@ async def delete_district(db: AsyncSession, district_id: UUID):
         await db.rollback()
         log.error(f"Error deleting district {district_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting district: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error deleting district: {str(e)}"
         )
 
+
 # ===== MANDAL CRUD OPERATIONS =====
+
 
 async def create_mandal(db: AsyncSession, mandal_data: MandalCreate):
     """Create a new mandal"""
@@ -435,9 +418,9 @@ async def create_mandal(db: AsyncSession, mandal_data: MandalCreate):
         await db.rollback()
         log.error(f"Error creating mandal: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating mandal: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error creating mandal: {str(e)}"
         )
+
 
 async def get_mandal_by_id(db: AsyncSession, mandal_id: UUID):
     """Get mandal by ID"""
@@ -446,10 +429,7 @@ async def get_mandal_by_id(db: AsyncSession, mandal_id: UUID):
         mandal = result.scalar_one_or_none()
 
         if not mandal:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Mandal with id {mandal_id} not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Mandal with id {mandal_id} not found")
 
         return mandal
 
@@ -458,9 +438,9 @@ async def get_mandal_by_id(db: AsyncSession, mandal_id: UUID):
     except Exception as e:
         log.error(f"Error fetching mandal {mandal_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching mandal: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching mandal: {str(e)}"
         )
+
 
 async def get_mandals_by_district(db: AsyncSession, district_id: UUID, active_only: bool = False):
     """Get all mandals for a specific district (cascading level 2)"""
@@ -470,7 +450,7 @@ async def get_mandals_by_district(db: AsyncSession, district_id: UUID, active_on
 
         query = select(Mandal).where(Mandal.district_id == district_id)
         if active_only:
-            query = query.where(Mandal.is_active == True)
+            query = query.where(Mandal.is_active)
         query = query.order_by(Mandal.name)
 
         result = await db.execute(query)
@@ -481,9 +461,9 @@ async def get_mandals_by_district(db: AsyncSession, district_id: UUID, active_on
     except Exception as e:
         log.error(f"Error fetching mandals for district {district_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching mandals: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching mandals: {str(e)}"
         )
+
 
 @cache_dropdown(ttl=300)
 async def get_mandals_dropdown(db: AsyncSession, district_id: UUID, active_only: bool = True):
@@ -491,7 +471,7 @@ async def get_mandals_dropdown(db: AsyncSession, district_id: UUID, active_only:
     try:
         query = select(Mandal).where(Mandal.district_id == district_id)
         if active_only:
-            query = query.where(Mandal.is_active == True)
+            query = query.where(Mandal.is_active)
         query = query.order_by(Mandal.name)
 
         result = await db.execute(query)
@@ -500,9 +480,9 @@ async def get_mandals_dropdown(db: AsyncSession, district_id: UUID, active_only:
     except Exception as e:
         log.error(f"Error fetching mandals dropdown for district {district_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching mandals dropdown: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching mandals dropdown: {str(e)}"
         )
+
 
 async def update_mandal(db: AsyncSession, mandal_id: UUID, mandal_update: MandalUpdate):
     """Update mandal"""
@@ -539,9 +519,9 @@ async def update_mandal(db: AsyncSession, mandal_id: UUID, mandal_update: Mandal
         await db.rollback()
         log.error(f"Error updating mandal {mandal_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating mandal: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error updating mandal: {str(e)}"
         )
+
 
 async def delete_mandal(db: AsyncSession, mandal_id: UUID):
     """Delete mandal"""
@@ -567,6 +547,5 @@ async def delete_mandal(db: AsyncSession, mandal_id: UUID):
         await db.rollback()
         log.error(f"Error deleting mandal {mandal_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting mandal: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error deleting mandal: {str(e)}"
         )

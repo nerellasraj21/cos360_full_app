@@ -1,19 +1,23 @@
 import uuid
+
 # app/api/v1/exam/remark_grade_endpoints.py
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
 
 from app.db.tenant_session import get_tenant_db
-from app.tools.simple_permissions import check_role_plan_permission_with_error
-from app.tools.simple_permissions import get_current_user_token
 from app.schemas.exam.remark_grade_schema import (
-    RemarkGradeSetCreate, RemarkGradeSetRead, RemarkGradeSetUpdate,
+    RemarkGradeSetCreate,
+    RemarkGradeSetRead,
+    RemarkGradeSetUpdate,
 )
 from app.service.exam.remark_grade_service import (
-    create_remark_grade_set, list_remark_grade_sets, get_remark_grade_set_or_404,
-    update_remark_grade_set, delete_remark_grade_set,
+    create_remark_grade_set,
+    delete_remark_grade_set,
+    get_remark_grade_set_or_404,
+    list_remark_grade_sets,
+    update_remark_grade_set,
 )
+from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
 router = APIRouter(prefix="/remark-grades", tags=["Remark Grades"])
 
@@ -25,20 +29,20 @@ async def create_remark_set(
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'create')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "create")
     result = await create_remark_grade_set(db, payload)
     return result
 
 
-@router.get("", response_model=List[RemarkGradeSetRead])
+@router.get("", response_model=list[RemarkGradeSetRead])
 async def list_remark_sets(
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     results = await list_remark_grade_sets(db)
     return results
 
@@ -50,8 +54,8 @@ async def get_remark_set(
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'read')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     result = await get_remark_grade_set_or_404(db, set_id)
     return result
 
@@ -64,8 +68,8 @@ async def update_remark_set(
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'update')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "update")
     result = await update_remark_grade_set(db, set_id, payload)
     return result
 
@@ -77,6 +81,6 @@ async def delete_remark_set(
     db: AsyncSession = Depends(get_tenant_db),
 ):
     current_user = await get_current_user_token(request)
-    role = current_user.get('role')
-    await check_role_plan_permission_with_error(db, request, role, 'exams', 'delete')
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "delete")
     await delete_remark_grade_set(db, set_id)

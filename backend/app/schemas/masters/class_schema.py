@@ -1,32 +1,38 @@
-from pydantic import BaseModel
-from typing import Optional, List
-from app.schemas.masters.sections_schema import SectionRead, SectionCreate, SectionUpdate
 from datetime import datetime
 from uuid import UUID
 
+from pydantic import BaseModel
+
+from app.schemas.masters.sections_schema import SectionCreate, SectionRead, SectionUpdate
+
+
 class ClassBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     is_active: bool = True
     short_code: str
     academic_year_id: UUID
 
+
 class ClassCreate(ClassBase):
-    sections: Optional[List[SectionCreate]] = None  # Use create schema
+    sections: list[SectionCreate] | None = None  # Use create schema
+
 
 class ClassUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
-    short_code: Optional[str] = None
-    academic_year_id: Optional[UUID]
-    sections: Optional[List[SectionUpdate]] = None  # Use Update schema
+    name: str | None = None
+    description: str | None = None
+    is_active: bool | None = None
+    short_code: str | None = None
+    academic_year_id: UUID | None
+    sections: list[SectionUpdate] | None = None  # Use Update schema
+
 
 class ClassRead(ClassBase):
     id: UUID
-    sections: List[SectionRead] = []  # Use read schema for response
+    sections: list[SectionRead] = []  # Use read schema for response
 
     model_config = {"from_attributes": True}
+
 
 class ClassOut(BaseModel):
     id: UUID
@@ -40,6 +46,7 @@ class ClassOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class ClassDropdown(BaseModel):
     id: UUID
