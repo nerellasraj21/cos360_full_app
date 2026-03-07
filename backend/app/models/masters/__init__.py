@@ -1,5 +1,5 @@
 from ..student.certificate_type_model import CertificateType
-from ..student.student_certificate_model import CertificateIssue
+from ..student.student_certificate_model import CertificateIssue, FileAuditLog, StaleFileRegistry
 from ..student.student_document_model import StudentDocument
 from ..student.student_homework_model import StudentHomework
 from ..student.student_model import Student

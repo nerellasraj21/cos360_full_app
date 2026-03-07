@@ -22,7 +22,7 @@ from app.service.student.certificate_type_service import (
 )
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
-router = APIRouter(prefix="/student/certificate-types", tags=["Student/Certificate Types"])
+router = APIRouter(prefix="/certificates/types", tags=["Student/Certificate Types"])
 
 
 # Create Certificate Type

@@ -41,10 +41,16 @@ class Settings(BaseSettings):
     TENANT_DEVELOPMENT_MODE: bool = False  # Relaxed validation for dev
     TENANT_DEFAULT_NAME: str = "default"  # Default tenant name for fallback
 
+    # S3 / File Storage configuration
+    S3_BUCKET: str = ""  # e.g. "cos360-tenant-files-staging" for Railway, "cos360-tenant-files-prod" for AWS
+    S3_REGION: str = "ap-south-1"
+    S3_ENDPOINT_URL: str | None = None  # Optional: for Cloudflare R2 or custom endpoints
+    STALE_FILE_TTL_DAYS: int = 10  # Days before stale files are permanently deleted
+
     class Config:
         env_file = ".env"
         populate_by_name = True  # Enables Field(alias=...) to work
-        extra = "ignore"  # Ignore unknown env vars (e.g. SCHEMA_NAME used by alembic)
+        extra = "ignore"  # Ignore unknown env vars (e.g. SCHEMA_NAME used by alembic, AWS_ACCESS_KEY_ID)
 
 
 settings = Settings()
