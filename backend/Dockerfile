@@ -13,8 +13,6 @@ COPY ./migrations ./migrations
 
 COPY ./app ./app
 
-COPY .env .
-
 COPY ./start.sh /start.sh
 RUN chmod +x /start.sh
 
