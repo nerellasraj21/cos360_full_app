@@ -14,15 +14,46 @@ class CertificateUploadRequest(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ReceivedDocumentUploadRequest(BaseModel):
+    """Request model for uploading a received document (Category 1 — Admin only)"""
+    student_id: UUID
+    certificate_type_id: UUID
+    remarks: str | None = Field(None, max_length=500)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class IssuedCertificateCreateRequest(BaseModel):
+    """Request model for issuing a school certificate (Category 2 — Admin only)"""
+    student_id: UUID
+    certificate_type_id: UUID
+    issue_date: date
+    remarks: str | None = Field(None, max_length=500)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StudentSelectorItem(BaseModel):
+    """Student item returned by the admin cascade selector"""
+    student_id: UUID
+    full_name: str
+    admission_no: str | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CertificateRead(BaseModel):
     """Response model for reading certificate details"""
     id: UUID
     student_id: UUID
-    certificate_type_id: UUID
+    certificate_type_id: UUID | None
     type_name: str  # Certificate type name
-    file_path: str  # S3 key
-    issue_date: date
+    file_path: str | None  # S3 key
+    issue_date: date | None
     remarks: str | None
+    certificate_category: str | None = None
+    issued_by_name: str | None = None
+    issuer_signature_url: str | None = None  # presigned S3 URL
     created_at: datetime
     updated_at: datetime | None
 

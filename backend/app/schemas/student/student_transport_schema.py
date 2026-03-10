@@ -1,4 +1,5 @@
 from datetime import datetime, time
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
@@ -11,6 +12,7 @@ class StudentTransportBase(BaseModel):
     stop_id: UUID
     fee_term_id: UUID | None = None
     fee_per_term: Annotated[float, confloat(gt=0)] = Field(..., description="Fee must be positive")
+    pricing_id: UUID | None = None
 
 
 class StudentTransportCreate(StudentTransportBase):
@@ -22,6 +24,7 @@ class StudentTransportUpdate(BaseModel):
     stop_id: UUID | None = None
     fee_term_id: UUID | None = None
     fee_per_term: Annotated[float, confloat(gt=0)] | None = None
+    pricing_id: UUID | None = None
 
 
 # --- Nested detail schemas for enriched response ---
@@ -69,6 +72,14 @@ class StudentInfo(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PricingInfo(BaseModel):
+    id: UUID
+    billing_cycle: str
+    cycle_name: str
+    amount: Decimal
+    model_config = {"from_attributes": True}
+
+
 class StudentTransportOut(StudentTransportBase):
     id: UUID
     created_at: datetime
@@ -76,4 +87,5 @@ class StudentTransportOut(StudentTransportBase):
     trip: TripInfo | None = None
     stop: StopInfo | None = None
     student: StudentInfo | None = None
+    pricing: PricingInfo | None = None
     model_config = {"from_attributes": True}

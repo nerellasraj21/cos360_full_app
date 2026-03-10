@@ -8,6 +8,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.models.masters.transport.route_stop_model import RouteStop
+from app.models.masters.transport.transport_pricing_model import TransportPricing
 from app.models.masters.transport.trip_model import Trip
 from app.models.student.student_model import Student
 from app.models.student.student_transport_model import StudentTransportAssignment
@@ -87,6 +88,23 @@ async def add_student_transport(data: StudentTransportCreate, db: AsyncSession, 
                 request=request,
             )
 
+        # Validate pricing_id if provided, and use pricing amount as fee if fee_per_term not explicitly set
+        if data.pricing_id:
+            pricing_result = await db.execute(
+                select(TransportPricing).where(
+                    TransportPricing.id == data.pricing_id,
+                    TransportPricing.is_active == True,  # noqa: E712
+                )
+            )
+            pricing = pricing_result.scalar_one_or_none()
+            if not pricing:
+                raise create_not_found_error(
+                    message="Transport pricing not found or inactive",
+                    resource_type="transport_pricing",
+                    resource_id=str(data.pricing_id),
+                    request=request,
+                )
+
         # Validate fee amount
         if data.fee_per_term < 0:
             raise create_validation_error(
@@ -111,6 +129,7 @@ async def add_student_transport(data: StudentTransportCreate, db: AsyncSession, 
                 selectinload(StudentTransportAssignment.trip).selectinload(Trip.route),
                 selectinload(StudentTransportAssignment.trip).selectinload(Trip.vehicle),
                 selectinload(StudentTransportAssignment.stop),
+                selectinload(StudentTransportAssignment.pricing),
             )
             .where(StudentTransportAssignment.id == new_assignment.id)
         )
@@ -163,6 +182,7 @@ async def get_transport_assignments(
                 selectinload(StudentTransportAssignment.trip).selectinload(Trip.route),
                 selectinload(StudentTransportAssignment.trip).selectinload(Trip.vehicle),
                 selectinload(StudentTransportAssignment.stop),
+                selectinload(StudentTransportAssignment.pricing),
             )
         )
         return result.scalars().all()
@@ -209,6 +229,7 @@ async def get_transport_by_student_id(
                 selectinload(StudentTransportAssignment.trip).selectinload(Trip.route),
                 selectinload(StudentTransportAssignment.trip).selectinload(Trip.vehicle),
                 selectinload(StudentTransportAssignment.stop),
+                selectinload(StudentTransportAssignment.pricing),
             )
             .where(StudentTransportAssignment.student_id == student_id)
         )
@@ -291,6 +312,22 @@ async def update_partial_details_transport_assignment(
                     request=request,
                 )
 
+        # Validate pricing_id if being updated
+        if "pricing_id" in update_data and update_data["pricing_id"]:
+            pricing_result = await db.execute(
+                select(TransportPricing).where(
+                    TransportPricing.id == update_data["pricing_id"],
+                    TransportPricing.is_active == True,  # noqa: E712
+                )
+            )
+            if not pricing_result.scalar_one_or_none():
+                raise create_not_found_error(
+                    message="Transport pricing not found or inactive",
+                    resource_type="transport_pricing",
+                    resource_id=str(update_data["pricing_id"]),
+                    request=request,
+                )
+
         # Validate stop exists if being updated
         if "stop_id" in update_data:
             stop_result = await db.execute(select(RouteStop).where(RouteStop.id == update_data["stop_id"]))
@@ -317,6 +354,7 @@ async def update_partial_details_transport_assignment(
                 selectinload(StudentTransportAssignment.trip).selectinload(Trip.route),
                 selectinload(StudentTransportAssignment.trip).selectinload(Trip.vehicle),
                 selectinload(StudentTransportAssignment.stop),
+                selectinload(StudentTransportAssignment.pricing),
             )
             .where(StudentTransportAssignment.id == transport_id)
         )

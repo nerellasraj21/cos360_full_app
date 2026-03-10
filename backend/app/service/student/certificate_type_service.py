@@ -125,6 +125,25 @@ async def get_certificate_types_dropdown(db: AsyncSession):
         )
 
 
+async def search_certificate_types(db: AsyncSession, q: str = "", limit: int = 10):
+    """Search certificate types by name using ILIKE"""
+    try:
+        query = (
+            select(CertificateType)
+            .where(CertificateType.name.ilike(f"%{q}%"))
+            .order_by(CertificateType.name)
+            .limit(limit)
+        )
+        result = await db.execute(query)
+        return result.scalars().all()
+    except Exception as e:
+        log.error(f"Error searching certificate types: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error searching certificate types: {str(e)}",
+        )
+
+
 async def update_certificate_type(
     db: AsyncSession, certificate_type_id: UUID, certificate_type_update: CertificateTypeUpdate
 ):

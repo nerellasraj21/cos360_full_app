@@ -108,7 +108,7 @@ async def get_vehicle_route_stops(db: AsyncSession, vehicle_id: UUID, route_id: 
 
         # Get all stops for this route
         stops_query = (
-            select(RouteStop.id, RouteStop.name, RouteStop.number, RouteStop.reaching_time, RouteStop.fees)
+            select(RouteStop.id, RouteStop.name, RouteStop.number, RouteStop.reaching_time, RouteStop.pickup_time, RouteStop.drop_time, RouteStop.fees)
             .where(RouteStop.route_id == route_id, RouteStop.is_active)
             .order_by(RouteStop.number)
         )
@@ -120,6 +120,8 @@ async def get_vehicle_route_stops(db: AsyncSession, vehicle_id: UUID, route_id: 
                 "name": stop.name,
                 "number": stop.number,
                 "reaching_time": stop.reaching_time,
+                "pickup_time": stop.pickup_time,
+                "drop_time": stop.drop_time,
                 "fees": stop.fees,
             }
             for stop in result

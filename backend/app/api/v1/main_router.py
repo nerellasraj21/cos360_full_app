@@ -59,6 +59,7 @@ from app.api.v1.masters.transport.routes_endpoints import router as routes_route
 # from app.api.v1.masters.transport.student_trip_endpoints import router as student_trip_router
 from app.api.v1.masters.transport.trip_endpoints import router as trip_router
 from app.api.v1.masters.transport.trip_type_endpoints import router as trip_type_router
+from app.api.v1.masters.transport.transport_pricing_endpoints import router as transport_pricing_router
 from app.api.v1.masters.transport.vehicle_endpoints import router as vehicle_router
 from app.api.v1.profile import router as profile_router
 from app.api.v1.public.org_routes import router as org_router
@@ -106,6 +107,7 @@ router.include_router(trip_router)
 router.include_router(vehicle_router)
 router.include_router(route_type_router)
 router.include_router(trip_type_router)
+router.include_router(transport_pricing_router)
 router.include_router(timetable_router)
 router.include_router(admission_router)
 router.include_router(certificate_router)

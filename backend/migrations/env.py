@@ -115,6 +115,8 @@ def run_migrations_online() -> None:
         # Convert asyncpg to psycopg2 for alembic compatibility
         if database_url.startswith("postgresql+asyncpg://"):
             database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
+        # psycopg2 uses sslmode instead of ssl
+        database_url = database_url.replace("?ssl=", "?sslmode=").replace("&ssl=", "&sslmode=")
         config_section["sqlalchemy.url"] = database_url
     
     connectable = engine_from_config(
@@ -125,12 +127,11 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         # Set the search_path for Alembic migrations
-        @event.listens_for(connection, "begin")
-        def set_search_path(conn):
-            import os
-            schema_name = os.getenv('SCHEMA_NAME', 'cos360_masters')
-            conn.exec_driver_sql(f'SET search_path TO {schema_name}')
-            
+        schema_name = os.getenv('SCHEMA_NAME', 'cos360_masters')
+        connection.execute(
+            __import__('sqlalchemy').text(f'SET search_path TO {schema_name}, public')
+        )
+
         context.configure(
             connection=connection, target_metadata=target_metadata, compare_type=True,  # Enable type comparison
         )

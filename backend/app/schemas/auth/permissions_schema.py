@@ -6,8 +6,8 @@ from pydantic import BaseModel
 class RoleMenuPermissionBase(BaseModel):
     role_id: UUID
     menu_id: UUID
-    can_view: bool = True
-    can_edit: bool = False
+    can_view: bool | None = True
+    can_edit: bool | None = False
 
 
 class RoleMenuPermissionCreate(RoleMenuPermissionBase):

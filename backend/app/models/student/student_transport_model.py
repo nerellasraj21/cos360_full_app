@@ -17,6 +17,7 @@ class StudentTransportAssignment(Base):
     stop_id = Column(UUID(as_uuid=True), ForeignKey("route_stops.id"), nullable=False)
     # fee_term_id = Column(Integer, ForeignKey("fee_terms.id"), nullable=True)
     fee_per_term = Column(Float, nullable=False)
+    pricing_id = Column(UUID(as_uuid=True), ForeignKey("transport_pricing.id"), nullable=True)
 
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
@@ -25,3 +26,4 @@ class StudentTransportAssignment(Base):
     student = relationship("Student", backref="transport_assignments")
     trip = relationship("Trip")
     stop = relationship("RouteStop")
+    pricing = relationship("TransportPricing")
