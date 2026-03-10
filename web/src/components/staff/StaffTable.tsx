@@ -1,26 +1,25 @@
 import React, { useState, useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
+import { ViewButton, EditButton, DeleteButton, TableActionGroup } from '@/components/common/TableActions';
 import {
   Edit,
   Trash2,
   Eye,
   Plus,
-  MoreHorizontal,
   ChevronUp,
   ChevronDown,
   ChevronsUpDown,
   Search,
   Filter
 } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useStaffEnrollments, useUpdateStaffEnrollment, useDeleteStaffEnrollment, useDesignationsDropdown } from '@/hooks/masters/useStaff';
 import { useRoles } from '@/api/auth';
 import { StaffEnrollmentForm } from './StaffEnrollmentForm';
@@ -285,35 +284,14 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
                 <TableCell className="align-middle">{staffMember.department || '-'}</TableCell>
                 <TableCell className="align-middle">{new Date(staffMember.joining_date).toLocaleDateString()}</TableCell>
                 <TableCell className="align-middle">
-                  <Badge variant={staffMember.is_active ? "default" : "secondary"}>
-                    {staffMember.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
+                  <StatusBadge status={staffMember.is_active} />
                 </TableCell>
                 <TableCell className="align-middle">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleView(staffMember)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleEdit(staffMember)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleDelete(staffMember.id)}
-                        className="text-red-600"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <TableActionGroup>
+                    <ViewButton onClick={() => handleView(staffMember)} title="View Staff" />
+                    <EditButton onClick={() => handleEdit(staffMember)} title="Edit Staff" />
+                    <DeleteButton onClick={() => handleDelete(staffMember.id)} title="Delete Staff" />
+                  </TableActionGroup>
                 </TableCell>
               </TableRow>
             ))}
@@ -323,7 +301,7 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
 
       {/* View Modal */}
       <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Staff Details - {selectedStaff ? `${selectedStaff.first_name} ${selectedStaff.last_name || ''}`.trim() : ''}</DialogTitle>
           </DialogHeader>
@@ -357,7 +335,7 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
 
       {/* Edit Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Edit Staff Member</DialogTitle>
           </DialogHeader>

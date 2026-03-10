@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CheckCircle, XCircle, Eye, Clock, FileText, DollarSign, Calendar, User, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
@@ -98,18 +99,6 @@ export function ExpenseApprovals() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending_approval':
-        return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
-      case 'approved':
-        return <Badge variant="default"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
-      case 'rejected':
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
 
   if (isLoading) {
     return (
@@ -237,7 +226,7 @@ export function ExpenseApprovals() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {getStatusBadge(transaction.status)}
+                      <StatusBadge status={transaction.status} />
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -312,7 +301,7 @@ export function ExpenseApprovals() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Status</Label>
-                  <div className="mt-1">{getStatusBadge(transactionDetails.status)}</div>
+                  <div className="mt-1"><StatusBadge status={transactionDetails.status} /></div>
                 </div>
               </div>
 

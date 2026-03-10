@@ -1,10 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { LayoutDashboard } from 'lucide-react'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const Route = createFileRoute('/_app/')({
   component: () => (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold">Welcome to the Dashboard</h1>
-      <p className="mt-4">This is the main application area with sidebar and navbar.</p>
+    <div>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Welcome to COS360 School Management System"
+        icon={<LayoutDashboard className="h-5 w-5" />}
+      />
     </div>
   ),
 }) 

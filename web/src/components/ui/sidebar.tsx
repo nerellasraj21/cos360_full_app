@@ -1,31 +1,89 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
+    // UI / layout (keep)
     Home,
-    Calendar,
-    MessageSquare,
     Folder,
+    ChevronDown,
+    LogOut,
+    Sun,
+    Moon,
+    X,
+    // New top-level module icons
+    LayoutDashboard,
+    Database,
+    GraduationCap,
+    Briefcase,
+    Banknote,
+    Wallet,
+    Bus,
+    Send,
+    // Calendar variants
+    Calendar,
+    CalendarDays,
+    CalendarRange,
+    CalendarOff,
+    CalendarClock,
+    // Masters
+    School,
+    Layers,
+    BookOpen,
+    BookMarked,
+    ScrollText,
+    Tag,
+    Tags,
+    GitBranch,
+    Users,
+    Users2,
+    ShieldCheck,
+    // Student / Staff
+    UserPlus,
+    UserCheck,
+    UserRound,
+    FolderOpen,
+    BadgeCheck,
+    ClipboardCheck,
+    // Fee / Expense / Finance
+    ArrowLeftRight,
+    Receipt,
+    RotateCcw,
+    BarChart2,
+    BarChart3,
+    IndianRupee,
+    Building2,
+    CheckCircle2,
+    // Settings / Audit
+    Settings,
+    Settings2,
+    History,
+    // Transport
+    Route as RouteIcon,
+    MapPin,
+    Truck,
+    Navigation,
+    // Exam
+    ClipboardList,
+    PenLine,
+    Pencil,
+    Ticket,
+    Trophy,
+    Download,
+    Table2,
+    LayoutGrid,
+    LayoutTemplate,
+    ListChecks,
+    // Communication / Notifications
+    MessageSquare,
+    Bell,
+    // Admin / User management
+    UserCog,
+    Lock,
+    LayoutList,
+    // Misc legacy (keep for any unmapped menu items)
     ShoppingCart,
     Bitcoin,
     Mail,
     FileText,
-    Users,
-    Settings,
-    ChevronDown,
-    LogOut,
-    BookOpen,
-    GraduationCap,
-    Building,
-    Sun,
-    Moon,
-    X,
-    ClipboardList,
-    Award,
-    Ticket,
-    BarChart3,
-    Star,
-    ListChecks,
-    PenLine,
 } from "lucide-react";
 import clsx from "clsx";
 import { useLogoutMutation } from "../../api/auth";
@@ -43,54 +101,140 @@ interface SidebarProps {
 // Icon mapping utility
 const getIconForMenuItem = (name: string) => {
     const iconMap: Record<string, any> = {
-        Dashboard: Home,
-        Masters: Building,
-        Classes: GraduationCap,
-        Sections: Users,
+        // ── Top-level modules ──────────────────────────────────────────────────
+        Dashboard: LayoutDashboard,
+        Masters: Database,
+        Students: GraduationCap,
+        Staff: Briefcase,
+        "Staff Management": Briefcase,
+        "Fee Management": Banknote,
+        Expense: Wallet,
+        Transport: Bus,
+        "Exam Management": ClipboardList,
+        "Exam Dashboard": ClipboardList,
+        Communication: Send,
+        Calendar: CalendarDays,
+        Timetable: LayoutGrid,
+        "Timetable Management": LayoutGrid,
+        Administration: Building2,
+
+        // ── Masters submodules ─────────────────────────────────────────────────
+        Classes: School,
+        Sections: Layers,
         Academics: BookOpen,
-        Curriculum: FileText,
-        Subjects: BookOpen,
-        Syllabus: FileText,
-        Calendar: Calendar,
+        Curriculum: BookMarked,
+        Subjects: BookMarked,
+        Syllabus: ScrollText,
+        "Academic Years": CalendarRange,
+        "Classes & Sections": LayoutGrid,
+        "Classes and Sections": LayoutGrid,
+        "Subject Categories": Tag,
+        "Class Subject Mappings": GitBranch,
+        Parents: Users2,
+        "Roles & Permissions": ShieldCheck,
+        "User Management": UserCog,
+        "Role Management": ShieldCheck,
+        "Permission Management": Lock,
+        "Menu Management": LayoutList,
+        Holidays: CalendarOff,
+
+        // ── Students submodules ────────────────────────────────────────────────
+        Admission: UserPlus,
+        "Student Admission": UserPlus,
+        Attendance: UserCheck,
+        "Student Attendance": UserCheck,
+        Certificates: ScrollText,
+        "Certificate Types": Tag,
+        "My Certificates": ScrollText,
+        "Student Certificates": ScrollText,
+        Documents: FolderOpen,
+        "My Documents": FolderOpen,
+        "Student Documents": FolderOpen,
+        "Documents Upload": FolderOpen,
+
+        // ── Staff submodules ───────────────────────────────────────────────────
+        Enrollment: UserPlus,
+        Designations: BadgeCheck,
+        "Staff Attendance": ClipboardCheck,
+
+        // ── Fee submodules ─────────────────────────────────────────────────────
+        "Fee Categories": Tag,
+        "Fee Types": Tags,
+        "Fee Terms": CalendarRange,
+        "Fee Mappings": GitBranch,
+        Transactions: ArrowLeftRight,
+        "Fee Collections": Wallet,
+        "Fee Collection": Wallet,
+        Receipts: Receipt,
+        "Fee Receipts": Receipt,
+        Refunds: RotateCcw,
+        "Fee Refunds": RotateCcw,
+        "Fee Reports": BarChart2,
+        Reports: BarChart2,
+        "Student Reports": BarChart2,
+        "Student Report": BarChart2,
+        "Staff Reports": BarChart2,
+        "Staff Report": BarChart2,
+        "Transport Reports": BarChart2,
+        "Transport Report": BarChart2,
+        "Academic Reports": BarChart2,
+        "Academic Report": BarChart2,
+        "Term Amounts": IndianRupee,
+        "Fee Term Amounts": IndianRupee,
+
+        // ── Expense submodules ─────────────────────────────────────────────────
+        Categories: Tag,
+        Departments: Building2,
+        Approvals: CheckCircle2,
+        Settings: Settings2,
+        "Expense Settings": Settings2,
+        "Audit Log": History,
+
+        // ── Transport submodules ───────────────────────────────────────────────
+        Routes: RouteIcon,
+        "Route Stops": MapPin,
+        Vehicles: Truck,
+        Trips: Navigation,
+        "Transport Trips": Navigation,
+        "Student Transport": UserRound,
+        "Student Trips": Navigation,
+
+        // ── Exam submodules ────────────────────────────────────────────────────
+        Exams: ClipboardList,
+        "Exam List": ClipboardList,
+        "Create Exam": PenLine,
+        "Mark Entry": Pencil,
+        "Mark Permissions": ShieldCheck,
+        "Exam Dates": CalendarClock,
+        Results: Trophy,
+        "Student Results": Trophy,
+        "Hall Tickets": Ticket,
+        "Hall Ticket Download": Download,
+        Grading: Layers,
+        "Grading Setup": Layers,
+        "Exam Grade Schemes": Table2,
+        "Subject Grade Schemes": Table2,
+        "Remark Grade Sets": ListChecks,
+        "Board Patterns": LayoutTemplate,
+        "Exam Settings": Settings2,
+        Notifications: Bell,
+
+        // ── Misc / legacy ──────────────────────────────────────────────────────
         Chat: MessageSquare,
         "File Manager": Folder,
         Ecommerce: ShoppingCart,
         Crypto: Bitcoin,
         Email: Mail,
-        Invoices: FileText,
+        Invoices: Receipt,
         Projects: Folder,
-        Settings: Settings,
-        "Fee Management": Bitcoin,
-        "Fee Categories": FileText,
-        "Fee Types": FileText,
-        "Fee Terms": FileText,
-        "Fee Mappings": Users,
-        "Fee Reports": FileText,
-        // Exam module
-        "Exam Management": ClipboardList,
-        "Exams": ClipboardList,
-        "Exam List": ClipboardList,
-        "Create Exam": PenLine,
-        "Mark Entry": PenLine,
-        "Mark Permissions": Users,
-        "Exam Dates": Calendar,
-        "Results": Award,
-        "Student Results": Award,
-        "Hall Tickets": Ticket,
-        "Hall Ticket Download": Ticket,
-        "Grading Setup": Star,
-        "Exam Grade Schemes": Star,
-        "Subject Grade Schemes": Star,
-        "Remark Grade Sets": ListChecks,
-        "Board Patterns": BookOpen,
-        "Exam Settings": Settings,
-        "Audit Log": BarChart3,
-        "Notifications": MessageSquare,
-        "Communication": MessageSquare,
     };
 
     return iconMap[name] || Folder;
 };
+
+// Normalize URL for comparison: lowercase, strip separators (-, _), remove trailing slash
+const normalizeUrl = (url: string): string =>
+    url.toLowerCase().replace(/[-_\s]/g, '').replace(/\/+$/, '');
 
 function RecursiveMenuItem({
     item,
@@ -121,15 +265,42 @@ function RecursiveMenuItem({
     const isHovered = hoveredMenu === item.id;
     const navigate = useNavigate();
     const location = useLocation();
-    const isActive = item.url && location.pathname === item.url;
+    const isActive = item.url && normalizeUrl(location.pathname) === normalizeUrl(item.url);
     
+    // Map module names to routes when they don't match the simple lowercase derivation
+    const MODULE_ROUTE_MAP: Record<string, string> = {
+        'report': '/reports',
+        'reports': '/reports',
+        'administration': '/admin',
+        'feemanagement': '/fee',
+        'staffmanagement': '/staff',
+        'exammanagement': '/exam',
+        'timetablemanagement': '/TimeTable',
+    };
+
+    // For top-level items, always derive the dashboard URL from the name
+    // (backend may send a child page URL like /masters/routeStops instead of /masters)
+    const getDerivedUrl = (): string | null => {
+        if (level === 0) {
+            const derivedName = item.name.toLowerCase().replace(/\s+/g, '');
+            return MODULE_ROUTE_MAP[derivedName] || `/${derivedName}`;
+        }
+        return item.url;
+    };
+
     const handleClick = () => {
         if (hasChildren) {
             onExpand(item.id);
-        } else if (item.url) {
-            navigate({ to: item.url });
-            if (isMobile && onItemClick) {
-                onItemClick();
+            const targetUrl = getDerivedUrl();
+            if (targetUrl) {
+                navigate({ to: targetUrl });
+                if (isMobile && onItemClick) onItemClick();
+            }
+        } else {
+            const targetUrl = getDerivedUrl() || item.url;
+            if (targetUrl) {
+                navigate({ to: targetUrl });
+                if (isMobile && onItemClick) onItemClick();
             }
         }
     };
@@ -143,7 +314,7 @@ function RecursiveMenuItem({
                     level > 0 && "ml-4 text-sm",
                     "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-sidebar",
                     isActive
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        ? "border-l-4 border-primary bg-primary/10 text-primary hover:bg-primary/20"
                         : "hover:bg-sidebar-accent"
                 )}
                 onClick={handleClick}
@@ -156,7 +327,8 @@ function RecursiveMenuItem({
                 <Icon className="w-5 h-5 flex-shrink-0" />
                 <span
                     className={clsx(
-                        "transition-all duration-200 font-medium",
+                        "transition-all duration-200",
+                        isActive ? "font-semibold" : "font-medium",
                         open ? "opacity-100 ml-1" : "opacity-0 w-0 overflow-hidden"
                     )}
                 >
@@ -223,7 +395,7 @@ export function Sidebar({
 
     // Helper function to find if any child is active
     const hasActiveChild = (item: MenuItem): boolean => {
-        if (item.url && location.pathname === item.url) {
+        if (item.url && normalizeUrl(location.pathname) === normalizeUrl(item.url)) {
             return true;
         }
         if (item.children) {

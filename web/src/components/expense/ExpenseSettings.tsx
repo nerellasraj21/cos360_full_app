@@ -9,6 +9,7 @@ import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFo
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Label } from '@/components/ui/label';
 import { Plus, Edit, Settings, Shield, Workflow, Bell, Database } from 'lucide-react';
 import { useExpenseSettings, useExpenseCommonSettings, useCreateExpenseSetting, useUpdateExpenseSetting, useDeleteExpenseSetting } from '@/hooks/expense';
@@ -201,9 +202,7 @@ export function ExpenseSettings() {
                 <Shield className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Approval Workflow</p>
-                  <Badge variant={commonSettings.approval_workflow_enabled ? 'default' : 'secondary'}>
-                    {commonSettings.approval_workflow_enabled ? 'Enabled' : 'Disabled'}
-                  </Badge>
+                  <StatusBadge status={commonSettings.approval_workflow_enabled} label={commonSettings.approval_workflow_enabled ? 'Enabled' : 'Disabled'} />
                 </div>
               </div>
             </CardContent>
@@ -215,9 +214,7 @@ export function ExpenseSettings() {
                 <Database className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Attachment Required</p>
-                  <Badge variant={commonSettings.attachment_required ? 'default' : 'secondary'}>
-                    {commonSettings.attachment_required ? 'Yes' : 'No'}
-                  </Badge>
+                  <StatusBadge status={commonSettings.attachment_required} label={commonSettings.attachment_required ? 'Yes' : 'No'} />
                 </div>
               </div>
             </CardContent>
@@ -229,9 +226,7 @@ export function ExpenseSettings() {
                 <Bell className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Notifications</p>
-                  <Badge variant={commonSettings.notification_enabled ? 'default' : 'secondary'}>
-                    {commonSettings.notification_enabled ? 'Enabled' : 'Disabled'}
-                  </Badge>
+                  <StatusBadge status={commonSettings.notification_enabled} label={commonSettings.notification_enabled ? 'Enabled' : 'Disabled'} />
                 </div>
               </div>
             </CardContent>
@@ -320,9 +315,7 @@ export function ExpenseSettings() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={setting.is_active ? 'default' : 'secondary'}>
-                          {setting.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
+                        <StatusBadge status={setting.is_active} />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -374,7 +367,7 @@ export function ExpenseSettings() {
         guardDirty={isFormDirty}
         onDirtyDiscard={() => setIsFormDirty(false)}
       >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingSetting ? 'Edit Setting' : 'Create Setting'}

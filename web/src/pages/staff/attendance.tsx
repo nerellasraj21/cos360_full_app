@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, CheckCircle, XCircle, Search, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Save, CheckCircle, XCircle, Search, Eye, EyeOff, ClipboardCheck } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from 'sonner';
 import { Table } from '@/components/common/table';
 import type { TableColumn } from '@/components/common/table';
@@ -379,9 +380,7 @@ const StaffAttendancePage: React.FC = () => {
 
     return (
         <div className="container mx-auto p-4 space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Staff Attendance</h1>
-            </div>
+            <PageHeader title="Staff Attendance" icon={<ClipboardCheck className="h-5 w-5" />} />
 
             {/* Date Selection */}
             <Card>

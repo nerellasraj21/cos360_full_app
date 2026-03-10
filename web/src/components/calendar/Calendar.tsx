@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Edit, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useDrop, useDrag } from "react-dnd";
 import { addDays, startOfWeek, startOfMonth, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, addMonths, subMonths, isWithinInterval, parseISO } from "date-fns";
@@ -565,7 +565,7 @@ export function Calendar() {
                     </td>
                     <td className="px-4 py-2">
                       {hasUpdatePermission && (
-                        <Button size="sm" variant="outline" onClick={() => { setSelectedEvent(ev); setIsEditDirty(false); setShowEditDialog(true); }}>Edit</Button>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Event" onClick={() => { setSelectedEvent(ev); setIsEditDirty(false); setShowEditDialog(true); }}><Edit className="h-4 w-4" /></Button>
                       )}
                     </td>
                   </tr>

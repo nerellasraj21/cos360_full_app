@@ -3,337 +3,620 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Table } from "@/components/common/table";
-import type { TableColumn } from "@/components/common/table";
-import { FileText, Trash2, RotateCcw, ChevronDown, ChevronUp, Upload, Download, Loader2 } from "lucide-react";
+import { FileText, Trash2, RotateCcw, Upload, Download, Loader2, ChevronRight, User, ScrollText } from "lucide-react";
+import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from "sonner";
 import {
-  useCertificates,
-  useCreateCertificate,
+  useCertificatesByStudent,
+  useUploadReceived,
+  useUploadIssued,
   useDeleteCertificate,
   useDownloadCertificateDocument,
+  useSelectorClasses,
+  useSelectorSections,
+  useSelectorStudents,
+  useSearchCertificateTypes,
 } from "@/api/hooks/students/certificates";
-import { useCertificateTypes } from "@/api/certificateTypes";
-import { useStudentsDropdown } from "@/api/hooks/students/useAdmission";
-import type { CertificateRead } from "@/api/hooks/students/certificates";
+import type { CertificateRead, SelectorStudent } from "@/types/certificates/types";
+
+type UploadTab = "received" | "issued";
 
 export const CertificateUploadPage: React.FC = () => {
-  const [selectedStudent, setSelectedStudent] = useState<string>("");
-  const [selectedType, setSelectedType] = useState<string>("");
-  const [issueDate, setIssueDate] = useState<string>("");
-  const [remarks, setRemarks] = useState<string>("");
-  const [certificateFile, setCertificateFile] = useState<File | null>(null);
+  // Cascade selector state
+  const [classId, setClassId] = useState("");
+  const [sectionId, setSectionId] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<SelectorStudent | null>(null);
 
+  // Upload tabs
+  const [uploadTab, setUploadTab] = useState<UploadTab>("received");
+
+  // Delete dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
-  const [isUploadSectionOpen, setIsUploadSectionOpen] = useState(false);
 
-  const { data: certificatesResponse, isLoading: certificatesLoading } = useCertificates({ limit: 50 });
-  const { data: students = [] } = useStudentsDropdown();
-  const { data: certificateTypesResponse } = useCertificateTypes({ limit: 100 });
-  const certificateTypes = certificateTypesResponse?.items || [];
+  // Received form
+  const [recvTypeId, setRecvTypeId] = useState("");
+  const [recvRemarks, setRecvRemarks] = useState("");
+  const [recvFile, setRecvFile] = useState<File | null>(null);
 
-  const createCertificate = useCreateCertificate();
+  // Issued form
+  const [issuedTypeId, setIssuedTypeId] = useState("");
+  const [issuedDate, setIssuedDate] = useState("");
+  const [issuedRemarks, setIssuedRemarks] = useState("");
+  const [issuedFile, setIssuedFile] = useState<File | null>(null);
+
+  // Data hooks
+  const { data: classes = [], isLoading: classesLoading } = useSelectorClasses();
+  const { data: sections = [] } = useSelectorSections(classId);
+  const { data: students = [], isLoading: studentsLoading } = useSelectorStudents(
+    classId,
+    sectionId || undefined
+  );
+  const { data: certTypes = [] } = useSearchCertificateTypes("", 100);
+
+  const { data: certificatesData, isLoading: certsLoading } = useCertificatesByStudent(
+    selectedStudentId
+  );
+
+  // Mutations
+  const uploadReceived = useUploadReceived();
+  const uploadIssued = useUploadIssued();
   const deleteCertificate = useDeleteCertificate();
   const downloadCertificate = useDownloadCertificateDocument();
 
-  const certificates = certificatesResponse?.items || [];
+  const certificates = certificatesData?.items ?? [];
 
-  const handleDownload = async (certificateId: string) => {
+  // Cascade handlers
+  const handleClassChange = (val: string) => {
+    setClassId(val);
+    setSectionId("");
+    setSelectedStudentId("");
+    setSelectedStudent(null);
+  };
+
+  const handleSectionChange = (val: string) => {
+    setSectionId(val === "__all__" ? "" : val);
+    setSelectedStudentId("");
+    setSelectedStudent(null);
+  };
+
+  const handleStudentChange = (val: string) => {
+    setSelectedStudentId(val);
+    setSelectedStudent(students.find((s) => s.student_id === val) ?? null);
+  };
+
+  // Download
+  const handleDownload = async (id: string) => {
     try {
-      const result = await downloadCertificate.mutateAsync(certificateId);
+      const result = await downloadCertificate.mutateAsync(id);
       window.location.href = result.presigned_url;
     } catch {
-      // Error handled by mutation
+      // handled by mutation
     }
   };
 
-  const handleSubmit = async () => {
-    if (!selectedStudent || !selectedType) {
-      toast.error("Please fill all required fields");
+  // Submit received
+  const handleSubmitReceived = async () => {
+    if (!selectedStudentId || !recvTypeId || !recvFile) {
+      toast.error("Student, certificate type, and file are required");
       return;
     }
-
+    const formData = new FormData();
+    formData.append("student_id", selectedStudentId);
+    formData.append("certificate_type_id", recvTypeId);
+    if (recvRemarks) formData.append("remarks", recvRemarks);
+    formData.append("file", recvFile);
     try {
-      await createCertificate.mutateAsync({
-        student_id: selectedStudent,
-        certificate_type_id: selectedType,
-        issue_date: issueDate || undefined,
-        remarks: remarks || undefined,
-        certificate_file: certificateFile || undefined,
-      });
-
-      setSelectedStudent("");
-      setSelectedType("");
-      setIssueDate("");
-      setRemarks("");
-      setCertificateFile(null);
+      await uploadReceived.mutateAsync(formData);
+      setRecvTypeId("");
+      setRecvRemarks("");
+      setRecvFile(null);
     } catch {
-      // Error handled by mutation
+      // handled
     }
   };
 
+  const handleResetReceived = () => {
+    setRecvTypeId("");
+    setRecvRemarks("");
+    setRecvFile(null);
+  };
+
+  // Submit issued
+  const handleSubmitIssued = async () => {
+    if (!selectedStudentId || !issuedTypeId || !issuedDate || !issuedFile) {
+      toast.error("Certificate type, issue date, and file are required");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("student_id", selectedStudentId);
+    formData.append("certificate_type_id", issuedTypeId);
+    formData.append("issue_date", issuedDate);
+    if (issuedRemarks) formData.append("remarks", issuedRemarks);
+    formData.append("file", issuedFile);
+    try {
+      await uploadIssued.mutateAsync(formData);
+      setIssuedTypeId("");
+      setIssuedDate("");
+      setIssuedRemarks("");
+      setIssuedFile(null);
+    } catch {
+      // handled
+    }
+  };
+
+  const handleResetIssued = () => {
+    setIssuedTypeId("");
+    setIssuedDate("");
+    setIssuedRemarks("");
+    setIssuedFile(null);
+  };
+
+  // Delete
   const handleDelete = async (row: CertificateRead) => {
     try {
       await deleteCertificate.mutateAsync(row.id);
       setDeleteDialogOpen(null);
     } catch {
-      // Error handled by mutation
+      // handled
     }
   };
 
-  const columns: TableColumn<CertificateRead>[] = [
-    {
-      key: "type_name",
-      label: "Certificate Type",
-      render: (value) => (
-        <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-muted-foreground" />
-          {value || "-"}
-        </div>
-      ),
-    },
-    {
-      key: "issue_date",
-      label: "Issue Date",
-      render: (value) => (value ? new Date(value).toLocaleDateString() : "-"),
-    },
-    {
-      key: "remarks",
-      label: "Remarks",
-      render: (value) => value || "-",
-    },
-    {
-      key: "file_path",
-      label: "File",
-      render: (value) =>
-        value ? (
-          <Badge variant="secondary">
-            <FileText className="h-3 w-3 mr-1" />
-            Uploaded
-          </Badge>
-        ) : (
-          <span className="text-muted-foreground text-sm">No file</span>
-        ),
-    },
-    {
-      key: "actions" as keyof CertificateRead,
-      label: "Actions",
-      render: (_, row) => (
-        <div className="flex gap-1">
-          {row.file_path && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleDownload(row.id)}
-              disabled={downloadCertificate.isPending}
-              title="Download"
-            >
-              {downloadCertificate.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-            </Button>
-          )}
-          <Dialog
-            open={deleteDialogOpen === row.id}
-            onOpenChange={(open) => setDeleteDialogOpen(open ? row.id : null)}
-          >
-            <DialogTrigger asChild>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                title="Delete"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delete Certificate?</DialogTitle>
-                <DialogDescription>
-                  Are you sure you want to delete this certificate? This action cannot be undone.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button
-                  variant="destructive"
-                  onClick={() => handleDelete(row)}
-                  disabled={deleteCertificate.isPending}
-                >
-                  {deleteCertificate.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : null}
-                  Delete
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      ),
-    },
-  ];
+  const inputClass =
+    "w-full px-3 py-2 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <Card>
-        <CardHeader
-          className="cursor-pointer hover:bg-muted/50 transition-colors"
-          onClick={() => setIsUploadSectionOpen(!isUploadSectionOpen)}
-        >
-          <div className="flex items-center justify-between">
-            <CardTitle>Issue New Certificate</CardTitle>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              {isUploadSectionOpen ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-        {isUploadSectionOpen && (
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Student *</Label>
-                <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select student" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students.map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.display_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Certificate Type *</Label>
-                <Select value={selectedType} onValueChange={setSelectedType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select certificate type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {certificateTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Issue Date</Label>
-                <input
-                  type="date"
-                  value={issueDate}
-                  onChange={(e) => setIssueDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Certificate File</Label>
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.docx"
-                  onChange={(e) => setCertificateFile(e.target.files?.[0] || null)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
-                />
-                {certificateFile && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Upload className="h-4 w-4" />
-                    {certificateFile.name}
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">PDF, JPG, JPEG, PNG, DOCX — max 10 MB</p>
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label>Remarks</Label>
-                <textarea
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
-                  placeholder="Optional remarks"
-                  rows={3}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                onClick={handleSubmit}
-                disabled={createCertificate.isPending}
-                className="flex-1 md:flex-none"
-              >
-                {createCertificate.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  "Issue Certificate"
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedStudent("");
-                  setSelectedType("");
-                  setIssueDate("");
-                  setRemarks("");
-                  setCertificateFile(null);
-                }}
-                disabled={createCertificate.isPending}
-                className="flex-1 md:flex-none"
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Reset
-              </Button>
-            </div>
-          </CardContent>
-        )}
-      </Card>
-
+      <PageHeader title="Student Certificates" icon={<ScrollText className="h-5 w-5" />} />
+      {/* ── Cascade Selector ── */}
       <Card>
         <CardHeader>
-          <CardTitle>All Certificates</CardTitle>
+          <CardTitle>Select Student</CardTitle>
         </CardHeader>
-        <CardContent>
-          {certificatesLoading ? (
-            <div className="flex justify-center items-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <span className="ml-2">Loading certificates...</span>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Class */}
+            <div className="space-y-1.5 flex-1 min-w-[160px]">
+              <Label>Class *</Label>
+              <Select value={classId} onValueChange={handleClassChange} disabled={classesLoading}>
+                <SelectTrigger>
+                  <SelectValue placeholder={classesLoading ? "Loading..." : "Select class"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          ) : certificates.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No certificates issued yet.</p>
+
+            {classId && (
+              <>
+                <ChevronRight className="h-4 w-4 text-muted-foreground mb-1 shrink-0" />
+
+                {/* Section */}
+                <div className="space-y-1.5 flex-1 min-w-[160px]">
+                  <Label>Section</Label>
+                  <Select
+                    value={sectionId || "__all__"}
+                    onValueChange={handleSectionChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All sections" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All sections</SelectItem>
+                      {sections.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <ChevronRight className="h-4 w-4 text-muted-foreground mb-1 shrink-0" />
+
+                {/* Student */}
+                <div className="space-y-1.5 flex-1 min-w-[200px]">
+                  <Label>Student *</Label>
+                  <Select
+                    value={selectedStudentId}
+                    onValueChange={handleStudentChange}
+                    disabled={studentsLoading || students.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          studentsLoading
+                            ? "Loading..."
+                            : students.length === 0
+                            ? "No students found"
+                            : "Select student"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {students.map((s) => (
+                        <SelectItem key={s.student_id} value={s.student_id}>
+                          {s.full_name} ({s.admission_no})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+          </div>
+
+          {selectedStudent && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1">
+              <User className="h-4 w-4" />
+              <span>
+                Selected:{" "}
+                <strong className="text-foreground">{selectedStudent.full_name}</strong>
+                {" — "}
+                {selectedStudent.admission_no}
+              </span>
             </div>
-          ) : (
-            <Table
-              columns={columns}
-              data={certificates}
-              onEdit={() => {}}
-              onDelete={() => {}}
-              className="w-full"
-              isEditing={false}
-            />
           )}
         </CardContent>
       </Card>
+
+      {/* ── Upload + Datatable (shown after student selected) ── */}
+      {selectedStudentId && (
+        <>
+          {/* Upload Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <CardTitle>Upload for {selectedStudent?.full_name}</CardTitle>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant={uploadTab === "received" ? "default" : "outline"}
+                    onClick={() => setUploadTab("received")}
+                  >
+                    Received Document
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={uploadTab === "issued" ? "default" : "outline"}
+                    onClick={() => setUploadTab("issued")}
+                  >
+                    Issue Certificate
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {uploadTab === "received" ? (
+                /* ── Received Document Form ── */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Certificate Type *</Label>
+                      <Select value={recvTypeId} onValueChange={setRecvTypeId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {certTypes.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>
+                        Document File *{" "}
+                        <span className="text-xs text-muted-foreground font-normal">
+                          PDF/JPG/PNG/DOCX, max 10 MB
+                        </span>
+                      </Label>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.docx"
+                        onChange={(e) => setRecvFile(e.target.files?.[0] ?? null)}
+                        className={inputClass}
+                      />
+                      {recvFile && (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Upload className="h-3 w-3" />
+                          {recvFile.name}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Remarks</Label>
+                      <textarea
+                        value={recvRemarks}
+                        onChange={(e) => setRecvRemarks(e.target.value)}
+                        className={inputClass}
+                        placeholder="Optional remarks (max 500 characters)"
+                        rows={2}
+                        maxLength={500}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleSubmitReceived}
+                      disabled={uploadReceived.isPending}
+                    >
+                      {uploadReceived.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        "Upload Document"
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleResetReceived}
+                      disabled={uploadReceived.isPending}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* ── Issue Certificate Form ── */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Certificate Type *</Label>
+                      <Select value={issuedTypeId} onValueChange={setIssuedTypeId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {certTypes.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Issue Date *</Label>
+                      <input
+                        type="date"
+                        value={issuedDate}
+                        onChange={(e) => setIssuedDate(e.target.value)}
+                        className={inputClass}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>
+                        Certificate File *{" "}
+                        <span className="text-xs text-muted-foreground font-normal">
+                          PDF/JPG/PNG/DOCX, max 10 MB
+                        </span>
+                      </Label>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.docx"
+                        onChange={(e) => setIssuedFile(e.target.files?.[0] ?? null)}
+                        className={inputClass}
+                      />
+                      {issuedFile && (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Upload className="h-3 w-3" />
+                          {issuedFile.name}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Remarks</Label>
+                      <textarea
+                        value={issuedRemarks}
+                        onChange={(e) => setIssuedRemarks(e.target.value)}
+                        className={inputClass}
+                        placeholder="Optional remarks (max 500 characters)"
+                        rows={2}
+                        maxLength={500}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleSubmitIssued}
+                      disabled={uploadIssued.isPending}
+                    >
+                      {uploadIssued.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Issuing...
+                        </>
+                      ) : (
+                        "Issue Certificate"
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleResetIssued}
+                      disabled={uploadIssued.isPending}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── Datatable ── */}
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <CardTitle>
+                  Certificates — {selectedStudent?.full_name}
+                  {certificatesData && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      ({certificatesData.total} total)
+                    </span>
+                  )}
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {certsLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                  <span className="ml-2">Loading certificates...</span>
+                </div>
+              ) : certificates.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
+                  <p>No certificates found.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-3 font-medium text-muted-foreground w-10">
+                          S.No.
+                        </th>
+                        <th className="text-left py-3 px-3 font-medium text-muted-foreground">
+                          Certificate Type
+                        </th>
+                        <th className="text-left py-3 px-3 font-medium text-muted-foreground">
+                          Issue Date
+                        </th>
+                        <th className="text-left py-3 px-3 font-medium text-muted-foreground">
+                          Remarks
+                        </th>
+                        <th className="text-left py-3 px-3 font-medium text-muted-foreground">
+                          File
+                        </th>
+                        <th className="text-left py-3 px-3 font-medium text-muted-foreground">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {certificates.map((cert, idx) => (
+                        <tr
+                          key={cert.id}
+                          className="border-b hover:bg-muted/40 transition-colors"
+                          style={{ height: 48 }}
+                        >
+                          <td className="py-2 px-3 text-muted-foreground">{idx + 1}</td>
+                          <td className="py-2 px-3">
+                            <div className="flex items-center gap-1.5">
+                              <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                              {cert.type_name || "-"}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3">
+                            {cert.issue_date
+                              ? new Date(cert.issue_date).toLocaleDateString()
+                              : "-"}
+                          </td>
+                          <td className="py-2 px-3 max-w-[180px] truncate text-muted-foreground">
+                            {cert.remarks || "-"}
+                          </td>
+                          <td className="py-2 px-3">
+                            {cert.file_path ? (
+                              <Badge variant="secondary">
+                                <FileText className="h-3 w-3 mr-1" />
+                                Uploaded
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">No file</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="flex gap-1">
+                              {cert.file_path && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDownload(cert.id)}
+                                  disabled={downloadCertificate.isPending}
+                                  title="Download"
+                                >
+                                  {downloadCertificate.isPending ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Download className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => setDeleteDialogOpen(cert.id)}
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            <Dialog
+                              open={deleteDialogOpen === cert.id}
+                              onOpenChange={(open) =>
+                                setDeleteDialogOpen(open ? cert.id : null)
+                              }
+                            >
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Delete Certificate?</DialogTitle>
+                                  <DialogDescription>
+                                    Are you sure you want to delete{" "}
+                                    <strong>{cert.type_name}</strong>? This action cannot be
+                                    undone.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter>
+                                  <DialogClose asChild>
+                                    <Button variant="outline">Cancel</Button>
+                                  </DialogClose>
+                                  <Button
+                                    variant="destructive"
+                                    onClick={() => handleDelete(cert)}
+                                    disabled={deleteCertificate.isPending}
+                                  >
+                                    {deleteCertificate.isPending && (
+                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    )}
+                                    Delete
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 };

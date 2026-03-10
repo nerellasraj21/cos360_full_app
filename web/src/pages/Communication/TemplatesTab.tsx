@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
   Dialog,
   DialogContent,
@@ -115,7 +116,7 @@ function TemplateFormModal({ open, onOpenChange, editing }: TemplateFormModalPro
 
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
-      <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{editing ? 'Edit Template' : 'New Template'}</DialogTitle>
         </DialogHeader>
@@ -392,9 +393,7 @@ export default function TemplatesTab() {
                       {t.variables.join(', ') || '—'}
                     </td>
                     <td className="px-4 py-2">
-                      <Badge variant={t.is_active ? 'default' : 'secondary'}>
-                        {t.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
+                      <StatusBadge status={t.is_active} />
                     </td>
                     <td className="px-4 py-2 text-muted-foreground hidden lg:table-cell">
                       {t.updated_at ? new Date(t.updated_at).toLocaleDateString() : '—'}
@@ -406,6 +405,8 @@ export default function TemplatesTab() {
                           size="sm"
                           onClick={() => openEdit(t)}
                           aria-label={`Edit ${t.name}`}
+                          className="h-8 w-8 p-0"
+                          title="Edit Template"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -415,7 +416,8 @@ export default function TemplatesTab() {
                             size="sm"
                             onClick={() => setDeactivateTarget(t)}
                             aria-label={`Deactivate ${t.name}`}
-                            className="text-destructive hover:text-destructive"
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
+                            title="Deactivate Template"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -442,9 +444,7 @@ export default function TemplatesTab() {
                       {CHANNEL_ICONS[t.channel]} {t.channel.toUpperCase()}
                     </p>
                   </div>
-                  <Badge variant={t.is_active ? 'default' : 'secondary'}>
-                    {t.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
+                  <StatusBadge status={t.is_active} />
                 </div>
                 {t.variables.length > 0 && (
                   <p className="text-xs text-muted-foreground">
@@ -452,17 +452,18 @@ export default function TemplatesTab() {
                   </p>
                 )}
                 <div className="flex gap-2 pt-1">
-                  <Button variant="outline" size="sm" onClick={() => openEdit(t)}>
-                    <Edit className="h-3 w-3 mr-1" /> Edit
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Template" onClick={() => openEdit(t)}>
+                    <Edit className="h-4 w-4" />
                   </Button>
                   {t.is_active && (
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      className="text-destructive"
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
+                      title="Deactivate Template"
                       onClick={() => setDeactivateTarget(t)}
                     >
-                      <Trash2 className="h-3 w-3 mr-1" /> Deactivate
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
                 </div>

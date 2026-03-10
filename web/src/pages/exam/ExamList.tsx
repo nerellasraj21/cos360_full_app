@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Plus, Eye, Copy, Trash2, Loader2, ClipboardList, MoreHorizontal, Edit, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -248,27 +249,12 @@ export default function ExamList() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ClipboardList className="h-6 w-6 text-muted-foreground" />
-          <div>
-            <h1 className="text-2xl font-bold">Exam Management</h1>
-            <p className="text-sm text-muted-foreground">Manage all examinations for the academic year</p>
-          </div>
-        </div>
-        {isAdmin && (
-          <Button
-            onClick={() => navigate({ to: '/exam/exams/create' as any })}
-            disabled={!hasGradingSetup}
-            title={!hasGradingSetup ? 'Set up grading schemes before creating an exam' : ''}
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Create Exam
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Exam Management"
+        icon={<ClipboardList className="h-5 w-5" />}
+        subtitle="Manage all examinations for the academic year"
+        actions={isAdmin ? <Button onClick={() => navigate({ to: '/exam/exams/create' as any })} disabled={!hasGradingSetup} title={!hasGradingSetup ? 'Set up grading schemes before creating an exam' : ''} className="gap-2"><Plus className="h-4 w-4" /> Create Exam</Button> : null}
+      />
 
       {/* Grading warning */}
       {isAdmin && !hasGradingSetup && (

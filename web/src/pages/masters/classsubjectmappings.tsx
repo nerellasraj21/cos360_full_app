@@ -17,7 +17,7 @@ import type {
 import { fetchSubjects } from "@/api/masters/subjects";
 import type { Subject } from "@/types/masters/subject";
 import { useAcademicYearStore } from "@/lib/academicYearStore";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { usePermission } from "@/hooks/usePermission";
 import { AddBulkClassSubjectMappingsModal } from "@/components/masters/classsubjectmappings";
@@ -189,9 +189,7 @@ export default function ClassSubjectMappingsPage() {
       label: "Active",
       editable: true,
       render: (v) => (
-        <Badge variant={v ? "default" : "secondary"}>
-          {v ? "Active" : "Inactive"}
-        </Badge>
+        <StatusBadge status={v} />
       ),
       renderEdit: (value, _row, onChange) => (
         <input

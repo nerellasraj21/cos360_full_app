@@ -1,6 +1,7 @@
 import * as React from "react"
 import { useState } from "react"
 import * as RadixDialog from "@radix-ui/react-dialog"
+import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   AlertDialog,
@@ -72,17 +73,32 @@ export function DialogTrigger({ children, ...props }: React.ComponentProps<typeo
 interface DialogContentProps extends React.ComponentProps<typeof RadixDialog.Content> {
   /** Allow closing by clicking outside the dialog. Default: false */
   allowOutsideClose?: boolean
-  /** Allow closing by pressing Escape key. Default: false */
+  /** Allow closing by pressing Escape key. Default: true */
   allowEscapeClose?: boolean
+  /** Show the close (X) button in the top-right corner. Default: true */
+  showCloseButton?: boolean
+  /** When true, the inner wrapper uses flex-col + overflow-hidden instead of overflow-y-auto.
+   *  Use this for dialogs that manage their own internal scroll structure. */
+  customLayout?: boolean
 }
 
-export function DialogContent({ className, children, allowOutsideClose = false, allowEscapeClose = false, onInteractOutside, onEscapeKeyDown, ...props }: DialogContentProps) {
+export function DialogContent({
+  className,
+  children,
+  showCloseButton = true,
+  customLayout = false,
+  allowOutsideClose = false,
+  allowEscapeClose = true,
+  onInteractOutside,
+  onEscapeKeyDown,
+  ...props
+}: DialogContentProps) {
   return (
     <RadixDialog.Portal>
       <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
       <RadixDialog.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-background p-6 shadow-lg focus:outline-none",
+          "fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-background shadow-lg focus:outline-none max-h-[85vh] flex flex-col overflow-hidden",
           className
         )}
         onInteractOutside={(e) => {
@@ -101,14 +117,30 @@ export function DialogContent({ className, children, allowOutsideClose = false, 
         }}
         {...props}
       >
-        {children}
+        {showCloseButton && (
+          <RadixDialog.Close
+            className="absolute right-3 top-3 z-20 rounded-full p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-ring"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </RadixDialog.Close>
+        )}
+        {customLayout ? (
+          <div className="flex-1 flex flex-col overflow-hidden p-6">
+            {children}
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-6">
+            {children}
+          </div>
+        )}
       </RadixDialog.Content>
     </RadixDialog.Portal>
   )
 }
 
 export function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("mb-4", className)} {...props} />
+  return <div className={cn("mb-4 pr-8", className)} {...props} />
 }
 
 export function DialogTitle({ className, ...props }: React.ComponentProps<typeof RadixDialog.Title>) {

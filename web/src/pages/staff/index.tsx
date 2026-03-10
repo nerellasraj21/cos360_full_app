@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Users, UserCheck, Settings } from 'lucide-react';
+import { Plus, Users, UserCheck, Settings, Briefcase } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { StaffTable } from '@/components/staff/StaffTable';
 import { StaffEnrollmentForm } from '@/components/staff/StaffEnrollmentForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -18,18 +19,12 @@ export default function StaffPage() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Staff Management</h1>
-          <p className="text-muted-foreground">
-            Manage staff enrollment, attendance, and designations
-          </p>
-        </div>
-        <Button onClick={() => setShowEnrollmentForm(true)} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Add Staff Member
-        </Button>
-      </div>
+      <PageHeader
+        title="Staff Management"
+        icon={<Briefcase className="h-5 w-5" />}
+        subtitle="Manage staff enrollment, attendance, and designations"
+        actions={<Button onClick={() => setShowEnrollmentForm(true)} className="flex items-center gap-2"><Plus className="h-4 w-4" /> Add Staff Member</Button>}
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
@@ -96,7 +91,7 @@ export default function StaffPage() {
 
       {/* Enrollment Form Dialog */}
       <Dialog open={showEnrollmentForm} onOpenChange={setShowEnrollmentForm}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Add New Staff Member</DialogTitle>
           </DialogHeader>

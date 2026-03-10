@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Clock, Settings, BookOpen, Users, Calendar, Tag, Link2, MapPin, Truck } from 'lucide-react'
+import { Clock, Settings, BookOpen, Users, Calendar, Tag, Link2, MapPin, Truck, Database } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const Route = createFileRoute('/_app/masters/')({
   component: MastersDashboard,
@@ -76,19 +77,17 @@ const sections = [
 function MastersDashboard() {
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Masters Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Configure and manage all master data for the school system
-          </p>
-        </div>
-        <Badge variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 text-sm">
-          <Clock className="h-3.5 w-3.5" />
-          Coming Soon
-        </Badge>
-      </div>
+      <PageHeader
+        title="Masters Dashboard"
+        subtitle="Configure and manage all master data for the school system"
+        icon={<Database className="h-5 w-5" />}
+        actions={
+          <Badge variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 text-sm">
+            <Clock className="h-3.5 w-3.5" />
+            Coming Soon
+          </Badge>
+        }
+      />
 
       {/* Coming Soon Banner */}
       <div className="rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-950/20 p-8 text-center">

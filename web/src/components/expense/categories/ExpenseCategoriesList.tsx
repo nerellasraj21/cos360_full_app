@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useExpenseCategories, useCreateExpenseCategory, useUpdateExpenseCategory, useDeleteExpenseCategory } from '@/hooks/expense';
 import type { ExpenseCategoryCreateRequest, ExpenseCategoryUpdateRequest, ExpenseCategoryRead } from '@/types/expense/index';
 import { PermissionGuard } from '@/components/PermissionGuard';
@@ -195,9 +195,7 @@ export function ExpenseCategoriesList({ onCreateCategory }: ExpenseCategoriesLis
                                         {category.description || '-'}
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant={category.is_active ? "default" : "secondary"}>
-                                            {category.is_active ? 'Active' : 'Inactive'}
-                                        </Badge>
+                                        <StatusBadge status={category.is_active} />
                                     </TableCell>
                                     <TableCell>
                                         {new Date(category.created_at).toLocaleDateString()}

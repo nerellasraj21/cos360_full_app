@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
-import { FileText, Trash2, RotateCcw, ChevronDown, ChevronUp, Upload, Eye, Download } from "lucide-react";
+import { FileText, Trash2, RotateCcw, ChevronDown, ChevronUp, Upload, Eye, Download, FolderOpen } from "lucide-react";
+import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from "sonner";
 import { useStudentDocuments, useUploadStudentDocument, useDeleteStudentDocument, useDownloadStudentDocument } from "@/api/hooks/students/documents";
 import { useStudentsDropdown } from "@/api/hooks/students/useAdmission";
@@ -153,9 +154,7 @@ export const DocumentUploadPage: React.FC = () => {
 
     return (
         <div className="container mx-auto p-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold">Document Upload</h1>
-            </div>
+            <PageHeader title="Document Upload" icon={<FolderOpen className="h-5 w-5" />} />
 
             <Card>
                 <CardHeader

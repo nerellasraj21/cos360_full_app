@@ -4,18 +4,16 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PermissionGuard } from '@/components/common';
 import { Users, Calendar, Briefcase, ArrowRight } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export function StaffPage() {
     return (
         <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-foreground">Staff Management</h1>
-                    <p className="text-muted-foreground mt-2">
-                        Comprehensive staff enrollment, attendance tracking, and designation management
-                    </p>
-                </div>
-            </div>
+            <PageHeader
+                title="Staff Management"
+                subtitle="Comprehensive staff enrollment, attendance tracking, and designation management"
+                icon={<Briefcase className="h-5 w-5" />}
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <PermissionGuard resource="staff" action="list">

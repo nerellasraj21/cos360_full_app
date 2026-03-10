@@ -2,18 +2,12 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ExpenseDepartments } from '@/components/expense';
 import { Building } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export function ExpenseDepartmentsPage() {
     return (
         <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-foreground">Expense Departments</h1>
-                    <p className="text-muted-foreground mt-2">
-                        Manage departments for expense categorization and organization
-                    </p>
-                </div>
-            </div>
+            <PageHeader title="Expense Departments" icon={<Building className="h-5 w-5" />} subtitle="Manage departments for expense categorization and organization" />
 
             <Card>
                 <CardHeader>

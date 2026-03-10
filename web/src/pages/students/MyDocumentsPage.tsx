@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
-import { FileText, Download, Upload, Plus } from "lucide-react";
+import { FileText, Download, Upload, Plus, FolderOpen } from "lucide-react";
+import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from "sonner";
 import { useMyDocuments, useDownloadStudentDocument, useUploadMyDocument } from "@/api/hooks/students/documents";
 import { useAuthStore } from "@/lib/authStore";
@@ -147,9 +148,7 @@ export const MyDocumentsPage: React.FC = () => {
 
     return (
         <div className="container mx-auto p-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold">My Documents</h1>
-                <Button
+            <PageHeader title="My Documents" icon={<FolderOpen className="h-5 w-5" />} actions={<Button
                     onClick={handleUploadToggle}
                     variant="outline"
                     className="flex items-center gap-2"
@@ -157,8 +156,7 @@ export const MyDocumentsPage: React.FC = () => {
                     <Plus className="h-4 w-4" />
                     Upload Document
                     {isUploadExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </Button>
-            </div>
+                </Button>} />
 
             {/* Collapsible Upload Section */}
             {isUploadExpanded && (

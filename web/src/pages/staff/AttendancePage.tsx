@@ -2,6 +2,8 @@ import React from 'react';
 import AttendanceComponent from '../../components/common/AttendanceComponent';
 import { useQuery } from '@tanstack/react-query';
 import type { Teacher } from '../../types/attendance';
+import { ClipboardCheck } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 
 const mockTeachers: Teacher[] = [
@@ -44,7 +46,7 @@ const TeacherAttendancePage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Teacher Attendance</h1>
+      <PageHeader title="Teacher Attendance" icon={<ClipboardCheck className="h-5 w-5" />} />
       
       <AttendanceComponent
         type="teacher"

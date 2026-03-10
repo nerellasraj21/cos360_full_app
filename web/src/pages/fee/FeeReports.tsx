@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { PermissionGuard } from '@/components/common';
 
 export function FeeReports() {
@@ -39,12 +40,7 @@ function FeeReportsContent() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-foreground">Fee Reports & Export</h1>
-                <p className="text-muted-foreground mt-1">
-                    Generate reports and export fee data
-                </p>
-            </div>
+            <PageHeader title="Fee Reports & Export" icon={<BarChart3 className="h-5 w-5" />} subtitle="Generate reports and export fee data" />
 
             {/* Reports functionality will be implemented here */}
             <div className="text-center py-8 text-muted-foreground">

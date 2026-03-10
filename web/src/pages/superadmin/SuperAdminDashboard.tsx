@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -79,18 +81,6 @@ const SuperAdminDashboard = () => {
         tenant.domain.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const getStatusBadge = (status: string) => {
-        switch (status) {
-            case 'active':
-                return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Active</Badge>;
-            case 'suspended':
-                return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800"><AlertTriangle className="w-3 h-3 mr-1" />Suspended</Badge>;
-            case 'terminated':
-                return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Terminated</Badge>;
-            default:
-                return <Badge variant="outline">{status}</Badge>;
-        }
-    };
 
     const getHealthStatusColor = (status: string) => {
         switch (status) {
@@ -113,17 +103,11 @@ const SuperAdminDashboard = () => {
 
     return (
         <div className="container mx-auto p-6 space-y-6">
-            <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                    <Settings className="w-8 h-8 text-primary" />
-                    <div>
-                        <h1 className="text-3xl font-bold">Super Admin Dashboard</h1>
-                        <p className="text-muted-foreground">
-                            Manage tenants, monitor system health, and oversee platform operations
-                        </p>
-                    </div>
-                </div>
-            </div>
+            <PageHeader
+                title="Super Admin Dashboard"
+                subtitle="Manage tenants, monitor system health, and oversee platform operations"
+                icon={<Settings className="h-5 w-5" />}
+            />
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <TabsList className="grid w-full grid-cols-4">
@@ -242,7 +226,7 @@ const SuperAdminDashboard = () => {
                                                     <TableCell>
                                                         <code className="text-sm">{tenant.domain}</code>
                                                     </TableCell>
-                                                    <TableCell>{getStatusBadge(tenant.status)}</TableCell>
+                                                    <TableCell><StatusBadge status={tenant.status} /></TableCell>
                                                     <TableCell>
                                                         {plans.find(p => p.id === tenant.plan_id)?.name || tenant.plan_id}
                                                     </TableCell>
@@ -414,9 +398,7 @@ const SuperAdminDashboard = () => {
                                                         <CardTitle className="text-lg">{plan.name}</CardTitle>
                                                         <CardDescription>{plan.description}</CardDescription>
                                                     </div>
-                                                    <Badge variant={plan.is_active ? 'default' : 'secondary'}>
-                                                        {plan.is_active ? 'Active' : 'Inactive'}
-                                                    </Badge>
+                                                    <StatusBadge status={plan.is_active} />
                                                 </div>
                                                 <div className="text-3xl font-bold text-primary">
                                                     ${plan.price}

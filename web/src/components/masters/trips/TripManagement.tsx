@@ -454,7 +454,7 @@ export function TripManagement({ className }: TripManagementProps) {
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" onClick={() => setDeletingTrip(trip)}>
+                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive/80" onClick={() => setDeletingTrip(trip)}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </AlertDialogTrigger>

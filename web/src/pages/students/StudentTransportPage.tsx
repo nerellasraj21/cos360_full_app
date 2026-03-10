@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   Loader2, Bus, MapPin, Clock, IndianRupee, Navigation2, Truck,
-  Plus, Filter, Search, Edit, Trash2,
+  Plus, Filter, Search, Edit, Trash2, Tag,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/authStore';
 import { useParentChildren } from '@/api/auth';
@@ -27,8 +27,10 @@ import {
 import { useStudentsDropdownSimple } from '@/api/hooks/students/admissions';
 import { useTrips } from '@/api/hooks/masters/trips';
 import { useRouteStops } from '@/api/hooks/masters/routeStops';
+import { useTransportPricingDropdown } from '@/api/hooks/masters/transportPricing';
 import type { StudentTransportOut, StudentTransportCreate, StudentTransportUpdate } from '@/types/masters/studentTransport';
 import type { TripOut, TripListResponse } from '@/types/masters/trip';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 // ─── Role router ─────────────────────────────────────────────────────────────
 
@@ -84,6 +86,7 @@ function AdminView() {
 
   return (
     <div className="container mx-auto p-4 space-y-4">
+      <PageHeader title="Student Transport" icon={<Bus className="h-5 w-5" />} />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Student Transport Assignments</CardTitle>
@@ -116,6 +119,7 @@ function AdminView() {
                 <TableHead>Trip</TableHead>
                 <TableHead>Route</TableHead>
                 <TableHead>Stop</TableHead>
+                <TableHead>Pricing</TableHead>
                 <TableHead>Fee / Term</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -123,7 +127,7 @@ function AdminView() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     No transport assignments found.
                   </TableCell>
                 </TableRow>
@@ -152,7 +156,15 @@ function AdminView() {
                     <TableCell>
                       {t.stop ? `${t.stop.name} (#${t.stop.number})` : '—'}
                     </TableCell>
-                    <TableCell>₹{t.fee_per_term.toLocaleString()}</TableCell>
+                    <TableCell>
+                      {t.pricing ? (
+                        <div>
+                          <p className="text-sm">{t.pricing.cycle_name}</p>
+                          <p className="text-xs text-muted-foreground">₹{Number(t.pricing.amount).toLocaleString()}</p>
+                        </div>
+                      ) : '—'}
+                    </TableCell>
+                    <TableCell>₹{Number(t.fee_per_term).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" onClick={() => setEditingTransport(t)}>
                         <Edit className="h-4 w-4" />
@@ -211,6 +223,12 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
   const [tripId, setTripId] = useState('');
   const [stopId, setStopId] = useState('');
   const [feePerTerm, setFeePerTerm] = useState('');
+  const [pricingId, setPricingId] = useState('');
+
+  // Derive vehicleId from selected trip for pricing dropdown
+  const selectedTrip = trips.find(t => t.id === tripId);
+  const vehicleId = selectedTrip?.vehicle_id;
+  const { data: pricingOptions = [] } = useTransportPricingDropdown(vehicleId);
 
   useEffect(() => {
     if (open) {
@@ -218,6 +236,7 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
       setTripId(transport?.trip_id ?? '');
       setStopId(transport?.stop_id ?? '');
       setFeePerTerm(transport?.fee_per_term?.toString() ?? '');
+      setPricingId(transport?.pricing_id ?? '');
     }
   }, [open, transport]);
 
@@ -233,6 +252,7 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
       if (tripId !== transport.trip_id) updateData.trip_id = tripId;
       if (stopId !== transport.stop_id) updateData.stop_id = stopId;
       if (fee !== transport.fee_per_term) updateData.fee_per_term = fee;
+      if ((pricingId || null) !== (transport.pricing_id || null)) updateData.pricing_id = pricingId || null;
       updateMutation.mutate(
         { id: transport.id, transport: updateData },
         { onSuccess: () => onOpenChange(false) },
@@ -244,6 +264,7 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
         stop_id: stopId,
         fee_term_id: null,
         fee_per_term: fee,
+        pricing_id: pricingId || null,
       };
       createMutation.mutate(createData, { onSuccess: () => onOpenChange(false) });
     }
@@ -300,6 +321,29 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
             </Select>
           </div>
 
+          {pricingOptions.length > 0 && (
+            <div className="space-y-2">
+              <Label>Pricing Plan (optional)</Label>
+              <Select value={pricingId} onValueChange={(val) => {
+                setPricingId(val);
+                const selected = pricingOptions.find(p => p.id === val);
+                if (selected) setFeePerTerm(selected.amount.toString());
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select pricing..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {pricingOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.cycle_name} — ₹{Number(p.amount).toLocaleString()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label>Fee per Term (₹)</Label>
             <Input
@@ -331,7 +375,7 @@ function StudentOwnView({ studentId }: { studentId: string }) {
 
   return (
     <div className="container mx-auto p-4 space-y-4">
-      <h1 className="text-2xl font-bold">My Transport</h1>
+      <PageHeader title="My Transport" icon={<Bus className="h-5 w-5" />} />
       <TransportList transports={transports} isLoading={isLoading} />
     </div>
   );
@@ -355,7 +399,7 @@ function ParentView({ parentEntityId }: { parentEntityId: string | null }) {
 
   return (
     <div className="container mx-auto p-4 space-y-4">
-      <h1 className="text-2xl font-bold">Children's Transport</h1>
+      <PageHeader title="Children's Transport" icon={<Bus className="h-5 w-5" />} />
 
       <Card>
         <CardHeader><CardTitle>Select Child</CardTitle></CardHeader>
@@ -455,9 +499,7 @@ function TransportList({
                 <Bus className="h-4 w-4 text-muted-foreground" />
                 {t.trip ? `Trip #${t.trip.trip_number}` : 'Transport Assignment'}
               </div>
-              <Badge variant={t.is_active ? 'default' : 'secondary'}>
-                {t.is_active ? 'Active' : 'Inactive'}
-              </Badge>
+              <StatusBadge status={t.is_active} />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
@@ -509,12 +551,35 @@ function TransportList({
                 </div>
               )}
 
-              {t.stop?.reaching_time && (
+              {(t.stop?.pickup_time || t.stop?.reaching_time) && (
                 <div className="flex items-start gap-2">
                   <Clock className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                   <div>
                     <p className="text-muted-foreground text-xs">Pickup Time</p>
-                    <p className="font-medium">{t.stop.reaching_time.substring(0, 5)}</p>
+                    <p className="font-medium">
+                      {(t.stop.pickup_time || t.stop.reaching_time)!.substring(0, 5)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {t.stop?.drop_time && (
+                <div className="flex items-start gap-2">
+                  <Clock className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="text-muted-foreground text-xs">Drop Time</p>
+                    <p className="font-medium">{t.stop.drop_time.substring(0, 5)}</p>
+                  </div>
+                </div>
+              )}
+
+              {t.pricing && (
+                <div className="flex items-start gap-2">
+                  <Tag className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="text-muted-foreground text-xs">Pricing Plan</p>
+                    <p className="font-medium">{t.pricing.cycle_name}</p>
+                    <p className="text-xs text-muted-foreground">₹{t.pricing.amount.toLocaleString()}</p>
                   </div>
                 </div>
               )}
@@ -523,7 +588,7 @@ function TransportList({
                 <IndianRupee className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                 <div>
                   <p className="text-muted-foreground text-xs">Fee per Term</p>
-                  <p className="font-medium">₹{t.fee_per_term.toLocaleString()}</p>
+                  <p className="font-medium">₹{Number(t.fee_per_term).toLocaleString()}</p>
                 </div>
               </div>
             </div>

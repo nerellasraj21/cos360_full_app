@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { FileText, Download, Eye, Calendar, CreditCard, User, Building, Hash } from 'lucide-react';
@@ -19,15 +19,6 @@ export function ExpenseTransactionView({ transaction, onClose }: ExpenseTransact
   const { data: expenseTypes = [] } = useExpenseTypeDropdown();
   const { data: categories = [] } = useExpenseCategoryDropdown();
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'approved': return 'default';
-      case 'pending': return 'secondary';
-      case 'rejected': return 'destructive';
-      case 'draft': return 'outline';
-      default: return 'secondary';
-    }
-  };
 
   const getTypeName = (typeId: string) => {
     const type = expenseTypes.find(t => t.id === typeId);
@@ -67,7 +58,7 @@ export function ExpenseTransactionView({ transaction, onClose }: ExpenseTransact
     },
     {
       label: 'Status',
-      value: <Badge variant={getStatusBadgeVariant(transaction.status)}>{transaction.status}</Badge>,
+      value: <StatusBadge status={transaction.status} />,
       icon: null
     },
     {

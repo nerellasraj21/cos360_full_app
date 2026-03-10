@@ -1,7 +1,8 @@
 import { FeeNavigation } from '@/components/fee/dashboard/FeeNavigation';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { Card, CardContent } from '@/components/ui/card';
-import { ShieldX } from 'lucide-react';
+import { ShieldX, Banknote } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export default function FeeDashboard() {
   return (
@@ -36,13 +37,11 @@ export default function FeeDashboard() {
 function FeeDashboardContent() {
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Fee Management Dashboard</h1>
-                <p className="text-muted-foreground">
-                    Comprehensive overview and management of all fee-related components
-                </p>
-            </div>
+            <PageHeader
+                title="Fee Management Dashboard"
+                subtitle="Comprehensive overview and management of all fee-related components"
+                icon={<Banknote className="h-5 w-5" />}
+            />
 
             {/* Navigation to Fee Sections */}
             <FeeNavigation />

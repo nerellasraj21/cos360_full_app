@@ -6,7 +6,8 @@ import type { StudentTripBase, StudentTrip as StudentTripOut } from "@/types/mas
 import { useStudentTrips, useCreateStudentTrip, useUpdateStudentTrip, useDeleteStudentTrip } from '@/api/hooks/masters/studentTrips';
 import { PermissionGuard } from '@/components/common';
 import { Card, CardContent } from '@/components/ui/card';
-import { ShieldX } from 'lucide-react';
+import { ShieldX, Bus } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import Select, { type SingleValue } from 'react-select';
 import { useStudentsDropdown } from '@/api/hooks/students/admissions';
 import { useRouteStops } from '@/api/hooks/masters/routeStops';
@@ -336,9 +337,7 @@ export default function StudentTripsPage() {
             }
         >
             <div className="p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold text-foreground">Student Transport Assignments</h1>
-                </div>
+                <PageHeader title="Student Transport Assignments" icon={<Bus className="h-5 w-5" />} />
 
                 {/* Filters */}
                 <Card>

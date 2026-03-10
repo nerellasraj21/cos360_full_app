@@ -7,7 +7,7 @@ import { PermissionGuard } from '@/components/common';
 import type { RouteStop, RouteStopInput } from '@/types/masters/routeStop';
 import Select from 'react-select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ShieldX } from 'lucide-react';
 
 const formFields: FormField[] = [
@@ -15,6 +15,8 @@ const formFields: FormField[] = [
   { name: 'name', label: 'Stop Name', required: true },
   { name: 'number', label: 'Stop Number', type: 'number', required: true },
   { name: 'reaching_time', label: 'Reaching Time', required: true },
+  { name: 'pickup_time', label: 'Pickup Time' },
+  { name: 'drop_time', label: 'Drop Time' },
   { name: 'fees', label: 'Fees', type: 'number', required: true },
   { name: 'is_active', label: 'Active', type: 'checkbox' },
 ];
@@ -24,6 +26,8 @@ const defaultValues: RouteStopInput = {
   name: '',
   number: 1, // Start with 1 as first stop
   reaching_time: '08:30:00',
+  pickup_time: '',
+  drop_time: '',
   fees: 25, // Integer as per backend
   is_active: true,
 };
@@ -100,6 +104,36 @@ export default function RouteStopsPage() {
       )
     },
     {
+      key: 'pickup_time',
+      label: 'Pickup Time',
+      editable: true,
+      render: (value: string | null) => value ? value.substring(0, 5) : '—',
+      renderEdit: (value: any, _row: RouteStop, onChange: (val: any) => void) => (
+        <input
+          type="time"
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full px-2 py-1 border border-input rounded text-sm"
+          style={{ minHeight: '32px' }}
+        />
+      )
+    },
+    {
+      key: 'drop_time',
+      label: 'Drop Time',
+      editable: true,
+      render: (value: string | null) => value ? value.substring(0, 5) : '—',
+      renderEdit: (value: any, _row: RouteStop, onChange: (val: any) => void) => (
+        <input
+          type="time"
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full px-2 py-1 border border-input rounded text-sm"
+          style={{ minHeight: '32px' }}
+        />
+      )
+    },
+    {
       key: 'fees',
       label: 'Fees',
       editable: true,
@@ -110,9 +144,7 @@ export default function RouteStopsPage() {
       label: 'Active',
       editable: true,
       render: (_value: any, row: RouteStop) => (
-        <Badge variant={row.is_active ? "default" : "secondary"}>
-          {row.is_active ? 'Active' : 'Inactive'}
-        </Badge>
+        <StatusBadge status={row.is_active} />
       ),
       renderEdit: (value: any, _row: RouteStop, onChange: (val: any) => void) => (
         <div className="flex items-center justify-center">
@@ -163,7 +195,7 @@ export default function RouteStopsPage() {
         />
       );
     }
-    if (field.name === 'reaching_time') {
+    if (field.name === 'reaching_time' || field.name === 'pickup_time' || field.name === 'drop_time') {
       return (
         <input
           type="time"

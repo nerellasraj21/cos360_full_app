@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Search,
@@ -20,6 +21,7 @@ import {
   X,
   Trash2
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useExpenseTransactions, useExpenseTransactionAuditLogs, useExpenseAuditSummary } from '@/hooks/expense';
 import { useExpenseDepartmentDropdown } from '@/hooks/expense';
 import { PermissionGuard } from '@/components/PermissionGuard';
@@ -94,14 +96,7 @@ export function ExpenseAuditPage() {
       }
     >
       <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Expense Audit & Compliance</h1>
-          <p className="text-muted-foreground mt-2">
-            Complete audit trail and compliance reporting for all expense activities
-          </p>
-        </div>
-      </div>
+      <PageHeader title="Expense Audit & Compliance" icon={<Activity className="h-5 w-5" />} subtitle="Complete audit trail and compliance reporting for all expense activities" />
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList>
@@ -243,9 +238,7 @@ export function ExpenseAuditPage() {
                             {getDepartmentName(transaction.department_id)}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={transaction.status === 'approved' ? 'default' : 'secondary'}>
-                              {transaction.status}
-                            </Badge>
+                            <StatusBadge status={transaction.status} />
                           </TableCell>
                           <TableCell>
                             <Button

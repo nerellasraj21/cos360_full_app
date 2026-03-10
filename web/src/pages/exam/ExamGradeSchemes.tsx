@@ -1,5 +1,7 @@
 import { Fragment, useState, useMemo } from 'react'
 import { Plus, Edit, Trash2, Loader2, Award, ChevronDown, ChevronRight, Save, Filter, Search, ChevronUp, ChevronsUpDown } from 'lucide-react'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { FilterBar } from '@/components/ui/FilterBar'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
@@ -118,21 +120,7 @@ export default function ExamGradeSchemes() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Award className="h-6 w-6 text-muted-foreground" />
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Exam Grade Schemes</h1>
-            <p className="text-sm text-muted-foreground">
-              Map total percentage ranges to grades (A+, A, B...) with GPA and pass/fail
-            </p>
-          </div>
-        </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" />
-          New Scheme
-        </Button>
-      </div>
+      <PageHeader title="Exam Grade Schemes" icon={<Award className="h-5 w-5" />} subtitle="Map total percentage ranges to grades (A+, A, B...) with GPA and pass/fail" actions={<Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" /> New Scheme</Button>} />
 
       {schemes.length === 0 ? (
         <Card>
@@ -150,16 +138,12 @@ export default function ExamGradeSchemes() {
         </Card>
       ) : (
         <div className="space-y-3">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-              <Filter className="h-3.5 w-3.5" />
-              <span>Filters</span>
-            </div>
+          <FilterBar>
             <div className="relative max-w-sm">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input placeholder="Search schemes..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
             </div>
-          </div>
+          </FilterBar>
           <div className="overflow-hidden rounded-lg border">
           <table className="w-full text-sm">
             <thead>
@@ -204,13 +188,14 @@ export default function ExamGradeSchemes() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(scheme)}>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Grade Scheme" onClick={() => openEdit(scheme)}>
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-destructive hover:text-destructive"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
+                          title="Delete Grade Scheme"
                           onClick={() => setDeleteTarget(scheme.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -235,7 +220,7 @@ export default function ExamGradeSchemes() {
 
       {/* Create / Edit Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>{editTarget ? 'Edit Exam Grade Scheme' : 'Create Exam Grade Scheme'}</DialogTitle>
           </DialogHeader>

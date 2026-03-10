@@ -2,7 +2,8 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { DesignationsTable } from '@/components/staff';
 import { PermissionGuard } from '@/components/common';
-import { Briefcase, ShieldX } from 'lucide-react';
+import { Briefcase, ShieldX, BadgeCheck } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export function StaffDesignationsPage() {
     return (
@@ -30,14 +31,7 @@ export function StaffDesignationsPage() {
             }
         >
             <div className="p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Staff Designations</h1>
-                        <p className="text-muted-foreground mt-2">
-                            Manage job titles and designations for staff role assignments
-                        </p>
-                    </div>
-                </div>
+                <PageHeader title="Staff Designations" icon={<BadgeCheck className="h-5 w-5" />} subtitle="Manage job titles and designations for staff role assignments" />
 
                 <Card>
                     <CardHeader>

@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ViewButton, EditButton, DeleteButton, DownloadButton, TableActionGroup } from '@/components/common/TableActions';
 import { Edit, Trash2, Plus, Users, Mail, Phone, Calendar, Award, MapPin, Filter, Download, FileText, FileSpreadsheet, Eye, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Search, GraduationCap, Briefcase, Landmark, Wallet } from 'lucide-react';
 import {
   DropdownMenu,
@@ -737,46 +739,31 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                                     )}
                                                     {col.key === 'department' && (staffMember.department || '-')}
                                                     {col.key === 'status' && (
-                                                        <Badge variant={staffMember.is_active ? "default" : "secondary"}>
-                                                            {staffMember.is_active ? 'Active' : 'Inactive'}
-                                                        </Badge>
+                                                        <StatusBadge status={staffMember.is_active} />
                                                     )}
                                                 </TableCell>
                                             ))}
                                             <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-2">
+                                                <TableActionGroup>
                                                     {hasReadPermission && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
+                                                        <ViewButton
                                                             onClick={() => handleView(staffMember)}
                                                             title="View Staff Details"
-                                                        >
-                                                            <Eye className="h-4 w-4" />
-                                                        </Button>
+                                                        />
                                                     )}
                                                     {hasUpdatePermission && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
+                                                        <EditButton
                                                             onClick={() => handleEdit(staffMember)}
                                                             title="Edit Staff"
-                                                        >
-                                                            <Edit className="h-4 w-4" />
-                                                        </Button>
+                                                        />
                                                     )}
                                                     {hasDeletePermission && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
+                                                        <DeleteButton
                                                             onClick={() => handleDelete(staffMember)}
                                                             title="Delete Staff"
-                                                            className="text-red-600 hover:text-red-700"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
+                                                        />
                                                     )}
-                                                </div>
+                                                </TableActionGroup>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -845,7 +832,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 onDirtyDiscard={() => setIsFormDirty(false)}
                 modal={false}
             >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
             <DialogHeader>
                 <DialogTitle>
                     {editingStaff ? 'Edit Staff Enrollment' : 'Create Staff Enrollment'}
@@ -1247,7 +1234,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
 
         {/* View Staff Details Dialog */}
         <Dialog open={showViewDialog} onOpenChange={() => setShowViewDialog(false)}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Users className="h-5 w-5" />
@@ -1354,9 +1341,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Status:</span>
-                                        <Badge variant={displayStaff.is_active ? "default" : "secondary"}>
-                                            {displayStaff.is_active ? 'Active' : 'Inactive'}
-                                        </Badge>
+                                        <StatusBadge status={displayStaff.is_active} />
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Created:</span>

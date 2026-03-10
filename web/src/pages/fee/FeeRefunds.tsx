@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -538,22 +538,6 @@ function FeeRefundsContent() {
     });
   }, [refunds, sortKey, sortDir]);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'default';
-      case 'processed':
-        return 'default';
-      case 'approved':
-        return 'secondary';
-      case 'requested':
-        return 'outline';
-      case 'rejected':
-        return 'destructive';
-      default:
-        return 'secondary';
-    }
-  };
 
   if (isLoading) {
     return (
@@ -582,7 +566,7 @@ function FeeRefundsContent() {
     <div className="space-y-6">
       {/* Create Refund Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl max-h-[80vh]">
               <DialogHeader>
                 <div className="flex items-center justify-between">
                   <DialogTitle>Create New Refund Request</DialogTitle>
@@ -974,9 +958,7 @@ function FeeRefundsContent() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusBadge(refund.status)}>
-                          {refund.status.charAt(0).toUpperCase() + refund.status.slice(1)}
-                        </Badge>
+                        <StatusBadge status={refund.status} />
                       </TableCell>
                       <TableCell>
                         {new Date(refund.requested_date).toLocaleDateString()}
@@ -1024,14 +1006,12 @@ function FeeRefundsContent() {
 
       {/* View Refund Modal */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               Refund Details
               {selectedRefund && (
-                <Badge variant={getStatusBadge(selectedRefund.status)}>
-                  {selectedRefund.status.charAt(0).toUpperCase() + selectedRefund.status.slice(1)}
-                </Badge>
+                <StatusBadge status={selectedRefund.status} />
               )}
             </DialogTitle>
             <DialogDescription>
@@ -1197,7 +1177,7 @@ function FeeRefundsContent() {
 
       {/* Approve/Reject Modal */}
       <Dialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-md max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Approve or Reject Refund</DialogTitle>
             <DialogDescription>
@@ -1256,7 +1236,7 @@ function FeeRefundsContent() {
 
       {/* Process Refund Modal */}
       <Dialog open={showProcessDialog} onOpenChange={setShowProcessDialog}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-md max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Process Refund</DialogTitle>
             <DialogDescription>

@@ -3,7 +3,7 @@ import { Plus, Edit, Trash2, AlertTriangle, Loader2, Filter, Search, ChevronUp, 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -182,27 +182,29 @@ export function FeeTypesList() {
                                             })()}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant={type.fee_status === 'active' ? 'default' : 'secondary'}>
-                                                {type.fee_status === 'active' ? 'Active' : 'Inactive'}
-                                            </Badge>
+                                            <StatusBadge status={type.fee_status} />
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 {canUpdate && (
                                                     <Button
-                                                        variant="outline"
+                                                        variant="ghost"
                                                         size="sm"
                                                         onClick={() => handleEditType(type)}
+                                                        className="h-8 w-8 p-0"
+                                                        title="Edit Fee Type"
                                                     >
                                                         <Edit className="h-4 w-4" />
                                                     </Button>
                                                 )}
                                                 {canDelete && (
                                                     <Button
-                                                        variant="outline"
+                                                        variant="ghost"
                                                         size="sm"
                                                         onClick={() => handleDeleteType(type)}
                                                         disabled={deleteTypeMutation.isPending}
+                                                        className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
+                                                        title="Delete Fee Type"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>

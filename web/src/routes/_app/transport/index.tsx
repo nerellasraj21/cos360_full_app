@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Clock, Truck, MapPin, RouteIcon, Users, Navigation } from 'lucide-react'
+import { Clock, Truck, MapPin, RouteIcon, Users, Navigation, Bus, IndianRupee } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const Route = createFileRoute('/_app/transport/')({
   component: TransportDashboard,
@@ -37,6 +38,13 @@ const sections = [
     bg: 'bg-green-500/10',
   },
   {
+    icon: IndianRupee,
+    title: 'Pricing',
+    description: 'Configure transport pricing plans and billing cycles',
+    color: 'text-emerald-500',
+    bg: 'bg-emerald-500/10',
+  },
+  {
     icon: Users,
     title: 'Student Transport',
     description: 'Assign and manage student transport allocations',
@@ -55,19 +63,17 @@ const sections = [
 function TransportDashboard() {
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Transport Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage school transport, routes, vehicles, and student allocations
-          </p>
-        </div>
-        <Badge variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 text-sm">
-          <Clock className="h-3.5 w-3.5" />
-          Coming Soon
-        </Badge>
-      </div>
+      <PageHeader
+        title="Transport Dashboard"
+        subtitle="Manage school transport, routes, vehicles, and student allocations"
+        icon={<Bus className="h-5 w-5" />}
+        actions={
+          <Badge variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 text-sm">
+            <Clock className="h-3.5 w-3.5" />
+            Coming Soon
+          </Badge>
+        }
+      />
 
       {/* Coming Soon Banner */}
       <div className="rounded-xl border-2 border-dashed border-yellow-300 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/20 p-8 text-center">

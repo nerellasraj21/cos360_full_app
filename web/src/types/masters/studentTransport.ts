@@ -26,8 +26,17 @@ export interface TransportStopDetail {
   id: string;
   name: string;
   number: number;
-  reaching_time: string | null;  // HH:MM:SS or null
+  reaching_time: string | null;  // HH:MM:SS or null (deprecated)
+  pickup_time?: string | null;   // HH:MM:SS or null
+  drop_time?: string | null;     // HH:MM:SS or null
   fees: number;
+}
+
+export interface TransportPricingDetail {
+  id: string;
+  billing_cycle: string;
+  cycle_name: string;
+  amount: number;
 }
 
 export interface StudentTransportBase {
@@ -36,6 +45,7 @@ export interface StudentTransportBase {
     stop_id: string;
     fee_term_id: string | null;
     fee_per_term: number;
+    pricing_id?: string | null;
 }
 
 export interface StudentTransportCreate extends StudentTransportBase {}
@@ -46,6 +56,7 @@ export interface StudentTransportUpdate {
     stop_id?: string;
     fee_term_id?: string;
     fee_per_term?: number;
+    pricing_id?: string | null;
     is_active?: boolean;
 }
 
@@ -63,4 +74,5 @@ export interface StudentTransportOut extends StudentTransportBase {
     trip?: TransportTripDetail;
     stop?: TransportStopDetail;
     student?: StudentInfo;
+    pricing?: TransportPricingDetail;
 }

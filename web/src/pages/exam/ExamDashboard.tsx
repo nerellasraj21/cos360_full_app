@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { Loader2, BookOpen, ClipboardList, Award, Ticket, Settings, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useExamList } from '@/api/hooks/exam/useExam'
 import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
@@ -91,18 +92,17 @@ export default function ExamDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold">Exam Management</h1>
-          <p className="text-sm text-muted-foreground">
-            {selectedYear ? `Academic Year: ${selectedYear.title}` : 'All academic years'}
-          </p>
-        </div>
-        <Button onClick={() => navigate({ to: '/exam/exams/create' as any })} className="gap-2">
-          <Plus className="h-4 w-4" />
-          New Exam
-        </Button>
-      </div>
+      <PageHeader
+        title="Exam Management"
+        subtitle={selectedYear ? `Academic Year: ${selectedYear.title}` : 'All academic years'}
+        icon={<ClipboardList className="h-5 w-5" />}
+        actions={
+          <Button onClick={() => navigate({ to: '/exam/exams/create' as any })} className="gap-2">
+            <Plus className="h-4 w-4" />
+            New Exam
+          </Button>
+        }
+      />
 
       {/* Quick Links */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">

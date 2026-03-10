@@ -27,6 +27,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { User } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 interface ProfileFormData {
   email: string;
@@ -95,7 +96,7 @@ const StaffProfile: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Staff Profile</h1>
+      <PageHeader title="Staff Profile" icon={<User className="h-5 w-5" />} />
       <div className="flex justify-center mb-6">
         {profile.profile_photo_url ? (
           <img src={profile.profile_photo_url} alt="Profile Picture" className="w-24 h-24 rounded-full object-cover" />

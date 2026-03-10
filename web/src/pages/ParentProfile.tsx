@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Separator } from '@/components/ui/separator';
-import { User, Mail, Phone, Briefcase, Edit2, Users } from 'lucide-react';
+import { User, Mail, Phone, Briefcase, Edit, Users } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { getParentProfile } from '@/api/parent';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { ParentProfileEdit } from '@/components/parent/ParentProfileEdit';
@@ -100,16 +101,11 @@ function ParentProfileContent() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Profile</h1>
-          <p className="text-muted-foreground">
-            Manage your personal information and view your children
-          </p>
-        </div>
+        <PageHeader title="My Profile" icon={<User className="h-5 w-5" />} subtitle="Manage your personal information and view your children" />
 
         <PermissionGuard resource="parent_profile" action="update_own">
           <Button onClick={() => setIsEditing(true)} className="flex items-center gap-2">
-            <Edit2 className="h-4 w-4" />
+            <Edit className="h-4 w-4" />
             Edit Profile
           </Button>
         </PermissionGuard>
@@ -209,9 +205,7 @@ function ParentProfileContent() {
                       </div>
                     </div>
 
-                    <Badge variant={child.is_active ? 'default' : 'secondary'}>
-                      {child.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
+                    <StatusBadge status={child.is_active} />
                   </div>
                 </div>
               ))}

@@ -1,7 +1,8 @@
 import { Table, type TableColumn } from '@/components/common/table';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { ViewButton, EditButton, ActivateButton, DeactivateButton, TableActionGroup } from '@/components/common/TableActions';
 import { Loader2, Eye, Edit, CheckCircle, XCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -212,38 +213,28 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       key: 'is_active',
       label: 'Status',
       render: (value: boolean) => (
-        <Badge variant={value ? 'default' : 'secondary'}>
-          {value ? 'Active' : 'Inactive'}
-        </Badge>
+        <StatusBadge status={value} />
       )
     },
     {
       key: 'actions',
       label: 'Actions',
       render: (_, row) => (
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
+        <TableActionGroup>
+          <ViewButton
             onClick={() => {
-              // Find the full admission data
               const admission = admissionsResponse?.items?.find(item => item.id === row.id);
               if (admission) {
                 setSelectedAdmission(admission);
                 setViewModalOpen(true);
               }
             }}
-            className="h-8 w-8 p-0 hover:bg-accent"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
+            title="View Admission"
+          />
           {hasUpdatePermission && (
             <>
-              <Button
-                variant="ghost"
-                size="sm"
+              <EditButton
                 onClick={() => {
-                  // Find the full admission data
                   const admission = admissionsResponse?.items?.find(item => item.id === row.id);
                   if (admission) {
                     setSelectedAdmission(admission);
@@ -263,26 +254,24 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                     setEditModalOpen(true);
                   }
                 }}
-                className="h-8 w-8 p-0 hover:bg-accent"
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleToggleStatus(row)}
-                className={`h-8 w-8 p-0 ${row.is_active ? 'hover:bg-destructive/10 hover:text-destructive' : 'hover:bg-green-500/10 hover:text-green-600'}`}
-                disabled={toggleStatusMutation.isPending}
-              >
-                {row.is_active ? (
-                  <XCircle className="h-4 w-4" />
-                ) : (
-                  <CheckCircle className="h-4 w-4" />
-                )}
-              </Button>
+                title="Edit Admission"
+              />
+              {row.is_active ? (
+                <DeactivateButton
+                  onClick={() => handleToggleStatus(row)}
+                  disabled={toggleStatusMutation.isPending}
+                  title="Deactivate Student"
+                />
+              ) : (
+                <ActivateButton
+                  onClick={() => handleToggleStatus(row)}
+                  disabled={toggleStatusMutation.isPending}
+                  title="Activate Student"
+                />
+              )}
             </>
           )}
-        </div>
+        </TableActionGroup>
       )
     }
   ];
@@ -438,7 +427,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
       {/* View Modal */}
       <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Admission Details - {selectedAdmission?.admission_number}</DialogTitle>
           </DialogHeader>
@@ -472,7 +461,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
       {/* Edit Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Edit Admission - {selectedAdmission?.admission_number}</DialogTitle>
           </DialogHeader>

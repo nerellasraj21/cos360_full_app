@@ -3,7 +3,7 @@ import { useParams, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, UserPlus, Trash2, Loader2, Shield, Info, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
@@ -137,9 +137,7 @@ export default function MarkPermissions() {
                         {new Date(perm.granted_at).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={perm.is_active ? 'default' : 'secondary'}>
-                          {perm.is_active ? 'Active' : 'Revoked'}
-                        </Badge>
+                        <StatusBadge status={perm.is_active} label={perm.is_active ? 'Active' : 'Revoked'} />
                       </td>
                       <td className="px-4 py-3 text-right">
                         <Button

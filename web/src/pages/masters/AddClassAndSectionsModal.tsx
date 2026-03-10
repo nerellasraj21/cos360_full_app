@@ -144,7 +144,7 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
       <DialogTrigger asChild>
         <Button>Add Class & Sections</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-hidden">
+      <DialogContent customLayout>
         <DialogHeader>
           <DialogTitle>
             {step === 0 && 'Enter Class Details'}

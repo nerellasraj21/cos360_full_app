@@ -6,7 +6,7 @@ import type { AcademicYear, AcademicYearInput } from '@/types/masters/academicye
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/usePermission';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 export default function AcademicYearsPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
@@ -71,9 +71,7 @@ export default function AcademicYearsPage() {
       label: 'Active',
       editable: true,
       render: (v) => (
-        <Badge variant={v ? "default" : "secondary"}>
-          {v ? 'Active' : 'Inactive'}
-        </Badge>
+        <StatusBadge status={v} />
       ),
       renderEdit: (value: boolean, _row: AcademicYear, onChange: (v: boolean) => void) => (
         <input

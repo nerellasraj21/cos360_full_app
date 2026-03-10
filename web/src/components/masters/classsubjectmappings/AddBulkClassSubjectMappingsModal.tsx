@@ -194,7 +194,7 @@ export function AddBulkClassSubjectMappingsModal({
       <DialogTrigger asChild>
         <Button onClick={() => setIsFormDirty(false)}>Add Class-Subject Mappings</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-3xl" customLayout>
         <DialogHeader>
           <DialogTitle>Add Class-Subject Mappings</DialogTitle>
         </DialogHeader>

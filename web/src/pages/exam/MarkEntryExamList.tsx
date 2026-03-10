@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Loader2, ClipboardList, ChevronRight, BarChart3, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Search } from 'lucide-react'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { FilterBar } from '@/components/ui/FilterBar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -72,21 +74,9 @@ export default function MarkEntryExamList() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <ClipboardList className="h-6 w-6 text-muted-foreground" />
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Mark Entry</h1>
-          <p className="text-sm text-muted-foreground">
-            Select an exam to enter or review marks
-          </p>
-        </div>
-      </div>
+      <PageHeader title="Mark Entry" icon={<ClipboardList className="h-5 w-5" />} subtitle="Select an exam to enter or review marks" />
 
-      {/* Filter Bar */}
-      <div className="flex items-center gap-3">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium text-muted-foreground">Filters</span>
+      <FilterBar>
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -96,7 +86,7 @@ export default function MarkEntryExamList() {
             className="pl-8 h-8 text-sm"
           />
         </div>
-      </div>
+      </FilterBar>
 
       {/* List */}
       {isLoading ? (

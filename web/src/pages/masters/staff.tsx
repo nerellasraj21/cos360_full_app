@@ -2,20 +2,14 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StaffEnrollmentTable, StaffAttendanceTable, DesignationsTable } from '@/components/staff';
 import { Users, Calendar, Briefcase } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export function StaffPage() {
     const [activeTab, setActiveTab] = useState('enrollment');
 
     return (
         <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">Staff Management</h1>
-                    <p className="text-muted-foreground mt-2">
-                        Comprehensive staff enrollment, attendance tracking, and designation management
-                    </p>
-                </div>
-            </div>
+            <PageHeader title="Staff Management" icon={<Briefcase className="h-5 w-5" />} subtitle="Comprehensive staff enrollment, attendance tracking, and designation management" />
 
             <div className="bg-muted/50 rounded-lg p-4">
                 <div className="flex items-center justify-between">

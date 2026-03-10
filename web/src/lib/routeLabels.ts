@@ -34,6 +34,7 @@ export const ROUTE_SEGMENT_LABELS: Record<string, string> = {
 
   // Fee
   fee: 'Fee Management',
+  fees: 'Fee Management',
   categories: 'Categories',
   types: 'Types',
   terms: 'Terms',
@@ -61,6 +62,7 @@ export const ROUTE_SEGMENT_LABELS: Record<string, string> = {
   trips: 'Trips',
   studenttransport: 'Student Transport',
   studenttrips: 'Student Trips',
+  pricing: 'Transport Pricing',
 
   // Exam
   exam: 'Exam',
@@ -104,10 +106,11 @@ export const MODULE_COLORS: Record<string, string> = {
   students: 'text-blue-600 dark:text-blue-400',
   staff: 'text-purple-600 dark:text-purple-400',
   fee: 'text-green-600 dark:text-green-400',
+  fees: 'text-green-600 dark:text-green-400',
   expense: 'text-orange-600 dark:text-orange-400',
   transport: 'text-yellow-600 dark:text-yellow-500',
   exam: 'text-red-600 dark:text-red-400',
-  masters: 'text-gray-600 dark:text-gray-400',
+  masters: 'text-cyan-600 dark:text-cyan-400',
   admin: 'text-slate-600 dark:text-slate-400',
   reports: 'text-indigo-600 dark:text-indigo-400',
   communication: 'text-teal-600 dark:text-teal-400',

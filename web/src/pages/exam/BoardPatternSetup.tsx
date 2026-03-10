@@ -1,11 +1,14 @@
 import { Fragment, useState, useMemo } from 'react'
 import { Plus, Edit, Trash2, Loader2, Layout, ChevronDown, ChevronRight, ChevronUp, Save, X, Filter, Search, ChevronsUpDown } from 'lucide-react'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { FilterBar } from '@/components/ui/FilterBar'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Select,
@@ -186,24 +189,9 @@ export default function BoardPatternSetup() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Layout className="h-6 w-6 text-muted-foreground" />
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Board Patterns</h1>
-            <p className="text-sm text-muted-foreground">Define exam type patterns per board and education level</p>
-          </div>
-        </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" />
-          New Pattern
-        </Button>
-      </div>
+      <PageHeader title="Board Patterns" icon={<Layout className="h-5 w-5" />} subtitle="Define exam type patterns per board and education level" actions={<Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" /> New Pattern</Button>} />
 
-      {/* Filter Bar */}
-      <div className="flex items-center gap-3">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium text-muted-foreground">Filters</span>
+      <FilterBar>
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -213,7 +201,7 @@ export default function BoardPatternSetup() {
             className="pl-8 h-8 text-sm"
           />
         </div>
-      </div>
+      </FilterBar>
 
       {patterns.length === 0 ? (
         <Card>
@@ -278,19 +266,18 @@ export default function BoardPatternSetup() {
                         <Badge variant="secondary">{pattern.exam_types.length} types</Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={pattern.is_active ? 'default' : 'secondary'}>
-                          {pattern.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
+                        <StatusBadge status={pattern.is_active} />
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(pattern)}>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Pattern" onClick={() => openEdit(pattern)}>
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-destructive hover:text-destructive"
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
+                            title="Delete Pattern"
                             onClick={() => setDeleteTarget(pattern.id)}
                           >
                             <Trash2 className="h-4 w-4" />

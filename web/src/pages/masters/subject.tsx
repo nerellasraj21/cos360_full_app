@@ -7,7 +7,7 @@ import type { Subject, SubjectInput } from '@/types/masters/subject';
 import { SubjectCategoriesDropdown } from '@/components/dropdown-system/components/SubjectCategoriesDropdown';
 import { SubjectCategoriesInfiniteDropdown, CreateCategoryPopover } from '@/components/dropdown';
 import { useAcademicYearStore } from "@/lib/academicYearStore";
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { usePermission } from '@/hooks/usePermission';
 
@@ -75,9 +75,7 @@ export default function SubjectPage() {
       label: 'Active',
       editable: true,
       render: (v) => (
-        <Badge variant={v ? "default" : "secondary"}>
-          {v ? 'Active' : 'Inactive'}
-        </Badge>
+        <StatusBadge status={v} />
       ),
       renderEdit: (value, _row, onChange) => (
         <input

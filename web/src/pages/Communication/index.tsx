@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ComposeTab from './ComposeTab';
 import TemplatesTab from './TemplatesTab';
 import LogsTab from './LogsTab';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 type Tab = 'compose' | 'templates' | 'logs';
 
@@ -25,13 +27,16 @@ export default function CommunicationPage() {
 
   return (
     <div className="space-y-4">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Communication</h1>
-        <Button variant="outline" onClick={handleNewTemplate}>
-          + New Template
-        </Button>
-      </div>
+      <PageHeader
+        title="Communication"
+        subtitle="Send messages, manage templates, and view notification logs"
+        icon={<MessageSquare className="h-5 w-5" />}
+        actions={
+          <Button variant="outline" onClick={handleNewTemplate}>
+            + New Template
+          </Button>
+        }
+      />
 
       {/* Desktop tab bar */}
       <div className="hidden md:flex border-b">

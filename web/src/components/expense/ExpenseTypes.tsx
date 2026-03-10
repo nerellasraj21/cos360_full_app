@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Label } from '@/components/ui/label';
 import { Plus, Edit, Trash2, Search, Loader2, Filter, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useExpenseTypes, useExpenseCategoryDropdown, useCreateExpenseType, useUpdateExpenseType, useDeleteExpenseType } from '@/hooks/expense';
@@ -237,9 +237,7 @@ export function ExpenseTypes() {
                   <TableCell>{getCategoryName(type.category_id)}</TableCell>
                   <TableCell>{type.description || '-'}</TableCell>
                   <TableCell>
-                    <Badge variant={type.is_active ? 'default' : 'secondary'}>
-                      {type.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
+                    <StatusBadge status={type.is_active} />
                   </TableCell>
                   <TableCell>
                     {new Date(type.created_at).toLocaleDateString()}

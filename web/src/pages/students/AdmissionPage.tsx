@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Filter } from 'lucide-react';
+import { GraduationCap } from 'lucide-react';
 import MultiStepAdmissionForm from '@/components/students/MultiStepAdmissionForm';
 import AdmissionTable from '@/components/students/AdmissionTable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useStudentsSearch } from '@/api/hooks/students/admissions';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { usePermission } from '@/hooks/usePermission';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { FilterBar } from '@/components/ui/FilterBar';
 
 const AdmissionPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -38,34 +40,31 @@ const AdmissionPage = () => {
       }
     >
       <div className="container mx-auto p-4 space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Student Admissions</h1>
-          <PermissionGuard
-            resource="student_admissions"
-            action="create"
-            fallback={null}
-          >
-            <Button onClick={() => setIsFormOpen(true)}>
-              New Admission
-            </Button>
-          </PermissionGuard>
-        </div>
+        <PageHeader
+          title="Student Admissions"
+          icon={<GraduationCap className="h-5 w-5" />}
+          actions={
+            <PermissionGuard
+              resource="student_admissions"
+              action="create"
+              fallback={null}
+            >
+              <Button onClick={() => setIsFormOpen(true)}>
+                New Admission
+              </Button>
+            </PermissionGuard>
+          }
+        />
 
         {hasListPermission && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-              <Filter className="h-3.5 w-3.5" />
-              <span>Filters</span>
-            </div>
-            <div className="flex gap-4">
-              <Input
-                placeholder="Search students by name or admission number..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="max-w-md"
-              />
-            </div>
-          </div>
+          <FilterBar>
+            <Input
+              placeholder="Search students by name or admission number..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="max-w-md"
+            />
+          </FilterBar>
         )}
 
         {!hasReadPermission ? (
@@ -83,7 +82,7 @@ const AdmissionPage = () => {
         )}
 
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogContent className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-full max-w-4xl">
             <DialogHeader>
               <DialogTitle>New Student Admission</DialogTitle>
             </DialogHeader>

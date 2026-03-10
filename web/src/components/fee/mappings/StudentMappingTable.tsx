@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { EditButton, DeleteButton, TableActionGroup } from '@/components/common/TableActions';
 import { Plus, Edit, Trash2, Search, Filter, Eye, Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { feeStudentMappingsApi } from '@/api/fee/studentMappings';
@@ -351,23 +352,17 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
                       <div className="font-medium">₹{parseFloat(mapping.total_fee).toLocaleString()}</div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                      <TableActionGroup>
+                        <EditButton
                           onClick={() => { setIsEditDirty(false); setEditingMapping(mapping); }}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
+                          title="Edit Mapping"
+                        />
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                            <DeleteButton
                               onClick={() => setDeletingMapping(mapping)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                              title="Delete Mapping"
+                            />
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
@@ -388,7 +383,7 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
-                      </div>
+                      </TableActionGroup>
                     </TableCell>
                   </TableRow>
                 ))

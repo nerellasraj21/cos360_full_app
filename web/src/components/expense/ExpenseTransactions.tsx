@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Plus, Search, Filter, Eye, Edit, Trash2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
@@ -41,15 +41,6 @@ export function ExpenseTransactions() {
   const transactions = transactionsResponse || [];
   const totalCount = transactions.length;
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'approved': return 'default';
-      case 'pending': return 'secondary';
-      case 'rejected': return 'destructive';
-      case 'draft': return 'outline';
-      default: return 'secondary';
-    }
-  };
 
   const getTypeName = (typeId: string) => {
     const type = expenseTypes.find(t => t.id === typeId);
@@ -221,9 +212,7 @@ export function ExpenseTransactions() {
                     {formatCurrency(transaction.amount)}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getStatusBadgeVariant(transaction.status)}>
-                      {transaction.status}
-                    </Badge>
+                    <StatusBadge status={transaction.status} />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
@@ -289,7 +278,7 @@ export function ExpenseTransactions() {
 
       {/* Create Transaction Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} guardDirty={isCreateDirty} onDirtyDiscard={() => setIsCreateDirty(false)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onChange={() => setIsCreateDirty(true)}>
+        <DialogContent className="max-w-2xl" onChange={() => setIsCreateDirty(true)}>
           <DialogHeader>
             <DialogTitle>Create Expense Transaction</DialogTitle>
           </DialogHeader>
@@ -302,7 +291,7 @@ export function ExpenseTransactions() {
 
       {/* View Transaction Dialog */}
       <Dialog open={!!viewTransaction} onOpenChange={() => setViewTransaction(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Transaction Details</DialogTitle>
           </DialogHeader>
@@ -317,7 +306,7 @@ export function ExpenseTransactions() {
 
       {/* Edit Transaction Dialog */}
       <Dialog open={!!editTransaction} onOpenChange={(open) => { if (!open) setEditTransaction(null); }} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onChange={() => setIsEditDirty(true)}>
+        <DialogContent className="max-w-2xl" onChange={() => setIsEditDirty(true)}>
           <DialogHeader>
             <DialogTitle>Edit Expense Transaction</DialogTitle>
           </DialogHeader>

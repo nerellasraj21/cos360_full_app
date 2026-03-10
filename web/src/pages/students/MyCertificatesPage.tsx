@@ -1,13 +1,12 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { DownloadButton } from "@/components/common/TableActions";
+import { FileText, Loader2, ScrollText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Table } from "@/components/common/table";
-import type { TableColumn } from "@/components/common/table";
-import { FileText, Download, Loader2 } from "lucide-react";
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useMyCertificates, useDownloadCertificateDocument } from "@/api/hooks/students/certificates";
 import { useAuthStore } from "@/lib/authStore";
-import type { CertificateRead } from "@/api/hooks/students/certificates";
+import type { CertificateRead } from "@/types/certificates/types";
 
 export const MyCertificatesPage: React.FC = () => {
   const { isAuthenticated } = useAuthStore();
@@ -15,75 +14,16 @@ export const MyCertificatesPage: React.FC = () => {
   const { data: certificatesData, isLoading } = useMyCertificates();
   const downloadCertificate = useDownloadCertificateDocument();
 
-  const certificates = certificatesData?.items || [];
+  const certificates = certificatesData?.items ?? [];
 
   const handleDownload = async (certificateId: string) => {
     try {
       const result = await downloadCertificate.mutateAsync(certificateId);
       window.location.href = result.presigned_url;
     } catch {
-      // Error handled by mutation
+      // handled by mutation
     }
   };
-
-  const columns: TableColumn<CertificateRead>[] = [
-    {
-      key: "type_name",
-      label: "Certificate Type",
-      render: (value) => (
-        <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-muted-foreground" />
-          {value || "-"}
-        </div>
-      ),
-    },
-    {
-      key: "issue_date",
-      label: "Issue Date",
-      render: (value) => (value ? new Date(value).toLocaleDateString() : "-"),
-    },
-    {
-      key: "remarks",
-      label: "Remarks",
-      render: (value) => value || "-",
-    },
-    {
-      key: "file_path",
-      label: "File",
-      render: (value) =>
-        value ? (
-          <Badge variant="secondary">
-            <FileText className="h-3 w-3 mr-1" />
-            Uploaded
-          </Badge>
-        ) : (
-          <span className="text-muted-foreground text-sm">No file</span>
-        ),
-    },
-    {
-      key: "actions" as keyof CertificateRead,
-      label: "Actions",
-      render: (_, row) => (
-        <div className="flex gap-2">
-          {row.file_path && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleDownload(row.id)}
-              disabled={downloadCertificate.isPending}
-            >
-              {downloadCertificate.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              Download
-            </Button>
-          )}
-        </div>
-      ),
-    },
-  ];
 
   if (!isAuthenticated) {
     return (
@@ -101,9 +41,17 @@ export const MyCertificatesPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      <PageHeader title="My Certificates" icon={<ScrollText className="h-5 w-5" />} />
       <Card>
         <CardHeader>
-          <CardTitle>Your Certificates</CardTitle>
+          <CardTitle>
+            Certificates
+            {certificatesData && (
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({certificatesData.total} total)
+              </span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -112,20 +60,84 @@ export const MyCertificatesPage: React.FC = () => {
               <span className="ml-2">Loading your certificates...</span>
             </div>
           ) : certificates.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <div className="text-center py-10 text-muted-foreground">
+              <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
               <p>No certificates found.</p>
               <p className="text-sm">Certificates issued to you will appear here.</p>
             </div>
           ) : (
-            <Table
-              columns={columns}
-              data={certificates}
-              onEdit={() => {}}
-              onDelete={() => {}}
-              isEditing={false}
-              className="w-full"
-            />
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-3 font-medium text-muted-foreground w-10">
+                      S.No.
+                    </th>
+                    <th className="text-left py-3 px-3 font-medium text-muted-foreground">
+                      Certificate Type
+                    </th>
+                    <th className="text-left py-3 px-3 font-medium text-muted-foreground">
+                      Issue Date
+                    </th>
+                    <th className="text-left py-3 px-3 font-medium text-muted-foreground">
+                      Remarks
+                    </th>
+                    <th className="text-left py-3 px-3 font-medium text-muted-foreground">
+                      File
+                    </th>
+                    <th className="text-left py-3 px-3 font-medium text-muted-foreground">
+                      Download
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {certificates.map((cert: CertificateRead, idx) => (
+                    <tr
+                      key={cert.id}
+                      className="border-b hover:bg-muted/40 transition-colors"
+                      style={{ height: 48 }}
+                    >
+                      <td className="py-2 px-3 text-muted-foreground">{idx + 1}</td>
+                      <td className="py-2 px-3">
+                        <div className="flex items-center gap-1.5">
+                          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                          {cert.type_name || "-"}
+                        </div>
+                      </td>
+                      <td className="py-2 px-3">
+                        {cert.issue_date
+                          ? new Date(cert.issue_date).toLocaleDateString()
+                          : "-"}
+                      </td>
+                      <td className="py-2 px-3 max-w-[200px] truncate text-muted-foreground">
+                        {cert.remarks || "-"}
+                      </td>
+                      <td className="py-2 px-3">
+                        {cert.file_path ? (
+                          <Badge variant="secondary">
+                            <FileText className="h-3 w-3 mr-1" />
+                            Uploaded
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">No file</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3">
+                        {cert.file_path ? (
+                          <DownloadButton
+                            onClick={() => handleDownload(cert.id)}
+                            disabled={downloadCertificate.isPending}
+                            title="Download Certificate"
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -292,6 +292,7 @@ export function FeeTermForm({ term, onSuccess, onCancel }: FeeTermFormProps) {
                                                     type="button"
                                                     variant="outline"
                                                     size="sm"
+                                                    className="text-destructive hover:text-destructive/80"
                                                     onClick={() => deleteDate(index)}
                                                     disabled={isPending}
                                                 >

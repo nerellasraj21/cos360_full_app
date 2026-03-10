@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
-import { FileText, Download, Search, Loader2 } from "lucide-react";
+import { DownloadButton, TableActionGroup } from "@/components/common/TableActions";
+import { FileText, Download, Search, Loader2, ScrollText } from "lucide-react";
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useStudentCertificates, useDownloadCertificateDocument } from "@/api/hooks/students/certificates";
 import { useStudentsDropdown } from "@/api/hooks/students/useAdmission";
 import type { CertificateRead } from "@/api/hooks/students/certificates";
@@ -66,29 +68,22 @@ export const StudentCertificatesPage: React.FC = () => {
       key: "actions" as keyof CertificateRead,
       label: "Actions",
       render: (_, row) => (
-        <div className="flex gap-2">
+        <TableActionGroup>
           {row.file_path && (
-            <Button
-              size="sm"
-              variant="outline"
+            <DownloadButton
               onClick={() => handleDownload(row.id)}
               disabled={downloadCertificate.isPending}
-            >
-              {downloadCertificate.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              Download
-            </Button>
+              title="Download Certificate"
+            />
           )}
-        </div>
+        </TableActionGroup>
       ),
     },
   ];
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      <PageHeader title="Student Certificates" icon={<ScrollText className="h-5 w-5" />} />
       <Card>
         <CardHeader>
           <CardTitle>Select Student</CardTitle>

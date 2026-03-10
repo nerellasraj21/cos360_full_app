@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -358,14 +358,10 @@ export function SectionsManagement({
                       </div>
                     )}
                     {col.key === 'classIsActive' && (
-                      <Badge variant={section.classIsActive ? "default" : "secondary"}>
-                        {section.classIsActive ? 'Active' : 'Inactive'}
-                      </Badge>
+                      <StatusBadge status={section.classIsActive} />
                     )}
                     {col.key === 'is_active' && (
-                      <Badge variant={section.is_active ? "default" : "secondary"}>
-                        {section.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
+                      <StatusBadge status={section.is_active} />
                     )}
                   </TableCell>
                 ))}

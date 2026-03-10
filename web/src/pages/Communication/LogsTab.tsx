@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { ViewButton } from '@/components/common/TableActions';
 import { Eye, Loader2 } from 'lucide-react';
 import { useLogs, useLogDetail } from '@/api/hooks/communication/communication';
 import type { Channel, NotificationStatus, NotificationLog, LogFilters } from '@/types/communication';
@@ -44,7 +45,7 @@ function LogDetailModal({ logId, onClose }: { logId: string; onClose: () => void
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle id="log-detail-title">Notification Detail</DialogTitle>
         </DialogHeader>
@@ -254,13 +255,7 @@ export default function LogsTab() {
                 <p className="text-xs text-muted-foreground">
                   {new Date(log.created_at).toLocaleString()}
                 </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedLogId(log.id)}
-                >
-                  <Eye className="h-3 w-3 mr-1" /> View
-                </Button>
+                <ViewButton onClick={() => setSelectedLogId(log.id)} title="View Log" />
               </div>
             ))}
           </div>
@@ -353,14 +348,7 @@ function LogRow({
         {new Date(log.created_at).toLocaleString()}
       </td>
       <td className="px-4 py-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onView}
-          aria-label={`View log for ${log.recipient_name}`}
-        >
-          <Eye className="h-4 w-4" />
-        </Button>
+        <ViewButton onClick={onView} title={`View log for ${log.recipient_name}`} />
       </td>
     </tr>
   );

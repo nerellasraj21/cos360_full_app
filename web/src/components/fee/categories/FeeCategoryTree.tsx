@@ -3,7 +3,7 @@ import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Loader2, ChevronLeft, Ch
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useFeeCategories, useCreateFeeCategory, useUpdateFeeCategory, useDeleteFeeCategory } from '@/hooks/fee/useFeeCategories';
@@ -62,9 +62,7 @@ function CategoryNode({ category, serialNumber, onEdit, onDelete, onManageTypes,
                     <div className="flex-1">
                         <h3 className="font-medium text-gray-900">{category.category_name}</h3>
                         <div className="flex items-center gap-2 mt-1">
-                            <Badge variant={category.category_status === 'active' ? "default" : "secondary"}>
-                                {category.category_status === 'active' ? 'Active' : 'Inactive'}
-                            </Badge>
+                            <StatusBadge status={category.category_status} />
                             {canViewTypes && (
                                 <span className="text-xs text-gray-500">
                                     {feeTypes.length} fee type{feeTypes.length !== 1 ? 's' : ''}
@@ -139,9 +137,7 @@ function CategoryNode({ category, serialNumber, onEdit, onDelete, onManageTypes,
                                     <div>
                                         <span className="font-medium text-sm">{feeType.type_name}</span>
                                         <div className="flex items-center gap-2 mt-1">
-                                            <Badge variant={feeType.fee_status === 'active' ? "default" : "secondary"}>
-                                                {feeType.fee_status === 'active' ? 'Active' : 'Inactive'}
-                                            </Badge>
+                                            <StatusBadge status={feeType.fee_status} />
                                             <span className="text-xs text-gray-500">
                                                 Term: {(() => {
                                                     if (!feeType.fee_term_name) return 'Unknown';

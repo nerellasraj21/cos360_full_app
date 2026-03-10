@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { EditButton, DeleteButton } from "@/components/common/TableActions";
 import { Edit, Trash2, Check, X, ChevronUp, ChevronDown, ChevronsUpDown, Search, Filter } from "lucide-react";
 import {
   Dialog,
@@ -324,14 +325,7 @@ export function Table<T extends { [key: string]: any }>({
                                   action="update"
                                   fallback={null}
                                 >
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleEditRow(rowIdx)}
-                                    className="h-8 w-8 p-0 hover:bg-accent"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
+                                  <EditButton onClick={() => handleEditRow(rowIdx)} title="Edit" />
                                 </PermissionGuard>
                               )}
                               {onDelete && (
@@ -347,14 +341,10 @@ export function Table<T extends { [key: string]: any }>({
                                   }
                                 >
                                   <DialogTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
+                                    <DeleteButton
                                       onClick={() => setDeleteIdx(rowIdx)}
-                                      className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                      title="Delete"
+                                    />
                                   </DialogTrigger>
                                   <DialogContent>
                                     <DialogHeader>

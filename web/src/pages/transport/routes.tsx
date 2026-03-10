@@ -14,7 +14,7 @@ import { PermissionGuard } from '@/components/common';
 import Select from 'react-select';
 import CreatableSelect from 'react-select/creatable';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ShieldX, Loader2 } from 'lucide-react';
 import type { RouteTypeDropdown, TripTypeDropdown } from '@/types/masters/transportTypes';
 import { toast } from 'sonner';
@@ -122,9 +122,7 @@ const createColumns = (routeTypeOptions: RouteTypeDropdown[], tripTypeOptions: T
         label: "Active",
         editable: true,
         render: (v: boolean) => (
-            <Badge variant={v ? "default" : "secondary"}>
-                {v ? 'Active' : 'Inactive'}
-            </Badge>
+            <StatusBadge status={v} />
         ),
         renderEdit: (value: any, _row: Route, onChange: (val: any) => void) => (
             <div className="flex items-center justify-center">

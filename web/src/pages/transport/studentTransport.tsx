@@ -4,7 +4,7 @@ import { MasterPage } from "../masters/common/MasterPage";
 import type { MasterPageConfig, FormField } from "../masters/common/MasterPage";
 import type { StudentTransportOut, StudentTransportCreate } from "@/types/masters/studentTransport";
 import { useStudentTransports, useCreateStudentTransport, useUpdateStudentTransport, useDeleteStudentTransport } from '@/api/hooks/masters/studentTransport';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 
 // Updated to match backend schema (2026-02-09)
 const formFields: FormField[] = [
@@ -12,6 +12,7 @@ const formFields: FormField[] = [
     { name: "student_id", label: "Student ID", required: true },
     { name: "stop_id", label: "Stop ID", required: true },
     { name: "fee_term_id", label: "Fee Term ID", required: true },
+    { name: "pricing_id", label: "Pricing ID" },
     { name: "fee_per_term", label: "Fee Per Term", type: "number", required: true },
 ];
 
@@ -20,6 +21,7 @@ const defaultValues: StudentTransportCreate = {
     student_id: "",
     stop_id: "",
     fee_term_id: "",
+    pricing_id: null,
     fee_per_term: 0,
 };
 
@@ -58,19 +60,23 @@ export default function StudentTransportPage() {
             editable: true,
         },
         {
+            key: "pricing_id",
+            label: "Pricing",
+            editable: true,
+            render: (v: string | null) => v || '—',
+        },
+        {
             key: "fee_per_term",
             label: "Fee Per Term",
             editable: true,
-            render: (v: number) => `$${v}`,
+            render: (v: number | string) => `₹${Number(v).toLocaleString()}`,
         },
         {
             key: "is_active",
             label: "Active",
             editable: true,
             render: (v: boolean) => (
-                <Badge variant={v ? "default" : "secondary"}>
-                    {v ? 'Active' : 'Inactive'}
-                </Badge>
+                <StatusBadge status={v} />
             ),
         },
     ];

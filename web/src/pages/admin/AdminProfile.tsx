@@ -27,6 +27,8 @@ import {
   FormControl,
   FormMessage,
 } from '@/components/ui/form';
+import { User } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from 'sonner';
 
 interface EmailFormData {
@@ -134,7 +136,7 @@ const AdminProfile: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Admin Profile</h1>
+      <PageHeader title="Admin Profile" icon={<User className="h-5 w-5" />} />
 
       <Card>
         <CardHeader>

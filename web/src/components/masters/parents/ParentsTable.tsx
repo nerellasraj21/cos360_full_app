@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { EditButton, DeleteButton, TableActionGroup } from '@/components/common/TableActions';
 import { Edit, Trash2, Plus, Users, Mail, Phone, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Search, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -299,26 +300,16 @@ export function ParentsTable({ className }: ParentsTableProps) {
                                             </div>
                                         </td>
                                         <td className="px-4 align-middle text-sm">
-                                            <div className="flex items-center gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
+                                            <TableActionGroup>
+                                                <EditButton
                                                     onClick={() => handleEdit(parent)}
-                                                    className="h-8 w-8 p-0"
                                                     title="Edit Parent"
-                                                >
-                                                    <Edit className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
+                                                />
+                                                <DeleteButton
                                                     onClick={() => handleDelete(parent)}
-                                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
                                                     title="Delete Parent"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
+                                                />
+                                            </TableActionGroup>
                                         </td>
                                     </tr>
                                 ))}

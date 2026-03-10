@@ -5,7 +5,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, CheckCircle, XCircle } from 'lucide-react';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Loader2, Save, CheckCircle, XCircle, UserCheck, Users } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from 'sonner';
 import { useClassSectionsDropdown, useStudentsByClassSection } from '@/api/hooks/masters/classesandsections';
 import { useStudentAttendance } from '@/api/hooks/students/attendance';
@@ -86,7 +88,7 @@ function StudentOwnView({ studentId }: { studentId: string }) {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
-      <h1 className="text-2xl font-bold">My Attendance</h1>
+      <PageHeader title="My Attendance" icon={<UserCheck className="h-5 w-5" />} />
 
       {/* Date range filter */}
       <Card>
@@ -165,7 +167,7 @@ function ParentView({ parentEntityId }: { parentEntityId: string | null }) {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
-      <h1 className="text-2xl font-bold">Children's Attendance</h1>
+      <PageHeader title="Children's Attendance" icon={<Users className="h-5 w-5" />} />
 
       {/* Child selector + date filter */}
       <Card>
@@ -260,9 +262,9 @@ function AttendanceRecordList({
   title?: string;
 }) {
   const statusBadge = (status: string) => {
-    if (status === 'present') return <Badge variant="default" className="bg-green-500">Present</Badge>;
-    if (status === 'absent') return <Badge variant="destructive">Absent</Badge>;
-    return <Badge variant="secondary" className="bg-yellow-500 text-white">Late</Badge>;
+    if (status === 'present') return <StatusBadge status={status} />;
+    if (status === 'absent') return <StatusBadge status={status} />;
+    return <StatusBadge status={status} />;
   };
 
   return (
@@ -503,9 +505,7 @@ function StaffView() {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Student Attendance</h1>
-      </div>
+      <PageHeader title="Student Attendance" icon={<UserCheck className="h-5 w-5" />} />
 
       <Card>
         <CardHeader><CardTitle>Select Class, Section & Date</CardTitle></CardHeader>

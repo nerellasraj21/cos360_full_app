@@ -5,7 +5,8 @@ import { StudentMappingTable } from '@/components/fee/mappings/StudentMappingTab
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { Card, CardContent } from '@/components/ui/card';
-import { ShieldX } from 'lucide-react';
+import { ShieldX, Map } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export function FeeMappings() {
   return (
@@ -39,7 +40,9 @@ export function FeeMappings() {
 
 function FeeMappingsContent() {
     const { academicYears, fetchAndSetAcademicYears, selectedAcademicYearId } = useAcademicYearStore();
-    const [activeTab, setActiveTab] = useState('student-mappings');
+    const [activeTab, setActiveTab] = useState(
+        window.location.hash === '#class-mappings' ? 'class-mappings' : 'student-mappings'
+    );
 
     // Initialize academic years if not loaded
     useEffect(() => {
@@ -50,9 +53,7 @@ function FeeMappingsContent() {
 
     return (
         <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-foreground">Fee Mappings Management</h1>
-            </div>
+            <PageHeader title="Fee Mappings Management" icon={<Map className="h-5 w-5" />} />
 
             <div className="bg-muted/50 rounded-lg p-4">
                 <div className="flex items-center justify-between">

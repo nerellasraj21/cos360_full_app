@@ -2,7 +2,8 @@ import React from 'react';
 import { FeeTypeManager } from '@/components/fee/types/FeeTypeManager';
 import { PermissionGuard } from '@/components/common';
 import { Card, CardContent } from '@/components/ui/card';
-import { ShieldX } from 'lucide-react';
+import { ShieldX, DollarSign } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export function FeeTypes() {
     return (
@@ -31,12 +32,7 @@ export function FeeTypes() {
         >
             <div className="space-y-6">
                 {/* Header */}
-                <div>
-                    <h1 className="text-2xl font-bold text-foreground">Fee Types Management</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Manage individual fee types and their properties
-                    </p>
-                </div>
+                <PageHeader title="Fee Types Management" icon={<DollarSign className="h-5 w-5" />} subtitle="Manage individual fee types and their properties" />
 
                 <FeeTypeManager />
             </div>

@@ -2,8 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { EditButton, DeleteButton, TableActionGroup } from '@/components/common/TableActions';
 import { ChevronDown, ChevronRight, ChevronUp, ChevronsUpDown, Edit, Trash2, Plus, Filter, Download, FileText, FileSpreadsheet, Search } from 'lucide-react';
 import {
   DropdownMenu,
@@ -335,36 +337,24 @@ export function ClassSectionsTable({
                           </Badge>
                         )}
                         {col.key === 'is_active' && (
-                          <Badge variant={classItem.is_active ? "default" : "secondary"}>
-                            {classItem.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
+                          <StatusBadge status={classItem.is_active} />
                         )}
                       </TableCell>
                     ))}
                     <TableCell className="text-right align-middle">
-                      <div className="flex items-center justify-end gap-2">
+                      <TableActionGroup>
                         <PermissionGuard resource="sections" action="create" fallback={null}>
                           <Button variant="ghost" size="sm" onClick={() => onAddSection(classItem.id)} title="Add Section">
                             <Plus className="h-4 w-4" />
                           </Button>
                         </PermissionGuard>
                         <PermissionGuard resource="classes" action="update" fallback={null}>
-                          <Button variant="ghost" size="sm" onClick={() => onEditClass(classItem)} title="Edit Class">
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <EditButton onClick={() => onEditClass(classItem)} title="Edit Class" />
                         </PermissionGuard>
                         <PermissionGuard resource="classes" action="delete" fallback={null}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onDeleteClass(classItem.id)}
-                            title="Delete Class"
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <DeleteButton onClick={() => onDeleteClass(classItem.id)} title="Delete Class" />
                         </PermissionGuard>
-                      </div>
+                      </TableActionGroup>
                     </TableCell>
                   </TableRow>
                   {expandedRows.has(classItem.id) && (
@@ -384,34 +374,16 @@ export function ClassSectionsTable({
                                   >
                                     <div className="flex items-center gap-2">
                                       <span className="font-medium">{section.name}</span>
-                                      <Badge variant={section.is_active ? "default" : "secondary"} className="text-xs">
-                                        {section.is_active ? 'Active' : 'Inactive'}
-                                      </Badge>
+                                      <StatusBadge status={section.is_active} />
                                     </div>
-                                    <div className="flex items-center gap-1">
+                                    <TableActionGroup>
                                       <PermissionGuard resource="sections" action="update" fallback={null}>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => onEditSection(section)}
-                                          title="Edit Section"
-                                          className="h-6 w-6 p-0"
-                                        >
-                                          <Edit className="h-3 w-3" />
-                                        </Button>
+                                        <EditButton onClick={() => onEditSection(section)} title="Edit Section" />
                                       </PermissionGuard>
                                       <PermissionGuard resource="sections" action="delete" fallback={null}>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => onDeleteSection(section.id)}
-                                          title="Delete Section"
-                                          className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
-                                        >
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
+                                        <DeleteButton onClick={() => onDeleteSection(section.id)} title="Delete Section" />
                                       </PermissionGuard>
-                                    </div>
+                                    </TableActionGroup>
                                   </div>
                                 ))}
                               </div>

@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
-import { FileText, Download, Search } from "lucide-react";
+import { FileText, Download, Search, FolderOpen } from "lucide-react";
+import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from "sonner";
 import { useStudentDocuments, useDownloadStudentDocument } from "@/api/hooks/students/documents";
 import { useStudentsDropdown } from "@/api/hooks/students/useAdmission";
@@ -62,9 +63,7 @@ export const StudentDocumentsPage: React.FC = () => {
 
     return (
         <div className="container mx-auto p-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold">Student Documents</h1>
-            </div>
+            <PageHeader title="Student Documents" icon={<FolderOpen className="h-5 w-5" />} />
 
             <Card>
                 <CardHeader>

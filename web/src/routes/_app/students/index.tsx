@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Clock, GraduationCap, UserCheck, FileText, Award, BookOpen, FolderOpen } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const Route = createFileRoute('/_app/students/')({
   component: StudentsDashboard,
@@ -55,19 +56,17 @@ const sections = [
 function StudentsDashboard() {
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Students Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Comprehensive management of student data, admissions, and records
-          </p>
-        </div>
-        <Badge variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 text-sm">
-          <Clock className="h-3.5 w-3.5" />
-          Coming Soon
-        </Badge>
-      </div>
+      <PageHeader
+        title="Students Dashboard"
+        subtitle="Comprehensive management of student data, admissions, and records"
+        icon={<GraduationCap className="h-5 w-5" />}
+        actions={
+          <Badge variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 text-sm">
+            <Clock className="h-3.5 w-3.5" />
+            Coming Soon
+          </Badge>
+        }
+      />
 
       {/* Coming Soon Banner */}
       <div className="rounded-xl border-2 border-dashed border-blue-300 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-8 text-center">

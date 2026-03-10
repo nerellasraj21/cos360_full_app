@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,8 +32,10 @@ import {
   Calendar,
   FileText,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import {
   fetchResourcePermissions,
   fetchResourcePermissionsPaginated,
@@ -483,12 +486,7 @@ const RolesPermissionsPage: React.FC = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Roles & Permissions</h1>
-          <p className="text-muted-foreground">
-            Manage user roles and their access permissions across the system
-          </p>
-        </div>
+        <PageHeader title="Roles & Permissions" icon={<ShieldCheck className="h-5 w-5" />} subtitle="Manage user roles and their access permissions across the system" />
         <div className="flex gap-2">
           {canManagePermissions() && (
             <>
@@ -655,6 +653,7 @@ const RolesPermissionsPage: React.FC = () => {
                         type="button"
                         variant="ghost"
                         size="sm"
+                        className="text-destructive hover:text-destructive/80"
                         onClick={() => removeBulkPermission(index)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -914,9 +913,7 @@ const RolesPermissionsPage: React.FC = () => {
                         </TableCell>
                         <TableCell>{role.description || 'No description'}</TableCell>
                         <TableCell>
-                          <Badge variant={role.is_active ? 'default' : 'secondary'}>
-                            {role.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
+                          <StatusBadge status={role.is_active} />
                         </TableCell>
                         <TableCell>
                           {new Date(role.created_at).toLocaleDateString()}
@@ -933,6 +930,7 @@ const RolesPermissionsPage: React.FC = () => {
                             <Button
                               variant="ghost"
                               size="sm"
+                              className="text-destructive hover:text-destructive/80"
                               onClick={() => handleDeleteRole(role.id)}
                               disabled={role.name === 'Admin'} // Prevent deleting admin role
                             >
@@ -1048,6 +1046,7 @@ const RolesPermissionsPage: React.FC = () => {
                             <Button
                               variant="ghost"
                               size="sm"
+                              className="text-destructive hover:text-destructive/80"
                               onClick={() => handleDelete(permission)}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -1309,7 +1308,7 @@ const RolesPermissionsPage: React.FC = () => {
                   <Edit className="h-4 w-4 mr-2" />
                   Update Academic Year
                 </Button>
-                <Button className="w-full" variant="outline">
+                <Button className="w-full text-destructive hover:text-destructive/80" variant="outline">
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete Academic Year
                 </Button>
@@ -1476,6 +1475,7 @@ const RolesPermissionsPage: React.FC = () => {
                                 type="button"
                                 variant="ghost"
                                 size="sm"
+                                className="text-destructive hover:text-destructive/80"
                                 onClick={() => removeSection(index)}
                               >
                                 <Trash2 className="h-4 w-4" />

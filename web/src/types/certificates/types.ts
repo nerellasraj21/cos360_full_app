@@ -23,17 +23,41 @@ export interface CertificateTypeDropdown {
   name: string;           // Certificate type name
 }
 
-// CertificateRead — new backend model (Mar 2026)
+// Certificate type search result — from GET /certificates/types/search
+export interface CertificateTypeSearchResult {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+// CertificateRead — matches backend CertificateRead schema
 export interface CertificateRead {
   id: string;
   student_id: string;
-  certificate_type_id: string;
-  type_name: string;          // Populated from type JOIN
-  file_path: string | null;   // S3 key (not local path)
-  issue_date: string;
+  certificate_type_id: string | null;
+  type_name: string;                    // Populated from type JOIN
+  file_path: string | null;             // S3 key (not local path)
+  issue_date: string | null;
   remarks: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Cascade selector types — admin student picker flow
+export interface SelectorClass {
+  id: string;
+  name: string;
+}
+
+export interface SelectorSection {
+  id: string;
+  name: string;
+}
+
+export interface SelectorStudent {
+  student_id: string;
+  full_name: string;
+  admission_no: string;
 }
 
 // Presigned URL download response — replaces binary blob stream
@@ -41,7 +65,7 @@ export interface PresignedUrlResponse {
   presigned_url: string;
   expires_in_seconds: number;
   certificate_id: string;
-  filename: string;
+  filename?: string;
 }
 
 export interface PaginatedResponse<T> {

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Upload, Loader2, Filter } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Upload, Loader2, Filter, Receipt } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -256,15 +257,6 @@ export function ExpenseTransactionsPage() {
   };
 
   // Get status badge
-  const getStatusBadge = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      pending: 'secondary',
-      approved: 'default',
-      paid: 'default',
-      cancelled: 'destructive'
-    };
-    return variants[status] || 'secondary';
-  };
 
   // Get status icon
   const getStatusIcon = (status: string) => {
@@ -319,24 +311,12 @@ export function ExpenseTransactionsPage() {
       }
     >
       <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Expense Transactions</h1>
-          <p className="text-muted-foreground mt-2">
-            Manage expense transactions with detailed line items and approval workflows
-          </p>
-        </div>
-        <PermissionGuard
-          resource="expense_transactions"
-          action="create"
-          fallback={null}
-        >
-          <Button onClick={handleCreate} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            New Transaction
-          </Button>
-        </PermissionGuard>
-      </div>
+      <PageHeader
+        title="Expense Transactions"
+        icon={<Receipt className="h-5 w-5" />}
+        subtitle="Manage expense transactions with detailed line items and approval workflows"
+        actions={<PermissionGuard resource="expense_transactions" action="create" fallback={null}><Button onClick={handleCreate} className="flex items-center gap-2"><Plus className="h-4 w-4" /> New Transaction</Button></PermissionGuard>}
+      />
 
       {/* Filters */}
       <Card>
@@ -432,10 +412,7 @@ export function ExpenseTransactionsPage() {
                         <TableCell>{transaction.expense_type_id}</TableCell>
                         <TableCell>₹{transaction.amount.toLocaleString()}</TableCell>
                         <TableCell>
-                          <Badge variant={getStatusBadge(transaction.status)} className="flex items-center gap-1 w-fit">
-                            {getStatusIcon(transaction.status)}
-                            {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-                          </Badge>
+                          <StatusBadge status={transaction.status} />
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
@@ -523,7 +500,7 @@ export function ExpenseTransactionsPage() {
           resetForm();
         }
       }} guardDirty={isFormDirty} onDirtyDiscard={() => setIsFormDirty(false)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>
               {selectedTransaction ? 'Edit Transaction' : 'Create New Transaction'}
@@ -764,7 +741,7 @@ export function ExpenseTransactionsPage() {
 
       {/* View Transaction Dialog */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Transaction Details</DialogTitle>
           </DialogHeader>
@@ -780,9 +757,7 @@ export function ExpenseTransactionsPage() {
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Status</label>
-                  <Badge variant={getStatusBadge(selectedTransaction.status)}>
-                    {selectedTransaction.status.charAt(0).toUpperCase() + selectedTransaction.status.slice(1)}
-                  </Badge>
+                  <StatusBadge status={selectedTransaction.status} />
                 </div>
 
                 <div>

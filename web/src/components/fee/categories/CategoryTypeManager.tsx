@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Edit, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -146,7 +146,7 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange} guardDirty={showCreateForm && isFormDirty} onDirtyDiscard={() => setIsFormDirty(false)}>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogContent className="max-w-2xl max-h-[80vh]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center justify-between">
                             <span>Manage Fee Types - {category.category_name}</span>
@@ -299,13 +299,13 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
                                                 className="h-8 w-8 p-0"
                                                 title="Edit Fee Type"
                                             >
-                                                <Edit2 className="h-4 w-4" />
+                                                <Edit className="h-4 w-4" />
                                             </Button>
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
                                                 onClick={() => handleDelete(feeType)}
-                                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                                className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
                                                 title="Delete Fee Type"
                                             >
                                                 <Trash2 className="h-4 w-4" />

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { EditButton, DeleteButton, TableActionGroup } from '@/components/common/TableActions';
 import { Edit, Trash2, Plus, Calculator, AlertCircle, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -448,7 +449,7 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                                                 </Badge>
                                             </td>
                                             <td className="px-4 py-3 text-sm align-middle">
-                                                <div className="flex items-center gap-1">
+                                                <TableActionGroup>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
@@ -458,25 +459,15 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                                                     >
                                                         <Calculator className="h-4 w-4" />
                                                     </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
+                                                    <EditButton
                                                         onClick={() => handleEdit(mapping)}
-                                                        className="h-8 w-8 p-0"
                                                         title="Edit Mapping"
-                                                    >
-                                                        <Edit className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
+                                                    />
+                                                    <DeleteButton
                                                         onClick={() => handleDelete(mapping)}
-                                                        className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
                                                         title="Delete Mapping"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
+                                                    />
+                                                </TableActionGroup>
                                             </td>
                                         </tr>
                                     );

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -393,18 +394,6 @@ function FeeTransactionsContent() {
     }
   };
 
-  const getStatusBadge = (status: TransactionStatus) => {
-    switch (status) {
-      case 'completed':
-        return 'default';
-      case 'cancelled':
-        return 'destructive';
-      case 'bounced':
-        return 'destructive';
-      default:
-        return 'secondary';
-    }
-  };
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -474,7 +463,7 @@ function FeeTransactionsContent() {
     <div className="space-y-6">
       {/* Create Transaction Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} guardDirty={true} onDirtyDiscard={() => { resetCreateForm(); setShowCreateDialog(false); }}>
-            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+            <DialogContent className="max-w-2xl" customLayout>
               <DialogHeader>
                 <DialogTitle>Create New Transaction</DialogTitle>
                 <DialogDescription>
@@ -1015,9 +1004,7 @@ function FeeTransactionsContent() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusBadge(transaction.status)}>
-                          {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-                        </Badge>
+                        <StatusBadge status={transaction.status} />
                       </TableCell>
                       <TableCell>
                         {new Date(transaction.transaction_date).toLocaleDateString()}
@@ -1048,9 +1035,7 @@ function FeeTransactionsContent() {
             <DialogTitle className="flex items-center gap-2">
               Transaction Details
               {selectedTransaction?.status && (
-                <Badge variant={getStatusBadge(selectedTransaction.status)}>
-                  {selectedTransaction.status.charAt(0).toUpperCase() + selectedTransaction.status.slice(1)}
-                </Badge>
+                <StatusBadge status={selectedTransaction.status} />
               )}
             </DialogTitle>
             <DialogDescription>
@@ -1346,13 +1331,7 @@ function FeeTransactionsContent() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-semibold">{transaction.transaction_number}</h4>
-                              <Badge variant={
-                                transaction.status === 'completed' ? 'default' :
-                                transaction.status === 'bounced' ? 'destructive' :
-                                'secondary'
-                              }>
-                                {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-                              </Badge>
+                              <StatusBadge status={transaction.status} />
                             </div>
 
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-2">

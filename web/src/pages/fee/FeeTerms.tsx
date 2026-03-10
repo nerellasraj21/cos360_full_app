@@ -7,7 +7,8 @@ import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { FeeTermsList } from '@/components/fee/terms/FeeTermsList';
 import { PermissionGuard } from '@/components/common';
 import { Card, CardContent } from '@/components/ui/card';
-import { ShieldX } from 'lucide-react';
+import { ShieldX, Calendar } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export function FeeTerms() {
   return (
@@ -62,12 +63,7 @@ function FeeTermsContent() {
                             Back to Dashboard
                         </Button>
                     </Link>
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Fee Terms Management</h1>
-                        <p className="text-muted-foreground">
-                            Configure fee terms and payment schedules for different fee structures
-                        </p>
-                    </div>
+                    <PageHeader title="Fee Terms Management" icon={<Calendar className="h-5 w-5" />} subtitle="Configure fee terms and payment schedules for different fee structures" />
                 </div>
             </div>
 

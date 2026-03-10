@@ -13,7 +13,8 @@ import Select, { type SingleValue } from 'react-select';
 import CreatableSelect from 'react-select/creatable';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Trash2, Save, Pencil, Download, ChevronDown, Copy } from 'lucide-react';
+import { Trash2, Save, Edit, Download, ChevronDown, Copy, LayoutGrid } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as htmlToImage from 'html-to-image';
@@ -584,9 +585,7 @@ export default function TimeTableEditor() {
 
     return (
         <>
-        <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold">Time Table Management</h1>
-        </div>
+        <PageHeader title="Time Table Management" icon={<LayoutGrid className="h-5 w-5" />} />
         <Card className="p-4">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
@@ -609,7 +608,7 @@ export default function TimeTableEditor() {
                             }}
                             className="min-w-[80px]"
                         >
-                            {isEditing ? <Save className="w-4 h-4 mr-1" /> : <Pencil className="w-4 h-4 mr-1" />}
+                            {isEditing ? <Save className="w-4 h-4 mr-1" /> : <Edit className="w-4 h-4 mr-1" />}
                             {isEditing ? 'Save' : 'Edit'}
                         </Button>
                     )}

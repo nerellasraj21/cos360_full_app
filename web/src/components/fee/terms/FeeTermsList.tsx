@@ -226,25 +226,30 @@ export function FeeTermsList() {
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <Button
-                                                        variant="outline"
+                                                        variant="ghost"
                                                         size="sm"
                                                         onClick={() => handleManagePaymentDates(term)}
+                                                        title="Manage Payment Dates"
                                                     >
                                                         <Calendar className="h-4 w-4 mr-1" />
                                                         Payment Dates
                                                     </Button>
                                                     <Button
-                                                        variant="outline"
+                                                        variant="ghost"
                                                         size="sm"
                                                         onClick={() => handleEditTerm(term)}
+                                                        className="h-8 w-8 p-0"
+                                                        title="Edit Fee Term"
                                                     >
                                                         <Edit className="h-4 w-4" />
                                                     </Button>
                                                     <Button
-                                                        variant="outline"
+                                                        variant="ghost"
                                                         size="sm"
                                                         onClick={() => handleDeleteTerm(term)}
                                                         disabled={deleteTermMutation.isPending}
+                                                        className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
+                                                        title="Delete Fee Term"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>

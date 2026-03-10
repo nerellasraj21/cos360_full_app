@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { EditButton, DeleteButton, TableActionGroup } from '@/components/common/TableActions';
 import { Edit, Trash2, Plus, Calendar, User, CheckCircle, XCircle, Clock, Search, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -324,27 +325,17 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-sm align-middle">
-                                            <div className="flex items-center gap-1">
+                                            <TableActionGroup>
                                                 {staffMember.attendance ? (
                                                     <>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
+                                                        <EditButton
                                                             onClick={() => handleEdit(staffMember.attendance!)}
-                                                            className="h-8 w-8 p-0"
                                                             title="Edit Attendance"
-                                                        >
-                                                            <Edit className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
+                                                        />
+                                                        <DeleteButton
                                                             onClick={() => handleDelete(staffMember.attendance!)}
-                                                            className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
                                                             title="Delete Attendance"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
+                                                        />
                                                     </>
                                                 ) : (
                                                     <div className="flex gap-1">
@@ -370,7 +361,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                                                         </Button>
                                                     </div>
                                                 )}
-                                            </div>
+                                            </TableActionGroup>
                                         </td>
                                     </tr>
                                 ))}

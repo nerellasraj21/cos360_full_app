@@ -3,7 +3,7 @@ import { useFormContext } from 'react-hook-form';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Separator } from '@/components/ui/separator';
 import { Building2, Database, Globe, Crown, CheckCircle, AlertTriangle } from 'lucide-react';
 import type { SuperOrgFormData } from '@/types/organization';
@@ -83,9 +83,7 @@ export const ReviewStep: React.FC = () => {
                             <div>
                                 <Label className="text-sm font-medium text-muted-foreground">Status</Label>
                                 <div className="flex items-center gap-2">
-                                    <Badge variant={formData.is_active ? 'default' : 'secondary'}>
-                                        {formData.is_active ? 'Active' : 'Inactive'}
-                                    </Badge>
+                                    <StatusBadge status={formData.is_active} />
                                 </div>
                             </div>
                         </div>

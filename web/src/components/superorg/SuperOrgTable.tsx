@@ -9,20 +9,12 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Input } from '@/components/ui/input';
+import { ViewButton, EditButton, DeleteButton, DeactivateButton, TableActionGroup } from '@/components/common/TableActions';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-    MoreHorizontal,
     Search,
     Filter,
-    Edit,
-    Trash2,
-    Eye,
     Globe,
     Database,
     Building2,
@@ -249,46 +241,24 @@ const SuperOrgTable: React.FC<SuperOrgTableProps> = ({ onRefresh, newOrganizatio
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="align-middle">
-                                        <Badge variant={org.is_active ? 'default' : 'secondary'}>
-                                            {org.is_active ? 'Active' : 'Inactive'}
-                                        </Badge>
+                                        <StatusBadge status={org.is_active} />
                                     </TableCell>
                                     <TableCell className="text-right align-middle">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                                    <span className="sr-only">Open menu</span>
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => handleView(org)}>
-                                                    <Eye className="mr-2 h-4 w-4" />
-                                                    View Details
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleEdit(org)}>
-                                                    <Edit className="mr-2 h-4 w-4" />
-                                                    Edit
-                                                </DropdownMenuItem>
-                                                {org.is_active && (
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleDeactivate(org)}
-                                                        className="text-orange-600"
-                                                    >
-                                                        <Eye className="mr-2 h-4 w-4" />
-                                                        Deactivate
-                                                    </DropdownMenuItem>
-                                                )}
-                                                <DropdownMenuItem
-                                                    onClick={() => handleDelete(org)}
-                                                    className="text-destructive"
-                                                    disabled={deleteOrganizationMutation.isPending}
-                                                >
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    {deleteOrganizationMutation.isPending ? 'Deleting...' : 'Delete'}
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        <TableActionGroup>
+                                            <ViewButton onClick={() => handleView(org)} title="View Details" />
+                                            <EditButton onClick={() => handleEdit(org)} title="Edit Organization" />
+                                            {org.is_active && (
+                                                <DeactivateButton
+                                                    onClick={() => handleDeactivate(org)}
+                                                    title="Deactivate Organization"
+                                                />
+                                            )}
+                                            <DeleteButton
+                                                onClick={() => handleDelete(org)}
+                                                disabled={deleteOrganizationMutation.isPending}
+                                                title="Delete Organization"
+                                            />
+                                        </TableActionGroup>
                                     </TableCell>
                                 </TableRow>
                             ))

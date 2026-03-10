@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from '@tanstack/react-router';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/PageHeader';
 import {
   Receipt,
   FolderOpen,
@@ -46,14 +47,11 @@ export function ExpensePage() {
       }
     >
       <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Expense Management</h1>
-          <p className="text-muted-foreground mt-2">
-            Comprehensive expense tracking, approval workflows, and financial compliance
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Expense Management"
+        subtitle="Comprehensive expense tracking, approval workflows, and financial compliance"
+        icon={<DollarSign className="h-5 w-5" />}
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
