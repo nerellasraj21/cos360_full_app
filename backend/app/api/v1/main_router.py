@@ -40,6 +40,9 @@ from app.api.v1.fee.fee_student_mapping_endpoints import router as fee_student_m
 from app.api.v1.fee.fee_term_endpoints import router as fee_term_router
 from app.api.v1.fee.fee_transaction_endpoints import router as fee_transaction_router
 from app.api.v1.fee.fee_type_endpoints import router as fee_type_router
+from app.api.v1.fee.fee_collection_endpoints import router as fee_collection_router
+from app.api.v1.fee.fee_concession_endpoints import router as fee_concession_router
+from app.api.v1.fee.fee_old_endpoints import router as fee_old_router
 from app.api.v1.masters.academic_year_routes import router as academic_year_router
 from app.api.v1.masters.caste_endpoints import router as caste_router
 from app.api.v1.masters.class_endpoints import router as class_router
@@ -132,6 +135,9 @@ router.include_router(fee_student_mapping_router)
 router.include_router(fee_transaction_router)
 router.include_router(fee_receipt_router)
 router.include_router(fee_refund_router)
+router.include_router(fee_collection_router)
+router.include_router(fee_concession_router)
+router.include_router(fee_old_router)
 router.include_router(seed_router)
 router.include_router(test_setup_router)
 router.include_router(test_jwt_router)

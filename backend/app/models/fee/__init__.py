@@ -1,6 +1,8 @@
 from .fee_category_model import FeeCategory
 from .fee_class_map_term_amount_model import FeeClassMappingTermAmount
 from .fee_class_mapping_model import FeeClassMapping
+from .fee_concession_model import ConcessionApproverEnum, FeeConcession
+from .fee_old_model import FeeOld, OldFeeSourceEnum
 from .fee_receipt_model import FeeReceipt
 from .fee_refund_model import FeeRefund
 from .fee_student_map_term_amount_model import FeeStudentMapTermAmount
@@ -24,4 +26,8 @@ __all__ = [
     "FeeTransactionItem",
     "FeeReceipt",
     "FeeRefund",
+    "FeeConcession",
+    "ConcessionApproverEnum",
+    "FeeOld",
+    "OldFeeSourceEnum",
 ]
