@@ -9,6 +9,8 @@ class RouteStopBase(BaseModel):
     name: str
     number: int
     reaching_time: time
+    pickup_time: time | None = None
+    drop_time: time | None = None
     fees: float
     is_active: bool = True
 
@@ -22,6 +24,8 @@ class RouteStopUpdate(BaseModel):
     name: str | None = None
     number: int | None = None
     reaching_time: time | None = None
+    pickup_time: time | None = None
+    drop_time: time | None = None
     fees: float | None = None
     is_active: bool | None = None
 
@@ -30,6 +34,8 @@ class RouteStopUpdate(BaseModel):
 
 class RouteStopOut(RouteStopBase):
     id: UUID
+    pickup_time: time | None = None
+    drop_time: time | None = None
     route_name: str | None = None
 
     class Config:
@@ -41,6 +47,8 @@ class RouteStopDropdown(BaseModel):
     name: str
     number: int
     reaching_time: time | None = None
+    pickup_time: time | None = None
+    drop_time: time | None = None
     fees: float | None = None
 
     model_config = {"from_attributes": True}

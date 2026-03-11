@@ -18,6 +18,7 @@ from app.service.student.certificate_type_service import (
     get_all_certificate_types,
     get_certificate_type_by_id,
     get_certificate_types_dropdown,
+    search_certificate_types,
     update_certificate_type,
 )
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
@@ -57,6 +58,21 @@ async def get_all_certificate_types_endpoint(
     await check_role_plan_permission_with_error(db, request, role, "certificate_types", "list")
 
     return await get_all_certificate_types(db, skip, limit)
+
+
+# Search Certificate Types
+@router.get("/search", response_model=list[CertificateTypeRead])
+async def search_certificate_types_endpoint(
+    request: Request,
+    q: str = Query("", description="Search query (name ILIKE)"),
+    limit: int = Query(10, ge=1, le=100, description="Max results"),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Search certificate types by name using ILIKE. Permission: student_certificates:list"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "student_certificates", "list")
+    return await search_certificate_types(db, q, limit)
 
 
 # Get Certificate Types Dropdown

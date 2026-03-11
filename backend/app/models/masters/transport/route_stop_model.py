@@ -14,7 +14,9 @@ class RouteStop(BaseOrg):
     route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id"))
     name = Column(String, nullable=False)
     number = Column(Integer)
-    reaching_time = Column(Time)
+    reaching_time = Column(Time)  # Deprecated: use pickup_time / drop_time instead
+    pickup_time = Column(Time, nullable=True)
+    drop_time = Column(Time, nullable=True)
     fees = Column(Integer)
     is_active = Column(Boolean, default=True)
 

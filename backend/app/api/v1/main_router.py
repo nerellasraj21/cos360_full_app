@@ -40,6 +40,9 @@ from app.api.v1.fee.fee_student_mapping_endpoints import router as fee_student_m
 from app.api.v1.fee.fee_term_endpoints import router as fee_term_router
 from app.api.v1.fee.fee_transaction_endpoints import router as fee_transaction_router
 from app.api.v1.fee.fee_type_endpoints import router as fee_type_router
+from app.api.v1.fee.fee_collection_endpoints import router as fee_collection_router
+from app.api.v1.fee.fee_concession_endpoints import router as fee_concession_router
+from app.api.v1.fee.fee_old_endpoints import router as fee_old_router
 from app.api.v1.masters.academic_year_routes import router as academic_year_router
 from app.api.v1.masters.caste_endpoints import router as caste_router
 from app.api.v1.masters.class_endpoints import router as class_router
@@ -59,6 +62,7 @@ from app.api.v1.masters.transport.routes_endpoints import router as routes_route
 # from app.api.v1.masters.transport.student_trip_endpoints import router as student_trip_router
 from app.api.v1.masters.transport.trip_endpoints import router as trip_router
 from app.api.v1.masters.transport.trip_type_endpoints import router as trip_type_router
+from app.api.v1.masters.transport.transport_pricing_endpoints import router as transport_pricing_router
 from app.api.v1.masters.transport.vehicle_endpoints import router as vehicle_router
 from app.api.v1.profile import router as profile_router
 from app.api.v1.public.org_routes import router as org_router
@@ -106,6 +110,7 @@ router.include_router(trip_router)
 router.include_router(vehicle_router)
 router.include_router(route_type_router)
 router.include_router(trip_type_router)
+router.include_router(transport_pricing_router)
 router.include_router(timetable_router)
 router.include_router(admission_router)
 router.include_router(certificate_router)
@@ -130,6 +135,9 @@ router.include_router(fee_student_mapping_router)
 router.include_router(fee_transaction_router)
 router.include_router(fee_receipt_router)
 router.include_router(fee_refund_router)
+router.include_router(fee_collection_router)
+router.include_router(fee_concession_router)
+router.include_router(fee_old_router)
 router.include_router(seed_router)
 router.include_router(test_setup_router)
 router.include_router(test_jwt_router)

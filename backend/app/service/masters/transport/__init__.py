@@ -48,6 +48,14 @@ from .trip_type_service import (
     update_all_details_trip_type,
     update_partial_details_trip_type,
 )
+from .transport_pricing_service import (
+    add_transport_pricing,
+    deactivate_transport_pricing,
+    get_all_transport_pricing,
+    get_pricing_by_vehicle,
+    get_transport_pricing_by_id,
+    update_transport_pricing,
+)
 from .vehicle_service import (
     add_vehicle,
     deactivate_vehicle,
@@ -109,4 +117,10 @@ __all__ = [
     "update_all_details_trip_type",
     "update_partial_details_trip_type",
     "get_trip_types_dropdown",
+    "add_transport_pricing",
+    "get_all_transport_pricing",
+    "get_transport_pricing_by_id",
+    "update_transport_pricing",
+    "deactivate_transport_pricing",
+    "get_pricing_by_vehicle",
 ]

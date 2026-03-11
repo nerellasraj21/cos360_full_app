@@ -58,7 +58,7 @@ class ParentOut(ParentBase):
             aadhar_number=parent.aadhar_number,
             gender=parent.gender,
             relation_to_student=parent.relation_to_student,
-            salary_range=parent.salary_range.value if parent.salary_range else None,
+            salary_range=parent.salary_range if parent.salary_range else None,
             students=[
                 StudentSimpleOut(
                     id=link.student.id, first_name=link.student.first_name, last_name=link.student.last_name

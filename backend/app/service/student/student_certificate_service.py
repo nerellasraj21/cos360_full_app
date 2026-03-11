@@ -6,6 +6,8 @@ Integrates with FileManager for S3 operations and logs all actions to FileAuditL
 """
 
 import logging
+import os
+import uuid as uuid_module
 from datetime import datetime, date
 from uuid import UUID
 
@@ -603,7 +605,7 @@ async def list_certificates(
         Dict with items, total, has_next
     """
     try:
-        # Build query
+        # Build base query
         query = select(CertificateIssue).options(
             selectinload(CertificateIssue.certificate_type)
         )
@@ -614,12 +616,14 @@ async def list_certificates(
         if certificate_type_id:
             query = query.where(CertificateIssue.certificate_type_id == certificate_type_id)
 
-        # Get total count
-        count_result = await db.execute(
-            select(func.count(CertificateIssue.id)).where(
-                CertificateIssue.student_id == student_id if student_id else True,
-            )
-        )
+        # Count with same filters
+        count_query = select(func.count(CertificateIssue.id))
+        if student_id:
+            count_query = count_query.where(CertificateIssue.student_id == student_id)
+        if certificate_type_id:
+            count_query = count_query.where(CertificateIssue.certificate_type_id == certificate_type_id)
+
+        count_result = await db.execute(count_query)
         total = count_result.scalar() or 0
 
         # Get paginated results
@@ -656,4 +660,243 @@ async def list_certificates(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error listing certificates: {str(e)}",
+        )
+
+
+# ============================================================================
+# CATEGORY-SPECIFIC CREATE OPERATIONS
+# ============================================================================
+
+
+async def _upload_signature(
+    tenant_schema: str,
+    student_id: UUID,
+    signature_file: UploadFile,
+) -> str:
+    """
+    Validate and upload signature image to S3.
+
+    Allowed: .png / .jpg / .jpeg, max 2 MB.
+    Returns S3 key.
+    """
+    _, ext = os.path.splitext(signature_file.filename or "")
+    ext_lower = ext.lower()
+
+    allowed_sig_exts = {".png", ".jpg", ".jpeg"}
+    if ext_lower not in allowed_sig_exts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Signature must be .png, .jpg, or .jpeg; got '{ext_lower}'",
+        )
+
+    data = await signature_file.read()
+
+    if len(data) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Signature file is empty",
+        )
+
+    if len(data) > 2 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Signature file must not exceed 2 MB",
+        )
+
+    file_uuid = str(uuid_module.uuid4())
+    s3_key = f"{tenant_schema}/signatures/{student_id}/{file_uuid}{ext_lower}"
+
+    async with await file_manager._get_s3_client() as client:
+        await client.put_object(
+            Bucket=file_manager.bucket,
+            Key=s3_key,
+            Body=data,
+            ContentType=signature_file.content_type or "image/png",
+        )
+
+    log.info(f"Signature uploaded to S3: {s3_key}")
+    return s3_key
+
+
+async def create_received_document(
+    db: AsyncSession,
+    student_id: UUID,
+    certificate_type_id: UUID,
+    remarks: str | None,
+    file: UploadFile,
+    tenant_schema: str,
+    actor_id: UUID,
+    actor_role: str,
+) -> CertificateRead:
+    """
+    Upload a received document (Category 1) for a student.
+
+    S3 path: {tenant}/received_docs/{student_id}/{uuid}.{ext}
+    """
+    try:
+        # 1. Validate student exists
+        result = await db.execute(select(Student).where(Student.id == student_id))
+        student = result.scalar_one_or_none()
+        if not student:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Student with id {student_id} not found",
+            )
+
+        # 2. Validate certificate type exists
+        result = await db.execute(
+            select(CertificateType).where(CertificateType.id == certificate_type_id)
+        )
+        cert_type = result.scalar_one_or_none()
+        if not cert_type:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Certificate type with id {certificate_type_id} not found",
+            )
+
+        # 3. Upload document to S3
+        s3_key = await file_manager.upload_file(
+            tenant_schema, "received_docs", str(student_id), file
+        )
+
+        # 4. Create DB record
+        cert = CertificateIssue(
+            student_id=student_id,
+            certificate_type_id=certificate_type_id,
+            remarks=remarks,
+            file_path=s3_key,
+            created_at=datetime.utcnow(),
+        )
+        db.add(cert)
+        await db.flush()
+
+        # 5. Load with relationships
+        result = await db.execute(
+            select(CertificateIssue)
+            .options(selectinload(CertificateIssue.certificate_type))
+            .where(CertificateIssue.id == cert.id)
+        )
+        cert_with_type = result.scalar_one()
+
+        # 6. Audit log
+        await _log_audit(db, actor_id, actor_role, student_id, cert.id, "upload", s3_key, tenant_schema)
+
+        await db.commit()
+        log.info(f"Received document created: {cert.id} for student {student_id}")
+
+        return CertificateRead(
+            id=cert_with_type.id,
+            student_id=cert_with_type.student_id,
+            certificate_type_id=cert_with_type.certificate_type_id,
+            type_name=cert_with_type.certificate_type.name if cert_with_type.certificate_type else "",
+            file_path=cert_with_type.file_path,
+            issue_date=cert_with_type.issue_date,
+            remarks=cert_with_type.remarks,
+            created_at=cert_with_type.created_at,
+            updated_at=cert_with_type.updated_at,
+        )
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error creating received document: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating received document: {str(e)}",
+        )
+
+
+async def create_issued_certificate(
+    db: AsyncSession,
+    student_id: UUID,
+    certificate_type_id: UUID,
+    issue_date: date,
+    remarks: str | None,
+    file: UploadFile,
+    tenant_schema: str,
+    actor_id: UUID,
+    actor_role: str,
+) -> CertificateRead:
+    """
+    Issue a school certificate (Category 2) for a student.
+
+    S3 paths:
+      document:  {tenant}/issued_certs/{student_id}/{uuid}.{ext}
+      signature: {tenant}/signatures/{student_id}/{uuid}.{ext}  (optional, .png/.jpg/.jpeg max 2 MB)
+    """
+    try:
+        # 1. Validate student
+        result = await db.execute(select(Student).where(Student.id == student_id))
+        student = result.scalar_one_or_none()
+        if not student:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Student with id {student_id} not found",
+            )
+
+        # 2. Validate certificate type
+        result = await db.execute(
+            select(CertificateType).where(CertificateType.id == certificate_type_id)
+        )
+        cert_type = result.scalar_one_or_none()
+        if not cert_type:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Certificate type with id {certificate_type_id} not found",
+            )
+
+        # 3. Upload document to S3
+        s3_key = await file_manager.upload_file(
+            tenant_schema, "issued_certs", str(student_id), file
+        )
+
+        # 4. Create DB record
+        cert = CertificateIssue(
+            student_id=student_id,
+            certificate_type_id=certificate_type_id,
+            issue_date=issue_date,
+            remarks=remarks,
+            file_path=s3_key,
+            created_at=datetime.utcnow(),
+        )
+        db.add(cert)
+        await db.flush()
+
+        # 6. Load with relationships
+        result = await db.execute(
+            select(CertificateIssue)
+            .options(selectinload(CertificateIssue.certificate_type))
+            .where(CertificateIssue.id == cert.id)
+        )
+        cert_with_type = result.scalar_one()
+
+        # 7. Audit log
+        await _log_audit(db, actor_id, actor_role, student_id, cert.id, "upload", s3_key, tenant_schema)
+
+        await db.commit()
+        log.info(f"Issued certificate created: {cert.id} for student {student_id}")
+
+        return CertificateRead(
+            id=cert_with_type.id,
+            student_id=cert_with_type.student_id,
+            certificate_type_id=cert_with_type.certificate_type_id,
+            type_name=cert_with_type.certificate_type.name if cert_with_type.certificate_type else "",
+            file_path=cert_with_type.file_path,
+            issue_date=cert_with_type.issue_date,
+            remarks=cert_with_type.remarks,
+            created_at=cert_with_type.created_at,
+            updated_at=cert_with_type.updated_at,
+        )
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error creating issued certificate: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating issued certificate: {str(e)}",
         )
