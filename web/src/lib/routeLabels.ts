@@ -39,6 +39,7 @@ export const ROUTE_SEGMENT_LABELS: Record<string, string> = {
   types: 'Types',
   terms: 'Terms',
   mappings: 'Class Mappings',
+  collection: 'Fee Collection',
   transactions: 'Transactions',
   receipts: 'Receipts',
   refunds: 'Refunds',

@@ -18,3 +18,24 @@ export type {
 export type { FeeTransaction, FeeTransactionItem, FeeTransactionCreateRequest, FeeTransactionUpdateRequest, FeeTransactionDetail } from './transaction';
 export type { FeeReceipt, FeeReceiptCreate, FeeReceiptUpdate } from './receipt';
 export type { FeeRefund, FeeRefundCreateRequest, FeeRefundUpdateRequest, FeeRefundWithDetails } from './refund';
+export type {
+    CollectionPaymentMethod,
+    StudentSearchParams,
+    StudentSearchResult,
+    FeeSummaryItem,
+    FeeSummaryResponse,
+    FeePaymentRequest,
+    FeePaymentItemPaid,
+    FeePaymentResponse,
+    ConcessionSummaryItem,
+    ConcessionSummaryResponse,
+    ConcessionItemCreate,
+    BulkConcessionRequest,
+    ConcessionHistoryItem,
+    ConcessionUpdate,
+    OldFeeRead,
+    OldFeeSummaryResponse,
+    OldFeeManualCreate,
+    OldFeeCarryForwardRequest,
+    OldFeeUpdate,
+} from './collection';

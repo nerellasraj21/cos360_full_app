@@ -79,6 +79,9 @@ export {
   bulkCreateMappings as bulkCreateStudentMappings,
 } from './studentMappings';
 
+// Fee Collection
+export { feeCollectionApi } from './collection';
+
 export const feeApi = {
   transactions: feeTransactionsApi,
 };

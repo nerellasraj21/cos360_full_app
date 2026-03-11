@@ -83,6 +83,7 @@ import { Route as AppFeeReportsRouteImport } from './routes/_app/fee/reports'
 import { Route as AppFeeRefundsRouteImport } from './routes/_app/fee/refunds'
 import { Route as AppFeeReceiptsRouteImport } from './routes/_app/fee/receipts'
 import { Route as AppFeeMappingsRouteImport } from './routes/_app/fee/mappings'
+import { Route as AppFeeCollectionRouteImport } from './routes/_app/fee/collection'
 import { Route as AppFeeCategoriesRouteImport } from './routes/_app/fee/categories'
 import { Route as AppExpenseTypesRouteImport } from './routes/_app/expense/types'
 import { Route as AppExpenseTransactionsRouteImport } from './routes/_app/expense/transactions'
@@ -507,6 +508,11 @@ const AppFeeMappingsRoute = AppFeeMappingsRouteImport.update({
   path: '/mappings',
   getParentRoute: () => AppFeeRoute,
 } as any)
+const AppFeeCollectionRoute = AppFeeCollectionRouteImport.update({
+  id: '/collection',
+  path: '/collection',
+  getParentRoute: () => AppFeeRoute,
+} as any)
 const AppFeeCategoriesRoute = AppFeeCategoriesRouteImport.update({
   id: '/categories',
   path: '/categories',
@@ -764,6 +770,7 @@ export interface FileRoutesByFullPath {
   '/expense/transactions': typeof AppExpenseTransactionsRoute
   '/expense/types': typeof AppExpenseTypesRoute
   '/fee/categories': typeof AppFeeCategoriesRoute
+  '/fee/collection': typeof AppFeeCollectionRoute
   '/fee/mappings': typeof AppFeeMappingsRoute
   '/fee/receipts': typeof AppFeeReceiptsRoute
   '/fee/refunds': typeof AppFeeRefundsRoute
@@ -872,6 +879,7 @@ export interface FileRoutesByTo {
   '/expense/transactions': typeof AppExpenseTransactionsRoute
   '/expense/types': typeof AppExpenseTypesRoute
   '/fee/categories': typeof AppFeeCategoriesRoute
+  '/fee/collection': typeof AppFeeCollectionRoute
   '/fee/mappings': typeof AppFeeMappingsRoute
   '/fee/receipts': typeof AppFeeReceiptsRoute
   '/fee/refunds': typeof AppFeeRefundsRoute
@@ -990,6 +998,7 @@ export interface FileRoutesById {
   '/_app/expense/transactions': typeof AppExpenseTransactionsRoute
   '/_app/expense/types': typeof AppExpenseTypesRoute
   '/_app/fee/categories': typeof AppFeeCategoriesRoute
+  '/_app/fee/collection': typeof AppFeeCollectionRoute
   '/_app/fee/mappings': typeof AppFeeMappingsRoute
   '/_app/fee/receipts': typeof AppFeeReceiptsRoute
   '/_app/fee/refunds': typeof AppFeeRefundsRoute
@@ -1108,6 +1117,7 @@ export interface FileRouteTypes {
     | '/expense/transactions'
     | '/expense/types'
     | '/fee/categories'
+    | '/fee/collection'
     | '/fee/mappings'
     | '/fee/receipts'
     | '/fee/refunds'
@@ -1216,6 +1226,7 @@ export interface FileRouteTypes {
     | '/expense/transactions'
     | '/expense/types'
     | '/fee/categories'
+    | '/fee/collection'
     | '/fee/mappings'
     | '/fee/receipts'
     | '/fee/refunds'
@@ -1333,6 +1344,7 @@ export interface FileRouteTypes {
     | '/_app/expense/transactions'
     | '/_app/expense/types'
     | '/_app/fee/categories'
+    | '/_app/fee/collection'
     | '/_app/fee/mappings'
     | '/_app/fee/receipts'
     | '/_app/fee/refunds'
@@ -1939,6 +1951,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFeeMappingsRouteImport
       parentRoute: typeof AppFeeRoute
     }
+    '/_app/fee/collection': {
+      id: '/_app/fee/collection'
+      path: '/collection'
+      fullPath: '/fee/collection'
+      preLoaderRoute: typeof AppFeeCollectionRouteImport
+      parentRoute: typeof AppFeeRoute
+    }
     '/_app/fee/categories': {
       id: '/_app/fee/categories'
       path: '/categories'
@@ -2446,6 +2465,7 @@ const AppExpenseRouteWithChildren = AppExpenseRoute._addFileChildren(
 
 interface AppFeeRouteChildren {
   AppFeeCategoriesRoute: typeof AppFeeCategoriesRoute
+  AppFeeCollectionRoute: typeof AppFeeCollectionRoute
   AppFeeMappingsRoute: typeof AppFeeMappingsRoute
   AppFeeReceiptsRoute: typeof AppFeeReceiptsRoute
   AppFeeRefundsRoute: typeof AppFeeRefundsRoute
@@ -2461,6 +2481,7 @@ interface AppFeeRouteChildren {
 
 const AppFeeRouteChildren: AppFeeRouteChildren = {
   AppFeeCategoriesRoute: AppFeeCategoriesRoute,
+  AppFeeCollectionRoute: AppFeeCollectionRoute,
   AppFeeMappingsRoute: AppFeeMappingsRoute,
   AppFeeReceiptsRoute: AppFeeReceiptsRoute,
   AppFeeRefundsRoute: AppFeeRefundsRoute,

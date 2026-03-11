@@ -36,3 +36,22 @@ export const FEE_STUDENT_DASHBOARD = `${FEE_BASE}/student/{student_id}/dashboard
 export const FEE_COLLECTION_REPORTS = `${FEE_BASE}/reports/collection`;
 export const FEE_OUTSTANDING_REPORTS = `${FEE_BASE}/reports/outstanding`;
 export const FEE_PAYMENT_HISTORY = `${FEE_BASE}/reports/payment-history`;
+
+// Fee Collection
+export const FEE_COLLECTION = `${FEE_BASE}/collection`;
+export const FEE_COLLECTION_SEARCH = `${FEE_COLLECTION}/search-student`;
+export const FEE_COLLECTION_SUMMARY = `${FEE_COLLECTION}/summary`;
+export const FEE_COLLECTION_MY_SUMMARY = `${FEE_COLLECTION}/my-summary`;
+export const FEE_COLLECTION_CHILD_SUMMARY = `${FEE_COLLECTION}/child-summary`;
+export const FEE_COLLECTION_PAY = `${FEE_COLLECTION}/pay`;
+
+// Fee Concessions
+export const FEE_CONCESSIONS = `${FEE_BASE}/concessions`;
+export const FEE_CONCESSIONS_BULK = `${FEE_CONCESSIONS}/bulk`;
+export const FEE_CONCESSIONS_STUDENT = `${FEE_CONCESSIONS}/student`;
+export const FEE_CONCESSIONS_HISTORY = `${FEE_CONCESSIONS}/history`;
+
+// Fee Old Fees
+export const FEE_OLD = `${FEE_BASE}/old-fees`;
+export const FEE_OLD_CARRY_FORWARD = `${FEE_OLD}/carry-forward`;
+export const FEE_OLD_STUDENT = `${FEE_OLD}/student`;
