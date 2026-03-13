@@ -7,7 +7,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, select, func
+from sqlalchemy import and_, select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -151,6 +151,11 @@ async def create_bulk_concessions(
             ))
 
     await db.commit()
+
+    # Audit log
+    for c in created:
+        await _write_audit_log(db, "fee_concession", "create", c.id, recorded_by, {"student_id": str(data.student_id), "amount": str(c.concession_amount)})
+
     return created
 
 
@@ -341,6 +346,10 @@ async def update_concession(
     await db.commit()
     await db.refresh(conc)
 
+    # Audit log
+    user_id = UUID(current_user.get("sub"))
+    await _write_audit_log(db, "fee_concession", "update", concession_id, user_id, {"amount": str(conc.concession_amount)})
+
     approver = conc.approved_by.value if hasattr(conc.approved_by, "value") else str(conc.approved_by)
 
     return FeeConcessionRead(
@@ -360,6 +369,7 @@ async def update_concession(
 async def revoke_concession(
     db: AsyncSession,
     concession_id: UUID,
+    current_user: dict | None = None,
 ) -> dict:
     """Soft delete (CR-07)."""
     result = await db.execute(
@@ -372,4 +382,27 @@ async def revoke_concession(
     conc.is_active = False
     await db.commit()
 
+    # Audit log
+    if current_user:
+        user_id = UUID(current_user.get("sub"))
+        await _write_audit_log(db, "fee_concession", "revoke", concession_id, user_id, {"student_id": str(conc.student_id)})
+
     return {"detail": "Concession revoked", "concession_id": str(concession_id)}
+
+
+# ─── Audit helper (shared pattern) ───────────────────────────────────────────
+
+
+async def _write_audit_log(db: AsyncSession, entity_type: str, action: str, entity_id: UUID, user_id: UUID, details: dict | None = None) -> None:
+    try:
+        import json as json_mod
+        await db.execute(
+            text(
+                "INSERT INTO audit_logs (entity_type, action, entity_id, performed_by, details, created_at) "
+                "VALUES (:et, :act, :eid, :uid, :det, NOW()) ON CONFLICT DO NOTHING"
+            ),
+            {"et": entity_type, "act": action, "eid": str(entity_id), "uid": str(user_id), "det": json_mod.dumps(details or {})},
+        )
+        await db.commit()
+    except Exception as e:
+        log.debug(f"Audit log write skipped: {e}")

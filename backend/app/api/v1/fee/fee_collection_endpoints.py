@@ -6,6 +6,7 @@ from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -21,6 +22,7 @@ from app.service.fee.fee_collection_service import (
     process_fee_payment,
     search_students_for_fee,
 )
+from app.service.fee.fee_receipt_service import FeeReceiptService
 from app.tools.enhanced_permissions import check_user_resource_access
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
@@ -35,17 +37,15 @@ router = APIRouter(prefix="/fee/collection", tags=["Fee Collection"])
 async def search_student(
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
-    admission_number: str | None = Query(None, description="Admission number (partial match)"),
-    mobile_number: str | None = Query(None, description="Mobile number (student or parent)"),
+    q: str | None = Query(None, min_length=2, description="Unified search: admission no, mobile, student name, or address"),
     class_id: UUID | None = Query(None, description="Class filter"),
     section_id: UUID | None = Query(None, description="Section filter"),
-    city: str | None = Query(None, description="City address search"),
-    mandal: str | None = Query(None, description="Mandal address search"),
-    village: str | None = Query(None, description="Village address search"),
 ):
     """
     Multi-criteria student search for fee collection (SR-01 to SR-08).
-    At least one parameter required.
+    The `q` parameter matches against admission number, parent mobile,
+    student name, city, and address fields simultaneously.
+    At least `q` or a class/section filter is required.
     """
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
@@ -53,13 +53,9 @@ async def search_student(
 
     return await search_students_for_fee(
         db,
-        admission_number=admission_number,
-        mobile_number=mobile_number,
+        q=q,
         class_id=class_id,
         section_id=section_id,
-        city=city,
-        mandal=mandal,
-        village=village,
     )
 
 
@@ -152,3 +148,39 @@ async def pay_fee(
     await check_role_plan_permission_with_error(db, request, role, "fee_collection", "create")
 
     return await process_fee_payment(db, data, current_user)
+
+
+# ─── Receipt PDF ──────────────────────────────────────────────────────────────
+
+
+@router.get("/receipts/{receipt_id}/pdf")
+@rate_limit_api()
+async def download_receipt_pdf(
+    receipt_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """
+    Download receipt as PDF (spec component 11.7).
+    Returns binary PDF with Content-Disposition attachment header.
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "fee_collection", "read")
+
+    # Get receipt record
+    receipt = await FeeReceiptService.get_receipt_by_id(db, receipt_id)
+
+    # Get receipt content for PDF
+    content = await FeeReceiptService.get_receipt_content(db, receipt.fee_transaction_id)
+    content.receipt_number = receipt.receipt_number
+
+    # Generate PDF bytes
+    pdf_bytes = FeeReceiptService.generate_receipt_pdf(content)
+
+    filename = f"{receipt.receipt_number}.pdf"
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

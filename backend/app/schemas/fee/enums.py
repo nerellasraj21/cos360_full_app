@@ -21,6 +21,7 @@ class PaymentMethod(StrEnum):
     CHEQUE = "cheque"
     BANK_TRANSFER = "bank_transfer"
     UPI = "upi"
+    DD = "dd"
     CARD = "card"
 
 

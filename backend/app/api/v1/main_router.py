@@ -16,6 +16,7 @@ from app.api.v1.exam.audit_endpoints import router as exam_audit_router
 from app.api.v1.exam.board_pattern_endpoints import router as board_pattern_router
 from app.api.v1.exam.exam_date_endpoints import router as exam_date_router
 from app.api.v1.exam.exam_endpoints import router as exam_router
+from app.api.v1.exam.exam_pattern_endpoints import router as exam_pattern_router
 from app.api.v1.exam.exam_settings_endpoints import router as exam_settings_router
 from app.api.v1.exam.grading_endpoints import router as grading_router
 from app.api.v1.exam.hall_ticket_endpoints import router as hall_ticket_router
@@ -175,6 +176,7 @@ router.include_router(exam_result_router)
 router.include_router(hall_ticket_router)
 router.include_router(exam_audit_router)
 router.include_router(exam_notification_router)
+router.include_router(exam_pattern_router)
 
 # ── Communication Module ──────────────────────────────────────────────────────
 router.include_router(communication_router)

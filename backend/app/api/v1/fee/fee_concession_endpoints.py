@@ -122,4 +122,4 @@ async def delete_concession(
     role = current_user.get("role")
     await check_role_plan_permission_with_error(db, request, role, "fee_concessions", "delete")
 
-    return await revoke_concession(db, concession_id)
+    return await revoke_concession(db, concession_id, current_user)
