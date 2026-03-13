@@ -1,6 +1,13 @@
-import { createFileRoute } from '@tanstack/react-router';
-import CommunicationPage from '../../pages/Communication';
+import { createFileRoute, Outlet } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_app/communication')({
-  component: CommunicationPage,
-});
+  component: CommunicationLayout,
+})
+
+function CommunicationLayout() {
+  return (
+    <div className="communication-layout">
+      <Outlet />
+    </div>
+  )
+}

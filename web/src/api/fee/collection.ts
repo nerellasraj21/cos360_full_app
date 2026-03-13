@@ -96,13 +96,9 @@ export const feeCollectionApi = {
   searchStudents: async (params: StudentSearchParams): Promise<StudentSearchResult[]> => {
     try {
       const searchParams = new URLSearchParams();
-      if (params.admission_number) searchParams.set('admission_number', params.admission_number);
-      if (params.mobile_number) searchParams.set('mobile_number', params.mobile_number);
+      if (params.q) searchParams.set('q', params.q);
       if (params.class_id) searchParams.set('class_id', params.class_id);
       if (params.section_id) searchParams.set('section_id', params.section_id);
-      if (params.city) searchParams.set('city', params.city);
-      if (params.mandal) searchParams.set('mandal', params.mandal);
-      if (params.village) searchParams.set('village', params.village);
 
       const response = await CAxios.get<StudentSearchResult[]>(
         `${FEE_COLLECTION_SEARCH}?${searchParams.toString()}`

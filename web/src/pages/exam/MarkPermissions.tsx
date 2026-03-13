@@ -62,7 +62,7 @@ export default function MarkPermissions() {
 
   const handleGrant = () => {
     if (!newUserId.trim()) return
-    grantMutation.mutate(newUserId.trim(), { onSuccess: () => setNewUserId('') })
+    grantMutation.mutate({ userId: newUserId.trim() }, { onSuccess: () => setNewUserId('') })
   }
 
   return (
@@ -118,7 +118,7 @@ export default function MarkPermissions() {
                     <th className="px-4 py-3 text-left font-medium w-12">S.No.</th>
                     <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('user_display_name')}>User <SortIcon col="user_display_name" /></th>
                     <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('granted_by')}>Granted By <SortIcon col="granted_by" /></th>
-                    <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('granted_at')}>Granted At <SortIcon col="granted_at" /></th>
+                    <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('created_at')}>Granted At <SortIcon col="created_at" /></th>
                     <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('is_active')}>Status <SortIcon col="is_active" /></th>
                     <th className="px-4 py-3 text-right font-medium">Actions</th>
                   </tr>
@@ -134,7 +134,7 @@ export default function MarkPermissions() {
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{perm.granted_by}</td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {new Date(perm.granted_at).toLocaleDateString()}
+                        {new Date(perm.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge status={perm.is_active} label={perm.is_active ? 'Active' : 'Revoked'} />

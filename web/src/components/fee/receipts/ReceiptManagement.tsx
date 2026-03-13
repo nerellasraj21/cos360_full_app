@@ -158,11 +158,11 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
     if (!selectedReceipt) return;
 
     try {
-      // For now, we'll just show a message since PDF download requires backend implementation
-      toast.info('PDF download functionality will be implemented with backend integration');
+      await feeReceiptsApi.downloadReceiptPdf(selectedReceipt.id, selectedReceipt.receipt_number);
+      toast.success('Receipt PDF downloaded');
     } catch (error) {
       console.error('Error downloading receipt:', error);
-      toast.error('Failed to download receipt');
+      toast.error('Failed to download receipt PDF');
     }
   };
 
@@ -458,7 +458,12 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Collected By</Label>
-                  <p>{receiptContent.collected_by_user}</p>
+                  <p>
+                    {receiptContent.collected_by_user}
+                    {receiptContent.collected_by_designation && (
+                      <span className="text-muted-foreground ml-1">({receiptContent.collected_by_designation})</span>
+                    )}
+                  </p>
                 </div>
               </div>
 

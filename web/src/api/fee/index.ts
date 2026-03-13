@@ -82,6 +82,9 @@ export {
 // Fee Collection
 export { feeCollectionApi } from './collection';
 
+// Fee Reports
+export { feeReportsApi } from './reports';
+
 export const feeApi = {
   transactions: feeTransactionsApi,
 };

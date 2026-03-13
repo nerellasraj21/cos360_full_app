@@ -94,6 +94,22 @@ export const feeReceiptsApi = {
     return response.data;
   },
 
+  // Download receipt as PDF
+  downloadReceiptPdf: async (receiptId: string, receiptNumber?: string): Promise<void> => {
+    const response = await CAxios.get(`/fee/collection/receipts/${receiptId}/pdf`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = receiptNumber ? `${receiptNumber}.pdf` : 'receipt.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
   // Health check
   healthCheck: async (): Promise<{ status: string; module: string; timestamp: string }> => {
     console.log('[DEBUG] feeReceiptsApi.healthCheck called');
@@ -112,5 +128,6 @@ export const {
   reprintReceipt,
   verifyReceipt,
   searchReceipts,
+  downloadReceiptPdf,
   healthCheck,
 } = feeReceiptsApi;

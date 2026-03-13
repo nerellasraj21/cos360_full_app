@@ -36,6 +36,7 @@ import { Route as AppMastersIndexRouteImport } from './routes/_app/masters/index
 import { Route as AppFeeIndexRouteImport } from './routes/_app/fee/index'
 import { Route as AppExpenseIndexRouteImport } from './routes/_app/expense/index'
 import { Route as AppExamIndexRouteImport } from './routes/_app/exam/index'
+import { Route as AppCommunicationIndexRouteImport } from './routes/_app/communication/index'
 import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
 import { Route as AppTransportVehiclesRouteImport } from './routes/_app/transport/vehicles'
 import { Route as AppTransportTripsRouteImport } from './routes/_app/transport/trips'
@@ -101,6 +102,9 @@ import { Route as AppExamGradingRouteImport } from './routes/_app/exam/grading'
 import { Route as AppExamExamsRouteImport } from './routes/_app/exam/exams'
 import { Route as AppExamBoardPatternsRouteImport } from './routes/_app/exam/board-patterns'
 import { Route as AppExamAuditRouteImport } from './routes/_app/exam/audit'
+import { Route as AppCommunicationTemplatesRouteImport } from './routes/_app/communication/templates'
+import { Route as AppCommunicationLogsRouteImport } from './routes/_app/communication/logs'
+import { Route as AppCommunicationComposeRouteImport } from './routes/_app/communication/compose'
 import { Route as AppAdminProfileRouteImport } from './routes/_app/admin/profile'
 import { Route as AppExamResultsIndexRouteImport } from './routes/_app/exam/results/index'
 import { Route as AppExamMarksIndexRouteImport } from './routes/_app/exam/marks/index'
@@ -259,6 +263,11 @@ const AppExamIndexRoute = AppExamIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppExamRoute,
+} as any)
+const AppCommunicationIndexRoute = AppCommunicationIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppCommunicationRoute,
 } as any)
 const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
   id: '/admin/',
@@ -598,6 +607,22 @@ const AppExamAuditRoute = AppExamAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AppExamRoute,
 } as any)
+const AppCommunicationTemplatesRoute =
+  AppCommunicationTemplatesRouteImport.update({
+    id: '/templates',
+    path: '/templates',
+    getParentRoute: () => AppCommunicationRoute,
+  } as any)
+const AppCommunicationLogsRoute = AppCommunicationLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => AppCommunicationRoute,
+} as any)
+const AppCommunicationComposeRoute = AppCommunicationComposeRouteImport.update({
+  id: '/compose',
+  path: '/compose',
+  getParentRoute: () => AppCommunicationRoute,
+} as any)
 const AppAdminProfileRoute = AppAdminProfileRouteImport.update({
   id: '/admin/profile',
   path: '/admin/profile',
@@ -738,7 +763,7 @@ export interface FileRoutesByFullPath {
   '/Calender': typeof AppCalenderRoute
   '/TimeTable': typeof AppTimeTableRoute
   '/about': typeof AppAboutRoute
-  '/communication': typeof AppCommunicationRoute
+  '/communication': typeof AppCommunicationRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
   '/exam': typeof AppExamRouteWithChildren
   '/expense': typeof AppExpenseRouteWithChildren
@@ -753,6 +778,9 @@ export interface FileRoutesByFullPath {
   '/set-password': typeof AuthSetPasswordRoute
   '/': typeof AppIndexRoute
   '/admin/profile': typeof AppAdminProfileRoute
+  '/communication/compose': typeof AppCommunicationComposeRoute
+  '/communication/logs': typeof AppCommunicationLogsRoute
+  '/communication/templates': typeof AppCommunicationTemplatesRoute
   '/exam/audit': typeof AppExamAuditRoute
   '/exam/board-patterns': typeof AppExamBoardPatternsRoute
   '/exam/exams': typeof AppExamExamsRouteWithChildren
@@ -818,6 +846,7 @@ export interface FileRoutesByFullPath {
   '/transport/trips': typeof AppTransportTripsRoute
   '/transport/vehicles': typeof AppTransportVehiclesRoute
   '/admin': typeof AppAdminIndexRoute
+  '/communication/': typeof AppCommunicationIndexRoute
   '/exam/': typeof AppExamIndexRoute
   '/expense/': typeof AppExpenseIndexRoute
   '/fee/': typeof AppFeeIndexRoute
@@ -855,7 +884,6 @@ export interface FileRoutesByTo {
   '/Calender': typeof AppCalenderRoute
   '/TimeTable': typeof AppTimeTableRoute
   '/about': typeof AppAboutRoute
-  '/communication': typeof AppCommunicationRoute
   '/dashboard': typeof AppDashboardRoute
   '/fees': typeof AppFeesRoute
   '/profile': typeof AppProfileRoute
@@ -866,6 +894,9 @@ export interface FileRoutesByTo {
   '/set-password': typeof AuthSetPasswordRoute
   '/': typeof AppIndexRoute
   '/admin/profile': typeof AppAdminProfileRoute
+  '/communication/compose': typeof AppCommunicationComposeRoute
+  '/communication/logs': typeof AppCommunicationLogsRoute
+  '/communication/templates': typeof AppCommunicationTemplatesRoute
   '/exam/audit': typeof AppExamAuditRoute
   '/exam/board-patterns': typeof AppExamBoardPatternsRoute
   '/exam/grading': typeof AppExamGradingRouteWithChildren
@@ -927,6 +958,7 @@ export interface FileRoutesByTo {
   '/transport/trips': typeof AppTransportTripsRoute
   '/transport/vehicles': typeof AppTransportVehiclesRoute
   '/admin': typeof AppAdminIndexRoute
+  '/communication': typeof AppCommunicationIndexRoute
   '/exam': typeof AppExamIndexRoute
   '/expense': typeof AppExpenseIndexRoute
   '/fee': typeof AppFeeIndexRoute
@@ -966,7 +998,7 @@ export interface FileRoutesById {
   '/_app/Calender': typeof AppCalenderRoute
   '/_app/TimeTable': typeof AppTimeTableRoute
   '/_app/about': typeof AppAboutRoute
-  '/_app/communication': typeof AppCommunicationRoute
+  '/_app/communication': typeof AppCommunicationRouteWithChildren
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/exam': typeof AppExamRouteWithChildren
   '/_app/expense': typeof AppExpenseRouteWithChildren
@@ -981,6 +1013,9 @@ export interface FileRoutesById {
   '/_auth/set-password': typeof AuthSetPasswordRoute
   '/_app/': typeof AppIndexRoute
   '/_app/admin/profile': typeof AppAdminProfileRoute
+  '/_app/communication/compose': typeof AppCommunicationComposeRoute
+  '/_app/communication/logs': typeof AppCommunicationLogsRoute
+  '/_app/communication/templates': typeof AppCommunicationTemplatesRoute
   '/_app/exam/audit': typeof AppExamAuditRoute
   '/_app/exam/board-patterns': typeof AppExamBoardPatternsRoute
   '/_app/exam/exams': typeof AppExamExamsRouteWithChildren
@@ -1046,6 +1081,7 @@ export interface FileRoutesById {
   '/_app/transport/trips': typeof AppTransportTripsRoute
   '/_app/transport/vehicles': typeof AppTransportVehiclesRoute
   '/_app/admin/': typeof AppAdminIndexRoute
+  '/_app/communication/': typeof AppCommunicationIndexRoute
   '/_app/exam/': typeof AppExamIndexRoute
   '/_app/expense/': typeof AppExpenseIndexRoute
   '/_app/fee/': typeof AppFeeIndexRoute
@@ -1100,6 +1136,9 @@ export interface FileRouteTypes {
     | '/set-password'
     | '/'
     | '/admin/profile'
+    | '/communication/compose'
+    | '/communication/logs'
+    | '/communication/templates'
     | '/exam/audit'
     | '/exam/board-patterns'
     | '/exam/exams'
@@ -1165,6 +1204,7 @@ export interface FileRouteTypes {
     | '/transport/trips'
     | '/transport/vehicles'
     | '/admin'
+    | '/communication/'
     | '/exam/'
     | '/expense/'
     | '/fee/'
@@ -1202,7 +1242,6 @@ export interface FileRouteTypes {
     | '/Calender'
     | '/TimeTable'
     | '/about'
-    | '/communication'
     | '/dashboard'
     | '/fees'
     | '/profile'
@@ -1213,6 +1252,9 @@ export interface FileRouteTypes {
     | '/set-password'
     | '/'
     | '/admin/profile'
+    | '/communication/compose'
+    | '/communication/logs'
+    | '/communication/templates'
     | '/exam/audit'
     | '/exam/board-patterns'
     | '/exam/grading'
@@ -1274,6 +1316,7 @@ export interface FileRouteTypes {
     | '/transport/trips'
     | '/transport/vehicles'
     | '/admin'
+    | '/communication'
     | '/exam'
     | '/expense'
     | '/fee'
@@ -1327,6 +1370,9 @@ export interface FileRouteTypes {
     | '/_auth/set-password'
     | '/_app/'
     | '/_app/admin/profile'
+    | '/_app/communication/compose'
+    | '/_app/communication/logs'
+    | '/_app/communication/templates'
     | '/_app/exam/audit'
     | '/_app/exam/board-patterns'
     | '/_app/exam/exams'
@@ -1392,6 +1438,7 @@ export interface FileRouteTypes {
     | '/_app/transport/trips'
     | '/_app/transport/vehicles'
     | '/_app/admin/'
+    | '/_app/communication/'
     | '/_app/exam/'
     | '/_app/expense/'
     | '/_app/fee/'
@@ -1621,6 +1668,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/exam/'
       preLoaderRoute: typeof AppExamIndexRouteImport
       parentRoute: typeof AppExamRoute
+    }
+    '/_app/communication/': {
+      id: '/_app/communication/'
+      path: '/'
+      fullPath: '/communication/'
+      preLoaderRoute: typeof AppCommunicationIndexRouteImport
+      parentRoute: typeof AppCommunicationRoute
     }
     '/_app/admin/': {
       id: '/_app/admin/'
@@ -2077,6 +2131,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppExamAuditRouteImport
       parentRoute: typeof AppExamRoute
     }
+    '/_app/communication/templates': {
+      id: '/_app/communication/templates'
+      path: '/templates'
+      fullPath: '/communication/templates'
+      preLoaderRoute: typeof AppCommunicationTemplatesRouteImport
+      parentRoute: typeof AppCommunicationRoute
+    }
+    '/_app/communication/logs': {
+      id: '/_app/communication/logs'
+      path: '/logs'
+      fullPath: '/communication/logs'
+      preLoaderRoute: typeof AppCommunicationLogsRouteImport
+      parentRoute: typeof AppCommunicationRoute
+    }
+    '/_app/communication/compose': {
+      id: '/_app/communication/compose'
+      path: '/compose'
+      fullPath: '/communication/compose'
+      preLoaderRoute: typeof AppCommunicationComposeRouteImport
+      parentRoute: typeof AppCommunicationRoute
+    }
     '/_app/admin/profile': {
       id: '/_app/admin/profile'
       path: '/admin/profile'
@@ -2254,6 +2329,23 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AppCommunicationRouteChildren {
+  AppCommunicationComposeRoute: typeof AppCommunicationComposeRoute
+  AppCommunicationLogsRoute: typeof AppCommunicationLogsRoute
+  AppCommunicationTemplatesRoute: typeof AppCommunicationTemplatesRoute
+  AppCommunicationIndexRoute: typeof AppCommunicationIndexRoute
+}
+
+const AppCommunicationRouteChildren: AppCommunicationRouteChildren = {
+  AppCommunicationComposeRoute: AppCommunicationComposeRoute,
+  AppCommunicationLogsRoute: AppCommunicationLogsRoute,
+  AppCommunicationTemplatesRoute: AppCommunicationTemplatesRoute,
+  AppCommunicationIndexRoute: AppCommunicationIndexRoute,
+}
+
+const AppCommunicationRouteWithChildren =
+  AppCommunicationRoute._addFileChildren(AppCommunicationRouteChildren)
 
 interface AppExamExamsIdRouteChildren {
   AppExamExamsIdAuditRoute: typeof AppExamExamsIdAuditRoute
@@ -2549,7 +2641,7 @@ interface AppRouteChildren {
   AppCalenderRoute: typeof AppCalenderRoute
   AppTimeTableRoute: typeof AppTimeTableRoute
   AppAboutRoute: typeof AppAboutRoute
-  AppCommunicationRoute: typeof AppCommunicationRoute
+  AppCommunicationRoute: typeof AppCommunicationRouteWithChildren
   AppDashboardRoute: typeof AppDashboardRoute
   AppExamRoute: typeof AppExamRouteWithChildren
   AppExpenseRoute: typeof AppExpenseRouteWithChildren
@@ -2595,7 +2687,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCalenderRoute: AppCalenderRoute,
   AppTimeTableRoute: AppTimeTableRoute,
   AppAboutRoute: AppAboutRoute,
-  AppCommunicationRoute: AppCommunicationRoute,
+  AppCommunicationRoute: AppCommunicationRouteWithChildren,
   AppDashboardRoute: AppDashboardRoute,
   AppExamRoute: AppExamRouteWithChildren,
   AppExpenseRoute: AppExpenseRouteWithChildren,

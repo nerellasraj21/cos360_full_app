@@ -21,22 +21,16 @@ interface StudentSearchProps {
 }
 
 export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
-  const [admissionNumber, setAdmissionNumber] = useState('');
-  const [mobileNumber, setMobileNumber] = useState('');
+  const [query, setQuery] = useState('');
   const [classId, setClassId] = useState<string | null>(null);
   const [sectionId, setSectionId] = useState<string | null>(null);
-  const [city, setCity] = useState('');
-  const [mandal, setMandal] = useState('');
-  const [village, setVillage] = useState('');
   const [searchParams, setSearchParams] = useState<StudentSearchParams>({});
   const [searchEnabled, setSearchEnabled] = useState(false);
 
   const { data: classes = [] } = useClassesDropdown();
   const { data: sections = [] } = useSectionsByClassId(classId || '');
 
-  const hasAnyFilter = !!(
-    admissionNumber || mobileNumber || classId || sectionId || city || mandal || village
-  );
+  const hasAnyFilter = !!(query.trim() || classId || sectionId);
 
   const { data: results = [], isLoading, isError, error } = useStudentSearch(
     searchParams,
@@ -46,25 +40,17 @@ export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
   const handleSearch = useCallback(() => {
     if (!hasAnyFilter) return;
     const params: StudentSearchParams = {};
-    if (admissionNumber) params.admission_number = admissionNumber;
-    if (mobileNumber) params.mobile_number = mobileNumber;
+    if (query.trim()) params.q = query.trim();
     if (classId) params.class_id = classId;
     if (sectionId) params.section_id = sectionId;
-    if (city) params.city = city;
-    if (mandal) params.mandal = mandal;
-    if (village) params.village = village;
     setSearchParams(params);
     setSearchEnabled(true);
-  }, [admissionNumber, mobileNumber, classId, sectionId, city, mandal, village, hasAnyFilter]);
+  }, [query, classId, sectionId, hasAnyFilter]);
 
   const handleClear = useCallback(() => {
-    setAdmissionNumber('');
-    setMobileNumber('');
+    setQuery('');
     setClassId(null);
     setSectionId(null);
-    setCity('');
-    setMandal('');
-    setVillage('');
     setSearchParams({});
     setSearchEnabled(false);
   }, []);
@@ -80,18 +66,11 @@ export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
     <div className="space-y-4">
       <FilterBar>
         <Input
-          placeholder="Admission No."
-          value={admissionNumber}
-          onChange={(e) => setAdmissionNumber(e.target.value)}
+          placeholder="Search by name, admission no, mobile, city..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-36"
-        />
-        <Input
-          placeholder="Mobile No."
-          value={mobileNumber}
-          onChange={(e) => setMobileNumber(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-36"
+          className="w-64"
         />
         <Select
           value={classId || ''}
@@ -123,27 +102,6 @@ export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
             ))}
           </SelectContent>
         </Select>
-        <Input
-          placeholder="City"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-28"
-        />
-        <Input
-          placeholder="Mandal"
-          value={mandal}
-          onChange={(e) => setMandal(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-28"
-        />
-        <Input
-          placeholder="Village"
-          value={village}
-          onChange={(e) => setVillage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-28"
-        />
         <Button onClick={handleSearch} disabled={!hasAnyFilter || isLoading} size="sm">
           <Search className="h-4 w-4 mr-1" /> Search
         </Button>

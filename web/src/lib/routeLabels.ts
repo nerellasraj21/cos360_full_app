@@ -93,6 +93,9 @@ export const ROUTE_SEGMENT_LABELS: Record<string, string> = {
 
   // Communication
   communication: 'Communication',
+  compose: 'Compose',
+  templates: 'Templates',
+  logs: 'Logs',
 
   // Admin / Administration
   admin: 'Administration',

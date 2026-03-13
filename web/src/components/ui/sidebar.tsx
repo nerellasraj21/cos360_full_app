@@ -99,7 +99,7 @@ interface SidebarProps {
 }
 
 // Icon mapping utility
-const getIconForMenuItem = (name: string) => {
+export const getIconForMenuItem = (name: string) => {
     const iconMap: Record<string, any> = {
         // ── Top-level modules ──────────────────────────────────────────────────
         Dashboard: LayoutDashboard,

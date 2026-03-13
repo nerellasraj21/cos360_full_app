@@ -23,6 +23,21 @@ export type EntryType = 'marks' | 'remarks'
 
 export type IneligibilityReason = 'FEE_PENDING' | 'LOW_ATTENDANCE' | 'BOTH'
 
+export type AuditAction =
+  | 'mark_entered'
+  | 'mark_updated'
+  | 'bulk_uploaded'
+  | 'exam_published'
+  | 'exam_unlocked'
+  | 'grace_applied'
+  | 'moderation_applied'
+  | 'result_withheld'
+  | 'result_released'
+
+export type NotificationType = 'hall_ticket_available' | 'results_published' | 'exam_schedule' | 'custom'
+
+export type TargetAudience = 'students' | 'parents' | 'all'
+
 // ---------------------------------------------------------------------------
 // Exam Settings
 // ---------------------------------------------------------------------------
@@ -381,9 +396,15 @@ export interface MarkPermission {
   exam_id: string
   user_id: string
   granted_by: string
-  granted_at: string
+  scope_note: string | null
   is_active: boolean
+  created_at: string
   user_display_name?: string
+}
+
+export interface MarkPermissionUpdate {
+  is_active: boolean
+  scope_note?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -393,19 +414,35 @@ export interface HallTicketEligibility {
   id: string
   exam_id: string
   student_id: string
+  class_id: string
+  section_id: string | null
   attendance_percent: number | null
-  attendance_ok: boolean | null
-  fee_paid: boolean | null
-  is_eligible: boolean
+  attendance_ok: boolean
+  fee_paid: boolean
   attendance_override: boolean
   fee_override: boolean
   ineligibility_reason: IneligibilityReason | null
-  generated_at: string | null
-  overridden_by: string | null
+  is_eligible: boolean
+  hall_ticket_number: string | null
+  computed_at: string | null
   student_name?: string
   admission_number?: string
+  // Optional denormalized fields (not in backend schema yet, used by UI with fallback)
   class_name?: string
   section_name?: string
+}
+
+export interface ComputeEligibilityResponse {
+  exam_id: string
+  total_students: number
+  eligible: number
+  ineligible: number
+}
+
+export interface PublishHallTicketsResponse {
+  exam_id: string
+  hall_ticket_published: boolean
+  hall_ticket_published_at: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -440,4 +477,170 @@ export interface StudentExamResult {
   is_passed: boolean | null
   computed_at: string | null
   subject_results: StudentSubjectResult[]
+}
+
+// ---------------------------------------------------------------------------
+// Exam Pattern Templates
+// ---------------------------------------------------------------------------
+export interface TemplateComponentData {
+  component_name: string
+  entry_type: EntryType
+  max_marks: number | null
+  min_pass_marks: number | null
+  include_in_total: boolean
+  is_internal: boolean
+  remark_grade_set_id: string | null
+  sort_order: number
+}
+
+export interface TemplateItemCreate {
+  subject_id: string
+  subject_grade_scheme_id?: string | null
+  credit_hours?: number | null
+  has_internal_external_split?: boolean
+  internal_max_marks?: number | null
+  internal_min_pass?: number | null
+  external_max_marks?: number | null
+  external_min_pass?: number | null
+  sort_order?: number | null
+  components: TemplateComponentData[]
+}
+
+export interface TemplateItemRead extends TemplateItemCreate {
+  id: string
+  template_id: string
+}
+
+export interface TemplateCreate {
+  template_name: string
+  description?: string | null
+  board?: string | null
+  level?: string | null
+  items: TemplateItemCreate[]
+}
+
+export interface TemplateSaveFromExam {
+  template_name: string
+  description?: string | null
+  exam_id: string
+  class_id: string
+  section_id?: string | null
+}
+
+export interface TemplateRead {
+  id: string
+  template_name: string
+  description: string | null
+  board: string | null
+  level: string | null
+  source_exam_id: string | null
+  source_class_id: string | null
+  is_active: boolean
+  items: TemplateItemRead[]
+  created_at: string
+}
+
+export interface TemplateListItem {
+  id: string
+  template_name: string
+  description: string | null
+  board: string | null
+  level: string | null
+  item_count: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface TemplateUpdate {
+  template_name?: string
+  description?: string | null
+  board?: string | null
+  level?: string | null
+  is_active?: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Exam Pattern Copy / Apply / Compare / Auto-detect
+// ---------------------------------------------------------------------------
+export interface CopyPatternRequest {
+  source_class_id: string
+  source_section_id?: string | null
+  target_class_id: string
+  target_section_id?: string | null
+  skip_missing_subjects?: boolean
+}
+
+export interface ApplyTemplateRequest {
+  template_id: string
+  target_class_id: string
+  target_section_id?: string | null
+  skip_missing_subjects?: boolean
+}
+
+export interface SubjectComparisonItem {
+  subject_id: string
+  subject_name: string | null
+}
+
+export interface SubjectMismatchResponse {
+  common_subjects: SubjectComparisonItem[]
+  source_only_subjects: SubjectComparisonItem[]
+  target_only_subjects: SubjectComparisonItem[]
+  can_copy_all: boolean
+  copyable_count: number
+}
+
+export interface PatternSuggestion {
+  source_class_id: string
+  source_section_id: string | null
+  source_class_name: string | null
+  overlap_subject_count: number
+  total_source_configs: number
+  total_target_subjects: number
+  mismatch: SubjectMismatchResponse
+}
+
+export interface AutoDetectResponse {
+  suggestions: PatternSuggestion[]
+  has_suggestions: boolean
+}
+
+export interface AddClassSectionResponse {
+  class_section: ExamClassSection
+  auto_detect: AutoDetectResponse
+}
+
+// ---------------------------------------------------------------------------
+// Audit Log
+// ---------------------------------------------------------------------------
+export interface AuditLogEntry {
+  id: string
+  exam_id: string
+  student_id: string | null
+  subject_id: string | null
+  action: AuditAction | string
+  old_value: string | null
+  new_value: string | null
+  reason: string | null
+  performed_by: string
+  performed_at: string
+  metadata_: Record<string, unknown> | null
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+export interface ExamNotificationRequest {
+  notification_type: NotificationType
+  message: string
+  target_audience?: TargetAudience
+  send_push?: boolean
+  send_sms?: boolean
+  send_email?: boolean
+}
+
+export interface ExamNotificationResponse {
+  exam_id: string
+  notifications_queued: number
+  notification_type: string
 }

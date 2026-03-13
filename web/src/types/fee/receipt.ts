@@ -61,6 +61,7 @@ export interface ReceiptContent {
   total_amount: number;
   transaction_date: string;
   collected_by_user: string;
+  collected_by_designation?: string;
   receipt_items: ReceiptItemDetail[];
   remarks?: string;
   school_name: string;

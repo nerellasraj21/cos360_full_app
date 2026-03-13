@@ -32,10 +32,12 @@ export const FEE_REFUNDS = `${FEE_BASE}/refunds/`;
 // Student Fee Dashboard
 export const FEE_STUDENT_DASHBOARD = `${FEE_BASE}/student/{student_id}/dashboard`;
 
-// Fee Collection Reports
-export const FEE_COLLECTION_REPORTS = `${FEE_BASE}/reports/collection`;
-export const FEE_OUTSTANDING_REPORTS = `${FEE_BASE}/reports/outstanding`;
-export const FEE_PAYMENT_HISTORY = `${FEE_BASE}/reports/payment-history`;
+// Fee Reports (backend at /reports/fees/)
+export const FEE_REPORTS_BASE = '/reports/fees';
+export const FEE_COLLECTION_SUMMARY_REPORT = `${FEE_REPORTS_BASE}/collection-summary`;
+export const FEE_PENDING_FEES_REPORT = `${FEE_REPORTS_BASE}/pending-fees`;
+export const FEE_STRUCTURE_REPORT = `${FEE_REPORTS_BASE}/fee-structure`;
+export const FEE_REPORT_EXPORT = `${FEE_REPORTS_BASE}/export`;
 
 // Fee Collection
 export const FEE_COLLECTION = `${FEE_BASE}/collection`;

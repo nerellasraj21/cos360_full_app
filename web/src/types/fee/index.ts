@@ -39,3 +39,18 @@ export type {
     OldFeeCarryForwardRequest,
     OldFeeUpdate,
 } from './collection';
+export type {
+    FeeCollectionFilter,
+    PendingFeesFilter,
+    FeeStructureFilter,
+    FeeCollectionSummaryItem,
+    PendingFeesItem,
+    FeeStructureItem,
+    FeeCollectionStats,
+    PendingFeesStats,
+    FeeStructureStats,
+    FeeReportResponse,
+    FeeExportFormat,
+    FeeExportRequest,
+    FeeExportJobResponse,
+} from './report';

@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, CheckCircle } from 'lucide-react';
+import { Loader2, CheckCircle, Download } from 'lucide-react';
+import { toast } from 'sonner';
+import { feeReceiptsApi } from '@/api/fee/receipts';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,27 +53,28 @@ const PAYMENT_METHODS: { value: CollectionPaymentMethod; label: string }[] = [
   { value: 'upi', label: 'UPI' },
   { value: 'cheque', label: 'Cheque' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'dd', label: 'Demand Draft' },
 ];
 
 const paymentSchema = z.object({
   amount_to_pay: z.number({ required_error: 'Amount is required' }).positive('Amount must be greater than 0'),
-  payment_method: z.enum(['cash', 'upi', 'cheque', 'bank_transfer'] as const),
+  payment_method: z.enum(['cash', 'upi', 'cheque', 'bank_transfer', 'dd'] as const),
   upi_reference: z.string().optional(),
   bank_reference: z.string().optional(),
   cheque_number: z.string().optional(),
   cheque_bank: z.string().optional(),
   cheque_date: z.string().optional(),
-  send_sms: z.boolean().default(true),
-  print_duplicate: z.boolean().default(false),
+  send_sms: z.boolean(),
+  print_duplicate: z.boolean(),
   remarks: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.payment_method === 'upi' && !data.upi_reference) {
     ctx.addIssue({ code: 'custom', message: 'UPI reference is required', path: ['upi_reference'] });
   }
-  if (data.payment_method === 'cheque') {
-    if (!data.cheque_number) ctx.addIssue({ code: 'custom', message: 'Cheque number is required', path: ['cheque_number'] });
+  if (data.payment_method === 'cheque' || data.payment_method === 'dd') {
+    if (!data.cheque_number) ctx.addIssue({ code: 'custom', message: 'Cheque/DD number is required', path: ['cheque_number'] });
     if (!data.cheque_bank) ctx.addIssue({ code: 'custom', message: 'Bank name is required', path: ['cheque_bank'] });
-    if (!data.cheque_date) ctx.addIssue({ code: 'custom', message: 'Cheque date is required', path: ['cheque_date'] });
+    if (!data.cheque_date) ctx.addIssue({ code: 'custom', message: 'Cheque/DD date is required', path: ['cheque_date'] });
   }
   if (data.payment_method === 'bank_transfer' && !data.bank_reference) {
     ctx.addIssue({ code: 'custom', message: 'Bank reference is required', path: ['bank_reference'] });
@@ -214,12 +217,12 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
                 </div>
               )}
 
-              {/* Cheque Fields */}
-              {paymentMethod === 'cheque' && (
+              {/* Cheque / DD Fields */}
+              {(paymentMethod === 'cheque' || paymentMethod === 'dd') && (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="cheque_num">Cheque Number *</Label>
-                    <Input id="cheque_num" placeholder="e.g. CHQ123456" {...register('cheque_number')} />
+                    <Label htmlFor="cheque_num">{paymentMethod === 'dd' ? 'DD Number' : 'Cheque Number'} *</Label>
+                    <Input id="cheque_num" placeholder={paymentMethod === 'dd' ? 'e.g. DD123456' : 'e.g. CHQ123456'} {...register('cheque_number')} />
                     {errors.cheque_number && (
                       <p className="text-sm text-destructive">{errors.cheque_number.message}</p>
                     )}
@@ -232,7 +235,7 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="cheque_date">Cheque Date *</Label>
+                    <Label htmlFor="cheque_date">{paymentMethod === 'dd' ? 'DD Date' : 'Cheque Date'} *</Label>
                     <Input id="cheque_date" type="date" {...register('cheque_date')} />
                     {errors.cheque_date && (
                       <p className="text-sm text-destructive">{errors.cheque_date.message}</p>
@@ -356,7 +359,20 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
                 </div>
               )}
 
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await feeReceiptsApi.downloadReceiptPdf(paymentResult.receipt_id, paymentResult.receipt_number);
+                      toast.success('Receipt downloaded');
+                    } catch {
+                      toast.error('Failed to download receipt');
+                    }
+                  }}
+                >
+                  <Download className="h-4 w-4 mr-2" /> Download Receipt
+                </Button>
                 <Button onClick={handleCloseSuccess}>Close</Button>
               </div>
             </div>

@@ -12,6 +12,13 @@ import type {
   GradeSchemeCreate,
   ExamSettings,
   StudentExamResult,
+  TemplateCreate,
+  TemplateSaveFromExam,
+  TemplateUpdate,
+  CopyPatternRequest,
+  ApplyTemplateRequest,
+  MarkPermissionUpdate,
+  ExamNotificationRequest,
 } from '@/types/exam'
 
 // ---------------------------------------------------------------------------
@@ -34,6 +41,9 @@ export const examKeys = {
   subjectSchemes: ['subjectGradeSchemes'] as const,
   remarkSets: ['remarkGradeSets'] as const,
 
+  classSections: (examId: string) => [...examKeys.details(), examId, 'class-sections'] as const,
+  subjectConfigs: (examId: string) => [...examKeys.details(), examId, 'subject-configs'] as const,
+
   dates: (examId: string) => ['examDates', examId] as const,
 
   marks: (examId: string, classId: string, sectionId: string, subjectConfigId: string) =>
@@ -45,6 +55,12 @@ export const examKeys = {
 
   results: (examId: string, studentId?: string) =>
     studentId ? ['results', examId, studentId] : ['results', examId],
+
+  templates: ['examTemplates'] as const,
+  templatesList: (params?: Record<string, unknown>) => [...examKeys.templates, 'list', params ?? {}] as const,
+  template: (id: string) => [...examKeys.templates, id] as const,
+
+  audit: (examId: string) => ['examAudit', examId] as const,
 }
 
 // ---------------------------------------------------------------------------
@@ -180,8 +196,6 @@ export function useDeleteExamGradeScheme() {
   })
 }
 
-// Note: Grade bands are embedded in GradeSchemeCreate.bands — no separate CRUD endpoints on backend
-
 // ---------------------------------------------------------------------------
 // Subject Grade Schemes
 // ---------------------------------------------------------------------------
@@ -235,8 +249,6 @@ export function useDeleteSubjectGradeScheme() {
     },
   })
 }
-
-// Note: Subject grade bands are embedded in GradeSchemeCreate.bands — no separate CRUD endpoints on backend
 
 // ---------------------------------------------------------------------------
 // Remark Grade Sets
@@ -298,10 +310,26 @@ export function useDeleteRemarkGradeSet() {
 // ---------------------------------------------------------------------------
 export function useExamClassSections(examId: string) {
   return useQuery({
-    queryKey: [...examKeys.details(), examId, 'class-sections'],
+    queryKey: examKeys.classSections(examId),
     queryFn: () => examApi.getExamClassSections(examId),
     enabled: !!examId,
     staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useAddExamClassSection(examId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { class_id: string; section_id?: string | null }) =>
+      examApi.addExamClassSection(examId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examKeys.classSections(examId) })
+      queryClient.invalidateQueries({ queryKey: examKeys.subjectConfigs(examId) })
+      toast.success('Class-section added')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to add class-section')
+    },
   })
 }
 
@@ -310,10 +338,25 @@ export function useExamClassSections(examId: string) {
 // ---------------------------------------------------------------------------
 export function useExamSubjectConfigs(examId: string) {
   return useQuery({
-    queryKey: [...examKeys.details(), examId, 'subject-configs'],
+    queryKey: examKeys.subjectConfigs(examId),
     queryFn: () => examApi.getExamSubjectConfigs(examId),
     enabled: !!examId,
     staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useUpdateExamSubjectConfig(examId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ configId, data }: { configId: string; data: Record<string, unknown> }) =>
+      examApi.updateExamSubjectConfig(examId, configId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examKeys.subjectConfigs(examId) })
+      toast.success('Subject config updated')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update subject config')
+    },
   })
 }
 
@@ -354,7 +397,6 @@ export function useCreateExamFull() {
     onError: (error: any) => {
       const responseData = error?.response?.data
       console.error('[CreateExam] API error →', error?.response?.status, responseData)
-      // Stringify details so it's readable without expanding in DevTools
       if (responseData?.details) {
         console.error('[CreateExam] Error details →\n' + JSON.stringify(responseData.details, null, 2))
       }
@@ -431,7 +473,7 @@ export function useCloneExam() {
 }
 
 // ---------------------------------------------------------------------------
-// Publish / Compute
+// Publish / Compute / Unlock
 // ---------------------------------------------------------------------------
 export function useComputeAggregate(examId: string) {
   const queryClient = useQueryClient()
@@ -602,27 +644,6 @@ export function useUpsertMarks() {
   })
 }
 
-export function useBulkUpsertMarks() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (marks: MarkEntryCreate[]) => {
-      const examId = marks[0]?.exam_id ?? ''
-      const rest = marks.map(({ exam_id: _, ...m }) => m)
-      return examApi.upsertMarks(examId, rest[0])
-    },
-    onSuccess: (_data, variables) => {
-      const examId = variables[0]?.exam_id
-      if (examId) {
-        queryClient.invalidateQueries({ queryKey: ['marks', examId] })
-      }
-      toast.success('Marks uploaded successfully')
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Failed to upload marks')
-    },
-  })
-}
-
 export function useBatchSaveMarks(examId: string, subjectConfigId: string) {
   const queryClient = useQueryClient()
   return useMutation({
@@ -658,13 +679,29 @@ export function useMarkPermissions(examId: string) {
 export function useGrantMarkPermission(examId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (userId: string) => examApi.grantMarkPermission(examId, userId),
+    mutationFn: ({ userId, scopeNote }: { userId: string; scopeNote?: string }) =>
+      examApi.grantMarkPermission(examId, userId, scopeNote),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: examKeys.permissions(examId) })
       toast.success('Access granted successfully')
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to grant access')
+    },
+  })
+}
+
+export function useUpdateMarkPermission(examId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ permId, data }: { permId: string; data: MarkPermissionUpdate }) =>
+      examApi.updateMarkPermission(examId, permId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examKeys.permissions(examId) })
+      toast.success('Permission updated')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update permission')
     },
   })
 }
@@ -769,4 +806,171 @@ export function useGradingSchemes() {
   const examSchemes = useExamGradeSchemes()
   const subjectSchemes = useSubjectGradeSchemes()
   return { examSchemes, subjectSchemes }
+}
+
+// ---------------------------------------------------------------------------
+// Exam Pattern Templates
+// ---------------------------------------------------------------------------
+export function useTemplates(params?: { board?: string; level?: string }) {
+  return useQuery({
+    queryKey: examKeys.templatesList(params),
+    queryFn: () => examApi.listTemplates(params),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useTemplate(id: string) {
+  return useQuery({
+    queryKey: examKeys.template(id),
+    queryFn: () => examApi.getTemplate(id),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useCreateTemplate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: TemplateCreate) => examApi.createTemplate(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examKeys.templates })
+      toast.success('Template created successfully')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to create template')
+    },
+  })
+}
+
+export function useSaveTemplateFromExam() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: TemplateSaveFromExam) => examApi.saveTemplateFromExam(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examKeys.templates })
+      toast.success('Template saved from exam')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to save template')
+    },
+  })
+}
+
+export function useUpdateTemplate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: TemplateUpdate }) =>
+      examApi.updateTemplate(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examKeys.templates })
+      toast.success('Template updated')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update template')
+    },
+  })
+}
+
+export function useDeleteTemplate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => examApi.deleteTemplate(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examKeys.templates })
+      toast.success('Template deactivated')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete template')
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Pattern Copy / Apply / Compare / Auto-detect
+// ---------------------------------------------------------------------------
+export function useCopyPattern(examId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: CopyPatternRequest) => examApi.copyPattern(examId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examKeys.subjectConfigs(examId) })
+      toast.success('Pattern copied successfully')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to copy pattern')
+    },
+  })
+}
+
+export function useApplyTemplate(examId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: ApplyTemplateRequest) => examApi.applyTemplate(examId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examKeys.subjectConfigs(examId) })
+      toast.success('Template applied successfully')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to apply template')
+    },
+  })
+}
+
+export function useCompareSubjects(
+  examId: string,
+  params: {
+    source_class_id: string
+    source_section_id?: string | null
+    target_class_id: string
+    target_section_id?: string | null
+  },
+) {
+  return useQuery({
+    queryKey: ['examPatternCompare', examId, params],
+    queryFn: () => examApi.compareSubjects(examId, params),
+    enabled: !!examId && !!params.source_class_id && !!params.target_class_id,
+    staleTime: 30_000,
+  })
+}
+
+export function useAutoDetectPatterns(
+  examId: string,
+  params: {
+    target_class_id: string
+    target_section_id?: string | null
+  },
+) {
+  return useQuery({
+    queryKey: ['examPatternAutoDetect', examId, params],
+    queryFn: () => examApi.autoDetectPatterns(examId, params),
+    enabled: !!examId && !!params.target_class_id,
+    staleTime: 30_000,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Audit Log
+// ---------------------------------------------------------------------------
+export function useAuditLog(examId: string, params?: { page?: number; page_size?: number }) {
+  return useQuery({
+    queryKey: [...examKeys.audit(examId), params],
+    queryFn: () => examApi.getAuditLog(examId, params),
+    enabled: !!examId,
+    staleTime: 30_000,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+export function useSendExamNotification(examId: string) {
+  return useMutation({
+    mutationFn: (data: ExamNotificationRequest) => examApi.sendExamNotification(examId, data),
+    onSuccess: (data) => {
+      toast.success(`${data.notifications_queued} notification(s) queued`)
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to send notification')
+    },
+  })
 }

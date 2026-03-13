@@ -1,17 +1,13 @@
 // ===== Fee Collection Types =====
 
-export type CollectionPaymentMethod = 'cash' | 'upi' | 'cheque' | 'bank_transfer';
+export type CollectionPaymentMethod = 'cash' | 'upi' | 'cheque' | 'bank_transfer' | 'dd';
 
 // ---- Student Search ----
 
 export interface StudentSearchParams {
-  admission_number?: string;
-  mobile_number?: string;
+  q?: string;
   class_id?: string;
   section_id?: string;
-  city?: string;
-  mandal?: string;
-  village?: string;
 }
 
 export interface StudentSearchResult {

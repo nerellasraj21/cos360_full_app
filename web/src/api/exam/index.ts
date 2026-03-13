@@ -17,12 +17,29 @@ import type {
   ExamDatePayload,
   MarkEntryCreate,
   MarkEntryItem,
-  StudentMark,
   MarkPermission,
+  MarkPermissionUpdate,
   HallTicketEligibility,
+  ComputeEligibilityResponse,
+  PublishHallTicketsResponse,
   StudentExamResult,
   ExamStatus,
   ExamNature,
+  TemplateCreate,
+  TemplateSaveFromExam,
+  TemplateRead,
+  TemplateListItem,
+  TemplateUpdate,
+  CopyPatternRequest,
+  ApplyTemplateRequest,
+  SubjectMismatchResponse,
+  AutoDetectResponse,
+  AddClassSectionResponse,
+  AuditLogEntry,
+  ExamNotificationRequest,
+  ExamNotificationResponse,
+  ExamClassSection,
+  ExamSubjectConfig,
 } from '@/types/exam'
 
 // ---------------------------------------------------------------------------
@@ -69,8 +86,7 @@ export const deleteBoardPattern = async (id: string): Promise<void> => {
 
 // ---------------------------------------------------------------------------
 // Exam Grade Schemes
-// Backend: /grade-schemes/exam  (NOT /exam/grading/exam-schemes/)
-// Note: Grade bands are embedded in GradeSchemeCreate.bands — no separate band endpoints
+// Backend: /grade-schemes/exam
 // ---------------------------------------------------------------------------
 export const createExamGradeScheme = async (data: GradeSchemeCreate): Promise<ExamGradeScheme> => {
   const response = await CAxios.post('/grade-schemes/exam', data)
@@ -126,7 +142,7 @@ export const deleteSubjectGradeScheme = async (id: string): Promise<void> => {
 
 // ---------------------------------------------------------------------------
 // Remark Grade Sets
-// Backend: /remark-grades  (NOT /remark-grade-sets)
+// Backend: /remark-grades
 // ---------------------------------------------------------------------------
 export const createRemarkGradeSet = async (data: { name: string; options: RemarkGradeOptionCreate[] }): Promise<RemarkGradeSet> => {
   const response = await CAxios.post('/remark-grades', data)
@@ -159,14 +175,29 @@ export const deleteRemarkGradeSet = async (id: string): Promise<void> => {
 // Exam Class Sections & Subject Configs
 // Backend: /exams/{exam_id}/class-sections  and  /exams/{exam_id}/subject-configs
 // ---------------------------------------------------------------------------
-export const getExamClassSections = async (examId: string) => {
+export const getExamClassSections = async (examId: string): Promise<ExamClassSection[]> => {
   const response = await CAxios.get(`/exams/${examId}/class-sections`)
-  return response.data as import('@/types/exam').ExamClassSection[]
+  return response.data
 }
 
-export const getExamSubjectConfigs = async (examId: string) => {
+export const addExamClassSection = async (examId: string, data: { class_id: string; section_id?: string | null }): Promise<AddClassSectionResponse> => {
+  const response = await CAxios.post(`/exams/${examId}/class-sections`, data)
+  return response.data
+}
+
+export const getExamSubjectConfigs = async (examId: string): Promise<ExamSubjectConfig[]> => {
   const response = await CAxios.get(`/exams/${examId}/subject-configs`)
-  return response.data as import('@/types/exam').ExamSubjectConfig[]
+  return response.data
+}
+
+export const getExamSubjectConfig = async (examId: string, configId: string): Promise<ExamSubjectConfig> => {
+  const response = await CAxios.get(`/exams/${examId}/subject-configs/${configId}`)
+  return response.data
+}
+
+export const updateExamSubjectConfig = async (examId: string, configId: string, data: Partial<ExamSubjectConfig>): Promise<ExamSubjectConfig> => {
+  const response = await CAxios.put(`/exams/${examId}/subject-configs/${configId}`, data)
+  return response.data
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +205,6 @@ export const getExamSubjectConfigs = async (examId: string) => {
 // Backend: /exams  (NOT /exam/exams)
 // ---------------------------------------------------------------------------
 export const createExamFull = async (data: ExamCreateFull): Promise<ExamCreateFullResponse> => {
-  // Backend: POST /exams  (not /exam/exams/create-full/)
   const response = await CAxios.post('/exams', data)
   return response.data
 }
@@ -207,10 +237,10 @@ export const cloneExam = async (id: string, data?: { new_name?: string; academic
 }
 
 // ---------------------------------------------------------------------------
-// Exam action endpoints (not yet on backend — will 404 until implemented)
+// Exam action endpoints
 // ---------------------------------------------------------------------------
-export const computeAggregate = async (examId: string): Promise<void> => {
-  await CAxios.post(`/exams/${examId}/compute`, null, { params: { force: true } })
+export const computeAggregate = async (examId: string, force = true): Promise<void> => {
+  await CAxios.post(`/exams/${examId}/compute`, null, { params: { force } })
 }
 
 export const publishResults = async (examId: string): Promise<void> => {
@@ -223,7 +253,7 @@ export const unlockExam = async (examId: string, reason: string): Promise<void> 
 
 // ---------------------------------------------------------------------------
 // Exam Dates
-// Backend: /exams/{exam_id}/dates  (exam_id IN PATH, not query param)
+// Backend: /exams/{exam_id}/dates
 // ---------------------------------------------------------------------------
 export const createExamDate = async (examId: string, data: Omit<ExamDatePayload, 'exam_id'>): Promise<ExamDate> => {
   const response = await CAxios.post(`/exams/${examId}/dates`, data)
@@ -251,7 +281,7 @@ export const deleteExamDate = async (examId: string, dateId: string): Promise<vo
 
 // ---------------------------------------------------------------------------
 // Mark Entry
-// Backend: /exams/{exam_id}/marks  (exam_id IN PATH)
+// Backend: /exams/{exam_id}/marks
 // ---------------------------------------------------------------------------
 export const getMarks = async (params: {
   exam_id: string
@@ -326,15 +356,24 @@ export const uploadMarks = async (examId: string, formData: FormData): Promise<u
 
 // ---------------------------------------------------------------------------
 // Mark Entry Permissions
-// Backend: /exams/{exam_id}/mark-permissions  (NOT /exam/exams/{id}/permissions)
+// Backend: /exams/{exam_id}/mark-permissions
 // ---------------------------------------------------------------------------
 export const listMarkPermissions = async (examId: string): Promise<MarkPermission[]> => {
   const response = await CAxios.get(`/exams/${examId}/mark-permissions`)
   return response.data
 }
 
-export const grantMarkPermission = async (examId: string, userId: string): Promise<MarkPermission> => {
-  const response = await CAxios.post(`/exams/${examId}/mark-permissions`, { user_id: userId })
+export const grantMarkPermission = async (examId: string, userId: string, scopeNote?: string): Promise<MarkPermission> => {
+  const response = await CAxios.post(`/exams/${examId}/mark-permissions`, {
+    exam_id: examId,
+    user_id: userId,
+    scope_note: scopeNote ?? null,
+  })
+  return response.data
+}
+
+export const updateMarkPermission = async (examId: string, permId: string, data: MarkPermissionUpdate): Promise<MarkPermission> => {
+  const response = await CAxios.put(`/exams/${examId}/mark-permissions/${permId}`, data)
   return response.data
 }
 
@@ -343,14 +382,17 @@ export const revokeMarkPermission = async (examId: string, permId: string): Prom
 }
 
 // ---------------------------------------------------------------------------
-// Hall Tickets (not yet on backend — will 404 until backend adds these)
+// Hall Tickets
+// Backend: /exams/{exam_id}/hall-tickets/*
 // ---------------------------------------------------------------------------
-export const computeHallTicketEligibility = async (examId: string): Promise<void> => {
-  await CAxios.post(`/exams/${examId}/hall-tickets/generate`)
+export const computeHallTicketEligibility = async (examId: string): Promise<ComputeEligibilityResponse> => {
+  const response = await CAxios.post(`/exams/${examId}/hall-tickets/compute`)
+  return response.data
 }
 
-export const publishHallTickets = async (examId: string): Promise<void> => {
-  await CAxios.post(`/exams/${examId}/hall-tickets/publish`)
+export const publishHallTickets = async (examId: string): Promise<PublishHallTicketsResponse> => {
+  const response = await CAxios.post(`/exams/${examId}/hall-tickets/publish`)
+  return response.data
 }
 
 export const getEligibleStudents = async (examId: string): Promise<HallTicketEligibility[]> => {
@@ -385,7 +427,8 @@ export const downloadAllHallTickets = async (examId: string): Promise<Blob> => {
 }
 
 // ---------------------------------------------------------------------------
-// Results (not yet on backend)
+// Results
+// Backend: /exams/{exam_id}/results
 // ---------------------------------------------------------------------------
 export const getStudentResults = async (examId: string, params?: { student_id?: string; class_id?: string; section_id?: string }): Promise<StudentExamResult[]> => {
   const response = await CAxios.get(`/exams/${examId}/results`, { params })
@@ -398,24 +441,84 @@ export const getStudentResult = async (examId: string, studentId: string): Promi
 }
 
 // ---------------------------------------------------------------------------
-// Notifications (not yet on backend)
+// Notifications
+// Backend: POST /exams/{exam_id}/notify
 // ---------------------------------------------------------------------------
-export const sendExamNotification = async (examId: string, data: {
-  notification_type: 'hall_ticket_available' | 'results_published' | 'exam_schedule' | 'custom'
-  message: string
-  target_audience?: 'students' | 'parents' | 'all'
-  send_push?: boolean
-  send_sms?: boolean
-  send_email?: boolean
-}): Promise<{ notifications_queued: number; notification_type: string }> => {
+export const sendExamNotification = async (examId: string, data: ExamNotificationRequest): Promise<ExamNotificationResponse> => {
   const response = await CAxios.post(`/exams/${examId}/notify`, data)
   return response.data
 }
 
 // ---------------------------------------------------------------------------
-// Audit Log (not yet on backend)
+// Audit Log
+// Backend: GET /exams/{exam_id}/audit
 // ---------------------------------------------------------------------------
-export const getAuditLog = async (examId: string, params?: { page?: number; page_size?: number }): Promise<unknown> => {
-  const response = await CAxios.get('/exam/audit', { params: { exam_id: examId, ...params } })
+export const getAuditLog = async (examId: string, params?: { page?: number; page_size?: number }): Promise<AuditLogEntry[]> => {
+  const response = await CAxios.get(`/exams/${examId}/audit`, { params })
+  return response.data
+}
+
+// ---------------------------------------------------------------------------
+// Exam Pattern Templates
+// Backend: /exam-patterns/templates
+// ---------------------------------------------------------------------------
+export const createTemplate = async (data: TemplateCreate): Promise<TemplateRead> => {
+  const response = await CAxios.post('/exam-patterns/templates', data)
+  return response.data
+}
+
+export const saveTemplateFromExam = async (data: TemplateSaveFromExam): Promise<TemplateRead> => {
+  const response = await CAxios.post('/exam-patterns/templates/from-exam', data)
+  return response.data
+}
+
+export const listTemplates = async (params?: { board?: string; level?: string }): Promise<TemplateListItem[]> => {
+  const response = await CAxios.get('/exam-patterns/templates', { params })
+  return response.data
+}
+
+export const getTemplate = async (id: string): Promise<TemplateRead> => {
+  const response = await CAxios.get(`/exam-patterns/templates/${id}`)
+  return response.data
+}
+
+export const updateTemplate = async (id: string, data: TemplateUpdate): Promise<TemplateRead> => {
+  const response = await CAxios.put(`/exam-patterns/templates/${id}`, data)
+  return response.data
+}
+
+export const deleteTemplate = async (id: string): Promise<void> => {
+  await CAxios.delete(`/exam-patterns/templates/${id}`)
+}
+
+// ---------------------------------------------------------------------------
+// Exam Pattern Copy / Apply / Compare / Auto-detect
+// Backend: /exam-patterns/{exam_id}/*
+// ---------------------------------------------------------------------------
+export const copyPattern = async (examId: string, data: CopyPatternRequest): Promise<unknown> => {
+  const response = await CAxios.post(`/exam-patterns/${examId}/copy`, data)
+  return response.data
+}
+
+export const applyTemplate = async (examId: string, data: ApplyTemplateRequest): Promise<unknown> => {
+  const response = await CAxios.post(`/exam-patterns/${examId}/apply-template`, data)
+  return response.data
+}
+
+export const compareSubjects = async (examId: string, params: {
+  source_class_id: string
+  source_section_id?: string | null
+  target_class_id: string
+  target_section_id?: string | null
+}): Promise<SubjectMismatchResponse> => {
+  const response = await CAxios.get(`/exam-patterns/${examId}/compare`, { params })
+  return response.data
+}
+
+export const autoDetectPatterns = async (examId: string, params: {
+  target_class_id: string
+  target_section_id?: string | null
+}): Promise<AutoDetectResponse> => {
+  const response = await CAxios.get(`/exam-patterns/${examId}/auto-detect`, { params })
   return response.data
 }
