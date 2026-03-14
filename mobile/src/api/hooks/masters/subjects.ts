@@ -1,0 +1,83 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../../../../components/FeedbackToast';
+import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { PERMISSION_RESOURCES } from '../../../types/permissions';
+import { subjectsApi, Subject, SubjectInput, SubjectUpdate } from '../../index';
+
+// Get all subjects - permission protected
+export function useSubjects(params?: { academic_year_id?: string; active_only?: boolean; limit?: number }) {
+  return usePermissionProtectedQuery<Subject[]>({
+    queryKey: ['subjects', params],
+    queryFn: () => subjectsApi.getSubjects(params),
+    resource: PERMISSION_RESOURCES.SUBJECTS,
+    action: 'list',
+  });
+}
+
+// Get subject by ID - permission protected
+export function useSubject(id: string) {
+  return usePermissionProtectedQuery<Subject>({
+    queryKey: ['subjects', id],
+    queryFn: () => subjectsApi.getSubject(id),
+    resource: PERMISSION_RESOURCES.SUBJECTS,
+    action: 'read',
+    enabled: !!id,
+  });
+}
+
+// Create subject - permission protected
+export function useCreateSubject() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
+  
+  return usePermissionProtectedMutation<Subject, Error, SubjectInput>({
+    mutationFn: (data) => subjectsApi.createSubject(data),
+    resource: PERMISSION_RESOURCES.SUBJECTS,
+    action: 'create',
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      showSuccess('Subject created successfully');
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to create subject');
+    },
+  });
+}
+
+// Update subject - permission protected
+export function useUpdateSubject() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
+  
+  return usePermissionProtectedMutation<Subject, Error, { id: string; data: SubjectUpdate }>({
+    mutationFn: ({ id, data }) => subjectsApi.updateSubject(id, data),
+    resource: PERMISSION_RESOURCES.SUBJECTS,
+    action: 'update',
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      showSuccess('Subject updated successfully');
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to update subject');
+    },
+  });
+}
+
+// Delete subject - permission protected
+export function useDeleteSubject() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
+  
+  return usePermissionProtectedMutation<void, Error, string>({
+    mutationFn: (id) => subjectsApi.deleteSubject(id),
+    resource: PERMISSION_RESOURCES.SUBJECTS,
+    action: 'delete',
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      showSuccess('Subject deleted successfully');
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to delete subject');
+    },
+  });
+}
