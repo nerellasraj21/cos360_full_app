@@ -1,12 +1,15 @@
 # app/api/v1/exam/exam_endpoints.py
 import uuid
 
+from pydantic import BaseModel
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
 from app.schemas.exam.exam_class_section_schema import ExamClassSectionRead
+from app.schemas.exam.exam_config_template_schema import AddClassSectionResponse
 from app.schemas.exam.exam_create_full_schema import ExamCreateFull, ExamCreateFullResponse
 from app.schemas.exam.exam_schema import ExamListItem, ExamRead, ExamUpdate
 from app.schemas.exam.exam_subject_config_schema import ExamSubjectConfigRead, ExamSubjectConfigUpdate
@@ -21,6 +24,7 @@ from app.service.exam.exam_service import (
     list_exams,
     update_exam,
 )
+from app.service.exam.exam_pattern_service import add_class_section_to_exam, auto_detect_patterns
 from app.service.exam.exam_subject_config_service import (
     get_config_or_404,
     get_configs_for_exam,
@@ -157,6 +161,36 @@ async def list_class_sections(
     role = current_user.get("role")
     await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     return await get_class_sections_for_exam(db, exam_id)
+
+
+class AddClassSectionBody(BaseModel):
+    class_id: uuid.UUID
+    section_id: uuid.UUID | None = None
+
+
+@router.post("/{exam_id}/class-sections", response_model=AddClassSectionResponse, status_code=status.HTTP_201_CREATED)
+async def add_class_section(
+    exam_id: uuid.UUID,
+    payload: AddClassSectionBody,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Add a class/section to an exam and return auto-detect suggestions."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "create")
+    cs = await add_class_section_to_exam(db, exam_id, payload.class_id, payload.section_id)
+    suggestions = await auto_detect_patterns(db, exam_id, payload.class_id, payload.section_id)
+    await db.commit()
+    return AddClassSectionResponse(
+        class_section={
+            "id": str(cs.id),
+            "exam_id": str(cs.exam_id),
+            "class_id": str(cs.class_id),
+            "section_id": str(cs.section_id) if cs.section_id else None,
+        },
+        auto_detect=suggestions,
+    )
 
 
 # ── Subject Configs ───────────────────────────────────────────────────────────

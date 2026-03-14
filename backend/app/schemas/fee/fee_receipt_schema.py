@@ -77,6 +77,7 @@ class ReceiptContent(BaseModel):
     total_amount: Decimal
     transaction_date: datetime
     collected_by_user: str
+    collected_by_designation: str | None = None
     receipt_items: list[ReceiptItemDetail]
     remarks: str | None = None
     school_name: str

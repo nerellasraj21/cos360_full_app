@@ -7,7 +7,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -60,7 +60,7 @@ async def create_old_fee_manual(
     current_user: dict,
 ) -> FeeOldRead:
     """
-    Spec Section 2E — Scenario 2 (manual entry). OF-03, OF-04.
+    Spec Section 2E — Scenario 2 (manual entry). OF-03, OF-04, FR-510.
     """
     user_id = UUID(current_user.get("sub"))
 
@@ -71,6 +71,22 @@ async def create_old_fee_manual(
     admission_num = adm_result.scalar_one_or_none()
     if not admission_num:
         raise HTTPException(status_code=404, detail="Student admission not found")
+
+    # FR-510: Duplicate check — same student + academic_year_label + fee_type_name
+    dup_result = await db.execute(
+        select(func.count(FeeOld.id)).where(
+            and_(
+                FeeOld.student_id == data.student_id,
+                FeeOld.academic_year_label == data.academic_year_label,
+                FeeOld.fee_type_name == data.fee_type_name,
+            )
+        )
+    )
+    if dup_result.scalar_one() > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Old fee record for {data.academic_year_label} / {data.fee_type_name} already exists for this student",
+        )
 
     # Auto-settle if paid >= original (OF-05)
     is_settled = data.paid_amount >= data.original_amount
@@ -277,8 +293,9 @@ async def update_old_fee(
 async def settle_old_fee(
     db: AsyncSession,
     old_fee_id: UUID,
+    current_user: dict | None = None,
 ) -> dict:
-    """Mark as settled (write-off). OF-06, AC-17."""
+    """Mark as settled (write-off). OF-06, AC-17, FR-507."""
     result = await db.execute(select(FeeOld).where(FeeOld.id == old_fee_id))
     record = result.scalar_one_or_none()
     if not record:
@@ -287,12 +304,18 @@ async def settle_old_fee(
     record.is_settled = True
     await db.commit()
 
+    # Audit log
+    if current_user:
+        user_id = UUID(current_user.get("sub"))
+        await _write_audit_log(db, "fee_old", "settle", old_fee_id, user_id, {"action": "write_off"})
+
     return {"detail": "Old fee marked as settled", "old_fee_id": str(old_fee_id)}
 
 
 async def delete_old_fee(
     db: AsyncSession,
     old_fee_id: UUID,
+    current_user: dict | None = None,
 ) -> dict:
     """Hard delete — manual entries only."""
     result = await db.execute(select(FeeOld).where(FeeOld.id == old_fee_id))
@@ -310,4 +333,27 @@ async def delete_old_fee(
     await db.delete(record)
     await db.commit()
 
+    # Audit log
+    if current_user:
+        user_id = UUID(current_user.get("sub"))
+        await _write_audit_log(db, "fee_old", "delete", old_fee_id, user_id, {"fee_type": record.fee_type_name})
+
     return {"detail": "Old fee record deleted", "old_fee_id": str(old_fee_id)}
+
+
+# ─── Audit helper (shared pattern) ───────────────────────────────────────────
+
+
+async def _write_audit_log(db: AsyncSession, entity_type: str, action: str, entity_id: UUID, user_id: UUID, details: dict | None = None) -> None:
+    try:
+        import json as json_mod
+        await db.execute(
+            text(
+                "INSERT INTO audit_logs (entity_type, action, entity_id, performed_by, details, created_at) "
+                "VALUES (:et, :act, :eid, :uid, :det, NOW()) ON CONFLICT DO NOTHING"
+            ),
+            {"et": entity_type, "act": action, "eid": str(entity_id), "uid": str(user_id), "det": json_mod.dumps(details or {})},
+        )
+        await db.commit()
+    except Exception as e:
+        log.debug(f"Audit log write skipped: {e}")

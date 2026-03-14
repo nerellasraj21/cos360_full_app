@@ -2,12 +2,12 @@
 Schemas for Fee Collection module — Student Search, Fee Summary, Fee Payment.
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.fee.enums import PaymentMethod
 
@@ -72,14 +72,43 @@ class FeePaymentRequest(BaseModel):
     academic_year_id: UUID
     amount_to_pay: Decimal = Field(gt=0, max_digits=10, decimal_places=2)
     payment_method: PaymentMethod
-    upi_reference: Optional[str] = None
-    bank_reference: Optional[str] = None
-    cheque_number: Optional[str] = None
-    cheque_bank: Optional[str] = None
+    upi_reference: Optional[str] = Field(None, max_length=30)
+    bank_reference: Optional[str] = Field(None, max_length=30)
+    cheque_number: Optional[str] = Field(None, max_length=20)
+    cheque_bank: Optional[str] = Field(None, max_length=100)
     cheque_date: Optional[date] = None
     send_sms: bool = True
     print_duplicate: bool = False
     remarks: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_conditional_fields(self):
+        mode = self.payment_method
+
+        # FR-307: UPI reference required when mode=upi
+        if mode == PaymentMethod.UPI and not self.upi_reference:
+            raise ValueError("upi_reference is required when payment_method is 'upi'")
+
+        # FR-308: Bank reference required when mode=bank_transfer
+        if mode == PaymentMethod.BANK_TRANSFER and not self.bank_reference:
+            raise ValueError("bank_reference is required when payment_method is 'bank_transfer'")
+
+        # FR-306: Cheque/DD fields required when mode=cheque or dd
+        if mode in (PaymentMethod.CHEQUE, PaymentMethod.DD):
+            if not self.cheque_number:
+                raise ValueError("cheque_number is required when payment_method is 'cheque' or 'dd'")
+            if not self.cheque_bank:
+                raise ValueError("cheque_bank (bank name) is required when payment_method is 'cheque' or 'dd'")
+            if not self.cheque_date:
+                raise ValueError("cheque_date is required when payment_method is 'cheque' or 'dd'")
+
+        # FR-315: Cheque/DD date must not be more than 90 days in the future
+        if self.cheque_date:
+            max_future = date.today() + timedelta(days=90)
+            if self.cheque_date > max_future:
+                raise ValueError("cheque_date cannot be more than 90 days in the future")
+
+        return self
 
 
 class FeePaymentItemPaid(BaseModel):

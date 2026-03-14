@@ -124,7 +124,7 @@ async def settle_old_fee_record(
     role = current_user.get("role")
     await check_role_plan_permission_with_error(db, request, role, "fee_old", "delete")
 
-    return await settle_old_fee(db, old_fee_id)
+    return await settle_old_fee(db, old_fee_id, current_user)
 
 
 @router.delete("/{old_fee_id}")
@@ -139,4 +139,4 @@ async def delete_old_fee_record(
     role = current_user.get("role")
     await check_role_plan_permission_with_error(db, request, role, "fee_old", "delete")
 
-    return await delete_old_fee(db, old_fee_id)
+    return await delete_old_fee(db, old_fee_id, current_user)
