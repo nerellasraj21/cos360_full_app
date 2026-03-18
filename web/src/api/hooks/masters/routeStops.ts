@@ -29,13 +29,9 @@ export const routeStopsKeys = {
 
 // Get all route stops
 export function useRouteStops(activeOnly = true) {
-  const { checkPermission } = usePermission();
-  const hasListPermission = checkPermission('route_stops', 'list');
-
   return useQuery<RouteStop[]>({
     queryKey: routeStopsKeys.list(activeOnly),
     queryFn: () => fetchRouteStops(activeOnly),
-    enabled: hasListPermission,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

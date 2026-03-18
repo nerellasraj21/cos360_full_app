@@ -109,6 +109,7 @@ import { Route as AppAdminProfileRouteImport } from './routes/_app/admin/profile
 import { Route as AppExamResultsIndexRouteImport } from './routes/_app/exam/results/index'
 import { Route as AppExamMarksIndexRouteImport } from './routes/_app/exam/marks/index'
 import { Route as AppExamHallTicketsIndexRouteImport } from './routes/_app/exam/hall-tickets/index'
+import { Route as AppExamGradingIndexRouteImport } from './routes/_app/exam/grading/index'
 import { Route as AppExamExamsIndexRouteImport } from './routes/_app/exam/exams/index'
 import { Route as AppStudentsAdmissionAdmissionIdRouteImport } from './routes/_app/students/admission/$admissionId'
 import { Route as AppExamResultsIdRouteImport } from './routes/_app/exam/results/$id'
@@ -643,6 +644,11 @@ const AppExamHallTicketsIndexRoute = AppExamHallTicketsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppExamHallTicketsRoute,
 } as any)
+const AppExamGradingIndexRoute = AppExamGradingIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppExamGradingRoute,
+} as any)
 const AppExamExamsIndexRoute = AppExamExamsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -865,6 +871,7 @@ export interface FileRoutesByFullPath {
   '/exam/results/$id': typeof AppExamResultsIdRoute
   '/students/admission/$admissionId': typeof AppStudentsAdmissionAdmissionIdRoute
   '/exam/exams/': typeof AppExamExamsIndexRoute
+  '/exam/grading/': typeof AppExamGradingIndexRoute
   '/exam/hall-tickets/': typeof AppExamHallTicketsIndexRoute
   '/exam/marks/': typeof AppExamMarksIndexRoute
   '/exam/results/': typeof AppExamResultsIndexRoute
@@ -899,7 +906,6 @@ export interface FileRoutesByTo {
   '/communication/templates': typeof AppCommunicationTemplatesRoute
   '/exam/audit': typeof AppExamAuditRoute
   '/exam/board-patterns': typeof AppExamBoardPatternsRoute
-  '/exam/grading': typeof AppExamGradingRouteWithChildren
   '/exam/settings': typeof AppExamSettingsRoute
   '/expense/approvals': typeof AppExpenseApprovalsRoute
   '/expense/audit': typeof AppExpenseAuditRoute
@@ -976,6 +982,7 @@ export interface FileRoutesByTo {
   '/exam/results/$id': typeof AppExamResultsIdRoute
   '/students/admission/$admissionId': typeof AppStudentsAdmissionAdmissionIdRoute
   '/exam/exams': typeof AppExamExamsIndexRoute
+  '/exam/grading': typeof AppExamGradingIndexRoute
   '/exam/hall-tickets': typeof AppExamHallTicketsIndexRoute
   '/exam/marks': typeof AppExamMarksIndexRoute
   '/exam/results': typeof AppExamResultsIndexRoute
@@ -1100,6 +1107,7 @@ export interface FileRoutesById {
   '/_app/exam/results/$id': typeof AppExamResultsIdRoute
   '/_app/students/admission/$admissionId': typeof AppStudentsAdmissionAdmissionIdRoute
   '/_app/exam/exams/': typeof AppExamExamsIndexRoute
+  '/_app/exam/grading/': typeof AppExamGradingIndexRoute
   '/_app/exam/hall-tickets/': typeof AppExamHallTicketsIndexRoute
   '/_app/exam/marks/': typeof AppExamMarksIndexRoute
   '/_app/exam/results/': typeof AppExamResultsIndexRoute
@@ -1223,6 +1231,7 @@ export interface FileRouteTypes {
     | '/exam/results/$id'
     | '/students/admission/$admissionId'
     | '/exam/exams/'
+    | '/exam/grading/'
     | '/exam/hall-tickets/'
     | '/exam/marks/'
     | '/exam/results/'
@@ -1257,7 +1266,6 @@ export interface FileRouteTypes {
     | '/communication/templates'
     | '/exam/audit'
     | '/exam/board-patterns'
-    | '/exam/grading'
     | '/exam/settings'
     | '/expense/approvals'
     | '/expense/audit'
@@ -1334,6 +1342,7 @@ export interface FileRouteTypes {
     | '/exam/results/$id'
     | '/students/admission/$admissionId'
     | '/exam/exams'
+    | '/exam/grading'
     | '/exam/hall-tickets'
     | '/exam/marks'
     | '/exam/results'
@@ -1457,6 +1466,7 @@ export interface FileRouteTypes {
     | '/_app/exam/results/$id'
     | '/_app/students/admission/$admissionId'
     | '/_app/exam/exams/'
+    | '/_app/exam/grading/'
     | '/_app/exam/hall-tickets/'
     | '/_app/exam/marks/'
     | '/_app/exam/results/'
@@ -2180,6 +2190,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppExamHallTicketsIndexRouteImport
       parentRoute: typeof AppExamHallTicketsRoute
     }
+    '/_app/exam/grading/': {
+      id: '/_app/exam/grading/'
+      path: '/'
+      fullPath: '/exam/grading/'
+      preLoaderRoute: typeof AppExamGradingIndexRouteImport
+      parentRoute: typeof AppExamGradingRoute
+    }
     '/_app/exam/exams/': {
       id: '/_app/exam/exams/'
       path: '/'
@@ -2389,12 +2406,14 @@ interface AppExamGradingRouteChildren {
   AppExamGradingExamSchemesRoute: typeof AppExamGradingExamSchemesRoute
   AppExamGradingRemarksRoute: typeof AppExamGradingRemarksRoute
   AppExamGradingSubjectSchemesRoute: typeof AppExamGradingSubjectSchemesRoute
+  AppExamGradingIndexRoute: typeof AppExamGradingIndexRoute
 }
 
 const AppExamGradingRouteChildren: AppExamGradingRouteChildren = {
   AppExamGradingExamSchemesRoute: AppExamGradingExamSchemesRoute,
   AppExamGradingRemarksRoute: AppExamGradingRemarksRoute,
   AppExamGradingSubjectSchemesRoute: AppExamGradingSubjectSchemesRoute,
+  AppExamGradingIndexRoute: AppExamGradingIndexRoute,
 }
 
 const AppExamGradingRouteWithChildren = AppExamGradingRoute._addFileChildren(

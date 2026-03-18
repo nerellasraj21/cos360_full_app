@@ -432,6 +432,14 @@ export interface HallTicketEligibility {
   section_name?: string
 }
 
+export interface EnrolledStudent {
+  student_id: string
+  class_id: string
+  section_id: string | null
+  student_name?: string
+  admission_number?: string
+}
+
 export interface ComputeEligibilityResponse {
   exam_id: string
   total_students: number

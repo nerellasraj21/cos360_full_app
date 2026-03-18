@@ -606,6 +606,7 @@ export function Calendar() {
       end_date: newEventEnd,
       is_active: true,
       academic_year_id: selectedAcademicYearId,
+      color: newEventColor,
     });
     setIsAddDirty(false);
     setShowAddDialog(false);

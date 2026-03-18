@@ -723,6 +723,15 @@ export function useRevokeMarkPermission(examId: string) {
 // ---------------------------------------------------------------------------
 // Hall Ticket Eligibility
 // ---------------------------------------------------------------------------
+export function useEnrolledStudents(examId: string) {
+  return useQuery({
+    queryKey: [...examKeys.eligibility(examId), 'enrolled'],
+    queryFn: () => examApi.getEnrolledStudents(examId),
+    enabled: !!examId,
+    staleTime: 60_000,
+  })
+}
+
 export function useHallTicketEligibility(examId: string) {
   const eligible = useQuery({
     queryKey: [...examKeys.eligibility(examId), 'eligible'],

@@ -177,18 +177,15 @@ export function FeeTypeForm({ type, onSuccess, onCancel }: FeeTypeFormProps) {
                                 No fee terms available
                             </div>
                         ) : (
-                            terms.map((term) => {
-                                const displayName = (() => {
-                                    if (!term.term_name || term.term_name === term.id) {
-                                        // If term_name is empty or same as ID, create a readable name
-                                        return `Installment ${term.number_of_terms || 1}`;
-                                    }
-                                    return term.term_name;
-                                })();
+                            terms.map((term, idx) => {
+                                const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                                const isUUID = UUID_REGEX.test(term.term_name ?? '');
+                                const suffix = term.number_of_terms ? ` (${term.number_of_terms} installment${term.number_of_terms !== 1 ? 's' : ''})` : '';
+                                const label = (!term.term_name || isUUID)
+                                    ? `Term ${idx + 1}${suffix}`
+                                    : `${term.term_name}${suffix}`;
                                 return (
-                                    <SelectItem key={term.id} value={term.id}>
-                                        {displayName}{term.number_of_terms ? ` (${term.number_of_terms} terms)` : ''}
-                                    </SelectItem>
+                                    <SelectItem key={term.id} value={term.id}>{label}</SelectItem>
                                 );
                             })
                         )}

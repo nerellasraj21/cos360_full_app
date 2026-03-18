@@ -20,6 +20,7 @@ import type {
   MarkPermission,
   MarkPermissionUpdate,
   HallTicketEligibility,
+  EnrolledStudent,
   ComputeEligibilityResponse,
   PublishHallTicketsResponse,
   StudentExamResult,
@@ -392,6 +393,11 @@ export const computeHallTicketEligibility = async (examId: string): Promise<Comp
 
 export const publishHallTickets = async (examId: string): Promise<PublishHallTicketsResponse> => {
   const response = await CAxios.post(`/exams/${examId}/hall-tickets/publish`)
+  return response.data
+}
+
+export const getEnrolledStudents = async (examId: string): Promise<EnrolledStudent[]> => {
+  const response = await CAxios.get(`/exams/${examId}/hall-tickets/enrolled-students`)
   return response.data
 }
 

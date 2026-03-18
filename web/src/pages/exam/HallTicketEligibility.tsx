@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   useExamDetail,
+  useEnrolledStudents,
   useHallTicketEligibility,
   useComputeHallTickets,
   usePublishHallTickets,
@@ -22,6 +23,8 @@ export default function HallTicketEligibility() {
   const [confirmPublish, setConfirmPublish] = useState(false)
 
   const { data: exam } = useExamDetail(examId)
+  const enrolledQuery = useEnrolledStudents(examId)
+  const enrolled = enrolledQuery.data ?? []
   const { eligible: eligibleQuery, ineligible: ineligibleQuery } = useHallTicketEligibility(examId)
   const eligible = eligibleQuery.data ?? []
   const ineligible = ineligibleQuery.data ?? []
@@ -95,7 +98,7 @@ export default function HallTicketEligibility() {
         <div className="rounded-lg border bg-card p-4 flex items-center gap-3">
           <Users className="h-8 w-8 text-muted-foreground" />
           <div>
-            <p className="text-2xl font-bold">{eligible.length + ineligible.length}</p>
+            <p className="text-2xl font-bold">{enrolled.length}</p>
             <p className="text-xs text-muted-foreground">Total Students</p>
           </div>
         </div>
@@ -115,8 +118,12 @@ export default function HallTicketEligibility() {
         </div>
       </div>
 
-      <Tabs defaultValue="eligible">
+      <Tabs defaultValue="all">
         <TabsList>
+          <TabsTrigger value="all" className="gap-2">
+            All Students
+            <Badge variant="secondary" className="text-xs">{enrolled.length}</Badge>
+          </TabsTrigger>
           <TabsTrigger value="eligible" className="gap-2">
             Eligible
             <Badge variant="secondary" className="text-xs">{eligible.length}</Badge>
@@ -126,6 +133,30 @@ export default function HallTicketEligibility() {
             <Badge variant="destructive" className="text-xs">{ineligible.length}</Badge>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="all" className="mt-4">
+          {enrolledQuery.isLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : enrolled.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center">
+              <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">No students found for this exam's class-sections.</p>
+            </div>
+          ) : (
+            <div className="rounded-lg border divide-y">
+              {enrolled.map((s) => (
+                <div key={s.student_id} className="flex items-center justify-between px-4 py-2 text-sm">
+                  <div>
+                    <p className="font-medium">{s.student_name || '—'}</p>
+                    <p className="text-xs text-muted-foreground">{s.admission_number || '—'}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
 
         <TabsContent value="eligible" className="mt-4">
           <EligibilityPanel

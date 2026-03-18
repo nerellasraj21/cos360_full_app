@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/authStore';
 import { useParentChildren } from '@/api/auth';
+import type { TripOut, TripListResponse } from '@/types/masters/trip';
 import {
   useStudentTransports,
   useStudentTransportsByStudent,
@@ -29,7 +29,6 @@ import { useTrips } from '@/api/hooks/masters/trips';
 import { useRouteStops } from '@/api/hooks/masters/routeStops';
 import { useTransportPricingDropdown } from '@/api/hooks/masters/transportPricing';
 import type { StudentTransportOut, StudentTransportCreate, StudentTransportUpdate } from '@/types/masters/studentTransport';
-import type { TripOut, TripListResponse } from '@/types/masters/trip';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 // ─── Role router ─────────────────────────────────────────────────────────────
@@ -262,7 +261,6 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
         student_id: studentId,
         trip_id: tripId,
         stop_id: stopId,
-        fee_term_id: null,
         fee_per_term: fee,
         pricing_id: pricingId || null,
       };
@@ -493,13 +491,10 @@ function TransportList({
       <CardContent className="space-y-4">
         {transports.map((t) => (
           <div key={t.id} className="border rounded-lg p-4 space-y-3">
-            {/* Header: Trip # + status badge */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-medium">
-                <Bus className="h-4 w-4 text-muted-foreground" />
-                {t.trip ? `Trip #${t.trip.trip_number}` : 'Transport Assignment'}
-              </div>
-              <StatusBadge status={t.is_active} />
+            {/* Header: Trip # */}
+            <div className="flex items-center gap-2 font-medium">
+              <Bus className="h-4 w-4 text-muted-foreground" />
+              {t.trip ? `Trip #${t.trip.trip_number}` : 'Transport Assignment'}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">

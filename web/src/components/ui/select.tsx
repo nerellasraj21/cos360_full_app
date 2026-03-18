@@ -29,6 +29,13 @@ interface SelectValueProps {
   placeholder?: string;
 }
 
+function flattenChildren(children: React.ReactNode): string {
+  if (typeof children === 'string' || typeof children === 'number') return String(children);
+  if (Array.isArray(children)) return children.map(flattenChildren).join('');
+  if (React.isValidElement(children)) return flattenChildren((children.props as any).children);
+  return '';
+}
+
 export const Select: React.FC<SelectProps> = ({ value, onValueChange, children, disabled, className }) => {
   const options: { value: string; label: string }[] = [];
   let placeholder = "";
@@ -45,7 +52,7 @@ export const Select: React.FC<SelectProps> = ({ value, onValueChange, children, 
               if (itemProps.value && itemProps.children) {
                 options.push({
                   value: itemProps.value,
-                  label: typeof itemProps.children === 'string' ? itemProps.children : itemProps.value
+                  label: flattenChildren(itemProps.children) || itemProps.value
                 });
               }
 

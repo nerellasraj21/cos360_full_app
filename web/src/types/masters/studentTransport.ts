@@ -43,7 +43,6 @@ export interface StudentTransportBase {
     trip_id: string;
     student_id: string;
     stop_id: string;
-    fee_term_id: string | null;
     fee_per_term: number;
     pricing_id?: string | null;
 }
@@ -52,12 +51,9 @@ export interface StudentTransportCreate extends StudentTransportBase {}
 
 export interface StudentTransportUpdate {
     trip_id?: string;
-    student_id?: string;
     stop_id?: string;
-    fee_term_id?: string;
     fee_per_term?: number;
     pricing_id?: string | null;
-    is_active?: boolean;
 }
 
 export interface StudentInfo {
@@ -68,7 +64,6 @@ export interface StudentInfo {
 
 export interface StudentTransportOut extends StudentTransportBase {
     id: string;
-    is_active: boolean;
     created_at: string;
     updated_at: string;
     trip?: TransportTripDetail;

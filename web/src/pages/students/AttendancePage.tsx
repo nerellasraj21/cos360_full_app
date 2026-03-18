@@ -378,9 +378,9 @@ function StaffView() {
     }
   }, [students, existingAttendances, selectedDate]);
 
-  const loadExistingAttendance = async () => {
+  const loadExistingAttendance = async (silent = false) => {
     if (!selectedDate) return;
-    setIsLoadingAttendance(true);
+    if (!silent) setIsLoadingAttendance(true);
     try {
       const dateAttendances = await getAttendanceByDate(selectedDate);
       setExistingAttendances(dateAttendances);
@@ -388,7 +388,7 @@ function StaffView() {
       console.error('Failed to load existing attendance:', error);
       toast.error('Failed to load existing attendance data');
     } finally {
-      setIsLoadingAttendance(false);
+      if (!silent) setIsLoadingAttendance(false);
     }
   };
 
@@ -437,56 +437,66 @@ function StaffView() {
     setSaveMessage(null);
     setSaveError(null);
     try {
-      const bulkUpdateData: BulkAttendanceUpdate[] = [];
-      const individualUpdates: Promise<any>[] = [];
-      const deletions: Promise<any>[] = [];
+      // Snapshot before async ops
+      const toCreate: BulkAttendanceUpdate[] = [];
+      const toUpdate: { id: string; studentId: string; status: 'absent' | 'late' }[] = [];
+      const toDelete: string[] = []; // record IDs to delete
+      const toDeleteStudentIds: string[] = []; // student IDs whose records are removed
 
       studentAttendances.forEach((attendance) => {
         if (!attendance.isModified) return;
         if (attendance.status === 'present') {
           if (attendance.existingRecord) {
-            deletions.push(deleteAttendance(attendance.existingRecord.id));
+            toDelete.push(attendance.existingRecord.id);
+            toDeleteStudentIds.push(attendance.student_id);
           }
         } else {
           if (attendance.existingRecord) {
-            individualUpdates.push(
-              updateAttendance(attendance.existingRecord.id, { status: attendance.status, remarks: '' })
-            );
+            toUpdate.push({ id: attendance.existingRecord.id, studentId: attendance.student_id, status: attendance.status });
           } else {
-            bulkUpdateData.push({ student_id: attendance.student_id, status: attendance.status, remarks: '' });
+            toCreate.push({ student_id: attendance.student_id, status: attendance.status, remarks: '' });
           }
         }
       });
 
-      let bulkUpdateResponse: StudentAttendanceOut[] = [];
-      if (bulkUpdateData.length > 0) {
-        bulkUpdateResponse = await bulkUpdateAttendanceByDate(selectedDate, bulkUpdateData);
+      // Run all operations in parallel
+      let bulkResponse: StudentAttendanceOut[] = [];
+      const ops: Promise<any>[] = [
+        ...toUpdate.map(u => updateAttendance(u.id, { status: u.status, remarks: '' })),
+        ...toDelete.map(id => deleteAttendance(id)),
+      ];
+      if (toCreate.length > 0) {
+        ops.push(bulkUpdateAttendanceByDate(selectedDate, toCreate).then(r => { bulkResponse = r; }));
       }
-      await Promise.all([...individualUpdates, ...deletions]);
+      await Promise.all(ops);
+
+      // Patch studentAttendances in-place — do NOT touch existingAttendances
+      // so the useEffect never fires and the full list never rebuilds
+      setStudentAttendances(prev => {
+        const newMap = new Map(prev);
+        // Cleared to present: remove existingRecord
+        toDeleteStudentIds.forEach(studentId => {
+          const att = newMap.get(studentId);
+          if (att) newMap.set(studentId, { ...att, isModified: false, existingRecord: undefined });
+        });
+        // Updated (absent ↔ late): patch existingRecord status
+        toUpdate.forEach(u => {
+          const att = newMap.get(u.studentId);
+          if (att) newMap.set(u.studentId, {
+            ...att, isModified: false,
+            existingRecord: att.existingRecord ? { ...att.existingRecord, status: u.status } : undefined,
+          });
+        });
+        // Newly created: attach server record (gives us the real ID for future saves)
+        bulkResponse.forEach(newRecord => {
+          const att = newMap.get(newRecord.student_id);
+          if (att) newMap.set(newRecord.student_id, { ...att, isModified: false, existingRecord: newRecord });
+        });
+        return newMap;
+      });
 
       setSaveMessage('Attendance saved successfully!');
       toast.success('Attendance saved successfully!');
-
-      if (bulkUpdateResponse.length > 0) {
-        setExistingAttendances(prev => {
-          const updated = [...prev];
-          bulkUpdateResponse.forEach(newRecord => {
-            const idx = updated.findIndex(att => att.student_id === newRecord.student_id);
-            if (idx >= 0) updated[idx] = newRecord;
-            else updated.push(newRecord);
-          });
-          return updated;
-        });
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await loadExistingAttendance();
-
-      setStudentAttendances(prev => {
-        const newMap = new Map(prev);
-        newMap.forEach(att => { att.isModified = false; });
-        return newMap;
-      });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to save attendance';
       setSaveError(msg);
@@ -502,6 +512,15 @@ function StaffView() {
   };
 
   const hasUnsavedChanges = Array.from(studentAttendances.values()).some(att => att.isModified);
+
+  const attendanceSummary = useMemo(() => {
+    const all = Array.from(studentAttendances.values());
+    return {
+      present: all.filter(a => a.status === 'present').length,
+      absent: all.filter(a => a.status === 'absent').length,
+      late: all.filter(a => a.status === 'late').length,
+    };
+  }, [studentAttendances]);
 
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -587,38 +606,68 @@ function StaffView() {
                     <span className="text-red-800">{saveError}</span>
                   </div>
                 )}
-                <div className="grid gap-4">
+                {students.length > 0 && (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="flex items-center justify-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <span className="text-2xl font-bold text-green-700">{attendanceSummary.present}</span>
+                      <span className="text-sm text-green-600 font-medium">Present</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <span className="text-2xl font-bold text-red-700">{attendanceSummary.absent}</span>
+                      <span className="text-sm text-red-600 font-medium">Absent</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <span className="text-2xl font-bold text-yellow-700">{attendanceSummary.late}</span>
+                      <span className="text-sm text-yellow-600 font-medium">Late</span>
+                    </div>
+                  </div>
+                )}
+                <div className="grid gap-2">
                   {students
                     .filter(student => student.student?.id)
                     .map((student) => {
                       const attendance = studentAttendances.get(student.student.id);
+                      const status = attendance?.status || 'present';
+                      const statusStyles = {
+                        present: 'bg-green-100 text-green-700 border-green-300',
+                        absent: 'bg-red-100 text-red-700 border-red-300',
+                        late: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+                      }[status];
+                      const rowStyles = attendance?.isModified
+                        ? 'border-blue-300 bg-blue-50'
+                        : status === 'absent'
+                        ? 'border-red-200'
+                        : status === 'late'
+                        ? 'border-yellow-200'
+                        : 'border-gray-200';
                       return (
                         <div
                           key={student.id}
-                          className={`flex items-center justify-between p-4 border rounded-lg ${attendance?.isModified ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}
+                          className={`flex items-center justify-between p-4 border rounded-lg ${rowStyles}`}
                           style={{ height: '64px' }}
                         >
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${statusStyles} capitalize min-w-[60px] justify-center`}>
+                              {status}
+                            </span>
                             <div>
                               <div className="font-medium">{getStudentName(student.student)}</div>
                               <div className="text-sm text-gray-500">Roll No: {student.admission_number || 'N/A'}</div>
                             </div>
-                            {attendance?.existingRecord && <Badge variant="outline" className="text-xs">Existing</Badge>}
                             {attendance?.isModified && <Badge variant="secondary" className="text-xs">Modified</Badge>}
                           </div>
                           <div className="flex items-center gap-2">
-                            <Label className="text-sm">Status:</Label>
                             <Select
-                              value={attendance?.status || 'present'}
+                              value={status}
                               onValueChange={(value) =>
                                 handleAttendanceChange(student.student.id, value as 'present' | 'absent' | 'late')
                               }
                             >
                               <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="present">present</SelectItem>
-                                <SelectItem value="absent">absent</SelectItem>
-                                <SelectItem value="late">late</SelectItem>
+                                <SelectItem value="present">Present</SelectItem>
+                                <SelectItem value="absent">Absent</SelectItem>
+                                <SelectItem value="late">Late</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
