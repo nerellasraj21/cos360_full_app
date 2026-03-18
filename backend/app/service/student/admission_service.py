@@ -231,15 +231,10 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
         except Exception as e:
             raise create_validation_error(message=f"Invalid student data: {str(e)}", field="student", request=request)
 
-        # Create student user — username: firstname.lastname (collision-safe)
+        # Create student user — username: admission_number (guaranteed unique)
         try:
-            base_username = (
-                f"{student_dict.first_name.strip().lower().replace(' ', '')}"
-                f".{student_dict.last_name.strip().lower().replace(' ', '')}"
-            )
-            student_username = await _generate_unique_username(base_username, db)
             student_user_data = User(
-                username=student_username,
+                username=admission_number,
                 password_hash=hash_password("student@123"),
                 is_active=True,
                 role_id=student_role_id,
@@ -254,6 +249,14 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
 
         db.add(student_user_data)
         await db.flush()
+
+        # Mark as first login (student must set a new password on first login)
+        try:
+            from sqlalchemy import text as _text
+
+            await db.execute(_text("UPDATE users SET is_first_login = TRUE WHERE id = :id"), {"id": str(student_user_data.id)})
+        except Exception:
+            pass  # column not yet added — apply script adds it
 
         student_dict.user_id = student_user_data.id
         db.add(student_dict)
@@ -306,6 +309,14 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
                 )
                 db.add(father_user_data)
                 await db.flush()
+
+                # Mark as first login (parent must set a new password on first login)
+                try:
+                    from sqlalchemy import text as _text
+
+                    await db.execute(_text("UPDATE users SET is_first_login = TRUE WHERE id = :id"), {"id": str(father_user_data.id)})
+                except Exception:
+                    pass
 
                 father_dict.user_id = father_user_data.id
                 db.add(father_dict)
@@ -368,6 +379,14 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
                 )
                 db.add(mother_user_data)
                 await db.flush()
+
+                # Mark as first login (parent must set a new password on first login)
+                try:
+                    from sqlalchemy import text as _text
+
+                    await db.execute(_text("UPDATE users SET is_first_login = TRUE WHERE id = :id"), {"id": str(mother_user_data.id)})
+                except Exception:
+                    pass
 
                 mother_dict.user_id = mother_user_data.id
                 db.add(mother_dict)
@@ -747,8 +766,22 @@ async def update_partial_details_admission(
     Raises:
         HTTPException: For not found, validation, or database errors
     """
+    # Separate field groups
+    STUDENT_FIELDS = {"first_name", "last_name", "date_of_birth", "gender", "is_primary", "aadhar_number", "apaar_number", "nationality", "mother_tongue", "caste", "caste_id", "sub_caste", "sub_caste_id", "community", "identification_marks"}
+    FATHER_FIELDS = {"father_name", "father_email", "father_phone", "father_occupation", "father_aadhar_number", "father_gender", "father_salary_range"}
+    MOTHER_FIELDS = {"mother_name", "mother_email", "mother_phone", "mother_occupation", "mother_aadhar_number", "mother_gender", "mother_salary_range"}
+
     try:
-        result = await db.execute(select(Admission).where(Admission.student_id == student_id))
+        # Fetch with eager loading so we can update student + parent in same transaction
+        result = await db.execute(
+            select(Admission)
+            .options(
+                selectinload(Admission.student)
+                .selectinload(Student.parent_links)
+                .selectinload(StudentParentLink.parent)
+            )
+            .where(Admission.student_id == student_id)
+        )
         admission = result.scalar_one_or_none()
 
         if not admission:
@@ -769,14 +802,35 @@ async def update_partial_details_admission(
                     request=request,
                 )
 
-        # Update only the fields that are provided
+        # Update admission-level fields
         for field, value in update_data.items():
             if hasattr(admission, field):
                 setattr(admission, field, value)
 
+        # Update student personal fields
+        student = admission.student
+        for field in STUDENT_FIELDS:
+            if field in update_data:
+                setattr(student, field, update_data[field])
+
+        # Update parent fields via parent_links
+        for link in student.parent_links:
+            parent = link.parent
+            relation = (parent.relation_to_student or "").lower()
+            if relation == "father":
+                for key in FATHER_FIELDS:
+                    if key in update_data:
+                        parent_field = key[len("father_"):]  # strip "father_" prefix
+                        setattr(parent, parent_field, update_data[key])
+            elif relation == "mother":
+                for key in MOTHER_FIELDS:
+                    if key in update_data:
+                        parent_field = key[len("mother_"):]  # strip "mother_" prefix
+                        setattr(parent, parent_field, update_data[key])
+
         await db.flush()
 
-        # Fetch the updated admission with all relationships before commit
+        # Refresh admission object with all relationships before commit
         result = await db.execute(
             select(Admission)
             .options(

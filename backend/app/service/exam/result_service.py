@@ -146,6 +146,87 @@ async def publish_exam(db: AsyncSession, exam_id: UUID) -> Exam:
     return exam
 
 
+async def get_student_raw_marks(
+    db: AsyncSession,
+    exam_id: UUID,
+    student_id: UUID,
+) -> dict:
+    """
+    Return raw entered marks for a student — no compute or publish required.
+    Visible as soon as the teacher saves marks.
+    """
+    # Get student name
+    name_sql = text("""
+        SELECT TRIM(COALESCE(first_name, '') || ' ' || COALESCE(last_name, '')) AS student_name
+        FROM students WHERE id = :student_id
+    """)
+    name_row = (await db.execute(name_sql, {"student_id": str(student_id)})).mappings().first()
+
+    marks_sql = text("""
+        SELECT
+            sm.subject_config_id,
+            sub.name AS subject_name,
+            COALESCE(esc.sort_order, 999) AS subject_sort,
+            comp.component_name,
+            comp.max_marks,
+            COALESCE(comp.sort_order, 0) AS component_sort,
+            sm.marks_obtained,
+            sm.is_absent,
+            sm.remark_grade
+        FROM student_marks sm
+        JOIN exam_subject_config esc ON esc.id = sm.subject_config_id
+        LEFT JOIN subjects sub ON sub.id = esc.subject_id
+        JOIN exam_subject_components comp ON comp.id = sm.component_id
+        WHERE sm.exam_id = :exam_id AND sm.student_id = :student_id
+        ORDER BY COALESCE(esc.sort_order, 999), COALESCE(comp.sort_order, 0)
+    """)
+    rows = (await db.execute(marks_sql, {"exam_id": str(exam_id), "student_id": str(student_id)})).mappings().all()
+
+    subjects: dict = {}
+    for row in rows:
+        sid = str(row["subject_config_id"])
+        if sid not in subjects:
+            subjects[sid] = {
+                "subject_config_id": row["subject_config_id"],
+                "subject_name": row["subject_name"],
+                "_sort": row["subject_sort"],
+                "components": [],
+            }
+        subjects[sid]["components"].append({
+            "component_name": row["component_name"],
+            "marks_obtained": row["marks_obtained"],
+            "max_marks": row["max_marks"],
+            "is_absent": row["is_absent"],
+            "remark_grade": row["remark_grade"],
+        })
+
+    sorted_subjects = sorted(subjects.values(), key=lambda s: s["_sort"])
+    for s in sorted_subjects:
+        s.pop("_sort", None)
+
+    return {
+        "exam_id": exam_id,
+        "student_id": student_id,
+        "student_name": name_row["student_name"] if name_row else None,
+        "subjects": sorted_subjects,
+    }
+
+
+async def get_published_result_or_403(
+    db: AsyncSession,
+    exam_id: UUID,
+    student_id: UUID,
+) -> dict:
+    """Fetch result only if exam is published/finalized (student/parent access)."""
+    exam = await get_exam_or_404(db, exam_id)
+    if exam.status not in ("published", "finalized"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Results are not yet published for this exam.",
+        )
+    return await get_student_result_or_404(db, exam_id, student_id)
+
+
 async def unlock_exam(db: AsyncSession, exam_id: UUID, reason: str) -> Exam:
     exam = await get_exam_or_404(db, exam_id)
     if exam.status not in ("locked", "published", "finalized"):

@@ -132,9 +132,12 @@ class UserContextService:
             "students",
             "student_admissions",
             "fee_transactions",
+            "fee_collection",
             "student_attendance",
             "student_certificates",
             "student_documents",
+            "exams",
+            "exam_marks",
         ]:
             # Get all children of this parent
             children_query = select(StudentParentLink.student_id).where(

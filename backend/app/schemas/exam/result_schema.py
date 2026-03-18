@@ -67,3 +67,26 @@ class UnlockExamResponse(BaseModel):
     exam_id: UUID
     status: str
     reason: str
+
+
+# ── Raw marks view (no compute/publish required) ─────────────────────────────
+
+class MarksComponentView(BaseModel):
+    component_name: str
+    marks_obtained: Decimal | None = None
+    max_marks: Decimal | None = None
+    is_absent: bool = False
+    remark_grade: str | None = None
+
+
+class MarksSubjectView(BaseModel):
+    subject_config_id: UUID
+    subject_name: str | None = None
+    components: list[MarksComponentView] = []
+
+
+class StudentMarksView(BaseModel):
+    exam_id: UUID
+    student_id: UUID
+    student_name: str | None = None
+    subjects: list[MarksSubjectView] = []
