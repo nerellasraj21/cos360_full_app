@@ -27,6 +27,14 @@ class HallTicketEligibilityRead(BaseModel):
     admission_number: str | None = None
 
 
+class EnrolledStudentRead(BaseModel):
+    student_id: UUID
+    class_id: UUID
+    section_id: UUID | None = None
+    student_name: str | None = None
+    admission_number: str | None = None
+
+
 class EligibilityOverrideRequest(BaseModel):
     attendance_override: bool = False
     fee_override: bool = False

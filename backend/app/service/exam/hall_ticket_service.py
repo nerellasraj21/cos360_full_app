@@ -276,6 +276,31 @@ async def _get_eligibility_with_students(
     return [dict(r) for r in rows]
 
 
+async def get_enrolled_students_for_exam(db: AsyncSession, exam_id: UUID) -> list[dict]:
+    """
+    Return all students in the exam's class-sections from student_admissions,
+    enriched with student name and admission number. No eligibility computation required.
+    """
+    await get_exam_or_404(db, exam_id)
+    sql = text("""
+        SELECT DISTINCT
+            sa.student_id,
+            ecs.class_id,
+            ecs.section_id,
+            TRIM(COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '')) AS student_name,
+            sa.admission_number
+        FROM exam_class_sections ecs
+        JOIN student_admissions sa
+          ON sa.current_class_id = ecs.class_id
+         AND (ecs.section_id IS NULL OR sa.current_section_id = ecs.section_id)
+        LEFT JOIN students s ON s.id = sa.student_id
+        WHERE ecs.exam_id = :exam_id
+        ORDER BY student_name
+    """)
+    rows = (await db.execute(sql, {"exam_id": str(exam_id)})).mappings().all()
+    return [dict(r) for r in rows]
+
+
 async def get_eligible_students(db: AsyncSession, exam_id: UUID) -> list[dict]:
     return await _get_eligibility_with_students(db, exam_id, is_eligible=True)
 

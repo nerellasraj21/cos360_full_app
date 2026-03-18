@@ -152,7 +152,12 @@ async def deactivate(request: Request, subject_id: UUID, db: AsyncSession = Depe
 
 
 @router.get("/categories/{category_id}/subjects", response_model=list[SubjectRead])
-async def get_subjects_by_category(category_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
+async def get_subjects_by_category(
+    request: Request, category_id: UUID, db: AsyncSession = Depends(get_tenant_db)
+):
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "subjects", "list")
     return await get_subjects_by_category_id(category_id, db)
 
 
@@ -162,4 +167,7 @@ async def get_subjects_by_category_dropdown(
     request: Request, category_id: UUID, db: AsyncSession = Depends(get_tenant_db)
 ):
     """Get subjects by category ID for dropdown (id + name only). Rate limited to 100 requests per minute."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "subjects", "list")
     return await get_subjects_by_category_id_dropdown(category_id, db)

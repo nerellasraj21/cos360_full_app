@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
 from app.schemas.masters.parent_schema import ParentOut
-from app.schemas.masters.student_parent_link_schema import StudentParentLinkCreate, StudentParentLinkOut
+from app.schemas.masters.student_parent_link_schema import ChildStudentOut, StudentParentLinkCreate, StudentParentLinkOut
 from app.schemas.student.student_schema import StudentOut
 from app.service.masters.student_parent_link_service import (
     get_all_student_parent_links,
@@ -78,6 +78,56 @@ async def get_parent_students(parent_id: UUID, request: Request, db: AsyncSessio
         await check_role_plan_permission_with_error(db, request, role, "parent_management", "read")
 
     return await get_students_for_parent(parent_id, db)
+
+
+@router.get("/my-children", response_model=list[ChildStudentOut])
+async def get_my_children(request: Request, db: AsyncSession = Depends(get_tenant_db)):
+    """Return the authenticated parent's children with class/section/year info."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    if role != "Parent":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only parents can access this endpoint")
+
+    user_id = current_user.get("sub")
+    r = await db.execute(text("SELECT id FROM parents WHERE user_id = :uid"), {"uid": user_id})
+    parent_id = r.scalar_one_or_none()
+    if not parent_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent profile not found")
+
+    result = await db.execute(
+        text("""
+            SELECT * FROM (
+                SELECT DISTINCT ON (s.id)
+                    s.id::text                            AS id,
+                    s.first_name,
+                    s.last_name,
+                    s.first_name || ' ' || s.last_name   AS name,
+                    s.is_active,
+                    s.date_of_birth::text                AS date_of_birth,
+                    s.gender,
+                    sa.admission_number,
+                    sa.academic_year_id::text            AS academic_year_id,
+                    ay.title                             AS academic_year,
+                    sa.current_class_id::text            AS class_id,
+                    cl.name                              AS class_name,
+                    sa.current_section_id::text          AS section_id,
+                    sec.name                             AS section_name
+                FROM student_parent_links spl
+                JOIN students s ON s.id = spl.student_id
+                LEFT JOIN student_admissions sa ON sa.student_id = s.id
+                LEFT JOIN academic_years ay ON ay.id = sa.academic_year_id
+                LEFT JOIN classes cl ON cl.id = sa.current_class_id
+                LEFT JOIN sections sec ON sec.id = sa.current_section_id
+                WHERE spl.parent_id = :parent_id
+                ORDER BY s.id, sa.admission_date DESC NULLS LAST
+            ) children
+            ORDER BY first_name, last_name
+        """),
+        {"parent_id": str(parent_id)},
+    )
+    rows = result.mappings().all()
+    return [ChildStudentOut(**dict(row)) for row in rows]
 
 
 @router.get("/", response_model=list[StudentParentLinkOut])

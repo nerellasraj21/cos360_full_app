@@ -17,14 +17,19 @@ from app.schemas.exam.result_schema import (
     ComputeResultResponse,
     PublishResultResponse,
     StudentExamResultRead,
+    StudentMarksView,
 )
 from app.service.exam.aggregate_service import compute_exam_aggregate
 from app.service.exam.audit_service import log_action
 from app.service.exam.result_service import (
     get_exam_results,
+    get_published_result_or_403,
+    get_student_raw_marks,
     get_student_result_or_404,
     publish_exam,
 )
+from app.models.masters.student_parent_association_model import StudentParentLink
+from app.tools.enhanced_permissions import check_user_resource_access
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
 router = APIRouter(prefix="/exams", tags=["Exam Results"])
@@ -118,3 +123,93 @@ async def get_single_result(
     await check_role_plan_permission_with_error(db, request, role, "exams", "read")
 
     return await get_student_result_or_404(db, exam_id, student_id)
+
+
+@router.get("/{exam_id}/my-result", response_model=StudentExamResultRead)
+async def get_my_result(
+    exam_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Student views their own result (only after exam is published)."""
+    from fastapi import HTTPException, status
+
+    user_context = await check_user_resource_access(db, request, "exams", "read")
+    if not user_context.student_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only students can access this endpoint")
+
+    return await get_published_result_or_403(db, exam_id, user_context.student_id)
+
+
+@router.get("/{exam_id}/child-result/{student_id}", response_model=StudentExamResultRead)
+async def get_child_result(
+    exam_id: uuid.UUID,
+    student_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Parent views their child's result (only after exam is published)."""
+    from fastapi import HTTPException, status
+    from sqlalchemy import select
+
+    user_context = await check_user_resource_access(db, request, "exams", "read")
+    if not user_context.parent_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only parents can access this endpoint")
+
+    # Verify parent-child link directly
+    link = await db.execute(
+        select(StudentParentLink).where(
+            StudentParentLink.parent_id == user_context.parent_id,
+            StudentParentLink.student_id == student_id,
+        )
+    )
+    if not link.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot access results for unrelated student")
+
+    return await get_published_result_or_403(db, exam_id, student_id)
+
+
+# ── Raw entered marks (no compute/publish required) ───────────────────────────
+
+
+@router.get("/{exam_id}/my-marks", response_model=StudentMarksView)
+async def get_my_marks(
+    exam_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Student views their own entered marks — visible immediately after teacher saves."""
+    from fastapi import HTTPException, status
+
+    user_context = await check_user_resource_access(db, request, "exams", "read")
+    if not user_context.student_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only students can access this endpoint")
+
+    return await get_student_raw_marks(db, exam_id, user_context.student_id)
+
+
+@router.get("/{exam_id}/child-marks/{student_id}", response_model=StudentMarksView)
+async def get_child_marks(
+    exam_id: uuid.UUID,
+    student_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Parent views their child's entered marks — visible immediately after teacher saves."""
+    from fastapi import HTTPException, status
+    from sqlalchemy import select
+
+    user_context = await check_user_resource_access(db, request, "exams", "read")
+    if not user_context.parent_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only parents can access this endpoint")
+
+    link = await db.execute(
+        select(StudentParentLink).where(
+            StudentParentLink.parent_id == user_context.parent_id,
+            StudentParentLink.student_id == student_id,
+        )
+    )
+    if not link.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot access marks for unrelated student")
+
+    return await get_student_raw_marks(db, exam_id, student_id)
