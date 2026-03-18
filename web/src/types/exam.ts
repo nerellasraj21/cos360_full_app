@@ -488,6 +488,30 @@ export interface StudentExamResult {
 }
 
 // ---------------------------------------------------------------------------
+// Raw Marks View (student/parent — no compute/publish required)
+// ---------------------------------------------------------------------------
+export interface MarksComponentView {
+  component_name: string
+  marks_obtained: number | null
+  max_marks: number | null
+  is_absent: boolean
+  remark_grade: string | null
+}
+
+export interface MarksSubjectView {
+  subject_config_id: string
+  subject_name: string | null
+  components: MarksComponentView[]
+}
+
+export interface StudentMarksView {
+  exam_id: string
+  student_id: string
+  student_name: string | null
+  subjects: MarksSubjectView[]
+}
+
+// ---------------------------------------------------------------------------
 // Exam Pattern Templates
 // ---------------------------------------------------------------------------
 export interface TemplateComponentData {

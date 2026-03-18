@@ -76,6 +76,7 @@ export interface StudentOut {
 
 export interface StudentAdmissionBase {
   admission_date: string;
+  admission_type?: string;
   academic_year_id?: string;
   admitted_academic_year_id?: string;
   admitted_class_id?: string;
@@ -149,19 +150,57 @@ export interface StudentAdmissionResponse extends StudentAdmissionBase {
 }
 
 export interface StudentAdmissionUpdate {
+  // Admission fields
+  admission_date?: string;
+  admission_type?: string;
+  academic_year_id?: string;
+  admitted_academic_year_id?: string;
+  admitted_class_id?: string;
+  admitted_section_id?: string;
+  current_class_id?: string;
+  current_section_id?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  state_id?: string;
+  district_id?: string;
+  mandal_id?: string;
+  is_previous_school?: boolean;
+  previous_school_name?: string;
+  previous_class?: string;
+  previous_school_remark?: string;
+  // Student personal fields
   first_name?: string;
   last_name?: string;
   date_of_birth?: string;
-  is_primary?: string;
   gender?: string;
-  admission_date?: string;
-  admitted_class_id?: string;
-  current_class_id?: string;
-  academic_year_id?: string;
-  address_line1?: string;
-  city?: string;
-  state?: string;
+  is_primary?: string;
   aadhar_number?: string;
+  apaar_number?: string;
+  nationality?: string;
+  mother_tongue?: string;
+  caste?: string;
+  caste_id?: string;
+  sub_caste?: string;
+  sub_caste_id?: string;
+  community?: string;
+  identification_marks?: string;
+  // Parent fields
+  father_name?: string;
+  father_email?: string;
+  father_phone?: string;
+  father_occupation?: string;
+  father_aadhar_number?: string;
+  father_gender?: string;
+  father_salary_range?: string;
+  mother_name?: string;
+  mother_email?: string;
+  mother_phone?: string;
+  mother_occupation?: string;
+  mother_aadhar_number?: string;
+  mother_gender?: string;
+  mother_salary_range?: string;
 }
 
 export interface StudentDropdownItem {

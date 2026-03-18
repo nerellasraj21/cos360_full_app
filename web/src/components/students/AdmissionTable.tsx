@@ -10,9 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { useAdmissions, useUpdateAdmission, useToggleStudentStatus } from '@/api/hooks/students/admissions';
+import { useAdmissions, useUpdateAdmission, useToggleStudentStatus, useAdmissionTypesDropdown } from '@/api/hooks/students/admissions';
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections';
 import { useAcademicYearsDropdown } from '@/api/hooks/masters/academicyears';
+import { StateDropdown } from '@/components/dropdown/StateDropdown';
+import { DistrictDropdown } from '@/components/dropdown/DistrictDropdown';
+import { MandalDropdown } from '@/components/dropdown/MandalDropdown';
+import { CasteDropdown } from '@/components/dropdown/CasteDropdown';
+import { SubCasteDropdown } from '@/components/dropdown/SubCasteDropdown';
 import { toast } from 'sonner';
 import type { StudentAdmissionResponse, StudentOut } from '@/types/admission';
 import type { ClassRead } from '@/types/masters/classesandsections';
@@ -47,21 +52,63 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [editForm, setEditForm] = useState({
+    // Admission fields
+    admission_date: '',
+    admission_type: '',
+    academic_year_id: '',
+    admitted_class_id: '',
+    admitted_section_id: '',
     current_class_id: '',
     current_section_id: '',
     address_line1: '',
     address_line2: '',
     city: '',
     state: '',
+    state_id: '',
+    district_id: '',
+    mandal_id: '',
     is_previous_school: false,
     previous_school_name: '',
     previous_class: '',
-    previous_school_remark: ''
+    previous_school_remark: '',
+    // Student fields
+    first_name: '',
+    last_name: '',
+    date_of_birth: '',
+    gender: '',
+    is_primary: 'not_primary',
+    aadhar_number: '',
+    apaar_number: '',
+    nationality: '',
+    mother_tongue: '',
+    caste: '',
+    caste_id: '',
+    sub_caste: '',
+    sub_caste_id: '',
+    community: '',
+    identification_marks: '',
+    // Father fields
+    father_name: '',
+    father_email: '',
+    father_phone: '',
+    father_occupation: '',
+    father_aadhar_number: '',
+    father_gender: '',
+    father_salary_range: '',
+    // Mother fields
+    mother_name: '',
+    mother_email: '',
+    mother_phone: '',
+    mother_occupation: '',
+    mother_aadhar_number: '',
+    mother_gender: '',
+    mother_salary_range: '',
   });
 
   const { data: admissionsResponse, isLoading } = useAdmissions({ skip: page * pageSize, limit: pageSize });
   const { data: classesData = [] } = useClassSectionsDropdown();
   const { data: academicYears = [] } = useAcademicYearsDropdown();
+  const { data: admissionTypes = [] } = useAdmissionTypesDropdown();
   const updateMutation = useUpdateAdmission();
   const toggleStatusMutation = useToggleStudentStatus();
 
@@ -238,17 +285,59 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                   const admission = admissionsResponse?.items?.find(item => item.id === row.id);
                   if (admission) {
                     setSelectedAdmission(admission);
+                    const s = admission.student as any;
                     setEditForm({
+                      // Admission fields
+                      admission_date: admission.admission_date || '',
+                      admission_type: admission.admission_type || '',
+                      academic_year_id: admission.academic_year_id || '',
+                      admitted_class_id: admission.admitted_class_id || '',
+                      admitted_section_id: admission.admitted_section_id || '',
                       current_class_id: admission.current_class_id || '',
                       current_section_id: admission.current_section_id || '',
                       address_line1: admission.address_line1 || '',
                       address_line2: admission.address_line2 || '',
                       city: admission.city || '',
                       state: admission.state || '',
+                      state_id: admission.state || '',  // state column stores UUID (same as state_id)
+                      district_id: (admission as any).district_id || '',
+                      mandal_id: (admission as any).mandal_id || '',
                       is_previous_school: admission.is_previous_school || false,
                       previous_school_name: admission.previous_school_name || '',
                       previous_class: admission.previous_class || '',
-                      previous_school_remark: admission.previous_school_remark || ''
+                      previous_school_remark: admission.previous_school_remark || '',
+                      // Student fields
+                      first_name: s?.first_name || '',
+                      last_name: s?.last_name || '',
+                      date_of_birth: s?.date_of_birth || '',
+                      gender: s?.gender || '',
+                      is_primary: s?.is_primary || 'not_primary',
+                      aadhar_number: s?.aadhar_number || '',
+                      apaar_number: s?.apaar_number || '',
+                      nationality: s?.nationality || '',
+                      mother_tongue: s?.mother_tongue || '',
+                      caste: s?.caste || '',
+                      caste_id: s?.caste || '',       // caste column stores UUID (same as caste_id)
+                      sub_caste: s?.sub_caste || '',
+                      sub_caste_id: s?.sub_caste || '', // sub_caste column stores UUID
+                      community: s?.community || '',
+                      identification_marks: s?.identification_marks || '',
+                      // Father fields
+                      father_name: s?.father?.name || '',
+                      father_email: s?.father?.email || '',
+                      father_phone: s?.father?.phone || '',
+                      father_occupation: s?.father?.occupation || '',
+                      father_aadhar_number: s?.father?.aadhar_number || '',
+                      father_gender: s?.father?.gender || '',
+                      father_salary_range: s?.father?.salary_range || '',
+                      // Mother fields
+                      mother_name: s?.mother?.name || '',
+                      mother_email: s?.mother?.email || '',
+                      mother_phone: s?.mother?.phone || '',
+                      mother_occupation: s?.mother?.occupation || '',
+                      mother_aadhar_number: s?.mother?.aadhar_number || '',
+                      mother_gender: s?.mother?.gender || '',
+                      mother_salary_range: s?.mother?.salary_range || '',
                     });
                     setIsEditDirty(false);
                     setEditModalOpen(true);
@@ -461,12 +550,119 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
       {/* Edit Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
-        <DialogContent className="max-w-2xl max-h-[80vh]">
+        <DialogContent className="max-w-2xl max-h-[85vh]">
           <DialogHeader>
             <DialogTitle>Edit Admission - {selectedAdmission?.admission_number}</DialogTitle>
           </DialogHeader>
           {selectedAdmission && (
-            <div className="space-y-4" onChange={() => setIsEditDirty(true)}>
+            <div className="space-y-4 overflow-y-auto pr-1" onChange={() => setIsEditDirty(true)}>
+
+              {/* Admission Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-admission-date">Admission Date</Label>
+                  <Input
+                    id="edit-admission-date"
+                    type="date"
+                    value={editForm.admission_date}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, admission_date: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-admission-type">Admission Type</Label>
+                  <Select
+                    value={editForm.admission_type}
+                    onValueChange={(value) => setEditForm(prev => ({ ...prev, admission_type: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {admissionTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-academic-year">Academic Year</Label>
+                  <Select
+                    value={editForm.academic_year_id}
+                    onValueChange={(value) => setEditForm(prev => ({ ...prev, academic_year_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select academic year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {academicYears.map((year) => (
+                        <SelectItem key={String(year.id)} value={String(year.id)}>
+                          {year.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>{/* spacer */}</div>
+              </div>
+
+              {/* Admitted To */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-admitted-class">Admitted Class</Label>
+                  <Select
+                    value={editForm.admitted_class_id}
+                    onValueChange={(value) => {
+                      setEditForm(prev => ({
+                        ...prev,
+                        admitted_class_id: value,
+                        admitted_section_id: ''
+                      }));
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select class" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classesData.map((classItem) => (
+                        <SelectItem key={String(classItem.id)} value={String(classItem.id)}>
+                          {classItem.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-admitted-section">Admitted Section</Label>
+                  <Select
+                    value={editForm.admitted_section_id}
+                    onValueChange={(value) => setEditForm(prev => ({ ...prev, admitted_section_id: value }))}
+                    disabled={!editForm.admitted_class_id}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select section" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {editForm.admitted_class_id && classesData
+                        .find(c => String(c.id) === String(editForm.admitted_class_id))
+                        ?.sections.map((section) => (
+                          <SelectItem key={String(section.id)} value={String(section.id)}>
+                            {section.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Current Placement */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-class">Current Class</Label>
@@ -485,7 +681,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                     </SelectTrigger>
                     <SelectContent>
                       {classesData.map((classItem) => (
-                        <SelectItem key={classItem.id} value={classItem.id}>
+                        <SelectItem key={String(classItem.id)} value={String(classItem.id)}>
                           {classItem.name}
                         </SelectItem>
                       ))}
@@ -505,9 +701,9 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                     </SelectTrigger>
                     <SelectContent>
                       {editForm.current_class_id && classesData
-                        .find(c => c.id === editForm.current_class_id)
+                        .find(c => String(c.id) === String(editForm.current_class_id))
                         ?.sections.map((section) => (
-                          <SelectItem key={section.id} value={section.id}>
+                          <SelectItem key={String(section.id)} value={String(section.id)}>
                             {section.name}
                           </SelectItem>
                         ))}
@@ -548,10 +744,41 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
                 <div>
                   <Label htmlFor="edit-state">State</Label>
-                  <Input
+                  <StateDropdown
                     id="edit-state"
-                    value={editForm.state}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, state: e.target.value }))}
+                    value={editForm.state_id}
+                    onChange={(value) => setEditForm(prev => ({
+                      ...prev,
+                      state_id: value || '',
+                      state: value || '',  // keep state in sync (UUID, same as create form)
+                      district_id: '',
+                      mandal_id: ''
+                    }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-district">District (Optional)</Label>
+                  <DistrictDropdown
+                    id="edit-district"
+                    stateId={editForm.state_id || undefined}
+                    value={editForm.district_id}
+                    onChange={(value) => setEditForm(prev => ({
+                      ...prev,
+                      district_id: value || '',
+                      mandal_id: ''
+                    }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-mandal">Mandal (Optional)</Label>
+                  <MandalDropdown
+                    id="edit-mandal"
+                    districtId={editForm.district_id || undefined}
+                    value={editForm.mandal_id}
+                    onChange={(value) => setEditForm(prev => ({ ...prev, mandal_id: value || '' }))}
                   />
                 </div>
               </div>
@@ -597,6 +824,206 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                   </div>
                 </div>
               )}
+
+              {/* Student Details */}
+              <p className="text-sm font-semibold text-muted-foreground pt-2">Student Details</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-first-name">First Name</Label>
+                  <Input id="edit-first-name" value={editForm.first_name} onChange={(e) => setEditForm(prev => ({ ...prev, first_name: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-last-name">Last Name</Label>
+                  <Input id="edit-last-name" value={editForm.last_name} onChange={(e) => setEditForm(prev => ({ ...prev, last_name: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-dob">Date of Birth</Label>
+                  <Input id="edit-dob" type="date" value={editForm.date_of_birth} onChange={(e) => setEditForm(prev => ({ ...prev, date_of_birth: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-gender">Gender</Label>
+                  <Select value={editForm.gender} onValueChange={(v) => setEditForm(prev => ({ ...prev, gender: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-is-primary">Primary Status</Label>
+                  <Select value={editForm.is_primary} onValueChange={(v) => setEditForm(prev => ({ ...prev, is_primary: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="not_primary">Not Primary</SelectItem>
+                      <SelectItem value="primary">Primary</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>{/* spacer */}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-aadhar">Aadhar Number</Label>
+                  <Input id="edit-aadhar" value={editForm.aadhar_number} onChange={(e) => setEditForm(prev => ({ ...prev, aadhar_number: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-apaar">APAAR Number</Label>
+                  <Input id="edit-apaar" value={editForm.apaar_number} onChange={(e) => setEditForm(prev => ({ ...prev, apaar_number: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-nationality">Nationality</Label>
+                  <Input id="edit-nationality" value={editForm.nationality} onChange={(e) => setEditForm(prev => ({ ...prev, nationality: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-mother-tongue">Mother Tongue</Label>
+                  <Input id="edit-mother-tongue" value={editForm.mother_tongue} onChange={(e) => setEditForm(prev => ({ ...prev, mother_tongue: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <CasteDropdown
+                    id="edit-caste"
+                    value={editForm.caste_id}
+                    onChange={(value) => setEditForm(prev => ({ ...prev, caste_id: value || '', caste: value || '', sub_caste_id: '', sub_caste: '' }))}
+                  />
+                </div>
+                <div>
+                  <SubCasteDropdown
+                    id="edit-sub-caste"
+                    casteId={editForm.caste_id || undefined}
+                    value={editForm.sub_caste_id}
+                    onChange={(value) => setEditForm(prev => ({ ...prev, sub_caste_id: value || '', sub_caste: value || '' }))}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-community">Community</Label>
+                  <Input id="edit-community" value={editForm.community} onChange={(e) => setEditForm(prev => ({ ...prev, community: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-id-marks">Identification Marks</Label>
+                  <Input id="edit-id-marks" value={editForm.identification_marks} onChange={(e) => setEditForm(prev => ({ ...prev, identification_marks: e.target.value }))} />
+                </div>
+              </div>
+
+              {/* Father Details */}
+              <p className="text-sm font-semibold text-muted-foreground pt-2">Father's Details</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-father-name">Name</Label>
+                  <Input id="edit-father-name" value={editForm.father_name} onChange={(e) => setEditForm(prev => ({ ...prev, father_name: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-father-email">Email</Label>
+                  <Input id="edit-father-email" type="email" value={editForm.father_email} onChange={(e) => setEditForm(prev => ({ ...prev, father_email: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-father-phone">Phone</Label>
+                  <Input id="edit-father-phone" value={editForm.father_phone} onChange={(e) => setEditForm(prev => ({ ...prev, father_phone: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-father-occupation">Occupation</Label>
+                  <Input id="edit-father-occupation" value={editForm.father_occupation} onChange={(e) => setEditForm(prev => ({ ...prev, father_occupation: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-father-aadhar">Aadhar Number</Label>
+                  <Input id="edit-father-aadhar" value={editForm.father_aadhar_number} onChange={(e) => setEditForm(prev => ({ ...prev, father_aadhar_number: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-father-gender">Gender (Optional)</Label>
+                  <Select value={editForm.father_gender} onValueChange={(v) => setEditForm(prev => ({ ...prev, father_gender: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-father-salary">Salary Range (Optional)</Label>
+                  <Select value={editForm.father_salary_range} onValueChange={(v) => setEditForm(prev => ({ ...prev, father_salary_range: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select salary range" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="below_1l">Below 1L</SelectItem>
+                      <SelectItem value="1l_3l">1L - 3L</SelectItem>
+                      <SelectItem value="3l_5l">3L - 5L</SelectItem>
+                      <SelectItem value="5l_10l">5L - 10L</SelectItem>
+                      <SelectItem value="above_10l">Above 10L</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Mother Details */}
+              <p className="text-sm font-semibold text-muted-foreground pt-2">Mother's Details</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-mother-name">Name</Label>
+                  <Input id="edit-mother-name" value={editForm.mother_name} onChange={(e) => setEditForm(prev => ({ ...prev, mother_name: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-mother-email">Email</Label>
+                  <Input id="edit-mother-email" type="email" value={editForm.mother_email} onChange={(e) => setEditForm(prev => ({ ...prev, mother_email: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-mother-phone">Phone</Label>
+                  <Input id="edit-mother-phone" value={editForm.mother_phone} onChange={(e) => setEditForm(prev => ({ ...prev, mother_phone: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-mother-occupation">Occupation</Label>
+                  <Input id="edit-mother-occupation" value={editForm.mother_occupation} onChange={(e) => setEditForm(prev => ({ ...prev, mother_occupation: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-mother-aadhar">Aadhar Number</Label>
+                  <Input id="edit-mother-aadhar" value={editForm.mother_aadhar_number} onChange={(e) => setEditForm(prev => ({ ...prev, mother_aadhar_number: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-mother-gender">Gender (Optional)</Label>
+                  <Select value={editForm.mother_gender} onValueChange={(v) => setEditForm(prev => ({ ...prev, mother_gender: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-mother-salary">Salary Range (Optional)</Label>
+                  <Select value={editForm.mother_salary_range} onValueChange={(v) => setEditForm(prev => ({ ...prev, mother_salary_range: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select salary range" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="below_1l">Below 1L</SelectItem>
+                      <SelectItem value="1l_3l">1L - 3L</SelectItem>
+                      <SelectItem value="3l_5l">3L - 5L</SelectItem>
+                      <SelectItem value="5l_10l">5L - 10L</SelectItem>
+                      <SelectItem value="above_10l">Above 10L</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -607,23 +1034,59 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
               onClick={async () => {
                 if (selectedAdmission) {
                   try {
-                    // Send complete admission data with updated fields
                     const updateData = {
-                      admission_date: selectedAdmission.admission_date,
-                      academic_year_id: selectedAdmission.academic_year_id,
+                      // Admission fields
+                      admission_date: editForm.admission_date || selectedAdmission.admission_date,
+                      admission_type: editForm.admission_type || undefined,
+                      academic_year_id: editForm.academic_year_id || selectedAdmission.academic_year_id,
                       admitted_academic_year_id: selectedAdmission.admitted_academic_year_id,
-                      admitted_class_id: selectedAdmission.admitted_class_id,
-                      admitted_section_id: selectedAdmission.admitted_section_id,
+                      admitted_class_id: editForm.admitted_class_id || selectedAdmission.admitted_class_id,
+                      admitted_section_id: editForm.admitted_section_id || selectedAdmission.admitted_section_id,
                       current_class_id: editForm.current_class_id || selectedAdmission.current_class_id,
                       current_section_id: editForm.current_section_id || selectedAdmission.current_section_id,
                       address_line1: editForm.address_line1,
                       address_line2: editForm.address_line2,
                       city: editForm.city,
-                      state: editForm.state,
+                      state: editForm.state_id || editForm.state,  // use state_id (UUID) as state value
+                      state_id: editForm.state_id || undefined,
+                      district_id: editForm.district_id || undefined,
+                      mandal_id: editForm.mandal_id || undefined,
                       is_previous_school: editForm.is_previous_school,
                       previous_school_name: editForm.previous_school_name,
                       previous_class: editForm.previous_class,
-                      previous_school_remark: editForm.previous_school_remark
+                      previous_school_remark: editForm.previous_school_remark,
+                      // Student fields
+                      first_name: editForm.first_name || undefined,
+                      last_name: editForm.last_name || undefined,
+                      date_of_birth: editForm.date_of_birth || undefined,
+                      gender: editForm.gender || undefined,
+                      is_primary: editForm.is_primary || undefined,
+                      aadhar_number: editForm.aadhar_number || undefined,
+                      apaar_number: editForm.apaar_number || undefined,
+                      nationality: editForm.nationality || undefined,
+                      mother_tongue: editForm.mother_tongue || undefined,
+                      caste: editForm.caste_id || editForm.caste || undefined,
+                      caste_id: editForm.caste_id || undefined,
+                      sub_caste: editForm.sub_caste_id || editForm.sub_caste || undefined,
+                      sub_caste_id: editForm.sub_caste_id || undefined,
+                      community: editForm.community || undefined,
+                      identification_marks: editForm.identification_marks || undefined,
+                      // Father fields
+                      father_name: editForm.father_name || undefined,
+                      father_email: editForm.father_email || undefined,
+                      father_phone: editForm.father_phone || undefined,
+                      father_occupation: editForm.father_occupation || undefined,
+                      father_aadhar_number: editForm.father_aadhar_number || undefined,
+                      father_gender: editForm.father_gender || undefined,
+                      father_salary_range: editForm.father_salary_range || undefined,
+                      // Mother fields
+                      mother_name: editForm.mother_name || undefined,
+                      mother_email: editForm.mother_email || undefined,
+                      mother_phone: editForm.mother_phone || undefined,
+                      mother_occupation: editForm.mother_occupation || undefined,
+                      mother_aadhar_number: editForm.mother_aadhar_number || undefined,
+                      mother_gender: editForm.mother_gender || undefined,
+                      mother_salary_range: editForm.mother_salary_range || undefined,
                     };
 
                     await updateMutation.mutateAsync({

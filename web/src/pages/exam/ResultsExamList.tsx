@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useExamList } from '@/api/hooks/exam/useExam'
 import { useAcademicYearStore } from '@/lib/academicYearStore'
+import { useAuthStore } from '@/lib/authStore'
 import type { ExamStatus } from '@/types/exam'
 
 const STATUS_BADGE: Record<ExamStatus, string> = {
@@ -22,6 +23,8 @@ const STATUS_BADGE: Record<ExamStatus, string> = {
 export default function ResultsExamList() {
   const navigate = useNavigate()
   const { selectedAcademicYearId, academicYears, fetchAndSetAcademicYears } = useAcademicYearStore()
+  const { role } = useAuthStore()
+  const isStudentOrParent = ['student', 'parent'].includes(role?.name?.toLowerCase() ?? '')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortKey, setSortKey] = useState<'exam_name' | 'board' | 'status' | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
@@ -144,7 +147,7 @@ export default function ResultsExamList() {
                     key={exam.id}
                     className="cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/20"
                     style={{ height: '48px' }}
-                    onClick={() => navigate({ to: `/exam/results/${exam.id}` as any })}
+                    onClick={() => navigate({ to: (isStudentOrParent ? `/exam/my-marks/${exam.id}` : `/exam/results/${exam.id}`) as any })}
                   >
                     <td className="px-4 py-3 text-muted-foreground text-sm">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium">{exam.exam_name}</td>
@@ -161,7 +164,7 @@ export default function ResultsExamList() {
                     <td className="px-4 py-3 text-right">
                       <Button variant="ghost" size="sm" className="gap-1 text-xs">
                         <Award className="h-3 w-3" />
-                        View Results
+                        {isStudentOrParent ? 'View Marks' : 'View Results'}
                         <ChevronRight className="h-3 w-3" />
                       </Button>
                     </td>

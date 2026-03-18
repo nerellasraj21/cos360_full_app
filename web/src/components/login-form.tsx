@@ -114,11 +114,11 @@ export default function LoginForm({
                   )}
                 </div>
                 <div className="grid gap-2 sm:gap-3">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="username">Username / Admission Number</Label>
                   <Input
                     id="username"
                     type="text"
-                    placeholder="Enter Username"
+                    placeholder="Email or Admission Number"
                     required
                   />
                 </div>

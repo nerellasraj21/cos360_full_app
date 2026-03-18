@@ -809,6 +809,27 @@ export function useStudentResults(examId: string, params?: { student_id?: string
 }
 
 // ---------------------------------------------------------------------------
+// Raw Marks View (student/parent)
+// ---------------------------------------------------------------------------
+export function useMyMarks(examId: string) {
+  return useQuery({
+    queryKey: ['myMarks', examId],
+    queryFn: () => examApi.getMyMarks(examId),
+    enabled: !!examId,
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
+export function useChildMarks(examId: string, studentId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['childMarks', examId, studentId],
+    queryFn: () => examApi.getChildMarks(examId, studentId!),
+    enabled: !!examId && !!studentId,
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Combined grading schemes for wizard dropdowns
 // ---------------------------------------------------------------------------
 export function useGradingSchemes() {

@@ -1,5 +1,6 @@
 import CAxios from '@/api/index'
 import type {
+  StudentMarksView,
   ExamSettings,
   BoardExamPattern,
   BoardPatternCreate,
@@ -443,6 +444,18 @@ export const getStudentResults = async (examId: string, params?: { student_id?: 
 
 export const getStudentResult = async (examId: string, studentId: string): Promise<StudentExamResult> => {
   const response = await CAxios.get(`/exams/${examId}/results/${studentId}`)
+  return response.data
+}
+
+// Student views own entered marks (no compute/publish required)
+export const getMyMarks = async (examId: string): Promise<StudentMarksView> => {
+  const response = await CAxios.get(`/exams/${examId}/my-marks`)
+  return response.data
+}
+
+// Parent views child's entered marks (no compute/publish required)
+export const getChildMarks = async (examId: string, studentId: string): Promise<StudentMarksView> => {
+  const response = await CAxios.get(`/exams/${examId}/child-marks/${studentId}`)
   return response.data
 }
 

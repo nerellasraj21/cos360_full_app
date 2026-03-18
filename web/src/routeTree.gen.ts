@@ -113,6 +113,7 @@ import { Route as AppExamGradingIndexRouteImport } from './routes/_app/exam/grad
 import { Route as AppExamExamsIndexRouteImport } from './routes/_app/exam/exams/index'
 import { Route as AppStudentsAdmissionAdmissionIdRouteImport } from './routes/_app/students/admission/$admissionId'
 import { Route as AppExamResultsIdRouteImport } from './routes/_app/exam/results/$id'
+import { Route as AppExamMyMarksExamIdRouteImport } from './routes/_app/exam/my-marks/$examId'
 import { Route as AppExamMarksExamIdRouteImport } from './routes/_app/exam/marks/$examId'
 import { Route as AppExamHallTicketsExamIdRouteImport } from './routes/_app/exam/hall-tickets/$examId'
 import { Route as AppExamGradingSubjectSchemesRouteImport } from './routes/_app/exam/grading/subject-schemes'
@@ -665,6 +666,11 @@ const AppExamResultsIdRoute = AppExamResultsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AppExamResultsRoute,
 } as any)
+const AppExamMyMarksExamIdRoute = AppExamMyMarksExamIdRouteImport.update({
+  id: '/my-marks/$examId',
+  path: '/my-marks/$examId',
+  getParentRoute: () => AppExamRoute,
+} as any)
 const AppExamMarksExamIdRoute = AppExamMarksExamIdRouteImport.update({
   id: '/$examId',
   path: '/$examId',
@@ -868,6 +874,7 @@ export interface FileRoutesByFullPath {
   '/exam/grading/subject-schemes': typeof AppExamGradingSubjectSchemesRoute
   '/exam/hall-tickets/$examId': typeof AppExamHallTicketsExamIdRouteWithChildren
   '/exam/marks/$examId': typeof AppExamMarksExamIdRouteWithChildren
+  '/exam/my-marks/$examId': typeof AppExamMyMarksExamIdRoute
   '/exam/results/$id': typeof AppExamResultsIdRoute
   '/students/admission/$admissionId': typeof AppStudentsAdmissionAdmissionIdRoute
   '/exam/exams/': typeof AppExamExamsIndexRoute
@@ -979,6 +986,7 @@ export interface FileRoutesByTo {
   '/exam/grading/subject-schemes': typeof AppExamGradingSubjectSchemesRoute
   '/exam/hall-tickets/$examId': typeof AppExamHallTicketsExamIdRouteWithChildren
   '/exam/marks/$examId': typeof AppExamMarksExamIdRouteWithChildren
+  '/exam/my-marks/$examId': typeof AppExamMyMarksExamIdRoute
   '/exam/results/$id': typeof AppExamResultsIdRoute
   '/students/admission/$admissionId': typeof AppStudentsAdmissionAdmissionIdRoute
   '/exam/exams': typeof AppExamExamsIndexRoute
@@ -1104,6 +1112,7 @@ export interface FileRoutesById {
   '/_app/exam/grading/subject-schemes': typeof AppExamGradingSubjectSchemesRoute
   '/_app/exam/hall-tickets/$examId': typeof AppExamHallTicketsExamIdRouteWithChildren
   '/_app/exam/marks/$examId': typeof AppExamMarksExamIdRouteWithChildren
+  '/_app/exam/my-marks/$examId': typeof AppExamMyMarksExamIdRoute
   '/_app/exam/results/$id': typeof AppExamResultsIdRoute
   '/_app/students/admission/$admissionId': typeof AppStudentsAdmissionAdmissionIdRoute
   '/_app/exam/exams/': typeof AppExamExamsIndexRoute
@@ -1228,6 +1237,7 @@ export interface FileRouteTypes {
     | '/exam/grading/subject-schemes'
     | '/exam/hall-tickets/$examId'
     | '/exam/marks/$examId'
+    | '/exam/my-marks/$examId'
     | '/exam/results/$id'
     | '/students/admission/$admissionId'
     | '/exam/exams/'
@@ -1339,6 +1349,7 @@ export interface FileRouteTypes {
     | '/exam/grading/subject-schemes'
     | '/exam/hall-tickets/$examId'
     | '/exam/marks/$examId'
+    | '/exam/my-marks/$examId'
     | '/exam/results/$id'
     | '/students/admission/$admissionId'
     | '/exam/exams'
@@ -1463,6 +1474,7 @@ export interface FileRouteTypes {
     | '/_app/exam/grading/subject-schemes'
     | '/_app/exam/hall-tickets/$examId'
     | '/_app/exam/marks/$examId'
+    | '/_app/exam/my-marks/$examId'
     | '/_app/exam/results/$id'
     | '/_app/students/admission/$admissionId'
     | '/_app/exam/exams/'
@@ -2218,6 +2230,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppExamResultsIdRouteImport
       parentRoute: typeof AppExamResultsRoute
     }
+    '/_app/exam/my-marks/$examId': {
+      id: '/_app/exam/my-marks/$examId'
+      path: '/my-marks/$examId'
+      fullPath: '/exam/my-marks/$examId'
+      preLoaderRoute: typeof AppExamMyMarksExamIdRouteImport
+      parentRoute: typeof AppExamRoute
+    }
     '/_app/exam/marks/$examId': {
       id: '/_app/exam/marks/$examId'
       path: '/$examId'
@@ -2529,6 +2548,7 @@ interface AppExamRouteChildren {
   AppExamResultsRoute: typeof AppExamResultsRouteWithChildren
   AppExamSettingsRoute: typeof AppExamSettingsRoute
   AppExamIndexRoute: typeof AppExamIndexRoute
+  AppExamMyMarksExamIdRoute: typeof AppExamMyMarksExamIdRoute
 }
 
 const AppExamRouteChildren: AppExamRouteChildren = {
@@ -2541,6 +2561,7 @@ const AppExamRouteChildren: AppExamRouteChildren = {
   AppExamResultsRoute: AppExamResultsRouteWithChildren,
   AppExamSettingsRoute: AppExamSettingsRoute,
   AppExamIndexRoute: AppExamIndexRoute,
+  AppExamMyMarksExamIdRoute: AppExamMyMarksExamIdRoute,
 }
 
 const AppExamRouteWithChildren =
