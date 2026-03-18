@@ -11,6 +11,7 @@ class HolidayBase(BaseModel):
     end_date: date
     is_active: bool = False
     academic_year_id: UUID
+    color: str | None = None
 
 
 class HolidayCreate(HolidayBase):
@@ -23,6 +24,7 @@ class HolidayUpdate(BaseModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     is_active: bool | None = None
+    color: str | None = None
 
 
 class HolidayRead(HolidayBase):

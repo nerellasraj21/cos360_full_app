@@ -21,6 +21,7 @@ async def create_holiday(db: AsyncSession, holiday_data: HolidayCreate):
             end_date=holiday_data.end_date,
             is_active=holiday_data.is_active,
             academic_year_id=holiday_data.academic_year_id,
+            color=holiday_data.color,
         )
         db.add(db_query)
         await db.flush()

@@ -10,7 +10,6 @@ class StudentTransportBase(BaseModel):
     student_id: UUID
     trip_id: UUID
     stop_id: UUID
-    fee_term_id: UUID | None = None
     fee_per_term: Annotated[float, confloat(gt=0)] = Field(..., description="Fee must be positive")
     pricing_id: UUID | None = None
 
@@ -22,7 +21,6 @@ class StudentTransportCreate(StudentTransportBase):
 class StudentTransportUpdate(BaseModel):
     trip_id: UUID | None = None
     stop_id: UUID | None = None
-    fee_term_id: UUID | None = None
     fee_per_term: Annotated[float, confloat(gt=0)] | None = None
     pricing_id: UUID | None = None
 
@@ -61,6 +59,8 @@ class StopInfo(BaseModel):
     name: str
     number: int | None = None
     reaching_time: time | None = None
+    pickup_time: time | None = None
+    drop_time: time | None = None
     fees: int | None = None
     model_config = {"from_attributes": True}
 

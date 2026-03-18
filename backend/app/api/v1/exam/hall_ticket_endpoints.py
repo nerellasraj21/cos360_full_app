@@ -20,6 +20,7 @@ from app.db.tenant_session import get_tenant_db
 from app.schemas.exam.hall_ticket_schema import (
     ComputeEligibilityResponse,
     EligibilityOverrideRequest,
+    EnrolledStudentRead,
     HallTicketEligibilityRead,
     PublishHallTicketsResponse,
 )
@@ -27,6 +28,7 @@ from app.service.exam.audit_service import log_action
 from app.service.exam.hall_ticket_service import (
     compute_eligibility,
     get_eligible_students,
+    get_enrolled_students_for_exam,
     get_ineligible_students,
     override_eligibility,
     publish_hall_tickets,
@@ -35,6 +37,19 @@ from app.tasks.exam.hall_ticket_pdf import generate_all_hall_tickets_zip, genera
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
 router = APIRouter(prefix="/exams", tags=["Hall Tickets"])
+
+
+@router.get("/{exam_id}/hall-tickets/enrolled-students", response_model=list[EnrolledStudentRead])
+async def list_enrolled_students(
+    exam_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """List all students enrolled in the exam's class-sections (no compute required)."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "read")
+    return await get_enrolled_students_for_exam(db, exam_id)
 
 
 @router.post("/{exam_id}/hall-tickets/compute", response_model=ComputeEligibilityResponse)
