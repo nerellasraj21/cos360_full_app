@@ -87,7 +87,7 @@ export default function StudentSelector({
           </Text>
         </View>
         {selectedStudent?.id === item.id && (
-          <IconSymbol name="checkmark" size={20} color="#1e3a8a" />
+          <IconSymbol name="checkmark" size={20} color="#556ee6" />
         )}
       </View>
     </TouchableOpacity>

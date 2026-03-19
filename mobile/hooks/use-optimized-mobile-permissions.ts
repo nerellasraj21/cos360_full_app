@@ -116,7 +116,7 @@ export const useOptimizedMobilePermissions = (): UseOptimizedMobilePermissionRes
       if (user && role) {
         const checkTime = performance.now() - startTime;
         permissionAnalytics.recordPermissionCheck(
-          user.id || 'unknown',
+          String(user.id) || 'unknown',
           role.name || 'unknown',
           resource,
           action,
@@ -150,7 +150,7 @@ export const useOptimizedMobilePermissions = (): UseOptimizedMobilePermissionRes
     // Record analytics
     if (user && role) {
       permissionAnalytics.recordPermissionCheck(
-        user.id || 'unknown',
+        String(user.id) || 'unknown',
         role.name || 'unknown',
         resource,
         action,

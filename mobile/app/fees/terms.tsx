@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { AppLayout } from '@/components';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { FeeTermResponse, FeeTermRequest, feeTermsApi } from '@/src/api/fees';
@@ -19,12 +20,36 @@ import {
     Alert,
     FlatList,
     Modal,
+    Platform,
     StyleSheet,
     Switch,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+
+const formatToDisplay = (iso: string): string => {
+  if (!iso || !iso.match(/^\d{4}-\d{2}-\d{2}$/)) return '';
+  const [yyyy, mm, dd] = iso.split('-');
+  return `${dd}/${mm}/${yyyy}`;
+};
+
+const parseDdMmYyyy = (display: string): string | null => {
+  const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, dd, mm, yyyy] = match;
+  const iso = `${yyyy}-${mm}-${dd}`;
+  const date = new Date(iso + 'T00:00:00');
+  if (isNaN(date.getTime())) return null;
+  return iso;
+};
+
+const autoFormatDateInput = (text: string): string => {
+  const digits = text.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
 
 
 export default function FeeTermsScreen() {
@@ -39,6 +64,7 @@ export default function FeeTermsScreen() {
   });
 
   const [selectedDate, setSelectedDate] = useState('');
+  const [dateDisplayValue, setDateDisplayValue] = useState('');
   const [showPicker, setShowPicker] = useState(false);
 
   const colorScheme = useColorScheme();
@@ -106,6 +132,7 @@ export default function FeeTermsScreen() {
       fee_term_dates: [],
     });
     setSelectedDate('');
+    setDateDisplayValue('');
     setShowPicker(false);
     setEditingTerm(null);
   };
@@ -126,6 +153,7 @@ export default function FeeTermsScreen() {
       fee_term_dates: term.fee_term_dates?.map(td => ({ fee_term_date: td.fee_term_date })) || [],
     });
     setSelectedDate('');
+    setDateDisplayValue('');
     setShowPicker(false);
     setIsModalVisible(true);
   };
@@ -263,9 +291,9 @@ export default function FeeTermsScreen() {
 
   return (
     <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS}>
+      <AppLayout title="Fee Terms">
       <ThemedView style={styles.container}>
         <View style={styles.header}>
-          <ThemedText type="title">Fee Terms</ThemedText>
           <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS}>
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: colors.primary }]}
@@ -354,17 +382,31 @@ export default function FeeTermsScreen() {
 
               <ThemedText style={styles.label}>Add Term Date</ThemedText>
               <View style={styles.row}>
-                <TouchableOpacity
-                  style={[styles.dateInput, {
-                    backgroundColor: colors.background,
-                    borderColor: colors.border,
-                  }]}
-                  onPress={() => setShowPicker(true)}
-                >
-                  <ThemedText style={{ color: selectedDate ? colors.foreground : colors['muted-foreground'] }}>
-                    {selectedDate || 'Select date'}
-                  </ThemedText>
-                </TouchableOpacity>
+                <View style={[styles.dateInput, {
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }]}>
+                  <TextInput
+                    style={{ color: colors.foreground, flex: 1, fontSize: 16 }}
+                    placeholder="DD/MM/YYYY"
+                    placeholderTextColor={colors['muted-foreground']}
+                    value={dateDisplayValue}
+                    onChangeText={(text) => {
+                      const formatted = autoFormatDateInput(text);
+                      setDateDisplayValue(formatted);
+                      const parsed = parseDdMmYyyy(formatted);
+                      if (parsed) setSelectedDate(parsed);
+                      else if (!text) setSelectedDate('');
+                    }}
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
+                  <TouchableOpacity onPress={() => setShowPicker(true)} style={{ paddingLeft: 8 }}>
+                    <Ionicons name="calendar-outline" size={18} color={colors['muted-foreground']} />
+                  </TouchableOpacity>
+                </View>
                 <TouchableOpacity
                   style={[styles.addDateButton, { backgroundColor: colors.primary }]}
                   onPress={() => {
@@ -374,6 +416,7 @@ export default function FeeTermsScreen() {
                         fee_term_dates: [...prev.fee_term_dates, { fee_term_date: selectedDate }]
                       }));
                       setSelectedDate('');
+                      setDateDisplayValue('');
                     }
                   }}
                   disabled={!selectedDate || formData.fee_term_dates.length >= formData.number_of_terms}
@@ -386,7 +429,7 @@ export default function FeeTermsScreen() {
               {formData.fee_term_dates.map((item, index) => (
                 <View key={index} style={[styles.dateItem, { backgroundColor: colors.background }]}>
                   <ThemedText style={{ color: colors.foreground, flex: 1 }}>
-                    {item.fee_term_date}
+                    {formatToDisplay(item.fee_term_date) || item.fee_term_date}
                   </ThemedText>
                   <TouchableOpacity
                     style={[styles.removeButton, { backgroundColor: colors.destructive }]}
@@ -403,19 +446,21 @@ export default function FeeTermsScreen() {
               ))}
             </View>
 
-            {showPicker && (
+            {showPicker ? (
               <DateTimePicker
-                value={selectedDate ? new Date(selectedDate) : new Date()}
+                value={selectedDate ? new Date(selectedDate + 'T00:00:00') : new Date()}
                 mode="date"
-                display="default"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={(event, date) => {
-                  if (date) {
-                    setSelectedDate(date.toISOString().split('T')[0]);
-                  }
                   setShowPicker(false);
+                  if (event.type === 'set' && date) {
+                    const iso = date.toISOString().split('T')[0];
+                    setSelectedDate(iso);
+                    setDateDisplayValue(formatToDisplay(iso));
+                  }
                 }}
               />
-            )}
+            ) : null}
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -439,6 +484,7 @@ export default function FeeTermsScreen() {
         </View>
       </Modal>
       </ThemedView>
+      </AppLayout>
     </ReadOrListPermissionGuard>
   );
 }

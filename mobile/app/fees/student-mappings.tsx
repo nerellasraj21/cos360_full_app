@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { AppLayout } from '@/components';
 import CustomDropdown from '@/components/ui/dropdown';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -90,7 +91,7 @@ export default function FeeStudentMappingsScreen() {
 
   const { data: students = [] } = useQuery({
     queryKey: ['students-dropdown'],
-    queryFn: () => studentAdmissionsApi.studentsDropdown(true), // true for active only
+    queryFn: () => studentAdmissionsApi.studentsDropdown({ active_only: true }),
   });
 
   const { data: classSections = [] } = useQuery({
@@ -508,9 +509,9 @@ export default function FeeStudentMappingsScreen() {
 
   return (
     <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS}>
+      <AppLayout title="Student Mappings">
       <ThemedView style={styles.container}>
         <View style={styles.header}>
-          <ThemedText type="title">Student Mappings</ThemedText>
           <View style={styles.headerButtons}>
             <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS}>
               <TouchableOpacity
@@ -536,7 +537,7 @@ export default function FeeStudentMappingsScreen() {
         </View>
 
         {/* Filters */}
-        {/* <View style={[styles.filtersContainer, { backgroundColor: colors.card }]}>
+        <View style={[styles.filtersContainer, { backgroundColor: colors.card }]}>
           <ThemedText type="subtitle" style={styles.filtersTitle}>Filters</ThemedText>
           <View style={styles.filtersRow}>
             <View style={styles.filterItem}>
@@ -557,15 +558,6 @@ export default function FeeStudentMappingsScreen() {
                 placeholder="All classes"
               />
             </View>
-            <View style={styles.filterItem}>
-              <ThemedText style={styles.filterLabel}>Section</ThemedText>
-              <CustomDropdown
-                data={[{ label: 'All Sections', value: '' }, ...allSectionOptions]}
-                value={filters.section_id}
-                onChange={(value) => setFilters(prev => ({ ...prev, section_id: value as string }))}
-                placeholder="All sections"
-              />
-            </View>
           </View>
           <View style={styles.filtersRow}>
             <View style={styles.filterItem}>
@@ -575,15 +567,6 @@ export default function FeeStudentMappingsScreen() {
                 value={filters.fee_type_id}
                 onChange={(value) => setFilters(prev => ({ ...prev, fee_type_id: value as string }))}
                 placeholder="All fee types"
-              />
-            </View>
-            <View style={styles.filterItem}>
-              <ThemedText style={styles.filterLabel}>Academic Year</ThemedText>
-              <CustomDropdown
-                data={[{ label: 'All Years', value: '' }, ...academicYears.map(year => ({ label: year.title, value: year.id }))]}
-                value={filters.academic_year_id}
-                onChange={(value) => setFilters(prev => ({ ...prev, academic_year_id: value as string }))}
-                placeholder="All years"
               />
             </View>
             <View style={styles.filterItem}>
@@ -601,7 +584,7 @@ export default function FeeStudentMappingsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View> */}
+        </View>
 
         {selectedMappings.length > 0 && (
           <View style={[styles.selectionBar, { backgroundColor: colors.accent }]}>
@@ -919,6 +902,7 @@ export default function FeeStudentMappingsScreen() {
           </View>
         </Modal>
       </ThemedView>
+      </AppLayout>
     </ReadOrListPermissionGuard>
   );
 }

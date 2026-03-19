@@ -99,7 +99,7 @@ export default function StudentTransportScreen() {
     return studentTransportData.filter((item: StudentTransport) => {
       const student = students.find(s => s.id === item.student_id);
       const route = routes.find(r => r.id === item.route_id);
-      const matchesSearch = student?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      const matchesSearch = student?.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             route?.route_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             item.trip_type.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesSearch;
@@ -137,7 +137,7 @@ export default function StudentTransportScreen() {
     const student = students.find(s => s.id === transport.student_id);
     Alert.alert(
       'Delete Student Transport',
-      `Are you sure you want to delete transport for ${student?.name || 'Unknown Student'}?`,
+      `Are you sure you want to delete transport for ${student?.display_name || 'Unknown Student'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -181,7 +181,7 @@ export default function StudentTransportScreen() {
         <View style={styles.transportHeader}>
           <View style={styles.transportInfo}>
             <ThemedText type="subtitle" style={styles.studentName}>
-              {student?.name || 'Unknown Student'}
+              {student?.display_name || 'Unknown Student'}
             </ThemedText>
             <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#10B981' : '#EF4444' }]}>
               <ThemedText style={styles.statusText}>
@@ -363,7 +363,7 @@ export default function StudentTransportScreen() {
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.label}>Student *</ThemedText>
                   <CustomDropdown
-                    data={students.map(student => ({ label: student.name, value: student.id }))}
+                    data={students.map(student => ({ label: student.display_name, value: student.id }))}
                     value={formData.student_id}
                     onChange={(value) => setFormData(prev => ({ ...prev, student_id: value?.toString() || '' }))}
                     placeholder="Select student"

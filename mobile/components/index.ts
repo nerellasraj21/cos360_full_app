@@ -26,7 +26,6 @@ export * from './LoadingIndicator';
 export * from './parallax-scroll-view';
 export * from './PermissionGuard';
 export * from './PermissionGuards';
-export * from './PermissionErrorBoundary';
 export * from './ToastProvider';
 
 // Navigation protection components

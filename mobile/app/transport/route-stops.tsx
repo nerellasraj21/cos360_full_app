@@ -432,10 +432,10 @@ export default function RouteStopsScreen() {
                 <TouchableOpacity
                   style={[styles.button, styles.submitButton, { backgroundColor: colors.primary }]}
                   onPress={handleSubmit}
-                  disabled={createMutation.isLoading || updateMutation.isLoading}
+                  disabled={createMutation.isPending || updateMutation.isPending}
                 >
                   <ThemedText style={styles.submitButtonText}>
-                    {createMutation.isLoading || updateMutation.isLoading ? 'Saving...' : (editingStop ? 'Update' : 'Create')}
+                    {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingStop ? 'Update' : 'Create')}
                   </ThemedText>
                 </TouchableOpacity>
               </View>

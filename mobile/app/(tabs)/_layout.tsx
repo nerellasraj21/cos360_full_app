@@ -52,6 +52,11 @@ const TAB_CONFIGS: TabConfig[] = [
     requireAll: false,
   },
   {
+    name: 'exam',
+    moduleResources: ['exams', 'exam_marks', 'exam_results', 'exam_hall_tickets'],
+    requireAll: false,
+  },
+  {
     name: 'profile',
     moduleResources: [],
     alwaysShow: true,

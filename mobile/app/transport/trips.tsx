@@ -401,10 +401,10 @@ export default function TripsScreen() {
                 <TouchableOpacity
                   style={[styles.button, styles.submitButton, { backgroundColor: colors.primary }]}
                   onPress={handleSubmit}
-                  disabled={createMutation.isLoading || updateMutation.isLoading}
+                  disabled={createMutation.isPending || updateMutation.isPending}
                 >
                   <ThemedText style={styles.submitButtonText}>
-                    {createMutation.isLoading || updateMutation.isLoading ? 'Saving...' : (editingTrip ? 'Update' : 'Create')}
+                    {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingTrip ? 'Update' : 'Create')}
                   </ThemedText>
                 </TouchableOpacity>
               </View>

@@ -29,15 +29,11 @@ import type {
 } from '../src/types/transport';
 
 // Routes hooks with permission protection
-export const useRoutes = (params?: {
-  skip?: number;
-  limit?: number;
-  is_active?: boolean;
-}) => {
+export const useRoutes = () => {
   return usePermissionProtectedListQuery(
     PERMISSION_RESOURCES.TRANSPORT_ROUTES,
-    ['routes', params],
-    () => routesApi.getRoutes(params)
+    ['routes'],
+    () => routesApi.getRoutes()
   );
 };
 
@@ -281,7 +277,7 @@ export const useStudents = () => {
     queryKey: ['students-dropdown'],
     queryFn: async () => {
       const { studentAdmissionsApi } = await import('../src/api/students');
-      return studentAdmissionsApi.studentsDropdown(true); // Only active students
+      return studentAdmissionsApi.studentsDropdown({ active_only: true }); // Only active students
     },
   });
 };

@@ -1,161 +1,88 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
-import { Colors } from '@/constants/theme';
 import { useTheme } from '@/contexts';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
+const AMBER = '#F59E0B';
+
+const sections = [
+  { title: 'Routes',            description: 'Manage transport routes and schedules',        icon: 'map' as const,      color: AMBER,     route: '/transport/routes',          resource: PERMISSION_RESOURCES.TRANSPORT_ROUTES,      action: 'list' },
+  { title: 'Route Stops',       description: 'Manage stops along transport routes',          icon: 'location' as const, color: '#D97706', route: '/transport/route-stops',     resource: PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS, action: 'list' },
+  { title: 'Vehicles',          description: 'Fleet management and maintenance tracking',    icon: 'car' as const,      color: AMBER,     route: '/transport/vehicles',        resource: PERMISSION_RESOURCES.TRANSPORT_VEHICLES,    action: 'list' },
+  { title: 'Trips',             description: 'Assign vehicles and drivers to routes',        icon: 'navigate' as const, color: '#B45309', route: '/transport/trips',           resource: PERMISSION_RESOURCES.TRANSPORT_TRIPS,       action: 'list' },
+  { title: 'Student Transport', description: 'Manage student transport assignments',         icon: 'people' as const,   color: AMBER,     route: '/transport/studentTransport',resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,     action: 'list' },
+  { title: 'Student Trips',     description: 'Detailed student trip assignments with fees',  icon: 'person' as const,   color: '#D97706', route: '/transport/studentTrips',    resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,     action: 'list' },
+];
+
 export default function TransportScreen() {
   const router = useRouter();
-  const { theme, colors } = useTheme();
-  const themeColors = colors;
+  const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
 
-  const transportModules = [
-   {
-     id: 'routes',
-     title: 'Routes',
-     description: 'Manage transport routes and schedules',
-     icon: 'bus-outline',
-     screen: '/transport/routes',
-     color: '#3B82F6',
-   },
-   {
-     id: 'route-stops',
-     title: 'Route Stops',
-     description: 'Manage stops along transport routes',
-     icon: 'location-outline',
-     screen: '/transport/route-stops',
-     color: '#EF4444',
-   },
-   {
-     id: 'vehicles',
-     title: 'Vehicles',
-     description: 'Fleet management and maintenance',
-     icon: 'car-outline',
-     screen: '/transport/vehicles',
-     color: '#10B981',
-   },
-   {
-     id: 'trips',
-     title: 'Trips',
-     description: 'Assign vehicles and drivers to routes',
-     icon: 'navigate-outline',
-     screen: '/transport/trips',
-     color: '#F59E0B',
-   },
-   {
-     id: 'student-transport',
-     title: 'Student Transport',
-     description: 'Manage student transport assignments',
-     icon: 'people-outline',
-     screen: '/transport/studentTransport',
-     color: '#8B5CF6',
-   },
-   {
-     id: 'student-trips',
-     title: 'Student Trips',
-     description: 'Detailed student trip assignments with fees',
-     icon: 'person-outline',
-     screen: '/transport/studentTrips',
-     color: '#06B6D4',
-   },
- ];
-
-  const renderModuleCard = (module: typeof transportModules[0]) => {
-    const resourceMap: { [key: string]: string } = {
-      'routes': PERMISSION_RESOURCES.TRANSPORT_ROUTES,
-      'route-stops': PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS,
-      'vehicles': PERMISSION_RESOURCES.TRANSPORT_VEHICLES,
-      'trips': PERMISSION_RESOURCES.TRANSPORT_TRIPS,
-      'student-transport': PERMISSION_RESOURCES.STUDENT_TRANSPORT,
-      'student-trips': PERMISSION_RESOURCES.STUDENT_TRANSPORT, // Using same resource for both student transport modules
-    };
-
-    const resource = resourceMap[module.id] || PERMISSION_RESOURCES.TRANSPORT_ROUTES;
-    const hasAccess = hasPermission ? hasPermission(resource, 'list') : false;
-
-    const handlePress = () => {
-      if (hasAccess) {
-        router.push(module.screen as any);
-      }
-    };
-
-    return (
-      <TouchableOpacity
-        key={module.id}
-        style={[
-          styles.moduleCard, 
-          { 
-            backgroundColor: hasAccess ? themeColors.card : themeColors.muted,
-            opacity: hasAccess ? 1 : 0.6
-          }
-        ]}
-        onPress={handlePress}
-        disabled={!hasAccess}
-      >
-        <View style={[
-          styles.iconContainer, 
-          { 
-            backgroundColor: hasAccess 
-              ? module.color + '20' 
-              : themeColors['muted-foreground'] + '20'
-          }
-        ]}>
-          {hasAccess ? (
-            <Ionicons name={module.icon as any} size={32} color={module.color} />
-          ) : (
-            <Ionicons name="lock-closed" size={32} color={themeColors['muted-foreground']} />
-          )}
-        </View>
-        <View style={styles.moduleInfo}>
-          <ThemedText style={styles.moduleTitle}>{module.title}</ThemedText>
-          <ThemedText style={styles.moduleDescription}>
-            {hasAccess 
-              ? module.description 
-              : "You don't have permission to access this feature"
-            }
-          </ThemedText>
-        </View>
-        {hasAccess ? (
-          <Ionicons name="chevron-forward" size={20} color={themeColors['muted-foreground']} />
-        ) : (
-          <Ionicons name="lock-closed" size={20} color={themeColors['muted-foreground']} />
-        )}
-      </TouchableOpacity>
-    );
-  };
+  const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
+  const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
   return (
     <AppLayout title="Transport">
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Welcome Section */}
-        <View style={[styles.welcomeCard, { backgroundColor: themeColors.card }]}>
-          <Ionicons name="bus" size={48} color={themeColors.primary} />
-          <ThemedText style={styles.welcomeTitle}>Welcome to Transport</ThemedText>
-          <ThemedText style={styles.welcomeText}>
-            Manage your schools transportation system efficiently with our comprehensive tools.
-          </ThemedText>
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+
+        {/* Banner */}
+        <View style={[styles.banner, { backgroundColor: AMBER }]}>
+          <View style={styles.bannerDecor} />
+          <View style={styles.bannerDecor2} />
+          <View style={styles.bannerIcon}>
+            <Ionicons name="bus" size={28} color="white" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.bannerTitle}>Transport Management</Text>
+            <Text style={styles.bannerSub}>Routes · Vehicles · Trips · Students</Text>
+          </View>
         </View>
 
-        {/* Transport Modules */}
-        <View style={styles.modulesSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>
-            Transport Modules
-          </ThemedText>
+        {/* Section label */}
+        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>TRANSPORT SECTIONS</Text>
 
-          {transportModules.map(renderModuleCard)}
+        {/* Grid */}
+        <View style={styles.grid}>
+          {sections.map((section, i) => {
+            const hasAccess = hasPermission ? hasPermission(section.resource, section.action) : false;
+            return (
+              <TouchableOpacity
+                key={i}
+                style={[
+                  styles.sectionCard,
+                  { backgroundColor: cardBg, borderColor: borderCol },
+                  !hasAccess && { opacity: 0.5 },
+                ]}
+                onPress={() => hasAccess && router.push(section.route as any)}
+                disabled={!hasAccess}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.sectionIconBox, { backgroundColor: section.color + '18' }]}>
+                  <Ionicons
+                    name={hasAccess ? section.icon : 'lock-closed'}
+                    size={24}
+                    color={hasAccess ? section.color : '#9ca3af'}
+                  />
+                </View>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]} numberOfLines={2}>
+                  {section.title}
+                </Text>
+                <Text style={[styles.sectionDesc, { color: colors['muted-foreground'] }]} numberOfLines={2}>
+                  {hasAccess ? section.description : 'No access — contact admin'}
+                </Text>
+                {hasAccess && (
+                  <View style={[styles.sectionArrow, { backgroundColor: section.color + '18' }]}>
+                    <Ionicons name="arrow-forward" size={12} color={section.color} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </ScrollView>
     </AppLayout>
@@ -163,68 +90,49 @@ export default function TransportScreen() {
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-    padding: 16,
+  scroll: { flex: 1 },
+  content: { padding: 16, paddingBottom: 32 },
+  banner: {
+    borderRadius: 18, padding: 18,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    marginBottom: 16, overflow: 'hidden',
   },
-  welcomeCard: {
-    borderRadius: 12,
-    padding: 24,
-    marginBottom: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  bannerDecor: {
+    position: 'absolute', top: -30, right: -30,
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  welcomeTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 8,
+  bannerDecor2: {
+    position: 'absolute', bottom: -40, right: 60,
+    width: 90, height: 90, borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  welcomeText: {
-    textAlign: 'center',
-    opacity: 0.8,
-    lineHeight: 20,
+  bannerIcon: {
+    width: 52, height: 52, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  modulesSection: {
-    marginBottom: 16,
+  bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 2 },
+  bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 16 },
+  sectionLabel: {
+    fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12,
   },
-  sectionTitle: {
-    marginBottom: 16,
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  sectionCard: {
+    width: '48%', borderRadius: 14, borderWidth: 1,
+    padding: 16, minHeight: 120,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
-  moduleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+  sectionIconBox: {
+    width: 44, height: 44, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 10,
   },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  moduleInfo: {
-    flex: 1,
-  },
-  moduleTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  moduleDescription: {
-    fontSize: 14,
-    opacity: 0.7,
+  sectionTitle: { fontSize: 13, fontWeight: '700', marginBottom: 4, lineHeight: 18 },
+  sectionDesc: { fontSize: 11, lineHeight: 16, flex: 1 },
+  sectionArrow: {
+    alignSelf: 'flex-end', marginTop: 8,
+    width: 22, height: 22, borderRadius: 11,
+    justifyContent: 'center', alignItems: 'center',
   },
 });

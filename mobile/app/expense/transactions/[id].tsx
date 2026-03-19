@@ -226,7 +226,7 @@ export default function ExpenseTransactionDetailScreen() {
                 <TouchableOpacity
                   style={[styles.actionButton, styles.rejectButton]}
                   onPress={handleReject}
-                  disabled={approveMutation.isLoading}
+                  disabled={approveMutation.isPending}
                 >
                   <Ionicons name="close" size={16} color="white" />
                   <ThemedText style={styles.actionButtonText}>Reject</ThemedText>
@@ -235,7 +235,7 @@ export default function ExpenseTransactionDetailScreen() {
                 <TouchableOpacity
                   style={[styles.actionButton, styles.approveButton]}
                   onPress={handleApprove}
-                  disabled={approveMutation.isLoading}
+                  disabled={approveMutation.isPending}
                 >
                   <Ionicons name="checkmark" size={16} color="white" />
                   <ThemedText style={styles.actionButtonText}>Approve</ThemedText>
@@ -296,10 +296,10 @@ export default function ExpenseTransactionDetailScreen() {
                     backgroundColor: approvalAction === 'approve' ? '#10B981' : '#EF4444'
                   }]}
                   onPress={handleApprovalSubmit}
-                  disabled={approveMutation.isLoading}
+                  disabled={approveMutation.isPending}
                 >
                   <ThemedText style={styles.submitButtonText}>
-                    {approveMutation.isLoading ? 'Processing...' :
+                    {approveMutation.isPending ? 'Processing...' :
                      approvalAction === 'approve' ? 'Approve' : 'Reject'}
                   </ThemedText>
                 </TouchableOpacity>

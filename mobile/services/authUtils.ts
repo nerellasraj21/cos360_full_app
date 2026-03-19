@@ -396,12 +396,13 @@ export const isAuthenticated = async (): Promise<boolean> => {
 /**
  * Login user with credentials
  */
-export const loginUser = async (username: string, password: string, clientName?: string): Promise<AuthResponse> => {
+export const loginUser = async (username: string, password: string, clientName?: string, academicYearId?: string): Promise<AuthResponse> => {
   try {
     const response = await apiClient.post('/auth/login', {
       username,
       password,
       client_name: clientName,
+      academic_year_id: academicYearId,
     });
 
     // Store auth data
@@ -418,17 +419,10 @@ export const loginUser = async (username: string, password: string, clientName?:
  * Logout user
  */
 export const logoutUser = async (): Promise<void> => {
-  try {
-    // Call logout API
-    await apiClient.post('/auth/logout');
-
-    // Clear local auth data
-    await clearAuthData();
-  } catch (error) {
-    console.error('Logout error:', error);
-    // Still clear local data even if API call fails
-    await clearAuthData();
-  }
+  // Clear local auth data immediately — don't wait for the API
+  await clearAuthData();
+  // Notify server in background (fire-and-forget)
+  apiClient.post('/auth/logout').catch(() => {});
 };
 
 /**

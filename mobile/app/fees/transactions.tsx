@@ -83,7 +83,7 @@ export default function FeeTransactionsScreen() {
 
   const { data: students = [] } = useQuery({
     queryKey: ['studentsDropdown'],
-    queryFn: () => studentAdmissionsApi.getStudentsDropdown(),
+    queryFn: () => studentAdmissionsApi.studentsDropdown({ active_only: true }),
   });
 
   // const { data: academicYears = [] } = useQuery({
@@ -778,7 +778,7 @@ export default function FeeTransactionsScreen() {
                                 setFormData(prev => ({
                                   ...prev,
                                   transaction_items: newItems,
-                                  total_amount: newItems.reduce((sum, item) => (item.amount_paid || 0), 0)
+                                  total_amount: newItems.reduce((sum, item) => sum + (item.amount_paid || 0), 0)
                                 }));
                               }}
                               placeholder="0.00"

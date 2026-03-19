@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/nerel/Documents/Workspace/React Workspace/COS360_Frontend/**)",
+      "Bash(curl:*)",
+      "WebFetch(domain:www.cos360.app)",
+      "Bash(ls:*)",
+      "Bash(python:*)",
+      "Bash(npx tsc:*)",
+      "Bash(echo:*)"
+    ]
+  }
+}

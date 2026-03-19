@@ -443,10 +443,10 @@ export default function SubjectsScreen() {
               <TouchableOpacity
                 style={[styles.button, styles.submitButton, { backgroundColor: themeColors.primary }]}
                 onPress={handleSubmit}
-                disabled={createMutation.isLoading || updateMutation.isLoading}
+                disabled={createMutation.isPending || updateMutation.isPending}
               >
                 <ThemedText style={styles.submitButtonText}>
-                  {createMutation.isLoading || updateMutation.isLoading ? 'Saving...' : (editingSubject ? 'Update' : 'Create')}
+                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingSubject ? 'Update' : 'Create')}
                 </ThemedText>
               </TouchableOpacity>
             </View>
@@ -495,10 +495,10 @@ export default function SubjectsScreen() {
               <TouchableOpacity
                 style={[styles.button, styles.submitButton, { backgroundColor: themeColors.primary }]}
                 onPress={handleCreateCategory}
-                disabled={createCategoryMutation.isLoading}
+                disabled={createCategoryMutation.isPending}
               >
                 <ThemedText style={styles.submitButtonText}>
-                  {createCategoryMutation.isLoading ? 'Creating...' : 'Create'}
+                  {createCategoryMutation.isPending ? 'Creating...' : 'Create'}
                 </ThemedText>
               </TouchableOpacity>
             </View>

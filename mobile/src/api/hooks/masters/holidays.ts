@@ -97,7 +97,7 @@ export function useActivateHoliday() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToast();
   
-  return usePermissionProtectedMutation<void, Error, string>({
+  return usePermissionProtectedMutation<HolidayRead, Error, string>({
     mutationFn: (id) => holidaysApi.activateHoliday(id),
     resource: PERMISSION_RESOURCES.HOLIDAYS,
     action: 'update',

@@ -1,194 +1,83 @@
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { AppLayout } from '@/components';
-import { Colors } from '@/constants/theme';
 import { useTheme } from '@/contexts';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-const expenseSections = [
-  {
-    id: 'transactions',
-    title: 'Transactions',
-    description: 'View and manage expense transactions',
-    icon: 'receipt-outline',
-    route: '/expense/transactions',
-  },
-  {
-    id: 'categories',
-    title: 'Categories',
-    description: 'Manage expense categories',
-    icon: 'folder-outline',
-    route: '/expense/categories',
-  },
-  {
-    id: 'types',
-    title: 'Types',
-    description: 'Configure expense types within categories',
-    icon: 'list-outline',
-    route: '/expense/types',
-  },
-  {
-    id: 'approvals',
-    title: 'Approvals',
-    description: 'Review and approve pending expenses',
-    icon: 'checkmark-circle-outline',
-    route: '/expense/approvals',
-  },
-  // {
-  //   id: 'audit',
-  //   title: 'Audit',
-  //   description: 'View audit logs and transaction history',
-  //   icon: 'document-text-outline',
-  //   route: '/expense/audit',
-  // },
-  // {
-  //   id: 'reports',
-  //   title: 'Reports',
-  //   description: 'Generate expense reports and analytics',
-  //   icon: 'bar-chart-outline',
-  //   route: '/expense/reports',
-  // },
-  // {
-  //   id: 'settings',
-  //   title: 'Settings',
-  //   description: 'Configure expense management settings',
-  //   icon: 'settings-outline',
-  //   route: '/expense/settings',
-  // },
-  // {
-  //   id: 'departments',
-  //   title: 'Departments',
-  //   description: 'Manage departments for expense assignment',
-  //   icon: 'business-outline',
-  //   route: '/expense/departments',
-  // },
-];
+const ORANGE = '#F97316';
 
-const summaryCards = [
-  {
-    id: 'total-transactions',
-    title: 'Total Transactions',
-    value: '1,247',
-    icon: 'receipt',
-    color: '#3B82F6',
-  },
-  {
-    id: 'total-amount',
-    title: 'Total Amount',
-    value: '₹2.4M',
-    icon: 'cash',
-    color: '#10B981',
-  },
-  {
-    id: 'pending-approvals',
-    title: 'Pending Approvals',
-    value: '23',
-    icon: 'time',
-    color: '#F59E0B',
-  },
-  {
-    id: 'approved-amount',
-    title: 'Approved Amount',
-    value: '₹1.8M',
-    icon: 'checkmark-circle',
-    color: '#8B5CF6',
-  },
+const sections = [
+  { title: 'Transactions', description: 'View and manage expense transactions',  icon: 'receipt' as const,              color: ORANGE,    route: '/expense/transactions', resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS, action: 'list' },
+  { title: 'Categories',   description: 'Manage expense categories',             icon: 'folder' as const,               color: '#EA580C', route: '/expense/categories',   resource: PERMISSION_RESOURCES.EXPENSE_CATEGORIES,   action: 'list' },
+  { title: 'Types',        description: 'Configure expense types in categories', icon: 'pricetag' as const,             color: ORANGE,    route: '/expense/types',        resource: PERMISSION_RESOURCES.EXPENSE_TYPES,        action: 'list' },
+  { title: 'Approvals',    description: 'Review and approve pending expenses',   icon: 'checkmark-done-circle' as const,color: '#C2410C', route: '/expense/approvals',    resource: PERMISSION_RESOURCES.EXPENSE_APPROVALS,    action: 'approve' },
 ];
 
 export default function ExpenseScreen() {
   const router = useRouter();
-  const { theme, colors } = useTheme();
+  const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
 
-  const handleNavigate = (route: string, hasAccess: boolean) => {
-    if (hasAccess) {
-      router.push(route as any);
-    }
-  };
-
-  const renderSummaryCard = (card: typeof summaryCards[0]) => (
-    <View key={card.id} style={[styles.summaryCard, { backgroundColor: colors.card }]}>
-      <View style={[styles.cardIcon, { backgroundColor: card.color + '20' }]}>
-        <Ionicons name={card.icon as any} size={24} color={card.color} />
-      </View>
-      <View style={styles.cardContent}>
-        <ThemedText style={styles.cardValue}>{card.value}</ThemedText>
-        <ThemedText style={[styles.cardTitle, { color: colors['muted-foreground'] }]}>
-          {card.title}
-        </ThemedText>
-      </View>
-    </View>
-  );
+  const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
+  const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
   return (
     <AppLayout title="Expense Management">
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Summary Cards */}
-        <View style={styles.summarySection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>
-            Overview
-          </ThemedText>
-          <View style={styles.summaryGrid}>
-            {summaryCards.map(renderSummaryCard)}
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+
+        {/* Banner */}
+        <View style={[styles.banner, { backgroundColor: ORANGE }]}>
+          <View style={styles.bannerDecor} />
+          <View style={styles.bannerDecor2} />
+          <View style={styles.bannerIcon}>
+            <Ionicons name="wallet" size={28} color="white" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.bannerTitle}>Expense Management</Text>
+            <Text style={styles.bannerSub}>Track, manage and approve expenses</Text>
           </View>
         </View>
 
-        {/* Navigation Cards */}
-        <View style={styles.section}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>
-            Management
-          </ThemedText>
-          {expenseSections.map((section) => {
-            const resourceMap: { [key: string]: string } = {
-              'transactions': PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS,
-              'categories': PERMISSION_RESOURCES.EXPENSE_CATEGORIES,
-              'types': PERMISSION_RESOURCES.EXPENSE_TYPES,
-              'approvals': PERMISSION_RESOURCES.EXPENSE_APPROVALS
-            };
+        {/* Section label */}
+        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>EXPENSE SECTIONS</Text>
 
-            const resource = resourceMap[section.id] || PERMISSION_RESOURCES.EXPENSE_CATEGORIES;
-            const action = section.id === 'approvals' ? 'approve' : 'list';
-            const hasAccess = hasPermission ? hasPermission(resource, action) : false;
-
+        {/* Grid */}
+        <View style={styles.grid}>
+          {sections.map((section, i) => {
+            const hasAccess = hasPermission ? hasPermission(section.resource, section.action) : false;
             return (
               <TouchableOpacity
-                key={section.id}
+                key={i}
                 style={[
-                  styles.sectionCard, 
-                  { 
-                    backgroundColor: hasAccess ? colors.card : colors.muted,
-                    opacity: hasAccess ? 1 : 0.6
-                  }
+                  styles.sectionCard,
+                  { backgroundColor: cardBg, borderColor: borderCol },
+                  !hasAccess && { opacity: 0.5 },
                 ]}
-                onPress={() => handleNavigate(section.route, hasAccess)}
+                onPress={() => hasAccess && router.push(section.route as any)}
                 disabled={!hasAccess}
+                activeOpacity={0.75}
               >
-                <Ionicons
-                  name={hasAccess ? section.icon as any : "lock-closed"}
-                  size={24}
-                  color={hasAccess ? colors.primary : colors['muted-foreground']}
-                  style={styles.sectionIcon}
-                />
-                <ThemedView style={styles.sectionContent}>
-                  <ThemedText type="subtitle" style={styles.sectionTitle}>
-                    {section.title}
-                  </ThemedText>
-                  <ThemedText style={[styles.sectionDescription, { color: colors['muted-foreground'] }]}>
-                    {hasAccess 
-                      ? section.description 
-                      : "You don't have permission to access this feature"
-                    }
-                  </ThemedText>
-                </ThemedView>
-                <Ionicons
-                  name={hasAccess ? "chevron-forward" : "lock-closed"}
-                  size={20}
-                  color={colors['muted-foreground']}
-                />
+                <View style={[styles.sectionIconBox, { backgroundColor: section.color + '18' }]}>
+                  <Ionicons
+                    name={hasAccess ? section.icon : 'lock-closed'}
+                    size={24}
+                    color={hasAccess ? section.color : '#9ca3af'}
+                  />
+                </View>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]} numberOfLines={2}>
+                  {section.title}
+                </Text>
+                <Text style={[styles.sectionDesc, { color: colors['muted-foreground'] }]} numberOfLines={2}>
+                  {hasAccess ? section.description : 'No access — contact admin'}
+                </Text>
+                {hasAccess && (
+                  <View style={[styles.sectionArrow, { backgroundColor: section.color + '18' }]}>
+                    <Ionicons name="arrow-forward" size={12} color={section.color} />
+                  </View>
+                )}
               </TouchableOpacity>
             );
           })}
@@ -199,82 +88,49 @@ export default function ExpenseScreen() {
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-    padding: 20,
+  scroll: { flex: 1 },
+  content: { padding: 16, paddingBottom: 32 },
+  banner: {
+    borderRadius: 18, padding: 18,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    marginBottom: 16, overflow: 'hidden',
   },
-  summarySection: {
-    marginBottom: 24,
+  bannerDecor: {
+    position: 'absolute', top: -30, right: -30,
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  section: {
-    marginBottom: 24,
+  bannerDecor2: {
+    position: 'absolute', bottom: -40, right: 60,
+    width: 90, height: 90, borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  sectionTitle: {
-    marginBottom: 16,
+  bannerIcon: {
+    width: 52, height: 52, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+  bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 2 },
+  bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 16 },
+  sectionLabel: {
+    fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12,
   },
-  summaryCard: {
-    flex: 1,
-    minWidth: '45%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  cardContent: {
-    flex: 1,
-  },
-  cardValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  cardTitle: {
-    fontSize: 12,
-  },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   sectionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    marginBottom: 12,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    width: '48%', borderRadius: 14, borderWidth: 1,
+    padding: 16, minHeight: 120,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
-  sectionIcon: {
-    marginRight: 16,
+  sectionIconBox: {
+    width: 44, height: 44, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 10,
   },
-  sectionContent: {
-    flex: 1,
-  },
-  sectionDescription: {
-    fontSize: 14,
-    lineHeight: 20,
+  sectionTitle: { fontSize: 13, fontWeight: '700', marginBottom: 4, lineHeight: 18 },
+  sectionDesc: { fontSize: 11, lineHeight: 16, flex: 1 },
+  sectionArrow: {
+    alignSelf: 'flex-end', marginTop: 8,
+    width: 22, height: 22, borderRadius: 11,
+    justifyContent: 'center', alignItems: 'center',
   },
 });

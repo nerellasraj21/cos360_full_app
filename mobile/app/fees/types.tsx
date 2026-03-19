@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { AppLayout } from '@/components';
 import CustomDropdown from '@/components/ui/dropdown';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -254,28 +255,32 @@ export default function FeeTypesScreen() {
   if (isLoading) {
     console.log('FeeTypesScreen: Showing loading state');
     return (
-      <ThemedView style={styles.centerContainer}>
-        <ThemedText>Loading fee types...</ThemedText>
-      </ThemedView>
+      <AppLayout title="Fee Types">
+        <View style={styles.centerContainer}>
+          <ThemedText>Loading fee types...</ThemedText>
+        </View>
+      </AppLayout>
     );
   }
 
   if (error) {
     console.error('FeeTypesScreen: Showing error state, error details:', error);
     return (
-      <ThemedView style={styles.centerContainer}>
-        <ThemedText style={{ color: colors.destructive }}>
-          Error loading fee types
-        </ThemedText>
-      </ThemedView>
+      <AppLayout title="Fee Types">
+        <View style={styles.centerContainer}>
+          <ThemedText style={{ color: colors.destructive }}>
+            Error loading fee types
+          </ThemedText>
+        </View>
+      </AppLayout>
     );
   }
 
   return (
     <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.FEE_TYPES}>
+      <AppLayout title="Fee Types">
       <ThemedView style={styles.container}>
         <View style={styles.header}>
-          <ThemedText type="title">Fee Types</ThemedText>
           <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TYPES}>
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: colors.primary }]}
@@ -439,6 +444,7 @@ export default function FeeTypesScreen() {
         </View>
       </Modal>
       </ThemedView>
+      </AppLayout>
     </ReadOrListPermissionGuard>
   );
 }

@@ -50,12 +50,13 @@ export const refreshToken = async (): Promise<string | null> => {
     const refreshTokenValue = await getRefreshToken();
     if (!refreshTokenValue) return null;
 
-    // Assuming refresh endpoint exists
-    const response = await fetch('http://localhost:8003/api/v1/auth/login/refresh', {
+    const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://www.cos360.app/api/v1';
+    const schema = await AsyncStorage.getItem('@auth/client_schema').catch(() => null);
+    const response = await fetch(`${apiUrl}/auth/login/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'cschema': 'test_tenant', 
+        ...(schema ? { 'cschema': schema } : {}),
       },
       body: JSON.stringify({ refresh_token: refreshTokenValue }),
     });

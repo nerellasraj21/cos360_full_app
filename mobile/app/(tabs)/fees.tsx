@@ -1,193 +1,139 @@
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { AppLayout } from '@/components';
-import { Colors } from '@/constants/theme';
 import { useTheme } from '@/contexts';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-const feeSections = [
-  {
-    id: 'categories',
-    title: 'Fee Categories',
-    description: 'Manage fee categories like Tuition, Transportation, etc.',
-    icon: 'folder-outline',
-    route: '/fees/categories',
-  },
-  {
-    id: 'types',
-    title: 'Fee Types',
-    description: 'Configure different types of fees within categories.',
-    icon: 'list-outline',
-    route: '/fees/types',
-  },
-  {
-    id: 'terms',
-    title: 'Fee Terms',
-    description: 'Set up payment terms and schedules.',
-    icon: 'calendar-outline',
-    route: '/fees/terms',
-  },
-  {
-    id: 'class-mappings',
-    title: 'Class Mappings',
-    description: 'Map fees to specific classes with amounts.',
-    icon: 'school-outline',
-    route: '/fees/class-mappings',
-  },
-  {
-    id: 'student-mappings',
-    title: 'Student Mappings',
-    description: 'Assign fees to individual students.',
-    icon: 'people-outline',
-    route: '/fees/student-mappings',
-  },
-  {
-    id: 'transactions',
-    title: 'Fee Transactions',
-    description: 'View and manage fee payment transactions.',
-    icon: 'card-outline',
-    route: '/fees/transactions',
-  },
-  {
-    id: 'refunds',
-    title: 'Fee Refunds',
-    description: 'Process and track fee refunds.',
-    icon: 'return-up-back-outline',
-    route: '/fees/refunds',
-  },
+const GREEN = '#10B981';
+
+const sections = [
+  { title: 'Fee Categories',   description: 'Manage fee categories like Tuition, Transport', icon: 'folder' as const,          color: GREEN,     route: '/fees/categories',       resource: PERMISSION_RESOURCES.FEE_CATEGORIES,       action: 'list' },
+  { title: 'Fee Types',        description: 'Configure types of fees within categories',     icon: 'pricetag' as const,        color: '#3B82F6', route: '/fees/types',            resource: PERMISSION_RESOURCES.FEE_TYPES,            action: 'list' },
+  { title: 'Fee Terms',        description: 'Set up payment terms and schedules',            icon: 'calendar' as const,        color: '#F59E0B', route: '/fees/terms',            resource: PERMISSION_RESOURCES.FEE_TERMS,            action: 'list' },
+  { title: 'Class Mappings',   description: 'Map fees to specific classes with amounts',     icon: 'school' as const,          color: '#8B5CF6', route: '/fees/class-mappings',   resource: PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS,   action: 'list' },
+  { title: 'Student Mappings', description: 'Assign fees to individual students',            icon: 'people' as const,          color: '#06B6D4', route: '/fees/student-mappings', resource: PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS, action: 'list' },
+  { title: 'Transactions',     description: 'View and manage fee payment transactions',      icon: 'card' as const,            color: '#556ee6', route: '/fees/transactions',     resource: PERMISSION_RESOURCES.FEE_TRANSACTIONS,     action: 'list' },
+  { title: 'Fee Refunds',      description: 'Process and track fee refunds',                 icon: 'refresh-circle' as const,  color: '#EF4444', route: '/fees/refunds',          resource: PERMISSION_RESOURCES.FEE_REFUNDS,          action: 'list' },
 ];
 
 export default function FeesScreen() {
   const router = useRouter();
-  const { theme, colors } = useTheme();
+  const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
 
-  const handleNavigate = (route: string, hasAccess: boolean) => {
-    if (hasAccess) {
-      router.push(route as any);
-    }
-  };
+  const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
+  const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
   return (
     <AppLayout title="Fee Management">
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {feeSections.map((section) => {
-          const resourceMap: { [key: string]: string } = {
-            'categories': PERMISSION_RESOURCES.FEE_CATEGORIES,
-            'types': PERMISSION_RESOURCES.FEE_TYPES,
-            'terms': PERMISSION_RESOURCES.FEE_TERMS,
-            'class-mappings': PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS,
-            'student-mappings': PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS,
-            'transactions': PERMISSION_RESOURCES.FEE_TRANSACTIONS,
-            'refunds': PERMISSION_RESOURCES.FEE_REFUNDS
-          };
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
-          const resource = resourceMap[section.id] || PERMISSION_RESOURCES.FEE_CATEGORIES;
-          const hasAccess = hasPermission ? hasPermission(resource, 'list') : false;
+        {/* Banner */}
+        <View style={[styles.banner, { backgroundColor: GREEN }]}>
+          <View style={styles.bannerDecor} />
+          <View style={styles.bannerDecor2} />
+          <View style={styles.bannerIcon}>
+            <Ionicons name="cash" size={28} color="white" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.bannerTitle}>Fee Management</Text>
+            <Text style={styles.bannerSub}>Manage all fee operations in one place</Text>
+          </View>
+        </View>
 
-          return (
-            <TouchableOpacity
-              key={section.id}
-              style={[
-                styles.sectionCard, 
-                { 
-                  backgroundColor: hasAccess ? colors.card : colors.muted,
-                  opacity: hasAccess ? 1 : 0.6
-                }
-              ]}
-              onPress={() => handleNavigate(section.route, hasAccess)}
-              disabled={!hasAccess}
-            >
-              <Ionicons
-                name={hasAccess ? section.icon as any : "lock-closed"}
-                size={24}
-                color={hasAccess ? colors.primary : colors['muted-foreground']}
-                style={styles.sectionIcon}
-              />
-              <ThemedView style={styles.sectionContent}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
+        {/* Section label */}
+        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>FEE SECTIONS</Text>
+
+        {/* Grid */}
+        <View style={styles.grid}>
+          {sections.map((section, i) => {
+            const hasAccess = hasPermission ? hasPermission(section.resource, section.action) : false;
+            return (
+              <TouchableOpacity
+                key={i}
+                style={[
+                  styles.sectionCard,
+                  { backgroundColor: cardBg, borderColor: borderCol },
+                  !hasAccess && { opacity: 0.5 },
+                ]}
+                onPress={() => hasAccess && router.push(section.route as any)}
+                disabled={!hasAccess}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.sectionIconBox, { backgroundColor: section.color + '18' }]}>
+                  <Ionicons
+                    name={hasAccess ? section.icon : 'lock-closed'}
+                    size={24}
+                    color={hasAccess ? section.color : '#9ca3af'}
+                  />
+                </View>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]} numberOfLines={2}>
                   {section.title}
-                </ThemedText>
-                <ThemedText style={[styles.sectionDescription, { color: colors['muted-foreground'] }]}>
-                  {hasAccess 
-                    ? section.description 
-                    : "You don't have permission to access this feature"
-                  }
-                </ThemedText>
-              </ThemedView>
-              <Ionicons
-                name={hasAccess ? "chevron-forward" : "lock-closed"}
-                size={20}
-                color={colors['muted-foreground']}
-              />
-            </TouchableOpacity>
-          );
-        })}
+                </Text>
+                <Text style={[styles.sectionDesc, { color: colors['muted-foreground'] }]} numberOfLines={2}>
+                  {hasAccess ? section.description : 'No access — contact admin'}
+                </Text>
+                {hasAccess && (
+                  <View style={[styles.sectionArrow, { backgroundColor: section.color + '18' }]}>
+                    <Ionicons name="arrow-forward" size={12} color={section.color} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </ScrollView>
     </AppLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-    padding: 20,
+  scroll: { flex: 1 },
+  content: { padding: 16, paddingBottom: 32 },
+  banner: {
+    borderRadius: 18, padding: 18,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    marginBottom: 16, overflow: 'hidden',
   },
+  bannerDecor: {
+    position: 'absolute', top: -30, right: -30,
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  bannerDecor2: {
+    position: 'absolute', bottom: -40, right: 60,
+    width: 90, height: 90, borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  bannerIcon: {
+    width: 52, height: 52, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 2 },
+  bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 16 },
+  sectionLabel: {
+    fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12,
+  },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   sectionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    marginBottom: 12,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    width: '48%', borderRadius: 14, borderWidth: 1,
+    padding: 16, minHeight: 120,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
-  sectionIcon: {
-    marginRight: 16,
+  sectionIconBox: {
+    width: 44, height: 44, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 10,
   },
-  sectionContent: {
-    flex: 1,
-  },
-  sectionTitle: {
-    marginBottom: 4,
-  },
-  sectionDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  accessDeniedCard: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-    marginTop: 40,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  accessDeniedTitle: {
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  accessDeniedText: {
-    textAlign: 'center',
-    fontSize: 14,
-    lineHeight: 20,
+  sectionTitle: { fontSize: 13, fontWeight: '700', marginBottom: 4, lineHeight: 18 },
+  sectionDesc: { fontSize: 11, lineHeight: 16, flex: 1 },
+  sectionArrow: {
+    alignSelf: 'flex-end', marginTop: 8,
+    width: 22, height: 22, borderRadius: 11,
+    justifyContent: 'center', alignItems: 'center',
   },
 });

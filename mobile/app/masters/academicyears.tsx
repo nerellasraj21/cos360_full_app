@@ -351,10 +351,10 @@ export default function AcademicYearsScreen() {
               <TouchableOpacity
                 style={[styles.button, styles.submitButton, { backgroundColor: themeColors.primary }]}
                 onPress={handleSubmit}
-                disabled={createMutation.isLoading || updateMutation.isLoading}
+                disabled={createMutation.isPending || updateMutation.isPending}
               >
                 <ThemedText style={styles.submitButtonText}>
-                  {createMutation.isLoading || updateMutation.isLoading ? 'Saving...' : (editingYear ? 'Update' : 'Create')}
+                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingYear ? 'Update' : 'Create')}
                 </ThemedText>
               </TouchableOpacity>
             </View>

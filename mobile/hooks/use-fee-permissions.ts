@@ -168,7 +168,7 @@ export const useFeeStudentMappings = (filters?: any) => {
 export const useCreateFeeStudentMapping = () => {
   return usePermissionProtectedCreateMutation<any, Error, FeeStudentMappingRequest>(
     PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS,
-    feeStudentMappingsApi.createFeeStudentMapping
+    (data: FeeStudentMappingRequest) => feeStudentMappingsApi.createFeeStudentMapping(data as any)
   );
 };
 

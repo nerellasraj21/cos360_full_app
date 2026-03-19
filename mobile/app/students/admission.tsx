@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useState, useEffect } from 'react';
@@ -46,10 +47,33 @@ const isValidAadhar = (aadhar: string): boolean => {
   return /^\d{12}$/.test(aadhar);
 };
 
+const formatToDisplay = (iso: string): string => {
+  if (!iso || !iso.match(/^\d{4}-\d{2}-\d{2}$/)) return '';
+  const [yyyy, mm, dd] = iso.split('-');
+  return `${dd}/${mm}/${yyyy}`;
+};
+
+const parseDdMmYyyy = (display: string): string | null => {
+  const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, dd, mm, yyyy] = match;
+  const iso = `${yyyy}-${mm}-${dd}`;
+  if (!isValidDate(iso)) return null;
+  return iso;
+};
+
+const autoFormatDateInput = (text: string): string => {
+  const digits = text.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
 
 interface FormData {
   // Academic Details
   admission_date: string;
+  admission_type: string;
   academic_year_id: string;
   admitted_academic_year_id: string;
   admitted_class_id: string;
@@ -75,7 +99,7 @@ interface FormData {
     last_name: string;
     date_of_birth: string;
     gender: string;
-    is_primary?: boolean;
+    is_primary?: string;  // "primary" | "non_primary" | "not_primary"
     aadhar_number?: string;
     apaar_number?: string;
     caste?: string;
@@ -125,14 +149,24 @@ export default function StudentAdmissionScreen() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [viewMode, setViewMode] = useState<'form' | 'list'>('form'); // New state for view mode
-  const [searchQuery, setSearchQuery] = useState(''); // Search query state
-  const [currentPage, setCurrentPage] = useState(1); // Pagination state
-  const [pageSize] = useState(10); // Items per page
+  const [viewMode, setViewMode] = useState<'form' | 'list'>('form');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [sameAsAdmission, setSameAsAdmission] = useState(false);
+  const [activeDateField, setActiveDateField] = useState<string | null>(null);
+  const [dateDisplayValues, setDateDisplayValues] = useState<Record<string, string>>(() => {
+    const todayIso = new Date().toISOString().split('T')[0];
+    return {
+      admission_date: formatToDisplay(todayIso),
+      'student.date_of_birth': '',
+    };
+  });
 
   const [formData, setFormData] = useState<FormData>({
     // Academic Details
     admission_date: new Date().toISOString().split('T')[0],
+    admission_type: 'Non-Primary Admission',
     academic_year_id: '',
     admitted_academic_year_id: '',
     admitted_class_id: '',
@@ -158,7 +192,7 @@ export default function StudentAdmissionScreen() {
       last_name: '',
       date_of_birth: '',
       gender: '',
-      is_primary: false,
+      is_primary: 'not_primary',
       aadhar_number: '',
       apaar_number: '',
       caste: '',
@@ -263,6 +297,17 @@ export default function StudentAdmissionScreen() {
     }
   }, [formData.current_class_id]);
 
+  // Sync current class/section with admission class/section when checkbox is checked
+  React.useEffect(() => {
+    if (sameAsAdmission) {
+      setFormData(prev => ({
+        ...prev,
+        current_class_id: prev.admitted_class_id,
+        current_section_id: prev.admitted_section_id,
+      }));
+    }
+  }, [sameAsAdmission, formData.admitted_class_id, formData.admitted_section_id]);
+
   // Populate form data when editing
   useEffect(() => {
     if (existingAdmission && studentId) {
@@ -285,9 +330,8 @@ export default function StudentAdmissionScreen() {
         } else if (isFutureDate(formData.admission_date)) {
           newErrors.admission_date = 'Admission date cannot be in the future';
         }
-        if (!formData.academic_year_id) newErrors.academic_year_id = 'Academic year is required';
-        if (!formData.admitted_class_id) newErrors.admitted_class_id = 'Admitted class is required';
-        if (!formData.admitted_section_id) newErrors.admitted_section_id = 'Admitted section is required';
+        if (!formData.admitted_class_id) newErrors.admitted_class_id = 'Class is required';
+        if (!formData.admitted_section_id) newErrors.admitted_section_id = 'Section is required';
         if (!formData.current_class_id) newErrors.current_class_id = 'Current class is required';
         if (!formData.current_section_id) newErrors.current_section_id = 'Current section is required';
         break;
@@ -383,15 +427,19 @@ export default function StudentAdmissionScreen() {
       if (isEditMode && studentId) {
         // Update operation
         const updateData: StudentAdmissionUpdate = {
-          student_name: `${formData.student.first_name} ${formData.student.last_name}`,
-          admission_number: existingAdmission?.admission_number,
-          class_id: formData.current_class_id,
-          section_id: formData.current_section_id,
+          first_name: formData.student.first_name,
+          last_name: formData.student.last_name,
+          current_class_id: formData.current_class_id,
+          current_section_id: formData.current_section_id,
           academic_year_id: formData.academic_year_id,
           date_of_birth: formData.student.date_of_birth,
           admission_date: formData.admission_date,
-          parent_contact: formData.father.phone || formData.mother.phone,
-          address: `${formData.address_line1}${formData.address_line2 ? `, ${formData.address_line2}` : ''}, ${formData.city}, ${formData.state}`,
+          address_line1: formData.address_line1,
+          address_line2: formData.address_line2,
+          city: formData.city,
+          state: formData.state,
+          father_phone: formData.father.phone,
+          mother_phone: formData.mother.phone,
         };
         updateAdmissionMutation.mutate({ studentId, data: updateData });
       } else {
@@ -443,9 +491,16 @@ export default function StudentAdmissionScreen() {
     setIsEditMode(false);
     setViewMode('form');
     router.setParams({ id: undefined });
+    setSameAsAdmission(false);
+    setActiveDateField(null);
+    setDateDisplayValues({
+      admission_date: formatToDisplay(new Date().toISOString().split('T')[0]),
+      'student.date_of_birth': '',
+    });
     // Reset form data
     setFormData({
       admission_date: new Date().toISOString().split('T')[0],
+      admission_type: 'Non-Primary Admission',
       academic_year_id: '',
       admitted_academic_year_id: '',
       admitted_class_id: '',
@@ -465,7 +520,7 @@ export default function StudentAdmissionScreen() {
         last_name: '',
         date_of_birth: '',
         gender: '',
-        is_primary: false,
+        is_primary: 'not_primary',
         aadhar_number: '',
         apaar_number: '',
         caste: '',
@@ -570,7 +625,7 @@ export default function StudentAdmissionScreen() {
     return (
       <View style={styles.inputContainer}>
         <ThemedText style={styles.label}>{label}</ThemedText>
-        <View style={[styles.inputWrapper, { backgroundColor: themeColors.card }]}>
+        <View style={[styles.inputWrapper, { backgroundColor: themeColors.background, borderColor: themeColors.border }]}>
           <TextInput
             style={[styles.input, { color: themeColors['card-foreground'] }]}
             placeholder={placeholder}
@@ -632,6 +687,64 @@ export default function StudentAdmissionScreen() {
     );
   };
 
+  const renderDateField = (label: string, field: string) => {
+    const fieldParts = field.split('.');
+    let error: string = '';
+    if (fieldParts.length === 1) {
+      error = (errors as any)[field] || '';
+    } else {
+      const [parent, child] = fieldParts;
+      error = (errors as any)[parent]?.[child] || '';
+    }
+
+    const displayValue = dateDisplayValues[field] ?? '';
+
+    const handleTextChange = (text: string) => {
+      const formatted = autoFormatDateInput(text);
+      setDateDisplayValues(prev => ({ ...prev, [field]: formatted }));
+      const parsed = parseDdMmYyyy(formatted);
+      if (parsed) {
+        updateFormData(field, parsed);
+      }
+    };
+
+    return (
+      <View style={styles.inputContainer}>
+        <ThemedText style={styles.label}>{label}</ThemedText>
+        <View style={[
+          styles.inputWrapper,
+          {
+            backgroundColor: themeColors.background,
+            borderColor: error ? themeColors.destructive : themeColors.border,
+            flexDirection: 'row',
+            alignItems: 'center',
+          }
+        ]}>
+          <TextInput
+            style={[styles.input, { color: themeColors['card-foreground'], flex: 1 }]}
+            placeholder="DD/MM/YYYY"
+            placeholderTextColor={themeColors['muted-foreground']}
+            value={displayValue}
+            onChangeText={handleTextChange}
+            keyboardType="numeric"
+            maxLength={10}
+          />
+          <TouchableOpacity
+            onPress={() => setActiveDateField(field)}
+            style={{ paddingHorizontal: 12, paddingVertical: 4 }}
+          >
+            <Ionicons name="calendar-outline" size={20} color={themeColors['muted-foreground']} />
+          </TouchableOpacity>
+        </View>
+        {error ? (
+          <ThemedText style={[styles.errorText, { color: themeColors.destructive }]}>
+            {error}
+          </ThemedText>
+        ) : null}
+      </View>
+    );
+  };
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 0: // Academic Details
@@ -640,13 +753,57 @@ export default function StudentAdmissionScreen() {
             <ThemedText type="subtitle" style={styles.sectionTitle}>
               Academic Details
             </ThemedText>
-            {renderInput('Admission Date *', 'admission_date', 'YYYY-MM-DD', 'default')}
-            {renderDropdown('Academic Year *', 'academic_year_id', academicYearsData || [], 'Select academic year', false, academicYearsLoading, academicYearsError?.message)}
-            {renderDropdown('Admitted Academic Year', 'admitted_academic_year_id', academicYearsData || [], 'Select admitted academic year', false, academicYearsLoading, academicYearsError?.message)}
-            {renderDropdown('Admitted Class *', 'admitted_class_id', classesData || [], 'Select admitted class', false, classesLoading, classesError?.message)}
-            {renderDropdown('Admitted Section *', 'admitted_section_id', sectionsData || [], 'Select admitted section', !formData.admitted_class_id, sectionsLoading, sectionsError?.message)}
-            {renderDropdown('Current Class *', 'current_class_id', classesData || [], 'Select current class', false, classesLoading, classesError?.message)}
-            {renderDropdown('Current Section *', 'current_section_id', currentSectionsData || [], 'Select current section', !formData.current_class_id, currentSectionsLoading, currentSectionsError?.message)}
+
+            {/* Row 1: Admission Date | Admission Type */}
+            <View style={styles.row}>
+              <View style={styles.halfColumn}>
+                {renderDateField('Admission Date *', 'admission_date')}
+              </View>
+              <View style={styles.halfColumn}>
+                {renderDropdown('Admission Type', 'admission_type', [
+                  { label: 'Primary Admission', value: 'Primary Admission' },
+                  { label: 'Non-Primary Admission', value: 'Non-Primary Admission' },
+                ], 'Select type')}
+              </View>
+            </View>
+
+            {/* Row 2: Class | Section */}
+            <View style={styles.row}>
+              <View style={styles.halfColumn}>
+                {renderDropdown('Class *', 'admitted_class_id', classesData || [], 'Select Class', false, classesLoading, classesError?.message)}
+              </View>
+              <View style={styles.halfColumn}>
+                {renderDropdown('Section *', 'admitted_section_id', sectionsData || [], 'Select Section', !formData.admitted_class_id, sectionsLoading, sectionsError?.message)}
+              </View>
+            </View>
+
+            {/* Checkbox: Same as Admission */}
+            <TouchableOpacity
+              style={styles.checkboxContainer}
+              onPress={() => setSameAsAdmission(v => !v)}
+              activeOpacity={0.7}
+            >
+              <View style={[
+                styles.checkbox,
+                { borderColor: sameAsAdmission ? themeColors.primary : themeColors.border },
+                sameAsAdmission && { backgroundColor: themeColors.primary },
+              ]}>
+                {sameAsAdmission && <Ionicons name="checkmark" size={14} color="white" />}
+              </View>
+              <ThemedText style={[styles.checkboxLabel, { color: themeColors.foreground }]}>
+                Current Class/Section same as Admission Class/Section
+              </ThemedText>
+            </TouchableOpacity>
+
+            {/* Row 3: Current Class | Current Section */}
+            <View style={styles.row}>
+              <View style={styles.halfColumn}>
+                {renderDropdown('Current Class', 'current_class_id', classesData || [], 'Select Current Class', sameAsAdmission, classesLoading, classesError?.message)}
+              </View>
+              <View style={styles.halfColumn}>
+                {renderDropdown('Current Section', 'current_section_id', currentSectionsData || [], 'Select Current Section', sameAsAdmission || !formData.current_class_id, currentSectionsLoading, currentSectionsError?.message)}
+              </View>
+            </View>
           </View>
         );
 
@@ -658,7 +815,7 @@ export default function StudentAdmissionScreen() {
             </ThemedText>
             {renderInput('First Name *', 'student.first_name', 'Enter first name')}
             {renderInput('Last Name *', 'student.last_name', 'Enter last name')}
-            {renderInput('Date of Birth *', 'student.date_of_birth', 'YYYY-MM-DD', 'default')}
+            {renderDateField('Date of Birth *', 'student.date_of_birth')}
             {renderDropdown('Gender *', 'student.gender', [
               { label: 'Male', value: 'male' },
               { label: 'Female', value: 'female' },
@@ -730,7 +887,7 @@ export default function StudentAdmissionScreen() {
             </ThemedText>
             <View style={styles.checkboxContainer}>
               <TouchableOpacity
-                style={styles.checkbox}
+                style={[styles.checkbox, { borderColor: themeColors.border }]}
                 onPress={() => updateFormData('is_previous_school', !formData.is_previous_school)}
               >
                 <View style={[styles.checkboxInner, formData.is_previous_school && { backgroundColor: themeColors.primary }]} />
@@ -797,7 +954,7 @@ export default function StudentAdmissionScreen() {
       <View style={[styles.header, { backgroundColor: themeColors.card }]}>
         <View style={styles.searchContainer}>
           <TextInput
-            style={[styles.searchInput, { backgroundColor: themeColors.background, color: themeColors.foreground }]}
+            style={[styles.searchInput, { backgroundColor: themeColors.background, color: themeColors.foreground, borderColor: themeColors.border }]}
             placeholder="Search by name or admission number..."
             placeholderTextColor={themeColors['muted-foreground']}
             value={searchQuery}
@@ -831,7 +988,7 @@ export default function StudentAdmissionScreen() {
           </View>
         ) : (
           <View>
-            {(searchQuery ? searchResults : admissionsData?.items || []).filter(Boolean).map((admission) => {
+            {(searchQuery ? (searchResults ?? []) : admissionsData?.items ?? []).filter(Boolean).map((admission) => {
               const isStudentAdmission = 'student' in admission;
               const studentId = isStudentAdmission ? admission.student.id : admission.id;
               const firstName = isStudentAdmission ? admission.student.first_name : admission.first_name;
@@ -935,28 +1092,70 @@ export default function StudentAdmissionScreen() {
           >
             {/* Step Indicator */}
             <View style={styles.stepIndicator}>
-              {STEPS.map((step, index) => (
-                <View key={step} style={styles.stepItem}>
-                  <View style={[
-                    styles.stepCircle,
-                    index <= currentStep && { backgroundColor: themeColors.primary }
-                  ]}>
-                    <ThemedText style={[
-                      styles.stepNumber,
-                      index <= currentStep && { color: 'white' }
+              <View style={styles.stepsRow}>
+                {STEPS.map((step, index) => (
+                  <React.Fragment key={step}>
+                    <View style={[
+                      styles.stepCircle,
+                      index < currentStep
+                        ? { backgroundColor: themeColors.primary }
+                        : index === currentStep
+                        ? { backgroundColor: themeColors.primary }
+                        : { backgroundColor: themeColors.muted },
                     ]}>
-                      {index + 1}
-                    </ThemedText>
-                  </View>
-                  <ThemedText style={[
-                    styles.stepLabel,
-                    index <= currentStep && { color: themeColors.primary }
-                  ]}>
-                    {step}
-                  </ThemedText>
-                </View>
-              ))}
+                      {index < currentStep ? (
+                        <Ionicons name="checkmark" size={14} color="white" />
+                      ) : (
+                        <ThemedText style={[
+                          styles.stepNumber,
+                          index <= currentStep ? { color: 'white' } : { color: themeColors['muted-foreground'] },
+                        ]}>
+                          {index + 1}
+                        </ThemedText>
+                      )}
+                    </View>
+                    {index < STEPS.length - 1 && (
+                      <View style={[
+                        styles.stepConnector,
+                        { backgroundColor: index < currentStep ? themeColors.primary : themeColors.muted },
+                      ]} />
+                    )}
+                  </React.Fragment>
+                ))}
+              </View>
+              <ThemedText style={[styles.currentStepName, { color: themeColors.primary }]}>
+                Step {currentStep + 1} of {STEPS.length}: {STEPS[currentStep]}
+              </ThemedText>
             </View>
+
+            {/* Date picker rendered at root level so Android dialog is unobstructed */}
+            {activeDateField ? (
+              <DateTimePicker
+                value={(() => {
+                  const parts = activeDateField.split('.');
+                  let iso = '';
+                  if (parts.length === 1) {
+                    iso = (formData as any)[activeDateField] || '';
+                  } else {
+                    const [parent, child] = parts;
+                    iso = (formData as any)[parent]?.[child] || '';
+                  }
+                  return iso ? new Date(iso + 'T00:00:00') : new Date();
+                })()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                maximumDate={new Date()}
+                onChange={(event, selectedDate) => {
+                  const field = activeDateField;
+                  setActiveDateField(null);
+                  if (event.type === 'set' && selectedDate) {
+                    const iso = selectedDate.toISOString().split('T')[0];
+                    updateFormData(field, iso);
+                    setDateDisplayValues(prev => ({ ...prev, [field]: formatToDisplay(iso) }));
+                  }
+                }}
+              />
+            ) : null}
 
             <ScrollView
               style={styles.scrollView}
@@ -995,10 +1194,10 @@ export default function StudentAdmissionScreen() {
                         <TouchableOpacity
                           style={[styles.navButton, styles.deleteButton, { borderColor: themeColors.destructive }]}
                           onPress={handleDelete}
-                          disabled={deleteAdmissionMutation.isLoading}
+                          disabled={deleteAdmissionMutation.isPending}
                         >
                           <ThemedText style={[styles.navButtonText, { color: themeColors.destructive }]}>
-                            {deleteAdmissionMutation.isLoading ? 'Deleting...' : 'Delete'}
+                            {deleteAdmissionMutation.isPending ? 'Deleting...' : 'Delete'}
                           </ThemedText>
                         </TouchableOpacity>
                       </DeletePermissionGuard>
@@ -1011,14 +1210,14 @@ export default function StudentAdmissionScreen() {
                             styles.navButton,
                             styles.submitButton,
                             {
-                              backgroundColor: updateAdmissionMutation.isLoading ? themeColors['muted'] : themeColors.primary
+                              backgroundColor: updateAdmissionMutation.isPending ? themeColors['muted'] : themeColors.primary
                             }
                           ]}
                           onPress={handleSubmit}
-                          disabled={updateAdmissionMutation.isLoading}
+                          disabled={updateAdmissionMutation.isPending}
                         >
                           <ThemedText style={styles.submitButtonText}>
-                            {updateAdmissionMutation.isLoading ? 'Updating...' : 'Update Student Admission'}
+                            {updateAdmissionMutation.isPending ? 'Updating...' : 'Update Student Admission'}
                           </ThemedText>
                         </TouchableOpacity>
                       </UpdatePermissionGuard>
@@ -1030,14 +1229,14 @@ export default function StudentAdmissionScreen() {
                             styles.navButton,
                             styles.submitButton,
                             {
-                              backgroundColor: createAdmissionMutation.isLoading ? themeColors['muted'] : themeColors.primary
+                              backgroundColor: createAdmissionMutation.isPending ? themeColors['muted'] : themeColors.primary
                             }
                           ]}
                           onPress={handleSubmit}
-                          disabled={createAdmissionMutation.isLoading}
+                          disabled={createAdmissionMutation.isPending}
                         >
                           <ThemedText style={styles.submitButtonText}>
-                            {createAdmissionMutation.isLoading ? 'Creating...' : 'Create Student Admission'}
+                            {createAdmissionMutation.isPending ? 'Creating...' : 'Create Student Admission'}
                           </ThemedText>
                         </TouchableOpacity>
                       </CreatePermissionGuard>
@@ -1085,7 +1284,6 @@ const styles = StyleSheet.create({
   inputWrapper: {
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   input: {
     padding: 12,
@@ -1096,34 +1294,37 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   stepIndicator: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 20,
-    marginBottom: 16,
-  },
-  stepItem: {
+    paddingVertical: 16,
+    marginBottom: 8,
     alignItems: 'center',
-    flex: 1,
+  },
+  stepsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 10,
   },
   stepCircle: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+  },
+  stepConnector: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+    marginHorizontal: 3,
   },
   stepNumber: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  currentStepName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B7280',
-  },
-  stepLabel: {
-    fontSize: 12,
-    textAlign: 'center',
-    color: '#6B7280',
   },
   checkboxContainer: {
     flexDirection: 'row',
@@ -1134,7 +1335,6 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderWidth: 2,
-    borderColor: '#D1D5DB',
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1247,7 +1447,6 @@ const styles = StyleSheet.create({
     paddingRight: 40,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     fontSize: 16,
   },
   searchIcon: {
@@ -1334,5 +1533,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 16,
     opacity: 0.7,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  halfColumn: {
+    flex: 1,
+  },
+  dateInput: {
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
 });

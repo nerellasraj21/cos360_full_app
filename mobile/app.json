@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "cos360",
+    "name": "COS360",
     "slug": "cos360",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,10 +8,26 @@
     "scheme": "cos360",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.cos360.mobile",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "COS360 needs camera access to upload photos.",
+        "NSPhotoLibraryUsageDescription": "COS360 needs photo library access to upload images.",
+        "NSPhotoLibraryAddUsageDescription": "COS360 needs permission to save photos to your library.",
+        "NSMicrophoneUsageDescription": "COS360 needs microphone access for video recording.",
+        "NSDocumentsFolderUsageDescription": "COS360 needs access to documents for file uploads.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
+
     "android": {
+      "package": "com.cos360.mobile",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -19,19 +35,30 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
     },
+
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro"
     },
+
     "plugins": [
       "expo-router",
       [
         "expo-document-picker",
-        {
-          "iCloudContainerEnvironment": "Production"
-        }
+        {}
       ],
       [
         "expo-splash-screen",
@@ -46,6 +73,13 @@
         }
       ]
     ],
+
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id-here"
+      }
+    },
+
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

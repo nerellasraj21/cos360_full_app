@@ -96,7 +96,7 @@ export default function FeeRefundsScreen() {
 
   const { data: studentsData } = useQuery<{ items: any[]; total_count: number; has_next: boolean }>({
     queryKey: ['studentsAdmissions', activeAcademicYearId],
-    queryFn: () => studentAdmissionsApi.getStudentAdmissions({ academic_year_id: activeAcademicYearId || undefined }),
+    queryFn: () => studentAdmissionsApi.getStudentAdmissions({ academic_year_id: activeAcademicYearId || undefined } as any),
   });
 
   const students = studentsData?.items?.map((student: any) => ({

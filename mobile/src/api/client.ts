@@ -13,11 +13,12 @@ export const setSelectedStudentForInterceptor = (student: ParentStudent | null) 
   selectedStudentForInterceptor = student;
 };
 
-const apiClient = axios.create({
-  // baseURL: 'http://localhost:8000/api/v1',
-  baseURL: 'http://192.168.0.110:8000/api/v1',
-  timeout: 10000,
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1';
 
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
 });
 
 // Request interceptor for authentication

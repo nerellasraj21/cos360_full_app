@@ -77,5 +77,20 @@ export {
 export * from './students';
 export * from './transport';
 export * from './expense';
-export * from './profile';
+export {
+  StudentProfileOut,
+  StudentProfileUpdate,
+  StaffProfile,
+  StaffProfileUpdate,
+  ChildProfileOut,
+  ParentProfileOut,
+  ParentProfileUpdate,
+  studentProfileApi,
+  parentProfileApi,
+  BLOOD_GROUPS,
+  validateEmail,
+  validatePhone,
+  validateBloodGroup,
+  validateDate,
+} from './profile';
 

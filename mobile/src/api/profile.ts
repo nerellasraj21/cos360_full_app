@@ -120,7 +120,7 @@ export const parentProfileApi = {
 
   // Update parent's own profile
   updateProfile: async (data: ParentProfileUpdate): Promise<ParentProfileOut> => {
-    const response = await apiClient.put<ParentProfileOut>('/profile/parent', data);
+    const response = await apiClient.put<ParentProfileOut>('/profile/parent/me', data);
     return response.data;
   },
 };

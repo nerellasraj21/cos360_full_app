@@ -219,10 +219,10 @@ export default function CreateExpenseTransactionScreen() {
           <TouchableOpacity
             style={[styles.submitButton, { backgroundColor: colors.primary }]}
             onPress={handleSubmit}
-            disabled={createMutation.isLoading}
+            disabled={createMutation.isPending}
           >
             <ThemedText style={styles.submitButtonText}>
-              {createMutation.isLoading ? 'Creating...' : 'Create Transaction'}
+              {createMutation.isPending ? 'Creating...' : 'Create Transaction'}
             </ThemedText>
           </TouchableOpacity>
         </View>

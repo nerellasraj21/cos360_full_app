@@ -150,7 +150,7 @@ export default function StudentTripsScreen() {
     const trip = trips.find(t => t.id === assignment.trip_id);
     Alert.alert(
       'Delete Student Transport Assignment',
-      `Are you sure you want to delete transport assignment for ${student?.name || 'Unknown Student'} on Trip ${trip?.trip_number || 'Unknown Trip'}?`,
+      `Are you sure you want to delete transport assignment for ${student?.display_name || 'Unknown Student'} on Trip ${trip?.trip_number || 'Unknown Trip'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -205,7 +205,7 @@ export default function StudentTripsScreen() {
 
     const tripDisplay = trip ? `Trip ${trip.trip_number}` : 'Unknown Trip';
     const stopDisplay = stop?.name || 'Unknown Stop';
-    const feeTermDisplay = feeTerm?.term_name || feeTerm?.name || 'No Term';
+    const feeTermDisplay = feeTerm?.term_name || 'No Term';
 
     return (
       <View style={[styles.assignmentCard, { backgroundColor: colors.card }]}>
@@ -510,10 +510,10 @@ export default function StudentTripsScreen() {
                   <TouchableOpacity
                     style={[styles.button, styles.submitButton, { backgroundColor: colors.primary }]}
                     onPress={handleSubmit}
-                    disabled={createMutation.isLoading || updateMutation.isLoading}
+                    disabled={createMutation.isPending || updateMutation.isPending}
                   >
                     <ThemedText style={styles.submitButtonText}>
-                      {createMutation.isLoading || updateMutation.isLoading ? 'Saving...' : (editingTrip ? 'Update' : 'Create')}
+                      {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingTrip ? 'Update' : 'Create')}
                     </ThemedText>
                   </TouchableOpacity>
                 </View>

@@ -263,10 +263,10 @@ export default function ExpenseTypesScreen() {
                 <TouchableOpacity
                   style={[styles.submitButton, { backgroundColor: colors.primary }]}
                   onPress={handleSubmit}
-                  disabled={createMutation.isLoading || updateMutation.isLoading}
+                  disabled={createMutation.isPending || updateMutation.isPending}
                 >
                   <ThemedText style={styles.submitButtonText}>
-                    {createMutation.isLoading || updateMutation.isLoading ? 'Saving...' :
+                    {createMutation.isPending || updateMutation.isPending ? 'Saving...' :
                      editingType ? 'Update' : 'Create'}
                   </ThemedText>
                 </TouchableOpacity>

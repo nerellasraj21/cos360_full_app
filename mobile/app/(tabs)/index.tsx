@@ -1,165 +1,163 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View, ScrollView } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
-import { Colors } from '@/constants/theme';
-import { useTheme } from '@/contexts';
-
+import { useAuth, useTheme } from '@/contexts';
 import { PermissionGuard } from '../../src/components/mobile/MobilePermissionGuard';
+
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good Morning';
+  if (hour < 17) return 'Good Afternoon';
+  return 'Good Evening';
+};
+
+const getFormattedDate = () =>
+  new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+const MODULES = [
+  {
+    id: 'students',
+    title: 'Students',
+    icon: 'people' as const,
+    color: '#3B82F6',
+    bg: '#EFF6FF',
+    darkBg: '#3B82F620',
+    route: '/students',
+    stat: '1,250+ Students',
+  },
+  {
+    id: 'fees',
+    title: 'Fees',
+    icon: 'card' as const,
+    color: '#10B981',
+    bg: '#F0FDF4',
+    darkBg: '#10B98120',
+    route: '/fees',
+    stat: '₹2.5M Collected',
+  },
+  {
+    id: 'masters',
+    title: 'Masters',
+    icon: 'settings' as const,
+    color: '#06B6D4',
+    bg: '#ECFEFF',
+    darkBg: '#06B6D420',
+    route: '/masters',
+    stat: '15+ Modules',
+  },
+  {
+    id: 'transport',
+    title: 'Transport',
+    icon: 'bus' as const,
+    color: '#F59E0B',
+    bg: '#FFFBEB',
+    darkBg: '#F59E0B20',
+    route: '/transport',
+    stat: '25 Vehicles',
+  },
+  {
+    id: 'staff',
+    title: 'Staff',
+    icon: 'person' as const,
+    color: '#8B5CF6',
+    bg: '#F5F3FF',
+    darkBg: '#8B5CF620',
+    route: '/staff',
+    stat: '85 Members',
+  },
+  {
+    id: 'expense',
+    title: 'Expense',
+    icon: 'wallet' as const,
+    color: '#F97316',
+    bg: '#FFF7ED',
+    darkBg: '#F9731620',
+    route: '/expense',
+    stat: '₹1.2M Spent',
+  },
+];
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { theme, colors } = useTheme();
-  const themeColors = colors;
+  const { colors, theme } = useTheme();
+  const { user } = useAuth();
 
-
-  const quickActions = [
-    {
-      id: 'students',
-      title: 'Students',
-      description: 'Manage student admissions and records',
-      icon: () => <Ionicons name="people" size={28} color="#3B82F6" />,
-      onPress: () => router.push('/students'),
-      color: '#3B82F6',
-      stats: '1,250+ Students'
-    },
-    {
-      id: 'fees',
-      title: 'Fees',
-      description: 'Handle fee collection and payments',
-      icon: () => <Ionicons name="card" size={28} color="#10B981" />,
-      onPress: () => router.push('/fees'),
-      color: '#10B981',
-      stats: '₹2.5M Collected'
-    },
-    {
-      id: 'masters',
-      title: 'Masters',
-      description: 'Configure academic and system settings',
-      icon: () => <Ionicons name="settings" size={28} color="#F59E0B" />,
-      onPress: () => router.push('/masters'),
-      color: '#F59E0B',
-      stats: '15+ Modules'
-    },
-    {
-      id: 'transport',
-      title: 'Transport',
-      description: 'Manage routes and vehicle assignments',
-      icon: () => <Ionicons name="bus" size={28} color="#8B5CF6" />,
-      onPress: () => router.push('/transport'),
-      color: '#8B5CF6',
-      stats: '25 Vehicles'
-    },
-    {
-      id: 'staff',
-      title: 'Staff',
-      description: 'Manage teaching and administrative staff',
-      icon: () => <Ionicons name="person" size={28} color="#EF4444" />,
-      onPress: () => router.push('/staff'),
-      color: '#EF4444',
-      stats: '85 Staff Members'
-    },
-    {
-      id: 'expense',
-      title: 'Expense',
-      description: 'Track and manage school expenses',
-      icon: () => <Ionicons name="wallet" size={28} color="#06B6D4" />,
-      onPress: () => router.push('/expense'),
-      color: '#06B6D4',
-      stats: '₹1.2M Spent'
-    }
-  ];
-
-  const recentActivities = [
-    {
-      id: '1',
-      title: 'New Student Admission',
-      description: 'John Smith admitted to Grade 10-A',
-      time: '2 hours ago',
-      icon: 'person-add' as const,
-      color: '#10B981'
-    },
-    {
-      id: '2',
-      title: 'Fee Payment Received',
-      description: '₹5,000 received from Sarah Johnson',
-      time: '4 hours ago',
-      icon: 'cash' as const,
-      color: '#3B82F6'
-    },
-    {
-      id: '3',
-      title: 'Timetable Updated',
-      description: 'Grade 9-B timetable modified',
-      time: '1 day ago',
-      icon: 'time' as const,
-      color: '#F59E0B'
-    },
-    {
-      id: '4',
-      title: 'New Staff Member',
-      description: 'Ms. Emily Chen joined as English Teacher',
-      time: '2 days ago',
-      icon: 'person' as const,
-      color: '#8B5CF6'
-    }
-  ];
-
-  const renderQuickAction = (action: typeof quickActions[0]) => (
-    <TouchableOpacity
-      key={action.id}
-      style={[styles.actionCard, { backgroundColor: themeColors.card }]}
-      onPress={action.onPress}
-    >
-      <View style={[styles.actionIcon, { backgroundColor: action.color + '20' }]}>
-        {action.icon()}
-      </View>
-      <View style={styles.actionContent}>
-        <ThemedText type="subtitle" style={styles.actionTitle}>
-          {action.title}
-        </ThemedText>
-        <ThemedText style={styles.actionDescription}>
-          {action.description}
-        </ThemedText>
-
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={themeColors['muted-foreground']} />
-    </TouchableOpacity>
-  );
-
+  const initial = (user?.username || 'U').charAt(0).toUpperCase();
 
   return (
-    <PermissionGuard
-      resourceConstant="profile"
-      actionConstant="read_own"
-    >
+    <PermissionGuard resourceConstant="profile" actionConstant="read_own">
       <AppLayout title="Dashboard">
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-          {/* Welcome Section */}
-          <View style={styles.welcomeSection}>
-            <Ionicons name="person-circle" size={32} color={themeColors.primary} />
-            <ThemedText type="title" style={styles.welcomeText}>
-              Welcome Username
-            </ThemedText>
-          </View>
+        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
 
-          {/* Quick Actions */}
-          <View style={styles.section}>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              Quick Actions
-            </ThemedText>
-            <ThemedText style={styles.sectionDescription}>
-              Access key modules and features
-            </ThemedText>
+          {/* Hero / Greeting Card */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroDecorCircle1} />
+            <View style={styles.heroDecorCircle2} />
 
-            <View style={styles.actionsGrid}>
-              {quickActions.map(renderQuickAction)}
+            {/* Top row: greeting + avatar */}
+            <View style={styles.heroTop}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.heroGreeting}>{getGreeting()},</Text>
+                <Text style={styles.heroName}>{user?.username || 'User'} 👋</Text>
+                <View style={styles.heroDateRow}>
+                  <Ionicons name="calendar-outline" size={13} color="rgba(255,255,255,0.65)" />
+                  <Text style={styles.heroDate}>{getFormattedDate()}</Text>
+                </View>
+              </View>
+              <View style={styles.heroAvatar}>
+                <Text style={styles.heroAvatarText}>{initial}</Text>
+              </View>
+            </View>
+
+            {/* Stats bar */}
+            <View style={styles.heroStatsBar}>
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatNum}>1,250</Text>
+                <Text style={styles.heroStatLabel}>Students</Text>
+              </View>
+              <View style={styles.heroStatDivider} />
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatNum}>85</Text>
+                <Text style={styles.heroStatLabel}>Staff</Text>
+              </View>
+              <View style={styles.heroStatDivider} />
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatNum}>₹2.5M</Text>
+                <Text style={styles.heroStatLabel}>Collected</Text>
+              </View>
             </View>
           </View>
+
+          {/* Module Grid */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Modules</Text>
+            <View style={styles.grid}>
+              {MODULES.map(mod => (
+                <TouchableOpacity
+                  key={mod.id}
+                  style={[
+                    styles.moduleCard,
+                    { backgroundColor: theme === 'dark' ? mod.darkBg : mod.bg },
+                  ]}
+                  onPress={() => router.push(mod.route as any)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.moduleIconBg, { backgroundColor: mod.color }]}>
+                    <Ionicons name={mod.icon} size={22} color="white" />
+                  </View>
+                  <Text style={[styles.moduleTitle, { color: mod.color }]}>{mod.title}</Text>
+                  <Text style={[styles.moduleStat, { color: colors['muted-foreground'] }]}>{mod.stat}</Text>
+                  <View style={[styles.moduleArrowBg, { backgroundColor: mod.color + '20' }]}>
+                    <Ionicons name="arrow-forward" size={13} color={mod.color} />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
         </ScrollView>
       </AppLayout>
     </PermissionGuard>
@@ -167,146 +165,151 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
+  heroCard: {
+    margin: 16,
+    borderRadius: 22,
+    backgroundColor: '#556ee6',
+    overflow: 'hidden',
+    shadowColor: '#556ee6',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 10,
   },
-  welcomeSection: {
+  heroDecorCircle1: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  heroDecorCircle2: {
+    position: 'absolute',
+    bottom: -30,
+    left: -30,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  heroTop: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     padding: 20,
-    paddingBottom: 10,
+    paddingBottom: 16,
   },
-  welcomeText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  subtitle: {
-    fontSize: 16,
-    opacity: 0.7,
-    marginTop: 4,
-  },
-  section: {
-    padding: 20,
-    paddingTop: 0,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  sectionDescription: {
+  heroGreeting: {
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
-    opacity: 0.7,
-    marginBottom: 16,
+    fontWeight: '500',
   },
-  actionsGrid: {
-    gap: 12,
-  },
-  actionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  actionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  actionContent: {
-    flex: 1,
-  },
-  actionTitle: {
-    marginBottom: 4,
-  },
-  actionDescription: {
-    fontSize: 14,
-    opacity: 0.7,
+  heroName: {
+    color: 'white',
+    fontSize: 22,
+    fontWeight: '700',
+    marginTop: 3,
     marginBottom: 8,
   },
-  statsBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statsText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  activitiesList: {
-    gap: 12,
-  },
-  activityCard: {
+  heroDateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    gap: 5,
   },
-  activityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  heroDate: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+  },
+  heroAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginLeft: 12,
   },
-  activityContent: {
+  heroAvatarText: {
+    color: 'white',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  heroStatsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    marginHorizontal: 16,
+    marginBottom: 18,
+    borderRadius: 14,
+    paddingVertical: 12,
+  },
+  heroStatItem: {
     flex: 1,
+    alignItems: 'center',
   },
-  activityTitle: {
-    marginBottom: 2,
+  heroStatNum: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
   },
-  activityDescription: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginBottom: 4,
+  heroStatLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 11,
+    marginTop: 2,
   },
-  activityTime: {
-    fontSize: 12,
-    opacity: 0.6,
+  heroStatDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  statsGrid: {
+  section: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    marginBottom: 14,
+  },
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
   },
-  statCard: {
-    flex: 1,
-    minWidth: '45%',
-    flexDirection: 'row',
-    alignItems: 'center',
+  moduleCard: {
+    width: '47%',
+    borderRadius: 18,
     padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    overflow: 'hidden',
   },
-  statContent: {
-    marginLeft: 12,
-    flex: 1,
+  moduleIconBg: {
+    width: 46,
+    height: 46,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
   },
-  statNumber: {
-    fontSize: 24,
+  moduleTitle: {
+    fontSize: 15,
     fontWeight: '700',
+    marginBottom: 4,
   },
-  statLabel: {
-    fontSize: 14,
-    opacity: 0.7,
+  moduleStat: {
+    fontSize: 12,
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  moduleArrowBg: {
+    alignSelf: 'flex-end',
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

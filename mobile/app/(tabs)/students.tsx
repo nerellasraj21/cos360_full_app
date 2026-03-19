@@ -1,468 +1,423 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View
-} from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { AppLayout } from '@/components';
-import { Colors } from '@/constants/theme';
 import { useTheme } from '@/contexts';
 import { studentAdmissionsApi, StudentAdmission } from '@/src/api/students';
-import { useMobilePermission } from '../../src/hooks/useMobilePermission';
-import { PERMISSION_RESOURCES } from '../../src/types/permissions';
+import { useMobilePermission } from '@/src/hooks/useMobilePermission';
+import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
 type Student = StudentAdmission;
 
-const studentActions = [
+const BLUE = '#3B82F6';
+
+const sections = [
   {
-    title: 'Core Management',
-    icon: 'school',
-    color: '#3B82F6',
-    actions: [
-      { title: 'New Admission', icon: 'person-add', route: '/students/admission', description: 'Add new student' },
-      { title: 'Mark Attendance', icon: 'checkmark-circle', route: '/students/attendance', description: 'Daily attendance' },
-    ]
+    title: 'Student Admissions',
+    description: 'Manage student admissions',
+    icon: 'person-add' as const,
+    color: BLUE,
+    route: '/students/admission',
+    resource: PERMISSION_RESOURCES.STUDENT_ADMISSIONS,
+    action: 'list',
   },
   {
-    title: 'Student Services',
-    icon: 'people',
+    title: 'Student Attendance',
+    description: 'Track and manage daily student attendance',
+    icon: 'checkmark-circle' as const,
     color: '#10B981',
-    actions: [
-      { title: 'Student Profile', icon: 'person', route: '/students/profile', description: 'View & edit profile' },
-      { title: 'Transport', icon: 'bus', route: '/students/transport', description: 'Transport assignments' },
-    ]
+    route: '/students/attendance',
+    resource: PERMISSION_RESOURCES.STUDENT_ATTENDANCE,
+    action: 'create',
   },
   {
-    title: 'Certificates',
-    icon: 'document',
-    color: '#F59E0B',
-    actions: [
-      { title: 'My Certificates', icon: 'document', route: '/students/mycertificates', description: 'View certificates' },
-      { title: 'Student Certificates', icon: 'documents', route: '/students/studentcertificates', description: 'Manage certificates' },
-      { title: 'Upload Certificate', icon: 'cloud-upload', route: '/students/certificateupload', description: 'Upload new certificate' },
-      { title: 'Certificate Types', icon: 'list', route: '/students/certificatetypes', description: 'Manage types' },
-    ]
+    title: 'Student Documents',
+    description: 'Upload and manage student documents',
+    icon: 'folder-open' as const,
+    color: '#F97316',
+    route: '/students/studentdocuments',
+    resource: PERMISSION_RESOURCES.STUDENT_DOCUMENTS,
+    action: 'list',
   },
   {
-    title: 'Documents',
-    icon: 'folder',
+    title: 'Student Certificates',
+    description: 'Issue and manage student certificates',
+    icon: 'ribbon' as const,
     color: '#8B5CF6',
-    actions: [
-      { title: 'My Documents', icon: 'folder', route: '/students/mydocuments', description: 'View documents' },
-      { title: 'Student Documents', icon: 'folder-open', route: '/students/studentdocuments', description: 'Manage documents' },
-      { title: 'Upload Document', icon: 'cloud-upload', route: '/students/documentupload', description: 'Upload new document' },
-    ]
+    route: '/students/studentcertificates',
+    resource: PERMISSION_RESOURCES.STUDENT_CERTIFICATES,
+    action: 'list',
+  },
+  {
+    title: 'Certificate Types',
+    description: 'Manage certificate types',
+    icon: 'pricetag' as const,
+    color: '#F59E0B',
+    route: '/students/certificatetypes',
+    resource: PERMISSION_RESOURCES.STUDENT_CERTIFICATES,
+    action: 'list',
+  },
+  {
+    title: 'Student Transport',
+    description: 'View student transport assignments',
+    icon: 'bus' as const,
+    color: '#EF4444',
+    route: '/students/transport',
+    resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,
+    action: 'list',
   },
 ];
 
 export default function StudentsScreen() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedClass, setSelectedClass] = useState<string>('');
-  const [selectedSection, setSelectedSection] = useState<string>('');
   const router = useRouter();
-  const { theme, colors } = useTheme();
-  const themeColors = colors;
+  const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
+  const queryClient = useQueryClient();
 
-  // Fetch students data - permission protected
   const hasListPermission = hasPermission ? hasPermission(PERMISSION_RESOURCES.STUDENTS, 'list') : false;
-  const { data: studentsData, isLoading, error, refetch } = useQuery({
+  const { data: studentsData, isLoading } = useQuery({
     queryKey: ['students'],
     queryFn: () => studentAdmissionsApi.getStudentAdmissions().then(res => res.items),
-    enabled: hasListPermission, // Only fetch if user has permission
+    enabled: hasListPermission,
   });
 
-  // Filter students based on search and filters
-  const filteredStudents = useMemo(() => {
-    if (!studentsData) return [];
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      studentAdmissionsApi.toggleActiveStatus(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['students'] }),
+    onError: () => Alert.alert('Error', 'Failed to update student status.'),
+  });
 
-    return studentsData.filter((student: Student) => {
-      const fullName = `${student.student.first_name} ${student.student.last_name}`.toLowerCase();
-      const matchesSearch =
-        fullName.includes(searchQuery.toLowerCase()) ||
-        student.admission_number.toLowerCase().includes(searchQuery.toLowerCase());
+  const handleToggleActive = (student: Student) => {
+    const action = student.is_active ? 'deactivate' : 'activate';
+    Alert.alert(
+      `${student.is_active ? 'Deactivate' : 'Activate'} Student`,
+      `Are you sure you want to ${action} ${student.student.first_name} ${student.student.last_name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: student.is_active ? 'Deactivate' : 'Activate',
+          style: student.is_active ? 'destructive' : 'default',
+          onPress: () => toggleActiveMutation.mutate({ id: student.id }),
+        },
+      ],
+    );
+  };
 
-      const matchesClass = !selectedClass || student.current_class_id === selectedClass;
-      const matchesSection = !selectedSection || student.current_section_id === selectedSection;
+  const totalStudents = studentsData?.length ?? 0;
+  const activeStudents = studentsData?.filter((s: Student) => s.is_active).length ?? 0;
+  const inactiveStudents = totalStudents - activeStudents;
 
-      return matchesSearch && matchesClass && matchesSection;
-    });
-  }, [studentsData, searchQuery, selectedClass, selectedSection]);
-
-  // Get unique classes and sections for filters
-  const uniqueClasses = useMemo(() => {
-    if (!studentsData) return [];
-    return [...new Set(studentsData.map((student: Student) => student.current_class_id))];
-  }, [studentsData]);
-
-  const uniqueSections = useMemo(() => {
-    if (!studentsData) return [];
-    return [...new Set(studentsData.map((student: Student) => student.current_section_id).filter(Boolean))];
-  }, [studentsData]);
-
+  const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
+  const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
   return (
-    <AppLayout title="Student Management System">
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Statistics Cards */}
-        <View style={styles.statsContainer}>
-          <View style={[styles.statCard, { backgroundColor: themeColors.card }]}>
-            <Ionicons name="people" size={32} color="#3B82F6" />
-            <View style={styles.statContent}>
-              <ThemedText type="title" style={styles.statNumber}>
-                {studentsData?.length || 0}
-              </ThemedText>
-              <ThemedText style={styles.statLabel}>Total Students</ThemedText>
-            </View>
-          </View>
+    <AppLayout title="Students">
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
-          <View style={[styles.statCard, { backgroundColor: themeColors.card }]}>
-            <Ionicons name="school" size={32} color="#10B981" />
-            <View style={styles.statContent}>
-              <ThemedText type="title" style={styles.statNumber}>
-                {studentsData?.filter((s: Student) => s.is_active).length || 0}
-              </ThemedText>
-              <ThemedText style={styles.statLabel}>Active Students</ThemedText>
-            </View>
+        {/* Banner */}
+        <View style={[styles.banner, { backgroundColor: BLUE }]}>
+          <View style={styles.bannerDecor} />
+          <View style={styles.bannerDecor2} />
+          <View style={styles.bannerIcon}>
+            <Ionicons name="people" size={28} color="white" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.bannerTitle}>Students Dashboard</Text>
+            <Text style={styles.bannerSub}>Comprehensive management of student data, admissions, and records</Text>
           </View>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.actionsSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>
-            Quick Actions
-          </ThemedText>
-
-          {studentActions.map((section, sectionIndex) => (
-            <View key={sectionIndex} style={styles.sectionContainer}>
-              <View style={styles.sectionHeader}>
-                <View style={[styles.sectionIcon, { backgroundColor: section.color }]}>
-                  <Ionicons name={section.icon as any} size={20} color="white" />
-                </View>
-                <ThemedText type="defaultSemiBold" style={styles.sectionTitleText}>
-                  {section.title}
-                </ThemedText>
-              </View>
-
-              <View style={styles.actionsGrid}>
-                {section.actions.map((action, actionIndex) => {
-                  // Map actions to appropriate permissions
-                  const getActionPermission = (actionTitle: string) => {
-                    const permissionMap: { [key: string]: [string, string] } = {
-                      'New Admission': [PERMISSION_RESOURCES.STUDENT_ADMISSIONS, 'create'],
-                      'Mark Attendance': [PERMISSION_RESOURCES.STUDENT_ATTENDANCE, 'create'],
-                      'Student Profile': [PERMISSION_RESOURCES.STUDENTS, 'read'],
-                      'Transport': [PERMISSION_RESOURCES.STUDENT_TRANSPORT, 'list'],
-                      'My Certificates': [PERMISSION_RESOURCES.STUDENT_CERTIFICATES, 'read'],
-                      'Student Certificates': [PERMISSION_RESOURCES.STUDENT_CERTIFICATES, 'list'],
-                      'Upload Certificate': [PERMISSION_RESOURCES.STUDENT_CERTIFICATES, 'create'],
-                      'Certificate Types': [PERMISSION_RESOURCES.STUDENT_CERTIFICATES, 'list'],
-                      'My Documents': [PERMISSION_RESOURCES.STUDENT_DOCUMENTS, 'read'],
-                      'Student Documents': [PERMISSION_RESOURCES.STUDENT_DOCUMENTS, 'list'],
-                      'Upload Document': [PERMISSION_RESOURCES.STUDENT_DOCUMENTS, 'create']
-                    };
-                    return permissionMap[actionTitle] || [PERMISSION_RESOURCES.STUDENTS, 'read'];
-                  };
-
-                  const [resource, actionType] = getActionPermission(action.title);
-                  const hasAccess = hasPermission ? hasPermission(resource, actionType) : false;
-
-                  return (
-                    <TouchableOpacity
-                      key={actionIndex}
-                      style={[
-                        styles.actionCard,
-                        {
-                          backgroundColor: hasAccess ? themeColors.card : themeColors.muted,
-                          opacity: hasAccess ? 1 : 0.6
-                        }
-                      ]}
-                      onPress={() => hasAccess && router.push(action.route as any)}
-                      disabled={!hasAccess}
-                    >
-                      <Ionicons
-                        name={hasAccess ? action.icon as any : "lock-closed"}
-                        size={24}
-                        color={hasAccess ? section.color : themeColors['muted-foreground']}
-                      />
-                      <View style={styles.actionContent}>
-                        <ThemedText style={styles.actionTitle}>{action.title}</ThemedText>
-                        <ThemedText style={styles.actionDescription}>
-                          {hasAccess
-                            ? action.description
-                            : "You don't have permission to access this feature"
-                          }
-                        </ThemedText>
-                      </View>
-                      <Ionicons
-                        name={hasAccess ? "chevron-forward" : "lock-closed"}
-                        size={16}
-                        color={themeColors['muted-foreground']}
-                      />
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+        {/* Stats row */}
+        <View style={styles.statsRow}>
+          <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <View style={[styles.statIconBox, { backgroundColor: BLUE + '18' }]}>
+              <Ionicons name="people" size={20} color={BLUE} />
             </View>
-          ))}
+            <Text style={[styles.statNum, { color: colors.foreground }]}>{totalStudents}</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Total</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <View style={[styles.statIconBox, { backgroundColor: '#10B98118' }]}>
+              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+            </View>
+            <Text style={[styles.statNum, { color: colors.foreground }]}>{activeStudents}</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Active</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <View style={[styles.statIconBox, { backgroundColor: '#EF444418' }]}>
+              <Ionicons name="close-circle" size={20} color="#EF4444" />
+            </View>
+            <Text style={[styles.statNum, { color: colors.foreground }]}>{inactiveStudents}</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Inactive</Text>
+          </View>
         </View>
 
-        {/* Recent Students */}
-        <View style={styles.recentSection}>
-          <View style={styles.recentHeader}>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>
-              Recent Students
-            </ThemedText>
-            <TouchableOpacity onPress={() => router.push('/students/admission')}>
-              <ThemedText style={[styles.viewAllText, { color: themeColors.primary }]}>
-                Add New
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
+        {/* Sections label */}
+        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>STUDENTS SECTIONS</Text>
 
-          {filteredStudents.slice(0, 3).map((student) => (
-            <TouchableOpacity
-              key={student.id}
-              style={[styles.studentCard, { backgroundColor: themeColors.card }]}
-              onPress={() => router.push(`/students/${student.id}`)}
-            >
-              <View style={styles.studentHeader}>
-                <View style={styles.studentInfo}>
-                  <ThemedText type="subtitle" style={styles.studentName}>
-                    {`${student.student.first_name} ${student.student.last_name}`}
-                  </ThemedText>
-                  <ThemedText style={styles.admissionNumber}>
-                    {student.admission_number}
-                  </ThemedText>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: student.is_active ? '#10B981' : '#EF4444' }]}>
-                  <ThemedText style={styles.statusText}>
-                    {student.is_active ? 'Active' : 'Inactive'}
-                  </ThemedText>
-                </View>
-              </View>
-
-              <View style={styles.studentDetails}>
-                <View style={styles.detailRow}>
-                  <Ionicons name="school" size={16} color={themeColors['muted-foreground']} />
-                  <ThemedText style={styles.detailText}>
-                    Class {student.current_class_id} - Section {student.current_section_id || 'N/A'}
-                  </ThemedText>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-
-          {filteredStudents.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="people" size={64} color={themeColors['muted-foreground']} />
-              <ThemedText type="subtitle" style={styles.emptyTitle}>
-                No Students Yet
-              </ThemedText>
-              <ThemedText style={styles.emptyText}>
-                Start by adding your first student to the system
-              </ThemedText>
+        {/* Section cards grid */}
+        <View style={styles.grid}>
+          {sections.map((section, i) => {
+            const hasAccess = hasPermission ? hasPermission(section.resource, section.action) : false;
+            return (
               <TouchableOpacity
-                style={[styles.addFirstButton, { backgroundColor: themeColors.primary }]}
-                onPress={() => router.push('/students/admission')}
+                key={i}
+                style={[
+                  styles.sectionCard,
+                  { backgroundColor: cardBg, borderColor: borderCol },
+                  !hasAccess && { opacity: 0.5 },
+                ]}
+                onPress={() => hasAccess && router.push(section.route as any)}
+                disabled={!hasAccess}
+                activeOpacity={0.75}
               >
-                <Ionicons name="add" size={20} color="white" />
-                <ThemedText style={styles.addFirstButtonText}>Add First Student</ThemedText>
+                <View style={[styles.sectionIconBox, { backgroundColor: section.color + '18' }]}>
+                  <Ionicons
+                    name={hasAccess ? section.icon : 'lock-closed'}
+                    size={24}
+                    color={hasAccess ? section.color : '#9ca3af'}
+                  />
+                </View>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]} numberOfLines={2}>
+                  {section.title}
+                </Text>
+                <Text style={[styles.sectionDesc, { color: colors['muted-foreground'] }]} numberOfLines={2}>
+                  {hasAccess ? section.description : 'No access — contact admin'}
+                </Text>
+                {hasAccess && (
+                  <View style={[styles.sectionArrow, { backgroundColor: section.color + '18' }]}>
+                    <Ionicons name="arrow-forward" size={12} color={section.color} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Recent students */}
+        <View style={styles.recentHeader}>
+          <Text style={[styles.listTitle, { color: colors.foreground }]}>Recent Students</Text>
+          <TouchableOpacity onPress={() => router.push('/students/admission' as any)}>
+            <Text style={[styles.addNew, { color: colors.primary }]}>+ Add New</Text>
+          </TouchableOpacity>
+        </View>
+
+        {isLoading && (
+          <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>Loading students…</Text>
+          </View>
+        )}
+
+        {!isLoading && (studentsData ?? []).length === 0 && (
+          <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <Ionicons name="people-outline" size={44} color={colors['muted-foreground']} />
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Students Yet</Text>
+            <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>Start by adding your first student</Text>
+            <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: colors.primary }]} onPress={() => router.push('/students/admission' as any)}>
+              <Ionicons name="add" size={18} color="white" />
+              <Text style={styles.emptyBtnText}>Add First Student</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {(studentsData ?? []).slice(0, 5).map((student) => (
+          <View
+            key={student.id}
+            style={[styles.studentCard, { backgroundColor: cardBg, borderColor: borderCol }]}
+          >
+            <TouchableOpacity
+              style={styles.studentRow}
+              onPress={() => router.push(`/students/${student.id}` as any)}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.studentAvatarBox, { backgroundColor: BLUE + '18' }]}>
+                <Text style={[styles.studentAvatarText, { color: BLUE }]}>
+                  {student.student.first_name?.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.studentInfo}>
+                <Text style={[styles.studentName, { color: colors.foreground }]}>
+                  {student.student.first_name} {student.student.last_name}
+                </Text>
+                <View style={styles.studentMetaRow}>
+                  <Text style={[styles.studentMeta, { color: colors['muted-foreground'] }]}>
+                    {student.admission_number}
+                  </Text>
+                  <View style={[styles.statusPill, { backgroundColor: student.is_active ? '#dcfce7' : '#fee2e2' }]}>
+                    <Text style={[styles.statusText, { color: student.is_active ? '#16a34a' : '#ef4444' }]}>
+                      {student.is_active ? 'Active' : 'Inactive'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors['muted-foreground']} />
+            </TouchableOpacity>
+
+            <View style={[styles.actionBar, { borderTopColor: borderCol }]}>
+              <TouchableOpacity
+                style={styles.actionIconBtn}
+                onPress={() => router.push(`/students/${student.id}` as any)}
+              >
+                <Ionicons name="eye-outline" size={17} color={BLUE} />
+                <Text style={[styles.actionIconLabel, { color: BLUE }]}>View</Text>
+              </TouchableOpacity>
+
+              <View style={[styles.actionDivider, { backgroundColor: borderCol }]} />
+
+              <TouchableOpacity
+                style={styles.actionIconBtn}
+                onPress={() => router.push(`/students/admission?edit=${student.id}` as any)}
+              >
+                <Ionicons name="create-outline" size={17} color="#556ee6" />
+                <Text style={[styles.actionIconLabel, { color: '#556ee6' }]}>Edit</Text>
+              </TouchableOpacity>
+
+              <View style={[styles.actionDivider, { backgroundColor: borderCol }]} />
+
+              <TouchableOpacity
+                style={styles.actionIconBtn}
+                onPress={() => handleToggleActive(student)}
+                disabled={toggleActiveMutation.isPending}
+              >
+                <Ionicons
+                  name={student.is_active ? 'ban-outline' : 'checkmark-circle-outline'}
+                  size={17}
+                  color={student.is_active ? '#EF4444' : '#10B981'}
+                />
+                <Text style={[styles.actionIconLabel, { color: student.is_active ? '#EF4444' : '#10B981' }]}>
+                  {student.is_active ? 'Deactivate' : 'Activate'}
+                </Text>
               </TouchableOpacity>
             </View>
-          )}
-        </View>
+          </View>
+        ))}
       </ScrollView>
     </AppLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  statsContainer: {
+  scroll: { flex: 1 },
+  content: { padding: 16, paddingBottom: 32 },
+
+  // Banner
+  banner: {
+    borderRadius: 18,
+    padding: 18,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 24,
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 16,
+    overflow: 'hidden',
   },
+  bannerDecor: {
+    position: 'absolute', top: -30, right: -30,
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  bannerDecor2: {
+    position: 'absolute', bottom: -40, right: 60,
+    width: 90, height: 90, borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  bannerIcon: {
+    width: 52, height: 52, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 2 },
+  bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 16 },
+
+  // Stats
+  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: {
-    flex: 1,
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 4,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    flex: 1, borderRadius: 14, borderWidth: 1,
+    padding: 12, alignItems: 'center', gap: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
-  statContent: {
-    alignItems: 'center',
-    marginTop: 8,
+  statIconBox: { width: 38, height: 38, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  statNum: { fontSize: 16, fontWeight: '700' },
+  statLabel: { fontSize: 11 },
+
+  // Section label
+  sectionLabel: {
+    fontSize: 11, fontWeight: '700', letterSpacing: 1.2,
+    marginBottom: 12,
   },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  statLabel: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginTop: 4,
-  },
-  actionsSection: {
+
+  // Grid
+  grid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
     marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  sectionContainer: {
-    marginBottom: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  sectionTitleText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  actionsGrid: {
-    gap: 8,
-  },
-  actionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
+  sectionCard: {
+    width: '48%',
+    borderRadius: 14, borderWidth: 1,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+    minHeight: 120,
   },
-  actionContent: {
-    flex: 1,
-    marginLeft: 12,
+  sectionIconBox: {
+    width: 44, height: 44, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: 10,
   },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
+  sectionTitle: { fontSize: 13, fontWeight: '700', marginBottom: 4, lineHeight: 18 },
+  sectionDesc: { fontSize: 11, lineHeight: 16, flex: 1 },
+  sectionArrow: {
+    alignSelf: 'flex-end', marginTop: 8,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(59,130,246,0.1)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  actionDescription: {
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  recentSection: {
-    marginBottom: 20,
-  },
+
+  // Recent students header
   recentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
   },
-  viewAllText: {
-    fontSize: 14,
-    fontWeight: '600',
+  listTitle: { fontSize: 16, fontWeight: '700' },
+  addNew: { fontSize: 14, fontWeight: '600' },
+
+  // Empty state
+  emptyCard: {
+    borderRadius: 14, borderWidth: 1, padding: 32,
+    alignItems: 'center', gap: 8,
   },
+  emptyTitle: { fontSize: 16, fontWeight: '600' },
+  emptyText: { fontSize: 13, textAlign: 'center' },
+  emptyBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, marginTop: 4,
+  },
+  emptyBtnText: { color: 'white', fontWeight: '600' },
+
+  // Student cards
   studentCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: 14, borderWidth: 1, marginBottom: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+    overflow: 'hidden',
   },
-  studentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+  studentRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  studentAvatarBox: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center' },
+  studentAvatarText: { fontSize: 18, fontWeight: '700' },
+  studentInfo: { flex: 1 },
+  studentName: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
+  studentMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  studentMeta: { fontSize: 12 },
+  statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  statusText: { fontSize: 10, fontWeight: '700' },
+  actionBar: { flexDirection: 'row', borderTopWidth: 1 },
+  actionIconBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 5, paddingVertical: 9,
   },
-  studentInfo: {
-    flex: 1,
-  },
-  studentName: {
-    marginBottom: 4,
-  },
-  admissionNumber: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  studentDetails: {
-    gap: 8,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  detailText: {
-    fontSize: 14,
-    marginLeft: 8,
-    opacity: 0.8,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 64,
-  },
-  emptyTitle: {
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyText: {
-    textAlign: 'center',
-    opacity: 0.7,
-    marginBottom: 16,
-  },
-  addFirstButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  addFirstButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
+  actionIconLabel: { fontSize: 12, fontWeight: '600' },
+  actionDivider: { width: 1, marginVertical: 6 },
 });

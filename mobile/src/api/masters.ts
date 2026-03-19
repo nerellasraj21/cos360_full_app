@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Student } from './students';
+import type { Student } from './students'; // Student = StudentOut alias
 
 
 export interface AcademicYear {
@@ -727,31 +727,31 @@ export const subjectsApi = {
 // Subject Categories API
 export const subjectCategoriesApi = {
   getSubjectCategories: async (): Promise<SubjectCategory[]> => {
-    const response = await apiClient.get('/masters/subject_categories');
+    const response = await apiClient.get('/masters/subject_categories/categories');
     return response.data.items || response.data;
   },
 
   createSubjectCategory: async (data: SubjectCategoryCreate): Promise<SubjectCategory> => {
-    const response = await apiClient.post('/masters/subject_categories', data);
+    const response = await apiClient.post('/masters/subject_categories/categories', data);
     return response.data;
   },
 
   updateSubjectCategory: async (id: string, data: SubjectCategoryUpdate): Promise<SubjectCategory> => {
-    const response = await apiClient.put(`/masters/subject_categories/${id}`, data);
+    const response = await apiClient.put(`/masters/subject_categories/categories/${id}`, data);
     return response.data;
   },
 
   deleteSubjectCategory: async (id: string): Promise<void> => {
-    await apiClient.delete(`/masters/subject_categories/${id}`);
+    await apiClient.delete(`/masters/subject_categories/categories/${id}`);
   },
 
   getSubjectCategory: async (id: string): Promise<SubjectCategory> => {
-    const response = await apiClient.get(`/masters/subject_categories/${id}`);
+    const response = await apiClient.get(`/masters/subject_categories/categories/${id}`);
     return response.data;
   },
 
   getSubjectCategoriesDropdown: async (): Promise<Array<{ id: string, label: string }>> => {
-    const response = await apiClient.get('/masters/subject_categories/dropdown');
+    const response = await apiClient.get('/masters/subject_categories/categories/dropdown');
     return response.data;
   },
 };
@@ -760,59 +760,55 @@ export const subjectCategoriesApi = {
 export const classSubjectMappingsApi = {
   getClassSubjectMappings: async (academicYearId?: string): Promise<ClassSubjectMapping[]> => {
     const params = academicYearId ? { academic_year_id: academicYearId } : {};
-    const response = await apiClient.get('/class-subject-mappings/', { params });
+    const response = await apiClient.get('/masters/class-subject-mappings/', { params });
     return response.data.items || response.data;
   },
 
   createClassSubjectMapping: async (data: ClassSubjectMappingCreate): Promise<ClassSubjectMapping> => {
-    const response = await apiClient.post('/class-subject-mappings/', data);
+    const response = await apiClient.post('/masters/class-subject-mappings/', data);
     return response.data;
   },
 
   updateClassSubjectMapping: async (id: string, data: Partial<ClassSubjectMapping>): Promise<ClassSubjectMapping> => {
-    const response = await apiClient.put(`/class-subject-mappings/${id}`, data);
+    const response = await apiClient.put(`/masters/class-subject-mappings/${id}`, data);
     return response.data;
   },
 
   deleteClassSubjectMapping: async (id: string): Promise<void> => {
-    await apiClient.delete(`/class-subject-mappings/${id}`);
+    await apiClient.delete(`/masters/class-subject-mappings/${id}`);
   },
 
   getClassSubjectMapping: async (id: string): Promise<ClassSubjectMapping> => {
-    const response = await apiClient.get(`/class-subject-mappings/${id}`);
+    const response = await apiClient.get(`/masters/class-subject-mappings/${id}`);
     return response.data;
   },
 
   bulkCreateClassSubjectMappings: async (data: BulkClassSubjectMapping): Promise<any> => {
-    const response = await apiClient.post('/class-subject-mappings/bulk', data);
+    const response = await apiClient.post('/masters/class-subject-mappings/bulk', data);
     return response.data;
   },
 
   getMappingsByClass: async (classId: string): Promise<ClassSubjectMapping[]> => {
-    const response = await apiClient.get(`/class-subject-mappings/by-class/${classId}`);
+    const response = await apiClient.get(`/masters/class-subject-mappings/by-class/${classId}`);
     return response.data.items || response.data;
   },
 
   getMappingsDropdown: async (): Promise<Array<{ id: string, label: string }>> => {
-    const response = await apiClient.get('/class-subject-mappings/dropdown');
+    const response = await apiClient.get('/masters/class-subject-mappings/dropdown');
     return response.data;
   },
 };
 
 // Routes API
 export const routesApi = {
-  getRoutes: async (params?: {
-    skip?: number;
-    limit?: number;
-    is_active?: boolean;
-  }): Promise<Route[]> => {
-    const response = await apiClient.get('/masters/routes/', { params });
-    return response.data;
+  getRoutes: async (): Promise<Route[]> => {
+    const response = await apiClient.get('/masters/routes/all_routes');
+    return response.data.items || response.data;
   },
 
   getAllRoutes: async (): Promise<Route[]> => {
     const response = await apiClient.get('/masters/routes/all_routes');
-    return response.data;
+    return response.data.items || response.data;
   },
 
   getRoutesDropdown: async (): Promise<Array<{ id: string, route_name: string }>> => {
@@ -855,7 +851,7 @@ export const vehiclesApi = {
     is_active?: boolean;
   }): Promise<Vehicle[]> => {
     const response = await apiClient.get('/masters/vehicles/', { params });
-    return response.data;
+    return response.data.items || response.data;
   },
 
   getVehiclesDropdown: async (): Promise<Array<{ id: string, name: string }>> => {
@@ -892,7 +888,7 @@ export const routeStopsApi = {
     is_active?: boolean;
   }): Promise<RouteStop[]> => {
     const response = await apiClient.get('/masters/route-stops/', { params });
-    return response.data;
+    return response.data.items || response.data;
   },
 
   getRouteStop: async (id: string): Promise<RouteStop> => {
@@ -955,26 +951,26 @@ export const holidaysApi = {
 // Parents API
 export const parentsApi = {
   getParents: async (): Promise<Parent[]> => {
-    const response = await apiClient.get('/masters/parents/');
+    const response = await apiClient.get('/parents/');
     return response.data.items || response.data;
   },
 
   createParent: async (data: Omit<Parent, 'id' | 'students'>): Promise<Parent> => {
-    const response = await apiClient.post('/masters/parents/', data);
+    const response = await apiClient.post('/parents/', data);
     return response.data;
   },
 
   updateParent: async (id: string, data: Partial<Parent>): Promise<Parent> => {
-    const response = await apiClient.put(`/masters/parents/${id}`, data);
+    const response = await apiClient.patch(`/parents/${id}`, data);
     return response.data;
   },
 
   deleteParent: async (id: string): Promise<void> => {
-    await apiClient.delete(`/masters/parents/${id}`);
+    await apiClient.delete(`/parents/${id}`);
   },
 
   getParent: async (id: string): Promise<Parent> => {
-    const response = await apiClient.get(`/masters/parents/${id}`);
+    const response = await apiClient.get(`/parents/${id}`);
     return response.data;
   },
 
@@ -984,7 +980,7 @@ export const parentsApi = {
   },
 
   updateAuthenticatedParentProfile: async (data: Partial<Parent>): Promise<Parent> => {
-    const response = await apiClient.put('/profile/parent', data);
+    const response = await apiClient.put('/profile/parent/me', data);
     return response.data;
   },
 };
@@ -999,7 +995,7 @@ export const tripsApi = {
     driver_id?: string;
   }): Promise<Trip[]> => {
     const response = await apiClient.get('/masters/trips/', { params });
-    return response.data;
+    return response.data.items || response.data;
   },
 
   getTrip: async (id: string): Promise<Trip> => {
@@ -1049,8 +1045,9 @@ export const rolesApi = {
   },
 
   getRolesDropdown: async (): Promise<Array<{ id: string, label: string }>> => {
-    const response = await apiClient.get('/admin/role-mgmt/roles/dropdown');
-    return response.data;
+    const response = await apiClient.get('/admin/role-mgmt/roles/');
+    const roles: Role[] = response.data.roles || response.data.items || response.data;
+    return roles.map(r => ({ id: r.id, label: r.name }));
   },
 };
 
@@ -1096,7 +1093,7 @@ export const permissionsApi = {
   },
 
   getAvailableActions: async (): Promise<AvailableActions | string[]> => {
-    const response = await apiClient.get('/auth/available-actions');
+    const response = await apiClient.get('/auth/resource-permissions/dropdown/actions');
     return response.data;
   },
 

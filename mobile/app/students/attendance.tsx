@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -11,78 +10,226 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { AppLayout } from '@/components';
 import { CustomDropdown } from '@/components/ui/dropdown';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { studentAttendanceApi, studentAdmissionsApi, classSectionsApi } from '@/src/api';
 import { useTheme } from '@/contexts';
-import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard } from '@/components/PermissionGuards';
+import { useAuth } from '@/contexts/AuthContext';
+import { ReadOrListPermissionGuard, CreatePermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
-interface AttendanceRecord {
-  id: string;
-  student_id: string;
-  class_id: string;
-  attendance_date: string;
-  status: string;
-  remarks?: string;
-  created_at: string;
-  updated_at: string;
-  student_name?: string;
-  class_name?: string;
-  section_name?: string;
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'present': return '#10B981';
+    case 'absent': return '#EF4444';
+    case 'late': return '#F59E0B';
+    default: return '#6B7280';
+  }
+};
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'present': return 'checkmark-circle';
+    case 'absent': return 'close-circle';
+    case 'late': return 'time';
+    default: return 'help-circle';
+  }
+};
+
+// ─── Attendance history view (student + parent) ────────────────────────────
+
+function AttendanceHistoryView({
+  studentId,
+  studentName,
+}: {
+  studentId: string;
+  studentName?: string;
+}) {
+  const { colors } = useTheme();
+  const today = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
+  const selectedYear = today.getFullYear();
+
+  const startDate = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
+  const lastDay = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+  const endDate = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+  const { data: records, isLoading } = useQuery({
+    queryKey: ['attendance-history', studentId, startDate, endDate],
+    queryFn: () =>
+      studentAttendanceApi.getStudentAttendanceFilter(studentId, {
+        start_date: startDate,
+        end_date: endDate,
+      }),
+    enabled: !!studentId,
+  });
+
+  const monthOptions = MONTHS.map((m, i) => ({ label: m, value: String(i) }));
+
+  const sorted = useMemo(() => {
+    if (!records) return [];
+    return [...records].sort((a, b) => b.date.localeCompare(a.date));
+  }, [records]);
+
+  const stats = useMemo(() => {
+    if (!sorted.length) return { present: 0, absent: 0, late: 0, total: 0, pct: 0 };
+    const present = sorted.filter((r) => r.status === 'present').length;
+    const absent = sorted.filter((r) => r.status === 'absent').length;
+    const late = sorted.filter((r) => r.status === 'late').length;
+    const total = sorted.length;
+    const pct = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+    return { present, absent, late, total, pct };
+  }, [sorted]);
+
+  return (
+    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      {/* Month filter */}
+      <View style={[styles.filtersCard, { backgroundColor: colors.card }]}>
+        {studentName ? (
+          <ThemedText type="subtitle" style={styles.filtersTitle}>
+            {studentName}&apos;s Attendance
+          </ThemedText>
+        ) : (
+          <ThemedText type="subtitle" style={styles.filtersTitle}>
+            My Attendance
+          </ThemedText>
+        )}
+        <CustomDropdown
+          data={monthOptions}
+          placeholder="Select Month"
+          value={String(selectedMonth)}
+          onChange={(val) => setSelectedMonth(Number(val))}
+          style={{ backgroundColor: colors.background }}
+        />
+      </View>
+
+      {/* Stats summary */}
+      {sorted.length > 0 && (
+        <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+          <ThemedText type="subtitle" style={styles.summaryTitle}>
+            {MONTHS[selectedMonth]} {selectedYear}
+          </ThemedText>
+          <View style={styles.summaryStats}>
+            <View style={styles.statItem}>
+              <ThemedText style={[styles.statNumber, { color: '#3B82F6' }]}>{stats.total}</ThemedText>
+              <ThemedText style={styles.statLabel}>Days</ThemedText>
+            </View>
+            <View style={styles.statItem}>
+              <ThemedText style={[styles.statNumber, { color: '#10B981' }]}>{stats.present}</ThemedText>
+              <ThemedText style={styles.statLabel}>Present</ThemedText>
+            </View>
+            <View style={styles.statItem}>
+              <ThemedText style={[styles.statNumber, { color: '#EF4444' }]}>{stats.absent}</ThemedText>
+              <ThemedText style={styles.statLabel}>Absent</ThemedText>
+            </View>
+            <View style={styles.statItem}>
+              <ThemedText style={[styles.statNumber, { color: '#F59E0B' }]}>{stats.late}</ThemedText>
+              <ThemedText style={styles.statLabel}>Late</ThemedText>
+            </View>
+          </View>
+          <View style={styles.percentageBarBg}>
+            <View
+              style={[
+                styles.percentageFill,
+                {
+                  width: `${stats.pct}%` as any,
+                  backgroundColor: stats.pct >= 75 ? '#10B981' : '#EF4444',
+                },
+              ]}
+            />
+          </View>
+          <ThemedText style={[styles.percentageText, { color: stats.pct >= 75 ? '#10B981' : '#EF4444' }]}>
+            {stats.pct}% attendance
+          </ThemedText>
+        </View>
+      )}
+
+      {/* Records list */}
+      <View style={[styles.studentsCard, { backgroundColor: colors.card }]}>
+        <ThemedText type="subtitle" style={styles.studentsTitle}>
+          Attendance Records
+        </ThemedText>
+
+        {isLoading ? (
+          <ThemedText style={styles.emptyText}>Loading...</ThemedText>
+        ) : sorted.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="calendar-outline" size={48} color={colors['muted-foreground']} />
+            <ThemedText style={styles.emptyText}>
+              No records for {MONTHS[selectedMonth]}
+            </ThemedText>
+          </View>
+        ) : (
+          sorted.map((record) => (
+            <View
+              key={record.id}
+              style={[styles.recordRow, { borderBottomColor: colors.border }]}
+            >
+              <View style={styles.recordDateWrapper}>
+                <ThemedText style={styles.recordDateText}>
+                  {new Date(record.date + 'T00:00:00').toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                  })}
+                </ThemedText>
+                {record.remarks ? (
+                  <ThemedText style={styles.remarksText} numberOfLines={1}>
+                    {record.remarks}
+                  </ThemedText>
+                ) : null}
+              </View>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(record.status) }]}>
+                <Ionicons
+                  name={getStatusIcon(record.status) as any}
+                  size={13}
+                  color="white"
+                />
+                <ThemedText style={styles.statusText}>{record.status}</ThemedText>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+    </ScrollView>
+  );
 }
 
-export default function StudentAttendanceScreen() {
-  const router = useRouter();
-  // const colorScheme = useColorScheme();
-  // const theme = colorScheme === 'dark' ? 'dark' : 'light';
-  const { theme, colors } = useTheme();
-  const themeColors = Colors[theme];
+// ─── Staff view (mark attendance) ─────────────────────────────────────────────
+
+function StaffAttendanceView() {
+  const { colors } = useTheme();
   const queryClient = useQueryClient();
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedSection, setSelectedSection] = useState<string>('');
 
-  // Fetch attendance data
-  const { data: attendanceData, isLoading, refetch } = useQuery({
-    queryKey: ['student-attendance', selectedDate, selectedClass, selectedSection],
-    queryFn: async () => {
-      const response = await studentAttendanceApi.getStudentAttendance();
-      let filtered = response.items;
-
-      if (selectedClass) {
-        filtered = filtered.filter((record: AttendanceRecord) => record.class_name === selectedClass);
-      }
-      if (selectedSection) {
-        filtered = filtered.filter((record: AttendanceRecord) => record.section_name === selectedSection);
-      }
-
-      return filtered;
-    },
+  const { data: attendanceData } = useQuery({
+    queryKey: ['student-attendance', selectedDate],
+    queryFn: () => studentAttendanceApi.getAttendanceByDate(selectedDate),
   });
 
-  // Fetch students for the selected class/section
   const { data: studentsData } = useQuery({
     queryKey: ['students-for-attendance', selectedClass, selectedSection],
     queryFn: async () => {
       const response = await studentAdmissionsApi.getStudentAdmissions();
       let filtered = response.items;
-
       if (selectedClass) {
-        filtered = filtered.filter((student: any) => student.current_class_id === selectedClass);
+        filtered = filtered.filter((s: any) => s.current_class_id === selectedClass);
       }
       if (selectedSection) {
-        filtered = filtered.filter((student: any) => student.current_section_id === selectedSection);
+        filtered = filtered.filter((s: any) => s.current_section_id === selectedSection);
       }
-
       return filtered;
     },
   });
 
-  // Fetch dropdown data
   const { data: classesData } = useQuery({
     queryKey: ['classes-dropdown'],
     queryFn: async () => {
@@ -99,281 +246,247 @@ export default function StudentAttendanceScreen() {
     },
   });
 
-  // Mutation for marking attendance
-  const markAttendanceMutation = useMutation({
-    mutationFn: studentAttendanceApi.createStudentAttendance,
+  const markMutation = useMutation({
+    mutationFn: studentAttendanceApi.createAttendance,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-attendance'] });
-      Alert.alert('Success', 'Attendance marked successfully!');
     },
-    onError: (error) => {
-      Alert.alert('Error', 'Failed to mark attendance. Please try again.');
-      console.error('Mark attendance error:', error);
-    },
+    onError: () => Alert.alert('Error', 'Failed to mark attendance.'),
   });
 
-  const getAttendanceForStudent = (studentId: string) => {
-    return attendanceData?.find((record: AttendanceRecord) =>
-      record.student_id === studentId &&
-      record.attendance_date === selectedDate
-    );
-  };
+  const updateMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'present' | 'absent' | 'late' }) =>
+      studentAttendanceApi.updateAttendance(id, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student-attendance'] });
+    },
+    onError: () => Alert.alert('Error', 'Failed to update attendance.'),
+  });
 
-  const handleMarkAttendance = (student: any, status: 'present' | 'absent' | 'late') => {
-    const existingRecord = getAttendanceForStudent(student.id);
+  const getRecordForStudent = (studentEntityId: string) =>
+    attendanceData?.find((r: any) => r.student_id === studentEntityId);
 
-    if (existingRecord) {
+  const handleMark = (student: any, status: 'present' | 'absent' | 'late') => {
+    const existing = getRecordForStudent(student.student.id);
+    if (existing) {
       Alert.alert(
         'Update Attendance',
-        `Change attendance for this student to ${status}?`,
+        `Change to ${status}?`,
         [
           { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Update',
-            onPress: () => {
-              Alert.alert('Info', 'Update functionality would be implemented here');
-            }
-          }
-        ]
+          { text: 'Update', onPress: () => updateMutation.mutate({ id: existing.id, status }) },
+        ],
       );
     } else {
-      markAttendanceMutation.mutate({
-        student_id: student.id,
-        class_id: student.current_class_id,
-        attendance_date: selectedDate,
-        status,
-        remarks: '',
-      });
+      markMutation.mutate({ student_id: student.student.id, date: selectedDate, status });
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'present': return '#10B981';
-      case 'absent': return '#EF4444';
-      case 'late': return '#F59E0B';
-      default: return themeColors['muted-foreground'];
-    }
-  };
+  const stats = useMemo(() => {
+    if (!attendanceData) return null;
+    const present = (attendanceData as any[]).filter((r) => r.status === 'present').length;
+    const absent = (attendanceData as any[]).filter((r) => r.status === 'absent').length;
+    const late = (attendanceData as any[]).filter((r) => r.status === 'late').length;
+    return { present, absent, late, total: (attendanceData as any[]).length };
+  }, [attendanceData]);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'present': return 'checkmark-circle';
-      case 'absent': return 'close-circle';
-      case 'late': return 'time';
-      default: return 'help-circle';
-    }
-  };
+  return (
+    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      {/* Filters */}
+      <View style={[styles.filtersCard, { backgroundColor: colors.card }]}>
+        <ThemedText type="subtitle" style={styles.filtersTitle}>Filters</ThemedText>
 
-  const renderStudentAttendance = (student: any) => {
-    const attendanceRecord = getAttendanceForStudent(student.id);
-
-    return (
-      <View key={student.id} style={[styles.studentRow, { backgroundColor: themeColors.card }]}>
-        <View style={styles.studentInfo}>
-          <ThemedText style={styles.studentName}>{`${student.student.first_name} ${student.student.last_name}`}</ThemedText>
-          <ThemedText style={styles.admissionNumber}>{student.admission_number}</ThemedText>
+        <View style={styles.filterRow}>
+          <ThemedText style={styles.filterLabel}>Date</ThemedText>
+          <TouchableOpacity
+            style={[styles.dateButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => Alert.alert('Date Picker', 'Date picker will be implemented')}
+          >
+            <ThemedText>{new Date(selectedDate + 'T00:00:00').toLocaleDateString()}</ThemedText>
+            <Ionicons name="calendar" size={20} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
-        {attendanceRecord ? (
-          <View style={styles.attendanceStatus}>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(attendanceRecord.status) }]}>
-              <Ionicons name={getStatusIcon(attendanceRecord.status) as any} size={16} color="white" />
-              <ThemedText style={styles.statusText}>
-                {attendanceRecord.status}
-              </ThemedText>
+        <View style={styles.filterRow}>
+          <ThemedText style={styles.filterLabel}>Class</ThemedText>
+          <CustomDropdown
+            data={classesData || []}
+            placeholder="All Classes"
+            value={selectedClass}
+            onChange={(val) => setSelectedClass(val as string)}
+            style={{ backgroundColor: colors.background }}
+          />
+        </View>
+
+        <View style={styles.filterRow}>
+          <ThemedText style={styles.filterLabel}>Section</ThemedText>
+          <CustomDropdown
+            data={sectionsData || []}
+            placeholder="All Sections"
+            value={selectedSection}
+            onChange={(val) => setSelectedSection(val as string)}
+            style={{ backgroundColor: colors.background }}
+          />
+        </View>
+      </View>
+
+      {/* Summary */}
+      {stats && (
+        <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+          <ThemedText type="subtitle" style={styles.summaryTitle}>
+            Summary — {new Date(selectedDate + 'T00:00:00').toLocaleDateString()}
+          </ThemedText>
+          <View style={styles.summaryStats}>
+            <View style={styles.statItem}>
+              <ThemedText style={[styles.statNumber, { color: colors.primary }]}>{stats.total}</ThemedText>
+              <ThemedText style={styles.statLabel}>Total</ThemedText>
+            </View>
+            <View style={styles.statItem}>
+              <ThemedText style={[styles.statNumber, { color: '#10B981' }]}>{stats.present}</ThemedText>
+              <ThemedText style={styles.statLabel}>Present</ThemedText>
+            </View>
+            <View style={styles.statItem}>
+              <ThemedText style={[styles.statNumber, { color: '#EF4444' }]}>{stats.absent}</ThemedText>
+              <ThemedText style={styles.statLabel}>Absent</ThemedText>
+            </View>
+            <View style={styles.statItem}>
+              <ThemedText style={[styles.statNumber, { color: '#F59E0B' }]}>{stats.late}</ThemedText>
+              <ThemedText style={styles.statLabel}>Late</ThemedText>
             </View>
           </View>
-        ) : (
-          <CreatePermissionGuard
-            resource={PERMISSION_RESOURCES.STUDENT_ATTENDANCE}
-          >
-            <View style={styles.attendanceActions}>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#10B981' }]}
-                onPress={() => handleMarkAttendance(student, 'present')}
-              >
-                <Ionicons name="checkmark" size={16} color="white" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
-                onPress={() => handleMarkAttendance(student, 'absent')}
-              >
-                <Ionicons name="close" size={16} color="white" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#F59E0B' }]}
-                onPress={() => handleMarkAttendance(student, 'late')}
-              >
-                <Ionicons name="time" size={16} color="white" />
-              </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Students list */}
+      <View style={[styles.studentsCard, { backgroundColor: colors.card }]}>
+        <ThemedText type="subtitle" style={styles.studentsTitle}>Mark Attendance</ThemedText>
+
+        {studentsData?.map((student: any) => {
+          const record = getRecordForStudent(student.student.id);
+          return (
+            <View
+              key={student.id}
+              style={[styles.studentRow, { backgroundColor: colors.background }]}
+            >
+              <View style={styles.studentInfo}>
+                <ThemedText style={styles.studentName}>
+                  {student.student.first_name} {student.student.last_name}
+                </ThemedText>
+                <ThemedText style={styles.admissionNumber}>{student.admission_number}</ThemedText>
+              </View>
+
+              {record ? (
+                <TouchableOpacity
+                  style={[styles.statusBadge, { backgroundColor: getStatusColor(record.status) }]}
+                  onPress={() =>
+                    Alert.alert(
+                      'Change Attendance',
+                      `Current: ${record.status}. Change to:`,
+                      [
+                        { text: 'Present', onPress: () => updateMutation.mutate({ id: record.id, status: 'present' }) },
+                        { text: 'Absent', onPress: () => updateMutation.mutate({ id: record.id, status: 'absent' }) },
+                        { text: 'Late', onPress: () => updateMutation.mutate({ id: record.id, status: 'late' }) },
+                        { text: 'Cancel', style: 'cancel' },
+                      ],
+                    )
+                  }
+                >
+                  <Ionicons name={getStatusIcon(record.status) as any} size={14} color="white" />
+                  <ThemedText style={styles.statusText}>{record.status}</ThemedText>
+                </TouchableOpacity>
+              ) : (
+                <CreatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_ATTENDANCE}>
+                  <View style={styles.attendanceActions}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: '#10B981' }]}
+                      onPress={() => handleMark(student, 'present')}
+                    >
+                      <Ionicons name="checkmark" size={16} color="white" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
+                      onPress={() => handleMark(student, 'absent')}
+                    >
+                      <Ionicons name="close" size={16} color="white" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: '#F59E0B' }]}
+                      onPress={() => handleMark(student, 'late')}
+                    >
+                      <Ionicons name="time" size={16} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                </CreatePermissionGuard>
+              )}
             </View>
-          </CreatePermissionGuard>
+          );
+        })}
+
+        {(!studentsData || studentsData.length === 0) && (
+          <View style={styles.emptyState}>
+            <Ionicons name="people-outline" size={48} color="#9CA3AF" />
+            <ThemedText style={styles.emptyText}>
+              {selectedClass ? 'No students found' : 'Select a class to view students'}
+            </ThemedText>
+          </View>
         )}
       </View>
+    </ScrollView>
+  );
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
+export default function StudentAttendanceScreen() {
+  const { role, studentId, selectedStudent } = useAuth();
+  const { colors } = useTheme();
+
+  const roleName = role?.name?.toLowerCase();
+  const isStudent = roleName === 'student';
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName || '');
+
+  let content: React.ReactNode;
+
+  if (isStudent && studentId) {
+    content = <AttendanceHistoryView studentId={studentId} />;
+  } else if (isParent && selectedStudent) {
+    content = (
+      <AttendanceHistoryView
+        studentId={selectedStudent.id}
+        studentName={`${selectedStudent.first_name} ${selectedStudent.last_name}`}
+      />
     );
-  };
-
-  const renderAttendanceSummary = () => {
-    if (!attendanceData) return null;
-
-    const present = attendanceData.filter((record: any) => record.status === 'present').length;
-    const absent = attendanceData.filter((record: any) => record.status === 'absent').length;
-    const late = attendanceData.filter((record: any) => record.status === 'late').length;
-    const total = attendanceData.length;
-
-    return (
-      <View style={[styles.summaryCard, { backgroundColor: themeColors.card }]}>
-        <ThemedText type="subtitle" style={styles.summaryTitle}>
-          Attendance Summary - {new Date(selectedDate).toLocaleDateString()}
-        </ThemedText>
-
-        <View style={styles.summaryStats}>
-          <View style={styles.statItem}>
-            <Ionicons name="people" size={24} color={themeColors.primary} />
-            <ThemedText style={styles.statNumber}>{total}</ThemedText>
-            <ThemedText style={styles.statLabel}>Total</ThemedText>
-          </View>
-
-          <View style={styles.statItem}>
-            <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-            <ThemedText style={styles.statNumber}>{present}</ThemedText>
-            <ThemedText style={styles.statLabel}>Present</ThemedText>
-          </View>
-
-          <View style={styles.statItem}>
-            <Ionicons name="close-circle" size={24} color="#EF4444" />
-            <ThemedText style={styles.statNumber}>{absent}</ThemedText>
-            <ThemedText style={styles.statLabel}>Absent</ThemedText>
-          </View>
-
-          <View style={styles.statItem}>
-            <Ionicons name="time" size={24} color="#F59E0B" />
-            <ThemedText style={styles.statNumber}>{late}</ThemedText>
-            <ThemedText style={styles.statLabel}>Late</ThemedText>
-          </View>
-        </View>
+  } else if (isParent && !selectedStudent) {
+    content = (
+      <View style={styles.emptyState}>
+        <Ionicons name="person-outline" size={48} color={colors['muted-foreground']} />
+        <ThemedText style={styles.emptyText}>Please select a student from the header</ThemedText>
       </View>
     );
-  };
+  } else {
+    content = <StaffAttendanceView />;
+  }
 
   return (
     <ReadOrListPermissionGuard
       resource={PERMISSION_RESOURCES.STUDENT_ATTENDANCE}
       fallback={
-        <ThemedView style={styles.container}>
+        <AppLayout title="Attendance">
           <View style={styles.accessDeniedContainer}>
-            <Ionicons name="lock-closed" size={48} color={themeColors['muted-foreground']} />
+            <Ionicons name="lock-closed" size={48} color={colors['muted-foreground']} />
             <ThemedText style={styles.accessDeniedText}>
-              You don't have permission to access student attendance
+              You don&apos;t have permission to access attendance
             </ThemedText>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <ThemedText style={styles.backButtonText}>Go Back</ThemedText>
-            </TouchableOpacity>
           </View>
-        </ThemedView>
+        </AppLayout>
       }
     >
-      <ThemedView style={styles.container}>
-        {/* Header */}
-        <View style={[styles.header, { backgroundColor: themeColors.card }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
-          </TouchableOpacity>
-          <ThemedText type="title" style={styles.headerTitle}>
-            Student Attendance
-          </ThemedText>
-        </View>
-
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* Filters */}
-          <View style={[styles.filtersCard, { backgroundColor: themeColors.card }]}>
-            <ThemedText type="subtitle" style={styles.filtersTitle}>
-              Filters
-            </ThemedText>
-
-            <View style={styles.filterRow}>
-              <View style={styles.filterItem}>
-                <ThemedText style={styles.filterLabel}>Date</ThemedText>
-                <TouchableOpacity
-                  style={[styles.dateButton, { backgroundColor: themeColors.background }]}
-                  onPress={() => Alert.alert('Date Picker', 'Date picker would be implemented here')}
-                >
-                  <ThemedText>{new Date(selectedDate).toLocaleDateString()}</ThemedText>
-                  <Ionicons name="calendar" size={20} color={themeColors.primary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.filterRow}>
-              <View style={styles.filterItem}>
-                <ThemedText style={styles.filterLabel}>Class</ThemedText>
-                <CustomDropdown
-                  data={classesData || []}
-                  placeholder="All Classes"
-                  value={selectedClass}
-                  onChange={(value) => setSelectedClass(value as string)}
-                  style={{ backgroundColor: themeColors.background }}
-                />
-              </View>
-
-              <View style={styles.filterItem}>
-                <ThemedText style={styles.filterLabel}>Section</ThemedText>
-                <CustomDropdown
-                  data={sectionsData || []}
-                  placeholder="All Sections"
-                  value={selectedSection}
-                  onChange={(value) => setSelectedSection(value as string)}
-                  style={{ backgroundColor: themeColors.background }}
-                />
-              </View>
-            </View>
-          </View>
-
-          {/* Attendance Summary */}
-          {renderAttendanceSummary()}
-
-          {/* Students List */}
-          <View style={[styles.studentsCard, { backgroundColor: themeColors.card }]}>
-            <ThemedText type="subtitle" style={styles.studentsTitle}>
-              Mark Attendance
-            </ThemedText>
-
-            {studentsData?.map(renderStudentAttendance)}
-
-            {(!studentsData || studentsData.length === 0) && (
-              <View style={styles.emptyState}>
-                <Ionicons name="people" size={48} color={themeColors['muted-foreground']} />
-                <ThemedText style={styles.emptyText}>
-                  {selectedClass ? 'No students found for selected class' : 'Select a class to view students'}
-                </ThemedText>
-              </View>
-            )}
-          </View>
-        </ScrollView>
-      </ThemedView>
+      <AppLayout title="Attendance">{content}</AppLayout>
     </ReadOrListPermissionGuard>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    paddingTop: 50,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  headerTitle: {
-    flex: 1,
-  },
   scrollView: {
     flex: 1,
     padding: 16,
@@ -384,23 +497,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
   },
   filtersTitle: {
-    marginBottom: 16,
-  },
-  filterRow: {
     marginBottom: 12,
   },
-  filterItem: {
-    marginBottom: 8,
+  filterRow: {
+    marginBottom: 10,
   },
   filterLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     marginBottom: 4,
+    opacity: 0.7,
   },
   dateButton: {
     flexDirection: 'row',
@@ -409,7 +520,6 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   summaryCard: {
     borderRadius: 12,
@@ -417,7 +527,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
   },
@@ -428,6 +538,7 @@ const styles = StyleSheet.create({
   summaryStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    marginBottom: 16,
   },
   statItem: {
     alignItems: 'center',
@@ -435,12 +546,27 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginTop: 4,
+    marginBottom: 2,
   },
   statLabel: {
     fontSize: 12,
-    opacity: 0.7,
-    marginTop: 2,
+    opacity: 0.6,
+  },
+  percentageBarBg: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  percentageFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  percentageText: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   studentsCard: {
     borderRadius: 12,
@@ -448,12 +574,31 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
   },
   studentsTitle: {
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  recordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  recordDateWrapper: {
+    flex: 1,
+  },
+  recordDateText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  remarksText: {
+    fontSize: 11,
+    opacity: 0.5,
+    marginTop: 2,
   },
   studentRow: {
     flexDirection: 'row',
@@ -467,49 +612,48 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   studentName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
   },
   admissionNumber: {
     fontSize: 12,
-    opacity: 0.7,
-  },
-  attendanceStatus: {
-    alignItems: 'flex-end',
+    opacity: 0.6,
+    marginTop: 1,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
+    gap: 4,
   },
   statusText: {
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
-    marginLeft: 4,
+    textTransform: 'capitalize',
   },
   attendanceActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
   },
   emptyState: {
     alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 32,
   },
   emptyText: {
-    marginTop: 8,
+    marginTop: 10,
     textAlign: 'center',
-    opacity: 0.7,
+    opacity: 0.6,
+    fontSize: 14,
   },
   accessDeniedContainer: {
     flex: 1,
@@ -518,25 +662,9 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   accessDeniedText: {
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
-    marginTop: 16,
-    marginBottom: 20,
-    opacity: 0.7,
-  },
-  backButtonText: {
-    color: '#3B82F6',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  attendanceDisabled: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-  },
-  disabledText: {
-    fontSize: 12,
-    opacity: 0.6,
-    textAlign: 'center',
+    marginTop: 14,
+    opacity: 0.65,
   },
 });

@@ -33,7 +33,7 @@ export const runPermissionPerformanceTests = (
   clearCache?: () => void
 ): PermissionTestSuite => {
   
-  const testPermissions: PermissionTuple[] = [
+  const testPermissions: [string, string][] = [
     ['students', 'read'],
     ['students', 'create'],
     ['students', 'update'],

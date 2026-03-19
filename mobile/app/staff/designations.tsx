@@ -309,10 +309,10 @@ function StaffDesignationsScreenContent() {
               <TouchableOpacity
                 style={[styles.button, styles.submitButton, { backgroundColor: themeColors.primary }]}
                 onPress={handleSubmit}
-                disabled={createMutation.isLoading || updateMutation.isLoading}
+                disabled={createMutation.isPending || updateMutation.isPending}
               >
                 <ThemedText style={styles.submitButtonText}>
-                  {createMutation.isLoading || updateMutation.isLoading ? 'Saving...' : (editingDesignation ? 'Update' : 'Create')}
+                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingDesignation ? 'Update' : 'Create')}
                 </ThemedText>
               </TouchableOpacity>
             </View>

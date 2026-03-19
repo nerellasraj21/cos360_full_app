@@ -137,13 +137,13 @@ export function useStudentsSearch(query: string) {
 export function useStudentsDropdown(activeOnly = true) {
   return useQuery<StudentDropdownItem[]>({
     queryKey: ['students', 'dropdown', activeOnly],
-    queryFn: () => studentAdmissionsApi.studentsDropdown(activeOnly),
+    queryFn: () => studentAdmissionsApi.studentsDropdown({ active_only: activeOnly }),
   });
 }
 
 export function useStudentsDropdownSimple(activeOnly = true) {
   return useQuery<StudentDropdownSimpleItem[]>({
     queryKey: ['students', 'dropdown-simple', activeOnly],
-    queryFn: () => studentAdmissionsApi.studentsDropdownSimple(activeOnly),
+    queryFn: () => studentAdmissionsApi.studentsDropdownSimple({ active_only: activeOnly }),
   });
 }

@@ -26,13 +26,13 @@ export default function ParentsScreen() {
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? 'dark' : 'light';
   const themeColors = Colors[theme];
-  const { selectedStudent, availableStudents, user } = useAuth();
+  const { selectedStudent, availableStudents, role } = useAuth();
 
   // Check if user is a parent and handle student context
-  const isParentUser = user?.role?.name?.toLowerCase() === 'parent' || 
-                      user?.role?.name?.toLowerCase() === 'guardian' ||
-                      user?.role?.name?.toLowerCase() === 'father' ||
-                      user?.role?.name?.toLowerCase() === 'mother';
+  const isParentUser = role?.name?.toLowerCase() === 'parent' ||
+                      role?.name?.toLowerCase() === 'guardian' ||
+                      role?.name?.toLowerCase() === 'father' ||
+                      role?.name?.toLowerCase() === 'mother';
 
   // Fetch parents data using permission-protected hook
   const { data: parentsData, isLoading, error, refetch, hasPermission } = useParentsQuery();

@@ -26,13 +26,39 @@ import type { Staff, StaffInput } from '@/src/types/masters/staff';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useTheme } from '@/contexts';
 
+const formatToDisplay = (iso: string): string => {
+  if (!iso || !iso.match(/^\d{4}-\d{2}-\d{2}$/)) return '';
+  const [yyyy, mm, dd] = iso.split('-');
+  return `${dd}/${mm}/${yyyy}`;
+};
+
+const parseDdMmYyyy = (display: string): string | null => {
+  const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, dd, mm, yyyy] = match;
+  const iso = `${yyyy}-${mm}-${dd}`;
+  const date = new Date(iso + 'T00:00:00');
+  if (isNaN(date.getTime())) return null;
+  return iso;
+};
+
+const autoFormatDateInput = (text: string): string => {
+  const digits = text.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
 function StaffEnrollmentScreenContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGender, setSelectedGender] = useState<string>('');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isDesignationModalVisible, setIsDesignationModalVisible] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showDOBDatePicker, setShowDOBDatePicker] = useState(false);
+  const [activeDateField, setActiveDateField] = useState<string | null>(null);
+  const [dateDisplayValues, setDateDisplayValues] = useState<Record<string, string>>({
+    date_of_birth: '',
+    joining_date: formatToDisplay(new Date().toISOString().split('T')[0]),
+  });
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [formData, setFormData] = useState<StaffInput>({
     first_name: '',
@@ -118,6 +144,11 @@ function StaffEnrollmentScreenContent() {
       department: '',
     });
     setEditingStaff(null);
+    setActiveDateField(null);
+    setDateDisplayValues({
+      date_of_birth: '',
+      joining_date: formatToDisplay(new Date().toISOString().split('T')[0]),
+    });
   };
 
   // Filter staff based on search
@@ -151,6 +182,11 @@ function StaffEnrollmentScreenContent() {
       designation_id: staff.designation_id || '',
       department: staff.department || '',
     });
+    setActiveDateField(null);
+    setDateDisplayValues({
+      date_of_birth: formatToDisplay(staff.date_of_birth || ''),
+      joining_date: formatToDisplay(staff.joining_date),
+    });
     setIsModalVisible(true);
   };
 
@@ -172,26 +208,6 @@ function StaffEnrollmentScreenContent() {
   const handleDesignationSelect = (designationId: string) => {
     setFormData(prev => ({ ...prev, designation_id: designationId }));
     setIsDesignationModalVisible(false);
-  };
-
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setFormData(prev => ({
-        ...prev,
-        joining_date: selectedDate.toISOString().split('T')[0]
-      }));
-    }
-  };
-
-  const handleDOBDateChange = (event: any, selectedDate?: Date) => {
-    setShowDOBDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setFormData(prev => ({
-        ...prev,
-        date_of_birth: selectedDate.toISOString().split('T')[0]
-      }));
-    }
   };
 
   const handleSubmit = () => {
@@ -512,24 +528,25 @@ function StaffEnrollmentScreenContent() {
 
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.label}>Date of Birth</ThemedText>
-                  <TouchableOpacity
-                    style={[styles.input, { backgroundColor: themeColors.background, borderColor: themeColors.border }]}
-                    onPress={() => setShowDOBDatePicker(true)}
-                  >
-                    <ThemedText style={{ color: themeColors['card-foreground'] }}>
-                      {formData.date_of_birth ? new Date(formData.date_of_birth).toLocaleDateString() : 'Select date'}
-                    </ThemedText>
-                    <Ionicons name="calendar" size={20} color={themeColors['muted-foreground']} />
-                  </TouchableOpacity>
-                  {showDOBDatePicker && (
-                    <DateTimePicker
-                      value={formData.date_of_birth ? new Date(formData.date_of_birth) : new Date()}
-                      mode="date"
-                      display="default"
-                      onChange={handleDOBDateChange}
-                      maximumDate={new Date()}
+                  <View style={[styles.input, { backgroundColor: themeColors.background, borderColor: themeColors.border, flexDirection: 'row', alignItems: 'center' }]}>
+                    <TextInput
+                      style={{ color: themeColors['card-foreground'], flex: 1, fontSize: 16 }}
+                      placeholder="DD/MM/YYYY"
+                      placeholderTextColor={themeColors['muted-foreground']}
+                      value={dateDisplayValues.date_of_birth}
+                      onChangeText={(text) => {
+                        const formatted = autoFormatDateInput(text);
+                        setDateDisplayValues(prev => ({ ...prev, date_of_birth: formatted }));
+                        const parsed = parseDdMmYyyy(formatted);
+                        if (parsed) setFormData(prev => ({ ...prev, date_of_birth: parsed }));
+                      }}
+                      keyboardType="numeric"
+                      maxLength={10}
                     />
-                  )}
+                    <TouchableOpacity onPress={() => setActiveDateField('date_of_birth')} style={{ paddingLeft: 8 }}>
+                      <Ionicons name="calendar" size={20} color={themeColors['muted-foreground']} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
               </View>
@@ -539,24 +556,25 @@ function StaffEnrollmentScreenContent() {
 
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.label}>Joining Date *</ThemedText>
-                  <TouchableOpacity
-                    style={[styles.input, { backgroundColor: themeColors.background, borderColor: themeColors.border }]}
-                    onPress={() => setShowDatePicker(true)}
-                  >
-                    <ThemedText style={{ color: themeColors['card-foreground'] }}>
-                      {formData.joining_date ? new Date(formData.joining_date).toLocaleDateString() : 'Select date'}
-                    </ThemedText>
-                    <Ionicons name="calendar" size={20} color={themeColors['muted-foreground']} />
-                  </TouchableOpacity>
-                  {showDatePicker && (
-                    <DateTimePicker
-                      value={formData.joining_date ? new Date(formData.joining_date) : new Date()}
-                      mode="date"
-                      display="default"
-                      onChange={handleDateChange}
-                      maximumDate={new Date()}
+                  <View style={[styles.input, { backgroundColor: themeColors.background, borderColor: themeColors.border, flexDirection: 'row', alignItems: 'center' }]}>
+                    <TextInput
+                      style={{ color: themeColors['card-foreground'], flex: 1, fontSize: 16 }}
+                      placeholder="DD/MM/YYYY"
+                      placeholderTextColor={themeColors['muted-foreground']}
+                      value={dateDisplayValues.joining_date}
+                      onChangeText={(text) => {
+                        const formatted = autoFormatDateInput(text);
+                        setDateDisplayValues(prev => ({ ...prev, joining_date: formatted }));
+                        const parsed = parseDdMmYyyy(formatted);
+                        if (parsed) setFormData(prev => ({ ...prev, joining_date: parsed }));
+                      }}
+                      keyboardType="numeric"
+                      maxLength={10}
                     />
-                  )}
+                    <TouchableOpacity onPress={() => setActiveDateField('joining_date')} style={{ paddingLeft: 8 }}>
+                      <Ionicons name="calendar" size={20} color={themeColors['muted-foreground']} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 <View style={styles.formGroup}>
@@ -596,6 +614,27 @@ function StaffEnrollmentScreenContent() {
               </View>
             </ScrollView>
 
+            {activeDateField ? (
+              <DateTimePicker
+                value={(() => {
+                  const iso = activeDateField === 'date_of_birth' ? formData.date_of_birth : formData.joining_date;
+                  return iso ? new Date(iso + 'T00:00:00') : new Date();
+                })()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                maximumDate={new Date()}
+                onChange={(event, selectedDate) => {
+                  const field = activeDateField;
+                  setActiveDateField(null);
+                  if (event.type === 'set' && selectedDate) {
+                    const iso = selectedDate.toISOString().split('T')[0];
+                    setFormData(prev => ({ ...prev, [field]: iso }));
+                    setDateDisplayValues(prev => ({ ...prev, [field]: formatToDisplay(iso) }));
+                  }
+                }}
+              />
+            ) : null}
+
             <View style={styles.modalFooter}>
               <TouchableOpacity
                 style={[styles.button, styles.cancelButton]}
@@ -606,10 +645,10 @@ function StaffEnrollmentScreenContent() {
               <TouchableOpacity
                 style={[styles.button, styles.submitButton, { backgroundColor: themeColors.primary }]}
                 onPress={handleSubmit}
-                disabled={createMutation.isLoading || updateMutation.isLoading}
+                disabled={createMutation.isPending || updateMutation.isPending}
               >
                 <ThemedText style={styles.submitButtonText}>
-                  {createMutation.isLoading || updateMutation.isLoading ? 'Saving...' : (editingStaff ? 'Update' : 'Create')}
+                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingStaff ? 'Update' : 'Create')}
                 </ThemedText>
               </TouchableOpacity>
             </View>

@@ -160,7 +160,7 @@ function StaffAttendanceScreenContent() {
   const isFutureDate = new Date(selectedDate) > new Date();
 
   if (error) {
-    const isAuthError = error?.response?.status === 401 || error?.response?.status === 403;
+    const isAuthError = (error as any)?.response?.status === 401 || (error as any)?.response?.status === 403;
 
     return (
       <ThemedView style={styles.container}>
@@ -280,10 +280,10 @@ function StaffAttendanceScreenContent() {
           <TouchableOpacity
             style={[styles.saveButton, { backgroundColor: themeColors.primary }]}
             onPress={handleSaveAttendance}
-            disabled={updateAttendanceMutation.isLoading}
+            disabled={updateAttendanceMutation.isPending}
           >
             <ThemedText style={styles.saveButtonText}>
-              {updateAttendanceMutation.isLoading ? 'Saving...' : 'Save Attendance'}
+              {updateAttendanceMutation.isPending ? 'Saving...' : 'Save Attendance'}
             </ThemedText>
           </TouchableOpacity>
         </UpdatePermissionGuard>

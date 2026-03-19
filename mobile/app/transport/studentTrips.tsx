@@ -109,8 +109,8 @@ export default function StudentTripsScreen() {
       const student = students.find(s => s.id === item.student_id);
       const feeTerm = feeTerms.find(f => f.id === item.fee_term_id);
       const matchesSearch = trip?.trip_number.toString().includes(searchQuery) ||
-                            student?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            feeTerm?.name.toLowerCase().includes(searchQuery.toLowerCase());
+                            student?.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            feeTerm?.term_name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesSearch;
     });
   }, [studentTripsData, searchQuery, trips, students, feeTerms]);
@@ -146,7 +146,7 @@ export default function StudentTripsScreen() {
     const student = students.find(s => s.id === trip.student_id);
     Alert.alert(
       'Delete Student Trip',
-      `Are you sure you want to delete trip for ${student?.name || 'Unknown Student'}?`,
+      `Are you sure you want to delete trip for ${student?.display_name || 'Unknown Student'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -197,7 +197,7 @@ export default function StudentTripsScreen() {
         <View style={styles.tripHeader}>
           <View style={styles.tripInfo}>
             <ThemedText type="subtitle" style={styles.studentName}>
-              {student?.name || 'Unknown Student'}
+              {student?.display_name || 'Unknown Student'}
             </ThemedText>
             <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#10B981' : '#EF4444' }]}>
               <ThemedText style={styles.statusText}>
@@ -237,7 +237,7 @@ export default function StudentTripsScreen() {
           <View style={styles.detailRow}>
             <Ionicons name="cash" size={16} color={colors['muted-foreground']} />
             <ThemedText style={styles.detailText}>
-              ₹{item.fee_per_term} per term ({feeTerm?.name || 'Unknown Term'})
+              ₹{item.fee_per_term} per term ({feeTerm?.term_name || 'Unknown Term'})
             </ThemedText>
           </View>
           {item.created_at && (
@@ -377,7 +377,7 @@ export default function StudentTripsScreen() {
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.label}>Student *</ThemedText>
                   <CustomDropdown
-                    data={students.map(student => ({ label: student.name, value: student.id }))}
+                    data={students.map(student => ({ label: student.display_name, value: student.id }))}
                     value={formData.student_id}
                     onChange={(value) => setFormData(prev => ({ ...prev, student_id: value?.toString() || '' }))}
                     placeholder="Select student"
@@ -401,7 +401,7 @@ export default function StudentTripsScreen() {
                   <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
                     <ThemedText style={styles.label}>Fee Term *</ThemedText>
                     <CustomDropdown
-                      data={feeTerms.map(term => ({ label: term.name, value: term.id }))}
+                      data={feeTerms.map(term => ({ label: term.term_name, value: term.id }))}
                       value={formData.fee_term_id}
                       onChange={(value) => setFormData(prev => ({ ...prev, fee_term_id: value?.toString() || '' }))}
                       placeholder="Select fee term"

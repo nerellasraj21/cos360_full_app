@@ -38,6 +38,7 @@ export const PERMISSION_RESOURCES = {
   HOLIDAYS: 'holidays',
   TIMETABLES: 'timetables',
   ROLES_PERMISSIONS: 'roles_permissions',
+  CLASS_SUBJECT_MAPPINGS: 'class_subject_mappings',
   
   // Expense module
   EXPENSE_CATEGORIES: 'expense_categories',

@@ -6,6 +6,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth, useTheme } from '@/contexts';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -30,6 +31,7 @@ import {
 export default function ProfileTabScreen() {
   const { user, logout, role } = useAuth();
   const { colors } = useTheme();
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
 
@@ -79,7 +81,18 @@ export default function ProfileTabScreen() {
       'Are you sure you want to logout?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: async () => { await logout(); } },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (e) {
+              // ignore — clears locally regardless
+            }
+            router.replace('/login');
+          },
+        },
       ]
     );
   };

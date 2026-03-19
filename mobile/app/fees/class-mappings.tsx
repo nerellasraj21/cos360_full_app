@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { AppLayout } from '@/components';
 import CustomDropdown from '@/components/ui/dropdown';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -316,27 +317,31 @@ export default function FeeClassMappingsScreen() {
 
   if (isLoading) {
     return (
-      <ThemedView style={styles.centerContainer}>
-        <ThemedText>Loading fee class mappings...</ThemedText>
-      </ThemedView>
+      <AppLayout title="Class Mappings">
+        <View style={styles.centerContainer}>
+          <ThemedText>Loading fee class mappings...</ThemedText>
+        </View>
+      </AppLayout>
     );
   }
 
   if (error) {
     return (
-      <ThemedView style={styles.centerContainer}>
-        <ThemedText style={{ color: colors.destructive }}>
-          Error loading fee class mappings
-        </ThemedText>
-      </ThemedView>
+      <AppLayout title="Class Mappings">
+        <View style={styles.centerContainer}>
+          <ThemedText style={{ color: colors.destructive }}>
+            Error loading fee class mappings
+          </ThemedText>
+        </View>
+      </AppLayout>
     );
   }
 
   return (
     <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS}>
+      <AppLayout title="Class Mappings">
       <ThemedView style={styles.container}>
         <View style={styles.header}>
-          <ThemedText type="title">Class Mappings</ThemedText>
           <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS}>
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: colors.primary }]}
@@ -620,6 +625,7 @@ export default function FeeClassMappingsScreen() {
         </View>
       </Modal>
       </ThemedView>
+      </AppLayout>
     </ReadOrListPermissionGuard>
   );
 }

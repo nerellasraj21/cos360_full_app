@@ -85,6 +85,14 @@ export type PermissionResource =
   | 'expense_settings'
   | 'expense_reports'
 
+  // Exam Module
+  | 'exams'
+  | 'exam_marks'
+  | 'exam_results'
+  | 'exam_hall_tickets'
+  | 'exam_dates'
+  | 'grade_schemes'
+
 export type PermissionAction<T extends PermissionResource = PermissionResource> =
   // Common actions
   | 'create'
@@ -511,6 +519,49 @@ export const PERMISSIONS = {
     delete: 'expense_reports:delete' as PermissionString,
     list: 'expense_reports:list' as PermissionString,
     export: 'expense_reports:export' as PermissionString,
+  },
+
+  // Exam Module
+  exams: {
+    create: 'exams:create' as PermissionString,
+    read: 'exams:read' as PermissionString,
+    update: 'exams:update' as PermissionString,
+    delete: 'exams:delete' as PermissionString,
+    list: 'exams:list' as PermissionString,
+  },
+  exam_marks: {
+    create: 'exam_marks:create' as PermissionString,
+    read: 'exam_marks:read' as PermissionString,
+    update: 'exam_marks:update' as PermissionString,
+    list: 'exam_marks:list' as PermissionString,
+    download: 'exam_marks:download' as PermissionString,
+  },
+  exam_results: {
+    read: 'exam_results:read' as PermissionString,
+    list: 'exam_results:list' as PermissionString,
+    download: 'exam_results:download' as PermissionString,
+    approve: 'exam_results:approve' as PermissionString,
+  },
+  exam_hall_tickets: {
+    create: 'exam_hall_tickets:create' as PermissionString,
+    read: 'exam_hall_tickets:read' as PermissionString,
+    list: 'exam_hall_tickets:list' as PermissionString,
+    download: 'exam_hall_tickets:download' as PermissionString,
+    approve: 'exam_hall_tickets:approve' as PermissionString,
+  },
+  exam_dates: {
+    create: 'exam_dates:create' as PermissionString,
+    read: 'exam_dates:read' as PermissionString,
+    update: 'exam_dates:update' as PermissionString,
+    delete: 'exam_dates:delete' as PermissionString,
+    list: 'exam_dates:list' as PermissionString,
+  },
+  grade_schemes: {
+    create: 'grade_schemes:create' as PermissionString,
+    read: 'grade_schemes:read' as PermissionString,
+    update: 'grade_schemes:update' as PermissionString,
+    delete: 'grade_schemes:delete' as PermissionString,
+    list: 'grade_schemes:list' as PermissionString,
   },
 } as const
 

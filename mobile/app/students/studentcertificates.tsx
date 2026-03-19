@@ -1,198 +1,300 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
-import { useAllCertificates, useCertificateTypes } from '@/src/api/hooks/students/certificates';
-import { studentAdmissionsApi } from '@/src/api/students';
-import { CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/src/components/mobile/MobilePermissionGuard';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAllCertificates, useMyCertificates, useCertificateTypes } from '@/src/api/hooks/students/certificates';
+import { studentCertificatesApi, studentAdmissionsApi } from '@/src/api/students';
+import { DeletePermissionGuard, CreatePermissionGuard } from '@/src/components/mobile/MobilePermissionGuard';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
-interface StudentCertificate {
-  id: string;
-  student_id: string;
-  certificate_type_id: string;
-  issue_date: string;
-  description?: string;
-  file_path?: string;
-  created_at: string;
-  updated_at: string;
-  studentName?: string;
-  certificateName?: string;
-  certificateType?: string;
-  status?: 'active' | 'revoked';
+// ─── Shared certificate item ───────────────────────────────────────────────
+
+function CertificateItem({ item, colors }: { item: any; colors: any }) {
+  const handleDownload = async () => {
+    try {
+      const resp = await studentCertificatesApi.downloadCertificate(item.id);
+      if (resp?.presigned_url) {
+        await Linking.openURL(resp.presigned_url);
+      } else {
+        Alert.alert('Info', 'No download link available');
+      }
+    } catch {
+      Alert.alert('Error', 'Could not get download link');
+    }
+  };
+
+  return (
+    <View style={[styles.certCard, { backgroundColor: colors.card }]}>
+      <View style={styles.certHeader}>
+        <View style={styles.certInfo}>
+          <ThemedText style={styles.certType}>{item.type_name || 'Certificate'}</ThemedText>
+          {item.student_name ? (
+            <ThemedText style={styles.certStudent}>{item.student_name}</ThemedText>
+          ) : null}
+        </View>
+        <View style={styles.certMeta}>
+          {item.issue_date ? (
+            <ThemedText style={styles.certDate}>
+              {new Date(item.issue_date).toLocaleDateString()}
+            </ThemedText>
+          ) : null}
+        </View>
+      </View>
+
+      {item.remarks ? (
+        <View style={styles.detailRow}>
+          <Ionicons name="document-text-outline" size={14} color={colors['muted-foreground']} />
+          <ThemedText style={styles.detailText} numberOfLines={2}>{item.remarks}</ThemedText>
+        </View>
+      ) : null}
+
+      <View style={styles.actionButtons}>
+        {item.file_path ? (
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            onPress={handleDownload}
+          >
+            <Ionicons name="download-outline" size={15} color="white" />
+            <ThemedText style={styles.actionText}>Download</ThemedText>
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.actionButton, { backgroundColor: '#E5E7EB' }]}>
+            <Ionicons name="document-outline" size={15} color="#9CA3AF" />
+            <ThemedText style={[styles.actionText, { color: '#9CA3AF' }]}>No File</ThemedText>
+          </View>
+        )}
+        <DeletePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_CERTIFICATES}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
+            onPress={() =>
+              Alert.alert('Revoke Certificate', 'Revoke this certificate?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Revoke', style: 'destructive', onPress: () => Alert.alert('Info', 'Revoke API call here') },
+              ])
+            }
+          >
+            <Ionicons name="close-circle-outline" size={15} color="white" />
+            <ThemedText style={styles.actionText}>Revoke</ThemedText>
+          </TouchableOpacity>
+        </DeletePermissionGuard>
+      </View>
+    </View>
+  );
 }
 
-export default function StudentCertificatesPage() {
+// ─── Read-only view (student / parent) ────────────────────────────────────
+
+function ReadOnlyCertificates({ title }: { title?: string }) {
+  const { colors } = useTheme();
+  const { data: certs = [], isLoading } = useMyCertificates();
+
+  return (
+    <FlatList
+      data={certs as any[]}
+      renderItem={({ item }) => <CertificateItem item={item} colors={colors} />}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={styles.listContainer}
+      showsVerticalScrollIndicator={false}
+      ListHeaderComponent={title ? (
+        <ThemedText style={styles.viewTitle}>{title}</ThemedText>
+      ) : undefined}
+      ListEmptyComponent={
+        <View style={styles.emptyContainer}>
+          <Ionicons name="ribbon-outline" size={56} color={colors['muted-foreground']} />
+          <ThemedText style={styles.emptyTitle}>
+            {isLoading ? 'Loading...' : 'No Certificates Found'}
+          </ThemedText>
+        </View>
+      }
+    />
+  );
+}
+
+// ─── Parent view ────────────────────────────────────────────────────────────
+
+function ParentCertificates() {
+  const { selectedStudent } = useAuth();
+  const { colors } = useTheme();
+
+  const { data: certs, isLoading } = useQuery({
+    queryKey: ['certs-child', selectedStudent?.id],
+    queryFn: () => studentCertificatesApi.myChildCertificates(selectedStudent!.id),
+    enabled: !!selectedStudent?.id,
+  });
+
+  if (!selectedStudent) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="person-outline" size={48} color={colors['muted-foreground']} />
+        <ThemedText style={styles.emptyTitle}>Select a student from the header</ThemedText>
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      data={(certs || []) as any[]}
+      renderItem={({ item }) => <CertificateItem item={item} colors={colors} />}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={styles.listContainer}
+      showsVerticalScrollIndicator={false}
+      ListHeaderComponent={
+        <ThemedText style={styles.viewTitle}>
+          {selectedStudent.first_name}&apos;s Certificates
+        </ThemedText>
+      }
+      ListEmptyComponent={
+        <View style={styles.emptyContainer}>
+          <Ionicons name="ribbon-outline" size={56} color={colors['muted-foreground']} />
+          <ThemedText style={styles.emptyTitle}>
+            {isLoading ? 'Loading...' : 'No Certificates Found'}
+          </ThemedText>
+        </View>
+      }
+    />
+  );
+}
+
+// ─── Admin view ────────────────────────────────────────────────────────────
+
+function AdminCertificates() {
   const { colors } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedType, setSelectedType] = useState<string>('');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState('');
 
-  // Fetch certificates
-  const { data: certificatesData, isLoading } = useAllCertificates();
-
-  // Fetch certificate types for mapping
-  const { data: certificateTypesData } = useCertificateTypes();
-
-  // Fetch students for name mapping
-  const { data: studentsData } = useQuery({
-    queryKey: ['students-for-certificates'],
+  // For student name mapping
+  const { data: studentsMap } = useQuery({
+    queryKey: ['students-name-map'],
     queryFn: async () => {
       const response = await studentAdmissionsApi.getStudentAdmissions();
-      return response.items.reduce((acc: any, student: any) => {
-        acc[student.id] = `${student.student.first_name} ${student.student.last_name}`;
+      return response.items.reduce((acc: Record<string, string>, s: any) => {
+        acc[s.student.id] = `${s.student.first_name} ${s.student.last_name}`;
         return acc;
       }, {});
     },
   });
 
-  const getCertificateTypeName = (typeId: string) => {
-    const type = certificateTypesData?.items?.find((t: any) => t.id === typeId);
-    return type?.name || 'Unknown';
-  };
+  const { data: certsRaw = [], isLoading } = useAllCertificates();
+  const { data: typesData } = useCertificateTypes();
 
-  const getStudentName = (studentId: string) => {
-    return studentsData?.[studentId] || 'Unknown Student';
-  };
+  const certs = useMemo(() => {
+    return (certsRaw as any[]).map((c) => ({
+      ...c,
+      student_name: studentsMap?.[c.student_id] ?? '',
+    }));
+  }, [certsRaw, studentsMap]);
 
-  const enrichedCertificates = certificatesData?.map((cert: any) => ({
-    ...cert,
-    studentName: getStudentName(cert.student_id),
-    certificateName: cert.description || `Certificate ${cert.id}`,
-    certificateType: getCertificateTypeName(cert.certificate_type_id),
-    status: 'active' as const, // Assuming all are active unless we have a status field
-  })) || [];
+  const allTypes = useMemo(() => {
+    if (!typesData?.items) return [];
+    return typesData.items.map((t: any) => t.name);
+  }, [typesData]);
 
-  const filteredCertificates = enrichedCertificates.filter(cert => {
-    const matchesSearch = cert.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cert.certificateName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = !selectedType || cert.certificateType === selectedType;
-    return matchesSearch && matchesType;
-  });
+  const filtered = useMemo(() => {
+    return certs.filter((c) => {
+      const q = searchQuery.toLowerCase();
+      const matchSearch =
+        !q ||
+        (c.type_name || '').toLowerCase().includes(q) ||
+        (c.student_name || '').toLowerCase().includes(q);
+      const matchType = !selectedTypeFilter || c.type_name === selectedTypeFilter;
+      return matchSearch && matchType;
+    });
+  }, [certs, searchQuery, selectedTypeFilter]);
 
-  const certificateTypes = [...new Set(enrichedCertificates.map(cert => cert.certificateType))];
+  return (
+    <FlatList
+      data={filtered}
+      renderItem={({ item }) => <CertificateItem item={item} colors={colors} />}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={styles.listContainer}
+      showsVerticalScrollIndicator={false}
+      ListHeaderComponent={
+        <>
+          {/* Search */}
+          <View style={[styles.searchBar, { backgroundColor: colors.card }]}>
+            <Ionicons name="search" size={18} color={colors['muted-foreground']} />
+            <TextInput
+              style={[styles.searchInput, { color: colors['card-foreground'] }]}
+              placeholder="Search by student or type..."
+              placeholderTextColor={colors['muted-foreground']}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={18} color={colors['muted-foreground']} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
 
-  const renderCertificate = ({ item }: { item: StudentCertificate }) => (
-    <ThemedView style={[styles.certificateCard, { backgroundColor: colors.card }]}>
-      <View style={styles.certificateHeader}>
-        <View style={styles.certificateInfo}>
-          <ThemedText type="subtitle" style={styles.studentName}>
-            {item.studentName}
+          {/* Type filter chips */}
+          {allTypes.length > 0 && (
+            <View style={styles.chipRow}>
+              <TouchableOpacity
+                style={[styles.chip, !selectedTypeFilter && { backgroundColor: colors.primary }]}
+                onPress={() => setSelectedTypeFilter('')}
+              >
+                <ThemedText style={[styles.chipText, !selectedTypeFilter && { color: 'white' }]}>
+                  All
+                </ThemedText>
+              </TouchableOpacity>
+              {allTypes.map((t: string) => (
+                <TouchableOpacity
+                  key={t}
+                  style={[styles.chip, selectedTypeFilter === t && { backgroundColor: colors.primary }]}
+                  onPress={() => setSelectedTypeFilter(t === selectedTypeFilter ? '' : t)}
+                >
+                  <ThemedText
+                    style={[styles.chipText, selectedTypeFilter === t && { color: 'white' }]}
+                  >
+                    {t}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </>
+      }
+      ListEmptyComponent={
+        <View style={styles.emptyContainer}>
+          <Ionicons name="ribbon-outline" size={56} color={colors['muted-foreground']} />
+          <ThemedText style={styles.emptyTitle}>
+            {isLoading ? 'Loading...' : 'No Certificates Found'}
           </ThemedText>
-          <ThemedText style={styles.certificateName}>{item.certificateName}</ThemedText>
+          {(searchQuery || selectedTypeFilter) && !isLoading ? (
+            <ThemedText style={styles.emptyText}>Try adjusting your filters</ThemedText>
+          ) : null}
         </View>
-        <View style={[styles.statusBadge, {
-          backgroundColor: item.status === 'active' ? '#10B981' : '#EF4444'
-        }]}>
-          <ThemedText style={styles.statusText}>
-            {item.status === 'active' ? 'Active' : 'Revoked'}
-          </ThemedText>
-        </View>
-      </View>
-
-      <View style={styles.certificateDetails}>
-        <View style={styles.detailRow}>
-          <Ionicons name="document" size={16} color={colors['muted-foreground']} />
-          <ThemedText style={styles.detailText}>Type: {item.certificateType}</ThemedText>
-        </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="calendar" size={16} color={colors['muted-foreground']} />
-          <ThemedText style={styles.detailText}>
-            Issued: {new Date(item.issue_date).toLocaleDateString()}
-          </ThemedText>
-        </View>
-      </View>
-
-      <View style={styles.actionButtons}>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.primary }]}>
-          <Ionicons name="eye" size={16} color="white" />
-          <ThemedText style={styles.actionText}>View</ThemedText>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.primary }]}>
-          <Ionicons name="download" size={16} color="white" />
-          <ThemedText style={styles.actionText}>Download</ThemedText>
-        </TouchableOpacity>
-        <DeletePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_CERTIFICATES}>
-          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#EF4444' }]}>
-            <Ionicons name="close" size={16} color="white" />
-            <ThemedText style={styles.actionText}>Revoke</ThemedText>
-          </TouchableOpacity>
-        </DeletePermissionGuard>
-      </View>
-    </ThemedView>
+      }
+    />
   );
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
+export default function StudentCertificatesPage() {
+  const { role } = useAuth();
+  const roleName = role?.name?.toLowerCase();
+  const isStudent = roleName === 'student';
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName || '');
+
+  let content: React.ReactNode;
+  if (isStudent) {
+    content = <ReadOnlyCertificates />;
+  } else if (isParent) {
+    content = <ParentCertificates />;
+  } else {
+    content = <AdminCertificates />;
+  }
 
   return (
     <AppLayout title="Student Certificates">
-      <View style={styles.container}>
-        {/* Search Bar */}
-        <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
-          <Ionicons name="search" size={20} color={colors['muted-foreground']} />
-          <TextInput
-            style={[styles.searchInput, { color: colors['card-foreground'] }]}
-            placeholder="Search by student or certificate..."
-            placeholderTextColor={colors['muted-foreground']}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-
-        {/* Type Filters */}
-        <View style={styles.filterContainer}>
-          <TouchableOpacity
-            style={[styles.filterButton, { backgroundColor: colors.card }]}
-            onPress={() => setSelectedType('')}
-          >
-            <ThemedText style={[styles.filterText, !selectedType && { color: colors.primary }]}>
-              All Types
-            </ThemedText>
-          </TouchableOpacity>
-          {certificateTypes.map((type) => (
-            <TouchableOpacity
-              key={type}
-              style={[styles.filterButton, { backgroundColor: colors.card }]}
-              onPress={() => setSelectedType(type)}
-            >
-              <ThemedText style={[styles.filterText, selectedType === type && { color: colors.primary }]}>
-                {type}
-              </ThemedText>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Add Certificate Button */}
-        <CreatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_CERTIFICATES}>
-          <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary }]}>
-            <Ionicons name="add" size={20} color="white" />
-            <ThemedText style={styles.addButtonText}>Add Certificate</ThemedText>
-          </TouchableOpacity>
-        </CreatePermissionGuard>
-
-        <FlatList
-          data={filteredCertificates}
-          renderItem={renderCertificate}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="document" size={64} color={colors['muted-foreground']} />
-              <ThemedText type="subtitle" style={styles.emptyTitle}>
-                No Certificates Found
-              </ThemedText>
-              <ThemedText style={styles.emptyText}>
-                {searchQuery || selectedType
-                  ? 'Try adjusting your search or filters'
-                  : 'No student certificates available'}
-              </ThemedText>
-            </View>
-          }
-        />
-      </View>
+      <View style={styles.container}>{content}</View>
     </AppLayout>
   );
 }
@@ -200,133 +302,130 @@ export default function StudentCertificatesPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
   },
-  searchContainer: {
+  viewTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    padding: 16,
+    paddingBottom: 8,
+    opacity: 0.8,
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    margin: 16,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 12,
-    marginBottom: 16,
+    gap: 8,
   },
   searchInput: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
+    fontSize: 15,
   },
-  filterContainer: {
+  chipRow: {
     flexDirection: 'row',
-    marginBottom: 16,
     flexWrap: 'wrap',
-  },
-  filterButton: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
+    gap: 8,
     marginBottom: 8,
   },
-  filterText: {
-    fontSize: 14,
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+  },
+  chipText: {
+    fontSize: 13,
     fontWeight: '500',
   },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  addButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
   listContainer: {
-    paddingBottom: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
   },
-  certificateCard: {
+  certCard: {
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: 14,
+    marginBottom: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
-  certificateHeader: {
+  certHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  certificateInfo: {
+  certInfo: {
     flex: 1,
   },
-  studentName: {
-    marginBottom: 4,
-  },
-  certificateName: {
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
+  certType: {
+    fontSize: 15,
     fontWeight: '600',
+    marginBottom: 2,
   },
-  certificateDetails: {
-    marginBottom: 12,
+  certStudent: {
+    fontSize: 12,
+    opacity: 0.6,
+  },
+  certMeta: {
+    alignItems: 'flex-end',
+  },
+  certDate: {
+    fontSize: 12,
+    opacity: 0.6,
   },
   detailRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'flex-start',
+    gap: 6,
+    marginBottom: 8,
   },
   detailText: {
-    fontSize: 14,
-    marginLeft: 8,
+    fontSize: 13,
+    flex: 1,
+    opacity: 0.7,
   },
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 4,
   },
   actionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    flex: 1,
     justifyContent: 'center',
-    marginHorizontal: 2,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 5,
   },
   actionText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    marginLeft: 4,
   },
   emptyContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 64,
+    paddingVertical: 56,
+    paddingHorizontal: 16,
   },
   emptyTitle: {
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyText: {
+    marginTop: 14,
+    fontSize: 16,
+    fontWeight: '600',
     textAlign: 'center',
     opacity: 0.7,
+  },
+  emptyText: {
+    marginTop: 6,
+    fontSize: 13,
+    textAlign: 'center',
+    opacity: 0.5,
   },
 });

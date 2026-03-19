@@ -72,7 +72,7 @@ export default function CertificateUploadPage() {
     queryKey: ['certificate-types'],
     queryFn: async () => {
       console.log('DEBUG: Fetching certificate types');
-      const result = await certificateTypesApi.fetchCertificateTypes();
+      const result = await certificateTypesApi.listCertificateTypes();
       console.log('DEBUG: Certificate types result:', result);
       return result;
     },
@@ -235,7 +235,7 @@ export default function CertificateUploadPage() {
               <ThemedText style={styles.errorText}>Failed to load certificate types</ThemedText>
             ) : (
               <View style={styles.typeSelector}>
-                {certificateTypes?.items?.map((type) => (
+                {certificateTypes?.items?.map((type: { id: string; name: string; description: string | null }) => (
                   <TouchableOpacity
                     key={type.id}
                     style={[

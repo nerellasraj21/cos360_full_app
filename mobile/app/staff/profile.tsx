@@ -118,7 +118,7 @@ function StaffProfileScreenContent() {
           <TouchableOpacity
             style={[styles.editButton, { backgroundColor: themeColors.primary }]}
             onPress={isEditing ? handleSave : handleEdit}
-            disabled={updateProfileMutation.isLoading}
+            disabled={updateProfileMutation.isPending}
           >
             <Ionicons name={isEditing ? "checkmark" : "create"} size={20} color="white" />
           </TouchableOpacity>
@@ -243,10 +243,10 @@ function StaffProfileScreenContent() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons name="checkmark-circle" size={20} color={profile?.is_active ? colors.success || '#10B981' : colors.destructive} />
+            <Ionicons name="checkmark-circle" size={20} color={profile?.is_active ? '#10B981' : colors.destructive} />
             <View style={styles.infoContent}>
               <ThemedText style={styles.infoLabel}>Status</ThemedText>
-              <ThemedText style={[styles.infoValue, { color: profile?.is_active ? colors.success || '#10B981' : colors.destructive }]}>
+              <ThemedText style={[styles.infoValue, { color: profile?.is_active ? '#10B981' : colors.destructive }]}>
                 {profile?.is_active ? 'Active' : 'Inactive'}
               </ThemedText>
             </View>
@@ -266,10 +266,10 @@ function StaffProfileScreenContent() {
               <TouchableOpacity
                 style={[styles.actionButton, styles.saveButton, { backgroundColor: themeColors.primary }]}
                 onPress={handleSave}
-                disabled={updateProfileMutation.isLoading}
+                disabled={updateProfileMutation.isPending}
               >
                 <ThemedText style={styles.saveButtonText}>
-                  {updateProfileMutation.isLoading ? 'Saving...' : 'Save Changes'}
+                  {updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}
                 </ThemedText>
               </TouchableOpacity>
             </View>
@@ -454,7 +454,7 @@ export default function StaffProfileScreen() {
           </View>
           <View style={styles.scrollContent}>
             <View style={styles.photoSection}>
-              <Ionicons name="lock-closed" size={64} color={colors['muted-foreground']} />
+              <Ionicons name="lock-closed" size={64} color="#9CA3AF" />
               <ThemedText type="subtitle" style={styles.nameText}>
                 Access Denied
               </ThemedText>

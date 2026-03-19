@@ -21,11 +21,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useClassSections, useCreateClassSection, useUpdateSection, useDeleteSection, useClassList, useSectionList } from '@/src/api/hooks/masters/classesAndSections';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
-import { PermissionDebugger } from '@/components/PermissionDebugger';
-import { QuickPermissionCheck } from '@/components/QuickPermissionCheck';
-import { SimplePermissionTest } from '@/components/SimplePermissionTest';
-import { AuthStateDebugger } from '@/components/AuthStateDebugger';
-import { QuickDiagnostic } from '@/components/QuickDiagnostic';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ClassSectionData {
@@ -277,7 +272,6 @@ export default function ClassesAndSectionsScreen() {
         <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
           <ThemedText style={styles.retryText}>Retry</ThemedText>
         </TouchableOpacity>
-        <PermissionDebugger />
       </ThemedView>
     );
   }
@@ -303,12 +297,6 @@ export default function ClassesAndSectionsScreen() {
       }
     >
       <ThemedView style={styles.container}>
-        {/* Debug Components - Remove these after debugging */}
-        <QuickDiagnostic />
-        <AuthStateDebugger />
-        <QuickPermissionCheck />
-        <SimplePermissionTest />
-        
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -651,10 +639,10 @@ export default function ClassesAndSectionsScreen() {
                 <TouchableOpacity
                   style={[styles.button, styles.submitButton, { backgroundColor: themeColors.primary }]}
                   onPress={handleSubmit}
-                  disabled={createMutation.isLoading || updateMutation.isLoading}
+                  disabled={createMutation.isPending || updateMutation.isPending}
                 >
                   <ThemedText style={styles.submitButtonText}>
-                    {createMutation.isLoading || updateMutation.isLoading ? 'Saving...' : (editingClass ? 'Update' : 'Create')}
+                    {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingClass ? 'Update' : 'Create')}
                   </ThemedText>
                 </TouchableOpacity>
               )}

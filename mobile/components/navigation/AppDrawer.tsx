@@ -1,23 +1,25 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    View,
-    Text,
-    TouchableOpacity,
-    StyleSheet,
+    Animated,
+    Dimensions,
+    Easing,
     Modal,
+    Platform,
+    Pressable,
     ScrollView,
     StatusBar,
-    Animated,
-    Easing,
-    Platform,
-    Vibration,
-    TextInput,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useTheme } from '@/contexts';
 import { useAuth } from '@/contexts/AuthContext';
-import { router } from 'expo-router';
+import { useTheme } from '@/contexts';
+
+const DRAWER_WIDTH = Math.min(Dimensions.get('window').width * 0.82, 310);
 
 interface MenuItem {
     id: string;
@@ -33,155 +35,216 @@ interface AppDrawerProps {
     menuItems: MenuItem[];
 }
 
-// Icon mapping for different menu items
-const getMenuIcon = (name: string, path: string): string => {
-    const lowerName = name.toLowerCase();
-
+// Map web app paths → mobile expo-router paths
+const WEB_TO_MOBILE: Record<string, string> = {
     // Dashboard
-    if (lowerName.includes('dashboard')) return 'house.fill';
-
+    '/dashboard': '/(tabs)/',
     // Masters
-    if (lowerName.includes('masters') || lowerName.includes('master')) return 'gear';
-    if (lowerName.includes('academic') && lowerName.includes('year')) return 'calendar';
-    if (lowerName.includes('class') && !lowerName.includes('mapping')) return 'building.2';
-    if (lowerName.includes('section')) return 'rectangle.3.group';
-    if (lowerName.includes('staff') && !lowerName.includes('attendance')) return 'person.2';
-    if (lowerName.includes('staff') && lowerName.includes('attendance')) return 'clock';
-    if (lowerName.includes('designation')) return 'person.badge.plus';
-    if (lowerName.includes('subject') && !lowerName.includes('mapping') && !lowerName.includes('categor')) return 'book';
-    if (lowerName.includes('subject') && lowerName.includes('categor')) return 'folder';
-    if (lowerName.includes('mapping')) return 'link';
-    if (lowerName.includes('holiday')) return 'sun.max';
-    if (lowerName.includes('parent')) return 'person.2.circle';
-    if (lowerName.includes('timetable')) return 'calendar.badge.clock';
-
+    '/masters/routeStops': '/(tabs)/masters',
+    '/masters/academicyears': '/masters/academicyears',
+    '/masters/classesandsections': '/masters/classesandsections',
+    '/masters/subjectcategories': '/masters/subjectcategories',
+    '/masters/subjects': '/masters/subjects',
+    '/masters/classsubjectmappings': '/masters/classsubjectmappings',
+    '/masters/holidays': '/masters/holidays',
+    '/TimeTable': '/masters/timetable',
     // Students
-    if (lowerName.includes('student')) {
-        if (lowerName.includes('admission')) return 'person.badge.plus';
-        if (lowerName.includes('attendance')) return 'checkmark.circle';
-        if (lowerName.includes('document')) return 'doc';
-        if (lowerName.includes('certificate')) return 'rosette';
-        if (lowerName.includes('transport')) return 'bus';
-        return 'graduationcap';
-    }
-
-    // Fee Management
-    if (lowerName.includes('fee')) {
-        if (lowerName.includes('categor')) return 'folder';
-        if (lowerName.includes('type')) return 'tag';
-        if (lowerName.includes('term')) return 'calendar.badge.clock';
-        if (lowerName.includes('mapping')) return 'link';
-        if (lowerName.includes('amount')) return 'dollarsign.circle';
-        if (lowerName.includes('collection') || lowerName.includes('transaction')) return 'creditcard';
-        if (lowerName.includes('receipt')) return 'receipt';
-        if (lowerName.includes('refund')) return 'arrow.uturn.backward.circle';
-        return 'banknote';
-    }
-
+    '/students': '/(tabs)/students',
+    '/students/admission': '/students/admission',
+    '/students/attendance': '/students/attendance',
+    '/students/studentdocuments': '/students/studentdocuments',
+    '/students/studentcertificates': '/students/studentcertificates',
+    '/students/certificatetypes': '/students/certificatetypes',
+    '/students/studenttransport': '/students/transport',
+    // Staff (appears in both Masters and Staff module)
+    '/staff': '/(tabs)/staff',
+    '/staff/attendance': '/staff/attendance',
+    '/staff/designations': '/staff/designations',
+    '/staff/profile': '/staff/profile',
+    // Fees
+    '/fees': '/(tabs)/fees',
+    '/fee/categories': '/fees/categories',
+    '/fee/types': '/fees/types',
+    '/fee/terms': '/fees/terms',
+    '/fee/mappings': '/fees/class-mappings',
+    '/fee/term-amounts': '/fees/class-mappings',
+    '/fee/collection': '/fees/transactions',
+    '/fee/receipts': '/fees/transactions',
+    '/fee/refunds': '/fees/refunds',
     // Transport
-    if (lowerName.includes('transport') || lowerName.includes('route') || lowerName.includes('vehicle')) {
-        if (lowerName.includes('route') && !lowerName.includes('stop')) return 'map';
-        if (lowerName.includes('stop')) return 'mappin.circle';
-        if (lowerName.includes('vehicle')) return 'car';
-        if (lowerName.includes('trip')) return 'location.circle';
-        return 'bus';
+    '/transport': '/(tabs)/transport',
+    '/transport/routes': '/transport/routes',
+    '/transport/routeStops': '/transport/route-stops',
+    '/transport/vehicles': '/transport/vehicles',
+    '/masters/trips': '/transport/trips',
+    // Expense
+    '/expense': '/(tabs)/expense',
+    '/expense/categories': '/expense/categories',
+    '/expense/types': '/expense/types',
+    '/expense/transactions': '/expense/transactions',
+    '/expense/approvals': '/expense/approvals',
+    '/expense/reports': '/expense/reports',
+    // Exam
+    '/exam': '/(tabs)/exam',
+    '/exam/exams': '/exam/list',
+    '/exam/marks': '/exam/marks',
+    '/exam/hall-tickets': '/exam/hall-tickets',
+    '/exam/results': '/exam/results',
+    // Reports — fallback to home (no dedicated mobile screens yet)
+    '/reports/students': '/(tabs)/',
+    '/reports/staff': '/(tabs)/',
+    '/reports/transport': '/(tabs)/',
+    '/reports/academic': '/(tabs)/',
+    '/fee/reports': '/(tabs)/fees',
+    // Administration — no mobile screens yet
+    '/admin': '/(tabs)/',
+    '/admin/users': '/(tabs)/',
+    '/admin/roles': '/(tabs)/',
+    '/admin/permissions': '/(tabs)/',
+    '/admin/menus': '/(tabs)/',
+    // Communication — no mobile screen yet
+    '/communication': '/(tabs)/',
+};
+
+const mapPath = (webPath: string): string => {
+    if (WEB_TO_MOBILE[webPath]) return WEB_TO_MOBILE[webPath];
+    // Fallback: try prefix matching
+    if (webPath.startsWith('/students')) return '/(tabs)/students';
+    if (webPath.startsWith('/masters')) return '/(tabs)/masters';
+    if (webPath.startsWith('/fee')) return '/(tabs)/fees';
+    if (webPath.startsWith('/transport')) return '/(tabs)/transport';
+    if (webPath.startsWith('/staff')) return '/(tabs)/staff';
+    if (webPath.startsWith('/expense')) return '/(tabs)/expense';
+    if (webPath.startsWith('/exam')) return '/(tabs)/exam';
+    return '/(tabs)/';
+};
+
+// Map module name → { icon, color }
+const getModuleStyle = (name: string): { icon: keyof typeof Ionicons.glyphMap; color: string } => {
+    const n = name.toLowerCase();
+
+    if (n.includes('dashboard')) return { icon: 'home', color: '#556ee6' };
+
+    if (n.includes('student')) {
+        if (n.includes('admission')) return { icon: 'person-add', color: '#3B82F6' };
+        if (n.includes('attendance')) return { icon: 'checkmark-circle', color: '#3B82F6' };
+        if (n.includes('certificate')) return { icon: 'ribbon', color: '#3B82F6' };
+        if (n.includes('document')) return { icon: 'document-text', color: '#3B82F6' };
+        if (n.includes('transport')) return { icon: 'bus', color: '#3B82F6' };
+        return { icon: 'people', color: '#3B82F6' };
     }
 
-    // Reports
-    if (lowerName.includes('report')) return 'chart.bar';
-
-    // Administration
-    if (lowerName.includes('admin') || lowerName.includes('user') || lowerName.includes('role') || lowerName.includes('permission') || lowerName.includes('menu')) {
-        if (lowerName.includes('user')) return 'person.circle';
-        if (lowerName.includes('role')) return 'person.badge.shield.checkmark';
-        if (lowerName.includes('permission')) return 'lock.shield';
-        if (lowerName.includes('menu')) return 'list.bullet';
-        return 'gearshape';
+    if (n.includes('fee')) {
+        if (n.includes('categor')) return { icon: 'folder', color: '#10B981' };
+        if (n.includes('type')) return { icon: 'pricetag', color: '#10B981' };
+        if (n.includes('term')) return { icon: 'calendar', color: '#10B981' };
+        if (n.includes('mapping') || n.includes('class')) return { icon: 'link', color: '#10B981' };
+        if (n.includes('transaction') || n.includes('collection')) return { icon: 'card', color: '#10B981' };
+        if (n.includes('refund')) return { icon: 'refresh-circle', color: '#10B981' };
+        return { icon: 'cash', color: '#10B981' };
     }
 
-    // Default icons
-    return 'app';
+    if (n.includes('master')) return { icon: 'grid', color: '#06B6D4' };
+    if (n.includes('academic') && n.includes('year')) return { icon: 'calendar', color: '#06B6D4' };
+    if (n.includes('class') || n.includes('section')) return { icon: 'business', color: '#06B6D4' };
+    if (n.includes('subject') && n.includes('categor')) return { icon: 'folder', color: '#06B6D4' };
+    if (n.includes('subject')) return { icon: 'book', color: '#06B6D4' };
+    if (n.includes('timetable')) return { icon: 'time', color: '#06B6D4' };
+    if (n.includes('holiday')) return { icon: 'sunny', color: '#06B6D4' };
+    if (n.includes('role') || n.includes('permission')) return { icon: 'shield-checkmark', color: '#06B6D4' };
+
+    if (n.includes('transport') || n.includes('route') || n.includes('vehicle')) {
+        if (n.includes('route') && !n.includes('stop')) return { icon: 'map', color: '#F59E0B' };
+        if (n.includes('stop')) return { icon: 'location', color: '#F59E0B' };
+        if (n.includes('vehicle')) return { icon: 'car', color: '#F59E0B' };
+        if (n.includes('trip')) return { icon: 'navigate', color: '#F59E0B' };
+        return { icon: 'bus', color: '#F59E0B' };
+    }
+
+    if (n.includes('staff')) {
+        if (n.includes('attendance')) return { icon: 'calendar', color: '#8B5CF6' };
+        if (n.includes('designation')) return { icon: 'ribbon', color: '#8B5CF6' };
+        if (n.includes('profile')) return { icon: 'person-circle', color: '#8B5CF6' };
+        return { icon: 'people', color: '#8B5CF6' };
+    }
+
+    if (n.includes('expense')) {
+        if (n.includes('categor')) return { icon: 'folder', color: '#F97316' };
+        if (n.includes('type')) return { icon: 'pricetag', color: '#F97316' };
+        if (n.includes('approval')) return { icon: 'checkmark-done', color: '#F97316' };
+        return { icon: 'wallet', color: '#F97316' };
+    }
+
+    if (n.includes('exam')) {
+        if (n.includes('mark')) return { icon: 'create', color: '#EF4444' };
+        if (n.includes('result')) return { icon: 'bar-chart', color: '#EF4444' };
+        if (n.includes('hall') || n.includes('ticket')) return { icon: 'document-text', color: '#EF4444' };
+        if (n.includes('management')) return { icon: 'school', color: '#EF4444' };
+        return { icon: 'school', color: '#EF4444' };
+    }
+
+    if (n.includes('report')) return { icon: 'stats-chart', color: '#6B7280' };
+    if (n.includes('communication')) return { icon: 'chatbubbles', color: '#6B7280' };
+    if (n.includes('administration') || n.includes('admin')) return { icon: 'shield', color: '#6B7280' };
+    if (n.includes('profile')) return { icon: 'person-circle', color: '#556ee6' };
+    if (n.includes('setting')) return { icon: 'settings', color: '#6B7280' };
+
+    return { icon: 'apps', color: '#6B7280' };
 };
 
 const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose, menuItems }) => {
-    const { colors } = useTheme();
     const { user, role, logout } = useAuth();
-    const [currentFolder, setCurrentFolder] = useState<MenuItem | null>(null);
-    const [navigationStack, setNavigationStack] = useState<MenuItem[]>([]);
-    const [pressedItem, setPressedItem] = useState<string | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
-    const slideAnimation = useRef(new Animated.Value(0)).current;
-    const folderAnimation = useRef(new Animated.Value(0)).current;
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+    const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+    const backdropAnim = useRef(new Animated.Value(0)).current;
 
-    // Animate drawer entrance
     useEffect(() => {
         if (visible) {
-            Animated.timing(slideAnimation, {
-                toValue: 1,
-                duration: 300,
-                easing: Easing.bezier(0.25, 0.46, 0.45, 0.94),
-                useNativeDriver: true,
-            }).start();
+            Animated.parallel([
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 260,
+                    easing: Easing.bezier(0.25, 0.46, 0.45, 0.94),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(backdropAnim, {
+                    toValue: 1,
+                    duration: 260,
+                    useNativeDriver: true,
+                }),
+            ]).start();
         } else {
-            slideAnimation.setValue(0);
-            setCurrentFolder(null);
-            setNavigationStack([]);
-            setSearchQuery('');
+            Animated.parallel([
+                Animated.timing(slideAnim, {
+                    toValue: -DRAWER_WIDTH,
+                    duration: 220,
+                    easing: Easing.in(Easing.cubic),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(backdropAnim, {
+                    toValue: 0,
+                    duration: 220,
+                    useNativeDriver: true,
+                }),
+            ]).start(() => setExpandedIds(new Set()));
         }
     }, [visible]);
 
-    // Animate folder transitions
-    useEffect(() => {
-        Animated.timing(folderAnimation, {
-            toValue: currentFolder ? 1 : 0,
-            duration: 250,
-            easing: Easing.bezier(0.25, 0.46, 0.45, 0.94),
-            useNativeDriver: true,
-        }).start();
-    }, [currentFolder]);
-
-    const openFolder = (folder: MenuItem) => {
-        setNavigationStack(prev => [...prev, folder]);
-        setCurrentFolder(folder);
+    const toggleExpand = (id: string) => {
+        setExpandedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
     };
 
-    const closeFolder = () => {
-        const newStack = [...navigationStack];
-        newStack.pop();
-        setNavigationStack(newStack);
-        setCurrentFolder(newStack[newStack.length - 1] || null);
-    };
-
-    const goToRoot = () => {
-        setCurrentFolder(null);
-        setNavigationStack([]);
-    };
-
-    const handleMenuItemPress = (item: MenuItem) => {
-        // Haptic feedback
-        if (Platform.OS === 'ios') {
-            Vibration.vibrate(10);
-        }
-
-        if (item.children && item.children.length > 0) {
-            // Open folder
-            openFolder(item);
-        } else {
-            // Navigate to the item's path
-            setPressedItem(item.id);
-            setTimeout(() => {
-                onClose();
-                router.push(item.path as any);
-            }, 150);
-        }
-    };
-
-    const handlePressIn = (itemId: string) => {
-        setPressedItem(itemId);
-    };
-
-    const handlePressOut = () => {
-        setPressedItem(null);
+    const handleLeafPress = (path: string) => {
+        onClose();
+        setTimeout(() => router.push(mapPath(path) as any), 150);
     };
 
     const handleLogout = async () => {
@@ -194,565 +257,337 @@ const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose, menuItems }) =>
         }
     };
 
-    const renderAppIcon = (item: MenuItem) => {
-        const hasChildren = item.children && item.children.length > 0;
-        const icon = getMenuIcon(item.name, item.path);
-
-        return (
-            <TouchableOpacity
-                key={item.id}
-                style={[
-                    styles.appIcon,
-                    {
-                        backgroundColor: pressedItem === item.id ? colors.primary + '15' : 'transparent',
-                    }
-                ]}
-                onPress={() => handleMenuItemPress(item)}
-                onPressIn={() => handlePressIn(item.id)}
-                onPressOut={handlePressOut}
-                activeOpacity={1}
-            >
-                {/* App Icon Container */}
-                <Animated.View style={[
-                    styles.appIconContainer,
-                    {
-                        backgroundColor: hasChildren ? colors.secondary : colors.primary,
-                        transform: pressedItem === item.id ? [{ scale: 0.85 }] : [{ scale: 1 }],
-                    }
-                ]}>
-                    {hasChildren ? (
-                        // Folder icon with mini icons inside
-                        <View style={styles.folderIcon}>
-                            <View style={[styles.folderBackground, { backgroundColor: colors.secondary }]} />
-                            <View style={styles.miniIconsContainer}>
-                                {item.children!.slice(0, 4).map((child, index) => (
-                                    <View
-                                        key={child.id}
-                                        style={[
-                                            styles.miniIcon,
-                                            { backgroundColor: colors.primary },
-                                            index === 0 && styles.miniIconTopLeft,
-                                            index === 1 && styles.miniIconTopRight,
-                                            index === 2 && styles.miniIconBottomLeft,
-                                            index === 3 && styles.miniIconBottomRight,
-                                        ]}
-                                    >
-                                        <IconSymbol
-                                            name={getMenuIcon(child.name, child.path)}
-                                            size={8}
-                                            color={colors['primary-foreground']}
-                                        />
-                                    </View>
-                                ))}
-                            </View>
-                            {item.children!.length > 4 && (
-                                <View style={[styles.moreIndicator, { backgroundColor: colors.primary }]}>
-                                    <Text style={[styles.moreText, { color: colors['primary-foreground'] }]}>
-                                        +{item.children!.length - 4}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
-                    ) : (
-                        // Regular app icon
-                        <IconSymbol
-                            name={icon}
-                            size={32}
-                            color={colors['primary-foreground']}
-                        />
-                    )}
-                </Animated.View>
-
-                {/* App Name */}
-                <Text
-                    style={[
-                        styles.appName,
-                        { color: colors.foreground }
-                    ]}
-                    numberOfLines={2}
-                >
-                    {item.name}
-                </Text>
-            </TouchableOpacity>
-        );
-    };
-
-    const renderGridView = (items: MenuItem[]) => {
-        return (
-            <View style={styles.gridContainer}>
-                {items.map(item => renderAppIcon(item))}
-            </View>
-        );
-    };
-
-    // Filter and search logic
-    const filterMenuItems = (items: MenuItem[], query: string): MenuItem[] => {
-        if (!query.trim()) return items;
-
-        const filtered: MenuItem[] = [];
-
-        items.forEach(item => {
-            const matchesName = item.name.toLowerCase().includes(query.toLowerCase());
-
-            if (item.children && item.children.length > 0) {
-                const matchingChildren = filterMenuItems(item.children, query);
-
-                if (matchesName || matchingChildren.length > 0) {
-                    // If searching, flatten the structure to show all matching items
-                    if (matchesName) {
-                        filtered.push(item);
-                    }
-                    // Add matching children as top-level items when searching
-                    filtered.push(...matchingChildren);
-                }
-            } else if (matchesName) {
-                filtered.push(item);
-            }
-        });
-
-        return filtered;
-    };
-
-    const getCurrentItems = () => {
-        if (currentFolder) {
-            return currentFolder.children
-                ? filterMenuItems(currentFolder.children.sort((a, b) => a.display_order - b.display_order), searchQuery)
-                : [];
-        }
-
-        return menuItems && menuItems.length > 0
-            ? filterMenuItems([...menuItems].sort((a, b) => a.display_order - b.display_order), searchQuery)
-            : [];
-    };
-
-    const currentItems = getCurrentItems();
-
-    const slideTransform = slideAnimation.interpolate({
-        inputRange: [0, 1],
-        outputRange: [300, 0],
-    });
-
-    const fadeOpacity = slideAnimation.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, 1],
-    });
+    const sortedItems = [...(menuItems ?? [])].sort((a, b) => a.display_order - b.display_order);
+    const initial = (user?.username || 'U').charAt(0).toUpperCase();
 
     return (
         <Modal
             visible={visible}
-            animationType="fade"
-            presentationStyle="pageSheet"
+            animationType="none"
+            transparent
             onRequestClose={onClose}
-            transparent={false}
+            statusBarTranslucent
         >
-            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-                <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-
-                <Animated.View
-                    style={[
-                        styles.drawerContent,
-                        {
-                            transform: [{ translateX: slideTransform }],
-                            opacity: fadeOpacity,
-                        }
-                    ]}
-                >
-
-                    {/* Header */}
-                    <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                        <View style={styles.headerTop}>
-                            <View style={styles.headerLeft}>
-                                <View style={[styles.userAvatar, { backgroundColor: colors.primary }]}>
-                                    <Text style={[styles.userAvatarText, { color: colors['primary-foreground'] }]}>
-                                        {user?.username?.charAt(0).toUpperCase() || 'U'}
-                                    </Text>
-                                </View>
-                                <View style={styles.userInfo}>
-                                    <Text style={[styles.userName, { color: colors.foreground }]}>
-                                        {user?.username || 'User'}
-                                    </Text>
-                                    <Text style={[styles.userRole, { color: colors['muted-foreground'] }]}>
-                                        {role?.name || 'Role'}
-                                    </Text>
-                                </View>
-                            </View>
-                            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                                <IconSymbol name="xmark" size={24} color={colors['muted-foreground']} />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Search Bar */}
-                        <View style={[styles.searchContainer, { backgroundColor: colors.input }]}>
-                            <IconSymbol name="magnifyingglass" size={18} color={colors['muted-foreground']} />
-                            <TextInput
-                                style={[styles.searchInput, { color: colors.foreground }]}
-                                placeholder="Search apps..."
-                                placeholderTextColor={colors['muted-foreground']}
-                                value={searchQuery}
-                                onChangeText={setSearchQuery}
-                                clearButtonMode="while-editing"
-                                returnKeyType="search"
-                            />
-                        </View>
-                    </View>
-
-                    {/* Navigation Bar */}
-                    {currentFolder && (
-                        <View style={[styles.navigationBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-                            <TouchableOpacity onPress={closeFolder} style={styles.backButton}>
-                                <IconSymbol name="chevron.left" size={20} color={colors.primary} />
-                                <Text style={[styles.backText, { color: colors.primary }]}>Back</Text>
-                            </TouchableOpacity>
-                            <Text style={[styles.folderTitle, { color: colors.foreground }]} numberOfLines={1}>
-                                {currentFolder.name}
-                            </Text>
-                            <TouchableOpacity onPress={goToRoot} style={styles.homeButton}>
-                                <IconSymbol name="house.fill" size={20} color={colors.primary} />
-                            </TouchableOpacity>
-                        </View>
-                    )}
-
-                    {/* Content Area */}
-                    <ScrollView
-                        style={styles.menuContainer}
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.menuContent}
-                    >
-                        <Animated.View
-                            style={[
-                                styles.contentContainer,
-                                {
-                                    transform: [
-                                        {
-                                            translateX: folderAnimation.interpolate({
-                                                inputRange: [0, 1],
-                                                outputRange: [0, 0],
-                                            })
-                                        }
-                                    ],
-                                    opacity: folderAnimation.interpolate({
-                                        inputRange: [0, 0.5, 1],
-                                        outputRange: [1, 0.5, 1],
-                                    })
-                                }
-                            ]}
-                        >
-                            {currentItems.length > 0 ? (
-                                renderGridView(currentItems)
-                            ) : (
-                                <View style={styles.emptyState}>
-                                    <IconSymbol
-                                        name={searchQuery ? "magnifyingglass" : currentFolder ? "folder" : "app"}
-                                        size={48}
-                                        color={colors['muted-foreground']}
-                                    />
-                                    <Text style={[styles.emptyStateText, { color: colors['muted-foreground'] }]}>
-                                        {searchQuery
-                                            ? `No results found for "${searchQuery}"`
-                                            : currentFolder
-                                                ? "This folder is empty"
-                                                : "No menu items available"
-                                        }
-                                    </Text>
-                                </View>
-                            )}
-                        </Animated.View>
-                    </ScrollView>
-
-                    {/* Footer */}
-                    <View style={[styles.footer, { borderTopColor: colors.border }]}>
-                        <TouchableOpacity
-                            style={[styles.logoutButton, { backgroundColor: colors.destructive }]}
-                            onPress={handleLogout}
-                        >
-                            <IconSymbol name="arrow.right.square" size={20} color="white" />
-                            <Text style={styles.logoutText}>Logout</Text>
-                        </TouchableOpacity>
-                    </View>
+            <View style={styles.container}>
+                {/* Backdrop */}
+                <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
+                    <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
                 </Animated.View>
-            </SafeAreaView>
+
+                {/* Sidebar panel */}
+                <Animated.View
+                    style={[styles.sidebar, { transform: [{ translateX: slideAnim }] }]}
+                >
+                    <SafeAreaView style={styles.sidebarInner} edges={['top', 'bottom']}>
+                        {/* ── Brand header ── */}
+                        <View style={styles.brandHeader}>
+                            <View style={styles.brandLogoRow}>
+                                <View style={styles.brandIconBox}>
+                                    <Ionicons name="school" size={18} color="white" />
+                                </View>
+                                <Text style={styles.brandTitle}>COS360</Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={onClose}
+                                style={styles.brandClose}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                                <Ionicons name="close" size={20} color="rgba(255,255,255,0.5)" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* ── User strip ── */}
+                        <View style={styles.userStrip}>
+                            <View style={styles.userAvatar}>
+                                <Text style={styles.userAvatarText}>{initial}</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.userName} numberOfLines={1}>{user?.username || 'User'}</Text>
+                                <Text style={styles.userRole} numberOfLines={1}>{role?.name || 'User'}</Text>
+                            </View>
+                        </View>
+
+                        {/* ── MENU label ── */}
+                        <Text style={styles.sectionLabel}>MENU</Text>
+
+                        {/* ── Menu items ── */}
+                        <ScrollView
+                            style={{ flex: 1 }}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={styles.menuList}
+                        >
+                            {sortedItems.map(item => {
+                                const hasChildren = (item.children?.length ?? 0) > 0;
+                                const isExpanded = expandedIds.has(item.id);
+                                const { icon, color } = getModuleStyle(item.name);
+
+                                return (
+                                    <View key={item.id}>
+                                        {/* Parent row */}
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.menuRow,
+                                                isExpanded && styles.menuRowExpanded,
+                                            ]}
+                                            onPress={() => {
+                                                if (hasChildren) {
+                                                    toggleExpand(item.id);
+                                                } else {
+                                                    handleLeafPress(item.path);
+                                                }
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={[styles.menuIcon, { backgroundColor: color + '22' }]}>
+                                                <Ionicons name={icon} size={17} color={color} />
+                                            </View>
+                                            <Text
+                                                style={[
+                                                    styles.menuLabel,
+                                                    isExpanded && styles.menuLabelExpanded,
+                                                ]}
+                                                numberOfLines={1}
+                                            >
+                                                {item.name}
+                                            </Text>
+                                            {hasChildren && (
+                                                <Ionicons
+                                                    name={isExpanded ? 'chevron-down' : 'chevron-forward'}
+                                                    size={15}
+                                                    color={isExpanded ? '#fff' : 'rgba(255,255,255,0.3)'}
+                                                />
+                                            )}
+                                        </TouchableOpacity>
+
+                                        {/* Children (accordion) */}
+                                        {hasChildren && isExpanded && (
+                                            <View style={styles.childList}>
+                                                {[...(item.children ?? [])]
+                                                    .sort((a, b) => a.display_order - b.display_order)
+                                                    .map(child => {
+                                                        const c = getModuleStyle(child.name);
+                                                        return (
+                                                            <TouchableOpacity
+                                                                key={child.id}
+                                                                style={styles.childRow}
+                                                                onPress={() => handleLeafPress(child.path)}
+                                                                activeOpacity={0.7}
+                                                            >
+                                                                <View style={styles.childDotWrap}>
+                                                                    <View style={[styles.childDot, { backgroundColor: c.color }]} />
+                                                                </View>
+                                                                <Ionicons name={c.icon} size={14} color={c.color} style={{ marginRight: 8 }} />
+                                                                <Text style={styles.childLabel} numberOfLines={1}>
+                                                                    {child.name}
+                                                                </Text>
+                                                            </TouchableOpacity>
+                                                        );
+                                                    })}
+                                            </View>
+                                        )}
+                                    </View>
+                                );
+                            })}
+                        </ScrollView>
+
+                        {/* ── Footer / logout ── */}
+                        <View style={styles.footer}>
+                            <TouchableOpacity style={styles.logoutRow} onPress={handleLogout} activeOpacity={0.8}>
+                                <Ionicons name="log-out-outline" size={18} color="#ef4444" />
+                                <Text style={styles.logoutText}>Sign Out</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </SafeAreaView>
+                </Animated.View>
+            </View>
         </Modal>
     );
 };
 
+export default AppDrawer;
+
+const SIDEBAR_BG = '#1a1f37';
+const SIDEBAR_BORDER = 'rgba(255,255,255,0.07)';
+const TEXT_PRIMARY = '#e2e8f0';
+const TEXT_MUTED = 'rgba(255,255,255,0.4)';
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        flexDirection: 'row',
     },
-    drawerContent: {
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    sidebar: {
+        width: DRAWER_WIDTH,
+        height: '100%',
+        backgroundColor: SIDEBAR_BG,
+        shadowColor: '#000',
+        shadowOffset: { width: 6, height: 0 },
+        shadowOpacity: 0.45,
+        shadowRadius: 20,
+        elevation: 24,
+    },
+    sidebarInner: {
         flex: 1,
     },
-    header: {
-        paddingHorizontal: 20,
-        paddingVertical: 20,
+    // Brand
+    brandHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 18,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 12 : 12,
+        paddingBottom: 16,
         borderBottomWidth: 1,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-            },
-            android: {
-                elevation: 4,
-            },
-        }),
+        borderBottomColor: SIDEBAR_BORDER,
     },
-    headerTop: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    brandLogoRow: {
         flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    brandIconBox: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: '#556ee6',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    brandTitle: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    brandClose: {
+        padding: 4,
+    },
+    // User strip
+    userStrip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 18,
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: SIDEBAR_BORDER,
+        gap: 12,
     },
     userAvatar: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#556ee6',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 16,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.15,
-                shadowRadius: 4,
-            },
-            android: {
-                elevation: 3,
-            },
-        }),
     },
     userAvatarText: {
-        fontSize: 22,
+        color: '#fff',
+        fontSize: 15,
         fontWeight: '700',
-    },
-    userInfo: {
-        flex: 1,
     },
     userName: {
-        fontSize: 20,
-        fontWeight: '700',
-        marginBottom: 4,
+        color: TEXT_PRIMARY,
+        fontSize: 14,
+        fontWeight: '600',
     },
     userRole: {
+        color: TEXT_MUTED,
+        fontSize: 11,
+        marginTop: 1,
+    },
+    // Section label
+    sectionLabel: {
+        color: TEXT_MUTED,
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 1.4,
+        paddingHorizontal: 20,
+        paddingTop: 18,
+        paddingBottom: 6,
+    },
+    // Menu
+    menuList: {
+        paddingHorizontal: 8,
+        paddingBottom: 8,
+    },
+    menuRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 11,
+        borderRadius: 10,
+        gap: 12,
+        marginBottom: 2,
+    },
+    menuRowExpanded: {
+        backgroundColor: '#556ee6',
+    },
+    menuIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    menuLabel: {
+        flex: 1,
+        color: TEXT_PRIMARY,
         fontSize: 14,
-        opacity: 0.8,
-    },
-    closeButton: {
-        padding: 12,
-        borderRadius: 20,
-    },
-    navigationBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-    },
-    backButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 8,
-        paddingRight: 12,
-    },
-    backText: {
-        fontSize: 16,
         fontWeight: '500',
-        marginLeft: 4,
     },
-    folderTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        flex: 1,
-        textAlign: 'center',
-    },
-    homeButton: {
-        padding: 8,
-    },
-    menuContainer: {
-        flex: 1,
-    },
-    menuContent: {
-        paddingVertical: 20,
-        paddingHorizontal: 20,
-    },
-    contentContainer: {
-        flex: 1,
-    },
-    gridContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'flex-start',
-        alignItems: 'flex-start',
-    },
-    appIcon: {
-        width: '25%',
-        aspectRatio: 1,
-        padding: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 16,
-        marginBottom: 8,
-    },
-    appIconContainer: {
-        width: 60,
-        height: 60,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 8,
-        position: 'relative',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.15,
-                shadowRadius: 4,
-            },
-            android: {
-                elevation: 4,
-            },
-        }),
-    },
-    folderIcon: {
-        width: '100%',
-        height: '100%',
-        position: 'relative',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    folderBackground: {
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-        borderRadius: 16,
-        opacity: 0.9,
-    },
-    miniIconsContainer: {
-        width: 40,
-        height: 40,
-        position: 'relative',
-    },
-    miniIcon: {
-        position: 'absolute',
-        width: 16,
-        height: 16,
-        borderRadius: 4,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    miniIconTopLeft: {
-        top: 2,
-        left: 2,
-    },
-    miniIconTopRight: {
-        top: 2,
-        right: 2,
-    },
-    miniIconBottomLeft: {
-        bottom: 2,
-        left: 2,
-    },
-    miniIconBottomRight: {
-        bottom: 2,
-        right: 2,
-    },
-    moreIndicator: {
-        position: 'absolute',
-        bottom: -2,
-        right: -2,
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    moreText: {
-        fontSize: 8,
+    menuLabelExpanded: {
+        color: '#fff',
         fontWeight: '700',
     },
-    appName: {
-        fontSize: 12,
-        fontWeight: '500',
-        textAlign: 'center',
-        lineHeight: 14,
-        paddingHorizontal: 4,
+    // Children
+    childList: {
+        marginLeft: 20,
+        marginBottom: 6,
+        paddingLeft: 16,
+        borderLeftWidth: 1,
+        borderLeftColor: 'rgba(255,255,255,0.08)',
     },
-    footer: {
-        paddingHorizontal: 20,
-        paddingVertical: 20,
-        borderTopWidth: 1,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: -2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-            },
-            android: {
-                elevation: 4,
-            },
-        }),
-    },
-    logoutButton: {
+    childRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        paddingVertical: 9,
+        paddingRight: 8,
+    },
+    childDotWrap: {
+        width: 16,
+        alignItems: 'center',
+        marginRight: 4,
+    },
+    childDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 3,
+    },
+    childLabel: {
+        flex: 1,
+        color: 'rgba(255,255,255,0.55)',
+        fontSize: 13,
+        fontWeight: '400',
+    },
+    // Footer
+    footer: {
+        borderTopWidth: 1,
+        borderTopColor: SIDEBAR_BORDER,
+        paddingHorizontal: 20,
         paddingVertical: 16,
-        paddingHorizontal: 24,
-        borderRadius: 12,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.15,
-                shadowRadius: 4,
-            },
-            android: {
-                elevation: 3,
-            },
-        }),
+    },
+    logoutRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
     },
     logoutText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: '700',
-        marginLeft: 8,
-    },
-    emptyState: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: 60,
-        paddingHorizontal: 40,
-    },
-    emptyStateText: {
-        fontSize: 18,
-        marginTop: 16,
-        textAlign: 'center',
-        lineHeight: 24,
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 12,
-        marginTop: 8,
-    },
-    searchInput: {
-        flex: 1,
-        marginLeft: 12,
-        fontSize: 16,
-        paddingVertical: 0,
+        color: '#ef4444',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
-
-export default AppDrawer;

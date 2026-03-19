@@ -1,477 +1,371 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { AppLayout } from '@/components';
 import { CustomDropdown } from '@/components/ui/dropdown';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { studentDocumentsApi, studentAdmissionsApi } from '@/src/api';
 import { useTheme } from '@/contexts';
-import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard } from '@/components/PermissionGuards';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  ReadOrListPermissionGuard,
+  CreatePermissionGuard,
+} from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
-interface StudentDocument {
-  id: string;
-  student_id: string;
-  document_type: string;
-  document_name: string;
-  file_path?: string;
-  uploaded_at: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+const DOCUMENT_TYPES = [
+  'Birth Certificate',
+  'ID Card',
+  'Medical Report',
+  'Address Proof',
+  'Previous School Records',
+  'Passport',
+  'Transfer Certificate',
+  'Other',
+];
+
+const getDocIcon = (type: string) => {
+  const t = type.toLowerCase();
+  if (t.includes('birth')) return 'document-text';
+  if (t.includes('id')) return 'card';
+  if (t.includes('medical')) return 'medkit';
+  if (t.includes('address')) return 'home';
+  if (t.includes('passport')) return 'airplane';
+  if (t.includes('transfer')) return 'swap-horizontal';
+  return 'document';
+};
+
+// ─── Document card ─────────────────────────────────────────────────────────
+
+function DocumentCard({ doc, colors }: { doc: any; colors: any }) {
+  return (
+    <View style={[styles.docCard, { backgroundColor: colors.background }]}>
+      <View style={[styles.docIcon, { backgroundColor: `${colors.primary}15` }]}>
+        <Ionicons name={getDocIcon(doc.document_type) as any} size={20} color={colors.primary} />
+      </View>
+      <View style={styles.docInfo}>
+        <ThemedText style={styles.docType}>{doc.document_type}</ThemedText>
+        <ThemedText style={styles.docDate}>
+          {new Date(doc.upload_date).toLocaleDateString()}
+        </ThemedText>
+      </View>
+      <TouchableOpacity
+        style={[styles.docAction, { backgroundColor: `${colors.primary}18` }]}
+        onPress={() => Alert.alert('View', 'Document viewer coming soon')}
+      >
+        <Ionicons name="eye-outline" size={16} color={colors.primary} />
+      </TouchableOpacity>
+    </View>
+  );
 }
 
-export default function StudentDocumentsScreen() {
-  const router = useRouter();
-  // const colorScheme = useColorScheme();
-  // const theme = colorScheme === 'dark' ? 'dark' : 'light';
-  const { theme, colors } = useTheme();
-  const themeColors = Colors[theme];
-  const queryClient = useQueryClient();
+// ─── Student / Parent read-only view ───────────────────────────────────────
 
-  const [selectedStudent, setSelectedStudent] = useState<string>('');
+function MyDocumentsView({ studentId, title }: { studentId?: string; title?: string }) {
+  const { colors } = useTheme();
 
-  // Fetch documents data
-  const { data: documentsData, isLoading, refetch } = useQuery({
-    queryKey: ['student-documents', selectedStudent],
-    queryFn: async () => {
-      const response = await studentDocumentsApi.listDocuments();
-      let data = response;
-      if (selectedStudent) {
-        return data.filter((doc: any) => doc.student_id === selectedStudent);
-      }
-      return data;
-    },
+  const { data: docs, isLoading } = useQuery({
+    queryKey: ['my-documents', studentId],
+    queryFn: () => studentDocumentsApi.listDocuments(studentId ? { student_id: studentId } : undefined),
   });
 
-  // Fetch students for dropdown
+  return (
+    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      {title && <ThemedText style={styles.viewTitle}>{title}</ThemedText>}
+
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <ThemedText type="subtitle" style={styles.cardTitle}>Documents</ThemedText>
+        {isLoading ? (
+          <ThemedText style={styles.emptyText}>Loading...</ThemedText>
+        ) : docs && docs.length > 0 ? (
+          docs.map((doc: any) => <DocumentCard key={doc.id} doc={doc} colors={colors} />)
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="folder-open-outline" size={40} color={colors['muted-foreground']} />
+            <ThemedText style={styles.emptyText}>No documents found</ThemedText>
+          </View>
+        )}
+      </View>
+    </ScrollView>
+  );
+}
+
+// ─── Staff / Admin view ────────────────────────────────────────────────────
+
+function AdminDocumentsView() {
+  const { colors } = useTheme();
+  const queryClient = useQueryClient();
+  const [selectedStudent, setSelectedStudent] = useState('');
+
   const { data: studentsData } = useQuery({
     queryKey: ['students-dropdown'],
     queryFn: async () => {
       const response = await studentAdmissionsApi.getStudentAdmissions();
-      return response.items.map((student: any) => ({
-        label: `${student.student.first_name} ${student.student.last_name} (${student.admission_number})`,
-        value: student.id
+      return response.items.map((s: any) => ({
+        label: `${s.student.first_name} ${s.student.last_name} (${s.admission_number})`,
+        value: s.student.id,
       }));
     },
   });
 
-  // Document types
-  const documentTypes = [
-    { label: 'Birth Certificate', value: 'Birth Certificate' },
-    { label: 'ID Card', value: 'ID Card' },
-    { label: 'Medical Report', value: 'Medical Report' },
-    { label: 'Address Proof', value: 'Address Proof' },
-    { label: 'Previous School Records', value: 'Previous School Records' },
-    { label: 'Passport', value: 'Passport' },
-    { label: 'Other', value: 'Other' },
-  ];
+  const { data: docs, isLoading } = useQuery({
+    queryKey: ['student-documents', selectedStudent],
+    queryFn: () =>
+      studentDocumentsApi.listDocuments(
+        selectedStudent ? { student_id: selectedStudent } : undefined,
+      ),
+  });
 
-  // Mutation for uploading document
-  const uploadDocumentMutation = useMutation({
+  const uploadMutation = useMutation({
     mutationFn: studentDocumentsApi.uploadDocument,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-documents'] });
-      Alert.alert('Success', 'Document uploaded successfully!');
+      Alert.alert('Success', 'Document uploaded');
     },
-    onError: (error) => {
-      Alert.alert('Error', 'Failed to upload document. Please try again.');
-      console.error('Upload document error:', error);
-    },
+    onError: () => Alert.alert('Error', 'Failed to upload document'),
   });
 
-  const handleUploadDocument = (documentType: string) => {
+  const handleUpload = (docType: string) => {
     if (!selectedStudent) {
-      Alert.alert('Error', 'Please select a student first');
+      Alert.alert('Required', 'Please select a student first');
       return;
     }
-
     Alert.alert(
-      `Upload ${documentType}`,
-      'File picker would be implemented here. Simulating upload...',
+      `Upload ${docType}`,
+      'Select a file to upload',
       [
         {
-          text: 'Simulate Upload',
-          onPress: () => {
-            // Simulate file upload
-            uploadDocumentMutation.mutate({
-              student_id: selectedStudent,
-              document_type: documentType,
-              document_name: `${documentType} Document`,
-              document_file: new File([], `${documentType.toLowerCase()}.pdf`), // Mock file
-            } as any);
-          }
+          text: 'Choose File',
+          onPress: () =>
+            Alert.alert('Info', 'File picker integration needed for device files'),
         },
-        { text: 'Cancel', style: 'cancel' }
-      ]
+        { text: 'Cancel', style: 'cancel' },
+      ],
     );
   };
 
-  const getFileIcon = (documentType: string) => {
-    switch (documentType.toLowerCase()) {
-      case 'birth certificate':
-        return 'document-text';
-      case 'id card':
-        return 'card';
-      case 'medical report':
-        return 'medical';
-      case 'address proof':
-        return 'home';
-      case 'passport':
-        return 'airplane';
-      default:
-        return 'document';
-    }
-  };
-
-  const renderDocumentItem = ({ item }: { item: StudentDocument }) => (
-    <View style={[styles.documentCard, { backgroundColor: themeColors.card }]}>
-      <View style={styles.documentHeader}>
-        <View style={styles.documentIcon}>
-          <Ionicons name={getFileIcon(item.document_type) as any} size={24} color={themeColors.primary} />
-        </View>
-        <View style={styles.documentInfo}>
-          <ThemedText style={styles.documentType}>{item.document_type}</ThemedText>
-          <ThemedText style={styles.uploadDate}>
-            Uploaded: {new Date(item.uploaded_at).toLocaleDateString()}
-          </ThemedText>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#10B981' : '#EF4444' }]}>
-          <ThemedText style={styles.statusText}>
-            {item.is_active ? 'Active' : 'Inactive'}
-          </ThemedText>
-        </View>
+  return (
+    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      {/* Student filter */}
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <ThemedText type="subtitle" style={styles.cardTitle}>Filter by Student</ThemedText>
+        <CustomDropdown
+          data={studentsData || []}
+          placeholder="All Students"
+          value={selectedStudent}
+          onChange={(val) => setSelectedStudent(val as string)}
+          style={{ backgroundColor: colors.background }}
+        />
       </View>
 
-      <View style={styles.documentActions}>
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: themeColors.primary }]}
-          onPress={() => Alert.alert('View', 'Document viewer would be implemented')}
-        >
-          <Ionicons name="eye" size={16} color="white" />
-          <ThemedText style={styles.actionButtonText}>View</ThemedText>
-        </TouchableOpacity>
+      {/* Upload section */}
+      <CreatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_DOCUMENTS}>
+        {selectedStudent ? (
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
+            <ThemedText type="subtitle" style={styles.cardTitle}>Upload Document</ThemedText>
+            <View style={styles.docTypesGrid}>
+              {DOCUMENT_TYPES.map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.typeButton, { backgroundColor: colors.background }]}
+                  onPress={() => handleUpload(type)}
+                >
+                  <Ionicons
+                    name={getDocIcon(type) as any}
+                    size={18}
+                    color={colors.primary}
+                  />
+                  <ThemedText style={styles.typeText}>{type}</ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </CreatePermissionGuard>
 
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: '#10B981' }]}
-          onPress={() => Alert.alert('Download', 'Download functionality would be implemented')}
-        >
-          <Ionicons name="download" size={16} color="white" />
-          <ThemedText style={styles.actionButtonText}>Download</ThemedText>
-        </TouchableOpacity>
-
-        <UpdatePermissionGuard 
-          resource={PERMISSION_RESOURCES.STUDENT_DOCUMENTS}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#F59E0B' }]}
-            onPress={() => Alert.alert('Edit', 'Edit functionality would be implemented')}
-          >
-            <Ionicons name="create" size={16} color="white" />
-            <ThemedText style={styles.actionButtonText}>Edit</ThemedText>
-          </TouchableOpacity>
-        </UpdatePermissionGuard>
-      </View>
-    </View>
-  );
-
-  const renderUploadSection = () => (
-    <CreatePermissionGuard 
-      resource={PERMISSION_RESOURCES.STUDENT_DOCUMENTS}>
-      <View style={[styles.uploadSection, { backgroundColor: themeColors.card }]}>
-        <ThemedText type="subtitle" style={styles.sectionTitle}>
-          Upload New Document
+      {/* Documents list */}
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <ThemedText type="subtitle" style={styles.cardTitle}>
+          {selectedStudent ? 'Student Documents' : 'All Documents'}
         </ThemedText>
 
-        <View style={styles.documentTypesGrid}>
-          {documentTypes.map((type) => (
-            <TouchableOpacity
-              key={type.value}
-              style={[styles.documentTypeButton, { backgroundColor: themeColors.background }]}
-              onPress={() => handleUploadDocument(type.value)}
-              disabled={uploadDocumentMutation.isPending}
-            >
-              <Ionicons name={getFileIcon(type.value) as any} size={20} color={themeColors.primary} />
-              <ThemedText style={styles.documentTypeText}>{type.label}</ThemedText>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {isLoading ? (
+          <ThemedText style={styles.emptyText}>Loading...</ThemedText>
+        ) : docs && docs.length > 0 ? (
+          docs.map((doc: any) => <DocumentCard key={doc.id} doc={doc} colors={colors} />)
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="folder-open-outline" size={40} color={colors['muted-foreground']} />
+            <ThemedText style={styles.emptyText}>
+              {selectedStudent ? 'No documents for this student' : 'Select a student to view documents'}
+            </ThemedText>
+          </View>
+        )}
       </View>
-    </CreatePermissionGuard>
+    </ScrollView>
   );
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
+export default function StudentDocumentsScreen() {
+  const { role, studentId, selectedStudent } = useAuth();
+  const { colors } = useTheme();
+
+  const roleName = role?.name?.toLowerCase();
+  const isStudent = roleName === 'student';
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName || '');
+
+  let content: React.ReactNode;
+  if (isStudent) {
+    content = <MyDocumentsView />;
+  } else if (isParent && selectedStudent) {
+    content = (
+      <MyDocumentsView
+        studentId={selectedStudent.id}
+        title={`${selectedStudent.first_name}'s Documents`}
+      />
+    );
+  } else if (isParent && !selectedStudent) {
+    content = (
+      <View style={styles.emptyState}>
+        <Ionicons name="person-outline" size={48} color={colors['muted-foreground']} />
+        <ThemedText style={styles.emptyText}>Please select a student from the header</ThemedText>
+      </View>
+    );
+  } else {
+    content = <AdminDocumentsView />;
+  }
 
   return (
-    <ReadOrListPermissionGuard 
+    <ReadOrListPermissionGuard
       resource={PERMISSION_RESOURCES.STUDENT_DOCUMENTS}
       fallback={
-        <ThemedView style={styles.container}>
-          <View style={styles.accessDeniedContainer}>
-            <Ionicons name="lock-closed" size={48} color={themeColors['muted-foreground']} />
+        <AppLayout title="Documents">
+          <View style={styles.accessDenied}>
+            <Ionicons name="lock-closed" size={48} color={colors['muted-foreground']} />
             <ThemedText style={styles.accessDeniedText}>
-              You don't have permission to access student documents
+              You don&apos;t have permission to access documents
             </ThemedText>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <ThemedText style={styles.backButtonText}>Go Back</ThemedText>
-            </TouchableOpacity>
           </View>
-        </ThemedView>
+        </AppLayout>
       }
     >
-      <ThemedView style={styles.container}>
-        {/* Header */}
-        <View style={[styles.header, { backgroundColor: themeColors.card }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
-          </TouchableOpacity>
-          <ThemedText type="title" style={styles.headerTitle}>
-            Student Documents
-          </ThemedText>
-        </View>
-
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Filters */}
-        <View style={[styles.filtersCard, { backgroundColor: themeColors.card }]}>
-          <ThemedText type="subtitle" style={styles.filtersTitle}>
-            Filter by Student
-          </ThemedText>
-
-          <CustomDropdown
-            data={studentsData || []}
-            placeholder="Select student"
-            value={selectedStudent}
-            onChange={(value) => setSelectedStudent(value as string)}
-            style={{ backgroundColor: themeColors.background }}
-          />
-        </View>
-
-        {/* Upload Section */}
-        {renderUploadSection()}
-
-        {/* Documents List */}
-        <View style={[styles.documentsCard, { backgroundColor: themeColors.card }]}>
-          <ThemedText type="subtitle" style={styles.documentsTitle}>
-            Documents
-          </ThemedText>
-
-          <FlatList
-            data={documentsData}
-            renderItem={renderDocumentItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.documentsList}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Ionicons name="folder-open" size={48} color={themeColors['muted-foreground']} />
-                <ThemedText style={styles.emptyText}>
-                  {selectedStudent ? 'No documents found for selected student' : 'Select a student to view documents'}
-                </ThemedText>
-                {!selectedStudent && (
-                  <ThemedText style={styles.emptySubtext}>
-                    Choose a student from the dropdown above to see their documents
-                  </ThemedText>
-                )}
-              </View>
-            }
-          />
-        </View>
-      </ScrollView>
-      </ThemedView>
+      <AppLayout title="Documents">{content}</AppLayout>
     </ReadOrListPermissionGuard>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    paddingTop: 50,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  headerTitle: {
-    flex: 1,
-  },
   scrollView: {
     flex: 1,
     padding: 16,
   },
-  filtersCard: {
+  viewTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    opacity: 0.8,
+  },
+  card: {
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
-  filtersTitle: {
+  cardTitle: {
     marginBottom: 12,
   },
-  uploadSection: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionTitle: {
-    marginBottom: 16,
-  },
-  documentTypesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  documentTypeButton: {
+  docCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    minWidth: '48%',
     marginBottom: 8,
   },
-  documentTypeText: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 8,
-    flex: 1,
-  },
-  documentsCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  documentsTitle: {
-    marginBottom: 16,
-  },
-  documentsList: {
-    paddingBottom: 16,
-  },
-  documentCard: {
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  documentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  documentIcon: {
+  docIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  documentInfo: {
+  docInfo: {
     flex: 1,
   },
-  documentType: {
-    fontSize: 16,
+  docType: {
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: 2,
   },
-  uploadDate: {
-    fontSize: 12,
-    opacity: 0.7,
+  docDate: {
+    fontSize: 11,
+    opacity: 0.55,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  docAction: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
-  statusText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  documentActions: {
+  docTypesGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
-  actionButton: {
-    flex: 1,
+  typeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-    borderRadius: 6,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0,0,0,0.1)',
+    minWidth: '47%',
+    marginBottom: 2,
   },
-  actionButtonText: {
-    color: 'white',
+  typeText: {
     fontSize: 12,
     fontWeight: '500',
-    marginLeft: 4,
+    flex: 1,
   },
   emptyState: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
+    paddingVertical: 28,
   },
   emptyText: {
     marginTop: 8,
+    opacity: 0.6,
+    fontSize: 13,
     textAlign: 'center',
-    opacity: 0.7,
   },
-  emptySubtext: {
-    marginTop: 4,
-    textAlign: 'center',
-    fontSize: 12,
-    opacity: 0.5,
-  },
-  accessDeniedContainer: {
+  accessDenied: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   accessDeniedText: {
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
-    marginTop: 16,
-    marginBottom: 20,
-    opacity: 0.7,
-  },
-  backButtonText: {
-    color: '#3B82F6',
-    fontSize: 16,
-    fontWeight: '600',
+    marginTop: 14,
+    opacity: 0.65,
   },
 });

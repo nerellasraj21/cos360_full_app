@@ -1,22 +1,33 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
-import { ThemedText, ThemedView } from '../components';
-import { Radius } from '../constants/theme';
-import { useAuth, useTheme } from '../contexts';
+import { useAuth } from '../contexts';
+import apiClient from '../src/api/client';
 import { getClientSchema, setClientSchema } from '../services/authUtils';
 
-// Form validation
+const BRAND_COLOR = '#556ee6';
+const ACCENT_COLOR = '#556ee6';
+
+interface AcademicYear {
+  id: string;
+  title: string;
+  is_active: boolean;
+}
+
 interface FormData {
   username: string;
   password: string;
@@ -32,7 +43,6 @@ interface FormErrors {
 const LoginScreen: React.FC = () => {
   const router = useRouter();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
-  const { colors, componentStyles } = useTheme();
 
   const [clientSchema, setClientSchemaState] = useState<string>('');
   const [showClientSelection, setShowClientSelection] = useState<boolean>(true);
@@ -47,7 +57,12 @@ const LoginScreen: React.FC = () => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [showPassword, setShowPassword] = useState(false);
 
-  // Check if client schema is stored
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string>('');
+  const [academicYearLoading, setAcademicYearLoading] = useState(false);
+  const [academicYearError, setAcademicYearError] = useState<string>('');
+  const [showAcademicYearPicker, setShowAcademicYearPicker] = useState(false);
+
   useEffect(() => {
     const checkClientSchema = async () => {
       try {
@@ -60,8 +75,8 @@ const LoginScreen: React.FC = () => {
         } else {
           setShowClientSelection(true);
         }
-      } catch (error) {
-        console.error('Error checking client schema:', error);
+      } catch (err) {
+        console.error('Error checking client schema:', err);
         setShowClientSelection(true);
       } finally {
         setClientSchemaLoading(false);
@@ -70,189 +85,164 @@ const LoginScreen: React.FC = () => {
     checkClientSchema();
   }, []);
 
-  // Redirect to dashboard after successful login
   useEffect(() => {
     if (isAuthenticated) {
       router.replace('/(tabs)');
     }
   }, [isAuthenticated, router]);
 
-  // Clear errors when form data changes
   useEffect(() => {
     if (error) {
       clearError();
     }
   }, [formData, clearError]);
 
-  // Form validation
+  const fetchAcademicYears = async (showErrors = false) => {
+    setAcademicYearLoading(true);
+    setAcademicYearError('');
+    try {
+      const response = await apiClient.get('/auth/academic-years');
+      const raw = response.data;
+      // Handle both plain array and paginated { items: [...] } / { results: [...] }
+      const years: AcademicYear[] = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.items)
+        ? raw.items
+        : Array.isArray(raw?.results)
+        ? raw.results
+        : [];
+      setAcademicYears(years);
+      const activeYear = years.find((y: AcademicYear) => y.is_active) || years[0];
+      if (activeYear) setSelectedAcademicYearId(activeYear.id);
+      if (years.length === 0 && showErrors) setAcademicYearError('No academic years found for this organization.');
+    } catch (err: any) {
+      console.error('Failed to fetch academic years:', err);
+      if (showErrors) {
+        const detail = err?.response?.data?.detail || err?.response?.statusText || err?.message || 'Unknown error';
+        const status = err?.response?.status ? ` (${err.response.status})` : '';
+        setAcademicYearError(`Could not load academic years${status}: ${detail}`);
+      }
+      // Silently ignore errors on initial load — user can still login without selecting a year
+    } finally {
+      setAcademicYearLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showClientSelection) {
+      fetchAcademicYears();
+    }
+  }, [showClientSelection]);
+
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
-
-    if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
-    }
-
-    if (!formData.password.trim()) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-
-    if (!formData.clientName.trim()) {
-      newErrors.clientName = 'Client name is required';
-    }
-
+    if (!formData.username.trim()) newErrors.username = 'Username is required';
+    if (!formData.password.trim()) newErrors.password = 'Password is required';
+    else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    if (!formData.clientName.trim()) newErrors.clientName = 'Organization name is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle input changes
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear field error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
-    }
+    if (errors[field]) setErrors(prev => ({ ...prev, [field]: undefined }));
   };
 
-  // Handle client schema selection
   const handleClientSchemaSubmit = async () => {
-    if (!clientSchema.trim() || isLoading) {
-      return;
-    }
-
+    if (!clientSchema.trim() || isLoading) return;
     try {
       await setClientSchema(clientSchema);
       setFormData(prev => ({ ...prev, clientName: clientSchema }));
       setShowClientSelection(false);
-    } catch (error) {
-      console.error('Error saving client schema:', error);
+    } catch (err) {
+      console.error('Error saving client schema:', err);
     }
   };
 
-  // Handle login
   const handleLogin = async () => {
-    if (!validateForm()) {
-      return;
-    }
-
+    if (!validateForm()) return;
     try {
-      await login(formData.username, formData.password, formData.clientName);
-      // Navigation will be handled by the useEffect above
-    } catch (error) {
-      // Error is handled by AuthContext
-      console.error('Login failed:', error);
+      await login(formData.username, formData.password, formData.clientName, selectedAcademicYearId);
+    } catch (err) {
+      console.error('Login failed:', err);
     }
   };
-
 
   if (showClientSelection) {
     if (clientSchemaLoading) {
       return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ marginTop: 16, color: colors.foreground }}>Loading...</Text>
+        <View style={styles.loadingContainer}>
+          <StatusBar barStyle="light-content" backgroundColor={BRAND_COLOR} />
+          <View style={styles.loadingLogo}>
+            <Text style={styles.loadingLogoText}>COS</Text>
+            <Text style={styles.loadingLogo360}>360</Text>
+          </View>
+          <ActivityIndicator size="large" color="white" style={{ marginTop: 32 }} />
+          <Text style={styles.loadingText}>Initializing...</Text>
         </View>
       );
     }
 
     return (
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: colors.background }}
+        style={styles.screen}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        <StatusBar barStyle="light-content" backgroundColor={BRAND_COLOR} />
         <ScrollView
-          contentContainerStyle={{
-            flexGrow: 1,
-            justifyContent: 'center',
-            padding: 20,
-          }}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <ThemedView style={{ alignItems: 'center', marginBottom: 40 }}>
-            {/* App Logo/Title */}
-            <ThemedView
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: 40,
-                backgroundColor: colors.primary,
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: 20,
-              }}
-            >
-              <ThemedText style={{ fontSize: 32, color: colors['primary-foreground'] }}>
-                COS360
-              </ThemedText>
-            </ThemedView>
+          {/* Brand Header */}
+          <View style={styles.brandSection}>
+            <View style={styles.brandDecorCircle1} />
+            <View style={styles.brandDecorCircle2} />
+            <View style={styles.logoCircle}>
+              <Text style={styles.logoInitials}>COS</Text>
+              <Text style={styles.logo360}>360</Text>
+            </View>
+            <Text style={styles.appName}>COS360</Text>
+            <Text style={styles.appTagline}>School Management System</Text>
+          </View>
 
-            <ThemedText
-              style={{
-                fontSize: 24,
-                fontWeight: 'bold',
-                marginBottom: 8,
-              }}
-            >
-              Select Client
-            </ThemedText>
+          {/* Form Card */}
+          <View style={styles.formCard}>
+            <View style={styles.formCardHandle} />
+            <Text style={styles.cardTitle}>Select Organization</Text>
+            <Text style={styles.cardSubtitle}>Enter your organization code to get started</Text>
 
-            <ThemedText
-              style={{
-                fontSize: 16,
-                textAlign: 'center',
-              }}
-            >
-              Enter your client schema to continue
-            </ThemedText>
-          </ThemedView>
-
-          {/* Client Schema Input */}
-          <View style={{ marginBottom: 20 }}>
-            <View style={{ marginBottom: 24 }}>
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontWeight: '600',
-                  color: colors.foreground,
-                  marginBottom: 8,
-                }}
-              >
-                Client Schema
-              </Text>
-              <TextInput
-                style={{
-                  ...styles.textInput,
-                  borderColor: colors.border,
-                  backgroundColor: colors.input,
-                  color: colors.foreground,
-                }}
-                placeholder="Enter client schema"
-                placeholderTextColor={colors['muted-foreground']}
-                value={clientSchema}
-                onChangeText={setClientSchemaState}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Organization Code</Text>
+              <View style={[styles.inputContainer, clientSchema ? { borderColor: ACCENT_COLOR } : {}]}>
+                <Ionicons name="business-outline" size={20} color={clientSchema ? ACCENT_COLOR : '#9ca3af'} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. school_name"
+                  placeholderTextColor="#9ca3af"
+                  value={clientSchema}
+                  onChangeText={setClientSchemaState}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onSubmitEditing={handleClientSchemaSubmit}
+                  returnKeyType="done"
+                />
+              </View>
             </View>
 
-            {/* Continue Button */}
             <TouchableOpacity
-              style={{
-                ...styles.button,
-                backgroundColor: clientSchema.trim() ? colors.primary : colors.muted,
-              }}
+              style={[styles.primaryButton, { opacity: clientSchema.trim() ? 1 : 0.5 }]}
               onPress={handleClientSchemaSubmit}
               disabled={!clientSchema.trim() || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator color={colors['primary-foreground']} />
+                <ActivityIndicator color="white" />
               ) : (
-                <Text style={{
-                  color: colors['primary-foreground'],
-                  fontSize: 14,
-                  fontWeight: '600' as const,
-                }}>Continue</Text>
+                <>
+                  <Text style={styles.primaryButtonText}>Continue</Text>
+                  <Ionicons name="arrow-forward" size={18} color="white" />
+                </>
               )}
             </TouchableOpacity>
           </View>
@@ -263,240 +253,235 @@ const LoginScreen: React.FC = () => {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: colors.background }}
+      style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <StatusBar barStyle="light-content" backgroundColor={BRAND_COLOR} />
       <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: 'center',
-          padding: 20,
-        }}
+        contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ThemedView style={{ alignItems: 'center', marginBottom: 40 }}>
-          {/* App Logo/Title */}
-          <ThemedView
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: 40,
-              backgroundColor: colors.primary,
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginBottom: 20,
-            }}
-          >
-            <ThemedText style={{ fontSize: 32, color: colors['primary-foreground'] }}>
-              COS360
-            </ThemedText>
-          </ThemedView>
+        {/* Brand Header */}
+        <View style={styles.brandSection}>
+          <View style={styles.brandDecorCircle1} />
+          <View style={styles.brandDecorCircle2} />
+          <View style={styles.logoCircle}>
+            <Text style={styles.logoInitials}>COS</Text>
+            <Text style={styles.logo360}>360</Text>
+          </View>
+          <Text style={styles.appName}>COS360</Text>
+          <Text style={styles.appTagline}>School Management System</Text>
+        </View>
 
-          <ThemedText
-            style={{
-              fontSize: 24,
-              fontWeight: 'bold',
-              marginBottom: 8,
-            }}
-          >
-            Welcome Back
-          </ThemedText>
+        {/* Form Card */}
+        <View style={styles.formCard}>
+          <View style={styles.formCardHandle} />
+          <Text style={styles.cardTitle}>Welcome Back!</Text>
+          <Text style={styles.cardSubtitle}>Sign in to your account to continue</Text>
 
-          <ThemedText
-            style={{
-              fontSize: 16,
-              textAlign: 'center',
-            }}
-          >
-            Sign in to your account to continue
-          </ThemedText>
-        </ThemedView>
-
-        {/* Login Form */}
-        <View style={{ marginBottom: 20 }}>
-          {/* Username Input */}
-          <View style={{ marginBottom: 16 }}>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: '600',
-                color: colors.foreground,
-                marginBottom: 8,
-              }}
-            >
-              Username
-            </Text>
-            <TextInput
-              style={{
-                ...styles.textInput,
-                borderColor: errors.username ? colors.destructive : colors.border,
-                backgroundColor: colors.input,
-                color: colors.foreground,
-              }}
-              placeholder="Enter your username"
-              placeholderTextColor={colors['muted-foreground']}
-              value={formData.username}
-              onChangeText={(value) => handleInputChange('username', value)}
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!isLoading}
-            />
+          {/* Username */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Username</Text>
+            <View style={[styles.inputContainer, errors.username ? styles.inputError : formData.username ? styles.inputFocused : {}]}>
+              <Ionicons name="person-outline" size={20} color={errors.username ? '#ef4444' : formData.username ? ACCENT_COLOR : '#9ca3af'} style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Enter your username"
+                placeholderTextColor="#9ca3af"
+                value={formData.username}
+                onChangeText={(v) => handleInputChange('username', v)}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!isLoading}
+              />
+            </View>
             {errors.username && (
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: colors.destructive,
-                  marginTop: 4,
-                }}
-              >
-                {errors.username}
-              </Text>
+              <View style={styles.fieldErrorRow}>
+                <Ionicons name="alert-circle" size={12} color="#ef4444" />
+                <Text style={styles.fieldErrorText}>{errors.username}</Text>
+              </View>
             )}
           </View>
 
-          {/* Password Input */}
-          <View style={{ marginBottom: 16 }}>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: '600',
-                color: colors.foreground,
-                marginBottom: 8,
-              }}
-            >
-              Password
-            </Text>
-            <View style={{ position: 'relative' }}>
+          {/* Password */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Password</Text>
+            <View style={[styles.inputContainer, errors.password ? styles.inputError : formData.password ? styles.inputFocused : {}]}>
+              <Ionicons name="lock-closed-outline" size={20} color={errors.password ? '#ef4444' : formData.password ? ACCENT_COLOR : '#9ca3af'} style={styles.inputIcon} />
               <TextInput
-                style={{
-                  ...styles.textInput,
-                  borderColor: errors.password ? colors.destructive : colors.border,
-                  backgroundColor: colors.input,
-                  color: colors.foreground,
-                  paddingRight: 50,
-                }}
+                style={[styles.textInput, { flex: 1 }]}
                 placeholder="Enter your password"
-                placeholderTextColor={colors['muted-foreground']}
+                placeholderTextColor="#9ca3af"
                 value={formData.password}
-                onChangeText={(value) => handleInputChange('password', value)}
+                onChangeText={(v) => handleInputChange('password', v)}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!isLoading}
               />
-              <TouchableOpacity
-                style={{
-                  position: 'absolute',
-                  right: 12,
-                  top: '50%',
-                  transform: [{ translateY: -10 }],
-                }}
-                onPress={() => setShowPassword(!showPassword)}
-                disabled={isLoading}
-              >
-                <Text style={{ color: colors.primary, fontSize: 14 }}>
-                  {showPassword ? 'Hide' : 'Show'}
-                </Text>
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton} disabled={isLoading}>
+                <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#9ca3af" />
               </TouchableOpacity>
             </View>
             {errors.password && (
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: colors.destructive,
-                  marginTop: 4,
-                }}
-              >
-                {errors.password}
-              </Text>
+              <View style={styles.fieldErrorRow}>
+                <Ionicons name="alert-circle" size={12} color="#ef4444" />
+                <Text style={styles.fieldErrorText}>{errors.password}</Text>
+              </View>
             )}
           </View>
 
-          {/* Client Name Input */}
-          <View style={{ marginBottom: 24 }}>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: '600',
-                color: colors.foreground,
-                marginBottom: 8,
-              }}
+          {/* Academic Year */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Academic Year</Text>
+            <TouchableOpacity
+              style={[styles.inputContainer, selectedAcademicYearId ? styles.inputFocused : {}]}
+              onPress={() => setShowAcademicYearPicker(true)}
+              disabled={isLoading || academicYearLoading}
             >
-              Client Name
-            </Text>
-            <TextInput
-              style={{
-                ...styles.textInput,
-                borderColor: errors.clientName ? colors.destructive : colors.border,
-                backgroundColor: colors.input,
-                color: colors.foreground,
-              }}
-              placeholder="Enter client name"
-              placeholderTextColor={colors['muted-foreground']}
-              value={formData.clientName}
-              onChangeText={(value) => handleInputChange('clientName', value)}
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!isLoading}
-            />
+              <Ionicons name="calendar-outline" size={20} color={selectedAcademicYearId ? ACCENT_COLOR : '#9ca3af'} style={styles.inputIcon} />
+              {academicYearLoading ? (
+                <ActivityIndicator size="small" color={ACCENT_COLOR} style={{ flex: 1 }} />
+              ) : (
+                <Text style={[styles.textInput, { color: selectedAcademicYearId ? '#111827' : '#9ca3af' }]}>
+                  {academicYears.find(y => y.id === selectedAcademicYearId)?.title || 'Select academic year'}
+                </Text>
+              )}
+              <Ionicons name="chevron-down" size={18} color="#9ca3af" style={{ marginRight: 12 }} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Client Name */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Organization Name</Text>
+            <View style={[styles.inputContainer, errors.clientName ? styles.inputError : formData.clientName ? styles.inputFocused : {}]}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={errors.clientName ? '#ef4444' : formData.clientName ? ACCENT_COLOR : '#9ca3af'} style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Organization name"
+                placeholderTextColor="#9ca3af"
+                value={formData.clientName}
+                onChangeText={(v) => handleInputChange('clientName', v)}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!isLoading}
+              />
+            </View>
             {errors.clientName && (
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: colors.destructive,
-                  marginTop: 4,
-                }}
-              >
-                {errors.clientName}
-              </Text>
+              <View style={styles.fieldErrorRow}>
+                <Ionicons name="alert-circle" size={12} color="#ef4444" />
+                <Text style={styles.fieldErrorText}>{errors.clientName}</Text>
+              </View>
             )}
           </View>
 
-          {/* Error Message */}
+          {/* Error Banner */}
           {error && (
-            <View
-              style={{
-                backgroundColor: colors.destructive,
-                padding: 12,
-                borderRadius: Radius.default,
-                marginBottom: 16,
-              }}
-            >
-              <Text
-                style={{
-                  color: 'white',
-                  fontSize: 14,
-                  textAlign: 'center',
-                }}
-              >
-                {error}
-              </Text>
+            <View style={styles.errorBanner}>
+              <Ionicons name="warning" size={18} color="white" />
+              <Text style={styles.errorBannerText}>{error}</Text>
             </View>
           )}
 
-          {/* Login Button */}
+          {/* Sign In Button */}
           <TouchableOpacity
-            style={{
-              ...styles.button,
-              backgroundColor: isLoading ? colors.muted : colors.primary,
-              marginBottom: 16,
-            }}
+            style={[styles.primaryButton, { opacity: isLoading ? 0.75 : 1, marginTop: 8 }]}
             onPress={handleLogin}
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color={colors['primary-foreground']} />
+              <ActivityIndicator color="white" />
             ) : (
-              <Text style={{
-                color: colors['primary-foreground'],
-                fontSize: 14,
-                fontWeight: '600' as const,
-              }}>Sign In</Text>
+              <>
+                <Text style={styles.primaryButtonText}>Sign In</Text>
+                <Ionicons name="arrow-forward" size={18} color="white" />
+              </>
             )}
           </TouchableOpacity>
 
+          {/* Change Org Link */}
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => setShowClientSelection(true)}
+          >
+            <Ionicons name="swap-horizontal-outline" size={15} color={ACCENT_COLOR} />
+            <Text style={styles.linkButtonText}>Change Organization</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Academic Year Modal */}
+      <Modal visible={showAcademicYearPicker} transparent animationType="slide">
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          onPress={() => setShowAcademicYearPicker(false)}
+          activeOpacity={1}
+        >
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Select Academic Year</Text>
+
+            {academicYearLoading ? (
+              <View style={styles.modalCenter}>
+                <ActivityIndicator size="large" color={ACCENT_COLOR} />
+                <Text style={styles.modalCenterText}>Loading academic years...</Text>
+              </View>
+            ) : academicYearError ? (
+              <View style={styles.modalCenter}>
+                <Ionicons name="alert-circle-outline" size={40} color="#ef4444" />
+                <Text style={[styles.modalCenterText, { color: '#ef4444', marginTop: 8 }]}>{academicYearError}</Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                  <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={() => { fetchAcademicYears(true); }}
+                  >
+                    <Ionicons name="refresh" size={16} color="white" />
+                    <Text style={styles.retryButtonText}>Retry</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.retryButton, { backgroundColor: '#6b7280' }]}
+                    onPress={() => setShowAcademicYearPicker(false)}
+                  >
+                    <Text style={styles.retryButtonText}>Skip</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <FlatList
+                data={academicYears}
+                keyExtractor={item => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[styles.modalItem, selectedAcademicYearId === item.id && styles.modalItemActive]}
+                    onPress={() => { setSelectedAcademicYearId(item.id); setShowAcademicYearPicker(false); }}
+                  >
+                    <View style={styles.modalItemLeft}>
+                      <Text style={[styles.modalItemText, selectedAcademicYearId === item.id && styles.modalItemTextActive]}>
+                        {item.title}
+                      </Text>
+                      {item.is_active && (
+                        <View style={styles.activeBadge}>
+                          <Text style={styles.activeBadgeText}>Current</Text>
+                        </View>
+                      )}
+                    </View>
+                    {selectedAcademicYearId === item.id && (
+                      <Ionicons name="checkmark-circle" size={22} color={ACCENT_COLOR} />
+                    )}
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  <View style={styles.modalCenter}>
+                    <Ionicons name="calendar-outline" size={40} color="#9ca3af" />
+                    <Text style={styles.modalCenterText}>No academic years available</Text>
+                  </View>
+                }
+              />
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -504,18 +489,328 @@ const LoginScreen: React.FC = () => {
 export default LoginScreen;
 
 const styles = StyleSheet.create({
-  textInput: {
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 16,
+  screen: {
+    flex: 1,
+    backgroundColor: BRAND_COLOR,
   },
-  button: {
-    height: 50,
-    borderRadius: 8,
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: BRAND_COLOR,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingLogo: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingLogoText: {
+    color: 'white',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 2,
+    lineHeight: 26,
+  },
+  loadingLogo360: {
+    color: '#60a5fa',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 1,
+    lineHeight: 20,
+  },
+  loadingText: {
+    marginTop: 16,
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 15,
+    letterSpacing: 0.5,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  brandSection: {
+    alignItems: 'center',
+    paddingTop: Platform.OS === 'ios' ? 64 : 52,
+    paddingBottom: 52,
+    overflow: 'hidden',
+  },
+  brandDecorCircle1: {
+    position: 'absolute',
+    top: -60,
+    right: -60,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  brandDecorCircle2: {
+    position: 'absolute',
+    bottom: 20,
+    left: -40,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  logoCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  logoInitials: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 2,
+    lineHeight: 24,
+  },
+  logo360: {
+    color: '#93c5fd',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 1,
+    lineHeight: 19,
+  },
+  appName: {
+    color: 'white',
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: 3,
+    marginBottom: 6,
+  },
+  appTagline: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
+  formCard: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 48,
+  },
+  formCardHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 24,
+  },
+  cardTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 28,
+    lineHeight: 20,
+  },
+  inputGroup: {
+    marginBottom: 18,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    borderRadius: 14,
+    backgroundColor: '#f9fafb',
+    height: 54,
+  },
+  inputFocused: {
+    borderColor: ACCENT_COLOR,
+    backgroundColor: '#eff6ff',
+  },
+  inputError: {
+    borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+  },
+  inputIcon: {
+    marginHorizontal: 14,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#111827',
+    paddingVertical: 0,
+  },
+  eyeButton: {
+    padding: 12,
+    marginRight: 2,
+  },
+  fieldErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 5,
+    marginLeft: 2,
+  },
+  fieldErrorText: {
+    fontSize: 12,
+    color: '#ef4444',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ef4444',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 16,
+    gap: 10,
+  },
+  errorBannerText: {
+    color: 'white',
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
+  },
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: BRAND_COLOR,
+    borderRadius: 16,
+    height: 56,
+    gap: 10,
+    shadowColor: BRAND_COLOR,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  primaryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  linkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 6,
+  },
+  linkButtonText: {
+    color: ACCENT_COLOR,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: 420,
+    paddingBottom: 32,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  modalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f9fafb',
+  },
+  modalItemActive: {
+    backgroundColor: '#eff6ff',
+  },
+  modalItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  modalItemText: {
+    fontSize: 15,
+    color: '#374151',
+  },
+  modalItemTextActive: {
+    color: ACCENT_COLOR,
+    fontWeight: '600',
+  },
+  activeBadge: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  activeBadgeText: {
+    color: '#16a34a',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  modalCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+  },
+  modalCenterText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: ACCENT_COLOR,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

@@ -115,7 +115,7 @@ export function useDeleteCertificateType() {
 // Download certificate
 export function useDownloadCertificateDocument() {
   return useMutation({
-    mutationFn: async (certificateId: string): Promise<Blob> => {
+    mutationFn: async (certificateId: string) => {
       return await studentCertificatesApi.downloadCertificate(certificateId);
     },
   });

@@ -202,7 +202,7 @@ export const useUpdateStaffProfile = (options?: any) => {
 
 // Bulk Operations Hooks
 export const useBulkUpdateStaffAttendance = (options?: any) => {
-  return usePermissionProtectedMutation({
+  return usePermissionProtectedMutation<StaffAttendance[], Error, Record<string, StaffAttendanceInput>>({
     resource: PERMISSION_RESOURCES.STAFF_ATTENDANCE,
     action: 'update',
     mutationFn: async (updates: Record<string, StaffAttendanceInput>) => {

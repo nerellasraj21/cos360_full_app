@@ -15,9 +15,6 @@ export * from './use-permission-cache';
 export * from './use-permission-performance-monitor';
 export * from './use-permission-protected-api';
 
-// Fee permission hooks
-export * from './use-fee-permissions';
-
 // Screen permission hooks
 export * from '../src/hooks/useScreenPermissions';
 

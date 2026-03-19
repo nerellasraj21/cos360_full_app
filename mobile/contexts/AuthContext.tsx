@@ -52,7 +52,7 @@ type AuthAction =
 
 // Auth context interface
 interface AuthContextType extends AuthState {
-  login: (username: string, password: string, clientName?: string) => Promise<void>;
+  login: (username: string, password: string, clientName?: string, academicYearId?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   clearError: () => void;
@@ -263,6 +263,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             user: null,
             role: null,
             permissions: [],
+            menu: [],
             isAuthenticated: false
           }
         });
@@ -273,13 +274,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   // Login function
-  const login = async (username: string, password: string, clientName?: string): Promise<void> => {
+  const login = async (username: string, password: string, clientName?: string, academicYearId?: string): Promise<void> => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
       console.log('Attempting login for user:', username);
-      const response = await loginUser(username, password, clientName);
+      const response = await loginUser(username, password, clientName, academicYearId);
 
       // Fetch parent students BEFORE setting authenticated (to prevent navigation)
       const roleName = response.role?.name?.toLowerCase();
@@ -336,12 +337,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Logout function
   const logout = async (): Promise<void> => {
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
       await logoutUser();
-      dispatch({ type: 'LOGOUT' });
     } catch (error) {
       console.error('Logout error:', error);
-      // Still logout locally even if API call fails
+    } finally {
       dispatch({ type: 'LOGOUT' });
     }
   };

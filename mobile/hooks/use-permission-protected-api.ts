@@ -1,4 +1,4 @@
-import { useQuery, useMutation, UseQueryOptions, UseMutationOptions, QueryKey } from '@tanstack/react-query';
+import { useQuery, useMutation, UseQueryOptions, UseMutationOptions, QueryKey, UseMutateFunction } from '@tanstack/react-query';
 import { useOptimizedMobilePermissions } from './use-optimized-mobile-permissions';
 import { 
   PermissionResource, 
@@ -35,9 +35,10 @@ export interface UsePermissionProtectedMutationOptions<TData = unknown, TError =
 }
 
 export interface UsePermissionProtectedMutationResult<TData = unknown, TError = Error, TVariables = void> {
-  mutate: (variables: TVariables) => void;
+  mutate: UseMutateFunction<TData, TError, TVariables, unknown>;
   mutateAsync: (variables: TVariables) => Promise<TData>;
   isLoading: boolean;
+  isPending: boolean;
   isError: boolean;
   error: TError | null;
   hasPermission: boolean;
@@ -168,6 +169,7 @@ export const usePermissionProtectedMutation = <TData = unknown, TError = Error, 
     mutate: mutation.mutate,
     mutateAsync: mutation.mutateAsync,
     isLoading: mutation.isPending,
+    isPending: mutation.isPending,
     isError: mutation.isError,
     error: mutation.error,
     hasPermission: userHasPermission,
