@@ -183,9 +183,14 @@ export const getIconForMenuItem = (name: string) => {
         "Fee Term Amounts": IndianRupee,
 
         // ── Expense submodules ─────────────────────────────────────────────────
+        Overview: LayoutDashboard,
         Categories: Tag,
+        Types: Tags,
         Departments: Building2,
         Approvals: CheckCircle2,
+        "Pending Approvals": CheckCircle2,
+        Summary: LayoutList,
+        "Audit Trail": History,
         Settings: Settings2,
         "Expense Settings": Settings2,
         "Audit Log": History,

@@ -1,4 +1,52 @@
 
+// ============================================================================
+// HIERARCHICAL SUMMARY TYPES
+// ============================================================================
+
+export interface ExpenseEntryRead {
+  id: string;
+  amount: number;
+  description: string;
+  transaction_date: string;
+  payment_method: string;
+  vendor_name?: string;
+  status: string;
+  reference_number?: string;
+}
+
+export interface ExpenseTypeSummaryItem {
+  type_id: string;
+  type_name: string;
+  type_description?: string;
+  entries: ExpenseEntryRead[];
+  type_total: number;
+  entry_count: number;
+}
+
+export interface ExpenseCategorySummaryItem {
+  category_id: string;
+  category_name: string;
+  category_description?: string;
+  types: ExpenseTypeSummaryItem[];
+  category_total: number;
+  entry_count: number;
+}
+
+export interface ExpenseHierarchicalSummary {
+  categories: ExpenseCategorySummaryItem[];
+  grand_total: number;
+  total_entries: number;
+  academic_year_id?: string;
+  academic_year_title?: string;
+  start_date?: string;
+  end_date?: string;
+  generated_at: string;
+}
+
+// ============================================================================
+// CORE ENTITY TYPES
+// ============================================================================
+
 export interface ExpenseCategory {
   id: string;
   name: string;
@@ -64,6 +112,7 @@ export interface ExpenseTransaction {
   payment_method: 'cash' | 'cheque' | 'bank_transfer' | 'upi';
   vendor_name?: string;
   department_id?: string;
+  academic_year_id?: string;
   org_id: string;
   idempotency_key: string;
   status: string;

@@ -480,3 +480,6 @@ export const {
   attachments,
   reporting,
 } = expenseApi;
+
+export { expenseSummaryApi } from './summary';
+export type { ExpenseSummaryParams } from './summary';

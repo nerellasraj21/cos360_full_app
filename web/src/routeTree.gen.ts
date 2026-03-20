@@ -88,6 +88,7 @@ import { Route as AppFeeCollectionRouteImport } from './routes/_app/fee/collecti
 import { Route as AppFeeCategoriesRouteImport } from './routes/_app/fee/categories'
 import { Route as AppExpenseTypesRouteImport } from './routes/_app/expense/types'
 import { Route as AppExpenseTransactionsRouteImport } from './routes/_app/expense/transactions'
+import { Route as AppExpenseSummaryRouteImport } from './routes/_app/expense/summary'
 import { Route as AppExpenseSettingsRouteImport } from './routes/_app/expense/settings'
 import { Route as AppExpenseReportsRouteImport } from './routes/_app/expense/reports'
 import { Route as AppExpenseDepartmentsRouteImport } from './routes/_app/expense/departments'
@@ -539,6 +540,11 @@ const AppExpenseTransactionsRoute = AppExpenseTransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => AppExpenseRoute,
 } as any)
+const AppExpenseSummaryRoute = AppExpenseSummaryRouteImport.update({
+  id: '/summary',
+  path: '/summary',
+  getParentRoute: () => AppExpenseRoute,
+} as any)
 const AppExpenseSettingsRoute = AppExpenseSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -807,6 +813,7 @@ export interface FileRoutesByFullPath {
   '/expense/departments': typeof AppExpenseDepartmentsRoute
   '/expense/reports': typeof AppExpenseReportsRoute
   '/expense/settings': typeof AppExpenseSettingsRoute
+  '/expense/summary': typeof AppExpenseSummaryRoute
   '/expense/transactions': typeof AppExpenseTransactionsRoute
   '/expense/types': typeof AppExpenseTypesRoute
   '/fee/categories': typeof AppFeeCategoriesRoute
@@ -920,6 +927,7 @@ export interface FileRoutesByTo {
   '/expense/departments': typeof AppExpenseDepartmentsRoute
   '/expense/reports': typeof AppExpenseReportsRoute
   '/expense/settings': typeof AppExpenseSettingsRoute
+  '/expense/summary': typeof AppExpenseSummaryRoute
   '/expense/transactions': typeof AppExpenseTransactionsRoute
   '/expense/types': typeof AppExpenseTypesRoute
   '/fee/categories': typeof AppFeeCategoriesRoute
@@ -1045,6 +1053,7 @@ export interface FileRoutesById {
   '/_app/expense/departments': typeof AppExpenseDepartmentsRoute
   '/_app/expense/reports': typeof AppExpenseReportsRoute
   '/_app/expense/settings': typeof AppExpenseSettingsRoute
+  '/_app/expense/summary': typeof AppExpenseSummaryRoute
   '/_app/expense/transactions': typeof AppExpenseTransactionsRoute
   '/_app/expense/types': typeof AppExpenseTypesRoute
   '/_app/fee/categories': typeof AppFeeCategoriesRoute
@@ -1170,6 +1179,7 @@ export interface FileRouteTypes {
     | '/expense/departments'
     | '/expense/reports'
     | '/expense/settings'
+    | '/expense/summary'
     | '/expense/transactions'
     | '/expense/types'
     | '/fee/categories'
@@ -1283,6 +1293,7 @@ export interface FileRouteTypes {
     | '/expense/departments'
     | '/expense/reports'
     | '/expense/settings'
+    | '/expense/summary'
     | '/expense/transactions'
     | '/expense/types'
     | '/fee/categories'
@@ -1407,6 +1418,7 @@ export interface FileRouteTypes {
     | '/_app/expense/departments'
     | '/_app/expense/reports'
     | '/_app/expense/settings'
+    | '/_app/expense/summary'
     | '/_app/expense/transactions'
     | '/_app/expense/types'
     | '/_app/fee/categories'
@@ -2055,6 +2067,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppExpenseTransactionsRouteImport
       parentRoute: typeof AppExpenseRoute
     }
+    '/_app/expense/summary': {
+      id: '/_app/expense/summary'
+      path: '/summary'
+      fullPath: '/expense/summary'
+      preLoaderRoute: typeof AppExpenseSummaryRouteImport
+      parentRoute: typeof AppExpenseRoute
+    }
     '/_app/expense/settings': {
       id: '/_app/expense/settings'
       path: '/settings'
@@ -2574,6 +2593,7 @@ interface AppExpenseRouteChildren {
   AppExpenseDepartmentsRoute: typeof AppExpenseDepartmentsRoute
   AppExpenseReportsRoute: typeof AppExpenseReportsRoute
   AppExpenseSettingsRoute: typeof AppExpenseSettingsRoute
+  AppExpenseSummaryRoute: typeof AppExpenseSummaryRoute
   AppExpenseTransactionsRoute: typeof AppExpenseTransactionsRoute
   AppExpenseTypesRoute: typeof AppExpenseTypesRoute
   AppExpenseIndexRoute: typeof AppExpenseIndexRoute
@@ -2586,6 +2606,7 @@ const AppExpenseRouteChildren: AppExpenseRouteChildren = {
   AppExpenseDepartmentsRoute: AppExpenseDepartmentsRoute,
   AppExpenseReportsRoute: AppExpenseReportsRoute,
   AppExpenseSettingsRoute: AppExpenseSettingsRoute,
+  AppExpenseSummaryRoute: AppExpenseSummaryRoute,
   AppExpenseTransactionsRoute: AppExpenseTransactionsRoute,
   AppExpenseTypesRoute: AppExpenseTypesRoute,
   AppExpenseIndexRoute: AppExpenseIndexRoute,

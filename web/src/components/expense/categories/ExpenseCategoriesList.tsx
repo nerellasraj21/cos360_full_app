@@ -23,6 +23,7 @@ export function ExpenseCategoriesList({ onCreateCategory }: ExpenseCategoriesLis
     const [selectedCategory, setSelectedCategory] = useState<ExpenseCategoryRead | null>(null);
     const [isCreateFormDirty, setIsCreateFormDirty] = useState(false);
     const [isEditFormDirty, setIsEditFormDirty] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortKey, setSortKey] = useState<string | null>(null);
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -79,6 +80,7 @@ export function ExpenseCategoriesList({ onCreateCategory }: ExpenseCategoriesLis
     const handleCreate = () => {
         resetForm();
         setIsCreateFormDirty(false);
+        setSubmitError(null);
         setShowCreateDialog(true);
     };
 
@@ -103,6 +105,7 @@ export function ExpenseCategoriesList({ onCreateCategory }: ExpenseCategoriesLis
             return;
         }
 
+        setSubmitError(null);
         try {
             if (selectedCategory) {
                 const updateData: ExpenseCategoryUpdateRequest = {
@@ -122,8 +125,9 @@ export function ExpenseCategoriesList({ onCreateCategory }: ExpenseCategoriesLis
                 setShowCreateDialog(false);
             }
             resetForm();
-        } catch (error) {
-            // Error handling is done in the mutation hooks
+        } catch (error: any) {
+            const msg = error?.response?.data?.detail || error?.message || 'Something went wrong. Please try again.';
+            setSubmitError(msg);
         }
     };
 
@@ -287,6 +291,9 @@ export function ExpenseCategoriesList({ onCreateCategory }: ExpenseCategoriesLis
                         </div>
                     </div>
 
+                    {submitError && (
+                        <p className="text-sm text-red-500 -mt-2">{submitError}</p>
+                    )}
                     <DialogFooter>
                         <DialogClose asChild>
                             <Button variant="outline">Cancel</Button>
@@ -347,6 +354,9 @@ export function ExpenseCategoriesList({ onCreateCategory }: ExpenseCategoriesLis
                         </div>
                     </div>
 
+                    {submitError && (
+                        <p className="text-sm text-red-500 -mt-2">{submitError}</p>
+                    )}
                     <DialogFooter>
                         <DialogClose asChild>
                             <Button variant="outline">Cancel</Button>

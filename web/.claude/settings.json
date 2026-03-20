@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(ls:*)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\nerel\\Documents\\Workspace\\React Workspace\\cos360_mobile\\cos360_mobile_app\\app\\transport",
+      "C:\\Users\\nerel\\Documents\\Workspace\\React Workspace\\cos360_mobile\\cos360_mobile_app\\src\\api",
+      "C:\\Users\\nerel\\Documents\\Workspace\\React Workspace\\cos360_mobile\\cos360_mobile_app\\src\\types",
+      "C:\\Users\\nerel\\Documents\\Workspace\\React Workspace\\cos360_mobile\\cos360_mobile_app\\components\\navigation",
+      "C:\\Users\\nerel\\Documents\\Workspace\\React Workspace\\cos360_mobile\\cos360_mobile_app\\app\\(tabs)"
     ]
   }
 }
