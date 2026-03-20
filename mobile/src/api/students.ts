@@ -71,8 +71,8 @@ export interface StudentAdmissionCreate {
     is_primary?: string;                          // "primary" | "non_primary" | "not_primary"
     aadhar_number?: string;
     apaar_number?: string;
-    caste?: string;
-    sub_caste?: string;
+    caste_id?: string;
+    sub_caste_id?: string;
     community?: string;
     nationality?: string;
     mother_tongue?: string;

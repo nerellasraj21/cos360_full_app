@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
-import { useTheme } from '@/contexts';
+import { useAuth, useTheme } from '@/contexts';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
@@ -17,16 +17,68 @@ const sections = [
   { title: 'Student Mappings', description: 'Assign fees to individual students',            icon: 'people' as const,          color: '#06B6D4', route: '/fees/student-mappings', resource: PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS, action: 'list' },
   { title: 'Transactions',     description: 'View and manage fee payment transactions',      icon: 'card' as const,            color: '#556ee6', route: '/fees/transactions',     resource: PERMISSION_RESOURCES.FEE_TRANSACTIONS,     action: 'list' },
   { title: 'Fee Refunds',      description: 'Process and track fee refunds',                 icon: 'refresh-circle' as const,  color: '#EF4444', route: '/fees/refunds',          resource: PERMISSION_RESOURCES.FEE_REFUNDS,          action: 'list' },
+  { title: 'Fee Collection',   description: 'Collect and record fee payments from students', icon: 'wallet' as const,          color: '#7C3AED', route: '/fees/collection',       resource: PERMISSION_RESOURCES.FEE_TRANSACTIONS,     action: 'list' },
+  { title: 'Fee Reports',      description: 'Collection summary, pending fees & structure',  icon: 'bar-chart' as const,       color: '#0891B2', route: '/fees/reports',          resource: PERMISSION_RESOURCES.FEE_TRANSACTIONS,     action: 'list' },
 ];
 
 export default function FeesScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { role } = useAuth();
   const { hasPermission } = useMobilePermission();
+
+  const roleName = role?.name?.toLowerCase() ?? '';
+  const isStudent = roleName === 'student';
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
+  // ── Student / Parent: show only fee summary ───────────────────────────────
+  if (isStudent || isParent) {
+    const title = isStudent ? 'My Fees' : 'Child Fees';
+    const desc  = isStudent ? 'View your fee summary and payment history' : 'View child fee summary and payment history';
+    return (
+      <AppLayout title={title}>
+        <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <View style={[styles.banner, { backgroundColor: GREEN }]}>
+            <View style={styles.bannerDecor} />
+            <View style={styles.bannerDecor2} />
+            <View style={styles.bannerIcon}>
+              <Ionicons name="cash" size={28} color="white" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.bannerTitle}>{title}</Text>
+              <Text style={styles.bannerSub}>{desc}</Text>
+            </View>
+          </View>
+
+          <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>FEE SUMMARY</Text>
+
+          <TouchableOpacity
+            style={[styles.fullCard, { backgroundColor: cardBg, borderColor: borderCol }]}
+            onPress={() => router.push('/fees/collection' as any)}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.sectionIconBox, { backgroundColor: GREEN + '18' }]}>
+              <Ionicons name="wallet" size={28} color={GREEN} />
+            </View>
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground, fontSize: 16 }]}>
+                {isStudent ? 'My Fee Summary' : 'Child Fee Summary'}
+              </Text>
+              <Text style={[styles.sectionDesc, { color: colors['muted-foreground'] }]}>
+                {isStudent ? 'View dues, payments, concessions & old fees' : 'View dues, payments, concessions & old fees'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors['muted-foreground']} />
+          </TouchableOpacity>
+        </ScrollView>
+      </AppLayout>
+    );
+  }
+
+  // ── Admin / Staff / Teacher: full fee management grid ─────────────────────
   return (
     <AppLayout title="Fee Management">
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -135,5 +187,11 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end', marginTop: 8,
     width: 22, height: 22, borderRadius: 11,
     justifyContent: 'center', alignItems: 'center',
+  },
+  fullCard: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 14, borderWidth: 1, padding: 18,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
 });

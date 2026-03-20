@@ -18,15 +18,16 @@ import type {
 
 // Staff Enrollment API functions
 export const staffApi = {
-  // List Staff Enrollments
+  // List Staff — GET /staff/?skip=0&limit=20&search={text}&designation_id={uuid}&is_active={bool}
   getStaffEnrollments: async (params?: {
     skip?: number;
     limit?: number;
+    search?: string;
+    designation_id?: string;
+    is_active?: boolean;
     gender?: string;
   }): Promise<{ items: Staff[]; total: number }> => {
-    const queryParams = params ? new URLSearchParams(params as any).toString() : '';
-    const response = await apiClient.get(`/staff/enrollments${queryParams ? '?' + queryParams : ''}`);
-    // Handle both direct array response and wrapped response
+    const response = await apiClient.get('/staff/', { params });
     const data = response.data;
     if (Array.isArray(data)) {
       return { items: data, total: data.length };
@@ -34,25 +35,25 @@ export const staffApi = {
     return data;
   },
 
-  // Get Staff Enrollment by ID
+  // Get Staff by ID — GET /staff/enrollment/{staff_id}
   getStaffEnrollmentById: async (id: string): Promise<Staff> => {
     const response = await apiClient.get(`/staff/enrollment/${id}`);
     return response.data;
   },
 
-  // Create Staff Enrollment
+  // Create Staff — POST /staff/enrollment
   createStaffEnrollment: async (data: StaffInput): Promise<Staff> => {
     const response = await apiClient.post('/staff/enrollment', data);
     return response.data;
   },
 
-  // Update Staff Enrollment
+  // Update Staff — PATCH /staff/enrollment/{id}
   updateStaffEnrollment: async (id: string, data: Partial<StaffInput>): Promise<Staff> => {
     const response = await apiClient.patch(`/staff/enrollment/${id}`, data);
     return response.data;
   },
 
-  // Delete Staff Enrollment
+  // Delete Staff — DELETE /staff/enrollment/{id}
   deleteStaffEnrollment: async (id: string): Promise<void> => {
     await apiClient.delete(`/staff/enrollment/${id}`);
   }
@@ -236,16 +237,16 @@ export const parentApi = {
 
 // Staff Designations API functions
 export const staffDesignationsApi = {
-  // Get all staff designations
+  // Get all staff designations — GET /staff/designations/
   getStaffDesignations: async (): Promise<StaffDesignation[]> => {
-    const response = await apiClient.get('/masters/staff-designations/');
+    const response = await apiClient.get('/staff/designations/');
     return response.data.items || response.data;
   },
 
-  // Get designation by ID
+  // Get designation by ID — GET /staff/designations/{id}
   getDesignationById: async (id: number): Promise<StaffDesignation | null> => {
     try {
-      const response = await apiClient.get(`/masters/staff-designations/${id}`);
+      const response = await apiClient.get(`/staff/designations/${id}`);
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 404) return null;
@@ -262,10 +263,10 @@ export const staffEnrollmentApi = {
     return response.data.items || response.data;
   },
 
-  // Get enrollment by staff ID
+  // Get enrollment by staff ID — GET /staff/enrollment/{staff_id}
   getEnrollmentByStaffId: async (staffId: string): Promise<StaffEnrollment | null> => {
     try {
-      const response = await apiClient.get(`/staff/enrollments/staff/${staffId}`);
+      const response = await apiClient.get(`/staff/enrollment/${staffId}`);
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 404) return null;

@@ -16,6 +16,8 @@ export const PERMISSION_RESOURCES = {
   FEE_REFUNDS: 'fee_refunds',
   FEE_CLASS_MAPPINGS: 'fee_class_mappings',
   FEE_STUDENT_MAPPINGS: 'fee_student_mappings',
+  FEE_COLLECTION: 'fee_collection',
+  FEE_REPORTS: 'fee_reports',
   
   // Staff module
   STAFF: 'staff',
@@ -27,6 +29,7 @@ export const PERMISSION_RESOURCES = {
   TRANSPORT_ROUTE_STOPS: 'transport_route_stops',
   TRANSPORT_VEHICLES: 'transport_vehicles',
   TRANSPORT_TRIPS: 'transport_trips',
+  TRANSPORT_PRICING: 'transport_pricing',
   
   // Masters module
   ACADEMIC_YEARS: 'academic_years',

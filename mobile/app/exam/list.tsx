@@ -5,6 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts';
 import { examsApi, ExamListItem, ExamStatus } from '@/src/api/exam';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
@@ -29,20 +30,30 @@ const STATUSES: { label: string; value: ExamStatus | '' }[] = [
 export default function ExamListScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { role } = useAuth();
   const { hasPermission } = useMobilePermission();
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
+
+  const roleName = role?.name?.toLowerCase() ?? '';
+  const isStudent = roleName === 'student';
+  const isParent = roleName === 'parent' || roleName === 'guardian';
+  const isStudentOrParent = isStudent || isParent;
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ExamStatus | ''>('');
 
   const canCreate = hasPermission?.('exams', 'create');
 
+  // Students/parents can see published/finalized exams without explicit permission
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['exams', statusFilter],
-    queryFn: () => examsApi.list({ exam_status: statusFilter || undefined, size: 50 }),
-    enabled: !!(hasPermission?.('exams', 'list')),
+    queryFn: () => examsApi.list({
+      exam_status: isStudentOrParent ? (statusFilter || 'published') : (statusFilter || undefined),
+      size: 50,
+    }),
+    enabled: isStudentOrParent || !!(hasPermission?.('exams', 'list')),
   });
 
   const filtered = useMemo(() => {
@@ -60,7 +71,11 @@ export default function ExamListScreen() {
     return (
       <TouchableOpacity
         style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}
-        onPress={() => router.push(`/exam/${item.id}` as any)}
+        onPress={() =>
+          isStudentOrParent
+            ? router.push(`/exam/my-marks/${item.id}` as any)
+            : router.push(`/exam/${item.id}` as any)
+        }
         activeOpacity={0.75}
       >
         <View style={styles.cardHeader}>
@@ -89,7 +104,7 @@ export default function ExamListScreen() {
   };
 
   return (
-    <AppLayout title="All Exams">
+    <AppLayout title={isStudentOrParent ? 'My Exams' : 'All Exams'}>
       <View style={styles.container}>
 
         {/* Search */}

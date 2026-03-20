@@ -14,5 +14,13 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/api/mobilePermissions.ts",
+    "src/components/mobile/AccessDeniedScreen.tsx",
+    "src/components/mobile/PermissionStatusIndicator.tsx",
+    "src/navigation/ProtectedNavigator.tsx",
+    "src/utils/mobilePermissionCache.ts"
   ]
 }

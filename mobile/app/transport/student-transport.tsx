@@ -1,16 +1,16 @@
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import CustomDropdown from '@/components/ui/dropdown';
-import { useTheme } from '@/contexts';
-import { useStudents, useRoutesDropdown, useFeeTerms } from '@/hooks';
+import { useAuth, useTheme } from '@/contexts';
+import { useStudents, useRoutesDropdown } from '@/hooks';
 import { studentTransportApi, StudentTransport } from '../../src/api';
+import { useRouteStops } from '../../hooks/use-transport';
 import { PERMISSION_RESOURCES } from '../../src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import React, { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -34,10 +34,15 @@ export default function StudentTransportScreen() {
     trip_type: 'first trip',
     academic_year_id: '',
     fare_amount: 0,
-    is_active: true,
+    pricing_id: '',
   });
 
   const { colors } = useTheme();
+  const { role, selectedStudent, studentId, availableStudents } = useAuth();
+  const roleName = role?.name?.toLowerCase() ?? '';
+  const isStudent = roleName === 'student';
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
+  const childId = selectedStudent?.id ?? '';
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToastContext();
 
@@ -45,15 +50,33 @@ export default function StudentTransportScreen() {
   const { data: transportData, isLoading, error, refetch } = useQuery({
     queryKey: ['student-transport'],
     queryFn: () => studentTransportApi.getStudentTransports(),
+    enabled: !isStudent && !isParent,
+  });
+
+  // Student: own transport assignment
+  const { data: myTransport, isLoading: myTransportLoading } = useQuery({
+    queryKey: ['my-transport'],
+    queryFn: () => studentTransportApi.getStudentTransports({ student_id: studentId! }),
+    enabled: isStudent && !!studentId,
+  });
+
+  // Parent: selected child's transport assignment
+  const { data: childTransport, isLoading: childTransportLoading } = useQuery({
+    queryKey: ['child-transport', childId],
+    queryFn: () => studentTransportApi.getStudentTransports({ student_id: childId }),
+    enabled: isParent && !!childId,
   });
 
   const { data: studentsData } = useStudents();
   const { data: routesData } = useRoutesDropdown();
-  const { data: feeTermsData } = useFeeTerms();
+  const { data: routeStopsData } = useRouteStops({ route_id: formData.route_id || undefined });
 
   const students = studentsData || [];
   const routes = routesData || [];
-  const feeTerms = feeTermsData || [];
+  const stopOptions = (routeStopsData ?? []).map(s => ({
+    label: `${s.name} (Stop #${s.number})`,
+    value: s.id,
+  }));
 
   // Mutations
   const createMutation = useMutation({
@@ -119,7 +142,7 @@ export default function StudentTransportScreen() {
       trip_type: 'first trip',
       academic_year_id: '',
       fare_amount: 0,
-      is_active: true,
+      pricing_id: '',
     });
     setEditingTransport(null);
   };
@@ -133,7 +156,7 @@ export default function StudentTransportScreen() {
       trip_type: transport.trip_type,
       academic_year_id: transport.academic_year_id,
       fare_amount: transport.fare_amount,
-      is_active: transport.is_active,
+      pricing_id: transport.pricing_id ?? '',
     });
     setIsModalVisible(true);
   };
@@ -188,11 +211,6 @@ export default function StudentTransportScreen() {
             <ThemedText type="subtitle" style={styles.studentName}>
               {student?.display_name || 'Unknown Student'}
             </ThemedText>
-            <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#10B981' : '#EF4444' }]}>
-              <ThemedText style={styles.statusText}>
-                {item.is_active ? 'Active' : 'Inactive'}
-              </ThemedText>
-            </View>
           </View>
           <View style={styles.actionButtons}>
             <UpdatePermissionGuard 
@@ -247,6 +265,108 @@ export default function StudentTransportScreen() {
       </View>
     );
   }, [colors, students, routes]);
+
+  // ── STUDENT read-only view ────────────────────────────────────────────────
+  if (isStudent) {
+    const assignment = myTransport?.[0];
+    const route = routes.find(r => r.id === assignment?.route_id);
+    return (
+      <AppLayout title="My Transport">
+        {myTransportLoading ? (
+          <View style={styles.centerContainer}>
+            <ThemedText>Loading...</ThemedText>
+          </View>
+        ) : assignment ? (
+          <View style={{ padding: 16 }}>
+            <View style={[styles.transportCard, { backgroundColor: colors.card }]}>
+              <View style={styles.transportDetails}>
+                <View style={styles.detailRow}>
+                  <Ionicons name="bus" size={16} color={colors['muted-foreground']} />
+                  <ThemedText style={styles.detailText}>
+                    Route: {route?.route_name || assignment.route_id}
+                  </ThemedText>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="navigate" size={16} color={colors['muted-foreground']} />
+                  <ThemedText style={styles.detailText}>
+                    Trip: {assignment.trip_type}
+                  </ThemedText>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="cash" size={16} color={colors['muted-foreground']} />
+                  <ThemedText style={styles.detailText}>
+                    Fare: ₹{assignment.fare_amount}
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.centerContainer}>
+            <Ionicons name="bus-outline" size={64} color={colors['muted-foreground']} />
+            <ThemedText type="subtitle" style={styles.emptyTitle}>No Transport Assigned</ThemedText>
+            <ThemedText style={styles.emptyText}>You have no transport assignment.</ThemedText>
+          </View>
+        )}
+      </AppLayout>
+    );
+  }
+
+  // ── PARENT read-only view ─────────────────────────────────────────────────
+  if (isParent) {
+    const assignment = childTransport?.[0];
+    const route = routes.find(r => r.id === assignment?.route_id);
+    return (
+      <AppLayout title="Child Transport">
+        {!childId ? (
+          <View style={styles.centerContainer}>
+            <Ionicons name="person-outline" size={64} color={colors['muted-foreground']} />
+            <ThemedText type="subtitle" style={styles.emptyTitle}>No Student Selected</ThemedText>
+            <ThemedText style={styles.emptyText}>
+              {availableStudents && availableStudents.length > 0
+                ? 'Tap the student name in the header to switch.'
+                : 'No students are linked to your account. Contact the administrator.'}
+            </ThemedText>
+          </View>
+        ) : childTransportLoading ? (
+          <View style={styles.centerContainer}>
+            <ThemedText>Loading...</ThemedText>
+          </View>
+        ) : assignment ? (
+          <View style={{ padding: 16 }}>
+            <View style={[styles.transportCard, { backgroundColor: colors.card }]}>
+              <View style={styles.transportDetails}>
+                <View style={styles.detailRow}>
+                  <Ionicons name="bus" size={16} color={colors['muted-foreground']} />
+                  <ThemedText style={styles.detailText}>
+                    Route: {route?.route_name || assignment.route_id}
+                  </ThemedText>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="navigate" size={16} color={colors['muted-foreground']} />
+                  <ThemedText style={styles.detailText}>
+                    Trip: {assignment.trip_type}
+                  </ThemedText>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="cash" size={16} color={colors['muted-foreground']} />
+                  <ThemedText style={styles.detailText}>
+                    Fare: ₹{assignment.fare_amount}
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.centerContainer}>
+            <Ionicons name="bus-outline" size={64} color={colors['muted-foreground']} />
+            <ThemedText type="subtitle" style={styles.emptyTitle}>No Transport Assigned</ThemedText>
+            <ThemedText style={styles.emptyText}>No transport assignment for this student.</ThemedText>
+          </View>
+        )}
+      </AppLayout>
+    );
+  }
 
   if (error) {
     return (
@@ -380,39 +500,37 @@ export default function StudentTransportScreen() {
                   <CustomDropdown
                     data={routes.map(route => ({ label: route.route_name, value: route.id }))}
                     value={formData.route_id}
-                    onChange={(value) => setFormData(prev => ({ ...prev, route_id: value?.toString() || '' }))}
+                    onChange={(value) => setFormData(prev => ({ ...prev, route_id: value?.toString() || '', stop_id: '' }))}
                     placeholder="Select route"
                   />
                 </View>
 
-                <View style={styles.formRow}>
-                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <ThemedText style={styles.label}>Stop *</ThemedText>
-                    <TextInput
-                      style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
-                      placeholder="Enter stop ID"
-                      placeholderTextColor={colors['muted-foreground']}
-                      value={formData.stop_id}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, stop_id: text }))}
-                    />
-                  </View>
-                  <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                    <ThemedText style={styles.label}>Trip Type *</ThemedText>
-                    <TouchableOpacity
-                      style={[styles.dropdown, { borderColor: colors.border }]}
-                      onPress={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          trip_type: prev.trip_type === 'first trip' ? 'second trip' : 'first trip'
-                        }));
-                      }}
-                    >
-                      <ThemedText style={{ color: colors.foreground }}>
-                        {formData.trip_type === 'first trip' ? 'First Trip' : 'Second Trip'}
-                      </ThemedText>
-                      <Ionicons name="chevron-down" size={16} color={colors['muted-foreground']} />
-                    </TouchableOpacity>
-                  </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.label}>Stop *</ThemedText>
+                  <CustomDropdown
+                    data={stopOptions}
+                    value={formData.stop_id}
+                    onChange={(value) => setFormData(prev => ({ ...prev, stop_id: value?.toString() || '' }))}
+                    placeholder={formData.route_id ? 'Select stop' : 'Select route first'}
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.label}>Trip Type *</ThemedText>
+                  <TouchableOpacity
+                    style={[styles.dropdown, { borderColor: colors.border }]}
+                    onPress={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        trip_type: prev.trip_type === 'first trip' ? 'second trip' : 'first trip'
+                      }));
+                    }}
+                  >
+                    <ThemedText style={{ color: colors.foreground }}>
+                      {formData.trip_type === 'first trip' ? 'First Trip' : 'Second Trip'}
+                    </ThemedText>
+                    <Ionicons name="chevron-down" size={16} color={colors['muted-foreground']} />
+                  </TouchableOpacity>
                 </View>
 
                 <View style={styles.formRow}>
@@ -439,19 +557,6 @@ export default function StudentTransportScreen() {
                   </View>
                 </View>
 
-                <View style={styles.checkboxContainer}>
-                  <TouchableOpacity
-                    style={styles.checkbox}
-                    onPress={() => setFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
-                  >
-                    <Ionicons
-                      name={formData.is_active ? "checkbox" : "square-outline"}
-                      size={24}
-                      color={colors.primary}
-                    />
-                  </TouchableOpacity>
-                  <ThemedText style={styles.checkboxLabel}>Active</ThemedText>
-                </View>
               </ScrollView>
 
               <View style={styles.modalFooter}>

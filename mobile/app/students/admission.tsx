@@ -20,7 +20,7 @@ import { AppLayout } from '@/components';
 import { CustomDropdown } from '@/components/ui/dropdown';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { studentAdmissionsApi, classSectionsApi, academicYearsApi, StudentAdmissionCreate, StudentAdmissionUpdate } from '@/src/api';
+import { studentAdmissionsApi, classSectionsApi, academicYearsApi, castesApi, StudentAdmissionCreate, StudentAdmissionUpdate } from '@/src/api';
 import { useCreateAdmission, useUpdateAdmission, useDeleteAdmission, useAdmissionByStudentId, useAdmissions, useStudentsSearch, useStudentsDropdown, useStudentsDropdownSimple } from '@/src/api/hooks/students/admissions';
 import { useTheme } from '@/contexts';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
@@ -102,8 +102,8 @@ interface FormData {
     is_primary?: string;  // "primary" | "non_primary" | "not_primary"
     aadhar_number?: string;
     apaar_number?: string;
-    caste?: string;
-    sub_caste?: string;
+    caste_id?: string;
+    sub_caste_id?: string;
     community?: string;
     nationality?: string;
     mother_tongue?: string;
@@ -195,8 +195,8 @@ export default function StudentAdmissionScreen() {
       is_primary: 'not_primary',
       aadhar_number: '',
       apaar_number: '',
-      caste: '',
-      sub_caste: '',
+      caste_id: '',
+      sub_caste_id: '',
       community: '',
       nationality: '',
       mother_tongue: '',
@@ -265,6 +265,24 @@ export default function StudentAdmissionScreen() {
     },
   });
 
+  const { data: castesDropdownData, isLoading: castesDropdownLoading } = useQuery({
+    queryKey: ['castes-dropdown'],
+    queryFn: async () => {
+      const data = await castesApi.getCastesDropdown();
+      return data.map(item => ({ label: item.name, value: item.id }));
+    },
+  });
+
+  const { data: subCastesDropdownData, isLoading: subCastesDropdownLoading } = useQuery({
+    queryKey: ['sub-castes-dropdown', formData.student.caste_id],
+    queryFn: async () => {
+      if (!formData.student.caste_id) return [];
+      const data = await castesApi.getSubCastesDropdown(formData.student.caste_id);
+      return data.map(item => ({ label: item.name, value: item.id }));
+    },
+    enabled: !!formData.student.caste_id,
+  });
+
   // Fetch existing admission data if in edit mode
   const { data: existingAdmission, isLoading: admissionLoading } = useAdmissionByStudentId(studentId || '');
 
@@ -296,6 +314,11 @@ export default function StudentAdmissionScreen() {
       setFormData(prev => ({ ...prev, current_section_id: '' }));
     }
   }, [formData.current_class_id]);
+
+  // Clear sub-caste when caste changes
+  React.useEffect(() => {
+    setFormData(prev => ({ ...prev, student: { ...prev.student, sub_caste_id: '' } }));
+  }, [formData.student.caste_id]);
 
   // Sync current class/section with admission class/section when checkbox is checked
   React.useEffect(() => {
@@ -523,8 +546,8 @@ export default function StudentAdmissionScreen() {
         is_primary: 'not_primary',
         aadhar_number: '',
         apaar_number: '',
-        caste: '',
-        sub_caste: '',
+        caste_id: '',
+        sub_caste_id: '',
         community: '',
         nationality: '',
         mother_tongue: '',
@@ -606,7 +629,7 @@ export default function StudentAdmissionScreen() {
     label: string,
     field: string,
     placeholder: string,
-    keyboardType: 'default' | 'email-address' | 'phone-pad' = 'default',
+    keyboardType: 'default' | 'email-address' | 'phone-pad' | 'numeric' = 'default',
     multiline: boolean = false
   ) => {
     const fieldParts = field.split('.');
@@ -820,16 +843,36 @@ export default function StudentAdmissionScreen() {
               { label: 'Male', value: 'male' },
               { label: 'Female', value: 'female' },
               { label: 'Other', value: 'other' }
-            ], 'Select gender')}
-            {renderInput('Is Primary', 'student.is_primary', 'true/false')}
-            {renderInput('Aadhar Number', 'student.aadhar_number', 'Enter Aadhar number')}
-            {renderInput('APAAR Number', 'student.apaar_number', 'Enter APAAR number')}
-            {renderInput('Caste', 'student.caste', 'Enter caste')}
-            {renderInput('Sub Caste', 'student.sub_caste', 'Enter sub caste')}
-            {renderInput('Community', 'student.community', 'Enter community')}
+            ], 'Select Gender')}
+            {renderDropdown('Primary Status', 'student.is_primary', [
+              { label: 'Not Primary', value: 'not_primary' },
+              { label: 'Primary', value: 'primary' },
+            ], 'Select Status')}
             {renderInput('Nationality', 'student.nationality', 'Enter nationality')}
-            {renderInput('Mother Tongue', 'student.mother_tongue', 'Enter mother tongue')}
-            {renderInput('Identification Marks', 'student.identification_marks', 'Enter identification marks', 'default', true)}
+            {renderDropdown('Mother Tongue', 'student.mother_tongue', [
+              { label: 'Telugu', value: 'Telugu' },
+              { label: 'Hindi', value: 'Hindi' },
+              { label: 'English', value: 'English' },
+              { label: 'Tamil', value: 'Tamil' },
+              { label: 'Malayalam', value: 'Malayalam' },
+              { label: 'Kannada', value: 'Kannada' },
+              { label: 'Marathi', value: 'Marathi' },
+              { label: 'Bengali', value: 'Bengali' },
+              { label: 'Gujarati', value: 'Gujarati' },
+              { label: 'Urdu', value: 'Urdu' },
+              { label: 'Others', value: 'Others' },
+            ], 'Select Mother Tongue')}
+            {renderInput('Aadhar Number (Optional)', 'student.aadhar_number', 'Enter Aadhar number', 'numeric')}
+            {renderInput('APAAR Number (Optional)', 'student.apaar_number', 'Enter APAAR number')}
+            {renderDropdown('Caste (Optional)', 'student.caste_id', castesDropdownData || [], '-- Select Caste --', false, castesDropdownLoading)}
+            {renderDropdown('Sub-Caste (Optional)', 'student.sub_caste_id', subCastesDropdownData || [], '-- Select Sub-Caste --', !formData.student.caste_id, subCastesDropdownLoading)}
+            {!formData.student.caste_id && (
+              <ThemedText style={[styles.hintText, { color: themeColors['muted-foreground'] }]}>
+                Please select a caste first
+              </ThemedText>
+            )}
+            {renderInput('Community (Optional)', 'student.community', 'Enter community')}
+            {renderInput('Identification Marks (Optional)', 'student.identification_marks', 'Enter identification marks', 'default', true)}
           </View>
         );
 
@@ -1143,7 +1186,7 @@ export default function StudentAdmissionScreen() {
                   return iso ? new Date(iso + 'T00:00:00') : new Date();
                 })()}
                 mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
                 maximumDate={new Date()}
                 onChange={(event, selectedDate) => {
                   const field = activeDateField;
@@ -1292,6 +1335,12 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 12,
     marginTop: 4,
+  },
+  hintText: {
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 12,
+    marginLeft: 4,
   },
   stepIndicator: {
     paddingHorizontal: 16,

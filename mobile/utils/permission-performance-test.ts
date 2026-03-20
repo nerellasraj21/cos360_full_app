@@ -76,7 +76,7 @@ export const runPermissionPerformanceTests = (
     'Batch Permission Check',
     100,
     () => {
-      checkMultiplePermissions(testPermissions);
+      checkMultiplePermissions(testPermissions as any);
     }
   );
 

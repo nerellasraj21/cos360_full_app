@@ -84,10 +84,10 @@
 | Feature | Status | Details |
 |---------|--------|---------|
 | Dashboard screen | ✅ Complete | `app/(tabs)/index.tsx` |
-| Quick action cards | ✅ Complete | Links to all modules |
-| Permission-filtered cards | ✅ Complete | Only shows accessible modules |
-| Stats overview | ✅ Complete | Summary counters |
-| Recent activities | ✅ Complete | Activity feed display |
+| Quick action cards | ✅ Complete | 7 module cards: Students, Fees, Masters, Transport, Staff, Expense, Exam |
+| Permission-filtered cards | ✅ Complete | `accessibleModules` filter — only shows cards with `read` or `list` permission |
+| Empty state for restricted roles | ✅ Complete | Lock icon + message when user has no module permissions |
+| Greeting hero card | ✅ Complete | Greeting, username, date — no hardcoded stats |
 
 ---
 
@@ -308,6 +308,17 @@
 ---
 
 ---
+
+## Bug Fixes (v1.3.0)
+
+| File | Issue | Fix |
+|------|-------|-----|
+| `app/(tabs)/index.tsx` | Dashboard wrapped in `<PermissionGuard resourceConstant="profile" actionConstant="read_own">` — roles without that permission saw blank/access-denied screen after login | Removed `PermissionGuard` wrapper and import; dashboard is now accessible to all authenticated users |
+| `app/(tabs)/index.tsx` | Exam module had no dashboard card despite fully built screens at `app/(tabs)/exam.tsx` and `app/exam/*` | Added Exam entry to `MODULES` array (`color: #EC4899`, `resource: 'exams'`, `route: '/(tabs)/exam'`) |
+| `app/(tabs)/index.tsx` | All 6 module cards shown to every user with no permission check | Added `resource` field to all MODULES entries; added `accessibleModules` filter using `hasPermission()`; added empty state for roles with no module access |
+| `app/(tabs)/index.tsx` | Hero stats bar displayed hardcoded `1,250 / 85 / ₹2.5M` — misleading for all schools | Removed entire stats bar and all related style entries (`heroStatsBar`, `heroStatItem`, `heroStatNum`, `heroStatLabel`, `heroStatDivider`) |
+| `app/(tabs)/index.tsx` | Module routes used bare paths (`/students`) instead of tab group paths | Fixed all routes to `/(tabs)/students`, `/(tabs)/fees`, etc. |
+| `components/AppHeader.tsx` | Search icon button had no `onPress` handler — appeared interactive but did nothing | Added `disabled={true}` and `opacity: 0.4` until search feature is implemented |
 
 ## Bug Fixes (v1.2.0)
 

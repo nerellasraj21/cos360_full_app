@@ -55,7 +55,7 @@ const WEB_TO_MOBILE: Record<string, string> = {
     '/students/studentdocuments': '/students/studentdocuments',
     '/students/studentcertificates': '/students/studentcertificates',
     '/students/certificatetypes': '/students/certificatetypes',
-    '/students/studenttransport': '/students/transport',
+    '/students/studenttransport': '/transport/student-transport',
     // Staff (appears in both Masters and Staff module)
     '/staff': '/(tabs)/staff',
     '/staff/attendance': '/staff/attendance',
@@ -77,6 +77,8 @@ const WEB_TO_MOBILE: Record<string, string> = {
     '/transport/routeStops': '/transport/route-stops',
     '/transport/vehicles': '/transport/vehicles',
     '/masters/trips': '/transport/trips',
+    '/transport/student-transport': '/transport/student-transport',
+    '/transport/studentTransport': '/transport/student-transport',
     // Expense
     '/expense': '/(tabs)/expense',
     '/expense/categories': '/expense/categories',
@@ -195,6 +197,9 @@ const getModuleStyle = (name: string): { icon: keyof typeof Ionicons.glyphMap; c
 const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose, menuItems }) => {
     const { user, role, logout } = useAuth();
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+    const roleName = role?.name?.toLowerCase() ?? '';
+    const isStudentOrParent = ['student', 'parent', 'guardian', 'father', 'mother'].includes(roleName);
     const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
     const backdropAnim = useRef(new Animated.Value(0)).current;
 
@@ -257,7 +262,18 @@ const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose, menuItems }) =>
         }
     };
 
-    const sortedItems = [...(menuItems ?? [])].sort((a, b) => a.display_order - b.display_order);
+    const transportItem: MenuItem = {
+        id: '__my_transport',
+        name: 'My Transport',
+        path: '/transport/student-transport',
+        display_order: 999,
+        children: null,
+    };
+
+    const sortedItems = [
+        ...(menuItems ?? []).sort((a, b) => a.display_order - b.display_order),
+        ...(isStudentOrParent ? [transportItem] : []),
+    ];
     const initial = (user?.username || 'U').charAt(0).toUpperCase();
 
     return (

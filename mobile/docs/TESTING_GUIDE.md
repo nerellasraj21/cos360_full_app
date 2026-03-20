@@ -18,13 +18,15 @@ The API must be running at `http://<server-ip>:8000`.
 
 ### 1.2 Update the API Base URL
 
-Edit [src/api/client.ts](../src/api/client.ts) and set the correct IP of the machine running the backend:
+Edit `.env` (copy from `.env.example` if it doesn't exist) and set the correct IP of the machine running the backend:
 
-```typescript
-baseURL: 'http://192.168.0.110:8000/api/v1',  // <-- update this
+```env
+EXPO_PUBLIC_API_URL=http://192.168.0.110:8000/api/v1
 ```
 
 Both your backend machine and the test device must be on the **same Wi-Fi network**.
+
+> After changing `.env`, restart with `npx expo start --clear` and clear Expo Go app data on Android.
 
 ### 1.3 Install Dependencies
 
@@ -95,10 +97,12 @@ OR scan the QR code from `npm start` using the **Expo Go** app.
 ### 4.2 Home / Dashboard
 
 | # | Test Case | Expected Result |
-|---|-----------|-----------------|
-| 6 | Dashboard loads | Quick action cards show all accessible modules |
-| 7 | Locked action card | Card shows lock icon, tap does nothing |
-| 8 | Navigate to module | Tap card → navigates to correct module |
+| --- | --------- | --------------- |
+| 6 | Admin login — dashboard loads | All 7 module cards visible (Students, Fees, Masters, Transport, Staff, Expense, Exam) |
+| 7 | Restricted role — no module permissions | Lock icon + "No modules available. Contact your administrator." message shown |
+| 8 | Navigate to module | Tap card → navigates to correct tab |
+| 9 | Greeting hero card | Shows correct greeting (Morning/Afternoon/Evening), username, and today's date |
+| 10 | Dark mode | All module cards show correct tinted backgrounds |
 
 ### 4.3 Exam Module (New)
 
@@ -197,7 +201,8 @@ OR scan the QR code from `npm start` using the **Expo Go** app.
 ```bash
 curl -X POST http://192.168.0.110:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "admin@school.com", "password": "password", "client_schema": "school1"}'
+  -H "cschema: school1" \
+  -d '{"username": "admin", "password": "testpass123"}'
 ```
 
 ### Create Exam
@@ -207,11 +212,12 @@ curl -X POST http://192.168.0.110:8000/api/v1/exams \
   -H "cschema: school1" \
   -H "Content-Type: application/json" \
   -d '{
-    "title": "Term 1 Unit Test",
-    "academic_year_id": "2025-26",
+    "exam_name": "Term 1 Unit Test",
+    "academic_year_id": 1,
     "exam_type": "unit_test",
-    "start_date": "2025-06-01",
-    "end_date": "2025-06-10"
+    "board": "CBSE",
+    "level": "class",
+    "nature": "internal"
   }'
 ```
 
@@ -239,7 +245,7 @@ If the app cannot reach the backend:
 
 | Issue | Fix |
 |-------|-----|
-| "Network Error" on all requests | Check backend is running and IP is correct in `client.ts` |
+| "Network Error" on all requests | Check backend is running and `EXPO_PUBLIC_API_URL` in `.env` is correct; restart with `npx expo start --clear` |
 | App stuck on "Loading permissions..." | Backend `/auth/mobile/permissions/sync` endpoint may be down |
 | Tab not showing after login | User role may not have any of the module's permissions assigned |
 | Login succeeds but blank screen | Check `cschema` value — must match a valid tenant schema in the database |
@@ -250,14 +256,15 @@ If the app cannot reach the backend:
 
 ## 8. Test Accounts (Setup in Backend)
 
-Configure these users in the backend for testing:
+Login uses **username** (not email) + org code as `cschema`. Configure these users in the backend for testing:
 
-| Role | Email | Permissions |
-|------|-------|-------------|
-| Admin | admin@school.com | All modules |
-| Teacher | teacher@school.com | Students, Exam marks |
-| Parent | parent@school.com | Profile, own student data |
-| Accountant | accounts@school.com | Fees, Expense |
+| Role | Username | Org Code (cschema) | Expected Dashboard Cards |
+| ---- | -------- | ------------------ | ------------------------ |
+| Admin | admin | test_tenant | All 7 cards |
+| Staff | staff | test_tenant | Students, Fees, Staff, Expense, Exam |
+| Teacher | teacher | test_tenant | Students, Exam |
+| Student | student | test_tenant | None — empty state (lock icon) |
+| Parent | parent | test_tenant | None — empty state (lock icon) |
 
 ---
 

@@ -1,7 +1,7 @@
 # COS360 Mobile App — Project Overview
 
 **Project Name:** COS360 School Management System — Mobile Application
-**Version:** 1.0.0
+**Version:** 1.3.0
 **Platform:** Android · iOS · Web
 **Build Date:** March 2026
 
@@ -24,7 +24,7 @@ COS360 is a comprehensive school management platform. The mobile application pro
 ## 2. Platform & Framework
 
 | Item | Value |
-|------|-------|
+| ---- | ----- |
 | Framework | React Native with Expo (SDK 54) |
 | Language | TypeScript 5.9 |
 | Min React Native | 0.81.4 |
@@ -38,12 +38,12 @@ COS360 is a comprehensive school management platform. The mobile application pro
 
 ## 3. Application Architecture
 
-```
+```text
 COS360 Mobile App
 │
 ├── Presentation Layer (Expo Router / React Native)
 │   ├── File-based routing (app/ directory)
-│   ├── Tab navigation (9 tabs, permission-gated)
+│   ├── Tab navigation (permission-gated)
 │   └── Stack navigation for module screens
 │
 ├── State Management Layer
@@ -69,11 +69,12 @@ COS360 Mobile App
 ## 4. Module Summary
 
 | Module | Description | Status |
-|--------|-------------|--------|
+| ------ | ----------- | ------ |
 | Authentication | Login, token management, permission sync | Complete |
-| Home/Dashboard | Quick access cards, activity feed | Complete |
+| Home/Dashboard | Permission-filtered module cards, greeting hero | Complete |
 | Students | Admissions, profiles, attendance, documents, certificates | Complete |
 | Fees | Categories, types, terms, transactions, refunds, mappings | Complete |
+| Exam | List, create, mark entry, results, hall tickets | Complete |
 | Masters | Academic years, classes, subjects, holidays, timetables, RBAC | Complete |
 | Transport | Routes, vehicles, stops, trips, student transport | Complete |
 | Staff | Enrollment, profiles, designations, attendance | Complete |
@@ -86,28 +87,35 @@ COS360 Mobile App
 ## 5. Key Technical Features
 
 ### Permission-Based Access Control
+
 - Permissions synced from server on login
 - Cached locally with AsyncStorage for offline use
-- Tab visibility, screen access, and API calls all gated by permissions
-- Bulk permission checks to avoid repeated round-trips
+- Dashboard cards filtered by `hasPermission(resource, 'read' | 'list')`
+- Empty state shown when user has no module permissions
+- Tab visibility and screen access gated by permissions
 
 ### Multi-Tenant Architecture
+
 - Each school is a separate tenant
 - `cschema` header identifies the tenant on every API request
 - Data fully isolated at the database schema level
 
 ### Offline Support
+
 - Axios interceptor queues failed requests when offline
 - Permission cache serves as fallback if server unavailable
 - Token stored persistently via AsyncStorage
 
 ### Authentication & Security
+
 - JWT Bearer token authentication
+- Login uses `username` + `cschema` header (tenant code)
 - Automatic token refresh on 401 response
 - Tokens cleared on logout
 - Role & plan validation on all endpoints
 
 ### Theme Support
+
 - Light and dark mode
 - `userInterfaceStyle: "automatic"` follows system preference
 - ThemeContext provides consistent colors throughout the app
@@ -116,10 +124,11 @@ COS360 Mobile App
 
 ## 6. Project Directory Structure
 
-```
+```text
 cos360_mobile_app/
 ├── app/                    # Expo Router screens
 │   ├── (tabs)/             # Tab navigation
+│   ├── exam/               # Exam module screens
 │   ├── expense/            # Expense module screens
 │   ├── fees/               # Fees module screens
 │   ├── masters/            # Masters config screens
@@ -164,6 +173,7 @@ cos360_mobile_app/
 **API Base URL:** `https://www.cos360.app/api/v1` (set in `.env` as `EXPO_PUBLIC_API_URL`)
 
 The mobile app integrates with a FastAPI Python backend that exposes REST endpoints for:
+
 - Authentication & permissions
 - Student management
 - Fee management
@@ -198,5 +208,4 @@ npm run web
 
 ---
 
-*Document prepared: March 2026*
-*COS360 School Management System — Confidential*
+COS360 School Management System — Project Overview — March 2026

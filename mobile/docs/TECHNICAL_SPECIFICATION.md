@@ -127,10 +127,12 @@ Expo Router v6 maps file paths in `app/` directly to routes. Benefits:
 ### 3.2 Permission-Gated Tab Navigation
 
 Tabs are dynamically shown or hidden based on the user's permissions. Implementation:
+
 - On login, `/auth/mobile/permissions/sync` is called
 - Permissions stored in memory and AsyncStorage cache
 - `app/(tabs)/_layout.tsx` reads permissions and conditionally renders tabs
-- Individual screens wrapped in `MobilePermissionGuard` components
+- Dashboard (`app/(tabs)/index.tsx`) filters module cards using `hasPermission(resource, 'read' | 'list')` — no `PermissionGuard` wrapper; visible to all authenticated users
+- Module-level screens use `MobilePermissionGuard` where appropriate
 
 ### 3.3 React Query for Server State
 

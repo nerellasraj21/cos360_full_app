@@ -23,13 +23,13 @@ const TAB_CONFIGS: TabConfig[] = [
   },
   {
     name: 'students',
-    moduleResources: ['students', 'student_admissions', 'student_attendance', 'student_documents'],
-    requireAll: false,
+    moduleResources: [],
+    alwaysShow: true,
   },
   {
     name: 'fees',
-    moduleResources: ['fee_categories', 'fee_types', 'fee_terms', 'fee_transactions'],
-    requireAll: false,
+    moduleResources: [],
+    alwaysShow: true,
   },
   {
     name: 'masters',
@@ -38,8 +38,8 @@ const TAB_CONFIGS: TabConfig[] = [
   },
   {
     name: 'transport',
-    moduleResources: ['routes', 'vehicles', 'transport_trips', 'transport_routes'],
-    requireAll: false,
+    moduleResources: [],
+    alwaysShow: true,
   },
   {
     name: 'staff',
@@ -53,8 +53,13 @@ const TAB_CONFIGS: TabConfig[] = [
   },
   {
     name: 'exam',
-    moduleResources: ['exams', 'exam_marks', 'exam_results', 'exam_hall_tickets'],
-    requireAll: false,
+    moduleResources: [],
+    alwaysShow: true,
+  },
+  {
+    name: 'communication',
+    moduleResources: [],
+    alwaysShow: true,
   },
   {
     name: 'profile',

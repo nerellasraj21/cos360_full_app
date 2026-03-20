@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
-import { useTheme } from '@/contexts';
+import { useAuth, useTheme } from '@/contexts';
 import { studentAdmissionsApi, StudentAdmission } from '@/src/api/students';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
@@ -71,11 +71,30 @@ const sections = [
   },
 ];
 
+const STUDENT_QUICK_LINKS = [
+  { title: 'My Attendance',   icon: 'checkmark-circle' as const, color: '#10B981', route: '/students/attendance',    desc: 'View attendance history'           },
+  { title: 'My Certificates', icon: 'ribbon' as const,           color: '#8B5CF6', route: '/students/mycertificates', desc: 'Download your certificates'        },
+  { title: 'My Documents',    icon: 'folder-open' as const,      color: '#F97316', route: '/students/mydocuments',    desc: 'View & upload your documents'      },
+  { title: 'My Fees',         icon: 'wallet' as const,           color: '#10B981', route: '/fees/collection',         desc: 'View your fee summary & payments'  },
+];
+
+const PARENT_QUICK_LINKS = [
+  { title: 'Child Attendance',   icon: 'checkmark-circle' as const, color: '#10B981', route: '/students/attendance',    desc: 'View child attendance history'     },
+  { title: 'Child Certificates', icon: 'ribbon' as const,           color: '#8B5CF6', route: '/students/mycertificates', desc: 'Download child certificates'       },
+  { title: 'Child Documents',    icon: 'folder-open' as const,      color: '#F97316', route: '/students/mydocuments',    desc: 'View child documents'              },
+  { title: 'Child Fees',         icon: 'wallet' as const,           color: '#10B981', route: '/fees/collection',         desc: 'View child fee summary & payments' },
+];
+
 export default function StudentsScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { role } = useAuth();
   const { hasPermission } = useMobilePermission();
   const queryClient = useQueryClient();
+
+  const roleName = role?.name?.toLowerCase() ?? '';
+  const isStudent = roleName === 'student';
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
 
   const hasListPermission = hasPermission ? hasPermission(PERMISSION_RESOURCES.STUDENTS, 'list') : false;
   const { data: studentsData, isLoading } = useQuery({
@@ -114,6 +133,54 @@ export default function StudentsScreen() {
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
+  // ── Student / Parent quick-link view ─────────────────────────────────────
+  if (isStudent || isParent) {
+    const links = isStudent ? STUDENT_QUICK_LINKS : PARENT_QUICK_LINKS;
+    const title = isStudent ? 'My Portal' : 'Child Portal';
+    const subtitle = isStudent ? 'Quick access to your records' : 'Quick access to your child\'s records';
+    return (
+      <AppLayout title={title}>
+        <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          {/* Banner */}
+          <View style={[styles.banner, { backgroundColor: BLUE }]}>
+            <View style={styles.bannerDecor} />
+            <View style={styles.bannerDecor2} />
+            <View style={styles.bannerIcon}>
+              <Ionicons name={isStudent ? 'person' : 'people'} size={28} color="white" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.bannerTitle}>{title}</Text>
+              <Text style={styles.bannerSub}>{subtitle}</Text>
+            </View>
+          </View>
+
+          <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>QUICK ACCESS</Text>
+
+          <View style={styles.grid}>
+            {links.map((link, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[styles.sectionCard, { backgroundColor: theme === 'dark' ? '#1a1a2e' : '#ffffff', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9' }]}
+                onPress={() => router.push(link.route as any)}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.sectionIconBox, { backgroundColor: link.color + '18' }]}>
+                  <Ionicons name={link.icon} size={24} color={link.color} />
+                </View>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]} numberOfLines={2}>{link.title}</Text>
+                <Text style={[styles.sectionDesc, { color: colors['muted-foreground'] }]} numberOfLines={2}>{link.desc}</Text>
+                <View style={[styles.sectionArrow, { backgroundColor: link.color + '18' }]}>
+                  <Ionicons name="arrow-forward" size={12} color={link.color} />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+      </AppLayout>
+    );
+  }
+
+  // ── Admin / Staff / Teacher view ──────────────────────────────────────────
   return (
     <AppLayout title="Students">
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>

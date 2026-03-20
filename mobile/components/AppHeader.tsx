@@ -70,7 +70,11 @@ export default function AppHeader({
         {/* Right: action buttons */}
         <View style={styles.rightSection}>
           {showSearch && (
-            <TouchableOpacity style={styles.iconButton} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity
+              style={[styles.iconButton, { opacity: 0.4 }]}
+              disabled={true}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Ionicons name="search-outline" size={22} color="rgba(255,255,255,0.9)" />
             </TouchableOpacity>
           )}

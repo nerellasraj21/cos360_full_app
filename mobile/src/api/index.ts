@@ -2,7 +2,6 @@ export * from './auth';
 export { default as apiClient } from './client';
 export { queryClient } from './queryClient';
 export * from './staff';
-export * from './fees';
 // Export specific items from masters to avoid conflicts
 export {
   AcademicYear,
@@ -35,15 +34,12 @@ export {
   Route,
   RouteCreate,
   RouteUpdate,
-  routesApi,
   Vehicle,
   VehicleCreate,
   VehicleUpdate,
-  vehiclesApi,
   RouteStop,
   RouteStopCreate,
   RouteStopUpdate,
-  routeStopsApi,
   HolidayRead,
   HolidayCreate,
   HolidayUpdate,
@@ -51,7 +47,6 @@ export {
   Trip,
   TripCreate,
   TripUpdate,
-  tripsApi,
   Role,
   RoleCreate,
   RoleUpdate,
@@ -69,13 +64,80 @@ export {
   StudentTripCreate,
   StudentTripUpdate,
   studentTripsApi,
+  // Masters-authoritative StudentTransport types (used by transport screens)
   StudentTransport,
   StudentTransportCreate,
   StudentTransportUpdate,
   studentTransportApi,
+  CasteDropdownOption,
+  SubCasteDropdownOption,
+  castesApi,
 } from './masters';
-export * from './students';
-export * from './transport';
+// Explicit student exports, excluding types that conflict with masters
+export {
+  ReactNativeFile,
+  ParentCreate,
+  StudentOut,
+  Student,
+  StudentAdmissionCreate,
+  StudentAdmissionResponse,
+  StudentAdmission,
+  StudentAdmissionUpdate,
+  StudentDropdownItem,
+  StudentDropdownSimpleItem,
+  AttendanceStatus,
+  StudentAttendanceCreate,
+  StudentAttendanceUpdate,
+  StudentAttendanceOut,
+  CertificateRead,
+  CertificateResponse,
+  CertificateDownloadResponse,
+  CertificateCreate,
+  IssuedCertificateCreateRequest,
+  ReceivedDocumentCreateRequest,
+  CertificateUpdate,
+  CertificateTypeRead,
+  CertificateTypeDropdown,
+  CertificateTypeCreate,
+  CertificateTypeUpdate,
+  CertificateType,
+  CertificateSelectorClass,
+  CertificateSelectorSection,
+  CertificateSelectorStudent,
+  DocumentOut,
+  DocumentResponse,
+  DocumentCreate,
+  DocumentUpdate,
+  TransportRouteInfo,
+  TransportVehicleInfo,
+  TransportTripInfo,
+  TransportStopInfo,
+  TransportStudentInfo,
+  TransportPricingInfo,
+  StudentTransportOut,
+  TimetableSlot,
+  BulkTimetableCreate,
+  BulkTimetableUpdate,
+  TimetableDataItem,
+  FrontendTimetableCreate,
+  FrontendTimetableRead,
+  ParentStudent,
+  studentAdmissionsApi,
+  studentAttendanceApi,
+  studentCertificatesApi,
+  certificateTypesApi,
+  studentDocumentsApi,
+  timetableApi,
+  parentStudentsApi,
+} from './students';
+// Explicit transport exports to avoid conflicts with masters/students
+export {
+  routesApi,
+  vehiclesApi,
+  routeStopsApi,
+  tripsApi,
+  transportApi,
+} from './transport';
 export * from './expense';
 export {
   StudentProfileOut,
@@ -93,4 +155,14 @@ export {
   validateBloodGroup,
   validateDate,
 } from './profile';
-
+export {
+  feeCollectionApi,
+  feeConcessionsApi,
+  FeeSearchStudentResult,
+  FeeCollectionSummary,
+  FeeCollectionSummaryItem,
+  FeePaymentRequest,
+  FeePaymentResponse,
+  FeeConcession,
+  FeeConcessionCreate,
+} from './fees';

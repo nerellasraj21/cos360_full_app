@@ -1,6 +1,6 @@
 # COS360 Mobile App — API Integration Reference
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Date:** March 2026
 **Base URL:** `https://www.cos360.app/api/v1` (configured via `EXPO_PUBLIC_API_URL` in `.env`)
 
@@ -11,19 +11,21 @@
 **File:** `src/api/client.ts`
 
 ```typescript
-// Base configuration
 const apiClient = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL,  // set in .env
-  timeout: 10000,  // 10 seconds
+  timeout: 10000,
 });
 ```
 
 ### Request Interceptor
+
 Every request automatically includes:
+
 - `Authorization: Bearer {access_token}` — from AsyncStorage
 - `cschema: {tenant_schema}` — identifies the school client/tenant
 
 ### Response Interceptor
+
 - **401 Unauthorized:** Triggers automatic token refresh via `POST /auth/login/refresh`
   - On success: retries original request with new token
   - On failure: clears stored tokens, redirects to login
@@ -34,31 +36,40 @@ Every request automatically includes:
 ## 2. Authentication API
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/auth/login` | Login with email & password |
+| ------ | -------- | ----------- |
+| POST | `/auth/login` | Login with username & password |
 | POST | `/auth/login/refresh` | Refresh access token using refresh token |
 | POST | `/auth/logout` | Invalidate tokens |
 
 ### Login Request
+
 ```json
 {
-  "email": "user@school.com",
-  "password": "password123",
-  "client_schema": "school_schema_name"
+  "username": "admin",
+  "password": "testpass123"
 }
 ```
 
+> The tenant schema is sent as the `cschema` header, not in the request body.
+
 ### Login Response
+
 ```json
 {
   "access_token": "eyJ...",
   "refresh_token": "eyJ...",
   "user": {
     "id": 1,
-    "name": "John Doe",
-    "email": "user@school.com",
-    "role": "admin"
-  }
+    "username": "admin",
+    "email": "admin@school.com"
+  },
+  "role": {
+    "id": 1,
+    "name": "Admin"
+  },
+  "permissions": [
+    { "id": "exams:read", "resource": "exams", "action": "read", "is_granted": true }
+  ]
 }
 ```
 
@@ -69,33 +80,35 @@ Every request automatically includes:
 **File:** `src/api/mobilePermissions.ts`
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | POST | `/auth/mobile/permissions/sync` | Sync all permissions for current user |
 | POST | `/auth/permissions/check` | Check single permission |
 | POST | `/auth/permissions/bulk-check` | Check multiple permissions at once |
 
 ### Permission Sync Response
+
 ```json
 {
   "permissions": {
-    "students": ["read", "create", "update"],
-    "fees": ["read"],
-    "expense": []
+    "student_admissions": ["read", "create", "update", "list"],
+    "fee_transactions": ["read", "list"],
+    "exams": ["read", "list"]
   }
 }
 ```
 
 ### Permission Cache
+
 Permissions are cached locally in AsyncStorage after sync. Cache is used as fallback if server is unreachable.
 
 ---
 
 ## 4. Students API
 
-**File:** `src/api/students.ts` (765 lines)
+**File:** `src/api/students.ts`
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/students` | List students with search/filter |
 | POST | `/students` | Create new student (admission) |
 | GET | `/students/{id}` | Get student details |
@@ -107,12 +120,14 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 | POST | `/students/{id}/documents` | Upload document |
 | DELETE | `/students/{id}/documents/{docId}` | Delete document |
 | GET | `/students/{id}/certificates` | List certificates |
-| POST | `/students/{id}/certificates` | Upload certificate |
+| POST | `/students/certificates/` | Upload certificate |
+| GET | `/students/certificate-types` | List certificate types |
 | GET | `/students/{id}/transport` | Get transport assignment |
 | POST | `/students/{id}/transport` | Assign transport |
 | GET | `/students/dropdown` | Get students for dropdown select |
 
 **React Query Hooks:** `src/api/hooks/students/`
+
 - `admissions.ts` — Student admission hooks
 - `attendance.ts` — Attendance hooks
 - `certificates.ts` — Certificate hooks
@@ -124,27 +139,30 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 
 ## 5. Masters API
 
-**File:** `src/api/masters.ts` (1,184 lines)
+**File:** `src/api/masters.ts`
 
 ### Academic Years
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/academic-years` | List academic years |
 | POST | `/academic-years` | Create academic year |
 | PUT | `/academic-years/{id}` | Update |
 | DELETE | `/academic-years/{id}` | Delete |
 
 ### Classes & Sections
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/classes` | List classes |
 | POST | `/classes` | Create class |
 | GET | `/classes/{id}/sections` | List sections for class |
 | POST | `/classes/{id}/sections` | Add section |
 
 ### Subjects
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/subjects` | List subjects |
 | POST | `/subjects` | Create subject |
 | GET | `/subject-categories` | List categories |
@@ -152,24 +170,27 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 | POST | `/class-subject-mappings` | Map subject to class |
 
 ### Holidays
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/holidays` | List holidays |
 | POST | `/holidays` | Add holiday |
 | PUT | `/holidays/{id}` | Update |
 | DELETE | `/holidays/{id}` | Delete |
 
 ### Roles & Permissions
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/roles` | List roles |
 | POST | `/roles` | Create role |
 | GET | `/roles/{id}/permissions` | Get role permissions |
 | PUT | `/roles/{id}/permissions` | Update permissions |
 
 ### Timetables
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/timetables` | List timetable entries |
 | POST | `/timetables` | Create timetable entry |
 | PUT | `/timetables/{id}` | Update |
@@ -182,7 +203,7 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 **File:** `src/api/fees.ts`
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/fee-categories` | List fee categories |
 | POST | `/fee-categories` | Create category |
 | GET | `/fee-types` | List fee types |
@@ -206,7 +227,7 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 **File:** `src/api/transport.ts`
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/masters/routes/` | List routes |
 | POST | `/masters/routes/` | Create route |
 | GET | `/masters/vehicles/` | List vehicles |
@@ -223,10 +244,10 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 
 ## 8. Staff API
 
-**File:** `src/api/staff.ts` (313 lines)
+**File:** `src/api/staff.ts`
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/staff` | List staff members |
 | POST | `/staff` | Enroll staff member |
 | GET | `/staff/{id}` | Get staff details |
@@ -243,7 +264,7 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 **File:** `src/api/expense.ts`
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/expense-categories` | List categories |
 | POST | `/expense-categories` | Create category |
 | GET | `/expense-types` | List expense types |
@@ -266,7 +287,7 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 **File:** `src/api/profile.ts`
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/profile/student` | Get student profile |
 | PUT | `/profile/student` | Update student profile |
 | GET | `/profile/parent/me` | Get parent profile |
@@ -276,39 +297,48 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 
 ---
 
-## 11. Exam API (Backend Ready — Mobile Integration Pending)
+## 11. Exam API
 
-**Location:** `C:\...\PythonWorkspace\COS360\app\api\v1\exam\`
+**Mobile file:** `src/api/exam.ts` — fully integrated
+**Status:** Backend + Mobile complete
 
 ### Exam Management
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | POST | `/exams` | Create exam |
-| GET | `/exams` | List exams |
+| GET | `/exams` | List exams (filter: `exam_status`) |
 | GET | `/exams/{id}` | Get exam details |
 | PUT | `/exams/{id}` | Update exam |
 | DELETE | `/exams/{id}` | Delete exam |
 | POST | `/exams/{id}/clone` | Clone exam |
 | POST | `/exams/{id}/unlock` | Unlock for corrections |
 
+**Create exam request fields:** `exam_name`, `board`, `level`, `exam_type`, `nature`, `academic_year_id`
+
 ### Mark Entry
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/exams/{id}/marks/template` | Download Excel template |
-| GET | `/exams/{id}/marks` | Get marks grid (paginated) |
-| POST | `/exams/{id}/marks` | Save/update marks |
+| GET | `/exams/{id}/marks` | Get marks grid (paginated, param: `page_size`) |
+| POST | `/exams/{id}/marks` | Save/update marks (requires `component_id`) |
 
 ### Results
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | POST | `/exams/{id}/compute` | Compute results |
 | POST | `/exams/{id}/publish` | Publish results |
 | GET | `/exams/{id}/results` | List results |
 | GET | `/exams/{id}/results/{studentId}` | Get student result |
 
+**Result fields:** `is_passed`, `total_marks_obtained`, `grade_label`
+
 ### Hall Tickets
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | POST | `/exams/{id}/hall-tickets/compute` | Compute eligibility |
 | GET | `/exams/{id}/hall-tickets/eligible` | List eligible students |
 | GET | `/exams/{id}/hall-tickets/ineligible` | List ineligible students |
@@ -318,8 +348,9 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 | GET | `/exams/{id}/hall-tickets/download-all` | Download all as ZIP |
 
 ### Exam Dates
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/exams/{id}/dates` | List exam dates |
 | POST | `/exams/{id}/dates` | Add exam date |
 | POST | `/exams/{id}/dates/bulk` | Bulk add dates |
@@ -327,8 +358,9 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 | DELETE | `/exams/{id}/dates/{dateId}` | Delete date |
 
 ### Grade Schemes
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| ------ | -------- | ----------- |
 | GET | `/grade-schemes` | List schemes |
 | POST | `/grade-schemes` | Create scheme |
 | PUT | `/grade-schemes/{id}` | Update scheme |
@@ -339,7 +371,7 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 ## 12. Special Headers
 
 | Header | Value | Required On |
-|--------|-------|-------------|
+| ------ | ----- | ----------- |
 | `Authorization` | `Bearer {access_token}` | All authenticated requests |
 | `cschema` | `{tenant_schema}` | All requests |
 | `X-Student-ID` | `{student_id}` | Parent user requests for student data |
@@ -351,7 +383,7 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 ## 13. Error Handling
 
 | HTTP Status | Meaning | App Behavior |
-|-------------|---------|--------------|
+| ----------- | ------- | ------------ |
 | 200/201 | Success | Normal data flow |
 | 400 | Bad Request / Validation Error | Show field-level errors |
 | 401 | Unauthorized | Attempt token refresh; if fails → logout |
@@ -365,5 +397,4 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 
 ---
 
-*COS360 School Management System — API Integration Reference*
-*March 2026*
+COS360 School Management System — API Integration Reference — March 2026

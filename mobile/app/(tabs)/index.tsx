@@ -5,7 +5,6 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { AppLayout } from '@/components';
 import { useAuth, useTheme } from '@/contexts';
-import { PermissionGuard } from '../../src/components/mobile/MobilePermissionGuard';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -17,7 +16,11 @@ const getGreeting = () => {
 const getFormattedDate = () =>
   new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-const MODULES = [
+// resource: primary permission resource; resources: OR-list; alwaysShow: skip permission check
+const MODULES: {
+  id: string; title: string; icon: any; color: string; bg: string; darkBg: string;
+  route: string; resource?: string; resources?: string[]; alwaysShow?: boolean;
+}[] = [
   {
     id: 'students',
     title: 'Students',
@@ -25,8 +28,8 @@ const MODULES = [
     color: '#3B82F6',
     bg: '#EFF6FF',
     darkBg: '#3B82F620',
-    route: '/students',
-    stat: '1,250+ Students',
+    route: '/(tabs)/students',
+    resource: 'student_admissions',
   },
   {
     id: 'fees',
@@ -35,8 +38,8 @@ const MODULES = [
     color: '#10B981',
     bg: '#F0FDF4',
     darkBg: '#10B98120',
-    route: '/fees',
-    stat: '₹2.5M Collected',
+    route: '/(tabs)/fees',
+    resource: 'fee_transactions',
   },
   {
     id: 'masters',
@@ -45,8 +48,8 @@ const MODULES = [
     color: '#06B6D4',
     bg: '#ECFEFF',
     darkBg: '#06B6D420',
-    route: '/masters',
-    stat: '15+ Modules',
+    route: '/(tabs)/masters',
+    resource: 'academic_years',
   },
   {
     id: 'transport',
@@ -55,8 +58,8 @@ const MODULES = [
     color: '#F59E0B',
     bg: '#FFFBEB',
     darkBg: '#F59E0B20',
-    route: '/transport',
-    stat: '25 Vehicles',
+    route: '/(tabs)/transport',
+    alwaysShow: true,
   },
   {
     id: 'staff',
@@ -65,8 +68,8 @@ const MODULES = [
     color: '#8B5CF6',
     bg: '#F5F3FF',
     darkBg: '#8B5CF620',
-    route: '/staff',
-    stat: '85 Members',
+    route: '/(tabs)/staff',
+    resource: 'staff',
   },
   {
     id: 'expense',
@@ -75,67 +78,85 @@ const MODULES = [
     color: '#F97316',
     bg: '#FFF7ED',
     darkBg: '#F9731620',
-    route: '/expense',
-    stat: '₹1.2M Spent',
+    route: '/(tabs)/expense',
+    resource: 'expense_transactions',
+  },
+  {
+    id: 'exam',
+    title: 'Exam',
+    icon: 'document-text' as const,
+    color: '#EC4899',
+    bg: '#FDF2F8',
+    darkBg: '#EC489920',
+    route: '/(tabs)/exam',
+    resource: 'exams',
+  },
+  {
+    id: 'communication',
+    title: 'Communication',
+    icon: 'chatbubbles' as const,
+    color: '#6366F1',
+    bg: '#EEF2FF',
+    darkBg: '#6366F120',
+    route: '/(tabs)/communication',
+    alwaysShow: true,
   },
 ];
 
 export default function HomeScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
 
   const initial = (user?.username || 'U').charAt(0).toUpperCase();
 
+  // Only show modules the user has at least read or list permission for
+  const accessibleModules = MODULES.filter(mod => {
+    if (mod.alwaysShow) return true;
+    const resources = mod.resources ?? (mod.resource ? [mod.resource] : []);
+    return resources.some(r =>
+      hasPermission(r, 'read') || hasPermission(r, 'list') || hasPermission(r, 'read_own')
+    );
+  });
+
   return (
-    <PermissionGuard resourceConstant="profile" actionConstant="read_own">
-      <AppLayout title="Dashboard">
-        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+    <AppLayout title="Dashboard">
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
 
-          {/* Hero / Greeting Card */}
-          <View style={styles.heroCard}>
-            <View style={styles.heroDecorCircle1} />
-            <View style={styles.heroDecorCircle2} />
+        {/* Hero / Greeting Card */}
+        <View style={styles.heroCard}>
+          <View style={styles.heroDecorCircle1} />
+          <View style={styles.heroDecorCircle2} />
 
-            {/* Top row: greeting + avatar */}
-            <View style={styles.heroTop}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.heroGreeting}>{getGreeting()},</Text>
-                <Text style={styles.heroName}>{user?.username || 'User'} 👋</Text>
-                <View style={styles.heroDateRow}>
-                  <Ionicons name="calendar-outline" size={13} color="rgba(255,255,255,0.65)" />
-                  <Text style={styles.heroDate}>{getFormattedDate()}</Text>
-                </View>
-              </View>
-              <View style={styles.heroAvatar}>
-                <Text style={styles.heroAvatarText}>{initial}</Text>
+          {/* Top row: greeting + avatar */}
+          <View style={styles.heroTop}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.heroGreeting}>{getGreeting()},</Text>
+              <Text style={styles.heroName}>{user?.username || 'User'} 👋</Text>
+              <View style={styles.heroDateRow}>
+                <Ionicons name="calendar-outline" size={13} color="rgba(255,255,255,0.65)" />
+                <Text style={styles.heroDate}>{getFormattedDate()}</Text>
               </View>
             </View>
-
-            {/* Stats bar */}
-            <View style={styles.heroStatsBar}>
-              <View style={styles.heroStatItem}>
-                <Text style={styles.heroStatNum}>1,250</Text>
-                <Text style={styles.heroStatLabel}>Students</Text>
-              </View>
-              <View style={styles.heroStatDivider} />
-              <View style={styles.heroStatItem}>
-                <Text style={styles.heroStatNum}>85</Text>
-                <Text style={styles.heroStatLabel}>Staff</Text>
-              </View>
-              <View style={styles.heroStatDivider} />
-              <View style={styles.heroStatItem}>
-                <Text style={styles.heroStatNum}>₹2.5M</Text>
-                <Text style={styles.heroStatLabel}>Collected</Text>
-              </View>
+            <View style={styles.heroAvatar}>
+              <Text style={styles.heroAvatarText}>{initial}</Text>
             </View>
           </View>
+        </View>
 
-          {/* Module Grid */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Modules</Text>
+        {/* Module Grid */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Modules</Text>
+          {accessibleModules.length === 0 ? (
+            <View style={styles.emptyModules}>
+              <Ionicons name="lock-closed-outline" size={40} color={colors['muted-foreground']} />
+              <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
+                No modules available.{'\n'}Contact your administrator.
+              </Text>
+            </View>
+          ) : (
             <View style={styles.grid}>
-              {MODULES.map(mod => (
+              {accessibleModules.map(mod => (
                 <TouchableOpacity
                   key={mod.id}
                   style={[
@@ -149,18 +170,17 @@ export default function HomeScreen() {
                     <Ionicons name={mod.icon} size={22} color="white" />
                   </View>
                   <Text style={[styles.moduleTitle, { color: mod.color }]}>{mod.title}</Text>
-                  <Text style={[styles.moduleStat, { color: colors['muted-foreground'] }]}>{mod.stat}</Text>
                   <View style={[styles.moduleArrowBg, { backgroundColor: mod.color + '20' }]}>
                     <Ionicons name="arrow-forward" size={13} color={mod.color} />
                   </View>
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
+          )}
+        </View>
 
-        </ScrollView>
-      </AppLayout>
-    </PermissionGuard>
+      </ScrollView>
+    </AppLayout>
   );
 }
 
@@ -199,7 +219,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     padding: 20,
-    paddingBottom: 16,
+    paddingBottom: 20,
   },
   heroGreeting: {
     color: 'rgba(255,255,255,0.7)',
@@ -238,34 +258,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
   },
-  heroStatsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.18)',
-    marginHorizontal: 16,
-    marginBottom: 18,
-    borderRadius: 14,
-    paddingVertical: 12,
-  },
-  heroStatItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  heroStatNum: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  heroStatLabel: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  heroStatDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
   section: {
     paddingHorizontal: 16,
     paddingBottom: 24,
@@ -297,12 +289,7 @@ const styles = StyleSheet.create({
   moduleTitle: {
     fontSize: 15,
     fontWeight: '700',
-    marginBottom: 4,
-  },
-  moduleStat: {
-    fontSize: 12,
     marginBottom: 12,
-    lineHeight: 16,
   },
   moduleArrowBg: {
     alignSelf: 'flex-end',
@@ -311,5 +298,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  emptyModules: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

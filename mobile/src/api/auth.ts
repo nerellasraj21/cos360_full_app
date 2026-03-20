@@ -52,7 +52,7 @@ export const refreshToken = async (): Promise<string | null> => {
 
     const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://www.cos360.app/api/v1';
     const schema = await AsyncStorage.getItem('@auth/client_schema').catch(() => null);
-    const response = await fetch(`${apiUrl}/auth/login/refresh`, {
+    const response = await fetch(`${apiUrl}/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -13,7 +13,7 @@ export const PermissionPerformanceMonitor: React.FC<PermissionPerformanceMonitor
   onClose
 }) => {
   const [performanceData, setPerformanceData] = useState<any>(null);
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [refreshInterval, setRefreshInterval] = useState<ReturnType<typeof setInterval> | null>(null);
   const { getCacheStats, clearPermissionCache } = useOptimizedMobilePermissions();
 
   useEffect(() => {

@@ -543,11 +543,29 @@ export const examResultsApi = {
   getStudentResult: (examId: string, studentId: string) =>
     apiClient.get<StudentExamResult>(`/exams/${examId}/results/${studentId}`).then(r => r.data),
 
+  /** Student: computed result (only after exam is published/finalized) */
   getMyResult: (examId: string) =>
+    apiClient.get<StudentExamResult>(`/exams/${examId}/my-result`).then(r => r.data),
+
+  /** Parent: child's computed result (only after exam is published/finalized) */
+  getChildResult: (examId: string, studentId: string) =>
+    apiClient.get<StudentExamResult>(`/exams/${examId}/child-result/${studentId}`).then(r => r.data),
+
+  /** Student: raw marks (visible as soon as teacher enters marks) */
+  getMyRawMarks: (examId: string) =>
     apiClient.get<StudentMarksView>(`/exams/${examId}/my-marks`).then(r => r.data),
 
-  getChildResult: (examId: string, studentId: string) =>
+  /** Parent: child's raw marks (visible as soon as teacher enters marks) */
+  getChildRawMarks: (examId: string, studentId: string) =>
     apiClient.get<StudentMarksView>(`/exams/${examId}/child-marks/${studentId}`).then(r => r.data),
+
+  /** Alias for getMyRawMarks — used in my-marks screen */
+  getMyMarks: (examId: string) =>
+    apiClient.get<any>(`/exams/${examId}/my-marks`).then(r => r.data),
+
+  /** Alias for getChildRawMarks — used in my-marks screen */
+  getChildMarks: (examId: string, studentId: string) =>
+    apiClient.get<any>(`/exams/${examId}/child-marks/${studentId}`).then(r => r.data),
 };
 
 // ─── API: Hall Tickets ────────────────────────────────────────────────────────

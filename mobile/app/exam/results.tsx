@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
-import { useTheme } from '@/contexts';
+import { useAuth, useTheme } from '@/contexts';
 import { examsApi, examResultsApi, StudentExamResult } from '@/src/api/exam';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
 
@@ -17,6 +17,20 @@ export default function ResultsScreen() {
   const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
   const qc = useQueryClient();
+  const router = useRouter();
+  const { role } = useAuth();
+
+  const roleName = role?.name?.toLowerCase() ?? '';
+  const isStudentOrParent =
+    roleName === 'student' ||
+    ['parent', 'guardian', 'father', 'mother'].includes(roleName);
+
+  // Redirect student/parent immediately if examId was passed as a param
+  useEffect(() => {
+    if (isStudentOrParent && examId) {
+      router.replace(`/exam/my-marks/${examId}` as any);
+    }
+  }, [isStudentOrParent, examId]);
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -182,7 +196,13 @@ export default function ResultsScreen() {
                 <TouchableOpacity
                   key={e.id}
                   style={[styles.chip, { backgroundColor: selectedExamId === e.id ? colors.primary : cardBg, borderColor: borderCol }]}
-                  onPress={() => setSelectedExamId(e.id)}
+                  onPress={() => {
+                    if (isStudentOrParent) {
+                      router.push(`/exam/my-marks/${e.id}` as any);
+                    } else {
+                      setSelectedExamId(e.id);
+                    }
+                  }}
                 >
                   <Text style={[styles.chipText, { color: selectedExamId === e.id ? 'white' : colors['muted-foreground'] as string }]}>
                     {e.exam_name}

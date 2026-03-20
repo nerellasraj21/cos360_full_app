@@ -84,13 +84,13 @@ export interface ParentProfileUpdate {
 export const studentProfileApi = {
   // Get student's own profile
   getProfile: async (): Promise<StudentProfileOut> => {
-    const response = await apiClient.get<StudentProfileOut>('/profile/students/me');
+    const response = await apiClient.get<StudentProfileOut>('/profile/student/me');
     return response.data;
   },
 
   // Update student's own profile
   updateProfile: async (data: StudentProfileUpdate): Promise<StudentProfileOut> => {
-    const response = await apiClient.put<StudentProfileOut>('/profile/students/me', data);
+    const response = await apiClient.put<StudentProfileOut>('/profile/student/me', data);
     return response.data;
   },
 };

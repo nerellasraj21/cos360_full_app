@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
-import { useTheme } from '@/contexts';
+import { useAuth, useTheme } from '@/contexts';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
@@ -14,14 +14,43 @@ const sections = [
   { title: 'Route Stops',       description: 'Manage stops along transport routes',          icon: 'location' as const, color: '#D97706', route: '/transport/route-stops',     resource: PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS, action: 'list' },
   { title: 'Vehicles',          description: 'Fleet management and maintenance tracking',    icon: 'car' as const,      color: AMBER,     route: '/transport/vehicles',        resource: PERMISSION_RESOURCES.TRANSPORT_VEHICLES,    action: 'list' },
   { title: 'Trips',             description: 'Assign vehicles and drivers to routes',        icon: 'navigate' as const, color: '#B45309', route: '/transport/trips',           resource: PERMISSION_RESOURCES.TRANSPORT_TRIPS,       action: 'list' },
-  { title: 'Student Transport', description: 'Manage student transport assignments',         icon: 'people' as const,   color: AMBER,     route: '/transport/studentTransport',resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,     action: 'list' },
+  { title: 'Student Transport', description: 'Manage student transport assignments',         icon: 'people' as const,   color: AMBER,     route: '/transport/student-transport',resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,     action: 'list' },
   { title: 'Student Trips',     description: 'Detailed student trip assignments with fees',  icon: 'person' as const,   color: '#D97706', route: '/transport/studentTrips',    resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,     action: 'list' },
+  { title: 'Pricing',           description: 'Manage transport pricing by route and stop',   icon: 'pricetag' as const, color: '#556ee6', route: '/transport/pricing',         resource: PERMISSION_RESOURCES.TRANSPORT_ROUTES,      action: 'list' },
 ];
 
 export default function TransportScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { role } = useAuth();
   const { hasPermission } = useMobilePermission();
+
+  const roleName = role?.name?.toLowerCase() ?? '';
+  const isStudentOrParent = ['student', 'parent', 'guardian', 'father', 'mother'].includes(roleName);
+
+  // Student/parent: go directly to their own transport view
+  if (isStudentOrParent) {
+    const studentRoute = '/transport/student-transport';
+    return (
+      <AppLayout title="My Transport">
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
+          <Ionicons name="bus" size={56} color={AMBER} />
+          <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: '700', textAlign: 'center' }}>
+            Transport Information
+          </Text>
+          <Text style={{ color: colors['muted-foreground'], fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
+            View your transport assignment, route, stop and timings.
+          </Text>
+          <TouchableOpacity
+            style={{ backgroundColor: AMBER, borderRadius: 12, paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 }}
+            onPress={() => router.push(studentRoute as any)}
+          >
+            <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>View My Transport</Text>
+          </TouchableOpacity>
+        </View>
+      </AppLayout>
+    );
+  }
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';

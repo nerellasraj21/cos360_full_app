@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts';
 import { examsApi, ExamStatus } from '@/src/api/exam';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
@@ -30,7 +31,12 @@ const sections = [
 export default function ExamScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { role } = useAuth();
   const { hasPermission } = useMobilePermission();
+
+  const roleName = role?.name?.toLowerCase() ?? '';
+  const isStudent = roleName === 'student';
+  const isParent = roleName === 'parent' || roleName === 'guardian';
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -95,9 +101,30 @@ export default function ExamScreen() {
         </View>
 
         {/* Section label */}
-        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>EXAM SECTIONS</Text>
+        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>
+          {isStudent || isParent ? 'MY EXAMS' : 'EXAM SECTIONS'}
+        </Text>
 
-        {/* Grid */}
+        {/* My Marks card — student / parent only */}
+        {(isStudent || isParent) && (
+          <TouchableOpacity
+            style={[styles.myMarksCard, { backgroundColor: cardBg, borderColor: borderCol }]}
+            onPress={() => router.push('/exam/list' as any)}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.sectionIconBox, { backgroundColor: '#556ee618', marginBottom: 0, marginRight: 12 }]}>
+              <Ionicons name="ribbon" size={24} color="#556ee6" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>My Marks</Text>
+              <Text style={[styles.sectionDesc, { color: colors['muted-foreground'] }]}>View your exam marks and results</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors['muted-foreground']} />
+          </TouchableOpacity>
+        )}
+
+        {/* Admin grid — hidden for student / parent */}
+        {!isStudent && !isParent && (
         <View style={styles.grid}>
           {sections.map((section, i) => {
             const hasAccess = hasPermission ? hasPermission(section.resource as any, section.action) : false;
@@ -135,8 +162,10 @@ export default function ExamScreen() {
             );
           })}
         </View>
+        )}
 
-        {/* Recent Exams */}
+        {/* Recent Exams — admin only */}
+        {!isStudent && !isParent && (<>
         <View style={styles.recentHeader}>
           <Text style={[styles.listTitle, { color: colors.foreground }]}>Recent Exams</Text>
           {hasListPerm && (
@@ -196,6 +225,7 @@ export default function ExamScreen() {
             </TouchableOpacity>
           );
         })}
+        </>)}
 
       </ScrollView>
     </AppLayout>
@@ -286,4 +316,10 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 10, fontWeight: '700' },
   examDateRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   examDateText: { fontSize: 12 },
+  myMarksCard: {
+    flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1,
+    padding: 14, marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+  },
 });

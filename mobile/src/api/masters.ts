@@ -302,8 +302,10 @@ export interface RouteStop {
   name: string;
   number: number;
   reaching_time: string; // HH:MM:SS format
-  fees: number; 
+  fees: number;
   is_active: boolean;
+  pickup_time?: string;  // morning pickup time e.g. "07:30:00"
+  drop_time?: string;    // afternoon drop time e.g. "14:00:00"
   created_at?: string;
   updated_at?: string;
 }
@@ -315,6 +317,8 @@ export interface RouteStopCreate {
   reaching_time: string;
   fees: number;
   is_active?: boolean;
+  pickup_time?: string;
+  drop_time?: string;
 }
 
 export interface RouteStopUpdate {
@@ -324,6 +328,8 @@ export interface RouteStopUpdate {
   reaching_time?: string;
   fees?: number;
   is_active?: boolean;
+  pickup_time?: string;
+  drop_time?: string;
 }
 
 export interface Vehicle {
@@ -388,7 +394,7 @@ export interface StudentTransport {
   trip_type: string;
   academic_year_id: string;
   fare_amount: number;
-  is_active: boolean;
+  pricing_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -400,6 +406,7 @@ export interface StudentTransportCreate {
   trip_type: string;
   academic_year_id: string;
   fare_amount: number;
+  pricing_id?: string;
 }
 
 export interface StudentTransportUpdate {
@@ -409,7 +416,7 @@ export interface StudentTransportUpdate {
   trip_type?: string;
   academic_year_id?: string;
   fare_amount?: number;
-  is_active?: boolean;
+  pricing_id?: string;
 }
 
 export interface StudentTrip {
@@ -1177,6 +1184,35 @@ export const studentTripsApi = {
 
   getStudentTripsByStudent: async (studentId: string): Promise<StudentTrip[]> => {
     const response = await apiClient.get(`/students/student-transport/student/${studentId}`);
+    return response.data;
+  },
+};
+
+export interface CasteDropdownOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
+export interface SubCasteDropdownOption {
+  id: string;
+  caste_id: string;
+  name: string;
+  code: string;
+}
+
+export const castesApi = {
+  getCastesDropdown: async (activeOnly: boolean = true): Promise<CasteDropdownOption[]> => {
+    const response = await apiClient.get('/masters/castes/dropdown', {
+      params: { active_only: activeOnly },
+    });
+    return response.data;
+  },
+
+  getSubCastesDropdown: async (casteId: string, activeOnly: boolean = true): Promise<SubCasteDropdownOption[]> => {
+    const response = await apiClient.get(`/masters/castes/${casteId}/sub-castes/dropdown`, {
+      params: { active_only: activeOnly },
+    });
     return response.data;
   },
 };

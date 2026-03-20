@@ -32,6 +32,8 @@ export default function RouteStopsScreen() {
     name: '',
     number: 1,
     reaching_time: '07:00:00',
+    pickup_time: '',
+    drop_time: '',
     fees: 0,
     is_active: true,
   });
@@ -107,6 +109,8 @@ export default function RouteStopsScreen() {
       name: '',
       number: 1,
       reaching_time: '07:00:00',
+      pickup_time: '',
+      drop_time: '',
       fees: 0,
       is_active: true,
     });
@@ -120,6 +124,8 @@ export default function RouteStopsScreen() {
       name: stop.name,
       number: stop.number,
       reaching_time: stop.reaching_time,
+      pickup_time: stop.pickup_time ?? '',
+      drop_time: stop.drop_time ?? '',
       fees: stop.fees,
       is_active: stop.is_active,
     });
@@ -210,6 +216,22 @@ export default function RouteStopsScreen() {
               Stop #{item.number} • {item.reaching_time}
             </ThemedText>
           </View>
+          {item.pickup_time ? (
+            <View style={styles.detailRow}>
+              <Ionicons name="arrow-up-circle" size={16} color={colors['muted-foreground']} />
+              <ThemedText style={styles.detailText}>
+                Pickup: {item.pickup_time}
+              </ThemedText>
+            </View>
+          ) : null}
+          {item.drop_time ? (
+            <View style={styles.detailRow}>
+              <Ionicons name="arrow-down-circle" size={16} color={colors['muted-foreground']} />
+              <ThemedText style={styles.detailText}>
+                Drop: {item.drop_time}
+              </ThemedText>
+            </View>
+          ) : null}
           <View style={styles.detailRow}>
             <Ionicons name="cash" size={16} color={colors['muted-foreground']} />
             <ThemedText style={styles.detailText}>
@@ -403,6 +425,29 @@ export default function RouteStopsScreen() {
                       value={formData.fees.toString()}
                       onChangeText={(text) => setFormData(prev => ({ ...prev, fees: parseFloat(text) || 0 }))}
                       keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                    <ThemedText style={styles.label}>Pickup Time</ThemedText>
+                    <TextInput
+                      style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+                      placeholder="07:30:00"
+                      placeholderTextColor={colors['muted-foreground']}
+                      value={formData.pickup_time}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, pickup_time: text }))}
+                    />
+                  </View>
+                  <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                    <ThemedText style={styles.label}>Drop Time</ThemedText>
+                    <TextInput
+                      style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+                      placeholder="14:00:00"
+                      placeholderTextColor={colors['muted-foreground']}
+                      value={formData.drop_time}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, drop_time: text }))}
                     />
                   </View>
                 </View>

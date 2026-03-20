@@ -7,7 +7,12 @@
       "Bash(ls:*)",
       "Bash(python:*)",
       "Bash(npx tsc:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(npx eslint:*)",
+      "Read(//c/Users/nerel/.claude/projects/c--Users-nerel-Documents-Workspace-React-Workspace-cos360-mobile-cos360-mobile-app/memory/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\nerel\\.claude\\projects\\c--Users-nerel-Documents-Workspace-React-Workspace-cos360-mobile-cos360-mobile-app\\memory"
     ]
   }
 }
