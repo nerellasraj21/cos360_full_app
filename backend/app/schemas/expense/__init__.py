@@ -34,6 +34,12 @@ from .expense_transaction_schema import (
     ExpenseTransactionRead,
     ExpenseTransactionUpdate,
 )
+from .expense_summary_schema import (
+    ExpenseCategorySummary,
+    ExpenseEntryRead,
+    ExpenseHierarchicalSummary,
+    ExpenseTypeSummary,
+)
 from .expense_type_schema import ExpenseTypeCreate, ExpenseTypeDropdown, ExpenseTypeRead, ExpenseTypeUpdate
 
 __all__ = [
@@ -76,4 +82,9 @@ __all__ = [
     "ExpenseReportExportResponse",
     "CategorySummary",
     "TypeSummary",
+    # Summary schemas
+    "ExpenseHierarchicalSummary",
+    "ExpenseCategorySummary",
+    "ExpenseTypeSummary",
+    "ExpenseEntryRead",
 ]
