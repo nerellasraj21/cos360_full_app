@@ -4,6 +4,7 @@ import { useToastContext } from '@/components/ToastProvider';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useAuth, useTheme } from '@/contexts';
+import { useAcademicYear } from '../../contexts/AcademicYearContext';
 import { useStudents, useRoutesDropdown } from '@/hooks';
 import { studentTransportApi, StudentTransport } from '../../src/api';
 import { useRouteStops } from '../../hooks/use-transport';
@@ -39,6 +40,7 @@ export default function StudentTransportScreen() {
 
   const { colors } = useTheme();
   const { role, selectedStudent, studentId, availableStudents } = useAuth();
+  const { activeAcademicYearId } = useAcademicYear();
   const roleName = role?.name?.toLowerCase() ?? '';
   const isStudent = roleName === 'student';
   const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
@@ -140,7 +142,7 @@ export default function StudentTransportScreen() {
       route_id: '',
       stop_id: '',
       trip_type: 'first trip',
-      academic_year_id: '',
+      academic_year_id: activeAcademicYearId || '',
       fare_amount: 0,
       pricing_id: '',
     });
@@ -193,10 +195,18 @@ export default function StudentTransportScreen() {
       return;
     }
 
+    const payload = {
+      ...formData,
+      academic_year_id: formData.academic_year_id || activeAcademicYearId || '',
+      ...(formData.pricing_id ? { pricing_id: formData.pricing_id } : {}),
+    };
+    // Remove pricing_id key entirely if empty (backend rejects empty UUID string)
+    if (!payload.pricing_id) delete (payload as any).pricing_id;
+
     if (editingTransport) {
-      updateMutation.mutate({ id: editingTransport.id, data: formData });
+      updateMutation.mutate({ id: editingTransport.id, data: payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload);
     }
   };
 
@@ -517,32 +527,25 @@ export default function StudentTransportScreen() {
 
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.label}>Trip Type *</ThemedText>
-                  <TouchableOpacity
-                    style={[styles.dropdown, { borderColor: colors.border }]}
-                    onPress={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        trip_type: prev.trip_type === 'first trip' ? 'second trip' : 'first trip'
-                      }));
-                    }}
-                  >
-                    <ThemedText style={{ color: colors.foreground }}>
-                      {formData.trip_type === 'first trip' ? 'First Trip' : 'Second Trip'}
-                    </ThemedText>
-                    <Ionicons name="chevron-down" size={16} color={colors['muted-foreground']} />
-                  </TouchableOpacity>
+                  <CustomDropdown
+                    data={[
+                      { label: 'First Trip', value: 'first trip' },
+                      { label: 'Second Trip', value: 'second trip' },
+                    ]}
+                    value={formData.trip_type}
+                    onChange={(value) => setFormData(prev => ({ ...prev, trip_type: value?.toString() || 'first trip' }))}
+                    placeholder="Select trip type"
+                  />
                 </View>
 
                 <View style={styles.formRow}>
                   <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <ThemedText style={styles.label}>Academic Year *</ThemedText>
-                    <TextInput
-                      style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
-                      placeholder="Enter academic year ID"
-                      placeholderTextColor={colors['muted-foreground']}
-                      value={formData.academic_year_id}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, academic_year_id: text }))}
-                    />
+                    <ThemedText style={styles.label}>Academic Year</ThemedText>
+                    <View style={[styles.input, { borderColor: colors.border, justifyContent: 'center' }]}>
+                      <ThemedText style={{ color: colors['muted-foreground'], fontSize: 14 }}>
+                        {activeAcademicYearId ? 'Current year (auto)' : 'No active year'}
+                      </ThemedText>
+                    </View>
                   </View>
                   <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
                     <ThemedText style={styles.label}>Fare Amount *</ThemedText>

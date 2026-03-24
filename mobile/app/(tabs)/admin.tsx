@@ -7,49 +7,87 @@ import { useTheme } from '@/contexts';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
-const ORANGE = '#F97316';
+const ADMIN_COLOR = '#64748b';
 
 const sections = [
-  { title: 'Categories',        description: 'Manage top-level expense categories such as Infrastructure, Utilities, and Operations', icon: 'folder' as const,               color: '#EA580C', route: '/expense/categories',   resource: PERMISSION_RESOURCES.EXPENSE_CATEGORIES,   action: 'list'    },
-  { title: 'Types',             description: 'Define specific expense types within each category with budget limits and controls',     icon: 'pricetag' as const,             color: ORANGE,    route: '/expense/types',        resource: PERMISSION_RESOURCES.EXPENSE_TYPES,        action: 'list'    },
-  { title: 'Transactions',      description: 'Create, view, and track all expense transactions with full approval workflow',           icon: 'swap-horizontal' as const,      color: '#C2410C', route: '/expense/transactions', resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS, action: 'list'    },
-  { title: 'Pending Approvals', description: 'Review and approve or reject expense transactions awaiting authorization',              icon: 'checkmark-done-circle' as const,color: ORANGE,    route: '/expense/approvals',    resource: PERMISSION_RESOURCES.EXPENSE_APPROVALS,    action: 'approve' },
-  { title: 'Summary',           description: 'Category-wise breakdown with type totals and grand total — filterable by academic year', icon: 'bar-chart' as const,            color: '#EA580C', route: '/expense/summary',      resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS, action: 'list'    },
-  { title: 'Audit Trail',       description: 'Complete audit log of all expense actions including status changes and approvals',       icon: 'time' as const,                 color: '#C2410C', route: '/expense/audit',        resource: PERMISSION_RESOURCES.EXPENSE_AUDIT,        action: 'list'    },
+  {
+    title: 'User Management',
+    description: 'Manage user accounts and access across the organization',
+    icon: 'people' as const,
+    color: '#6366F1',
+    route: '/admin/users',
+    resource: PERMISSION_RESOURCES.ADMIN_USERS,
+  },
+  {
+    title: 'Role Management',
+    description: 'Configure roles and fine-grained access control',
+    icon: 'shield-checkmark' as const,
+    color: '#10B981',
+    route: '/admin/roles',
+    resource: PERMISSION_RESOURCES.ADMIN_ROLES,
+  },
+  {
+    title: 'Permission Management',
+    description: 'Manage granular permissions for each role',
+    icon: 'lock-closed' as const,
+    color: '#F59E0B',
+    route: '/admin/permissions',
+    resource: PERMISSION_RESOURCES.ADMIN_PERMISSIONS,
+  },
+  {
+    title: 'Menu Management',
+    description: 'Configure sidebar menu items and visibility',
+    icon: 'menu' as const,
+    color: '#EF4444',
+    route: '/admin/menu',
+    resource: PERMISSION_RESOURCES.ADMIN_MENU,
+  },
 ];
 
-export default function ExpenseScreen() {
+export default function AdminScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
+  const comingSoonBorderCol = theme === 'dark' ? 'rgba(255,255,255,0.15)' : '#cbd5e1';
 
   return (
-    <AppLayout title="Expense Management">
+    <AppLayout title="Administration">
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
         {/* Banner */}
-        <View style={[styles.banner, { backgroundColor: ORANGE }]}>
+        <View style={styles.banner}>
           <View style={styles.bannerDecor} />
           <View style={styles.bannerDecor2} />
           <View style={styles.bannerIcon}>
-            <Ionicons name="wallet" size={28} color="white" />
+            <Ionicons name="shield-checkmark" size={28} color="white" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.bannerTitle}>Expense Management</Text>
-            <Text style={styles.bannerSub}>Track, manage and approve expenses</Text>
+            <Text style={styles.bannerTitle}>Administration</Text>
+            <Text style={styles.bannerSub}>Manage system settings, users, roles, and organization-wide configurations</Text>
           </View>
         </View>
 
+        {/* Coming Soon card */}
+        <View style={[styles.comingSoonCard, { borderColor: comingSoonBorderCol, backgroundColor: cardBg }]}>
+          <Ionicons name="shield-checkmark" size={44} color={colors['muted-foreground']} />
+          <Text style={[styles.comingSoonTitle, { color: colors.foreground }]}>
+            Administration Dashboard — Coming Soon
+          </Text>
+          <Text style={[styles.comingSoonDesc, { color: colors['muted-foreground'] }]}>
+            A centralized administration panel with system health, user stats, and quick actions is being built. Use the sections below to access available admin sections.
+          </Text>
+        </View>
+
         {/* Section label */}
-        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>EXPENSE SECTIONS</Text>
+        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>ADMINISTRATION SECTIONS</Text>
 
         {/* Grid */}
         <View style={styles.grid}>
           {sections.map((section, i) => {
-            const hasAccess = hasPermission ? hasPermission(section.resource, section.action) : false;
+            const hasAccess = hasPermission ? hasPermission(section.resource, 'list') : false;
             return (
               <TouchableOpacity
                 key={i}
@@ -84,6 +122,7 @@ export default function ExpenseScreen() {
             );
           })}
         </View>
+
       </ScrollView>
     </AppLayout>
   );
@@ -93,7 +132,8 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 32 },
   banner: {
-    borderRadius: 18, padding: 18,
+    backgroundColor: '#556ee6',
+    borderRadius: 18, padding: 20,
     flexDirection: 'row', alignItems: 'center', gap: 14,
     marginBottom: 16, overflow: 'hidden',
   },
@@ -108,19 +148,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.07)',
   },
   bannerIcon: {
-    width: 52, height: 52, borderRadius: 14,
+    width: 54, height: 54, borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center',
   },
-  bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 2 },
+  bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 3 },
   bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 16 },
-  sectionLabel: {
-    fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12,
+  comingSoonCard: {
+    borderRadius: 14, borderWidth: 1.5,
+    borderStyle: 'dashed', padding: 28,
+    marginBottom: 20, alignItems: 'center', gap: 10,
   },
+  comingSoonTitle: { fontSize: 16, fontWeight: '600', textAlign: 'center', marginTop: 4 },
+  comingSoonDesc: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   sectionCard: {
     width: '48%', borderRadius: 14, borderWidth: 1,
-    padding: 16, minHeight: 120,
+    padding: 16, minHeight: 130,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },

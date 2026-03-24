@@ -1,5 +1,4 @@
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import CustomDropdown from '@/components/ui/dropdown';
@@ -9,7 +8,7 @@ import { RouteStop } from '../../src/api';
 import { useRouteStops, useCreateRouteStop, useUpdateRouteStop, useDeleteRouteStop } from '../../hooks/use-transport';
 import { PERMISSION_RESOURCES } from '../../src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -21,6 +20,225 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+type TimeField = 'reaching_time' | 'pickup_time' | 'drop_time';
+
+// ─── Custom Time Picker Modal ─────────────────────────────────────────────────
+// Renders as its own Modal so it layers correctly above the form Modal on both
+// Android and iOS. No dependency on @react-native-community/datetimepicker.
+
+function TimePickerModal({
+  visible,
+  initialTime,
+  onConfirm,
+  onCancel,
+  colors,
+}: {
+  visible: boolean;
+  initialTime: string;
+  onConfirm: (time: string) => void;
+  onCancel: () => void;
+  colors: any;
+}) {
+  const [hour, setHour] = useState(7);
+  const [minute, setMinute] = useState(0);
+
+  // Sync to the field's current value whenever the picker opens
+  useEffect(() => {
+    if (visible) {
+      const parts = (initialTime || '07:00:00').split(':').map(Number);
+      setHour(isNaN(parts[0]) ? 7 : parts[0]);
+      setMinute(isNaN(parts[1]) ? 0 : parts[1]);
+    }
+  }, [visible]);
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  const handleDone = () => {
+    onConfirm(`${pad(hour)}:${pad(minute)}:00`);
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onCancel}
+    >
+      <View style={tpStyles.overlay}>
+        <View style={[tpStyles.sheet, { backgroundColor: colors.background }]}>
+          {/* Header */}
+          <View style={[tpStyles.header, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={onCancel} style={tpStyles.headerBtn}>
+              <ThemedText style={{ color: colors['muted-foreground'], fontSize: 16 }}>
+                Cancel
+              </ThemedText>
+            </TouchableOpacity>
+            <ThemedText style={{ fontWeight: '700', fontSize: 16, color: colors.foreground }}>
+              Select Time
+            </ThemedText>
+            <TouchableOpacity onPress={handleDone} style={tpStyles.headerBtn}>
+              <ThemedText style={{ color: colors.primary, fontWeight: '700', fontSize: 16 }}>
+                Done
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+
+          {/* Hour : Minute picker */}
+          <View style={tpStyles.pickerRow}>
+            {/* Hour column */}
+            <View style={tpStyles.column}>
+              <TouchableOpacity
+                style={tpStyles.arrowBtn}
+                onPress={() => setHour(h => (h + 1) % 24)}
+              >
+                <Ionicons name="chevron-up" size={32} color={colors.primary} />
+              </TouchableOpacity>
+              <View style={[tpStyles.digitBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <ThemedText style={tpStyles.timeDigit}>{pad(hour)}</ThemedText>
+              </View>
+              <TouchableOpacity
+                style={tpStyles.arrowBtn}
+                onPress={() => setHour(h => (h - 1 + 24) % 24)}
+              >
+                <Ionicons name="chevron-down" size={32} color={colors.primary} />
+              </TouchableOpacity>
+              <ThemedText style={[tpStyles.columnLabel, { color: colors['muted-foreground'] }]}>
+                Hour
+              </ThemedText>
+            </View>
+
+            <ThemedText style={[tpStyles.colon, { color: colors.foreground }]}>:</ThemedText>
+
+            {/* Minute column */}
+            <View style={tpStyles.column}>
+              <TouchableOpacity
+                style={tpStyles.arrowBtn}
+                onPress={() => setMinute(m => (m + 1) % 60)}
+              >
+                <Ionicons name="chevron-up" size={32} color={colors.primary} />
+              </TouchableOpacity>
+              <View style={[tpStyles.digitBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <ThemedText style={tpStyles.timeDigit}>{pad(minute)}</ThemedText>
+              </View>
+              <TouchableOpacity
+                style={tpStyles.arrowBtn}
+                onPress={() => setMinute(m => (m - 1 + 60) % 60)}
+              >
+                <Ionicons name="chevron-down" size={32} color={colors.primary} />
+              </TouchableOpacity>
+              <ThemedText style={[tpStyles.columnLabel, { color: colors['muted-foreground'] }]}>
+                Minute
+              </ThemedText>
+            </View>
+          </View>
+
+          {/* Quick preset buttons */}
+          <View style={tpStyles.presets}>
+            {['06:00', '07:00', '08:00', '12:00', '14:00', '17:00'].map(t => {
+              const [ph, pm] = t.split(':').map(Number);
+              const isActive = ph === hour && pm === minute;
+              return (
+                <TouchableOpacity
+                  key={t}
+                  style={[
+                    tpStyles.presetBtn,
+                    { borderColor: colors.border, backgroundColor: isActive ? colors.primary : colors.card },
+                  ]}
+                  onPress={() => { setHour(ph); setMinute(pm); }}
+                >
+                  <ThemedText style={[tpStyles.presetText, { color: isActive ? '#fff' : colors.foreground }]}>
+                    {t}
+                  </ThemedText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const tpStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  headerBtn: {
+    minWidth: 60,
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 28,
+    gap: 12,
+  },
+  column: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  arrowBtn: {
+    padding: 6,
+  },
+  digitBox: {
+    width: 80,
+    height: 72,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timeDigit: {
+    fontSize: 40,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  columnLabel: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  colon: {
+    fontSize: 40,
+    fontWeight: '700',
+    marginBottom: 28,
+  },
+  presets: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  presetBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  presetText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+});
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function RouteStopsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,9 +258,27 @@ export default function RouteStopsScreen() {
 
   const { colors } = useTheme();
 
+  // Time picker state
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [activeTimeField, setActiveTimeField] = useState<TimeField>('reaching_time');
+
+  const openTimePicker = (field: TimeField) => {
+    setActiveTimeField(field);
+    setShowTimePicker(true);
+  };
+
+  const confirmTime = (time: string) => {
+    setFormData(prev => ({ ...prev, [activeTimeField]: time }));
+    setShowTimePicker(false);
+  };
+
+  const clearTime = (field: 'pickup_time' | 'drop_time') => {
+    setFormData(prev => ({ ...prev, [field]: '' }));
+  };
+
   // Fetch route stops data using permission-protected hook
-  const { data: routeStopsData, isLoading, error, refetch } = useRouteStops({ 
-    route_id: selectedRouteId || undefined 
+  const { data: routeStopsData, isLoading, error, refetch } = useRouteStops({
+    route_id: selectedRouteId || undefined
   });
 
   // Mutations using permission-protected hooks
@@ -182,7 +418,7 @@ export default function RouteStopsScreen() {
             </View>
           </View>
           <View style={styles.actionButtons}>
-            <UpdatePermissionGuard 
+            <UpdatePermissionGuard
               resource={PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS}>
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.primary }]}
@@ -191,7 +427,7 @@ export default function RouteStopsScreen() {
                 <Ionicons name="create" size={16} color="white" />
               </TouchableOpacity>
             </UpdatePermissionGuard>
-            <DeletePermissionGuard 
+            <DeletePermissionGuard
               resource={PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS}>
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
@@ -263,7 +499,7 @@ export default function RouteStopsScreen() {
 
   return (
     <AppLayout title="Route Stops">
-      <ReadOrListPermissionGuard 
+      <ReadOrListPermissionGuard
         resource={PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS}
         fallback={
           <View style={styles.centerContainer}>
@@ -280,7 +516,7 @@ export default function RouteStopsScreen() {
         <View style={styles.container}>
           {/* Header with Add Button */}
           <View style={styles.header}>
-            <CreatePermissionGuard 
+            <CreatePermissionGuard
               resource={PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS}>
               <TouchableOpacity
                 style={[styles.addButton, { backgroundColor: colors.primary }]}
@@ -408,13 +644,15 @@ export default function RouteStopsScreen() {
                 <View style={styles.formRow}>
                   <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
                     <ThemedText style={styles.label}>Reaching Time *</ThemedText>
-                    <TextInput
-                      style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
-                      placeholder="07:00:00"
-                      placeholderTextColor={colors['muted-foreground']}
-                      value={formData.reaching_time}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, reaching_time: text }))}
-                    />
+                    <TouchableOpacity
+                      style={[styles.input, styles.timeButton, { borderColor: colors.border }]}
+                      onPress={() => openTimePicker('reaching_time')}
+                    >
+                      <Ionicons name="time-outline" size={16} color={colors['muted-foreground']} />
+                      <ThemedText style={[styles.timeButtonText, { color: colors.foreground, flex: 1 }]}>
+                        {formData.reaching_time || '07:00:00'}
+                      </ThemedText>
+                    </TouchableOpacity>
                   </View>
                   <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
                     <ThemedText style={styles.label}>Fees *</ThemedText>
@@ -432,23 +670,47 @@ export default function RouteStopsScreen() {
                 <View style={styles.formRow}>
                   <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
                     <ThemedText style={styles.label}>Pickup Time</ThemedText>
-                    <TextInput
-                      style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
-                      placeholder="07:30:00"
-                      placeholderTextColor={colors['muted-foreground']}
-                      value={formData.pickup_time}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, pickup_time: text }))}
-                    />
+                    <View style={styles.timeRow}>
+                      <TouchableOpacity
+                        style={[styles.input, styles.timeButton, styles.timeButtonFlex, { borderColor: colors.border }]}
+                        onPress={() => openTimePicker('pickup_time')}
+                      >
+                        <Ionicons name="time-outline" size={16} color={colors['muted-foreground']} />
+                        <ThemedText style={[styles.timeButtonText, { color: formData.pickup_time ? colors.foreground : colors['muted-foreground'], flex: 1 }]}>
+                          {formData.pickup_time || 'Tap to set'}
+                        </ThemedText>
+                      </TouchableOpacity>
+                      {formData.pickup_time ? (
+                        <TouchableOpacity
+                          style={styles.clearTimeBtn}
+                          onPress={() => clearTime('pickup_time')}
+                        >
+                          <Ionicons name="close-circle" size={20} color={colors['muted-foreground']} />
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
                   </View>
                   <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
                     <ThemedText style={styles.label}>Drop Time</ThemedText>
-                    <TextInput
-                      style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
-                      placeholder="14:00:00"
-                      placeholderTextColor={colors['muted-foreground']}
-                      value={formData.drop_time}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, drop_time: text }))}
-                    />
+                    <View style={styles.timeRow}>
+                      <TouchableOpacity
+                        style={[styles.input, styles.timeButton, styles.timeButtonFlex, { borderColor: colors.border }]}
+                        onPress={() => openTimePicker('drop_time')}
+                      >
+                        <Ionicons name="time-outline" size={16} color={colors['muted-foreground']} />
+                        <ThemedText style={[styles.timeButtonText, { color: formData.drop_time ? colors.foreground : colors['muted-foreground'], flex: 1 }]}>
+                          {formData.drop_time || 'Tap to set'}
+                        </ThemedText>
+                      </TouchableOpacity>
+                      {formData.drop_time ? (
+                        <TouchableOpacity
+                          style={styles.clearTimeBtn}
+                          onPress={() => clearTime('drop_time')}
+                        >
+                          <Ionicons name="close-circle" size={20} color={colors['muted-foreground']} />
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
                   </View>
                 </View>
 
@@ -487,6 +749,15 @@ export default function RouteStopsScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Custom Time Picker — separate Modal, layers above form Modal on both platforms */}
+        <TimePickerModal
+          visible={showTimePicker}
+          initialTime={formData[activeTimeField]}
+          onConfirm={confirmTime}
+          onCancel={() => setShowTimePicker(false)}
+          colors={colors}
+        />
         </View>
       </ReadOrListPermissionGuard>
     </AppLayout>
@@ -666,6 +937,25 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+  },
+  timeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timeButtonFlex: {
+    flex: 1,
+  },
+  timeButtonText: {
+    fontSize: 14,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  clearTimeBtn: {
+    padding: 4,
   },
   checkboxContainer: {
     flexDirection: 'row',

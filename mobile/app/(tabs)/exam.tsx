@@ -25,7 +25,7 @@ const sections = [
   { title: 'Create Exam',  description: 'Create a new exam',         icon: 'add-circle' as const,    color: '#DC2626', route: '/exam/create',        resource: 'exams',             action: 'create' },
   { title: 'Enter Marks',  description: 'Enter student marks',       icon: 'create' as const,        color: '#8B5CF6', route: '/exam/marks',         resource: 'exam_marks',        action: 'create' },
   { title: 'View Results', description: 'Student exam results',      icon: 'bar-chart' as const,     color: '#10B981', route: '/exam/results',       resource: 'exam_results',      action: 'list' },
-  { title: 'Hall Tickets', description: 'Manage & publish tickets',  icon: 'document-text' as const, color: '#F59E0B', route: '/exam/hall-tickets',  resource: 'exam_hall_tickets', action: 'list' },
+  { title: 'Hall Tickets', description: 'Manage & publish tickets',  icon: 'document-text' as const, color: '#F59E0B', route: '/exam/hall-tickets',  resource: 'exams',             action: 'read' },
 ];
 
 export default function ExamScreen() {

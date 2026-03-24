@@ -62,6 +62,16 @@ const TAB_CONFIGS: TabConfig[] = [
     alwaysShow: true,
   },
   {
+    name: 'admin',
+    moduleResources: ['users', 'roles', 'permissions', 'menu'],
+    requireAll: false,
+  },
+  {
+    name: 'reports',
+    moduleResources: [],
+    alwaysShow: true,
+  },
+  {
     name: 'profile',
     moduleResources: [],
     alwaysShow: true,

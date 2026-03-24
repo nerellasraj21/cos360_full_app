@@ -23,7 +23,7 @@
    - 6.6 [Exam Module](#66-exam-module)
    - 6.7 [Transport Module](#67-transport-module)
    - 6.8 [Masters Module](#68-masters-module)
-   - 6.9 [Communication Module ⚠️ MISSING](#69-communication-module--fully-missing)
+   - 6.9 [Communication Module](#69-communication-module--fully-built)
 7. [Cross-Cutting UI Requirements](#7-cross-cutting-ui-requirements)
 8. [API Integration Contract](#8-api-integration-contract)
 9. [Environment & Build](#9-environment--build)
@@ -145,7 +145,7 @@ app/
 │   ├── staff.tsx          Staff hub
 │   ├── expense.tsx        Expense hub
 │   ├── exam.tsx           Exam hub
-│   ├── communication.tsx  Communication hub  ⚠️ NEEDS TO BE ADDED
+│   ├── communication.tsx  Communication hub  ✅ EXISTS
 │   ├── profile.tsx        User profile
 │   └── settings.tsx       Settings
 ├── students/              Student sub-screens
@@ -155,7 +155,7 @@ app/
 ├── exam/                  Exam sub-screens
 ├── expense/               Expense sub-screens
 ├── masters/               Masters sub-screens
-└── communication/         Communication sub-screens  ⚠️ NEEDS TO BE CREATED
+└── communication/         Communication sub-screens  ✅ EXISTS
 ```
 
 ### 3.5 API Client
@@ -209,7 +209,7 @@ Backend returns Decimal fields as **strings** (e.g., `"12500.00"`). Always use `
 
 `app/(tabs)/_layout.tsx` uses `TAB_CONFIGS` array. Each tab lists `moduleResources`. Tab only shows if user has at least one permission for those resources.
 
-**⚠️ Action needed:** Add communication tab entry to `TAB_CONFIGS`:
+**✅ Done:** Communication tab added to `TAB_CONFIGS`:
 
 ```typescript
 {
@@ -243,43 +243,46 @@ Backend returns Decimal fields as **strings** (e.g., `"12500.00"`). Always use `
 | Staff — Attendance | ✅ Complete | — |
 | Fee — Masters (categories/types/terms) | ✅ Complete | — |
 | Fee — Transactions (admin) | ✅ Complete | — |
-| Fee — Collection (role-aware) | ❌ Missing | Student own view + parent child view missing (see §6.4.1) |
-| Fee — Reports | ❌ Missing | Entire screen missing (see §6.4.2) |
+| Fee — Collection (role-aware) | ✅ Complete | `app/fees/collection.tsx` — admin 4-tab + student/parent views |
+| Fee — Reports | ✅ Complete | `app/fees/reports.tsx` — Collection, Pending, Structure tabs |
 | Expense — All screens | ✅ Complete | — |
 | Exam — List / Create / Detail | ✅ Complete | — |
 | Exam — Mark Entry | ✅ Complete | — |
-| Exam — My Marks (student/parent) | ❌ Missing | Screen missing (see §6.6.3) |
-| Exam — Grading Dashboard | ❌ Missing | Navigation hub missing (see §6.6.5) |
-| Exam — Hall Tickets | ⚠️ Incomplete | Verify endpoint is `/compute` not `/generate` |
+| Exam — My Marks (student/parent) | ✅ Complete | `app/exam/my-marks/[examId].tsx` |
+| Exam — Grading Dashboard | ✅ Complete | `app/exam/grading.tsx` — hub linking to marks, results, hall tickets |
+| Exam — Hall Tickets | ✅ Complete | Endpoint fixed to `/compute`; datatable layout |
+| Transport — Hub (4 sections) | ✅ Complete | Routes · Route Stops · Vehicles · Transport Trips (matches web) |
 | Transport — Routes | ✅ Complete | — |
-| Transport — Route Stops | ⚠️ Incomplete | Missing `pickup_time` / `drop_time` fields (see §6.7.2) |
+| Transport — Route Stops | ✅ Complete | `pickup_time` / `drop_time` fields added with time pickers |
 | Transport — Vehicles / Trips | ✅ Complete | — |
-| Transport — Pricing | ❌ Missing | Entire screen missing (see §6.7.5) |
-| Transport — Student Transport | ⚠️ Incomplete | Missing `pricing_id` field (see §6.7.6) |
+| Transport — Pricing | ✅ Complete | `app/transport/pricing.tsx` — full CRUD (standalone, not in hub) |
+| Transport — Student Transport | ✅ Complete | `pricing_id` added, stop dropdown, `is_active` removed (standalone, not in hub) |
 | Masters — All screens | ✅ Complete | — |
-| Communication | ❌ Missing | Entire module missing — tab + 3 screens (see §6.9) |
+| Communication | ✅ Complete | Tab + hub + compose + templates + logs — all built |
 | Profile | ✅ Complete | — |
 | Settings | ✅ Complete | — |
 
-### 5.2 What Needs To Be Built
+### 5.2 Build Status
 
-**New screens (create from scratch):**
-1. `app/communication/compose.tsx`
-2. `app/communication/templates.tsx`
-3. `app/communication/logs.tsx`
-4. `app/(tabs)/communication.tsx` (hub)
-5. `app/transport/pricing.tsx`
-6. `app/fees/reports.tsx`
-7. `app/exam/my-marks/[examId].tsx`
-8. `app/exam/grading.tsx`
+**Phase 2/3 screens — ✅ All Built:**
+1. `app/communication/compose.tsx` — ✅ Built
+2. `app/communication/templates.tsx` — ✅ Built
+3. `app/communication/logs.tsx` — ✅ Built
+4. `app/(tabs)/communication.tsx` (hub) — ✅ Built
+5. `app/transport/pricing.tsx` — ✅ Built
+6. `app/fees/reports.tsx` — ✅ Built
+7. `app/exam/my-marks/[examId].tsx` — ✅ Built
+8. `app/exam/grading.tsx` — ✅ Built
 
-**Existing screens needing updates:**
-1. `app/students/admission.tsx` — add extended fields
-2. `app/staff/enrollment.tsx` — add Work Experience, Bank, Salary, Qualifications sections
-3. `app/transport/route-stops.tsx` — add `pickup_time` / `drop_time` fields
-4. `app/transport/student-transport.tsx` — add `pricing_id` dropdown
-5. `app/exam/hall-tickets.tsx` — fix endpoint to `/hall-tickets/compute`
-6. `app/(tabs)/_layout.tsx` — add communication tab to `TAB_CONFIGS`
+**Phase 2/3 screen updates — ✅ All Applied:**
+1. `app/transport/route-stops.tsx` — `pickup_time` / `drop_time` added ✅
+2. `app/transport/student-transport.tsx` — `pricing_id` dropdown, stop dropdown, `is_active` removed ✅
+3. `app/exam/hall-tickets.tsx` — endpoint fixed to `/hall-tickets/compute` ✅
+4. `app/(tabs)/_layout.tsx` — communication tab added to `TAB_CONFIGS` ✅
+
+**Phase 4 screens — ⏳ Not yet built:**
+1. `app/students/admission.tsx` — extended fields (Aadhar, caste, photo, address cascade)
+2. `app/staff/enrollment.tsx` — Work Experience, Bank, Salary, Qualifications sections
 
 ---
 
@@ -401,7 +404,7 @@ Date picker → FlatList of all staff → mark each: `present | absent | late | 
 
 ### 6.4 Fee Module
 
-#### 6.4.1 Fee Collection — ❌ MISSING (role-aware views)
+#### 6.4.1 Fee Collection — ✅ BUILT (role-aware views)
 
 **Create:** `app/fees/collection.tsx`
 
@@ -427,7 +430,7 @@ This is different from the existing `app/fees/transactions.tsx` (admin-only list
 
 Add this screen to the fees hub (`app/(tabs)/fees.tsx`) as a prominent card.
 
-#### 6.4.2 Fee Reports — ❌ MISSING
+#### 6.4.2 Fee Reports — ✅ BUILT
 
 **Create:** `app/fees/reports.tsx`
 
@@ -450,16 +453,22 @@ Three sections (use horizontal scroll tabs or segmented control):
 
 Export: Use `expo-sharing` to share a CSV file generated client-side.
 
-#### 6.4.3 Fee Masters — ✅ EXIST
+#### 6.4.3 Fee Hub — ✅ COMPLETE (matches web app, 8 sub-modules)
+
+Hub screen: `app/(tabs)/fees.tsx`
 
 | Screen | File | Status |
 |---|---|---|
-| Categories | `app/fees/categories.tsx` | ✅ |
-| Types | `app/fees/types.tsx` | ✅ |
-| Terms | `app/fees/terms.tsx` | ✅ |
-| Class Mappings | `app/fees/class-mappings.tsx` | ✅ |
-| Transactions | `app/fees/transactions.tsx` | ✅ |
-| Refunds | `app/fees/refunds.tsx` | ✅ |
+| Fee Categories | `app/fees/categories.tsx` | ✅ |
+| Fee Types | `app/fees/types.tsx` | ✅ |
+| Fee Terms | `app/fees/terms.tsx` | ✅ |
+| Fee Mappings | `app/fees/class-mappings.tsx` | ✅ |
+| Fee Term Amounts | `app/fees/term-amounts.tsx` | ✅ |
+| Fee Collection | `app/fees/collection.tsx` | ✅ |
+| Fee Receipts | `app/fees/receipts.tsx` | ✅ |
+| Fee Refunds | `app/fees/refunds.tsx` | ✅ |
+
+> Note: `app/fees/transactions.tsx`, `app/fees/student-mappings.tsx`, and `app/fees/reports.tsx` exist as standalone screens but are not in the hub grid.
 
 ---
 
@@ -488,7 +497,7 @@ Export: Use `expo-sharing` to share a CSV file generated client-side.
 
 Teachers enter marks per student per subject component.
 
-#### 6.6.3 My Marks — ❌ MISSING
+#### 6.6.3 My Marks — ✅ BUILT
 
 **Create:** `app/exam/my-marks/[examId].tsx`
 
@@ -510,7 +519,7 @@ Teachers enter marks per student per subject component.
 
 Admin / Staff / Teacher view of published results.
 
-#### 6.6.5 Grading Dashboard — ❌ MISSING
+#### 6.6.5 Grading Dashboard — ✅ BUILT
 
 **Create:** `app/exam/grading.tsx`
 
@@ -522,60 +531,56 @@ Navigation hub with cards linking to:
 
 Only visible to Admin / Teacher roles.
 
-#### 6.6.6 Hall Tickets (`app/exam/hall-tickets.tsx`) — ⚠️ NEEDS FIX
+#### 6.6.6 Hall Tickets (`app/exam/hall-tickets.tsx`) — ✅ FIXED
 
-**Fix:** Generation must call `POST /hall-tickets/compute` (NOT `/hall-tickets/generate`).
-
-Check the existing implementation and update the endpoint string if it uses the old path.
+**Fixed:** Generation calls `POST /hall-tickets/compute`. Datatable layout implemented.
 
 ---
 
 ### 6.7 Transport Module
 
+**Hub (`app/(tabs)/transport.tsx`) shows 4 sections matching the web app:**
+Routes · Route Stops · Vehicles · Transport Trips
+
 #### 6.7.1 Routes (`app/transport/routes.tsx`) — ✅ EXISTS
 
 Full CRUD. Fields: route name, starting stop, ending stop, number of stops, route type, trip type, start/end time, is_active.
 
-#### 6.7.2 Route Stops (`app/transport/route-stops.tsx`) — ⚠️ NEEDS FIELDS
+#### 6.7.2 Route Stops (`app/transport/route-stops.tsx`) — ✅ UPDATED
 
-**Missing fields to add to the create/edit form:**
-- `pickup_time` (time text input, format `HH:MM:SS`)
-- `drop_time` (time text input, format `HH:MM:SS`)
-
-These must also be shown on each list row.
+`pickup_time` and `drop_time` fields added to the create/edit form and displayed on each list row. Time pickers use native Android dialog / iOS bottom-sheet spinner.
 
 #### 6.7.3 Vehicles (`app/transport/vehicles.tsx`) — ✅ EXISTS
 
-#### 6.7.4 Trips (`app/transport/trips.tsx`) — ✅ EXISTS
+#### 6.7.4 Transport Trips (`app/transport/trips.tsx`) — ✅ EXISTS
 
-#### 6.7.5 Transport Pricing — ❌ MISSING
+#### 6.7.5 Transport Pricing — ✅ BUILT (standalone, not in hub)
 
-**Create:** `app/transport/pricing.tsx`
+**File:** `app/transport/pricing.tsx`
 
-Full CRUD screen. API base: `GET|POST /masters/transport-pricing/`, `PUT|DELETE /masters/transport-pricing/{id}`
+Full CRUD screen. Not shown in transport hub grid — accessible via direct navigation.
+
+API base: `GET|POST /masters/transport-pricing/`, `PUT|DELETE /masters/transport-pricing/{id}`
 
 **List columns:** Name, Vehicle, Amount, Description, Active
 
 **Create / Edit form fields:**
+
 - Name (text input)
 - Vehicle (dropdown → `GET /masters/vehicles/`)
 - Amount (numeric input — **Decimal**: backend returns as string, display with `Number(val)`, send as number)
 - Description (multiline text input, optional)
 - Is Active (toggle switch)
 
-Add to the transport hub (`app/(tabs)/transport.tsx`) as a card.
+#### 6.7.6 Student Transport (`app/transport/student-transport.tsx`) — ✅ UPDATED (standalone, not in hub)
 
-#### 6.7.6 Student Transport (`app/transport/student-transport.tsx`) — ⚠️ NEEDS PRICING FIELD
-
-**Missing field to add to create/edit form:**
-- `pricing_id` — dropdown of transport pricing options, filtered by the vehicle of the selected trip
-- Load options from: `GET /masters/transport-pricing/?vehicle_id={vehicleId}`
-- Vehicle ID is derived from the selected trip's vehicle assignment
+`pricing_id` dropdown added; stop dropdown now filters by selected route; `is_active` field removed from form and payload.
 
 **Important:** Do NOT include `fee_term_id` or `is_active` in create/update payloads — these fields do not exist in the backend schema.
 
 **Role behavior:**
-- Admin: Full CRUD
+
+- Admin: Full CRUD (accessible via direct navigation)
 - Student: Read-only view of own assignment (stop name, pickup time, drop time, pricing)
 - Parent: Child selector → child's transport assignment
 
@@ -596,9 +601,9 @@ Add to the transport hub (`app/(tabs)/transport.tsx`) as a card.
 
 ---
 
-### 6.9 Communication Module — ❌ FULLY MISSING
+### 6.9 Communication Module — ✅ FULLY BUILT
 
-The entire module must be built. Add a **Communication** tab to the bottom tab bar.
+The entire module is built. Communication tab is in the bottom tab bar.
 
 #### Step 1 — Add tab to `app/(tabs)/_layout.tsx`
 

@@ -98,7 +98,7 @@ OR scan the QR code from `npm start` using the **Expo Go** app.
 
 | # | Test Case | Expected Result |
 | --- | --------- | --------------- |
-| 6 | Admin login — dashboard loads | All 7 module cards visible (Students, Fees, Masters, Transport, Staff, Expense, Exam) |
+| 6 | Admin login — dashboard loads | All 8 module cards visible (Students, Fees, Masters, Transport, Staff, Expense, Exam, Communication) |
 | 7 | Restricted role — no module permissions | Lock icon + "No modules available. Contact your administrator." message shown |
 | 8 | Navigate to module | Tap card → navigates to correct tab |
 | 9 | Greeting hero card | Shows correct greeting (Morning/Afternoon/Evening), username, and today's date |
@@ -260,8 +260,8 @@ Login uses **username** (not email) + org code as `cschema`. Configure these use
 
 | Role | Username | Org Code (cschema) | Expected Dashboard Cards |
 | ---- | -------- | ------------------ | ------------------------ |
-| Admin | admin | test_tenant | All 7 cards |
-| Staff | staff | test_tenant | Students, Fees, Staff, Expense, Exam |
+| Admin | admin | test_tenant | All 8 cards (incl. Communication) |
+| Staff | staff | test_tenant | Students, Fees, Staff, Expense, Exam, Communication |
 | Teacher | teacher | test_tenant | Students, Exam |
 | Student | student | test_tenant | None — empty state (lock icon) |
 | Parent | parent | test_tenant | None — empty state (lock icon) |

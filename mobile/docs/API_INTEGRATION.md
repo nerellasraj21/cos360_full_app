@@ -204,21 +204,50 @@ Permissions are cached locally in AsyncStorage after sync. Cache is used as fall
 
 | Method | Endpoint | Description |
 | ------ | -------- | ----------- |
-| GET | `/fee-categories` | List fee categories |
-| POST | `/fee-categories` | Create category |
-| GET | `/fee-types` | List fee types |
-| POST | `/fee-types` | Create type |
-| GET | `/fee-terms` | List payment terms |
-| POST | `/fee-terms` | Create term |
-| GET | `/fee-transactions` | List transactions |
-| POST | `/fee-transactions` | Record transaction |
-| GET | `/fee-transactions/{id}` | Get transaction detail |
-| GET | `/student-fee-mappings` | List student fee mappings |
-| POST | `/student-fee-mappings` | Map fee to student |
-| GET | `/class-fee-mappings` | List class fee mappings |
-| POST | `/class-fee-mappings` | Map fee to class |
-| POST | `/fee-refunds` | Process refund |
-| GET | `/fee-refunds` | List refunds |
+| GET | `/fee/categories/` | List fee categories |
+| POST | `/fee/categories/` | Create category |
+| PUT | `/fee/categories/{id}` | Update category |
+| DELETE | `/fee/categories/{id}` | Delete category |
+| GET | `/fee/types/` | List fee types |
+| POST | `/fee/types/` | Create fee type |
+| PUT | `/fee/types/{id}` | Update fee type |
+| DELETE | `/fee/types/{id}` | Delete fee type |
+| GET | `/fee/terms/` | List payment terms |
+| POST | `/fee/terms/` | Create term |
+| PUT | `/fee/terms/{id}` | Update term |
+| DELETE | `/fee/terms/{id}` | Delete term |
+| GET | `/fee/class-mappings/` | List class fee mappings (Fee Mappings hub screen) |
+| POST | `/fee/class-mappings/` | Create class mapping |
+| PUT | `/fee/class-mappings/{id}` | Update class mapping |
+| DELETE | `/fee/class-mappings/{id}` | Delete class mapping |
+| GET | `/fee/class-mapping-term-amounts/` | List term amounts (Fee Term Amounts hub screen) |
+| PUT | `/fee/class-mapping-term-amounts/{id}` | Update term amount |
+| POST | `/fee/class-mapping-term-amounts/` | Create term amount |
+| DELETE | `/fee/class-mapping-term-amounts/{id}` | Delete term amount |
+| GET | `/fee/collection/search-student` | Search student for fee collection |
+| GET | `/fee/collection/summary/{student_id}` | Get student fee summary (admin) |
+| GET | `/fee/collection/my-summary` | Get own fee summary (student) |
+| GET | `/fee/collection/child-summary/{student_id}` | Get child fee summary (parent) |
+| POST | `/fee/collection/pay` | Process fee payment |
+| GET | `/fee/collection/receipts/{receipt_id}/pdf` | Download receipt PDF |
+| GET | `/fee/receipts/` | List all fee receipts (Fee Receipts hub screen) |
+| GET | `/fee/receipts/{id}` | Get receipt detail |
+| POST | `/fee/receipts/generate/{transaction_id}` | Generate receipt for transaction |
+| POST | `/fee/receipts/{id}/reprint` | Reprint receipt |
+| GET | `/fee/receipts/{id}/verify` | Verify receipt |
+| GET | `/fee/transactions/` | List transactions |
+| POST | `/fee/transactions/` | Record transaction |
+| GET | `/fee/transactions/{id}` | Get transaction detail |
+| GET | `/fee/refunds/` | List refunds |
+| POST | `/fee/refunds/` | Create refund |
+| POST | `/fee/refunds/approve` | Approve refund |
+| POST | `/fee/refunds/process` | Process refund |
+| GET | `/fee/student-mappings/` | List student fee mappings |
+| POST | `/fee/student-mappings/` | Map fee to student |
+| GET | `/reports/fees/collection-summary/stats` | Fee collection stats |
+| GET | `/reports/fees/collection-summary` | Fee collection report rows |
+| GET | `/reports/fees/pending-fees` | Pending fees report |
+| GET | `/reports/fees/fee-structure` | Fee structure report |
 
 ---
 

@@ -194,7 +194,7 @@ export default function MarkEntryScreen() {
 
   return (
     <AppLayout title="Mark Entry">
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.container}>
 
           {/* Exam Selector */}

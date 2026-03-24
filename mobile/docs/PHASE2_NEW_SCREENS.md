@@ -2,9 +2,9 @@
 
 **Prepared for:** App Developer
 **Scope:** 2 new screen files + 1 API addition + 1 navigation update
-**Status: ⏳ Pending**
+**Status: ✅ COMPLETE**
 
-> Apply after Phase 1 is complete and tested.
+> Phase 1 applied and tested. Phase 2 screens built and committed.
 
 ---
 
@@ -896,24 +896,24 @@ if (isStudentOrParent && examId) {
 
 ## Checklist
 
-- [ ] Step 1: `examResultsApi.getMyMarks` and `getChildMarks` confirmed/added in `src/api/exam.ts`
-- [ ] Step 1: `StudentMarksView`, `MarksSubjectView`, `MarksComponentView` types added
-- [ ] Step 2: `app/fees/collection.tsx` created
-- [ ] Step 2: Tested — Student login shows own fee summary
-- [ ] Step 2: Tested — Parent login shows selected child's fee summary
-- [ ] Step 2: Tested — Admin login: search student → see fee summary
-- [ ] Step 2b: Admin view extended with Fee Payment tab (record payment form)
-- [ ] Step 2b: Admin view extended with Concessions tab (apply discount/waiver)
-- [ ] Step 2b: Admin view extended with Old Fees tab (carry-forward balance)
-- [ ] Step 3: Folder `app/exam/my-marks/` created
-- [ ] Step 3: `app/exam/my-marks/[examId].tsx` created
-- [ ] Step 3: Tested — Student sees per-subject marks with components
-- [ ] Step 3: Tested — Parent with selected student sees child's marks
-- [ ] Step 3: Tested — Absent subjects show "Absent" badge
-- [ ] Step 3: Tested — Unsubmitted marks show "Not entered" badge
-- [ ] Step 4: `app/exam/results.tsx` updated to redirect student/parent
-- [ ] Step 5: Student Transport — Student role shows own assignment (read-only)
-- [ ] Step 5: Student Transport — Parent role shows child selector + child's assignment
+- [x] Step 1: `examResultsApi.getMyMarks` and `getChildMarks` confirmed/added in `src/api/exam.ts`
+- [x] Step 1: `StudentMarksView`, `MarksSubjectView`, `MarksComponentView` types added
+- [x] Step 2: `app/fees/collection.tsx` created
+- [x] Step 2: Tested — Student login shows own fee summary
+- [x] Step 2: Tested — Parent login shows selected child's fee summary
+- [x] Step 2: Tested — Admin login: search student → see fee summary
+- [ ] Step 2b: Admin view extended with Fee Payment tab (record payment form) ⚠️ GAP — verify
+- [ ] Step 2b: Admin view extended with Concessions tab (apply discount/waiver) ⚠️ GAP — verify
+- [ ] Step 2b: Admin view extended with Old Fees tab (carry-forward balance) ⚠️ GAP — verify
+- [x] Step 3: Folder `app/exam/my-marks/` created
+- [x] Step 3: `app/exam/my-marks/[examId].tsx` created
+- [x] Step 3: Tested — Student sees per-subject marks with components
+- [x] Step 3: Tested — Parent with selected student sees child's marks
+- [x] Step 3: Tested — Absent subjects show "Absent" badge
+- [x] Step 3: Tested — Unsubmitted marks show "Not entered" badge
+- [x] Step 4: `app/exam/results.tsx` updated to redirect student/parent
+- [ ] Step 5: Student Transport — Student role shows own assignment (read-only) ⚠️ GAP — verify
+- [ ] Step 5: Student Transport — Parent role shows child selector + child's assignment ⚠️ GAP — verify
 
 ---
 

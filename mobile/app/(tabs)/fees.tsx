@@ -10,15 +10,14 @@ import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 const GREEN = '#10B981';
 
 const sections = [
-  { title: 'Fee Categories',   description: 'Manage fee categories like Tuition, Transport', icon: 'folder' as const,          color: GREEN,     route: '/fees/categories',       resource: PERMISSION_RESOURCES.FEE_CATEGORIES,       action: 'list' },
-  { title: 'Fee Types',        description: 'Configure types of fees within categories',     icon: 'pricetag' as const,        color: '#3B82F6', route: '/fees/types',            resource: PERMISSION_RESOURCES.FEE_TYPES,            action: 'list' },
-  { title: 'Fee Terms',        description: 'Set up payment terms and schedules',            icon: 'calendar' as const,        color: '#F59E0B', route: '/fees/terms',            resource: PERMISSION_RESOURCES.FEE_TERMS,            action: 'list' },
-  { title: 'Class Mappings',   description: 'Map fees to specific classes with amounts',     icon: 'school' as const,          color: '#8B5CF6', route: '/fees/class-mappings',   resource: PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS,   action: 'list' },
-  { title: 'Student Mappings', description: 'Assign fees to individual students',            icon: 'people' as const,          color: '#06B6D4', route: '/fees/student-mappings', resource: PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS, action: 'list' },
-  { title: 'Transactions',     description: 'View and manage fee payment transactions',      icon: 'card' as const,            color: '#556ee6', route: '/fees/transactions',     resource: PERMISSION_RESOURCES.FEE_TRANSACTIONS,     action: 'list' },
-  { title: 'Fee Refunds',      description: 'Process and track fee refunds',                 icon: 'refresh-circle' as const,  color: '#EF4444', route: '/fees/refunds',          resource: PERMISSION_RESOURCES.FEE_REFUNDS,          action: 'list' },
-  { title: 'Fee Collection',   description: 'Collect and record fee payments from students', icon: 'wallet' as const,          color: '#7C3AED', route: '/fees/collection',       resource: PERMISSION_RESOURCES.FEE_TRANSACTIONS,     action: 'list' },
-  { title: 'Fee Reports',      description: 'Collection summary, pending fees & structure',  icon: 'bar-chart' as const,       color: '#0891B2', route: '/fees/reports',          resource: PERMISSION_RESOURCES.FEE_TRANSACTIONS,     action: 'list' },
+  { title: 'Fee Categories',   description: 'Manage fee categories and their associated fee types', icon: 'folder' as const,         color: GREEN,     route: '/fees/categories',     resource: PERMISSION_RESOURCES.FEE_CATEGORIES,     action: 'list' },
+  { title: 'Fee Types',        description: 'Manage individual fee types and their properties',     icon: 'pricetag' as const,       color: '#3B82F6', route: '/fees/types',          resource: PERMISSION_RESOURCES.FEE_TYPES,          action: 'list' },
+  { title: 'Fee Terms',        description: 'Configure fee terms and payment schedules',            icon: 'calendar' as const,       color: '#F59E0B', route: '/fees/terms',          resource: PERMISSION_RESOURCES.FEE_TERMS,          action: 'list' },
+  { title: 'Fee Mappings',     description: 'Configure fee mappings for classes and term amounts',  icon: 'git-merge' as const,      color: '#8B5CF6', route: '/fees/class-mappings', resource: PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS, action: 'list' },
+  { title: 'Fee Term Amounts', description: 'Manage fee term amount configurations',                icon: 'cash-outline' as const,   color: '#06B6D4', route: '/fees/term-amounts',   resource: PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS, action: 'list' },
+  { title: 'Fee Collection',   description: 'Collect and manage fee payments from students',        icon: 'wallet' as const,         color: '#7C3AED', route: '/fees/collection',     resource: PERMISSION_RESOURCES.FEE_TRANSACTIONS,   action: 'list' },
+  { title: 'Fee Receipts',     description: 'View and manage fee payment receipts',                 icon: 'receipt' as const,        color: '#556ee6', route: '/fees/receipts',       resource: PERMISSION_RESOURCES.FEE_TRANSACTIONS,   action: 'list' },
+  { title: 'Fee Refunds',      description: 'Process and manage fee refunds',                       icon: 'refresh-circle' as const, color: '#EF4444', route: '/fees/refunds',        resource: PERMISSION_RESOURCES.FEE_REFUNDS,        action: 'list' },
 ];
 
 export default function FeesScreen() {

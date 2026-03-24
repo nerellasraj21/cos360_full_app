@@ -2,7 +2,7 @@
 
 **Prepared for:** App Developer
 **Scope:** 3 bug fixes in existing screens
-**Status: ✅ COMPLETE**
+**Status: ✅ COMPLETE (+ post-fix: time picker added)**
 
 > **Before you start:** Apply each fix one at a time and test on device before moving to the next.
 > The Communication tab fix is intentionally deferred to Phase 3 (the screen files must exist first).
@@ -12,7 +12,7 @@
 ## Fix List
 
 | # | File | Problem | Risk |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 1 | `src/api/exam.ts` | Hall ticket endpoint is `/generate` (old) — backend expects `/compute` | API call fails silently |
 | 2 | `app/transport/route-stops.tsx` + type | `pickup_time` and `drop_time` fields missing from form and display | Stops saved without times |
 | 3 | `app/transport/student-transport.tsx` + type | `pricing_id` missing; `stop_id` is a free-text input instead of dropdown; `is_active` field must be removed | Wrong data saved to backend |
@@ -439,6 +439,8 @@ For reference, here is what to add to `TAB_CONFIGS` in `app/(tabs)/_layout.tsx` 
 - [x] Fix 2a: `RouteStop` type updated with `pickup_time`, `drop_time`
 - [x] Fix 2b: Route stops form shows pickup/drop time fields
 - [x] Fix 2b: Route stop cards show pickup/drop times
+- [x] Fix 2b: Time fields use native time picker (bottom sheet Modal) — NOT plain TextInput
+- [x] Fix 2b: DateTimePicker rendered in separate top-level Modal (not nested inside form Modal) to avoid Android z-order bug
 - [x] Fix 2b: Tested — save and display works
 - [x] Fix 3a: `StudentTransport` type updated — `pricing_id` added, `is_active` removed
 - [x] Fix 3b: Stop field is now a dropdown (not free text)
@@ -449,5 +451,45 @@ For reference, here is what to add to `TAB_CONFIGS` in `app/(tabs)/_layout.tsx` 
 - [x] Fix 4: Skipped — will apply in Phase 3
 
 ---
+
+---
+
+## Post-Fix Notes
+
+### DateTimePicker with React Native Modal (Android)
+
+`@react-native-community/datetimepicker` fails to render when nested inside a React Native `Modal`. The native picker ends up behind the modal overlay regardless of z-order.
+
+**Pattern that works:** Render the `DateTimePicker` in its **own separate Modal** at the root component level, not inside any other Modal:
+
+```tsx
+return (
+  <>
+    <AppLayout>
+      {/* ... */}
+      <Modal visible={isFormOpen}>  {/* form modal — NO DateTimePicker here */}
+      </Modal>
+    </AppLayout>
+
+    {/* Time picker Modal — completely independent, top-level */}
+    <Modal visible={showTimePicker} animationType="slide" transparent>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <View style={{ backgroundColor, borderTopRadius }}>
+          <DateTimePicker display="spinner" mode="time" ... />
+        </View>
+      </View>
+    </Modal>
+  </>
+);
+```
+
+**Platform split (final working pattern):**
+
+- **Android** — `display="default"`, no wrapper Modal needed. Renders as a native system clock dialog; auto-commits and dismisses when user taps OK.
+- **iOS** — `display="spinner"`, wrapped in a separate `<Modal>` bottom-sheet with Cancel/Done buttons. Inline spinner wheels; commits only when Done is tapped.
+
+`display="spinner"` on Android does NOT render visible content without explicit height — always use `"default"` on Android.
+
+TypeScript `type` aliases must be at **module scope** (not inside the function body) — Metro Babel throws a syntax error otherwise.
 
 Last updated: March 2026

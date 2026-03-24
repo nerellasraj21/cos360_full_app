@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
   FlatList,
@@ -8,7 +10,6 @@ import {
   Modal,
   Platform,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -43,6 +44,7 @@ interface FormErrors {
 const LoginScreen: React.FC = () => {
   const router = useRouter();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [clientSchema, setClientSchemaState] = useState<string>('');
   const [showClientSelection, setShowClientSelection] = useState<boolean>(true);
@@ -173,7 +175,7 @@ const LoginScreen: React.FC = () => {
     if (clientSchemaLoading) {
       return (
         <View style={styles.loadingContainer}>
-          <StatusBar barStyle="light-content" backgroundColor={BRAND_COLOR} />
+          <StatusBar style="light" backgroundColor={BRAND_COLOR} />
           <View style={styles.loadingLogo}>
             <Text style={styles.loadingLogoText}>COS</Text>
             <Text style={styles.loadingLogo360}>360</Text>
@@ -189,14 +191,14 @@ const LoginScreen: React.FC = () => {
         style={styles.screen}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <StatusBar barStyle="light-content" backgroundColor={BRAND_COLOR} />
+        <StatusBar style="light" backgroundColor={BRAND_COLOR} />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {/* Brand Header */}
-          <View style={styles.brandSection}>
+          <View style={[styles.brandSection, { paddingTop: Platform.OS === 'ios' ? insets.top + 12 : 52 }]}>
             <View style={styles.brandDecorCircle1} />
             <View style={styles.brandDecorCircle2} />
             <View style={styles.logoCircle}>
@@ -256,14 +258,14 @@ const LoginScreen: React.FC = () => {
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <StatusBar barStyle="light-content" backgroundColor={BRAND_COLOR} />
+      <StatusBar style="light" backgroundColor={BRAND_COLOR} />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Brand Header */}
-        <View style={styles.brandSection}>
+        <View style={[styles.brandSection, { paddingTop: Platform.OS === 'ios' ? insets.top + 12 : 52 }]}>
           <View style={styles.brandDecorCircle1} />
           <View style={styles.brandDecorCircle2} />
           <View style={styles.logoCircle}>
@@ -534,7 +536,7 @@ const styles = StyleSheet.create({
   },
   brandSection: {
     alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 64 : 52,
+    paddingTop: 52,
     paddingBottom: 52,
     overflow: 'hidden',
   },

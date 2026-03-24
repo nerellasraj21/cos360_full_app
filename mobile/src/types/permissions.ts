@@ -26,7 +26,7 @@ export const PERMISSION_RESOURCES = {
   
   // Transport module
   TRANSPORT_ROUTES: 'transport_routes',
-  TRANSPORT_ROUTE_STOPS: 'transport_route_stops',
+  TRANSPORT_ROUTE_STOPS: 'route_stops',
   TRANSPORT_VEHICLES: 'transport_vehicles',
   TRANSPORT_TRIPS: 'transport_trips',
   TRANSPORT_PRICING: 'transport_pricing',
@@ -51,6 +51,12 @@ export const PERMISSION_RESOURCES = {
   EXPENSE_AUDIT: 'expense_audit',
   EXPENSE_DEPARTMENTS: 'expense_departments',
   
+  // Administration module
+  ADMIN_USERS: 'users',
+  ADMIN_ROLES: 'roles',
+  ADMIN_PERMISSIONS: 'permissions',
+  ADMIN_MENU: 'menu',
+
   // Profile and settings
   PROFILE: 'profile',
   STUDENT_PROFILE: 'student_profile',

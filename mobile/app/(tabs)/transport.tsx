@@ -10,13 +10,10 @@ import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 const AMBER = '#F59E0B';
 
 const sections = [
-  { title: 'Routes',            description: 'Manage transport routes and schedules',        icon: 'map' as const,      color: AMBER,     route: '/transport/routes',          resource: PERMISSION_RESOURCES.TRANSPORT_ROUTES,      action: 'list' },
-  { title: 'Route Stops',       description: 'Manage stops along transport routes',          icon: 'location' as const, color: '#D97706', route: '/transport/route-stops',     resource: PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS, action: 'list' },
-  { title: 'Vehicles',          description: 'Fleet management and maintenance tracking',    icon: 'car' as const,      color: AMBER,     route: '/transport/vehicles',        resource: PERMISSION_RESOURCES.TRANSPORT_VEHICLES,    action: 'list' },
-  { title: 'Trips',             description: 'Assign vehicles and drivers to routes',        icon: 'navigate' as const, color: '#B45309', route: '/transport/trips',           resource: PERMISSION_RESOURCES.TRANSPORT_TRIPS,       action: 'list' },
-  { title: 'Student Transport', description: 'Manage student transport assignments',         icon: 'people' as const,   color: AMBER,     route: '/transport/student-transport',resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,     action: 'list' },
-  { title: 'Student Trips',     description: 'Detailed student trip assignments with fees',  icon: 'person' as const,   color: '#D97706', route: '/transport/studentTrips',    resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,     action: 'list' },
-  { title: 'Pricing',           description: 'Manage transport pricing by route and stop',   icon: 'pricetag' as const, color: '#556ee6', route: '/transport/pricing',         resource: PERMISSION_RESOURCES.TRANSPORT_ROUTES,      action: 'list' },
+  { title: 'Routes',           description: 'Manage transport routes and their configurations',      icon: 'map' as const,      color: AMBER,     route: '/transport/routes',           resource: PERMISSION_RESOURCES.TRANSPORT_ROUTES,      action: 'list' },
+  { title: 'Route Stops',      description: 'Configure pickup and drop-off stops along routes',      icon: 'location' as const, color: '#D97706', route: '/transport/route-stops',      resource: PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS, action: 'list' },
+  { title: 'Vehicles',         description: 'Manage the school vehicle fleet and details',           icon: 'bus' as const,      color: AMBER,     route: '/transport/vehicles',         resource: PERMISSION_RESOURCES.TRANSPORT_VEHICLES,    action: 'list' },
+  { title: 'Transport Trips',  description: 'Schedule and track vehicle trips',                      icon: 'navigate' as const, color: '#B45309', route: '/transport/trips',            resource: PERMISSION_RESOURCES.TRANSPORT_TRIPS,       action: 'list' },
 ];
 
 export default function TransportScreen() {
@@ -68,7 +65,7 @@ export default function TransportScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.bannerTitle}>Transport Management</Text>
-            <Text style={styles.bannerSub}>Routes · Vehicles · Trips · Students</Text>
+            <Text style={styles.bannerSub}>Routes · Route Stops · Vehicles · Trips</Text>
           </View>
         </View>
 

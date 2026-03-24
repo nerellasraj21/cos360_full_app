@@ -143,7 +143,7 @@ export const SCREEN_PERMISSIONS: Record<string, ScreenPermissionConfig> = {
         description: 'View transport routes',
     },
     '/transport/route-stops': {
-        requiredPermissions: [['transport_route_stops', 'list'], ['transport_route_stops', 'read']],
+        requiredPermissions: [['transport_routes', 'list'], ['transport_routes', 'read']],
         requireAll: false,
         description: 'View route stops',
     },

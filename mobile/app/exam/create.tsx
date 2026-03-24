@@ -123,7 +123,7 @@ export default function CreateExamScreen() {
 
   return (
     <AppLayout title={isEdit ? 'Edit Exam' : 'Create Exam'}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
 
           {/* Exam Name */}

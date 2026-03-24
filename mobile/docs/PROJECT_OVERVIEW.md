@@ -17,6 +17,7 @@ COS360 is a comprehensive school management platform. The mobile application pro
 - Transport route and trip management
 - Staff enrollment and attendance
 - Expense tracking and approvals
+- SMS/email/push communication and message templates
 - Role-based access control (RBAC)
 
 ---
@@ -74,11 +75,12 @@ COS360 Mobile App
 | Home/Dashboard | Permission-filtered module cards, greeting hero | Complete |
 | Students | Admissions, profiles, attendance, documents, certificates | Complete |
 | Fees | Categories, types, terms, transactions, refunds, mappings | Complete |
-| Exam | List, create, mark entry, results, hall tickets | Complete |
+| Exam | List, create, mark entry, results, hall tickets, my marks, grading | Complete |
 | Masters | Academic years, classes, subjects, holidays, timetables, RBAC | Complete |
-| Transport | Routes, vehicles, stops, trips, student transport | Complete |
+| Transport | Routes, vehicles, stops, trips, pricing, student transport | Complete |
 | Staff | Enrollment, profiles, designations, attendance | Complete |
 | Expense | Categories, transactions, approvals, audit, reports | Complete |
+| Communication | SMS/email/push messaging, templates, message logs | Complete |
 | Profile | Student/Parent/Staff profile view & edit | Complete |
 | Settings | Theme, academic year selector, permission debug | Complete |
 
@@ -128,6 +130,7 @@ COS360 Mobile App
 cos360_mobile_app/
 ├── app/                    # Expo Router screens
 │   ├── (tabs)/             # Tab navigation
+│   ├── communication/      # Communication module screens
 │   ├── exam/               # Exam module screens
 │   ├── expense/            # Expense module screens
 │   ├── fees/               # Fees module screens

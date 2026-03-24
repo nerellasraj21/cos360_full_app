@@ -138,15 +138,19 @@
 
 ## 6. Fees Module
 
+**Hub sections (matches web app):** Fee Categories · Fee Types · Fee Terms · Fee Mappings · Fee Term Amounts · Fee Collection · Fee Receipts · Fee Refunds
+
 | Feature | Status | File |
 |---------|--------|------|
+| Fee hub (8 sections) | ✅ Complete | `app/(tabs)/fees.tsx` |
 | Fee categories | ✅ Complete | `app/fees/categories.tsx` |
 | Fee types | ✅ Complete | `app/fees/types.tsx` |
 | Fee terms | ✅ Complete | `app/fees/terms.tsx` |
-| Fee transactions | ✅ Complete | `app/fees/transactions.tsx` |
-| Student fee mappings | ✅ Complete | `app/fees/student-mappings.tsx` |
-| Class fee mappings | ✅ Complete | `app/fees/class-mappings.tsx` |
-| Refunds | ✅ Complete | `app/fees/refunds.tsx` |
+| Fee mappings (class-level) | ✅ Complete | `app/fees/class-mappings.tsx` |
+| Fee term amounts | ✅ Complete | `app/fees/term-amounts.tsx` |
+| Fee collection (role-aware) | ✅ Complete | `app/fees/collection.tsx` |
+| Fee receipts | ✅ Complete | `app/fees/receipts.tsx` |
+| Fee refunds | ✅ Complete | `app/fees/refunds.tsx` |
 | Fees API | ✅ Complete | `src/api/fees.ts` |
 | Fee type definitions | ✅ Complete | `src/types/fees.ts` |
 | Fee permission hook | ✅ Complete | `hooks/use-fee-permissions.ts` |
@@ -178,18 +182,18 @@
 
 ## 8. Transport Module
 
+**Hub sections (matches web app):** Routes · Route Stops · Vehicles · Transport Trips
+
 | Feature | Status | File |
 |---------|--------|------|
+| Transport hub (4 sections) | ✅ Complete | `app/(tabs)/transport.tsx` |
 | Route management | ✅ Complete | `app/transport/routes.tsx` |
-| Vehicle management | ✅ Complete | `app/transport/vehicles.tsx` |
 | Route stops | ✅ Complete | `app/transport/route-stops.tsx` |
+| Vehicle management | ✅ Complete | `app/transport/vehicles.tsx` |
 | Trip management | ✅ Complete | `app/transport/trips.tsx` |
-| Student transport assignment | ✅ Complete | `app/transport/student-transport.tsx` |
-| Student trips | ✅ Complete | `app/transport/student-trips.tsx` |
 | Transport API | ✅ Complete | `src/api/transport.ts` |
 | Transport hooks | ✅ Complete | `hooks/use-transport.ts` |
 | Transport type definitions | ✅ Complete | `src/types/transport.ts` |
-| Student transport hooks | ✅ Complete | `src/api/hooks/students/transport.ts` |
 
 ---
 
@@ -277,9 +281,38 @@
 | Exam detail screen | ✅ Complete | ✅ Complete | `app/exam/[id].tsx` |
 | Mark entry screen | ✅ Complete | ✅ Complete | `app/exam/marks.tsx` |
 | Results screen | ✅ Complete | ✅ Complete | `app/exam/results.tsx` |
-| Hall tickets screen | ✅ Complete | ✅ Complete | `app/exam/hall-tickets.tsx` |
+| Hall tickets screen (datatable) | ✅ Complete | ✅ Complete | `app/exam/hall-tickets.tsx` |
+| My Marks screen (student/parent) | ✅ Complete | ✅ Complete | `app/exam/my-marks/[examId].tsx` |
+| Grading dashboard | ✅ Complete | ✅ Complete | `app/exam/grading.tsx` |
 | Exam API layer | ✅ Complete | ✅ Complete | `src/api/exam.ts` |
 | Exam permissions | ✅ Complete | ✅ Complete | `src/constants/permissions.ts` |
+
+---
+
+## 15. Communication Module
+
+| Feature | Status | File |
+|---------|--------|------|
+| Communication tab entry | ✅ Complete | `app/(tabs)/communication.tsx` |
+| Communication hub screen (3 cards) | ✅ Complete | `app/(tabs)/communication.tsx` |
+| Compose message screen | ✅ Complete | `app/communication/compose.tsx` |
+| Message templates CRUD | ✅ Complete | `app/communication/templates.tsx` |
+| Message logs (read-only) | ✅ Complete | `app/communication/logs.tsx` |
+| Communication API layer | ✅ Complete | `src/api/communication.ts` |
+| Tab gating in `TAB_CONFIGS` | ✅ Complete | `app/(tabs)/_layout.tsx` |
+
+---
+
+## 16. Additional Phase 2 / Phase 3 Features
+
+| Feature | Status | File |
+|---------|--------|------|
+| Fee Collection screen (role-aware) | ✅ Complete | `app/fees/collection.tsx` |
+| Fee Term Amounts screen | ✅ Complete | `app/fees/term-amounts.tsx` |
+| Fee Receipts screen | ✅ Complete | `app/fees/receipts.tsx` |
+| Fee Reports screen (3 tabs) | ✅ Complete | `app/fees/reports.tsx` (standalone, not in fees hub) |
+| Transport Pricing CRUD | ✅ Complete | `app/transport/pricing.tsx` (not in transport hub — standalone screen) |
+| Student Transport CRUD | ✅ Complete | `app/transport/student-transport.tsx` (not in transport hub — role-based access) |
 
 ---
 
@@ -292,18 +325,19 @@
 | Permission System | 17 | 17 | 0 | 0 |
 | Dashboard | 5 | 5 | 0 | 0 |
 | Students | 18 | 18 | 0 | 0 |
-| Fees | 10 | 10 | 0 | 0 |
+| Fees | 14 | 14 | 0 | 0 |
 | Masters | 14 | 14 | 0 | 0 |
-| Transport | 10 | 10 | 0 | 0 |
+| Transport | 8 | 8 | 0 | 0 |
 | Staff | 10 | 10 | 0 | 0 |
 | Expense | 13 | 13 | 0 | 0 |
 | Profile | 8 | 8 | 0 | 0 |
 | Settings | 4 | 4 | 0 | 0 |
 | Parents | 4 | 4 | 0 | 0 |
-| **Exam Module** | **9** | **9** | **0** | **0** |
-| **TOTAL** | **149** | **149** | **0** | **0** |
+| Exam Module | 11 | 11 | 0 | 0 |
+| **Communication** | **7** | **7** | **0** | **0** |
+| **TOTAL** | **160** | **160** | **0** | **0** |
 
-**Overall Completion: 100% (149/149 features)**
+**Overall Completion: 100% (160/160 features)**
 
 ---
 

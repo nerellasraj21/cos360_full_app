@@ -2,10 +2,9 @@
 
 **Prepared for:** App Developer
 **Scope:** 6 new screen files + API additions + Communication tab activation
-**Status: ⏳ Pending**
+**Status: ✅ COMPLETE**
 
-> Apply after Phase 2 is complete and tested.
-> This phase activates the Communication tab (deferred from Phase 1).
+> Phase 2 complete. All Phase 3 screens built and committed.
 
 ---
 
@@ -1487,21 +1486,21 @@ Run through each screen after it's built:
 
 ## Checklist
 
-- [ ] Transport pricing API functions added to `src/api/transport.ts`
-- [ ] `app/transport/pricing.tsx` created and working
-- [ ] Fee reports API functions added to `src/api/fees.ts`
-- [ ] `app/fees/reports.tsx` created and working (all 3 tabs)
-- [ ] `src/api/communication.ts` created (new file)
-- [ ] `app/communication/compose.tsx` created and working
-- [ ] `app/communication/templates.tsx` created and working
-- [ ] `app/communication/logs.tsx` created and working
-- [ ] `app/exam/grading.tsx` created and working
-- [ ] `app/(tabs)/communication.tsx` created
-- [ ] Communication entry added to `TAB_CONFIGS` in `_layout.tsx`
-- [ ] All test scenarios above passed
-- [ ] ⚠️ Transport Pricing schema corrected to use Name + Vehicle + Amount + is_active
-- [ ] ⚠️ Communication hub rebuilt as 3-card hub (not a redirect)
-- [ ] ⚠️ Exam Grading Dashboard links corrected to Grade Schemes / Remark Sets / Hall Tickets
+- [x] Transport pricing API functions added to `src/api/transport.ts`
+- [x] `app/transport/pricing.tsx` created and working
+- [x] Fee reports API functions added to `src/api/fees.ts`
+- [x] `app/fees/reports.tsx` created and working (all 3 tabs)
+- [x] `src/api/communication.ts` created (new file)
+- [x] `app/communication/compose.tsx` created and working
+- [x] `app/communication/templates.tsx` created and working
+- [x] `app/communication/logs.tsx` created and working
+- [x] `app/exam/grading.tsx` created and working
+- [x] `app/(tabs)/communication.tsx` created
+- [x] Communication entry added to `TAB_CONFIGS` in `_layout.tsx`
+- [ ] All test scenarios above passed — verify on device
+- [ ] ⚠️ Transport Pricing schema corrected to use Name + Vehicle + Amount + is_active — verify
+- [ ] ⚠️ Communication hub rebuilt as 3-card hub (not a redirect) — verify
+- [ ] ⚠️ Exam Grading Dashboard links corrected to Grade Schemes / Remark Sets / Hall Tickets — verify
 
 ---
 

@@ -101,6 +101,26 @@ const MODULES: {
     route: '/(tabs)/communication',
     alwaysShow: true,
   },
+  {
+    id: 'reports',
+    title: 'Reports',
+    icon: 'bar-chart' as const,
+    color: '#556ee6',
+    bg: '#EEF2FF',
+    darkBg: '#556ee620',
+    route: '/(tabs)/reports',
+    alwaysShow: true,
+  },
+  {
+    id: 'admin',
+    title: 'Administration',
+    icon: 'shield-checkmark' as const,
+    color: '#64748b',
+    bg: '#F8FAFC',
+    darkBg: '#64748b20',
+    route: '/(tabs)/admin',
+    resources: ['users', 'roles', 'permissions', 'menu'],
+  },
 ];
 
 export default function HomeScreen() {

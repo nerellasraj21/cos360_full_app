@@ -9,7 +9,9 @@
       "Bash(npx tsc:*)",
       "Bash(echo:*)",
       "Bash(npx eslint:*)",
-      "Read(//c/Users/nerel/.claude/projects/c--Users-nerel-Documents-Workspace-React-Workspace-cos360-mobile-cos360-mobile-app/memory/**)"
+      "Read(//c/Users/nerel/.claude/projects/c--Users-nerel-Documents-Workspace-React-Workspace-cos360-mobile-cos360-mobile-app/memory/**)",
+      "Read(//c/Users/nerel/AppData/Local/Temp/claude/c--Users-nerel-Documents-Workspace-React-Workspace-cos360-mobile-cos360-mobile-app/tasks/**)",
+      "Bash(git add:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\nerel\\.claude\\projects\\c--Users-nerel-Documents-Workspace-React-Workspace-cos360-mobile-cos360-mobile-app\\memory"
