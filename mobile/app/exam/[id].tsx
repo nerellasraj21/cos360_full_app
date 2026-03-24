@@ -8,6 +8,7 @@ import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { examsApi, examDatesApi, ExamStatus } from '@/src/api/exam';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
+import { useToastContext } from '@/components/ToastProvider';
 
 const STATUS_COLORS: Record<ExamStatus, { bg: string; text: string }> = {
   draft:     { bg: '#6B728018', text: '#6B7280' },
@@ -23,6 +24,7 @@ export default function ExamDetailScreen() {
   const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
   const qc = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -49,9 +51,9 @@ export default function ExamDetailScreen() {
     mutationFn: () => examsApi.unlock(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['exam', id] });
-      Alert.alert('Success', 'Exam unlocked for corrections.');
+      showSuccess('Exam Unlocked', 'Exam unlocked for corrections.');
     },
-    onError: () => Alert.alert('Error', 'Failed to unlock exam.'),
+    onError: () => showError('Error', 'Failed to unlock exam.'),
   });
 
   const deleteMutation = useMutation({
@@ -60,7 +62,7 @@ export default function ExamDetailScreen() {
       qc.invalidateQueries({ queryKey: ['exams'] });
       router.back();
     },
-    onError: () => Alert.alert('Error', 'Failed to delete exam.'),
+    onError: () => showError('Error', 'Failed to delete exam.'),
   });
 
   if (isLoading) {

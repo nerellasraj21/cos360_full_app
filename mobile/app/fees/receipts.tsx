@@ -15,12 +15,14 @@ import {
 import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { feeReceiptsApi, FeeReceiptResponse } from '@/src/api/fees';
+import { useToastContext } from '@/components/ToastProvider';
 
 const INDIGO = '#556ee6';
 
 export default function FeeReceiptsScreen() {
   const { colors, theme } = useTheme();
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
   const [detailReceipt, setDetailReceipt] = useState<FeeReceiptResponse | null>(null);
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
@@ -34,11 +36,11 @@ export default function FeeReceiptsScreen() {
   const reprintMutation = useMutation({
     mutationFn: feeReceiptsApi.reprintFeeReceipt,
     onSuccess: () => {
-      Alert.alert('Success', 'Receipt reprint requested successfully');
+      showSuccess('Reprint Requested', 'Receipt reprint requested successfully');
       queryClient.invalidateQueries({ queryKey: ['feeReceipts'] });
     },
     onError: () => {
-      Alert.alert('Error', 'Failed to reprint receipt');
+      showError('Error', 'Failed to reprint receipt');
     },
   });
 

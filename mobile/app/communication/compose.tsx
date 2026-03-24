@@ -19,7 +19,7 @@ import {
   SendMessageRequest,
 } from '@/src/api/communication';
 
-type Channel = 'sms' | 'email' | 'push';
+type Channel = 'sms' | 'whatsapp' | 'email';
 type RecipientType = 'all' | 'class' | 'student' | 'staff' | 'parent';
 
 export default function ComposeScreen() {
@@ -82,7 +82,7 @@ export default function ComposeScreen() {
   const CHANNELS: { key: Channel; label: string; icon: string }[] = [
     { key: 'sms', label: 'SMS', icon: 'chatbubble' },
     { key: 'email', label: 'Email', icon: 'mail' },
-    { key: 'push', label: 'Push', icon: 'notifications' },
+    { key: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp' },
   ];
 
   const RECIPIENTS: { key: RecipientType; label: string }[] = [

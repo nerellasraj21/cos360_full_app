@@ -549,6 +549,8 @@ export const studentAdmissionsApi = {
   listAdmissions: async (params?: {
     skip?: number;
     limit?: number;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
   }): Promise<{ items: StudentAdmissionResponse[]; total_count: number; has_next: boolean }> => {
     const response = await apiClient.get('/students/admission/', { params });
     return response.data;
@@ -558,6 +560,8 @@ export const studentAdmissionsApi = {
   getStudentAdmissions: async (params?: {
     skip?: number;
     limit?: number;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
   }): Promise<{ items: StudentAdmissionResponse[]; total_count: number; has_next: boolean }> => {
     const response = await apiClient.get('/students/admission/', { params });
     return response.data;
@@ -651,7 +655,7 @@ export const studentAdmissionsApi = {
   },
 
   /** GET /students/admission/admission-types/dropdown */
-  getAdmissionTypesDropdown: async (): Promise<{ id: string; name: string }[]> => {
+  getAdmissionTypesDropdown: async (): Promise<{ value: string; label: string }[]> => {
     const response = await apiClient.get('/students/admission/admission-types/dropdown');
     return response.data;
   },
@@ -714,6 +718,12 @@ export const studentAttendanceApi = {
       `/student/attendance/student/${studentId}/filter`,
       { params },
     );
+    return response.data;
+  },
+
+  /** GET /student/attendance/{id} */
+  getAttendanceById: async (id: string): Promise<StudentAttendanceOut> => {
+    const response = await apiClient.get(`/student/attendance/${id}`);
     return response.data;
   },
 
@@ -980,10 +990,13 @@ export const certificateTypesApi = {
 // ─── Documents API ────────────────────────────────────────────────────────────
 
 export const studentDocumentsApi = {
-  /** GET /students/documents/?student_id=... */
+  /** GET /students/documents/ */
   listDocuments: async (params?: {
     student_id?: string;
     document_type?: string;
+    is_verified?: boolean;
+    skip?: number;
+    limit?: number;
   }): Promise<DocumentOut[]> => {
     const response = await apiClient.get('/students/documents/', { params });
     return response.data;
@@ -1035,9 +1048,67 @@ export const studentDocumentsApi = {
     return response.data;
   },
 
+  /** GET /students/documents/{id}/download → Blob */
+  downloadDocument: async (id: string): Promise<Blob> => {
+    const response = await apiClient.get(`/students/documents/${id}/download`, { responseType: 'blob' });
+    return response.data;
+  },
+
+  /** POST /students/documents/{id}/verify */
+  verifyDocument: async (id: string, data: { remarks?: string; is_verified: boolean }): Promise<DocumentOut> => {
+    const response = await apiClient.post(`/students/documents/${id}/verify`, data);
+    return response.data;
+  },
+
   /** DELETE /students/documents/{id} */
   deleteDocument: async (id: string): Promise<void> => {
     await apiClient.delete(`/students/documents/${id}`);
+  },
+};
+
+// ─── Document Types API ───────────────────────────────────────────────────────
+
+export interface DocumentTypeRead {
+  id: string;
+  name: string;
+  description?: string;
+  is_active: boolean;
+}
+
+export interface DocumentTypeCreate {
+  name: string;
+  description?: string;
+  is_active?: boolean;
+}
+
+export interface DocumentTypeUpdate {
+  name?: string;
+  description?: string;
+  is_active?: boolean;
+}
+
+export const documentTypesApi = {
+  /** GET /students/document-types/ */
+  list: async (params?: { skip?: number; limit?: number; is_active?: boolean }): Promise<DocumentTypeRead[]> => {
+    const response = await apiClient.get('/students/document-types/', { params });
+    return response.data.items || response.data;
+  },
+
+  /** POST /students/document-types/ */
+  create: async (data: DocumentTypeCreate): Promise<DocumentTypeRead> => {
+    const response = await apiClient.post('/students/document-types/', data);
+    return response.data;
+  },
+
+  /** PUT /students/document-types/{id} */
+  update: async (id: string, data: DocumentTypeUpdate): Promise<DocumentTypeRead> => {
+    const response = await apiClient.put(`/students/document-types/${id}`, data);
+    return response.data;
+  },
+
+  /** DELETE /students/document-types/{id} */
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/students/document-types/${id}`);
   },
 };
 
@@ -1103,7 +1174,7 @@ export const timetableApi = {
   },
 
   bulkUpdateTimetableSlots: async (data: BulkTimetableUpdate): Promise<unknown> => {
-    const response = await apiClient.patch('/students/timetable/timetable/slots/bulk', data);
+    const response = await apiClient.patch('/students/timetable/slots/bulk', data);
     return response.data;
   },
 
@@ -1124,9 +1195,43 @@ export const timetableApi = {
   },
 };
 
+// ─── Student Profile ──────────────────────────────────────────────────────────
+
+/** GET /profile/student/me */
+export interface StudentProfileOut {
+  id: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string | null;
+  gender: string | null;
+  admission_number: string | null;
+  aadhar_number: string | null;
+  apaar_number: string | null;
+  caste: string | null;
+  sub_caste: string | null;
+  community: string | null;
+  nationality: string | null;
+  mother_tongue: string | null;
+  identification_marks: string | null;
+}
+
+export const studentProfileApi = {
+  /** GET /profile/student/me — student's own profile */
+  getMyProfile: async (): Promise<StudentProfileOut> => {
+    const response = await apiClient.get('/profile/student/me');
+    return response.data;
+  },
+};
+
 // ─── Parent Students API ──────────────────────────────────────────────────────
 
 export const parentStudentsApi = {
+  /** GET /student-parent-links/parent/{parentEntityId}/students */
+  getChildrenByParentEntityId: async (parentEntityId: string): Promise<ParentStudent[]> => {
+    const response = await apiClient.get(`/student-parent-links/parent/${parentEntityId}/students`);
+    return response.data ?? [];
+  },
+
   /** GET /student-parent-links/my-children */
   getParentStudents: async (): Promise<ParentStudent[]> => {
     const response = await apiClient.get('/student-parent-links/my-children');

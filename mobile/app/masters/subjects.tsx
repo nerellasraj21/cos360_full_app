@@ -25,6 +25,7 @@ import { useAcademicYearsDropdown } from '@/src/api/hooks/masters/academicYears'
 import { useTheme, useAcademicYear } from '@/contexts';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 
 export default function SubjectsScreen() {
@@ -49,6 +50,7 @@ export default function SubjectsScreen() {
   const { theme, colors } = useTheme();
   const { activeAcademicYearId } = useAcademicYear();
   const themeColors = Colors[theme];
+  const { showSuccess, showError } = useToastContext();
 
   // Fetch data using permission-protected hooks
   const { data: subjectsData, isLoading, error, refetch } = useSubjects(
@@ -70,6 +72,7 @@ export default function SubjectsScreen() {
     if (createMutation.isSuccess) {
       setIsModalVisible(false);
       resetForm();
+      showSuccess('Subject Created', 'Subject has been created.');
       createMutation.reset();
     }
   }, [createMutation.isSuccess]);
@@ -78,12 +81,14 @@ export default function SubjectsScreen() {
     if (updateMutation.isSuccess) {
       setIsModalVisible(false);
       resetForm();
+      showSuccess('Subject Updated', 'Subject has been updated.');
       updateMutation.reset();
     }
   }, [updateMutation.isSuccess]);
 
   React.useEffect(() => {
     if (deleteMutation.isSuccess) {
+      showSuccess('Subject Deleted', 'Subject has been deleted.');
       deleteMutation.reset();
     }
   }, [deleteMutation.isSuccess]);
@@ -92,6 +97,7 @@ export default function SubjectsScreen() {
     if (createCategoryMutation.isSuccess) {
       setIsCategoryModalVisible(false);
       setNewCategoryName('');
+      showSuccess('Category Created', 'Subject category has been created.');
       createCategoryMutation.reset();
     }
   }, [createCategoryMutation.isSuccess]);
@@ -142,7 +148,7 @@ export default function SubjectsScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteMutation.mutate(subject.id),
+          onPress: () => deleteMutation.mutate(subject.id, { onError: (e: any) => showError('Delete Failed', e.message || 'Failed to delete subject') }),
         },
       ]
     );
@@ -161,9 +167,9 @@ export default function SubjectsScreen() {
     };
 
     if (editingSubject) {
-      updateMutation.mutate({ id: editingSubject.id, data: submitData });
+      updateMutation.mutate({ id: editingSubject.id, data: submitData }, { onError: (e: any) => showError('Update Failed', e.message || 'Failed to update subject') });
     } else {
-      createMutation.mutate(submitData);
+      createMutation.mutate(submitData, { onError: (e: any) => showError('Create Failed', e.message || 'Failed to create subject') });
     }
   };
 
@@ -172,7 +178,7 @@ export default function SubjectsScreen() {
       Alert.alert('Error', 'Category name is required');
       return;
     }
-    createCategoryMutation.mutate({ name: newCategoryName.trim() });
+    createCategoryMutation.mutate({ name: newCategoryName.trim() }, { onError: (e: any) => showError('Create Failed', e.message || 'Failed to create category') });
   };
 
   const getCategoryName = (categoryId: string) => {

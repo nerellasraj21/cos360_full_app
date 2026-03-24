@@ -8,6 +8,7 @@ import { AppLayout } from '@/components';
 import { useAuth, useTheme } from '@/contexts';
 import { examsApi, examResultsApi, StudentExamResult } from '@/src/api/exam';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
+import { useToastContext } from '@/components/ToastProvider';
 
 const PASS_COLOR = '#10B981';
 const FAIL_COLOR = '#EF4444';
@@ -19,6 +20,7 @@ export default function ResultsScreen() {
   const qc = useQueryClient();
   const router = useRouter();
   const { role } = useAuth();
+  const { showSuccess, showError } = useToastContext();
 
   const roleName = role?.name?.toLowerCase() ?? '';
   const isStudentOrParent =
@@ -63,18 +65,18 @@ export default function ResultsScreen() {
     mutationFn: () => examResultsApi.compute(selectedExamId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['exam-results', selectedExamId] });
-      Alert.alert('Success', 'Results computed successfully.');
+      showSuccess('Results Computed', 'Results computed successfully.');
     },
-    onError: () => Alert.alert('Error', 'Failed to compute results.'),
+    onError: () => showError('Error', 'Failed to compute results.'),
   });
 
   const publishMutation = useMutation({
     mutationFn: () => examResultsApi.publish(selectedExamId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['exams'] });
-      Alert.alert('Success', 'Results published to students and parents.');
+      showSuccess('Results Published', 'Results published to students and parents.');
     },
-    onError: () => Alert.alert('Error', 'Failed to publish results.'),
+    onError: () => showError('Error', 'Failed to publish results.'),
   });
 
   // Student detail view

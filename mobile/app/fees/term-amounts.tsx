@@ -22,6 +22,7 @@ import {
   FeeClassMappingResponse,
 } from '@/src/api/fees';
 import { FeeClassMappingTermAmount } from '@/src/types/fees';
+import { useToastContext } from '@/components/ToastProvider';
 
 const CYAN = '#06B6D4';
 
@@ -29,6 +30,7 @@ export default function FeeTermAmountsScreen() {
   const { colors, theme } = useTheme();
   const { activeAcademicYearId } = useAcademicYear();
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
 
   const [editingMapping, setEditingMapping] = useState<FeeClassMappingResponse | null>(null);
   const [termAmountDrafts, setTermAmountDrafts] = useState<{ id?: string; fee_term_date_id: string; amount: string }[]>([]);
@@ -46,7 +48,7 @@ export default function FeeTermAmountsScreen() {
       queryClient.invalidateQueries({ queryKey: ['feeClassMappings'] });
     },
     onError: () => {
-      Alert.alert('Error', 'Failed to update term amount');
+      showError('Error', 'Failed to update term amount');
     },
   });
 
@@ -57,7 +59,7 @@ export default function FeeTermAmountsScreen() {
       queryClient.invalidateQueries({ queryKey: ['feeClassMappings'] });
     },
     onError: () => {
-      Alert.alert('Error', 'Failed to create term amount');
+      showError('Error', 'Failed to create term amount');
     },
   });
 
@@ -108,9 +110,9 @@ export default function FeeTermAmountsScreen() {
     queryClient.invalidateQueries({ queryKey: ['feeClassMappings'] });
     setModalVisible(false);
     if (hasError) {
-      Alert.alert('Partial Success', 'Some term amounts could not be updated');
+      showError('Partial Success', 'Some term amounts could not be updated');
     } else {
-      Alert.alert('Success', 'Term amounts updated successfully');
+      showSuccess('Term Amounts Saved', 'Term amounts updated successfully');
     }
   };
 

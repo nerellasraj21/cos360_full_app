@@ -11,6 +11,7 @@ import {
   DeletePermissionGuard 
 } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
@@ -72,6 +73,7 @@ export default function FeeTermsScreen() {
   const colors = Colors[theme];
   const queryClient = useQueryClient();
   const { activeAcademicYearId } = useAcademicYear();
+  const { showSuccess, showError } = useToastContext();
 
   const { data: terms = [], isLoading, error } = useQuery({
     queryKey: ['feeTerms', activeAcademicYearId],
@@ -86,10 +88,10 @@ export default function FeeTermsScreen() {
       queryClient.invalidateQueries({ queryKey: ['feeTerms'] });
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Fee term created successfully');
+      showSuccess('Term Created', 'Fee term created successfully');
     },
     onError: (error) => {
-      Alert.alert('Error', 'Failed to create fee term');
+      showError('Error', 'Failed to create fee term');
       console.error('Create error:', error);
     },
   });
@@ -101,10 +103,10 @@ export default function FeeTermsScreen() {
       queryClient.invalidateQueries({ queryKey: ['feeTerms'] });
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Fee term updated successfully');
+      showSuccess('Term Updated', 'Fee term updated successfully');
     },
     onError: (error) => {
-      Alert.alert('Error', 'Failed to update fee term');
+      showError('Error', 'Failed to update fee term');
       console.error('Update error:', error);
     },
   });
@@ -114,11 +116,11 @@ export default function FeeTermsScreen() {
     onSuccess: () => {
       console.log('Delete mutation success');
       queryClient.invalidateQueries({ queryKey: ['feeTerms'] });
-      Alert.alert('Success', 'Fee term deleted successfully');
+      showSuccess('Term Deleted', 'Fee term deleted successfully');
     },
     onError: (error) => {
       console.log('Delete mutation error:', error);
-      Alert.alert('Error', 'Failed to delete fee term');
+      showError('Error', 'Failed to delete fee term');
       console.error('Delete error:', error);
     },
   });

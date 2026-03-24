@@ -23,6 +23,7 @@ import type { SubjectCategory, SubjectCategoryCreate, SubjectCategoryUpdate } fr
 import { useTheme } from '@/contexts';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 export default function SubjectCategoriesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,6 +38,7 @@ export default function SubjectCategoriesScreen() {
   const router = useRouter();
   const { theme, colors } = useTheme();
   const themeColors = Colors[theme];
+  const { showSuccess, showError } = useToastContext();
   const queryClient = useQueryClient();
   // Permission checking will be handled by PermissionGuard components
 
@@ -54,10 +56,10 @@ export default function SubjectCategoriesScreen() {
       queryClient.invalidateQueries({ queryKey: ['subjectCategories'] });
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Subject category created successfully');
+      showSuccess('Category Created', 'Subject category created successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to create subject category');
+      showError('Create Failed', error.message || 'Failed to create subject category');
     },
   });
 
@@ -68,10 +70,10 @@ export default function SubjectCategoriesScreen() {
       queryClient.invalidateQueries({ queryKey: ['subjectCategories'] });
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Subject category updated successfully');
+      showSuccess('Category Updated', 'Subject category updated successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to update subject category');
+      showError('Update Failed', error.message || 'Failed to update subject category');
     },
   });
 
@@ -79,10 +81,10 @@ export default function SubjectCategoriesScreen() {
     mutationFn: subjectCategoriesApi.deleteSubjectCategory,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subjectCategories'] });
-      Alert.alert('Success', 'Subject category deleted successfully');
+      showSuccess('Category Deleted', 'Subject category deleted successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to delete subject category');
+      showError('Delete Failed', error.message || 'Failed to delete subject category');
     },
   });
 

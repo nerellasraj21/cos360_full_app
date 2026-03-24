@@ -153,3 +153,32 @@ export interface StaffAssignmentInput {
   end_date?: string;
   is_active?: boolean;
 }
+
+// Staff Qualification Types
+export interface StaffQualification {
+  id: string;
+  staff_id: string;
+  degree: string;
+  institution: string;
+  year_of_passing?: number;
+  specialization?: string;
+  grade?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StaffQualificationInput {
+  degree: string;
+  institution: string;
+  year_of_passing?: number;
+  specialization?: string;
+  grade?: string;
+}
+
+export interface StaffQualificationUpdate {
+  degree?: string;
+  institution?: string;
+  year_of_passing?: number;
+  specialization?: string;
+  grade?: string;
+}

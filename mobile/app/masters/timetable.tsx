@@ -24,6 +24,7 @@ import { timetableApi, classSectionsApi, subjectsApi } from '@/src/api';
 import type { FrontendTimetableCreate, TimetableDataItem } from '@/src/api';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 const SPECIAL_LABELS: DropdownOption[] = [
   { value: 'SNACKS', label: 'Snacks' },
@@ -56,6 +57,7 @@ export default function TimeTableEditor() {
   const router = useRouter();
   const { colors } = useTheme();
   const themeColors = colors;
+  const { showSuccess, showError } = useToastContext();
   const queryClient = useQueryClient();
   const { activeAcademicYearId } = useAcademicYear();
 
@@ -112,10 +114,10 @@ export default function TimeTableEditor() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['timetable'] });
       setIsEditing(false);
-      Alert.alert('Success', 'Timetable created successfully');
+      showSuccess('Timetable Created', 'Timetable created successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to create timetable');
+      showError('Create Failed', error.message || 'Failed to create timetable');
     },
   });
 
@@ -125,10 +127,10 @@ export default function TimeTableEditor() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['timetable'] });
       setIsEditing(false);
-      Alert.alert('Success', 'Timetable updated successfully');
+      showSuccess('Timetable Updated', 'Timetable updated successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to update timetable');
+      showError('Update Failed', error.message || 'Failed to update timetable');
     },
   });
 

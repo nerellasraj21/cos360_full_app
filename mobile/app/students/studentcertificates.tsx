@@ -11,20 +11,22 @@ import { useAllCertificates, useMyCertificates, useCertificateTypes } from '@/sr
 import { studentCertificatesApi, studentAdmissionsApi } from '@/src/api/students';
 import { DeletePermissionGuard, CreatePermissionGuard } from '@/src/components/mobile/MobilePermissionGuard';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 // ─── Shared certificate item ───────────────────────────────────────────────
 
 function CertificateItem({ item, colors }: { item: any; colors: any }) {
+  const { showError } = useToastContext();
   const handleDownload = async () => {
     try {
       const resp = await studentCertificatesApi.downloadCertificate(item.id);
       if (resp?.presigned_url) {
         await Linking.openURL(resp.presigned_url);
       } else {
-        Alert.alert('Info', 'No download link available');
+        showError('No Download Link', 'No download link available');
       }
     } catch {
-      Alert.alert('Error', 'Could not get download link');
+      showError('Error', 'Could not get download link');
     }
   };
 

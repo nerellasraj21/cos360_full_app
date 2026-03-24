@@ -1,796 +1,408 @@
-import { ThemedText } from '@/components/themed-text';
 import { AppLayout } from '@/components';
+import { CreatePermissionGuard, DeletePermissionGuard, ReadOrListPermissionGuard, UpdatePermissionGuard } from '@/components/PermissionGuards';
+import { ThemedText } from '@/components/themed-text';
 import { useToastContext } from '@/components/ToastProvider';
-import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useAuth, useTheme } from '@/contexts';
-import { useAcademicYear } from '../../contexts/AcademicYearContext';
-import { useStudents, useRoutesDropdown } from '@/hooks';
-import { studentTransportApi, StudentTransport } from '../../src/api';
-import { useRouteStops } from '../../hooks/use-transport';
-import { PERMISSION_RESOURCES } from '../../src/types/permissions';
+import { routeStopsApi, routesApi, tripsApi } from '@/src/api/masters';
+import {
+  studentAdmissionsApi,
+  studentTransportApi,
+  StudentTransportCreate,
+  StudentTransportOut,
+} from '@/src/api/students';
+import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 
+const AMBER = '#F59E0B';
+
 export default function StudentTransportScreen() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingTransport, setEditingTransport] = useState<StudentTransport | null>(null);
-  const [formData, setFormData] = useState({
-    student_id: '',
-    route_id: '',
-    stop_id: '',
-    trip_type: 'first trip',
-    academic_year_id: '',
-    fare_amount: 0,
-    pricing_id: '',
-  });
-
-  const { colors } = useTheme();
-  const { role, selectedStudent, studentId, availableStudents } = useAuth();
-  const { activeAcademicYearId } = useAcademicYear();
-  const roleName = role?.name?.toLowerCase() ?? '';
-  const isStudent = roleName === 'student';
-  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
-  const childId = selectedStudent?.id ?? '';
-  const queryClient = useQueryClient();
+  const { colors, theme } = useTheme();
   const { showSuccess, showError } = useToastContext();
+  const { role, studentId } = useAuth();
+  const qc = useQueryClient();
 
-  // Fetch student transport data
-  const { data: transportData, isLoading, error, refetch } = useQuery({
-    queryKey: ['student-transport'],
-    queryFn: () => studentTransportApi.getStudentTransports(),
+  const roleName = (role?.name ?? '').toLowerCase();
+  const isStudent = roleName === 'student';
+  const isParent = ['parent', 'guardian', 'father', 'mother'].some(r => roleName.includes(r));
+
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editing, setEditing] = useState<StudentTransportOut | null>(null);
+  const [form, setForm] = useState({ student_id: '', trip_id: '', stop_id: '', fee_per_term: '' });
+
+  const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
+  const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
+  const inputBg = theme === 'dark' ? '#0f0f23' : '#f8fafc';
+
+  // ── Admin / Transport Manager: full list ───────────────────────────────────
+  const { data: assignments = [], isLoading, refetch } = useQuery({
+    queryKey: ['student-transport-list'],
+    queryFn: () => studentTransportApi.listStudentTransport(),
     enabled: !isStudent && !isParent,
   });
 
-  // Student: own transport assignment
-  const { data: myTransport, isLoading: myTransportLoading } = useQuery({
-    queryKey: ['my-transport'],
-    queryFn: () => studentTransportApi.getStudentTransports({ student_id: studentId! }),
+  // ── Student: own assignment ────────────────────────────────────────────────
+  const { data: myTransport, isLoading: myLoading } = useQuery({
+    queryKey: ['my-transport', studentId],
+    queryFn: () => studentTransportApi.getTransportByStudent(studentId!),
     enabled: isStudent && !!studentId,
   });
 
-  // Parent: selected child's transport assignment
-  const { data: childTransport, isLoading: childTransportLoading } = useQuery({
-    queryKey: ['child-transport', childId],
-    queryFn: () => studentTransportApi.getStudentTransports({ student_id: childId }),
-    enabled: isParent && !!childId,
+  // ── Form dropdowns (admin only) ────────────────────────────────────────────
+  const { data: studentsDropdown = [] } = useQuery({
+    queryKey: ['students-dropdown-transport'],
+    queryFn: () => studentAdmissionsApi.studentsDropdown({ active_only: true }),
+    enabled: !isStudent && !isParent,
   });
 
-  const { data: studentsData } = useStudents();
-  const { data: routesData } = useRoutesDropdown();
-  const { data: routeStopsData } = useRouteStops({ route_id: formData.route_id || undefined });
+  const { data: trips = [] } = useQuery({
+    queryKey: ['trips-all'],
+    queryFn: () => tripsApi.getTrips(),
+    enabled: !isStudent && !isParent,
+  });
 
-  const students = studentsData || [];
-  const routes = routesData || [];
-  const stopOptions = (routeStopsData ?? []).map(s => ({
-    label: `${s.name} (Stop #${s.number})`,
-    value: s.id,
-  }));
+  const { data: routesDropdown = [] } = useQuery({
+    queryKey: ['routes-dropdown-transport'],
+    queryFn: () => routesApi.getRoutesDropdown(),
+    enabled: !isStudent && !isParent,
+  });
 
-  // Mutations
+  const selectedTrip = useMemo(
+    () => (trips as any[]).find(t => t.id === form.trip_id),
+    [trips, form.trip_id],
+  );
+
+  const { data: stops = [] } = useQuery({
+    queryKey: ['route-stops-for-trip', selectedTrip?.route_id],
+    queryFn: () => routeStopsApi.getRouteStops({ route_id: selectedTrip!.route_id }),
+    enabled: !!selectedTrip?.route_id,
+  });
+
+  // ── Dropdown options ───────────────────────────────────────────────────────
+  const studentOptions = useMemo(
+    () => (studentsDropdown as any[]).map(s => ({
+      label: `${s.display_name} (${s.admission_number})` || '',
+      value: s.id,
+    })),
+    [studentsDropdown],
+  );
+
+  const tripOptions = useMemo(
+    () => (trips as any[]).map(t => {
+      const route = (routesDropdown as any[]).find(r => r.id === t.route_id);
+      return {
+        label: `Trip #${t.trip_number}${route ? ` — ${route.route_name}` : ''}`,
+        value: t.id,
+      };
+    }),
+    [trips, routesDropdown],
+  );
+
+  const stopOptions = useMemo(
+    () => (stops as any[]).map(s => ({ label: s.name || '', value: s.id })),
+    [stops],
+  );
+
+  // ── Mutations ──────────────────────────────────────────────────────────────
   const createMutation = useMutation({
-    mutationFn: studentTransportApi.createStudentTransport,
+    mutationFn: (data: StudentTransportCreate) => studentTransportApi.createStudentTransport(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['student-transport'] });
+      qc.invalidateQueries({ queryKey: ['student-transport-list'] });
       setIsModalVisible(false);
       resetForm();
-      showSuccess('Student transport created successfully');
+      showSuccess('Transport assignment created');
     },
-    onError: (error) => {
-      showError('Failed to create student transport', error.message);
-    },
+    onError: (err: any) => showError('Create failed', err?.response?.data?.detail ?? err.message),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<StudentTransport> }) =>
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
       studentTransportApi.updateStudentTransport(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['student-transport'] });
+      qc.invalidateQueries({ queryKey: ['student-transport-list'] });
       setIsModalVisible(false);
       resetForm();
-      showSuccess('Student transport updated successfully');
+      showSuccess('Transport assignment updated');
     },
-    onError: (error) => {
-      showError('Failed to update student transport', error.message);
-    },
+    onError: (err: any) => showError('Update failed', err?.response?.data?.detail ?? err.message),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: studentTransportApi.deleteStudentTransport,
+    mutationFn: (id: string) => studentTransportApi.deleteStudentTransport(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['student-transport'] });
-      showSuccess('Student transport deleted successfully');
+      qc.invalidateQueries({ queryKey: ['student-transport-list'] });
+      showSuccess('Transport assignment deleted');
     },
-    onError: (error) => {
-      showError('Failed to delete student transport', error.message);
-    },
+    onError: (err: any) => showError('Delete failed', err?.response?.data?.detail ?? err.message),
   });
 
-  // Filter student transports based on search
-  const filteredTransports = useMemo(() => {
-    if (!transportData || !Array.isArray(transportData)) return [];
-
-    return transportData.filter((transport: StudentTransport) => {
-      const student = students.find(s => s.id === transport.student_id);
-      const route = routes.find(r => r.id === transport.route_id);
-      const searchTerm = searchQuery.toLowerCase();
-
-      return (
-        student?.display_name.toLowerCase().includes(searchTerm) ||
-        route?.route_name.toLowerCase().includes(searchTerm) ||
-        transport.trip_type.toLowerCase().includes(searchTerm)
-      );
-    });
-  }, [transportData, students, routes, searchQuery]);
-
+  // ── Helpers ────────────────────────────────────────────────────────────────
   const resetForm = () => {
-    setFormData({
-      student_id: '',
-      route_id: '',
-      stop_id: '',
-      trip_type: 'first trip',
-      academic_year_id: activeAcademicYearId || '',
-      fare_amount: 0,
-      pricing_id: '',
-    });
-    setEditingTransport(null);
+    setForm({ student_id: '', trip_id: '', stop_id: '', fee_per_term: '' });
+    setEditing(null);
   };
 
-  const handleEdit = (transport: StudentTransport) => {
-    setEditingTransport(transport);
-    setFormData({
-      student_id: transport.student_id,
-      route_id: transport.route_id,
-      stop_id: transport.stop_id,
-      trip_type: transport.trip_type,
-      academic_year_id: transport.academic_year_id,
-      fare_amount: transport.fare_amount,
-      pricing_id: transport.pricing_id ?? '',
+  const openCreate = () => { resetForm(); setIsModalVisible(true); };
+
+  const openEdit = (item: StudentTransportOut) => {
+    setEditing(item);
+    setForm({
+      student_id: item.student_id,
+      trip_id: item.trip_id,
+      stop_id: item.stop_id,
+      fee_per_term: String(item.fee_per_term),
     });
     setIsModalVisible(true);
   };
 
-  const handleDelete = (transport: StudentTransport) => {
-    const student = students.find(s => s.id === transport.student_id);
-    Alert.alert(
-      'Delete Student Transport',
-      `Are you sure you want to delete transport for ${student?.display_name || 'Unknown Student'}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(transport.id),
-        },
-      ]
-    );
+  const handleDelete = (item: StudentTransportOut) => {
+    const name = item.student
+      ? `${item.student.first_name} ${item.student.last_name}`
+      : 'this student';
+    Alert.alert('Delete Assignment', `Remove transport for ${name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(item.id) },
+    ]);
   };
 
   const handleSubmit = () => {
-    if (!formData.student_id) {
-      Alert.alert('Error', 'Student is required');
-      return;
-    }
+    if (!form.student_id) { Alert.alert('Error', 'Student is required'); return; }
+    if (!form.trip_id)    { Alert.alert('Error', 'Trip is required'); return; }
+    if (!form.stop_id)    { Alert.alert('Error', 'Stop is required'); return; }
+    const fee = parseFloat(form.fee_per_term);
+    if (isNaN(fee) || fee < 0) { Alert.alert('Error', 'Enter a valid fee amount'); return; }
 
-    if (!formData.route_id) {
-      Alert.alert('Error', 'Route is required');
-      return;
-    }
-
-    if (!formData.stop_id) {
-      Alert.alert('Error', 'Stop is required');
-      return;
-    }
-
-    const payload = {
-      ...formData,
-      academic_year_id: formData.academic_year_id || activeAcademicYearId || '',
-      ...(formData.pricing_id ? { pricing_id: formData.pricing_id } : {}),
+    const payload: StudentTransportCreate = {
+      student_id: form.student_id,
+      trip_id:    form.trip_id,
+      stop_id:    form.stop_id,
+      fee_per_term: fee,
     };
-    // Remove pricing_id key entirely if empty (backend rejects empty UUID string)
-    if (!payload.pricing_id) delete (payload as any).pricing_id;
-
-    if (editingTransport) {
-      updateMutation.mutate({ id: editingTransport.id, data: payload });
-    } else {
-      createMutation.mutate(payload);
-    }
+    editing
+      ? updateMutation.mutate({ id: editing.id, data: payload })
+      : createMutation.mutate(payload);
   };
 
-  const renderTransportItem = useCallback(({ item }: { item: StudentTransport }) => {
-    const student = students.find(s => s.id === item.student_id);
-    const route = routes.find(r => r.id === item.route_id);
-
+  // ── STUDENT: read-only view ────────────────────────────────────────────────
+  if (isStudent) {
     return (
-      <View style={[styles.transportCard, { backgroundColor: colors.card }]}>
-        <View style={styles.transportHeader}>
-          <View style={styles.transportInfo}>
-            <ThemedText type="subtitle" style={styles.studentName}>
-              {student?.display_name || 'Unknown Student'}
+      <AppLayout title="My Transport">
+        {myLoading ? (
+          <View style={styles.centered}><ActivityIndicator color={AMBER} /></View>
+        ) : myTransport ? (
+          <View style={{ padding: 16 }}>
+            <View style={[styles.readCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+              <InfoRow icon="bus-outline" label={`Route: ${myTransport.trip?.route?.route_name ?? '—'} · Trip #${myTransport.trip?.trip_number ?? '—'}`} colors={colors} />
+              <InfoRow icon="location-outline" label={`Stop: ${myTransport.stop?.name ?? '—'}`} colors={colors} />
+              {myTransport.stop?.pickup_time && <InfoRow icon="time-outline" label={`Pickup: ${myTransport.stop.pickup_time}`} colors={colors} />}
+              {myTransport.stop?.drop_time   && <InfoRow icon="time-outline" label={`Drop: ${myTransport.stop.drop_time}`} colors={colors} />}
+              <InfoRow icon="cash-outline" label={`₹${myTransport.fee_per_term}/term`} colors={colors} />
+            </View>
+          </View>
+        ) : (
+          <View style={styles.centered}>
+            <Ionicons name="bus-outline" size={48} color={colors['muted-foreground']} />
+            <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
+              No transport assignment found.
             </ThemedText>
           </View>
-          <View style={styles.actionButtons}>
-            <UpdatePermissionGuard 
-              resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                onPress={() => handleEdit(item)}
-              >
-                <Ionicons name="create" size={16} color="white" />
+        )}
+      </AppLayout>
+    );
+  }
+
+  // ── ADMIN / TRANSPORT MANAGER: full CRUD ──────────────────────────────────
+  const renderItem = ({ item }: { item: StudentTransportOut }) => {
+    const studentName = item.student
+      ? `${item.student.first_name} ${item.student.last_name}`
+      : item.student_id;
+    return (
+      <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
+        <View style={styles.cardTop}>
+          <View style={[styles.iconBox, { backgroundColor: AMBER + '20' }]}>
+            <Ionicons name="person" size={18} color={AMBER} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.cardName, { color: colors.foreground }]}>{studentName}</Text>
+            <Text style={[styles.cardSub, { color: colors['muted-foreground'] }]}>
+              {item.trip?.route?.route_name ?? '—'} · Trip #{item.trip?.trip_number ?? '—'}
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
+              <TouchableOpacity onPress={() => openEdit(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="create-outline" size={18} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </UpdatePermissionGuard>
-            <DeletePermissionGuard 
-              resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
-                onPress={() => handleDelete(item)}
-              >
-                <Ionicons name="trash" size={16} color="white" />
+            <DeletePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
+              <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
               </TouchableOpacity>
             </DeletePermissionGuard>
           </View>
         </View>
-
-        <View style={styles.transportDetails}>
-          <View style={styles.detailRow}>
-            <Ionicons name="bus" size={16} color={colors['muted-foreground']} />
-            <ThemedText style={styles.detailText}>
-              Route: {route?.route_name || 'Unknown Route'}
-            </ThemedText>
-          </View>
-          <View style={styles.detailRow}>
-            <Ionicons name="navigate" size={16} color={colors['muted-foreground']} />
-            <ThemedText style={styles.detailText}>
-              Trip: {item.trip_type}
-            </ThemedText>
-          </View>
-          <View style={styles.detailRow}>
-            <Ionicons name="cash" size={16} color={colors['muted-foreground']} />
-            <ThemedText style={styles.detailText}>
-              Fare: ₹{item.fare_amount}
-            </ThemedText>
-          </View>
-          {item.created_at && (
-            <View style={styles.detailRow}>
-              <Ionicons name="calendar" size={16} color={colors['muted-foreground']} />
-              <ThemedText style={styles.detailText}>
-                Created: {new Date(item.created_at).toLocaleDateString()}
-              </ThemedText>
-            </View>
-          )}
+        <View style={[styles.cardBody, { borderTopColor: borderCol }]}>
+          <InfoRow icon="location-outline" label={`Stop: ${item.stop?.name ?? '—'}`} colors={colors} small />
+          {item.stop?.pickup_time && <InfoRow icon="time-outline" label={`Pickup: ${item.stop.pickup_time}`} colors={colors} small />}
+          {item.stop?.drop_time   && <InfoRow icon="time-outline" label={`Drop: ${item.stop.drop_time}`} colors={colors} small />}
+          <InfoRow icon="cash-outline" label={`₹${item.fee_per_term}/term`} colors={colors} small />
         </View>
       </View>
     );
-  }, [colors, students, routes]);
+  };
 
-  // ── STUDENT read-only view ────────────────────────────────────────────────
-  if (isStudent) {
-    const assignment = myTransport?.[0];
-    const route = routes.find(r => r.id === assignment?.route_id);
-    return (
-      <AppLayout title="My Transport">
-        {myTransportLoading ? (
-          <View style={styles.centerContainer}>
-            <ThemedText>Loading...</ThemedText>
-          </View>
-        ) : assignment ? (
-          <View style={{ padding: 16 }}>
-            <View style={[styles.transportCard, { backgroundColor: colors.card }]}>
-              <View style={styles.transportDetails}>
-                <View style={styles.detailRow}>
-                  <Ionicons name="bus" size={16} color={colors['muted-foreground']} />
-                  <ThemedText style={styles.detailText}>
-                    Route: {route?.route_name || assignment.route_id}
-                  </ThemedText>
-                </View>
-                <View style={styles.detailRow}>
-                  <Ionicons name="navigate" size={16} color={colors['muted-foreground']} />
-                  <ThemedText style={styles.detailText}>
-                    Trip: {assignment.trip_type}
-                  </ThemedText>
-                </View>
-                <View style={styles.detailRow}>
-                  <Ionicons name="cash" size={16} color={colors['muted-foreground']} />
-                  <ThemedText style={styles.detailText}>
-                    Fare: ₹{assignment.fare_amount}
-                  </ThemedText>
-                </View>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.centerContainer}>
-            <Ionicons name="bus-outline" size={64} color={colors['muted-foreground']} />
-            <ThemedText type="subtitle" style={styles.emptyTitle}>No Transport Assigned</ThemedText>
-            <ThemedText style={styles.emptyText}>You have no transport assignment.</ThemedText>
-          </View>
-        )}
-      </AppLayout>
-    );
-  }
-
-  // ── PARENT read-only view ─────────────────────────────────────────────────
-  if (isParent) {
-    const assignment = childTransport?.[0];
-    const route = routes.find(r => r.id === assignment?.route_id);
-    return (
-      <AppLayout title="Child Transport">
-        {!childId ? (
-          <View style={styles.centerContainer}>
-            <Ionicons name="person-outline" size={64} color={colors['muted-foreground']} />
-            <ThemedText type="subtitle" style={styles.emptyTitle}>No Student Selected</ThemedText>
-            <ThemedText style={styles.emptyText}>
-              {availableStudents && availableStudents.length > 0
-                ? 'Tap the student name in the header to switch.'
-                : 'No students are linked to your account. Contact the administrator.'}
-            </ThemedText>
-          </View>
-        ) : childTransportLoading ? (
-          <View style={styles.centerContainer}>
-            <ThemedText>Loading...</ThemedText>
-          </View>
-        ) : assignment ? (
-          <View style={{ padding: 16 }}>
-            <View style={[styles.transportCard, { backgroundColor: colors.card }]}>
-              <View style={styles.transportDetails}>
-                <View style={styles.detailRow}>
-                  <Ionicons name="bus" size={16} color={colors['muted-foreground']} />
-                  <ThemedText style={styles.detailText}>
-                    Route: {route?.route_name || assignment.route_id}
-                  </ThemedText>
-                </View>
-                <View style={styles.detailRow}>
-                  <Ionicons name="navigate" size={16} color={colors['muted-foreground']} />
-                  <ThemedText style={styles.detailText}>
-                    Trip: {assignment.trip_type}
-                  </ThemedText>
-                </View>
-                <View style={styles.detailRow}>
-                  <Ionicons name="cash" size={16} color={colors['muted-foreground']} />
-                  <ThemedText style={styles.detailText}>
-                    Fare: ₹{assignment.fare_amount}
-                  </ThemedText>
-                </View>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.centerContainer}>
-            <Ionicons name="bus-outline" size={64} color={colors['muted-foreground']} />
-            <ThemedText type="subtitle" style={styles.emptyTitle}>No Transport Assigned</ThemedText>
-            <ThemedText style={styles.emptyText}>No transport assignment for this student.</ThemedText>
-          </View>
-        )}
-      </AppLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <AppLayout title="Student Transport">
-        <View style={styles.centerContainer}>
-          <ThemedText style={{ color: colors.destructive }}>
-            Error loading student transport data
-          </ThemedText>
-          <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: colors.primary }]}
-            onPress={() => refetch()}
-          >
-            <ThemedText style={{ color: 'white' }}>Retry</ThemedText>
-          </TouchableOpacity>
-        </View>
-      </AppLayout>
-    );
-  }
+  const isMutating = createMutation.isPending || updateMutation.isPending;
 
   return (
     <AppLayout title="Student Transport">
-      <ReadOrListPermissionGuard 
-        resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}
-        fallback={
-          <View style={styles.centerContainer}>
-            <Ionicons name="lock-closed" size={64} color={colors['muted-foreground']} />
-            <ThemedText type="subtitle" style={styles.emptyTitle}>
-              Access Denied
-            </ThemedText>
-            <ThemedText style={styles.emptyText}>
-              You don't have permission to view student transport
-            </ThemedText>
-          </View>
-        }
-      >
-        <View style={styles.container}>
-          {/* Header with Add Button */}
-          <View style={styles.header}>
-            <CreatePermissionGuard 
-              resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
-              <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: colors.primary }]}
-                onPress={() => {
-                  resetForm();
-                  setIsModalVisible(true);
-                }}
-              >
-                <Ionicons name="add" size={20} color="white" />
-                <ThemedText style={styles.addButtonText}>Add Transport</ThemedText>
-              </TouchableOpacity>
-            </CreatePermissionGuard>
-          </View>
-
-        {/* Search Bar */}
-        <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
-          <Ionicons name="search" size={20} color={colors['muted-foreground']} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Search student transport..."
-            placeholderTextColor={colors['muted-foreground']}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close" size={20} color={colors['muted-foreground']} />
+      <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
+        {/* Action bar */}
+        <View style={styles.topBar}>
+          <CreatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
+            <TouchableOpacity style={[styles.addBtn, { backgroundColor: AMBER }]} onPress={openCreate}>
+              <Ionicons name="add" size={16} color="white" />
+              <Text style={styles.addBtnText}>Add Assignment</Text>
             </TouchableOpacity>
-          ) : null}
+          </CreatePermissionGuard>
         </View>
 
-        {/* Student Transport List */}
-        <FlatList
-          data={filteredTransports}
-          renderItem={renderTransportItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isLoading}
-              onRefresh={refetch}
-              tintColor={colors.primary}
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="people" size={64} color={colors['muted-foreground']} />
-              <ThemedText type="subtitle" style={styles.emptyTitle}>
-                No Student Transport Found
-              </ThemedText>
-              <ThemedText style={styles.emptyText}>
-                {searchQuery
-                  ? 'Try adjusting your search query'
-                  : 'Add student transport assignments to get started'}
-              </ThemedText>
-            </View>
-          }
-        />
+        {isLoading ? (
+          <View style={styles.centered}><ActivityIndicator color={AMBER} size="large" /></View>
+        ) : (
+          <FlatList
+            data={assignments as StudentTransportOut[]}
+            keyExtractor={item => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={AMBER} />}
+            ListEmptyComponent={
+              <View style={styles.centered}>
+                <Ionicons name="bus-outline" size={48} color={colors['muted-foreground']} />
+                <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
+                  No transport assignments found
+                </Text>
+              </View>
+            }
+          />
+        )}
 
-        {/* Add/Edit Modal */}
-        <Modal
-          visible={isModalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setIsModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-              <View style={styles.modalHeader}>
-                <ThemedText type="title" style={styles.modalTitle}>
-                  {editingTransport ? 'Edit Student Transport' : 'Add Student Transport'}
-                </ThemedText>
+        {/* Create / Edit Modal */}
+        <Modal visible={isModalVisible} animationType="slide" transparent onRequestClose={() => setIsModalVisible(false)}>
+          <View style={styles.overlay}>
+            <View style={[styles.modal, { backgroundColor: colors.background }]}>
+              <View style={styles.modalTop}>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                  {editing ? 'Edit Assignment' : 'New Assignment'}
+                </Text>
                 <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-                  <Ionicons name="close" size={24} color={colors.foreground} />
+                  <Ionicons name="close" size={22} color={colors.foreground} />
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.modalBody}>
-                <View style={styles.formGroup}>
-                  <ThemedText style={styles.label}>Student *</ThemedText>
-                  <CustomDropdown
-                    data={students.map(student => ({ label: student.display_name, value: student.id }))}
-                    value={formData.student_id}
-                    onChange={(value) => setFormData(prev => ({ ...prev, student_id: value?.toString() || '' }))}
-                    placeholder="Select student"
-                  />
-                </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={[styles.label, { color: colors.foreground }]}>Student *</Text>
+                <CustomDropdown
+                  data={studentOptions}
+                  value={form.student_id}
+                  onChange={(v: any) => setForm(f => ({ ...f, student_id: v?.toString() ?? '' }))}
+                  placeholder="Select student"
+                  search
+                />
 
-                <View style={styles.formGroup}>
-                  <ThemedText style={styles.label}>Route *</ThemedText>
-                  <CustomDropdown
-                    data={routes.map(route => ({ label: route.route_name, value: route.id }))}
-                    value={formData.route_id}
-                    onChange={(value) => setFormData(prev => ({ ...prev, route_id: value?.toString() || '', stop_id: '' }))}
-                    placeholder="Select route"
-                  />
-                </View>
+                <Text style={[styles.label, { color: colors.foreground }]}>Trip *</Text>
+                <CustomDropdown
+                  data={tripOptions}
+                  value={form.trip_id}
+                  onChange={(v: any) => setForm(f => ({ ...f, trip_id: v?.toString() ?? '', stop_id: '' }))}
+                  placeholder="Select trip"
+                />
 
-                <View style={styles.formGroup}>
-                  <ThemedText style={styles.label}>Stop *</ThemedText>
-                  <CustomDropdown
-                    data={stopOptions}
-                    value={formData.stop_id}
-                    onChange={(value) => setFormData(prev => ({ ...prev, stop_id: value?.toString() || '' }))}
-                    placeholder={formData.route_id ? 'Select stop' : 'Select route first'}
-                  />
-                </View>
+                <Text style={[styles.label, { color: colors.foreground }]}>Stop *</Text>
+                <CustomDropdown
+                  data={stopOptions}
+                  value={form.stop_id}
+                  onChange={(v: any) => setForm(f => ({ ...f, stop_id: v?.toString() ?? '' }))}
+                  placeholder={form.trip_id ? 'Select stop' : 'Select a trip first'}
+                />
 
-                <View style={styles.formGroup}>
-                  <ThemedText style={styles.label}>Trip Type *</ThemedText>
-                  <CustomDropdown
-                    data={[
-                      { label: 'First Trip', value: 'first trip' },
-                      { label: 'Second Trip', value: 'second trip' },
-                    ]}
-                    value={formData.trip_type}
-                    onChange={(value) => setFormData(prev => ({ ...prev, trip_type: value?.toString() || 'first trip' }))}
-                    placeholder="Select trip type"
-                  />
-                </View>
-
-                <View style={styles.formRow}>
-                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <ThemedText style={styles.label}>Academic Year</ThemedText>
-                    <View style={[styles.input, { borderColor: colors.border, justifyContent: 'center' }]}>
-                      <ThemedText style={{ color: colors['muted-foreground'], fontSize: 14 }}>
-                        {activeAcademicYearId ? 'Current year (auto)' : 'No active year'}
-                      </ThemedText>
-                    </View>
-                  </View>
-                  <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                    <ThemedText style={styles.label}>Fare Amount *</ThemedText>
-                    <TextInput
-                      style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
-                      placeholder="0"
-                      placeholderTextColor={colors['muted-foreground']}
-                      value={formData.fare_amount.toString()}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, fare_amount: parseFloat(text) || 0 }))}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                </View>
-
+                <Text style={[styles.label, { color: colors.foreground }]}>Fee Per Term (₹) *</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
+                  placeholder="0"
+                  placeholderTextColor={colors['muted-foreground']}
+                  value={form.fee_per_term}
+                  onChangeText={t => setForm(f => ({ ...f, fee_per_term: t }))}
+                  keyboardType="numeric"
+                />
               </ScrollView>
 
               <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={[styles.button, styles.cancelButton]}
-                  onPress={() => setIsModalVisible(false)}
-                >
-                  <ThemedText style={{ color: colors.foreground }}>Cancel</ThemedText>
+                <TouchableOpacity style={[styles.cancelBtn, { borderColor: borderCol }]} onPress={() => setIsModalVisible(false)}>
+                  <Text style={{ color: colors.foreground }}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.button, styles.submitButton, { backgroundColor: colors.primary }]}
-                  onPress={handleSubmit}
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                >
-                  <ThemedText style={styles.submitButtonText}>
-                    {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingTransport ? 'Update' : 'Create')}
-                  </ThemedText>
+                <TouchableOpacity style={[styles.submitBtn, { backgroundColor: AMBER }]} onPress={handleSubmit} disabled={isMutating}>
+                  <Text style={{ color: 'white', fontWeight: '600' }}>
+                    {isMutating ? 'Saving...' : editing ? 'Update' : 'Create'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
         </Modal>
-        </View>
       </ReadOrListPermissionGuard>
     </AppLayout>
   );
 }
 
+// ── Shared info row component ──────────────────────────────────────────────────
+function InfoRow({ icon, label, colors, small }: {
+  icon: string; label: string; colors: any; small?: boolean;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <Ionicons name={icon as any} size={small ? 13 : 14} color={AMBER} />
+      <Text style={{ fontSize: small ? 12 : 13, color: colors['muted-foreground'] }}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: 'white',
-    marginLeft: 8,
-    fontWeight: '600',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-  },
-  listContainer: {
-    paddingBottom: 20,
-  },
-  transportCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  transportHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  transportInfo: {
-    flex: 1,
-  },
-  studentName: {
-    marginBottom: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  transportDetails: {
-    gap: 8,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  detailText: {
-    fontSize: 14,
-    marginLeft: 8,
-    opacity: 0.8,
-    flex: 1,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-  },
-  emptyTitle: {
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyText: {
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  retryButton: {
-    marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '90%',
-    maxWidth: 400,
-    borderRadius: 12,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-  },
-  modalBody: {
-    marginBottom: 20,
-  },
-  formGroup: {
-    marginBottom: 16,
-  },
-  formRow: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  dropdown: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  checkbox: {
-    marginRight: 8,
-  },
-  checkboxLabel: {
-    fontSize: 16,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  button: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#F3F4F6',
-  },
-  submitButton: {
-    backgroundColor: '#3B82F6',
-  },
-  submitButtonText: {
-    color: 'white',
-    fontWeight: '600',
-  },
+  topBar: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, alignItems: 'flex-end' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9 },
+  addBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
+  list: { padding: 16, paddingTop: 8, gap: 12 },
+  card: { borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
+  iconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  cardName: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  cardSub:  { fontSize: 12 },
+  cardBody: { borderTopWidth: 1, paddingHorizontal: 14, paddingVertical: 10, gap: 6 },
+  readCard: { borderRadius: 12, borderWidth: 1, padding: 16, gap: 10 },
+  centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48 },
+  emptyText: { marginTop: 12, fontSize: 14 },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%' },
+  modalTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: 17, fontWeight: '700' },
+  label: { fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 14 },
+  input: { borderWidth: 1, borderRadius: 10, padding: 11, fontSize: 14 },
+  modalFooter: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  cancelBtn: { flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
+  submitBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
 });

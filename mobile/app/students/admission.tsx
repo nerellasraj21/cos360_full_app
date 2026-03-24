@@ -166,7 +166,7 @@ export default function StudentAdmissionScreen() {
   const [formData, setFormData] = useState<FormData>({
     // Academic Details
     admission_date: new Date().toISOString().split('T')[0],
-    admission_type: 'Non-Primary Admission',
+    admission_type: 'non_primary',
     academic_year_id: '',
     admitted_academic_year_id: '',
     admitted_class_id: '',
@@ -263,6 +263,12 @@ export default function StudentAdmissionScreen() {
       const data = await academicYearsApi.getAcademicYearsDropdown();
       return data.map(item => ({ label: item.title, value: item.id }));
     },
+  });
+
+  const { data: admissionTypesData } = useQuery({
+    queryKey: ['admission-types-dropdown'],
+    queryFn: () => studentAdmissionsApi.getAdmissionTypesDropdown(),
+    staleTime: 10 * 60 * 1000,
   });
 
   const { data: castesDropdownData, isLoading: castesDropdownLoading } = useQuery({
@@ -469,6 +475,7 @@ export default function StudentAdmissionScreen() {
         // Create operation
         const apiData: StudentAdmissionCreate = {
           admission_date: formData.admission_date,
+          admission_type: formData.admission_type as 'primary' | 'non_primary',
           academic_year_id: formData.academic_year_id,
           admitted_academic_year_id: formData.admitted_academic_year_id || formData.academic_year_id,
           admitted_class_id: formData.admitted_class_id,
@@ -523,7 +530,7 @@ export default function StudentAdmissionScreen() {
     // Reset form data
     setFormData({
       admission_date: new Date().toISOString().split('T')[0],
-      admission_type: 'Non-Primary Admission',
+      admission_type: 'non_primary',
       academic_year_id: '',
       admitted_academic_year_id: '',
       admitted_class_id: '',
@@ -783,9 +790,9 @@ export default function StudentAdmissionScreen() {
                 {renderDateField('Admission Date *', 'admission_date')}
               </View>
               <View style={styles.halfColumn}>
-                {renderDropdown('Admission Type', 'admission_type', [
-                  { label: 'Primary Admission', value: 'Primary Admission' },
-                  { label: 'Non-Primary Admission', value: 'Non-Primary Admission' },
+                {renderDropdown('Admission Type', 'admission_type', admissionTypesData || [
+                  { label: 'Primary Admission', value: 'primary' },
+                  { label: 'Non-Primary Admission', value: 'non_primary' },
                 ], 'Select type')}
               </View>
             </View>

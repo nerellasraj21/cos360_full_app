@@ -13,6 +13,7 @@ import {
   DeletePermissionGuard 
 } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
@@ -56,6 +57,7 @@ export default function FeeClassMappingsScreen() {
   const colors = Colors[theme];
   const queryClient = useQueryClient();
   const { activeAcademicYearId } = useAcademicYear();
+  const { showSuccess, showError } = useToastContext();
 
   const { data: mappings = [], isLoading, error } = useQuery({
     queryKey: ['feeClassMappings', activeAcademicYearId],
@@ -93,14 +95,14 @@ export default function FeeClassMappingsScreen() {
       setIsModalVisible(false);
       resetForm();
       setErrors({});
-      Alert.alert('Success', 'Fee class mapping created successfully');
+      showSuccess('Mapping Created', 'Fee class mapping created successfully');
     },
     onError: (error: any) => {
       console.error('Create error:', error);
       if (error.response?.data?.field_errors) {
         setErrors(error.response.data.field_errors);
       } else {
-        Alert.alert('Error', error.response?.data?.detail || 'Failed to create fee class mapping');
+        showError('Error', error.response?.data?.detail || 'Failed to create fee class mapping');
       }
     },
   });
@@ -113,14 +115,14 @@ export default function FeeClassMappingsScreen() {
       setIsModalVisible(false);
       resetForm();
       setErrors({});
-      Alert.alert('Success', 'Fee class mapping updated successfully');
+      showSuccess('Mapping Updated', 'Fee class mapping updated successfully');
     },
     onError: (error: any) => {
       console.error('Update error:', error);
       if (error.response?.data?.field_errors) {
         setErrors(error.response.data.field_errors);
       } else {
-        Alert.alert('Error', error.response?.data?.detail || 'Failed to update fee class mapping');
+        showError('Error', error.response?.data?.detail || 'Failed to update fee class mapping');
       }
     },
   });
@@ -130,11 +132,11 @@ export default function FeeClassMappingsScreen() {
     onSuccess: () => {
       console.log('Delete mutation onSuccess called');
       queryClient.invalidateQueries({ queryKey: ['feeClassMappings'] });
-      Alert.alert('Success', 'Fee class mapping deleted successfully');
+      showSuccess('Mapping Deleted', 'Fee class mapping deleted successfully');
     },
     onError: (error) => {
       console.log('Delete mutation onError called with error:', error);
-      Alert.alert('Error', 'Failed to delete fee class mapping');
+      showError('Error', 'Failed to delete fee class mapping');
       console.error('Delete error:', error);
     },
   });
@@ -150,10 +152,10 @@ export default function FeeClassMappingsScreen() {
         total_fee: 0,
         all_by_default: false,
       });
-      Alert.alert('Success', 'Bulk fee class mappings created successfully');
+      showSuccess('Bulk Mappings Created', 'Bulk fee class mappings created successfully');
     },
     onError: (error) => {
-      Alert.alert('Error', 'Failed to create bulk fee class mappings');
+      showError('Error', 'Failed to create bulk fee class mappings');
       console.error('Bulk create error:', error);
     },
   });

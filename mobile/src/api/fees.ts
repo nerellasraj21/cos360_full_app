@@ -319,14 +319,14 @@ export interface FeeConcessionCreate {
 }
 
 export const feeCollectionApi = {
-  /** GET /fee/collection/search-student */
+  /** GET /fee/collection/search */
   searchStudent: async (params: {
     q?: string;
     class_id?: string;
     section_id?: string;
     academic_year_id?: string;
   }): Promise<FeeSearchStudentResult[]> => {
-    const response = await apiClient.get('/fee/collection/search-student', { params });
+    const response = await apiClient.get('/fee/collection/search', { params });
     return response.data;
   },
 
@@ -439,8 +439,13 @@ export const feeClassMappingTermAmountsApi = {
 
 // Fee Categories API
 export const feeCategoriesApi = {
-  getFeeCategories: async (): Promise<FeeCategoryResponse[]> => {
-    const response = await apiClient.get('/fee/categories/');
+  getFeeCategories: async (params?: {
+    academic_year_id?: string;
+    category_status?: string;
+    skip?: number;
+    limit?: number;
+  }): Promise<FeeCategoryResponse[]> => {
+    const response = await apiClient.get('/fee/categories/', { params });
     return response.data.items || response.data;
   },
 
@@ -515,8 +520,11 @@ export const getFeeTermsByFeeType = async (feeTypeId: string): Promise<FeeTypeRe
 
 // Fee Terms API
 export const feeTermsApi = {
-  getFeeTerms: async (academicYearId?: string): Promise<FeeTermResponse[]> => {
-    const params = academicYearId ? { academic_year_id: academicYearId } : {};
+  getFeeTerms: async (params?: {
+    academic_year_id?: string;
+    skip?: number;
+    limit?: number;
+  }): Promise<FeeTermResponse[]> => {
     const response = await apiClient.get('/fee/terms/', { params });
     return response.data.items || response.data;
   },
@@ -541,8 +549,7 @@ export const feeTermsApi = {
     return response.data;
   },
 
-  getFeeTermsDropdown: async (academicYearId?: string): Promise<{id: string, label: string}[]> => {
-    const params = academicYearId ? { academic_year_id: academicYearId } : {};
+  getFeeTermsDropdown: async (params?: { fee_type_id?: string; academic_year_id?: string }): Promise<{id: string, label: string}[]> => {
     const response = await apiClient.get('/fee/terms/dropdown', { params });
     return response.data;
   },
@@ -869,19 +876,33 @@ export interface FeeStructureItem {
   status: string;
 }
 
+/** Stats returned by GET /reports/fee/pending-fees/stats */
+export interface FeePendingStats {
+  total_pending: string;
+  student_count: number;
+  overdue_count: number;
+}
+
+/** Stats returned by GET /reports/fee/structure/stats */
+export interface FeeStructureStats {
+  total_structure_amount: string;
+  class_count: number;
+  fee_type_count: number;
+}
+
 export const feeReportsApi = {
-  /** GET /reports/fees/collection-summary/stats — aggregate totals card */
+  /** GET /reports/fee/collection-summary/stats — aggregate totals card */
   getCollectionStats: async (params?: {
     academic_year_id?: string;
     date_from?: string;
     date_to?: string;
     payment_method?: string;
   }): Promise<FeeCollectionStats> => {
-    const response = await apiClient.get('/reports/fees/collection-summary/stats', { params });
+    const response = await apiClient.get('/reports/fee/collection-summary/stats', { params });
     return response.data;
   },
 
-  /** GET /reports/fees/collection-summary — paginated transaction rows */
+  /** GET /reports/fee/collection-summary — paginated transaction rows */
   getCollectionSummary: async (params?: {
     academic_year_id?: string;
     date_from?: string;
@@ -890,11 +911,11 @@ export const feeReportsApi = {
     page?: number;
     page_size?: number;
   }): Promise<FeeCollectionItem[]> => {
-    const response = await apiClient.get('/reports/fees/collection-summary', { params });
+    const response = await apiClient.get('/reports/fee/collection-summary', { params });
     return response.data.data || [];
   },
 
-  /** GET /reports/fees/pending-fees — paginated pending rows */
+  /** GET /reports/fee/pending-fees — paginated pending rows */
   getPendingFees: async (params?: {
     academic_year_id?: string;
     class_id?: string;
@@ -903,11 +924,20 @@ export const feeReportsApi = {
     page?: number;
     page_size?: number;
   }): Promise<FeePendingItem[]> => {
-    const response = await apiClient.get('/reports/fees/pending-fees', { params });
+    const response = await apiClient.get('/reports/fee/pending-fees', { params });
     return response.data.data || [];
   },
 
-  /** GET /reports/fees/fee-structure — paginated structure rows */
+  /** GET /reports/fee/pending-fees/stats */
+  getPendingFeesStats: async (params?: {
+    academic_year_id?: string;
+    class_id?: string;
+  }): Promise<FeePendingStats> => {
+    const response = await apiClient.get('/reports/fee/pending-fees/stats', { params });
+    return response.data;
+  },
+
+  /** GET /reports/fee/structure — paginated structure rows */
   getFeeStructure: async (params?: {
     academic_year_id?: string;
     class_id?: string;
@@ -915,7 +945,97 @@ export const feeReportsApi = {
     page?: number;
     page_size?: number;
   }): Promise<FeeStructureItem[]> => {
-    const response = await apiClient.get('/reports/fees/fee-structure', { params });
+    const response = await apiClient.get('/reports/fee/structure', { params });
     return response.data.data || [];
+  },
+
+  /** GET /reports/fee/structure/stats */
+  getFeeStructureStats: async (params?: {
+    academic_year_id?: string;
+    class_id?: string;
+  }): Promise<FeeStructureStats> => {
+    const response = await apiClient.get('/reports/fee/structure/stats', { params });
+    return response.data;
+  },
+
+  /** POST /reports/fee/export → Blob (CSV/XLSX) */
+  exportReport: async (data: {
+    report_type: 'collection' | 'pending' | 'structure';
+    format?: 'csv' | 'xlsx';
+    filters?: Record<string, any>;
+  }): Promise<Blob> => {
+    const response = await apiClient.post('/reports/fee/export', data, { responseType: 'blob' });
+    return response.data;
+  },
+};
+
+// ─── Old Fees API ─────────────────────────────────────────────────────────────
+
+export interface OldFeeItem {
+  id: string;
+  student_id: string;
+  current_year_id: string;
+  amount: number;
+  description?: string;
+  is_settled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OldFeeManualCreate {
+  student_id: string;
+  current_year_id: string;
+  amount: number;
+  description?: string;
+}
+
+export interface OldFeeCarryForwardRequest {
+  previous_year_id: string;
+  current_year_id: string;
+  student_ids?: string[];
+}
+
+export interface OldFeeUpdate {
+  amount?: number;
+  description?: string;
+}
+
+export const feeOldFeesApi = {
+  /** GET /fee/old/student/{studentId} */
+  getOldFeesByStudent: async (
+    studentId: string,
+    params?: { current_year_id?: string },
+  ): Promise<OldFeeItem[]> => {
+    const response = await apiClient.get(`/fee/old/student/${studentId}`, { params });
+    return response.data.items || response.data;
+  },
+
+  /** POST /fee/old/ — create manually */
+  createOldFee: async (data: OldFeeManualCreate): Promise<OldFeeItem> => {
+    const response = await apiClient.post('/fee/old/', data);
+    return response.data;
+  },
+
+  /** POST /fee/old/carry-forward */
+  carryForward: async (data: OldFeeCarryForwardRequest): Promise<any> => {
+    const response = await apiClient.post('/fee/old/carry-forward', data);
+    return response.data;
+  },
+
+  /** PUT /fee/old/{id} */
+  updateOldFee: async (id: string, data: OldFeeUpdate): Promise<OldFeeItem> => {
+    const response = await apiClient.put(`/fee/old/${id}`, data);
+    return response.data;
+  },
+
+  /** PATCH /fee/old/{id}/settle */
+  settleOldFee: async (id: string): Promise<OldFeeItem> => {
+    const response = await apiClient.patch(`/fee/old/${id}/settle`);
+    return response.data;
+  },
+
+  /** DELETE /fee/old/{id} */
+  deleteOldFee: async (id: string): Promise<void> => {
+    await apiClient.delete(`/fee/old/${id}`);
   },
 };

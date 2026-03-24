@@ -72,6 +72,10 @@ export {
   CasteDropdownOption,
   SubCasteDropdownOption,
   castesApi,
+  TransportPricing,
+  TransportPricingCreate,
+  TransportPricingUpdate,
+  transportPricingApi,
 } from './masters';
 // Explicit student exports, excluding types that conflict with masters
 export {
@@ -129,6 +133,11 @@ export {
   studentDocumentsApi,
   timetableApi,
   parentStudentsApi,
+  studentProfileApi,
+  DocumentTypeRead,
+  DocumentTypeCreate,
+  DocumentTypeUpdate,
+  documentTypesApi,
 } from './students';
 // Explicit transport exports to avoid conflicts with masters/students
 export {
@@ -148,6 +157,7 @@ export {
   ParentProfileOut,
   ParentProfileUpdate,
   studentProfileApi,
+  staffProfileApi,
   parentProfileApi,
   BLOOD_GROUPS,
   validateEmail,
@@ -158,6 +168,17 @@ export {
 export {
   feeCollectionApi,
   feeConcessionsApi,
+  feeCategoriesApi,
+  feeTypesApi,
+  feeTermsApi,
+  feeClassMappingsApi,
+  feeStudentMappingsApi,
+  feeTransactionsApi,
+  feeReceiptsApi,
+  feeRefundsApi,
+  feeReportsApi,
+  feeClassMappingTermAmountsApi,
+  feeOldFeesApi,
   FeeSearchStudentResult,
   FeeCollectionSummary,
   FeeCollectionSummaryItem,
@@ -165,4 +186,21 @@ export {
   FeePaymentResponse,
   FeeConcession,
   FeeConcessionCreate,
+  FeeCategoryRequest,
+  FeeCategoryResponse,
+  FeeTypeRequest,
+  FeeTypeResponse,
+  FeeTermRequest,
+  FeeTermResponse,
+  FeeClassMappingRequest,
+  FeeTransactionCreateRequest,
+  FeeTransactionResponse,
+  FeeReceiptResponse,
+  FeePendingStats,
+  FeeStructureStats,
+  OldFeeItem,
+  OldFeeManualCreate,
+  OldFeeCarryForwardRequest,
+  OldFeeUpdate,
 } from './fees';
+export * from './communication';

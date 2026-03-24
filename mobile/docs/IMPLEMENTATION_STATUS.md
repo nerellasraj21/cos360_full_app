@@ -1,7 +1,7 @@
 # COS360 Mobile App — Implementation Status
 
 **As of:** March 2026
-**Version:** 1.1.0
+**Version:** 1.4.0
 
 ---
 
@@ -76,6 +76,7 @@
 | Protected query hook | ✅ Complete | `src/hooks/usePermissionProtectedQuery.ts` |
 | Protected mutation hook | ✅ Complete | `src/hooks/usePermissionProtectedMutation.ts` |
 | Screen permission hook | ✅ Complete | `src/hooks/useScreenPermissions.ts` |
+| Admin permission resources | ✅ Complete | `ADMIN_USERS`, `ADMIN_ROLES`, `ADMIN_PERMISSIONS`, `ADMIN_MENU` in `src/types/permissions.ts` |
 
 ---
 
@@ -84,7 +85,7 @@
 | Feature | Status | Details |
 |---------|--------|---------|
 | Dashboard screen | ✅ Complete | `app/(tabs)/index.tsx` |
-| Quick action cards | ✅ Complete | 7 module cards: Students, Fees, Masters, Transport, Staff, Expense, Exam |
+| Quick action cards | ✅ Complete | 10 module cards: Students, Fees, Masters, Transport, Staff, Expense, Exam, Communication, Reports, Administration |
 | Permission-filtered cards | ✅ Complete | `accessibleModules` filter — only shows cards with `read` or `list` permission |
 | Empty state for restricted roles | ✅ Complete | Lock icon + message when user has no module permissions |
 | Greeting hero card | ✅ Complete | Greeting, username, date — no hardcoded stats |
@@ -191,8 +192,10 @@
 | Route stops | ✅ Complete | `app/transport/route-stops.tsx` |
 | Vehicle management | ✅ Complete | `app/transport/vehicles.tsx` |
 | Trip management | ✅ Complete | `app/transport/trips.tsx` |
+| Student transport (correct schema) | ✅ Complete | `app/transport/student-transport.tsx` — imports from `src/api/students.ts`; form: Student → Trip → Stop → `fee_per_term` |
 | Transport API | ✅ Complete | `src/api/transport.ts` |
 | Transport hooks | ✅ Complete | `hooks/use-transport.ts` |
+| Student transport hooks (correct schema) | ✅ Complete | `src/api/hooks/students/transport.ts` — imports `studentTransportApi` from `students.ts`, uses `listStudentTransport()` and `StudentTransportOut` |
 | Transport type definitions | ✅ Complete | `src/types/transport.ts` |
 
 ---
@@ -216,8 +219,11 @@
 
 ## 10. Expense Module
 
+**Hub sections (matches web app):** Categories · Types · Transactions · Pending Approvals · Summary · Audit Trail
+
 | Feature | Status | File |
 |---------|--------|------|
+| Expense hub (6 sections) | ✅ Complete | `app/(tabs)/expense.tsx` |
 | Expense categories | ✅ Complete | `app/expense/categories.tsx` |
 | Expense types | ✅ Complete | `app/expense/types.tsx` |
 | Expense departments | ✅ Complete | `app/expense/departments.tsx` |
@@ -225,7 +231,8 @@
 | Transaction detail | ✅ Complete | `app/expense/transactions/[id].tsx` |
 | Create transaction | ✅ Complete | `app/expense/transactions/create.tsx` |
 | Expense approvals | ✅ Complete | `app/expense/approvals.tsx` |
-| Expense audit | ✅ Complete | `app/expense/audit.tsx` |
+| Expense audit | ✅ Complete | `app/expense/audit.tsx` — full implementation: filterable list, action badges, category chips, search; calls `GET /expense/audit/logs` |
+| Global audit logs hook | ✅ Complete | `useExpenseGlobalAuditLogsProtected` in `hooks/use-expense-protected.ts` |
 | Expense reports | ✅ Complete | `app/expense/reports.tsx` |
 | Expense settings | ✅ Complete | `app/expense/settings.tsx` |
 | Expense API | ✅ Complete | `src/api/expense.ts` |
@@ -246,6 +253,7 @@
 | Student profile hook | ✅ Complete | `src/api/hooks/profile/useStudentProfile.ts` |
 | Parent profile hook | ✅ Complete | `src/api/hooks/profile/useParentProfile.ts` |
 | Staff profile hook | ✅ Complete | `src/api/hooks/profile/useStaffProfile.ts` |
+| `staffProfileApi` API export | ✅ Complete | Exported from `src/api/index.ts` (previously missing) |
 
 ---
 
@@ -291,14 +299,22 @@
 
 ## 15. Communication Module
 
+Single-page implementation — Compose, Templates, and Logs are in-page tabs within one screen (no separate sub-screens).
+Channels: **SMS · WhatsApp · Email** (Push removed). API types updated in `src/api/communication.ts` (`CommChannel` type, flexible `recipient_type`).
+
 | Feature | Status | File |
-|---------|--------|------|
-| Communication tab entry | ✅ Complete | `app/(tabs)/communication.tsx` |
-| Communication hub screen (3 cards) | ✅ Complete | `app/(tabs)/communication.tsx` |
-| Compose message screen | ✅ Complete | `app/communication/compose.tsx` |
-| Message templates CRUD | ✅ Complete | `app/communication/templates.tsx` |
-| Message logs (read-only) | ✅ Complete | `app/communication/logs.tsx` |
-| Communication API layer | ✅ Complete | `src/api/communication.ts` |
+| ------- | ------ | ---- |
+| Communication tab (single page, 3 in-page tabs) | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Compose** — SMS/WhatsApp/Email channel cards | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Compose** — Target Type dropdown (All Students/Parents/Staff + Class+Section variants) | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Compose** — Class + Section dropdowns (conditional, `classSectionsApi`) | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Compose** — Template dropdown (filtered by selected channel) → `POST /send/` | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Templates** — filter bar (channel chips, status chips, search, New Template button) | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Templates** — list with Name/Channel badge/Variables/Status/Date/Edit/Delete | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Templates** — CRUD modal → `GET/POST/PUT/DELETE /send/templates/` | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Logs** — filter bar (All Channels dropdown, All Status dropdown, From/To date) | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Logs** — filtered list with channel/status badges → `GET /send/logs` (lazy) | ✅ Complete | `app/(tabs)/communication.tsx` |
+| Communication API layer (`CommChannel` type, `whatsapp` support) | ✅ Complete | `src/api/communication.ts` |
 | Tab gating in `TAB_CONFIGS` | ✅ Complete | `app/(tabs)/_layout.tsx` |
 
 ---
@@ -316,13 +332,32 @@
 
 ---
 
+## 17. Administration Module
+
+**Hub sections (matches web app):** User Management · Role Management · Permission Management · Menu Management
+
+| Feature | Status | File |
+|---------|--------|------|
+| Administration tab hub | ✅ Complete | `app/(tabs)/admin.tsx` — banner, coming-soon card, 4-section permission-gated grid |
+| User Management screen | 🔄 Placeholder | `app/admin/users.tsx` |
+| Role Management screen | 🔄 Placeholder | `app/admin/roles.tsx` |
+| Permission Management screen | 🔄 Placeholder | `app/admin/permissions.tsx` |
+| Menu Management screen | 🔄 Placeholder | `app/admin/menu.tsx` |
+| Admin tab in `TAB_CONFIGS` | ✅ Complete | `app/(tabs)/_layout.tsx` — gated on `users/roles/permissions/menu` resources |
+| Administration card in dashboard | ✅ Complete | `app/(tabs)/index.tsx` — color `#64748b`, `resources: ['users','roles','permissions','menu']` |
+| Admin permission resource constants | ✅ Complete | `ADMIN_USERS`, `ADMIN_ROLES`, `ADMIN_PERMISSIONS`, `ADMIN_MENU` in `src/types/permissions.ts` |
+
+> **Note:** The 4 sub-module screens are currently "coming soon" placeholders. Full CRUD implementation (API integration, list/create/edit/delete) is planned for a future phase once the backend admin endpoints are confirmed.
+
+---
+
 ## Summary
 
 | Category | Total Features | Complete | In Progress | Planned |
 |----------|---------------|----------|-------------|---------|
 | Core Infrastructure | 15 | 15 | 0 | 0 |
 | Authentication | 12 | 12 | 0 | 0 |
-| Permission System | 17 | 17 | 0 | 0 |
+| Permission System | 18 | 18 | 0 | 0 |
 | Dashboard | 5 | 5 | 0 | 0 |
 | Students | 18 | 18 | 0 | 0 |
 | Fees | 14 | 14 | 0 | 0 |
@@ -334,14 +369,71 @@
 | Settings | 4 | 4 | 0 | 0 |
 | Parents | 4 | 4 | 0 | 0 |
 | Exam Module | 11 | 11 | 0 | 0 |
-| **Communication** | **7** | **7** | **0** | **0** |
-| **TOTAL** | **160** | **160** | **0** | **0** |
+| Communication | 7 | 7 | 0 | 0 |
+| Additional Features | 6 | 6 | 0 | 0 |
+| **Administration** | **8** | **4** | **4** | **0** |
+| **TOTAL** | **175** | **171** | **4** | **0** |
 
-**Overall Completion: 100% (160/160 features)**
+Overall Completion: 97.7% (171/175 features) — 4 admin sub-screens are placeholder/in-progress
 
 ---
 
 ---
+
+## Toast Notifications Rollout (v1.5.0)
+
+All CRUD mutation operations across every module now surface toast feedback using `useToastContext()` from `components/ToastProvider.tsx`.
+
+### Files updated with `showSuccess` / `showError` toasts
+
+| Module | Files |
+| ------ | ----- |
+| Expense | `categories.tsx`, `types.tsx`, `transactions.tsx` |
+| Communication | `(tabs)/communication.tsx` |
+| Masters | `academicyears.tsx`, `holidays.tsx`, `subjectcategories.tsx`, `rolespermissions.tsx`, `classsubjectmappings.tsx`, `subjects.tsx`, `timetable.tsx`, `classesandsections.tsx` |
+| Students | `attendance.tsx`, `certificates.tsx`, `certificateupload.tsx`, `documents.tsx`, `studentcertificates.tsx`, `transport.tsx` |
+| Transport | `pricing.tsx`, `route-stops.tsx` |
+| Exam | `[id].tsx`, `create.tsx`, `marks.tsx`, `hall-tickets.tsx`, `results.tsx` |
+| Fees | `receipts.tsx`, `class-mappings.tsx`, `collection.tsx`, `student-mappings.tsx`, `term-amounts.tsx`, `terms.tsx`, `types.tsx` |
+
+### Pattern
+
+```typescript
+// Import
+import { useToastContext } from '@/components/ToastProvider';
+
+// In component
+const { showSuccess, showError } = useToastContext();
+
+// In mutation onSuccess / onError
+onSuccess: () => { showSuccess('Item Created', 'Successfully saved.'); },
+onError: (err) => { showError('Failed', err.message); },
+```
+
+**Rule:** `Alert.alert` is preserved only for destructive confirmation dialogs (delete confirm) and form validation errors. All mutation result feedback uses toasts.
+
+---
+
+## Bug Fixes (v1.5.1)
+
+| File | Issue | Fix |
+|------|-------|-----|
+| `src/api/students.ts` | `getAdmissionTypesDropdown` typed as `{ id: string; name: string }[]` — wrong; backend returns `{ value, label }` | Fixed return type to `{ value: string; label: string }[]` |
+| `app/students/admission.tsx` | Default `admission_type` set to `'Non-Primary Admission'` (display string) — backend expects `'non_primary'` | Changed default and reset value to `'non_primary'` |
+| `app/students/admission.tsx` | Dropdown options used `value: 'Primary Admission'` / `'Non-Primary Admission'` — wrong enum values sent to API | Fixed to `value: 'primary'` / `'non_primary'`; options now loaded from `GET /students/admission/admission-types/dropdown` via `useQuery` |
+| `app/students/admission.tsx` | `admission_type` was missing from the create payload (`StudentAdmissionCreate`) — backend never received it | Added `admission_type: formData.admission_type as 'primary' \| 'non_primary'` to the create `apiData` object |
+
+## Bug Fixes (v1.4.0)
+
+| File | Issue | Fix |
+|------|-------|-----|
+| `src/api/hooks/students/transport.ts` | Imported `studentTransportApi` from `../../masters` (OLD schema: `route_id`, `trip_type`, `fare_amount`) — all hooks used wrong API methods and types | Changed import to `../../students`; replaced `StudentTransport` type with `StudentTransportOut`; replaced `getStudentTransports()` calls with `listStudentTransport()`; removed unsupported `route_id` filter param |
+| `app/transport/student-transport.tsx` | Imported from `'../../src/api'` (re-exports OLD masters schema); form used `route_id`, `trip_type`, `academic_year_id`, `fare_amount`; display used `route_name` on wrong nested path | Complete rewrite: now imports `studentTransportApi` directly from `@/src/api/students`; form flow changed to Student → Trip → Stop (filtered by trip's `route_id`) → `fee_per_term`; display uses `item.trip.route.route_name`, `item.stop.name`, `item.stop.pickup_time` |
+| `app/expense/audit.tsx` | Was a placeholder with "Audit logs will be displayed here" — no real data | Full implementation: filterable audit log list using `GET /expense/audit/logs`; action-colored badges; category filter chips (All / transaction / approval / payment / document); search bar; shows actor, role, timestamp, notes |
+| `src/api/expense.ts` | `expenseAuditApi` only had per-transaction endpoints; no global audit log endpoint existed | Added `getGlobalAuditLogs(params?)` calling `GET /expense/audit/logs` with filter support: `skip`, `limit`, `transaction_id`, `action`, `action_category`, `actor_user_id` |
+| `src/types/expense.ts` | `ExpenseAuditLog` type missing backend fields: `actor_username`, `actor_role`, `created_at`, `action_category`, `action_notes`, `request_ip_address` | Added all missing fields as optional — backward-compatible; existing code unaffected |
+| `hooks/use-expense-protected.ts` | No hook for global audit logs | Added `useExpenseGlobalAuditLogsProtected(params?)` using `PERMISSION_RESOURCES.EXPENSE_AUDIT` |
+| `src/api/index.ts` | `staffProfileApi` from `profile.ts` was not exported — screens importing from `@/src/api` could not access staff profile API | Added `staffProfileApi` to the profile section exports |
 
 ## Bug Fixes (v1.3.0)
 

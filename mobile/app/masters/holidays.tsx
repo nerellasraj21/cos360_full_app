@@ -151,6 +151,7 @@ import type { HolidayRead, HolidayCreate, HolidayUpdate, AcademicYear, AcademicY
 import { useTheme } from '@/contexts';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 // Calendar View Component
 function CalendarView({ holidays, themeColors }: { holidays: HolidayRead[], themeColors: any }) {
@@ -307,6 +308,7 @@ export default function HolidaysScreen() {
   const { theme, colors } = useTheme();
   // const theme = colorScheme === 'dark' ? 'dark' : 'light';
   const themeColors = Colors[theme];
+  const { showSuccess, showError } = useToastContext();
   const queryClient = useQueryClient();
   // Permission checking will be handled by PermissionGuard components
 
@@ -327,11 +329,11 @@ export default function HolidaysScreen() {
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Holiday created successfully');
+      showSuccess('Holiday Created', 'Holiday created successfully.');
     },
     onError: (error: any) => {
       console.error('Holiday creation failed:', error);
-      Alert.alert('Error', error.message || 'Failed to create holiday');
+      showError('Create Failed', error.message || 'Failed to create holiday');
     },
   });
 
@@ -341,10 +343,10 @@ export default function HolidaysScreen() {
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Holiday updated successfully');
+      showSuccess('Holiday Updated', 'Holiday updated successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to update holiday');
+      showError('Update Failed', error.message || 'Failed to update holiday');
     },
   });
 
@@ -352,10 +354,10 @@ export default function HolidaysScreen() {
     mutationFn: holidaysApi.deleteHoliday,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
-      Alert.alert('Success', 'Holiday deleted successfully');
+      showSuccess('Holiday Deleted', 'Holiday deleted successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to delete holiday');
+      showError('Delete Failed', error.message || 'Failed to delete holiday');
     },
   });
 
@@ -363,10 +365,10 @@ export default function HolidaysScreen() {
     mutationFn: holidaysApi.activateHoliday,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
-      Alert.alert('Success', 'Holiday activated successfully');
+      showSuccess('Holiday Activated', 'Holiday activated successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to activate holiday');
+      showError('Activate Failed', error.message || 'Failed to activate holiday');
     },
   });
 

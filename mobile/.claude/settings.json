@@ -14,7 +14,8 @@
       "Bash(git add:*)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\nerel\\.claude\\projects\\c--Users-nerel-Documents-Workspace-React-Workspace-cos360-mobile-cos360-mobile-app\\memory"
+      "c:\\Users\\nerel\\.claude\\projects\\c--Users-nerel-Documents-Workspace-React-Workspace-cos360-mobile-cos360-mobile-app\\memory",
+      "C:\\Users\\nerel\\Documents\\Workspace\\PythonWorkspace\\COS360\\app\\models\\expense"
     ]
   }
 }

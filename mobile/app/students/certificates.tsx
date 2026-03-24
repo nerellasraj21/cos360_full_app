@@ -22,20 +22,22 @@ import {
   CreatePermissionGuard,
 } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 // ─── Shared certificate card ───────────────────────────────────────────────
 
 function CertificateCard({ cert, colors }: { cert: any; colors: any }) {
+  const { showError } = useToastContext();
   const handleDownload = async () => {
     try {
       const resp = await studentCertificatesApi.downloadCertificate(cert.id);
       if (resp.presigned_url) {
         await Linking.openURL(resp.presigned_url);
       } else {
-        Alert.alert('Info', 'No download link available');
+        showError('No Download Link', 'No download link available');
       }
     } catch {
-      Alert.alert('Error', 'Failed to get download link');
+      showError('Error', 'Failed to get download link');
     }
   };
 
@@ -122,6 +124,7 @@ function MyCertificatesView({ studentId, title }: { studentId?: string; title?: 
 function AdminCertificatesView() {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
 
   const [selectedStudent, setSelectedStudent] = useState('');
   const [selectedCertTypeId, setSelectedCertTypeId] = useState('');
@@ -157,9 +160,9 @@ function AdminCertificatesView() {
     mutationFn: studentCertificatesApi.createCertificate,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-certificates'] });
-      Alert.alert('Success', 'Certificate created successfully');
+      showSuccess('Certificate Created', 'Certificate created successfully');
     },
-    onError: () => Alert.alert('Error', 'Failed to create certificate'),
+    onError: () => showError('Error', 'Failed to create certificate'),
   });
 
   const handleIssue = () => {

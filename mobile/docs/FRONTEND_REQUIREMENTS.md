@@ -1,7 +1,7 @@
 # COS360 Mobile App — Requirements Document
 
-**Version:** 2.0
-**Date:** 2026-03-20
+**Version:** 2.1
+**Date:** 2026-03-24
 **Platform:** React Native (Expo) — Android & iOS
 **Project Path:** `cos360_mobile/cos360_mobile_app`
 
@@ -256,7 +256,7 @@ Backend returns Decimal fields as **strings** (e.g., `"12500.00"`). Always use `
 | Transport — Route Stops | ✅ Complete | `pickup_time` / `drop_time` fields added with time pickers |
 | Transport — Vehicles / Trips | ✅ Complete | — |
 | Transport — Pricing | ✅ Complete | `app/transport/pricing.tsx` — full CRUD (standalone, not in hub) |
-| Transport — Student Transport | ✅ Complete | `pricing_id` added, stop dropdown, `is_active` removed (standalone, not in hub) |
+| Transport — Student Transport | ✅ Complete | Rewritten: correct API schema from `students.ts`; form: Student → Trip → Stop → `fee_per_term` (standalone, not in hub) |
 | Masters — All screens | ✅ Complete | — |
 | Communication | ✅ Complete | Tab + hub + compose + templates + logs — all built |
 | Profile | ✅ Complete | — |
@@ -276,9 +276,15 @@ Backend returns Decimal fields as **strings** (e.g., `"12500.00"`). Always use `
 
 **Phase 2/3 screen updates — ✅ All Applied:**
 1. `app/transport/route-stops.tsx` — `pickup_time` / `drop_time` added ✅
-2. `app/transport/student-transport.tsx` — `pricing_id` dropdown, stop dropdown, `is_active` removed ✅
+2. `app/transport/student-transport.tsx` — complete rewrite: correct API from `students.ts`, form: Student → Trip → Stop → `fee_per_term` ✅
 3. `app/exam/hall-tickets.tsx` — endpoint fixed to `/hall-tickets/compute` ✅
 4. `app/(tabs)/_layout.tsx` — communication tab added to `TAB_CONFIGS` ✅
+
+**v1.4.0 fixes — ✅ All Applied:**
+1. `src/api/hooks/students/transport.ts` — import fixed from `masters.ts` → `students.ts`; uses `listStudentTransport()` and `StudentTransportOut` ✅
+2. `app/expense/audit.tsx` — full audit screen implemented (was placeholder) ✅
+3. `src/api/expense.ts` — global `getGlobalAuditLogs()` added; `GET /expense/audit/logs` ✅
+4. `src/api/index.ts` — `staffProfileApi` now exported ✅
 
 **Phase 4 screens — ⏳ Not yet built:**
 1. `app/students/admission.tsx` — extended fields (Aadhar, caste, photo, address cascade)
@@ -330,7 +336,7 @@ Role-aware landing page. Render module cards from the menu items returned by aut
 
 *Admission Info:*
 - Admission Date (DateTimePicker)
-- Admission Type (dropdown: New / Lateral / Transfer)
+- Admission Type (dropdown — loaded from `GET /students/admission/admission-types/dropdown`; values: `primary` / `non_primary`; default: `non_primary`)
 - Academic Year (dropdown, already exists)
 - Admitted Class (dropdown → `GET /masters/classes/`)
 - Admitted Section (dropdown → cascades from Class, `GET /masters/sections/?class_id=`)
@@ -474,16 +480,26 @@ Hub screen: `app/(tabs)/fees.tsx`
 
 ### 6.5 Expense Module — ✅ ALL EXIST
 
+#### 6.5.1 Expense Hub — ✅ COMPLETE (matches web app, 6 sub-modules)
+
+Hub screen: `app/(tabs)/expense.tsx`
+
+| Section | Route | Status |
+| --- | --- | --- |
+| Categories | `app/expense/categories.tsx` | ✅ |
+| Types | `app/expense/types.tsx` | ✅ |
+| Transactions | `app/expense/transactions/` | ✅ |
+| Pending Approvals | `app/expense/approvals.tsx` | ✅ |
+| Summary | `app/expense/summary.tsx` | ✅ Complete |
+| Audit Trail | `app/expense/audit.tsx` | ✅ |
+
+#### 6.5.2 Additional Expense Screens
+
 | Screen | File |
-|---|---|
-| Transactions | `app/expense/transactions/` |
-| Categories | `app/expense/categories.tsx` |
-| Types | `app/expense/types.tsx` |
+| --- | --- |
 | Departments | `app/expense/departments.tsx` |
-| Approvals | `app/expense/approvals.tsx` |
 | Reports | `app/expense/reports.tsx` |
 | Settings | `app/expense/settings.tsx` |
-| Audit Log | `app/expense/audit.tsx` |
 
 ---
 
@@ -572,16 +588,26 @@ API base: `GET|POST /masters/transport-pricing/`, `PUT|DELETE /masters/transport
 - Description (multiline text input, optional)
 - Is Active (toggle switch)
 
-#### 6.7.6 Student Transport (`app/transport/student-transport.tsx`) — ✅ UPDATED (standalone, not in hub)
+#### 6.7.6 Student Transport (`app/transport/student-transport.tsx`) — ✅ REWRITTEN (standalone, not in hub)
 
-`pricing_id` dropdown added; stop dropdown now filters by selected route; `is_active` field removed from form and payload.
+Completely rewritten to use the correct API from `src/api/students.ts` (endpoint: `POST /students/student-transport/`).
 
-**Important:** Do NOT include `fee_term_id` or `is_active` in create/update payloads — these fields do not exist in the backend schema.
+**Form flow:** Select Student → Select Trip → Select Stop (filtered by trip's `route_id`) → Enter `fee_per_term` → optional `pricing_id`
+
+**Create payload:**
+
+```json
+{ "student_id": "uuid", "trip_id": "uuid", "stop_id": "uuid", "fee_per_term": 1200.00 }
+```
+
+**Display fields from `StudentTransportOut`:** `trip.route.route_name`, `trip.trip_number`, `stop.name`, `stop.pickup_time`, `stop.drop_time`, `fee_per_term`
+
+**Important:** Do NOT import `studentTransportApi` from `src/api` (index.ts) or `src/api/masters` — these export the OLD schema (`route_id`, `trip_type`, `fare_amount`). Always import from `src/api/students` directly.
 
 **Role behavior:**
 
-- Admin: Full CRUD (accessible via direct navigation)
-- Student: Read-only view of own assignment (stop name, pickup time, drop time, pricing)
+- Admin / Transport Manager: Full CRUD (accessible via direct navigation)
+- Student: Read-only view of own assignment via `getTransportByStudent(studentId)`
 - Parent: Child selector → child's transport assignment
 
 ---
@@ -889,9 +915,11 @@ EXPO_PUBLIC_API_URL=http://localhost:8000/api/v1
 | POST | `/masters/transport-pricing` | Create pricing |
 | PUT | `/masters/transport-pricing/{id}` | Update pricing |
 | DELETE | `/masters/transport-pricing/{id}` | Delete pricing |
-| GET | `/masters/student-transport` | Student assignments |
-| POST | `/masters/student-transport` | Create assignment |
-| PUT | `/masters/student-transport/{id}` | Update assignment |
+| GET | `/students/student-transport/` | Student transport assignments list |
+| POST | `/students/student-transport/` | Create assignment (`trip_id`, `stop_id`, `fee_per_term`) |
+| PATCH | `/students/student-transport/{id}` | Update assignment |
+| DELETE | `/students/student-transport/{id}` | Remove assignment |
+| GET | `/students/student-transport/student/{studentId}` | Get transport for specific student |
 
 #### Certificates
 
@@ -949,6 +977,8 @@ eas build --platform ios     # EAS cloud build (IPA)
 - [ ] All role pathways tested: Admin, Staff, Teacher, Student, Parent
 - [ ] `cschema` header present on all API calls
 - [ ] TypeScript: zero `any` types in new screens
+- [x] All CRUD mutations show `showSuccess` / `showError` toasts (rolled out to all modules — see `IMPLEMENTATION_STATUS.md`)
+- [ ] Delete confirmation dialogs still use `Alert.alert` (not toasts — user must confirm destructive actions)
 
 ---
 

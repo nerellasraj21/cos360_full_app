@@ -24,12 +24,14 @@ import { tripsApi, routeStopsApi } from '@/src/api/masters';
 import type { Trip } from '@/src/api/masters';
 import { CreatePermissionGuard, DeletePermissionGuard, ReadOrListPermissionGuard, UpdatePermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 export default function StudentTransportScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const themeColors = Colors[theme];
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
 
   const [selectedStudent, setSelectedStudent] = useState<string>('');
   const [selectedTrip, setSelectedTrip] = useState<string>('');
@@ -79,7 +81,7 @@ export default function StudentTransportScreen() {
     mutationFn: studentTransportApi.createStudentTransport,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-transport'] });
-      Alert.alert('Success', 'Transport assignment created successfully!');
+      showSuccess('Transport Assigned', 'Transport assignment created successfully!');
       setSelectedStudent('');
       setSelectedTrip('');
       setSelectedStop('');
@@ -87,7 +89,7 @@ export default function StudentTransportScreen() {
     },
     onError: (error: any) => {
       const msg = error?.response?.data?.detail || 'Failed to create transport assignment.';
-      Alert.alert('Error', msg);
+      showError('Error', msg);
     },
   });
 
@@ -95,9 +97,9 @@ export default function StudentTransportScreen() {
     mutationFn: studentTransportApi.deleteStudentTransport,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-transport'] });
-      Alert.alert('Success', 'Transport assignment removed.');
+      showSuccess('Assignment Removed', 'Transport assignment removed.');
     },
-    onError: () => Alert.alert('Error', 'Failed to remove transport assignment.'),
+    onError: () => showError('Error', 'Failed to remove transport assignment.'),
   });
 
   const handleCreate = () => {

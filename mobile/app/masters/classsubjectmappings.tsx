@@ -25,9 +25,11 @@ import { useSubjects } from '@/src/api/hooks/masters/subjects';
 import { PermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import type { ClassSubjectMapping, ClassSubjectMappingCreate } from '@/src/api/masters';
+import { useToastContext } from '@/components/ToastProvider';
 
 export default function ClassSubjectMappingsScreen() {
   const { colors, theme } = useTheme();
+  const { showSuccess, showError } = useToastContext();
   const { activeAcademicYearId } = useAcademicYear();
 
   const [selectedClassId, setSelectedClassId] = useState<string>('');
@@ -70,7 +72,10 @@ export default function ClassSubjectMappingsScreen() {
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => deleteMutation.mutate(mapping.id),
+          onPress: () => deleteMutation.mutate(mapping.id, {
+            onSuccess: () => showSuccess('Removed', 'Subject mapping has been removed.'),
+            onError: (e: any) => showError('Remove Failed', e.message || 'Failed to remove subject mapping'),
+          }),
         },
       ]
     );
@@ -102,7 +107,9 @@ export default function ClassSubjectMappingsScreen() {
           setIsAddModalVisible(false);
           setSelectedSubjectIds(new Set());
           refetch();
+          showSuccess('Subjects Added', `${selectedSubjectIds.size} subject(s) mapped to class.`);
         },
+        onError: (e: any) => showError('Add Failed', e.message || 'Failed to add subject mappings'),
       }
     );
   }

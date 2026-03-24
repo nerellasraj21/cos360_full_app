@@ -15,6 +15,7 @@ import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { examsApi, examHallTicketsApi, HallTicketEligibility } from '@/src/api/exam';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
+import { useToastContext } from '@/components/ToastProvider';
 
 type TabKey = 'eligible' | 'ineligible';
 
@@ -31,6 +32,7 @@ export default function HallTicketsScreen() {
   const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
   const qc = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
 
   const isDark     = theme === 'dark';
   const cardBg     = isDark ? '#1a1a2e' : '#ffffff';
@@ -70,15 +72,15 @@ export default function HallTicketsScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['hall-tickets-eligible', selectedExamId] });
       qc.invalidateQueries({ queryKey: ['hall-tickets-ineligible', selectedExamId] });
-      Alert.alert('Success', 'Eligibility computed successfully.');
+      showSuccess('Eligibility Computed', 'Eligibility computed successfully.');
     },
-    onError: () => Alert.alert('Error', 'Failed to compute eligibility.'),
+    onError: () => showError('Error', 'Failed to compute eligibility.'),
   });
 
   const publishMutation = useMutation({
     mutationFn: () => examHallTicketsApi.publish(selectedExamId),
-    onSuccess: () => Alert.alert('Success', 'Hall tickets published.'),
-    onError: () => Alert.alert('Error', 'Failed to publish hall tickets.'),
+    onSuccess: () => showSuccess('Hall Tickets Published', 'Hall tickets published.'),
+    onError: () => showError('Error', 'Failed to publish hall tickets.'),
   });
 
   const overrideMutation = useMutation({
@@ -90,8 +92,9 @@ export default function HallTicketsScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['hall-tickets-eligible', selectedExamId] });
       qc.invalidateQueries({ queryKey: ['hall-tickets-ineligible', selectedExamId] });
+      showSuccess('Eligibility Updated', 'Student eligibility updated successfully.');
     },
-    onError: () => Alert.alert('Error', 'Failed to override eligibility.'),
+    onError: () => showError('Error', 'Failed to override eligibility.'),
   });
 
   const activeData: HallTicketEligibility[] =

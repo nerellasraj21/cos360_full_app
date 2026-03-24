@@ -125,14 +125,21 @@ export interface ExpenseAuditLog {
   id: string;
   transaction_id: string;
   action: string;
+  action_category?: string;
   old_values?: Record<string, any>;
   new_values?: Record<string, any>;
-  user_id: string;
+  user_id?: string;
+  actor_user_id?: string;
+  actor_username?: string;
   user_role: string;
-  timestamp: string;
+  actor_role?: string;
+  timestamp?: string;
+  created_at?: string;
   ip_address?: string;
+  request_ip_address?: string;
   user_agent?: string;
   notes?: string;
+  action_notes?: string;
 }
 
 export interface ExpenseAuditLogSummary {

@@ -21,6 +21,7 @@ import {
   CreatePermissionGuard,
 } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 const DOCUMENT_TYPES = [
   'Birth Certificate',
@@ -104,6 +105,7 @@ function MyDocumentsView({ studentId, title }: { studentId?: string; title?: str
 function AdminDocumentsView() {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
   const [selectedStudent, setSelectedStudent] = useState('');
 
   const { data: studentsData } = useQuery({
@@ -129,9 +131,9 @@ function AdminDocumentsView() {
     mutationFn: studentDocumentsApi.uploadDocument,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-documents'] });
-      Alert.alert('Success', 'Document uploaded');
+      showSuccess('Document Uploaded', 'Document uploaded successfully');
     },
-    onError: () => Alert.alert('Error', 'Failed to upload document'),
+    onError: () => showError('Error', 'Failed to upload document'),
   });
 
   const handleUpload = (docType: string) => {

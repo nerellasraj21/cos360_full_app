@@ -2,23 +2,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../../../components/FeedbackToast';
 import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
-import { studentTransportApi, StudentTransport, StudentTransportCreate, StudentTransportUpdate } from '../../masters';
-
-// Types are imported from masters.ts
+import { studentTransportApi, StudentTransportOut, StudentTransportCreate, StudentTransportUpdate } from '../../students';
 
 // Get all student transport assignments - permission protected
-export function useStudentTransports(params?: { student_id?: string; route_id?: string }) {
-  return usePermissionProtectedQuery<StudentTransport[]>({
+export function useStudentTransports(params?: { student_id?: string }) {
+  return usePermissionProtectedQuery<StudentTransportOut[]>({
     resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,
     action: 'list',
     queryKey: ['student-transport', params],
-    queryFn: () => studentTransportApi.getStudentTransports(params),
+    queryFn: () => studentTransportApi.listStudentTransport(params),
   });
 }
 
 // Get student transport by ID - permission protected
 export function useStudentTransport(id: string) {
-  return usePermissionProtectedQuery<StudentTransport>({
+  return usePermissionProtectedQuery<StudentTransportOut>({
     resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,
     action: 'read',
     queryKey: ['student-transport', 'detail', id],
@@ -31,7 +29,7 @@ export function useStudentTransport(id: string) {
 export function useCreateStudentTransport() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToast();
-  return usePermissionProtectedMutation<StudentTransport, Error, StudentTransportCreate>({
+  return usePermissionProtectedMutation<StudentTransportOut, Error, StudentTransportCreate>({
     resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,
     action: 'create',
     mutationFn: studentTransportApi.createStudentTransport,
@@ -49,7 +47,7 @@ export function useCreateStudentTransport() {
 export function useUpdateStudentTransport() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToast();
-  return usePermissionProtectedMutation<StudentTransport, Error, { id: string; data: StudentTransportUpdate }>({
+  return usePermissionProtectedMutation<StudentTransportOut, Error, { id: string; data: StudentTransportUpdate }>({
     resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,
     action: 'update',
     mutationFn: ({ id, data }: { id: string; data: StudentTransportUpdate }) => studentTransportApi.updateStudentTransport(id, data),
@@ -83,11 +81,11 @@ export function useDeleteStudentTransport() {
 
 // Get my transport assignments (for student/parent users)
 export function useMyTransportAssignments(studentId?: string) {
-  return usePermissionProtectedQuery<StudentTransport[]>({
+  return usePermissionProtectedQuery<StudentTransportOut[]>({
     resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,
     action: 'read',
     queryKey: ['my-transport-assignments', studentId],
-    queryFn: () => studentTransportApi.getStudentTransports({ student_id: studentId }),
+    queryFn: () => studentTransportApi.listStudentTransport({ student_id: studentId }),
     enabled: !!studentId,
   });
 }

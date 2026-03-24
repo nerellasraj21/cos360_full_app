@@ -16,6 +16,7 @@ import {
   DeletePermissionGuard
 } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState, useEffect } from 'react';
@@ -78,6 +79,7 @@ export default function FeeStudentMappingsScreen() {
   const theme = colorScheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
 
   const { data: mappings = [], isLoading, error } = useQuery({
     queryKey: ['feeStudentMappings', filters],
@@ -116,10 +118,10 @@ export default function FeeStudentMappingsScreen() {
       queryClient.invalidateQueries({ queryKey: ['feeStudentMappings'] });
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Fee student mapping created successfully');
+      showSuccess('Mapping Created', 'Fee student mapping created successfully');
     },
     onError: (error) => {
-      Alert.alert('Error', 'Failed to create fee student mapping');
+      showError('Error', 'Failed to create fee student mapping');
       console.error('Create error:', error);
     },
   });
@@ -133,13 +135,13 @@ export default function FeeStudentMappingsScreen() {
 
       const message = `Bulk mappings created successfully. ${result.success_count}/${result.total_count} mappings created.`;
       if (result.errors && result.errors.length > 0) {
-        Alert.alert('Partial Success', `${message}\n\nErrors: ${result.errors.join(', ')}`);
+        showError('Partial Success', `${message} Errors: ${result.errors.join(', ')}`);
       } else {
-        Alert.alert('Success', message);
+        showSuccess('Bulk Mappings Created', message);
       }
     },
     onError: (error) => {
-      Alert.alert('Error', 'Failed to create bulk mappings');
+      showError('Error', 'Failed to create bulk mappings');
       console.error('Bulk create error:', error);
     },
   });
@@ -151,10 +153,10 @@ export default function FeeStudentMappingsScreen() {
       queryClient.invalidateQueries({ queryKey: ['feeStudentMappings'] });
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Fee student mapping updated successfully');
+      showSuccess('Mapping Updated', 'Fee student mapping updated successfully');
     },
     onError: (error) => {
-      Alert.alert('Error', 'Failed to update fee student mapping');
+      showError('Error', 'Failed to update fee student mapping');
       console.error('Update error:', error);
     },
   });
@@ -163,10 +165,10 @@ export default function FeeStudentMappingsScreen() {
     mutationFn: (id: string) => feeStudentMappingsApi.deleteFeeStudentMapping(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feeStudentMappings'] });
-      Alert.alert('Success', 'Fee student mapping deleted successfully');
+      showSuccess('Mapping Deleted', 'Fee student mapping deleted successfully');
     },
     onError: (error) => {
-      Alert.alert('Error', 'Failed to delete fee student mapping');
+      showError('Error', 'Failed to delete fee student mapping');
       console.error('Delete error:', error);
     },
   });

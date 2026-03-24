@@ -7,6 +7,7 @@ import { useRoutesDropdown } from '@/hooks';
 import { RouteStop } from '../../src/api';
 import { useRouteStops, useCreateRouteStop, useUpdateRouteStop, useDeleteRouteStop } from '../../hooks/use-transport';
 import { PERMISSION_RESOURCES } from '../../src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -257,6 +258,7 @@ export default function RouteStopsScreen() {
   });
 
   const { colors } = useTheme();
+  const { showSuccess, showError } = useToastContext();
 
   // Time picker state
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -294,11 +296,11 @@ export default function RouteStopsScreen() {
     if (createMutation.isSuccess) {
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Route stop created successfully');
+      showSuccess('Stop Created', 'Route stop created successfully');
       createMutation.reset();
     }
     if (createMutation.isError) {
-      Alert.alert('Error', 'Failed to create route stop');
+      showError('Error', 'Failed to create route stop');
     }
   }, [createMutation.isSuccess, createMutation.isError]);
 
@@ -306,21 +308,21 @@ export default function RouteStopsScreen() {
     if (updateMutation.isSuccess) {
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Route stop updated successfully');
+      showSuccess('Stop Updated', 'Route stop updated successfully');
       updateMutation.reset();
     }
     if (updateMutation.isError) {
-      Alert.alert('Error', 'Failed to update route stop');
+      showError('Error', 'Failed to update route stop');
     }
   }, [updateMutation.isSuccess, updateMutation.isError]);
 
   React.useEffect(() => {
     if (deleteMutation.isSuccess) {
-      Alert.alert('Success', 'Route stop deleted successfully');
+      showSuccess('Stop Deleted', 'Route stop deleted successfully');
       deleteMutation.reset();
     }
     if (deleteMutation.isError) {
-      Alert.alert('Error', 'Failed to delete route stop');
+      showError('Error', 'Failed to delete route stop');
     }
   }, [deleteMutation.isSuccess, deleteMutation.isError]);
 

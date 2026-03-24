@@ -13,6 +13,7 @@ import {
   DeletePermissionGuard 
 } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState, useEffect } from 'react';
@@ -47,6 +48,7 @@ export default function FeeTypesScreen() {
   const colors = Colors[theme];
   const { activeAcademicYearId } = useAcademicYear();
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
 
   console.log('FeeTypesScreen: activeAcademicYearId:', activeAcademicYearId);
 
@@ -118,10 +120,10 @@ export default function FeeTypesScreen() {
       queryClient.invalidateQueries({ queryKey: ['feeTypes'] });
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Fee type created successfully');
+      showSuccess('Type Created', 'Fee type created successfully');
     },
     onError: (error) => {
-      Alert.alert('Error', 'Failed to create fee type');
+      showError('Error', 'Failed to create fee type');
       console.error('Create error:', error);
     },
   });
@@ -133,10 +135,10 @@ export default function FeeTypesScreen() {
       queryClient.invalidateQueries({ queryKey: ['feeTypes'] });
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Fee type updated successfully');
+      showSuccess('Type Updated', 'Fee type updated successfully');
     },
     onError: (error) => {
-      Alert.alert('Error', 'Failed to update fee type');
+      showError('Error', 'Failed to update fee type');
       console.error('Update error:', error);
     },
   });
@@ -145,10 +147,10 @@ export default function FeeTypesScreen() {
     mutationFn: feeTypesApi.deleteFeeType,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feeTypes'] });
-      Alert.alert('Success', 'Fee type deleted successfully');
+      showSuccess('Type Deleted', 'Fee type deleted successfully');
     },
     onError: (error) => {
-      Alert.alert('Error', 'Failed to delete fee type');
+      showError('Error', 'Failed to delete fee type');
       console.error('Delete error:', error);
     },
   });

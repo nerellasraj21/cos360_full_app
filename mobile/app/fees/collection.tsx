@@ -22,6 +22,7 @@ import {
   FeeCollectionSummary,
   FeeConcessionCreate,
 } from '@/src/api/fees';
+import { useToastContext } from '@/components/ToastProvider';
 
 export default function FeeCollectionScreen() {
   const { role, selectedStudent } = useAuth();
@@ -49,6 +50,7 @@ export default function FeeCollectionScreen() {
   });
 
   const qc = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -99,9 +101,9 @@ export default function FeeCollectionScreen() {
       qc.invalidateQueries({ queryKey: ['fee-summary', selectedStudentId] });
       setAdminTab('summary');
       setPaymentForm({ amount: '', payment_method: 'cash', remarks: '' });
-      Alert.alert('Success', 'Payment recorded successfully');
+      showSuccess('Payment Recorded', 'Payment recorded successfully');
     },
-    onError: () => Alert.alert('Error', 'Failed to record payment'),
+    onError: () => showError('Error', 'Failed to record payment'),
   });
 
   const concessionMutation = useMutation({
@@ -117,9 +119,9 @@ export default function FeeCollectionScreen() {
       qc.invalidateQueries({ queryKey: ['fee-summary', selectedStudentId] });
       setAdminTab('summary');
       setConcessionForm({ fee_type_id: '', amount: '', approver_role: 'admin', remarks: '' });
-      Alert.alert('Success', 'Concession applied successfully');
+      showSuccess('Concession Applied', 'Concession applied successfully');
     },
-    onError: () => Alert.alert('Error', 'Failed to apply concession'),
+    onError: () => showError('Error', 'Failed to apply concession'),
   });
 
   // ── Shared summary renderer ───────────────────────────────────────────────

@@ -584,8 +584,8 @@ export interface BulkPermissionRequest {
 
 // Academic Years API
 export const academicYearsApi = {
-  getAcademicYears: async (): Promise<AcademicYear[]> => {
-    const response = await apiClient.get('/masters/academic_years/');
+  getAcademicYears: async (params?: { skip?: number; limit?: number; active_only?: boolean }): Promise<AcademicYear[]> => {
+    const response = await apiClient.get('/masters/academic_years/', { params });
     return response.data.items || response.data;
   },
 
@@ -696,7 +696,7 @@ export const classSectionsApi = {
 
 // Subjects API
 export const subjectsApi = {
-  getSubjects: async (params?: { academic_year_id?: string; active_only?: boolean; limit?: number }): Promise<Subject[]> => {
+  getSubjects: async (params?: { academic_year_id?: string; active_only?: boolean; skip?: number; limit?: number }): Promise<Subject[]> => {
     const response = await apiClient.get('/masters/subjects/', { params });
     return response.data.items || response.data;
   },
@@ -720,8 +720,8 @@ export const subjectsApi = {
     return response.data;
   },
 
-  getSubjectsDropdown: async (): Promise<Array<{ id: string, label: string }>> => {
-    const response = await apiClient.get('/masters/subjects/dropdown');
+  getSubjectsDropdown: async (params?: { category_id?: string; mandatory_only?: boolean; active_only?: boolean }): Promise<Array<{ id: string, label: string }>> => {
+    const response = await apiClient.get('/masters/subjects/dropdown', { params });
     return response.data;
   },
 
@@ -808,13 +808,13 @@ export const classSubjectMappingsApi = {
 
 // Routes API
 export const routesApi = {
-  getRoutes: async (): Promise<Route[]> => {
-    const response = await apiClient.get('/masters/routes/all_routes');
+  getRoutes: async (params?: { active_only?: boolean; skip?: number; limit?: number }): Promise<Route[]> => {
+    const response = await apiClient.get('/masters/routes/all_routes', { params });
     return response.data.items || response.data;
   },
 
-  getAllRoutes: async (): Promise<Route[]> => {
-    const response = await apiClient.get('/masters/routes/all_routes');
+  getAllRoutes: async (params?: { active_only?: boolean; skip?: number; limit?: number }): Promise<Route[]> => {
+    const response = await apiClient.get('/masters/routes/all_routes', { params });
     return response.data.items || response.data;
   },
 
@@ -842,6 +842,11 @@ export const routesApi = {
 
   updateRoute: async (id: string, data: RouteUpdate): Promise<Route> => {
     const response = await apiClient.put(`/masters/routes/${id}`, data);
+    return response.data;
+  },
+
+  patchRoute: async (id: string, data: Partial<RouteUpdate>): Promise<Route> => {
+    const response = await apiClient.patch(`/masters/routes/${id}`, data);
     return response.data;
   },
 
@@ -920,8 +925,8 @@ export const routeStopsApi = {
 
 // Holidays API
 export const holidaysApi = {
-  getHolidays: async (): Promise<HolidayRead[]> => {
-    const response = await apiClient.get('/masters/holidays/');
+  getHolidays: async (params?: { skip?: number; limit?: number; active_only?: boolean; academic_year_id?: string }): Promise<HolidayRead[]> => {
+    const response = await apiClient.get('/masters/holidays/', { params });
     return response.data.items || response.data;
   },
 
@@ -1056,6 +1061,36 @@ export const rolesApi = {
     const roles: Role[] = response.data.roles || response.data.items || response.data;
     return roles.map(r => ({ id: r.id, label: r.name }));
   },
+
+  /** GET /admin/role-mgmt/roles/{roleId}/permissions */
+  getRolePermissions: async (roleId: string): Promise<Permission[]> => {
+    const response = await apiClient.get(`/admin/role-mgmt/roles/${roleId}/permissions`);
+    return response.data.items || response.data;
+  },
+
+  /** PUT /admin/role-mgmt/roles/{roleId}/permissions */
+  updateRolePermission: async (roleId: string, data: Partial<PermissionUpdate>): Promise<Permission> => {
+    const response = await apiClient.put(`/admin/role-mgmt/roles/${roleId}/permissions`, data);
+    return response.data;
+  },
+
+  /** POST /admin/role-mgmt/roles/{roleId}/permissions/bulk */
+  bulkUpdateRolePermissions: async (roleId: string, data: BulkPermissionRequest): Promise<any> => {
+    const response = await apiClient.post(`/admin/role-mgmt/roles/${roleId}/permissions/bulk`, data);
+    return response.data;
+  },
+
+  /** GET /admin/role-mgmt/templates/ */
+  getPermissionTemplates: async (): Promise<any[]> => {
+    const response = await apiClient.get('/admin/role-mgmt/templates/');
+    return response.data.items || response.data;
+  },
+
+  /** POST /admin/role-mgmt/roles/{roleId}/apply-template */
+  applyTemplate: async (roleId: string, data: { template_id: string }): Promise<any> => {
+    const response = await apiClient.post(`/admin/role-mgmt/roles/${roleId}/apply-template`, data);
+    return response.data;
+  },
 };
 
 // Permissions API
@@ -1107,6 +1142,36 @@ export const permissionsApi = {
   bulkCreatePermissions: async (data: BulkPermissionRequest): Promise<any> => {
     const response = await apiClient.post('/auth/resource-permissions/bulk', data);
     return response.data;
+  },
+
+  /** GET /auth/resource-permissions/role/{roleId} */
+  getPermissionsByRole: async (roleId: string): Promise<Permission[]> => {
+    const response = await apiClient.get(`/auth/resource-permissions/role/${roleId}`);
+    return response.data.items || response.data;
+  },
+
+  /** GET /auth/resource-permissions/resource/{resource} */
+  getPermissionsByResource: async (resource: string): Promise<Permission[]> => {
+    const response = await apiClient.get(`/auth/resource-permissions/resource/${resource}`);
+    return response.data.items || response.data;
+  },
+
+  /** GET /auth/resource-permissions/role/{roleId}/summary */
+  getRolePermissionSummary: async (roleId: string): Promise<any> => {
+    const response = await apiClient.get(`/auth/resource-permissions/role/${roleId}/summary`);
+    return response.data;
+  },
+
+  /** GET /auth/resource-permissions/dropdown/resources */
+  getResourcesDropdown: async (): Promise<AvailableResources | string[]> => {
+    const response = await apiClient.get('/auth/resource-permissions/dropdown/resources');
+    return response.data;
+  },
+
+  /** GET /auth/resource-permissions/check/{roleId}/{resource}/{action} */
+  checkRolePermission: async (roleId: string, resource: string, action: string): Promise<boolean> => {
+    const response = await apiClient.get(`/auth/resource-permissions/check/${roleId}/${resource}/${action}`);
+    return response.data.granted ?? response.data;
   },
 };
 
@@ -1214,5 +1279,77 @@ export const castesApi = {
       params: { active_only: activeOnly },
     });
     return response.data;
+  },
+};
+
+// ─── Transport Pricing API ────────────────────────────────────────────────────
+
+export interface TransportPricing {
+  id: string;
+  vehicle_id: string;
+  billing_cycle: string;
+  cycle_name: string;
+  amount: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TransportPricingCreate {
+  vehicle_id: string;
+  billing_cycle: string;
+  cycle_name: string;
+  amount: number;
+  is_active?: boolean;
+}
+
+export interface TransportPricingUpdate {
+  vehicle_id?: string;
+  billing_cycle?: string;
+  cycle_name?: string;
+  amount?: number;
+  is_active?: boolean;
+}
+
+export const transportPricingApi = {
+  /** GET /masters/transport-pricing/ */
+  list: async (params?: { vehicle_id?: string; billing_cycle?: string }): Promise<TransportPricing[]> => {
+    const response = await apiClient.get('/masters/transport-pricing/', { params });
+    return response.data.items || response.data;
+  },
+
+  /** GET /masters/transport-pricing/{id} */
+  getById: async (id: string): Promise<TransportPricing> => {
+    const response = await apiClient.get(`/masters/transport-pricing/${id}`);
+    return response.data;
+  },
+
+  /** GET /masters/transport-pricing/dropdown */
+  getDropdown: async (params?: { vehicle_id?: string }): Promise<Array<{ id: string; cycle_name: string; amount: number }>> => {
+    const response = await apiClient.get('/masters/transport-pricing/dropdown', { params });
+    return response.data;
+  },
+
+  /** POST /masters/transport-pricing/ */
+  create: async (data: TransportPricingCreate): Promise<TransportPricing> => {
+    const response = await apiClient.post('/masters/transport-pricing/', data);
+    return response.data;
+  },
+
+  /** PUT /masters/transport-pricing/{id} */
+  update: async (id: string, data: TransportPricingUpdate): Promise<TransportPricing> => {
+    const response = await apiClient.put(`/masters/transport-pricing/${id}`, data);
+    return response.data;
+  },
+
+  /** PATCH /masters/transport-pricing/{id} */
+  patch: async (id: string, data: Partial<TransportPricingUpdate>): Promise<TransportPricing> => {
+    const response = await apiClient.patch(`/masters/transport-pricing/${id}`, data);
+    return response.data;
+  },
+
+  /** DELETE /masters/transport-pricing/{id} */
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/masters/transport-pricing/${id}`);
   },
 };

@@ -408,9 +408,11 @@ export interface MarkPermission {
 }
 
 export interface MarkPermissionCreate {
-  teacher_id: string;
-  subject_config_id: string;
-  class_id: string;
+  user_id: string;
+  scope_note?: string;
+  teacher_id?: string;
+  subject_config_id?: string;
+  class_id?: string;
   section_id?: string;
 }
 
@@ -481,8 +483,8 @@ export const examsApi = {
   delete: (examId: string) =>
     apiClient.delete(`/exams/${examId}`).then(r => r.data),
 
-  clone: (examId: string) =>
-    apiClient.post<Exam>(`/exams/${examId}/clone`).then(r => r.data),
+  clone: (examId: string, data?: { new_name?: string; academic_year_id?: string }) =>
+    apiClient.post<Exam>(`/exams/${examId}/clone`, data).then(r => r.data),
 
   unlock: (examId: string, reason?: string) =>
     apiClient.post<Exam>(`/exams/${examId}/unlock`, { reason }).then(r => r.data),
@@ -610,8 +612,8 @@ export const examHallTicketsApi = {
 // ─── API: Exam Dates ──────────────────────────────────────────────────────────
 
 export const examDatesApi = {
-  list: (examId: string) =>
-    apiClient.get<ExamDate[]>(`/exams/${examId}/dates`).then(r => r.data),
+  list: (examId: string, params?: { class_id?: string; section_id?: string }) =>
+    apiClient.get<ExamDate[]>(`/exams/${examId}/dates`, { params }).then(r => r.data),
 
   create: (examId: string, data: ExamDateCreateRequest) =>
     apiClient.post<ExamDate>(`/exams/${examId}/dates`, data).then(r => r.data),
@@ -664,8 +666,14 @@ export const examPatternsApi = {
   getTemplate: (templateId: string) =>
     apiClient.get<ExamTemplate>(`/exam-patterns/templates/${templateId}`).then(r => r.data),
 
+  updateTemplate: (templateId: string, data: Partial<TemplateCreate>) =>
+    apiClient.put<ExamTemplate>(`/exam-patterns/templates/${templateId}`, data).then(r => r.data),
+
   deleteTemplate: (templateId: string) =>
     apiClient.delete(`/exam-patterns/templates/${templateId}`).then(r => r.data),
+
+  saveFromExam: (examId: string, data: { name: string; description?: string }) =>
+    apiClient.post<ExamTemplate>('/exam-patterns/templates/from-exam', { exam_id: examId, ...data }).then(r => r.data),
 
   copyPattern: (examId: string, data: CopyPatternRequest) =>
     apiClient.post(`/exam-patterns/${examId}/copy`, data).then(r => r.data),

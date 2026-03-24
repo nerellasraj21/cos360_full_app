@@ -10,6 +10,7 @@ import {
 import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { examsApi, ExamCreateRequest, ExamNature, ExamLevel, ExamBoard } from '@/src/api/exam';
+import { useToastContext } from '@/components/ToastProvider';
 
 const EXAM_NATURES: { label: string; value: ExamNature }[] = [
   { label: 'Formative',  value: 'formative' },
@@ -41,6 +42,7 @@ export default function CreateExamScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const qc = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.12)' : '#e9ecef';
@@ -76,11 +78,10 @@ export default function CreateExamScreen() {
     mutationFn: (data: ExamCreateRequest) => examsApi.create(data),
     onSuccess: exam => {
       qc.invalidateQueries({ queryKey: ['exams'] });
-      Alert.alert('Success', 'Exam created successfully.', [
-        { text: 'OK', onPress: () => router.replace(`/exam/${exam.id}` as any) },
-      ]);
+      showSuccess('Exam Created', 'Exam created successfully.');
+      router.replace(`/exam/${exam.id}` as any);
     },
-    onError: () => Alert.alert('Error', 'Failed to create exam. Please try again.'),
+    onError: () => showError('Error', 'Failed to create exam. Please try again.'),
   });
 
   const updateMutation = useMutation({
@@ -88,11 +89,10 @@ export default function CreateExamScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['exam', examId] });
       qc.invalidateQueries({ queryKey: ['exams'] });
-      Alert.alert('Success', 'Exam updated successfully.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      showSuccess('Exam Updated', 'Exam updated successfully.');
+      router.back();
     },
-    onError: () => Alert.alert('Error', 'Failed to update exam. Please try again.'),
+    onError: () => showError('Error', 'Failed to update exam. Please try again.'),
   });
 
   const validate = () => {

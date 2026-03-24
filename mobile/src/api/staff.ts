@@ -13,7 +13,10 @@ import type {
     DesignationInput,
     StaffAttendance,
     StaffAttendanceInput,
-    StaffProfile
+    StaffProfile,
+    StaffQualification,
+    StaffQualificationInput,
+    StaffQualificationUpdate,
 } from '@/src/types/masters/staff';
 
 // Staff Enrollment API functions
@@ -56,7 +59,19 @@ export const staffApi = {
   // Delete Staff — DELETE /staff/enrollment/{id}
   deleteStaffEnrollment: async (id: string): Promise<void> => {
     await apiClient.delete(`/staff/enrollment/${id}`);
-  }
+  },
+
+  // Filter by designation — GET /staff/by-designation?designation_id={id}
+  getStaffByDesignation: async (designationId: string): Promise<Staff[]> => {
+    const response = await apiClient.get('/staff/by-designation', { params: { designation_id: designationId } });
+    return response.data.items || response.data;
+  },
+
+  // Drivers — GET /staff/drivers
+  getDrivers: async (): Promise<Staff[]> => {
+    const response = await apiClient.get('/staff/drivers');
+    return response.data.items || response.data;
+  },
 };
 
 // Staff Attendance API functions
@@ -91,15 +106,20 @@ export const staffAttendanceApi = {
     await apiClient.delete(`/staff/attendance/${id}`);
   },
 
-  // Get Staff Attendance by Date Range
+  // Get Staff Attendance by ID — GET /staff/attendance/{id}
+  getStaffAttendanceById: async (id: string): Promise<StaffAttendance> => {
+    const response = await apiClient.get(`/staff/attendance/${id}`);
+    return response.data;
+  },
+
+  // Get Staff Attendance by Date Range — GET /masters/staff/{staffId}/attendance/filter
   getStaffAttendanceByDateRange: async (staffId: string, params: {
     start_date: string;
     end_date: string;
   }): Promise<StaffAttendance[]> => {
-    const queryParams = new URLSearchParams(params as any).toString();
-    const response = await apiClient.get(`/staff/${staffId}/attendance/filter?${queryParams}`);
+    const response = await apiClient.get(`/masters/staff/${staffId}/attendance/filter`, { params });
     return response.data;
-  }
+  },
 };
 
 // Designations API functions
@@ -312,4 +332,65 @@ export const staffAssignmentsApi = {
     const response = await apiClient.put(`/staff/assignments/${id}`, data);
     return response.data;
   }
+};
+
+// Staff Qualifications API
+export const staffQualificationsApi = {
+  // GET /staff/{staffId}/qualifications
+  getQualifications: async (staffId: string): Promise<StaffQualification[]> => {
+    const response = await apiClient.get(`/staff/${staffId}/qualifications`);
+    return response.data.items || response.data;
+  },
+
+  // POST /staff/{staffId}/qualifications
+  addQualification: async (staffId: string, data: StaffQualificationInput): Promise<StaffQualification> => {
+    const response = await apiClient.post(`/staff/${staffId}/qualifications`, data);
+    return response.data;
+  },
+
+  // PUT /staff/{staffId}/qualifications/{qualId}
+  updateQualification: async (staffId: string, qualId: string, data: StaffQualificationUpdate): Promise<StaffQualification> => {
+    const response = await apiClient.put(`/staff/${staffId}/qualifications/${qualId}`, data);
+    return response.data;
+  },
+
+  // DELETE /staff/{staffId}/qualifications/{qualId}
+  deleteQualification: async (staffId: string, qualId: string): Promise<void> => {
+    await apiClient.delete(`/staff/${staffId}/qualifications/${qualId}`);
+  },
+};
+
+// Staff Attendance Reports API
+export const staffAttendanceReportsApi = {
+  // GET /reports/attendance/staff
+  getAttendanceReport: async (params?: {
+    start_date?: string;
+    end_date?: string;
+    staff_id?: string;
+    skip?: number;
+    limit?: number;
+  }): Promise<any[]> => {
+    const response = await apiClient.get('/reports/attendance/staff', { params });
+    return response.data.items || response.data;
+  },
+
+  // GET /reports/attendance/staff/stats
+  getAttendanceStats: async (params?: {
+    start_date?: string;
+    end_date?: string;
+    staff_id?: string;
+  }): Promise<any> => {
+    const response = await apiClient.get('/reports/attendance/staff/stats', { params });
+    return response.data;
+  },
+
+  // POST /reports/attendance/export → Blob
+  exportReport: async (data: {
+    start_date?: string;
+    end_date?: string;
+    format?: 'csv' | 'xlsx';
+  }): Promise<Blob> => {
+    const response = await apiClient.post('/reports/attendance/export', data, { responseType: 'blob' });
+    return response.data;
+  },
 };

@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 
-import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
     Alert,
@@ -15,15 +14,14 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AcademicYear } from '@/src/api';
 import { useAcademicYears, useCreateAcademicYear, useUpdateAcademicYear, useDeleteAcademicYear } from '@/src/api/hooks/masters/academicYears';
 import { useTheme } from '@/contexts';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 export default function AcademicYearsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,25 +34,20 @@ export default function AcademicYearsScreen() {
     is_active: true,
   });
 
-  const router = useRouter();
-  // const colorScheme = useColorScheme();
-  // const theme = colorScheme === 'dark' ? 'dark' : 'light';
-  const { theme, colors } = useTheme();
+  const { theme } = useTheme();
   const themeColors = Colors[theme];
+  const { showSuccess, showError } = useToastContext();
 
-  // Fetch academic years data using permission-protected hook
   const { data: academicYearsData, isLoading, error, refetch } = useAcademicYears();
-
-  // Mutations using permission-protected hooks
   const createMutation = useCreateAcademicYear();
   const updateMutation = useUpdateAcademicYear();
   const deleteMutation = useDeleteAcademicYear();
 
-  // Handle mutation success/error states
   React.useEffect(() => {
     if (createMutation.isSuccess) {
       setIsModalVisible(false);
       resetForm();
+      showSuccess('Created', 'Academic year has been created.');
       createMutation.reset();
     }
   }, [createMutation.isSuccess]);
@@ -63,37 +56,29 @@ export default function AcademicYearsScreen() {
     if (updateMutation.isSuccess) {
       setIsModalVisible(false);
       resetForm();
+      showSuccess('Updated', 'Academic year has been updated.');
       updateMutation.reset();
     }
   }, [updateMutation.isSuccess]);
 
   React.useEffect(() => {
     if (deleteMutation.isSuccess) {
+      showSuccess('Deleted', 'Academic year has been deleted.');
       deleteMutation.reset();
     }
   }, [deleteMutation.isSuccess]);
 
-  // Filter academic years based on search
   const filteredYears = useMemo(() => {
     if (!academicYearsData || !Array.isArray(academicYearsData)) return [];
-
-    return academicYearsData.filter((year: AcademicYear) => {
-      const matchesSearch =
-        year.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        year.start_date.includes(searchQuery) ||
-        year.end_date.includes(searchQuery);
-
-      return matchesSearch;
-    });
+    return academicYearsData.filter((year: AcademicYear) =>
+      year.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      year.start_date.includes(searchQuery) ||
+      year.end_date.includes(searchQuery)
+    );
   }, [academicYearsData, searchQuery]);
 
   const resetForm = () => {
-    setFormData({
-      title: '',
-      start_date: '',
-      end_date: '',
-      is_active: true,
-    });
+    setFormData({ title: '', start_date: '', end_date: '', is_active: true });
     setEditingYear(null);
   };
 
@@ -117,7 +102,9 @@ export default function AcademicYearsScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteMutation.mutate(year.id),
+          onPress: () => deleteMutation.mutate(year.id, {
+            onError: (e: any) => showError('Delete Failed', e.message || 'Failed to delete academic year'),
+          }),
         },
       ]
     );
@@ -128,57 +115,70 @@ export default function AcademicYearsScreen() {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
-
     if (editingYear) {
-      updateMutation.mutate({ id: editingYear.id, data: formData });
+      updateMutation.mutate({ id: editingYear.id, data: formData }, {
+        onError: (e: any) => showError('Update Failed', e.message || 'Failed to update academic year'),
+      });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(formData, {
+        onError: (e: any) => showError('Create Failed', e.message || 'Failed to create academic year'),
+      });
     }
   };
 
-  const renderAcademicYearItem = useCallback(({ item }: { item: AcademicYear }) => (
-    <View style={[styles.yearCard, { backgroundColor: themeColors.card }]}>
-      <View style={styles.yearHeader}>
-        <View style={styles.yearInfo}>
-          <ThemedText type="subtitle" style={styles.yearTitle}>
-            {item.title}
+  const isDark = theme === 'dark';
+  const borderColor = isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
+  const rowBg = themeColors.card;
+  const altRowBg = isDark ? 'rgba(255,255,255,0.03)' : '#F9FAFB';
+
+  const renderItem = useCallback(({ item, index }: { item: AcademicYear; index: number }) => (
+    <View style={[
+      styles.tableRow,
+      { backgroundColor: index % 2 === 0 ? rowBg : altRowBg, borderBottomColor: borderColor },
+    ]}>
+      {/* S.No */}
+      <View style={styles.colSno}>
+        <ThemedText style={styles.snoText}>{index + 1}</ThemedText>
+      </View>
+
+      {/* Title + Dates */}
+      <View style={styles.colMain}>
+        <ThemedText style={styles.titleText}>{item.title}</ThemedText>
+        <ThemedText style={[styles.dateText, { color: themeColors['muted-foreground'] }]}>
+          {item.start_date} → {item.end_date}
+        </ThemedText>
+      </View>
+
+      {/* Status Badge */}
+      <View style={styles.colStatus}>
+        <View style={[
+          styles.statusBadge,
+          { backgroundColor: item.is_active ? '#D1FAE5' : '#FEE2E2' },
+        ]}>
+          <ThemedText style={[
+            styles.statusText,
+            { color: item.is_active ? '#065F46' : '#991B1B' },
+          ]}>
+            {item.is_active ? 'Active' : 'Inactive'}
           </ThemedText>
-          <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#10B981' : '#EF4444' }]}>
-            <ThemedText style={styles.statusText}>
-              {item.is_active ? 'Active' : 'Inactive'}
-            </ThemedText>
-          </View>
-        </View>
-        <View style={styles.actionButtons}>
-          <PermissionGuard resourceConstant={PERMISSION_RESOURCES.ACADEMIC_YEARS} actionConstant="update">
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: themeColors.primary }]}
-              onPress={() => handleEdit(item)}
-            >
-              <Ionicons name="create" size={16} color="white" />
-            </TouchableOpacity>
-          </PermissionGuard>
-          <PermissionGuard resourceConstant={PERMISSION_RESOURCES.ACADEMIC_YEARS} actionConstant="delete">
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
-              onPress={() => handleDelete(item)}
-            >
-              <Ionicons name="trash" size={16} color="white" />
-            </TouchableOpacity>
-          </PermissionGuard>
         </View>
       </View>
 
-      <View style={styles.yearDetails}>
-        <View style={styles.detailRow}>
-          <Ionicons name="calendar" size={16} color={themeColors['muted-foreground']} />
-          <ThemedText style={styles.detailText}>
-            {new Date(item.start_date).toLocaleDateString()} - {new Date(item.end_date).toLocaleDateString()}
-          </ThemedText>
-        </View>
+      {/* Actions */}
+      <View style={styles.colActions}>
+        <PermissionGuard resourceConstant={PERMISSION_RESOURCES.ACADEMIC_YEARS} actionConstant="update">
+          <TouchableOpacity style={styles.iconBtn} onPress={() => handleEdit(item)}>
+            <Ionicons name="create-outline" size={18} color={themeColors.primary} />
+          </TouchableOpacity>
+        </PermissionGuard>
+        <PermissionGuard resourceConstant={PERMISSION_RESOURCES.ACADEMIC_YEARS} actionConstant="delete">
+          <TouchableOpacity style={styles.iconBtn} onPress={() => handleDelete(item)}>
+            <Ionicons name="trash-outline" size={18} color="#EF4444" />
+          </TouchableOpacity>
+        </PermissionGuard>
       </View>
     </View>
-  ), [themeColors]);
+  ), [themeColors, borderColor, rowBg, altRowBg]);
 
   if (error) {
     return (
@@ -186,7 +186,7 @@ export default function AcademicYearsScreen() {
         <View style={styles.centerContainer}>
           <ThemedText type="title">Error</ThemedText>
           <ThemedText>Failed to load academic years data</ThemedText>
-          <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+          <TouchableOpacity style={[styles.retryButton, { backgroundColor: themeColors.primary }]} onPress={() => refetch()}>
             <ThemedText style={styles.retryText}>Retry</ThemedText>
           </TouchableOpacity>
         </View>
@@ -208,160 +208,171 @@ export default function AcademicYearsScreen() {
     >
       <AppLayout title="Academic Years">
         <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <ThemedText style={styles.subtitle}>
-              {filteredYears.length} academic year{filteredYears.length !== 1 ? 's' : ''}
-            </ThemedText>
-          </View>
-          <PermissionGuard resourceConstant={PERMISSION_RESOURCES.ACADEMIC_YEARS} actionConstant="create">
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: themeColors.primary }]}
-              onPress={() => {
-                resetForm();
-                setIsModalVisible(true);
-              }}
-            >
-              <Ionicons name="add" size={24} color="white" />
-            </TouchableOpacity>
-          </PermissionGuard>
-        </View>
 
-      {/* Search Bar */}
-      <View style={[styles.searchContainer, { backgroundColor: themeColors.card }]}>
-        <Ionicons name="search" size={20} color={themeColors['muted-foreground']} />
-        <TextInput
-          style={[styles.searchInput, { color: themeColors['card-foreground'] }]}
-          placeholder="Search academic years..."
-          placeholderTextColor={themeColors['muted-foreground']}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close" size={20} color={themeColors['muted-foreground']} />
-          </TouchableOpacity>
-        ) : null}
-      </View>
-
-      {/* Academic Years List */}
-      <FlatList
-        data={filteredYears}
-        renderItem={renderAcademicYearItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
-            onRefresh={refetch}
-            tintColor={themeColors.primary}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="school" size={64} color={themeColors['muted-foreground']} />
-            <ThemedText type="subtitle" style={styles.emptyTitle}>
-              No Academic Years Found
-            </ThemedText>
-            <ThemedText style={styles.emptyText}>
-              {searchQuery
-                ? 'Try adjusting your search query'
-                : 'Add your first academic year to get started'}
-            </ThemedText>
-          </View>
-        }
-      />
-
-      {/* Add/Edit Modal */}
-      <Modal
-        visible={isModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
-            <View style={styles.modalHeader}>
-              <ThemedText type="title" style={styles.modalTitle}>
-                {editingYear ? 'Edit Academic Year' : 'Add Academic Year'}
+          {/* Page Header */}
+          <View style={styles.pageHeader}>
+            <View>
+              <ThemedText style={styles.pageTitle}>Academic Years</ThemedText>
+              <ThemedText style={[styles.pageSubtitle, { color: themeColors['muted-foreground'] }]}>
+                {filteredYears.length} record{filteredYears.length !== 1 ? 's' : ''} found
               </ThemedText>
-              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-                <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
+            </View>
+            <PermissionGuard resourceConstant={PERMISSION_RESOURCES.ACADEMIC_YEARS} actionConstant="create">
+              <TouchableOpacity
+                style={[styles.addButton, { backgroundColor: themeColors.primary }]}
+                onPress={() => { resetForm(); setIsModalVisible(true); }}
+              >
+                <Ionicons name="add" size={16} color="white" />
+                <ThemedText style={styles.addButtonText}>Add Academic Year</ThemedText>
               </TouchableOpacity>
+            </PermissionGuard>
+          </View>
+
+          {/* Search Bar */}
+          <View style={[styles.searchBar, { backgroundColor: themeColors.card, borderColor }]}>
+            <Ionicons name="search-outline" size={18} color={themeColors['muted-foreground']} />
+            <TextInput
+              style={[styles.searchInput, { color: themeColors['card-foreground'] }]}
+              placeholder="Search..."
+              placeholderTextColor={themeColors['muted-foreground']}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={18} color={themeColors['muted-foreground']} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {/* Table */}
+          <View style={[styles.tableContainer, { borderColor, backgroundColor: rowBg }]}>
+            {/* Table Header */}
+            <View style={[styles.tableHeader, { borderBottomColor: borderColor, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F3F4F6' }]}>
+              <View style={styles.colSno}>
+                <ThemedText style={styles.headerText}>S.No.</ThemedText>
+              </View>
+              <View style={styles.colMain}>
+                <ThemedText style={styles.headerText}>Title / Dates</ThemedText>
+              </View>
+              <View style={styles.colStatus}>
+                <ThemedText style={styles.headerText}>Active</ThemedText>
+              </View>
+              <View style={styles.colActions}>
+                <ThemedText style={styles.headerText}>Actions</ThemedText>
+              </View>
             </View>
 
-            <ScrollView style={styles.modalBody}>
-              <View style={styles.formGroup}>
-                <ThemedText style={styles.label}>Title *</ThemedText>
-                <TextInput
-                  style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border }]}
-                  placeholder="Enter academic year (e.g., 2024-25)"
-                  placeholderTextColor={themeColors['muted-foreground']}
-                  value={formData.title}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))}
-                />
-              </View>
+            {/* Rows */}
+            <FlatList
+              data={filteredYears}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={themeColors.primary} />
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="calendar-outline" size={48} color={themeColors['muted-foreground']} />
+                  <ThemedText style={[styles.emptyText, { color: themeColors['muted-foreground'] }]}>
+                    {searchQuery ? 'No results found' : 'No academic years yet'}
+                  </ThemedText>
+                </View>
+              }
+            />
+          </View>
 
-              <View style={styles.formGroup}>
-                <ThemedText style={styles.label}>Start Date *</ThemedText>
-                <TextInput
-                  style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border }]}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={themeColors['muted-foreground']}
-                  value={formData.start_date}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, start_date: text }))}
-                />
-              </View>
+        </View>
 
-              <View style={styles.formGroup}>
-                <ThemedText style={styles.label}>End Date *</ThemedText>
-                <TextInput
-                  style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border }]}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={themeColors['muted-foreground']}
-                  value={formData.end_date}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, end_date: text }))}
-                />
-              </View>
-
-              <View style={styles.checkboxContainer}>
-                <TouchableOpacity
-                  style={styles.checkbox}
-                  onPress={() => setFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
-                >
-                  <Ionicons
-                    name={formData.is_active ? "checkbox" : "square-outline"}
-                    size={24}
-                    color={themeColors.primary}
-                  />
-                </TouchableOpacity>
-                <ThemedText style={styles.checkboxLabel}>Active</ThemedText>
-              </View>
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                onPress={() => setIsModalVisible(false)}
-              >
-                <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.submitButton, { backgroundColor: themeColors.primary }]}
-                onPress={handleSubmit}
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
-                <ThemedText style={styles.submitButtonText}>
-                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingYear ? 'Update' : 'Create')}
+        {/* Add/Edit Modal */}
+        <Modal
+          visible={isModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setIsModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
+                <ThemedText style={styles.modalTitle}>
+                  {editingYear ? 'Edit Academic Year' : 'Add Academic Year'}
                 </ThemedText>
-              </TouchableOpacity>
+                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                  <Ionicons name="close" size={22} color={themeColors['muted-foreground']} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.label}>Title <ThemedText style={styles.required}>*</ThemedText></ThemedText>
+                  <TextInput
+                    style={[styles.input, { color: themeColors['card-foreground'], borderColor, backgroundColor: themeColors.card }]}
+                    placeholder="e.g. 2025-26"
+                    placeholderTextColor={themeColors['muted-foreground']}
+                    value={formData.title}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))}
+                  />
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                    <ThemedText style={styles.label}>Start Date <ThemedText style={styles.required}>*</ThemedText></ThemedText>
+                    <TextInput
+                      style={[styles.input, { color: themeColors['card-foreground'], borderColor, backgroundColor: themeColors.card }]}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={themeColors['muted-foreground']}
+                      value={formData.start_date}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, start_date: text }))}
+                    />
+                  </View>
+                  <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                    <ThemedText style={styles.label}>End Date <ThemedText style={styles.required}>*</ThemedText></ThemedText>
+                    <TextInput
+                      style={[styles.input, { color: themeColors['card-foreground'], borderColor, backgroundColor: themeColors.card }]}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={themeColors['muted-foreground']}
+                      value={formData.end_date}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, end_date: text }))}
+                    />
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.toggleRow}
+                  onPress={() => setFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
+                  activeOpacity={0.7}
+                >
+                  <ThemedText style={styles.label}>Active</ThemedText>
+                  <View style={[
+                    styles.toggle,
+                    { backgroundColor: formData.is_active ? themeColors.primary : (isDark ? '#374151' : '#D1D5DB') },
+                  ]}>
+                    <View style={[styles.toggleThumb, { transform: [{ translateX: formData.is_active ? 18 : 2 }] }]} />
+                  </View>
+                </TouchableOpacity>
+              </ScrollView>
+
+              <View style={[styles.modalFooter, { borderTopColor: borderColor }]}>
+                <TouchableOpacity
+                  style={[styles.btn, { backgroundColor: isDark ? '#374151' : '#F3F4F6' }]}
+                  onPress={() => setIsModalVisible(false)}
+                >
+                  <ThemedText style={{ color: isDark ? '#D1D5DB' : '#374151', fontWeight: '600' }}>Cancel</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.btn, { backgroundColor: themeColors.primary }]}
+                  onPress={handleSubmit}
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                >
+                  <ThemedText style={{ color: 'white', fontWeight: '600' }}>
+                    {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingYear ? 'Update' : 'Create')}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-        </View>
+        </Modal>
       </AppLayout>
     </ReadOrListPermissionGuard>
   );
@@ -378,131 +389,158 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
   },
-  header: {
+
+  // Page header
+  pageHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  headerContent: {
-    flex: 1,
+  pageTitle: {
+    fontSize: 20,
+    fontWeight: '700',
   },
-  subtitle: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginTop: 4,
+  pageSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
   },
   addButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 16,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addButtonText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // Search
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 14,
+    gap: 8,
   },
   searchInput: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
+    fontSize: 14,
   },
-  listContainer: {
-    paddingBottom: 20,
-  },
-  yearCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  yearHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  yearInfo: {
+
+  // Table
+  tableContainer: {
     flex: 1,
-  },
-  yearTitle: {
-    marginBottom: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
     borderRadius: 12,
-    alignSelf: 'flex-start',
+    borderWidth: 1,
+    overflow: 'hidden',
   },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  headerText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    opacity: 0.6,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+
+  // Columns
+  colSno: {
+    width: 36,
+  },
+  colMain: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  colStatus: {
+    width: 72,
+    alignItems: 'center',
+  },
+  colActions: {
+    flexDirection: 'row',
+    gap: 4,
+    width: 64,
+    justifyContent: 'flex-end',
+  },
+
+  snoText: {
+    fontSize: 13,
+    opacity: 0.5,
+    fontWeight: '500',
+  },
+  titleText: {
+    fontSize: 14,
     fontWeight: '600',
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
+  dateText: {
+    fontSize: 11,
+    marginTop: 2,
   },
-  actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+  statusBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 20,
   },
-  yearDetails: {
-    gap: 8,
+  statusText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  iconBtn: {
+    padding: 4,
   },
-  detailText: {
-    fontSize: 14,
-    marginLeft: 8,
-    opacity: 0.8,
-  },
+
+  // Empty
   emptyContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 64,
-  },
-  emptyTitle: {
-    marginTop: 16,
-    marginBottom: 8,
+    paddingVertical: 48,
+    gap: 10,
   },
   emptyText: {
-    textAlign: 'center',
-    opacity: 0.7,
+    fontSize: 14,
   },
+
+  // Retry
   retryButton: {
     marginTop: 16,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#3B82F6',
     borderRadius: 8,
   },
   retryText: {
     color: 'white',
     fontWeight: '600',
   },
+
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -510,64 +548,69 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
+    fontWeight: '700',
   },
   modalBody: {
     padding: 20,
+  },
+  formRow: {
+    flexDirection: 'row',
   },
   formGroup: {
     marginBottom: 16,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  required: {
+    color: '#EF4444',
   },
   input: {
     borderWidth: 1,
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
   },
-  checkboxContainer: {
+  toggleRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 4,
+    marginBottom: 8,
   },
-  checkbox: {
-    marginRight: 8,
+  toggle: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
   },
-  checkboxLabel: {
-    fontSize: 16,
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   modalFooter: {
     flexDirection: 'row',
     gap: 12,
     padding: 20,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
   },
-  button: {
+  btn: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#F3F4F6',
-  },
-  cancelButtonText: {
-    color: '#374151',
-    fontWeight: '600',
-  },
-  submitButton: {
-    backgroundColor: '#3B82F6',
-  },
-  submitButtonText: {
-    color: 'white',
-    fontWeight: '600',
   },
 });

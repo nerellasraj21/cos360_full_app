@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import apiClient from './client';
 
 const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
@@ -44,6 +45,82 @@ export const clearTokens = async (): Promise<void> => {
     console.error('Error clearing tokens:', error);
   }
 };
+
+// ─── Auth API types ───────────────────────────────────────────────────────────
+
+export interface AuthMenu {
+  id: string;
+  name: string;
+  path?: string;
+  icon?: string;
+  parent_id?: string | null;
+  order?: number;
+  is_active?: boolean;
+  children?: AuthMenu[];
+}
+
+export interface AuthMenuCreate {
+  name: string;
+  path?: string;
+  icon?: string;
+  parent_id?: string | null;
+  order?: number;
+  is_active?: boolean;
+}
+
+export interface AuthBasePermission {
+  id: string;
+  name: string;
+  codename: string;
+  content_type?: string;
+}
+
+export interface AuthBasePermissionCreate {
+  name: string;
+  codename: string;
+  content_type?: string;
+}
+
+// ─── Auth API ─────────────────────────────────────────────────────────────────
+
+export const authApi = {
+  /** POST /auth/staff/set-password */
+  setStaffPassword: async (data: { current_password: string; new_password: string }): Promise<void> => {
+    await apiClient.post('/auth/staff/set-password', data);
+  },
+
+  /** GET /auth/user-menu */
+  getUserMenu: async (): Promise<AuthMenu[]> => {
+    const response = await apiClient.get('/auth/user-menu');
+    return response.data.items || response.data || [];
+  },
+
+  /** GET /auth/menus/ */
+  getMenus: async (): Promise<AuthMenu[]> => {
+    const response = await apiClient.get('/auth/menus/');
+    return response.data.items || response.data || [];
+  },
+
+  /** POST /auth/menus/ */
+  createMenu: async (data: AuthMenuCreate): Promise<AuthMenu> => {
+    const response = await apiClient.post('/auth/menus/', data);
+    return response.data;
+  },
+
+  /** GET /auth/permissions/ */
+  getBasePermissions: async (): Promise<AuthBasePermission[]> => {
+    const response = await apiClient.get('/auth/permissions/');
+    return response.data.items || response.data || [];
+  },
+
+  /** POST /auth/permissions/ */
+  createBasePermission: async (data: AuthBasePermissionCreate): Promise<AuthBasePermission> => {
+    const response = await apiClient.post('/auth/permissions/', data);
+    return response.data;
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const refreshToken = async (): Promise<string | null> => {
   try {

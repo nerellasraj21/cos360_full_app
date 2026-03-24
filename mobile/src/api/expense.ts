@@ -105,7 +105,12 @@ export const expenseTransactionsApi = {
   getTransactions: async (params?: {
     skip?: number;
     limit?: number;
+    category_id?: string;
+    type_id?: string;
+    status?: string;
     status_filter?: string;
+    start_date?: string;
+    end_date?: string;
     expense_type_id?: string;
     department_id?: string;
   }): Promise<ExpenseTransactionListResponse> => {
@@ -137,8 +142,14 @@ export const expenseTransactionsApi = {
     return response.data;
   },
 
-  getPendingApprovals: async (): Promise<ExpenseTransactionListResponse> => {
-    const response = await apiClient.get('/expense/transactions/pending/approval');
+  getPendingApprovals: async (params?: { skip?: number; limit?: number }): Promise<ExpenseTransactionListResponse> => {
+    const response = await apiClient.get('/expense/transactions/pending/approval', { params });
+    return response.data;
+  },
+
+  /** PUT /expense/transactions/{id}/status */
+  updateTransactionStatus: async (id: string, data: { status: string }): Promise<ExpenseTransaction> => {
+    const response = await apiClient.put(`/expense/transactions/${id}/status`, data);
     return response.data;
   },
 };
@@ -206,6 +217,21 @@ export const expenseAuditApi = {
 
   getAuditSummary: async (transactionId: string): Promise<ExpenseAuditLogSummary> => {
     const response = await apiClient.get(`/expense/audit/transactions/${transactionId}/summary`);
+    return response.data;
+  },
+
+  /** GET /expense/audit — all audit logs with filters */
+  getGlobalAuditLogs: async (params?: {
+    skip?: number;
+    limit?: number;
+    transaction_id?: string;
+    action?: string;
+    action_category?: string;
+    actor_user_id?: string;
+    date_from?: string;
+    date_to?: string;
+  }): Promise<PaginatedResponse<ExpenseAuditLog>> => {
+    const response = await apiClient.get('/expense/audit', { params });
     return response.data;
   },
 };
@@ -279,10 +305,14 @@ export const expenseReportsApi = {
     return response.data;
   },
 
-  getSummaryReport: async (periodDays: number = 30): Promise<ExpenseSummaryReport> => {
-    const response = await apiClient.get('/expense/reports/summary', {
-      params: { period_days: periodDays },
-    });
+  /** GET /expense/summary — hierarchical summary */
+  getSummaryReport: async (params?: {
+    academic_year_id?: string;
+    start_date?: string;
+    end_date?: string;
+    status_filter?: string;
+  }): Promise<ExpenseSummaryReport> => {
+    const response = await apiClient.get('/expense/summary', { params });
     return response.data;
   },
 

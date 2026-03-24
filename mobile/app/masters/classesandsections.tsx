@@ -21,6 +21,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useClassSections, useCreateClassSection, useUpdateSection, useDeleteSection, useClassList, useSectionList } from '@/src/api/hooks/masters/classesAndSections';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ClassSectionData {
@@ -71,8 +72,9 @@ export default function ClassesAndSectionsScreen() {
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? 'dark' : 'light';
   const themeColors = Colors[theme];
+  const { showSuccess, showError } = useToastContext();
 
-  
+
   // Get auth context for debugging
   const { permissions, permissionsMap, role } = useAuth();
   
@@ -93,6 +95,7 @@ export default function ClassesAndSectionsScreen() {
     if (createMutation.isSuccess) {
       setIsModalVisible(false);
       resetForm();
+      showSuccess('Created', 'Class & sections have been created.');
       createMutation.reset();
     }
   }, [createMutation.isSuccess]);
@@ -101,12 +104,14 @@ export default function ClassesAndSectionsScreen() {
     if (updateMutation.isSuccess) {
       setIsModalVisible(false);
       resetForm();
+      showSuccess('Updated', 'Section has been updated.');
       updateMutation.reset();
     }
   }, [updateMutation.isSuccess]);
 
   React.useEffect(() => {
     if (deleteMutation.isSuccess) {
+      showSuccess('Deleted', 'Section has been deleted.');
       deleteMutation.reset();
     }
   }, [deleteMutation.isSuccess]);
@@ -178,7 +183,7 @@ export default function ClassesAndSectionsScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteMutation.mutate({ classId: classItem.class_id, sectionId: classItem.id }),
+          onPress: () => deleteMutation.mutate({ classId: classItem.class_id, sectionId: classItem.id }, { onError: (e: any) => showError('Delete Failed', e.message || 'Failed to delete section') }),
         },
       ]
     );
@@ -190,7 +195,7 @@ export default function ClassesAndSectionsScreen() {
         Alert.alert('Error', 'Please select class and section');
         return;
       }
-      updateMutation.mutate({ classId: editFormData.class_id, sectionId: editFormData.section_id, data: { is_active: editFormData.is_active } });
+      updateMutation.mutate({ classId: editFormData.class_id, sectionId: editFormData.section_id, data: { is_active: editFormData.is_active } }, { onError: (e: any) => showError('Update Failed', e.message || 'Failed to update section') });
     } else {
       if (!formData.class.name || formData.sections.length === 0) {
         Alert.alert('Error', 'Please provide class name and at least one section');
@@ -204,7 +209,7 @@ export default function ClassesAndSectionsScreen() {
         academic_year_id: '77334ce1-60e5-460f-a294-820bb4e0b692', // hardcoded for now
         sections: formData.sections,
       };
-      createMutation.mutate(data);
+      createMutation.mutate(data, { onError: (e: any) => showError('Create Failed', e.message || 'Failed to create class') });
     }
   };
 

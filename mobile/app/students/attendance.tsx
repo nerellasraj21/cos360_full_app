@@ -17,6 +17,7 @@ import { useTheme } from '@/contexts';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReadOrListPermissionGuard, CreatePermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -205,6 +206,7 @@ function AttendanceHistoryView({
 function StaffAttendanceView() {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
+  const { showError } = useToastContext();
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedClass, setSelectedClass] = useState<string>('');
@@ -251,7 +253,7 @@ function StaffAttendanceView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-attendance'] });
     },
-    onError: () => Alert.alert('Error', 'Failed to mark attendance.'),
+    onError: () => showError('Error', 'Failed to mark attendance.'),
   });
 
   const updateMutation = useMutation({
@@ -260,7 +262,7 @@ function StaffAttendanceView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-attendance'] });
     },
-    onError: () => Alert.alert('Error', 'Failed to update attendance.'),
+    onError: () => showError('Error', 'Failed to update attendance.'),
   });
 
   const getRecordForStudent = (studentEntityId: string) =>

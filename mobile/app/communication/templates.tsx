@@ -20,7 +20,7 @@ import { communicationApi, CommunicationTemplate } from '@/src/api/communication
 const CHANNEL_COLORS: Record<string, string> = {
   sms: '#10B981',
   email: '#3B82F6',
-  push: '#8B5CF6',
+  whatsapp: '#25D366',
 };
 
 export default function TemplatesScreen() {
@@ -32,7 +32,7 @@ export default function TemplatesScreen() {
     name: '',
     subject: '',
     body: '',
-    channel: 'sms' as 'sms' | 'email' | 'push',
+    channel: 'sms' as 'sms' | 'whatsapp' | 'email',
   });
 
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -216,7 +216,7 @@ export default function TemplatesScreen() {
 
                 <Text style={[styles.label, { color: colors.foreground }]}>Channel</Text>
                 <View style={styles.chipRow}>
-                  {(['sms', 'email', 'push'] as const).map((c) => (
+                  {(['sms', 'whatsapp', 'email'] as const).map((c) => (
                     <TouchableOpacity
                       key={c}
                       style={[

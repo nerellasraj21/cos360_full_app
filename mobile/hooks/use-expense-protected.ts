@@ -389,3 +389,19 @@ export const useExpenseSummaryReportProtected = (periodDays: number = 30) => {
     queryFn: () => expenseReportsApi.getSummaryReport(periodDays),
   });
 };
+
+// Permission-protected Global Audit Logs hook
+export const useExpenseGlobalAuditLogsProtected = (params?: {
+  skip?: number;
+  limit?: number;
+  transaction_id?: string;
+  action?: string;
+  action_category?: string;
+}) => {
+  return usePermissionProtectedQuery({
+    resource: PERMISSION_RESOURCES.EXPENSE_AUDIT,
+    action: 'read',
+    queryKey: ['expense-global-audit-logs', params],
+    queryFn: () => expenseAuditApi.getGlobalAuditLogs(params),
+  });
+};

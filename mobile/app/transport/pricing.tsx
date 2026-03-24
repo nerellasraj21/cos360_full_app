@@ -16,6 +16,7 @@ import {
 import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { useRoutesDropdown } from '@/hooks';
+import { useToastContext } from '@/components/ToastProvider';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TransportPricing {
@@ -67,6 +68,7 @@ const transportPricingApi = {
 export default function TransportPricingScreen() {
   const { colors, theme } = useTheme();
   const qc = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<TransportPricing | null>(null);
   const [form, setForm] = useState({
@@ -93,8 +95,9 @@ export default function TransportPricingScreen() {
       qc.invalidateQueries({ queryKey: ['transport-pricing'] });
       setShowModal(false);
       resetForm();
+      showSuccess('Pricing Created', 'Transport pricing created successfully');
     },
-    onError: () => Alert.alert('Error', 'Failed to create pricing'),
+    onError: () => showError('Error', 'Failed to create pricing'),
   });
 
   const updateMutation = useMutation({
@@ -104,14 +107,18 @@ export default function TransportPricingScreen() {
       qc.invalidateQueries({ queryKey: ['transport-pricing'] });
       setShowModal(false);
       resetForm();
+      showSuccess('Pricing Updated', 'Transport pricing updated successfully');
     },
-    onError: () => Alert.alert('Error', 'Failed to update pricing'),
+    onError: () => showError('Error', 'Failed to update pricing'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: transportPricingApi.delete,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['transport-pricing'] }),
-    onError: () => Alert.alert('Error', 'Failed to delete pricing'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['transport-pricing'] });
+      showSuccess('Pricing Deleted', 'Transport pricing deleted successfully');
+    },
+    onError: () => showError('Error', 'Failed to delete pricing'),
   });
 
   const resetForm = () => {

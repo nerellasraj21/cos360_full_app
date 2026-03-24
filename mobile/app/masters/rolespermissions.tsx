@@ -23,6 +23,7 @@ import type { Role, RoleCreate, RoleUpdate, Permission, PermissionCreate, Permis
 import { useTheme } from '@/contexts';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 
 export default function RolesPermissionsScreen() {
@@ -53,6 +54,7 @@ export default function RolesPermissionsScreen() {
   // const theme = colorScheme === 'dark' ? 'dark' : 'light';
   const { theme, colors } = useTheme();
   const themeColors = Colors[theme];
+  const { showSuccess, showError } = useToastContext();
 
   const queryClient = useQueryClient();
 
@@ -150,10 +152,10 @@ export default function RolesPermissionsScreen() {
       queryClient.invalidateQueries({ queryKey: ['permissionMatrix'] });
       setIsRoleModalVisible(false);
       resetRoleForm();
-      Alert.alert('Success', 'Role created successfully');
+      showSuccess('Role Created', 'Role created successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to create role');
+      showError('Create Failed', error.message || 'Failed to create role');
     },
   });
 
@@ -165,10 +167,10 @@ export default function RolesPermissionsScreen() {
       setIsRoleModalVisible(false);
       setEditingRole(null);
       resetRoleForm();
-      Alert.alert('Success', 'Role updated successfully');
+      showSuccess('Role Updated', 'Role updated successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to update role');
+      showError('Update Failed', error.message || 'Failed to update role');
     },
   });
 
@@ -177,10 +179,10 @@ export default function RolesPermissionsScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       queryClient.invalidateQueries({ queryKey: ['permissionMatrix'] });
-      Alert.alert('Success', 'Role deleted successfully');
+      showSuccess('Role Deleted', 'Role deleted successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to delete role');
+      showError('Delete Failed', error.message || 'Failed to delete role');
     },
   });
 
@@ -191,10 +193,10 @@ export default function RolesPermissionsScreen() {
       queryClient.invalidateQueries({ queryKey: ['permissionMatrix'] });
       setIsPermissionModalVisible(false);
       resetPermissionForm();
-      Alert.alert('Success', 'Permission created successfully');
+      showSuccess('Permission Created', 'Permission created successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to create permission');
+      showError('Create Failed', error.message || 'Failed to create permission');
     },
   });
 
@@ -206,10 +208,10 @@ export default function RolesPermissionsScreen() {
       setIsPermissionModalVisible(false);
       setEditingPermission(null);
       resetPermissionForm();
-      Alert.alert('Success', 'Permission updated successfully');
+      showSuccess('Permission Updated', 'Permission updated successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to update permission');
+      showError('Update Failed', error.message || 'Failed to update permission');
     },
   });
 
@@ -218,10 +220,10 @@ export default function RolesPermissionsScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resource-permissions'] });
       queryClient.invalidateQueries({ queryKey: ['permissionMatrix'] });
-      Alert.alert('Success', 'Permission deleted successfully');
+      showSuccess('Permission Deleted', 'Permission deleted successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to delete permission');
+      showError('Delete Failed', error.message || 'Failed to delete permission');
     },
   });
 
@@ -232,10 +234,10 @@ export default function RolesPermissionsScreen() {
       queryClient.invalidateQueries({ queryKey: ['permissionMatrix'] });
       setIsBulkModalVisible(false);
       resetBulkForm();
-      Alert.alert('Success', 'Permissions created successfully');
+      showSuccess('Permissions Created', 'Permissions created successfully.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to create permissions');
+      showError('Create Failed', error.message || 'Failed to create permissions');
     },
   });
 

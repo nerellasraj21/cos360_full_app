@@ -12,6 +12,7 @@ import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { studentAdmissionsApi, certificateTypesApi, studentCertificatesApi } from '@/src/api/students';
 import StudentSelector from '@/components/StudentSelector';
+import { useToastContext } from '@/components/ToastProvider';
 
 interface CertificateForm {
   certificateName: string;
@@ -44,6 +45,7 @@ const certificateTypes = [
 
 export default function CertificateUploadPage() {
   const { colors } = useTheme();
+  const { showSuccess, showError } = useToastContext();
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<StudentOption | null>(null);
   const [showStudentModal, setShowStudentModal] = useState(false);
@@ -99,7 +101,7 @@ export default function CertificateUploadPage() {
       }
     } catch (err) {
       console.log('DEBUG: Document picker error:', err);
-      Alert.alert('Error', 'Failed to pick document');
+      showError('Error', 'Failed to pick document');
     }
   };
 
@@ -147,26 +149,23 @@ export default function CertificateUploadPage() {
       const result = await studentCertificatesApi.createCertificate(uploadData);
       console.log('DEBUG: Upload successful, result:', result);
 
-      Alert.alert('Success', 'Certificate uploaded successfully!', [
-        { text: 'OK', onPress: () => {
-          // Reset form
-          setSelectedFile(null);
-          setSelectedStudent(null);
-          setFormData({
-            certificateName: '',
-            certificateTypeId: '',
-            studentId: '',
-            issueDate: '',
-            description: '',
-          });
-        }}
-      ]);
+      showSuccess('Certificate Uploaded', 'Certificate uploaded successfully!');
+      // Reset form
+      setSelectedFile(null);
+      setSelectedStudent(null);
+      setFormData({
+        certificateName: '',
+        certificateTypeId: '',
+        studentId: '',
+        issueDate: '',
+        description: '',
+      });
     } catch (error: any) {
       console.error('DEBUG: Upload error:', error);
       console.error('DEBUG: Error response:', error.response);
       console.error('DEBUG: Error data:', error.response?.data);
       const errorMessage = error.response?.data?.detail || error.message || 'Failed to upload certificate';
-      Alert.alert('Error', errorMessage);
+      showError('Upload Failed', errorMessage);
     } finally {
       setIsUploading(false);
     }

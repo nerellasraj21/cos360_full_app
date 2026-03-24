@@ -13,6 +13,7 @@ import {
   examsApi, examMarksApi, ExamListItem, ExamSubjectConfig, ExamSubjectComponent,
 } from '@/src/api/exam';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
+import { useToastContext } from '@/components/ToastProvider';
 
 interface LocalMark {
   marks: string;
@@ -34,6 +35,7 @@ export default function MarkEntryScreen() {
   const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
   const qc = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -119,9 +121,9 @@ export default function MarkEntryScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['exam-marks', selectedExamId] });
       setLocalMarks({});
-      Alert.alert('Success', 'Marks saved successfully.');
+      showSuccess('Marks Saved', 'Marks saved successfully.');
     },
-    onError: () => Alert.alert('Error', 'Failed to save marks. Please try again.'),
+    onError: () => showError('Error', 'Failed to save marks. Please try again.'),
   });
 
   const handleSave = () => {
