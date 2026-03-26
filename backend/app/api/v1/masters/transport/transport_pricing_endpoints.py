@@ -95,7 +95,7 @@ async def partial_update_transport_pricing(
     return await update_transport_pricing(pricing_id, data, db)
 
 
-@router.delete("/{pricing_id}")
+@router.delete("/{pricing_id}", response_model=TransportPricingOut, status_code=status.HTTP_200_OK)
 async def delete_transport_pricing(
     request: Request, pricing_id: UUID, db: AsyncSession = Depends(get_tenant_db)
 ):

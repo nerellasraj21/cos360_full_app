@@ -4,7 +4,7 @@ Fee Concession endpoints — bulk apply, summary, history, CRUD.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -110,7 +110,7 @@ async def update_single_concession(
     return await update_concession(db, concession_id, data, current_user)
 
 
-@router.delete("/{concession_id}")
+@router.delete("/{concession_id}", response_model=FeeConcessionRead, status_code=status.HTTP_200_OK)
 @rate_limit_api()
 async def delete_concession(
     concession_id: UUID,

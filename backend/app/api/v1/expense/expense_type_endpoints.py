@@ -128,7 +128,7 @@ async def update_expense_type_endpoint(
 
 
 # Delete Expense Type
-@router.delete("/{type_id}")
+@router.delete("/{type_id}", response_model=ExpenseTypeRead, status_code=status.HTTP_200_OK)
 @rate_limit_api("20 per minute")
 async def delete_expense_type_endpoint(request: Request, type_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     """Delete an expense type (soft delete). Rate limited to 20 deletes per minute."""
