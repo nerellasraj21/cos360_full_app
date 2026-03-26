@@ -39,7 +39,7 @@ export default function FeeReportsScreen() {
 
   const { data: pendingData, isLoading: pendingLoading } = useQuery({
     queryKey: ['fee-report-pending'],
-    queryFn: () => feeReportsApi.getPendingFees({ page_size: 100 }),
+    queryFn: () => feeReportsApi.getPendingFees({ page_size: 500 }),
     enabled: activeTab === 'pending',
   });
 
@@ -171,6 +171,30 @@ export default function FeeReportsScreen() {
           {/* ── Pending Fees ── */}
           {activeTab === 'pending' && (
             <View>
+              {/* Stats row */}
+              {(pendingData ?? []).length > 0 && (() => {
+                const items = pendingData ?? [];
+                const totalPending = items.reduce((sum, s) => sum + Number(s.balance_amount ?? 0), 0);
+                const overdueCount = items.filter(s => (s.days_overdue ?? 0) > 0).length;
+                return (
+                  <View style={styles.statsRow}>
+                    <View style={[styles.statCard, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
+                      <Text style={[styles.statValue, { color: '#92400E' }]}>
+                        ₹{totalPending.toLocaleString('en-IN')}
+                      </Text>
+                      <Text style={[styles.statLabel, { color: '#B45309' }]}>Total Pending</Text>
+                    </View>
+                    <View style={[styles.statCard, { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}>
+                      <Text style={[styles.statValue, { color: '#991B1B' }]}>{items.length}</Text>
+                      <Text style={[styles.statLabel, { color: '#B91C1C' }]}>Students</Text>
+                    </View>
+                    <View style={[styles.statCard, { backgroundColor: '#EDE9FE', borderColor: '#DDD6FE' }]}>
+                      <Text style={[styles.statValue, { color: '#5B21B6' }]}>{overdueCount}</Text>
+                      <Text style={[styles.statLabel, { color: '#6D28D9' }]}>Overdue</Text>
+                    </View>
+                  </View>
+                );
+              })()}
               {(pendingData ?? []).length === 0 ? (
                 <View style={styles.centered}>
                   <Ionicons name="checkmark-circle" size={48} color="#10B981" />
@@ -205,6 +229,30 @@ export default function FeeReportsScreen() {
           {/* ── Fee Structure ── */}
           {activeTab === 'structure' && (
             <View>
+              {/* Stats row */}
+              {(structureData ?? []).length > 0 && (() => {
+                const items = structureData ?? [];
+                const totalAmount = items.reduce((sum, i) => sum + Number(i.fee_amount ?? 0), 0);
+                const uniqueTypes = new Set(items.map(i => i.fee_type)).size;
+                return (
+                  <View style={styles.statsRow}>
+                    <View style={[styles.statCard, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' }]}>
+                      <Text style={[styles.statValue, { color: '#3730A3' }]}>
+                        ₹{totalAmount.toLocaleString('en-IN')}
+                      </Text>
+                      <Text style={[styles.statLabel, { color: '#4338CA' }]}>Total Amount</Text>
+                    </View>
+                    <View style={[styles.statCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
+                      <Text style={[styles.statValue, { color: '#14532D' }]}>{uniqueTypes}</Text>
+                      <Text style={[styles.statLabel, { color: '#166534' }]}>Fee Types</Text>
+                    </View>
+                    <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+                      <Text style={[styles.statValue, { color: colors.foreground }]}>{items.length}</Text>
+                      <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Mappings</Text>
+                    </View>
+                  </View>
+                );
+              })()}
               {(structureData ?? []).length === 0 ? (
                 <View style={styles.centered}>
                   <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
@@ -274,6 +322,20 @@ const styles = StyleSheet.create({
   summaryCardAmount: { color: 'white', fontSize: 28, fontWeight: '700', marginTop: 4 },
   summaryCardSub: { color: 'rgba(255,255,255,0.65)', fontSize: 12, marginTop: 4 },
   sectionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 10, marginTop: 8 },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    alignItems: 'center',
+  },
+  statValue: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  statLabel: { fontSize: 11, fontWeight: '500', textAlign: 'center' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

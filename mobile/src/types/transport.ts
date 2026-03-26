@@ -50,7 +50,9 @@ export interface RouteStop {
   name: string;
   number: number;
   reaching_time: string; // HH:MM:SS format
-  fees: number; 
+  pickup_time?: string;  // HH:MM:SS format
+  drop_time?: string;    // HH:MM:SS format
+  fees: number;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
@@ -61,6 +63,8 @@ export interface RouteStopCreate {
   name: string;
   number: number;
   reaching_time: string;
+  pickup_time?: string;
+  drop_time?: string;
   fees: number;
   is_active?: boolean;
 }
@@ -70,6 +74,8 @@ export interface RouteStopUpdate {
   name?: string;
   number?: number;
   reaching_time?: string;
+  pickup_time?: string;
+  drop_time?: string;
   fees?: number;
   is_active?: boolean;
 }
@@ -170,7 +176,6 @@ export interface StudentTrip {
   trip_id: string;
   student_id: string;
   stop_id: string;
-  fee_term_id: string;
   fee_per_term: number;
   is_active?: boolean;
   created_at?: string;
@@ -181,7 +186,6 @@ export interface StudentTripCreate {
   trip_id: string;
   student_id: string;
   stop_id: string;
-  fee_term_id: string;
   fee_per_term: number;
 }
 
@@ -189,7 +193,6 @@ export interface StudentTripUpdate {
   trip_id?: string;
   student_id?: string;
   stop_id?: string;
-  fee_term_id?: string;
   fee_per_term?: number;
   is_active?: boolean;
 }

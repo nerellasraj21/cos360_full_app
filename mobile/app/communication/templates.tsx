@@ -77,7 +77,7 @@ export default function TemplatesScreen() {
 
   const openEdit = (t: CommunicationTemplate) => {
     setEditing(t);
-    setForm({ name: t.name, subject: t.subject, body: t.body, channel: t.channel });
+    setForm({ name: t.name, subject: t.subject ?? '', body: t.body, channel: t.channel });
     setShowModal(true);
   };
 

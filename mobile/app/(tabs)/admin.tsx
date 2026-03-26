@@ -1,9 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
+import { authApi } from '@/src/api/auth';
+import { rolesApi } from '@/src/api';
+import { staffApi } from '@/src/api/staff';
+import { studentAdmissionsApi } from '@/src/api/students';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
@@ -23,7 +28,7 @@ const sections = [
     description: 'Configure roles and fine-grained access control',
     icon: 'shield-checkmark' as const,
     color: '#10B981',
-    route: '/admin/roles',
+    route: '/masters/rolespermissions',
     resource: PERMISSION_RESOURCES.ADMIN_ROLES,
   },
   {
@@ -31,7 +36,7 @@ const sections = [
     description: 'Manage granular permissions for each role',
     icon: 'lock-closed' as const,
     color: '#F59E0B',
-    route: '/admin/permissions',
+    route: '/masters/rolespermissions',
     resource: PERMISSION_RESOURCES.ADMIN_PERMISSIONS,
   },
   {
@@ -51,7 +56,37 @@ export default function AdminScreen() {
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
-  const comingSoonBorderCol = theme === 'dark' ? 'rgba(255,255,255,0.15)' : '#cbd5e1';
+  const statBg = theme === 'dark' ? '#16213e' : '#f8fafc';
+
+  const { data: staffData, isLoading: staffLoading } = useQuery({
+    queryKey: ['admin-stats-staff'],
+    queryFn: () => staffApi.getStaffEnrollments({ limit: 1 }),
+  });
+  const { data: studentsData, isLoading: studentsLoading } = useQuery({
+    queryKey: ['admin-stats-students'],
+    queryFn: () => studentAdmissionsApi.listAdmissions({ limit: 1 }),
+  });
+  const { data: roles = [], isLoading: rolesLoading } = useQuery({
+    queryKey: ['admin-stats-roles'],
+    queryFn: () => rolesApi.getRoles(),
+  });
+  const { data: menus = [], isLoading: menusLoading } = useQuery({
+    queryKey: ['admin-stats-menus'],
+    queryFn: () => authApi.getMenus(),
+  });
+
+  const statsLoading = staffLoading || studentsLoading || rolesLoading || menusLoading;
+  const staffCount = (staffData as any)?.total ?? (staffData as any)?.items?.length ?? 0;
+  const studentCount = (studentsData as any)?.total_count ?? (studentsData as any)?.total ?? (studentsData as any)?.items?.length ?? 0;
+  const rolesCount = Array.isArray(roles) ? roles.length : 0;
+  const menusCount = Array.isArray(menus) ? menus.length : 0;
+
+  const stats = [
+    { label: 'Staff', value: staffCount, icon: 'people' as const, color: '#8b5cf6' },
+    { label: 'Students', value: studentCount, icon: 'school' as const, color: '#3b82f6' },
+    { label: 'Roles', value: rolesCount, icon: 'shield-checkmark' as const, color: '#10b981' },
+    { label: 'Menus', value: menusCount, icon: 'menu' as const, color: '#f59e0b' },
+  ];
 
   return (
     <AppLayout title="Administration">
@@ -70,19 +105,26 @@ export default function AdminScreen() {
           </View>
         </View>
 
-        {/* Coming Soon card */}
-        <View style={[styles.comingSoonCard, { borderColor: comingSoonBorderCol, backgroundColor: cardBg }]}>
-          <Ionicons name="shield-checkmark" size={44} color={colors['muted-foreground']} />
-          <Text style={[styles.comingSoonTitle, { color: colors.foreground }]}>
-            Administration Dashboard — Coming Soon
-          </Text>
-          <Text style={[styles.comingSoonDesc, { color: colors['muted-foreground'] }]}>
-            A centralized administration panel with system health, user stats, and quick actions is being built. Use the sections below to access available admin sections.
-          </Text>
+        {/* Stats row */}
+        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>SYSTEM OVERVIEW</Text>
+        <View style={styles.statsRow}>
+          {stats.map((stat, i) => (
+            <View key={i} style={[styles.statCard, { backgroundColor: statBg, borderColor: borderCol }]}>
+              {statsLoading ? (
+                <ActivityIndicator size="small" color={stat.color} />
+              ) : (
+                <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
+              )}
+              <View style={styles.statLabelRow}>
+                <Ionicons name={stat.icon} size={12} color={colors['muted-foreground']} />
+                <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>{stat.label}</Text>
+              </View>
+            </View>
+          ))}
         </View>
 
         {/* Section label */}
-        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>ADMINISTRATION SECTIONS</Text>
+        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'], marginTop: 8 }]}>ADMINISTRATION SECTIONS</Text>
 
         {/* Grid */}
         <View style={styles.grid}>
@@ -154,14 +196,15 @@ const styles = StyleSheet.create({
   },
   bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 3 },
   bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 16 },
-  comingSoonCard: {
-    borderRadius: 14, borderWidth: 1.5,
-    borderStyle: 'dashed', padding: 28,
-    marginBottom: 20, alignItems: 'center', gap: 10,
+  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 10 },
+  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  statCard: {
+    flex: 1, borderRadius: 12, borderWidth: 1,
+    padding: 12, alignItems: 'center', gap: 4,
   },
-  comingSoonTitle: { fontSize: 16, fontWeight: '600', textAlign: 'center', marginTop: 4 },
-  comingSoonDesc: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12 },
+  statValue: { fontSize: 22, fontWeight: '800' },
+  statLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  statLabel: { fontSize: 10, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   sectionCard: {
     width: '48%', borderRadius: 14, borderWidth: 1,

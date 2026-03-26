@@ -67,9 +67,9 @@ const WEB_TO_MOBILE: Record<string, string> = {
     '/fee/types': '/fees/types',
     '/fee/terms': '/fees/terms',
     '/fee/mappings': '/fees/class-mappings',
-    '/fee/term-amounts': '/fees/class-mappings',
-    '/fee/collection': '/fees/transactions',
-    '/fee/receipts': '/fees/transactions',
+    '/fee/term-amounts': '/fees/term-amounts',
+    '/fee/collection': '/fees/collection',
+    '/fee/receipts': '/fees/receipts',
     '/fee/refunds': '/fees/refunds',
     // Transport
     '/transport': '/(tabs)/transport',
@@ -92,20 +92,20 @@ const WEB_TO_MOBILE: Record<string, string> = {
     '/exam/marks': '/exam/marks',
     '/exam/hall-tickets': '/exam/hall-tickets',
     '/exam/results': '/exam/results',
-    // Reports — fallback to home (no dedicated mobile screens yet)
-    '/reports/students': '/(tabs)/',
-    '/reports/staff': '/(tabs)/',
-    '/reports/transport': '/(tabs)/',
-    '/reports/academic': '/(tabs)/',
+    // Reports
+    '/reports/students': '/reports/staff-reports',
+    '/reports/staff': '/reports/staff-reports',
+    '/reports/transport': '/reports/transport-reports',
+    '/reports/academic': '/(tabs)/reports',
     '/fee/reports': '/(tabs)/fees',
-    // Administration — no mobile screens yet
-    '/admin': '/(tabs)/',
-    '/admin/users': '/(tabs)/',
-    '/admin/roles': '/(tabs)/',
-    '/admin/permissions': '/(tabs)/',
-    '/admin/menus': '/(tabs)/',
-    // Communication — no mobile screen yet
-    '/communication': '/(tabs)/',
+    // Administration
+    '/admin': '/admin/users',
+    '/admin/users': '/admin/users',
+    '/admin/roles': '/masters/rolespermissions',
+    '/admin/permissions': '/masters/rolespermissions',
+    '/admin/menus': '/admin/menu',
+    // Communication
+    '/communication': '/(tabs)/communication',
 };
 
 const mapPath = (webPath: string): string => {

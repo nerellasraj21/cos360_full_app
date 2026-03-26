@@ -1,7 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -20,8 +20,9 @@ function AppContent() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="login" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="profile" options={{ headerShown: false }} />
+      <Stack.Screen name="set-password" options={{ headerShown: false, gestureEnabled: false }} />
     </Stack>
   );
 }

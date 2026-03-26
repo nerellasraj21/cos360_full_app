@@ -1,11 +1,10 @@
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useTheme } from '@/contexts';
-import { Route } from '../../src/api';
+import type { Route as TransportRoute, RouteCreate, RouteUpdate } from '../../src/api';
 import { useRoutes, useCreateRoute, useUpdateRoute, useDeleteRoute } from '../../hooks/use-transport';
 import { PERMISSION_RESOURCES } from '../../src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,7 +25,7 @@ import {
 export default function RoutesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingRoute, setEditingRoute] = useState<Route | null>(null);
+  const [editingRoute, setEditingRoute] = useState<TransportRoute | null>(null);
   const [formData, setFormData] = useState({
     route_name: '',
     starting_stop: '',
@@ -89,7 +88,7 @@ export default function RoutesScreen() {
   const filteredRoutes = useMemo(() => {
     if (!routesData || !Array.isArray(routesData)) return [];
 
-    return routesData.filter((route: Route) => {
+    return routesData.filter((route: TransportRoute) => {
       const matchesSearch = route.route_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             route.starting_stop.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             route.ending_stop.toLowerCase().includes(searchQuery.toLowerCase());
@@ -112,7 +111,7 @@ export default function RoutesScreen() {
     setEditingRoute(null);
   };
 
-  const handleEdit = (route: Route) => {
+  const handleEdit = (route: TransportRoute) => {
     setEditingRoute(route);
     setFormData({
       route_name: route.route_name,
@@ -128,7 +127,7 @@ export default function RoutesScreen() {
     setIsModalVisible(true);
   };
 
-  const handleDelete = (route: Route) => {
+  const handleDelete = (route: TransportRoute) => {
     Alert.alert(
       'Delete Route',
       `Are you sure you want to delete "${route.route_name}"?`,
@@ -156,7 +155,7 @@ export default function RoutesScreen() {
     }
   };
 
-  const renderRouteItem = useCallback(({ item }: { item: Route }) => (
+  const renderRouteItem = useCallback(({ item }: { item: TransportRoute }) => (
     <View style={[styles.routeCard, { backgroundColor: colors.card }]}>
       <View style={styles.routeHeader}>
         <View style={styles.routeInfo}>

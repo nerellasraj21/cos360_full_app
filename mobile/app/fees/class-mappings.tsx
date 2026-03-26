@@ -130,14 +130,11 @@ export default function FeeClassMappingsScreen() {
   const deleteMutation = useMutation({
     mutationFn: feeClassMappingsApi.deleteFeeClassMapping,
     onSuccess: () => {
-      console.log('Delete mutation onSuccess called');
       queryClient.invalidateQueries({ queryKey: ['feeClassMappings'] });
       showSuccess('Mapping Deleted', 'Fee class mapping deleted successfully');
     },
-    onError: (error) => {
-      console.log('Delete mutation onError called with error:', error);
+    onError: () => {
       showError('Error', 'Failed to delete fee class mapping');
-      console.error('Delete error:', error);
     },
   });
 
@@ -190,8 +187,14 @@ export default function FeeClassMappingsScreen() {
   };
 
   const handleDelete = (mapping: FeeClassMappingResponse) => {
-    console.log('handleDelete called with mapping:', mapping.id);
-    deleteMutation.mutate(mapping.id);
+    Alert.alert(
+      'Delete Class Mapping',
+      `Are you sure you want to delete the mapping for Class ${mapping.class_name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(mapping.id) },
+      ]
+    );
   };
 
   const handleSubmit = () => {
@@ -344,6 +347,15 @@ export default function FeeClassMappingsScreen() {
       <AppLayout title="Class Mappings">
       <ThemedView style={styles.container}>
         <View style={styles.header}>
+          <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS}>
+            <TouchableOpacity
+              style={[styles.bulkButton, { backgroundColor: colors.secondary }]}
+              onPress={() => setIsBulkModalVisible(true)}
+            >
+              <Ionicons name="layers-outline" size={16} color="white" />
+              <ThemedText style={[styles.bulkButtonText, { color: 'white' }]}>Bulk Add</ThemedText>
+            </TouchableOpacity>
+          </CreatePermissionGuard>
           <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS}>
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: colors.primary }]}

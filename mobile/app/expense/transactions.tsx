@@ -155,13 +155,20 @@ export default function ExpenseTransactionsScreen() {
               Ref: {item.reference_number}
             </Text>
           ) : null}
-          <TouchableOpacity
-            onPress={() => handleDelete(item)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={{ marginLeft: 'auto' }}
-          >
-            <Ionicons name="trash-outline" size={15} color="#EF4444" />
-          </TouchableOpacity>
+          <View style={{ marginLeft: 'auto', flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+            <TouchableOpacity
+              onPress={() => router.push(`/expense/transactions/edit/${item.id}` as any)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="create-outline" size={15} color="#556ee6" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleDelete(item)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="trash-outline" size={15} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     );

@@ -328,9 +328,13 @@ export const useExpenseDepartmentDropdown = () => {
 };
 
 // Reports hooks
-export const useExpenseSummaryReport = (periodDays: number = 30) => {
+export const useExpenseSummaryReport = (params?: {
+  start_date?: string;
+  end_date?: string;
+  status_filter?: string;
+}) => {
   return useQuery({
-    queryKey: ['expense-summary-report', periodDays],
-    queryFn: () => expenseReportsApi.getSummaryReport(periodDays),
+    queryKey: ['expense-summary-report', params],
+    queryFn: () => expenseReportsApi.getSummaryReport(params),
   });
 };

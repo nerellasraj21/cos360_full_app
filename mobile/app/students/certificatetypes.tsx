@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ThemedText } from '@/components/themed-text';
@@ -20,6 +20,11 @@ export default function CertificateTypesPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
   const [newTypeDescription, setNewTypeDescription] = useState('');
+
+  // Edit state
+  const [editingType, setEditingType] = useState<CertificateTypeRead | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
   // API hooks
   const { data: certificateTypesData, isLoading } = useCertificateTypes();
@@ -47,9 +52,21 @@ export default function CertificateTypesPage() {
     });
   };
 
-  const handleToggleStatus = (id: string) => {
-    // Note: The API doesn't have an is_active field, so this functionality is removed
-    Alert.alert('Info', 'Status toggle not available in current API');
+  const openEditType = (item: CertificateTypeRead) => {
+    setEditingType(item);
+    setEditName(item.name);
+    setEditDescription(item.description || '');
+  };
+
+  const handleUpdateType = () => {
+    if (!editingType || !editName.trim()) {
+      Alert.alert('Error', 'Please enter a certificate type name');
+      return;
+    }
+    updateCertificateType.mutate(
+      { id: editingType.id, data: { name: editName.trim(), description: editDescription.trim() || undefined } },
+      { onSuccess: () => setEditingType(null) }
+    );
   };
 
   const handleDeleteType = (id: string) => {
@@ -80,15 +97,17 @@ export default function CertificateTypesPage() {
             {item.description || 'No description'}
           </ThemedText>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: '#10B981' }]}>
-          <ThemedText style={styles.statusText}>
-            Active
-          </ThemedText>
-        </View>
       </View>
 
       <View style={styles.typeFooter}>
         <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            onPress={() => openEditType(item)}
+          >
+            <Ionicons name="create" size={16} color="white" />
+            <ThemedText style={styles.actionText}>Edit</ThemedText>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
             onPress={() => handleDeleteType(item.id)}
@@ -180,6 +199,62 @@ export default function CertificateTypesPage() {
           }
         />
       </View>
+
+      {/* Edit Type Modal */}
+      <Modal
+        visible={!!editingType}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditingType(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border ?? '#E5E7EB' }]}>
+              <ThemedText style={styles.modalTitle}>Edit Certificate Type</ThemedText>
+              <TouchableOpacity onPress={() => setEditingType(null)}>
+                <Ionicons name="close" size={22} color={colors['muted-foreground']} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <View style={styles.formGroup}>
+                <ThemedText style={styles.label}>Type Name *</ThemedText>
+                <ThemedTextInput
+                  placeholder="Enter certificate type name"
+                  value={editName}
+                  onChangeText={setEditName}
+                />
+              </View>
+              <View style={styles.formGroup}>
+                <ThemedText style={styles.label}>Description</ThemedText>
+                <ThemedTextInput
+                  placeholder="Enter description (optional)"
+                  value={editDescription}
+                  onChangeText={setEditDescription}
+                  multiline
+                  numberOfLines={2}
+                />
+              </View>
+              <View style={styles.formButtons}>
+                <TouchableOpacity
+                  style={[styles.formButton, styles.cancelButton]}
+                  onPress={() => setEditingType(null)}
+                >
+                  <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.formButton, styles.submitButton, { backgroundColor: colors.primary }]}
+                  onPress={handleUpdateType}
+                  disabled={updateCertificateType.isPending}
+                >
+                  <ThemedText style={styles.submitButtonText}>
+                    {updateCertificateType.isPending ? 'Saving...' : 'Save Changes'}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </AppLayout>
   );
 }
@@ -330,5 +405,29 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     opacity: 0.7,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  modalBody: {
+    padding: 16,
   },
 });

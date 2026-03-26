@@ -13,12 +13,14 @@ interface AppHeaderProps {
   title?: string;
   showSearch?: boolean;
   showMenu?: boolean;
+  headerRight?: React.ReactNode;
 }
 
 export default function AppHeader({
   title = 'Dashboard',
   showSearch = true,
   showMenu = true,
+  headerRight,
 }: AppHeaderProps) {
   const { role, selectedStudent, availableStudents, selectStudent, user, menu } = useAuth();
   const schoolName = getSchoolName();
@@ -69,6 +71,7 @@ export default function AppHeader({
 
         {/* Right: action buttons */}
         <View style={styles.rightSection}>
+          {headerRight}
           {showSearch && (
             <TouchableOpacity
               style={[styles.iconButton, { opacity: 0.4 }]}

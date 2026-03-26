@@ -68,6 +68,15 @@ export interface AuthMenuCreate {
   is_active?: boolean;
 }
 
+export interface AuthMenuUpdate {
+  name?: string;
+  path?: string;
+  icon?: string;
+  parent_id?: string | null;
+  order?: number;
+  is_active?: boolean;
+}
+
 export interface AuthBasePermission {
   id: string;
   name: string;
@@ -105,6 +114,17 @@ export const authApi = {
   createMenu: async (data: AuthMenuCreate): Promise<AuthMenu> => {
     const response = await apiClient.post('/auth/menus/', data);
     return response.data;
+  },
+
+  /** PUT /auth/menus/{id} */
+  updateMenu: async (id: string, data: AuthMenuUpdate): Promise<AuthMenu> => {
+    const response = await apiClient.put(`/auth/menus/${id}`, data);
+    return response.data;
+  },
+
+  /** DELETE /auth/menus/{id} */
+  deleteMenu: async (id: string): Promise<void> => {
+    await apiClient.delete(`/auth/menus/${id}`);
   },
 
   /** GET /auth/permissions/ */

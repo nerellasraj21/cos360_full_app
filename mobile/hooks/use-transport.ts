@@ -259,14 +259,17 @@ export const useDeleteStudentTransport = () => {
   );
 };
 
-// Drivers hook (from staff API) - keeping existing implementation for now
+// Drivers hook (from staff API)
 export const useDrivers = () => {
   return useQuery({
     queryKey: ['drivers'],
     queryFn: async (): Promise<Array<{ id: string, name: string }>> => {
-      // This would need to be implemented with staff API
-      // For now, return empty array
-      return [];
+      const { legacyStaffApi } = await import('../src/api/staff');
+      const staff = await legacyStaffApi.getStaff();
+      return staff.map(s => ({
+        id: s.id,
+        name: [s.first_name, s.last_name].filter(Boolean).join(' '),
+      }));
     },
   });
 };
@@ -288,7 +291,7 @@ export const useStudentTrips = (params?: {
   limit?: number;
 }) => {
   return usePermissionProtectedListQuery(
-    PERMISSION_RESOURCES.TRANSPORT_TRIPS,
+    PERMISSION_RESOURCES.STUDENT_TRANSPORT,
     ['student-trips', params],
     () => studentTripsApi.getStudentTrips(params)
   );
@@ -296,7 +299,7 @@ export const useStudentTrips = (params?: {
 
 export const useStudentTrip = (id: string) => {
   return usePermissionProtectedReadQuery(
-    PERMISSION_RESOURCES.TRANSPORT_TRIPS,
+    PERMISSION_RESOURCES.STUDENT_TRANSPORT,
     ['student-trip', id],
     () => studentTripsApi.getStudentTrip(id),
     { enabled: !!id }
@@ -305,21 +308,21 @@ export const useStudentTrip = (id: string) => {
 
 export const useCreateStudentTrip = () => {
   return usePermissionProtectedCreateMutation(
-    PERMISSION_RESOURCES.TRANSPORT_TRIPS,
+    PERMISSION_RESOURCES.STUDENT_TRANSPORT,
     (data: StudentTripCreate) => studentTripsApi.createStudentTrip(data)
   );
 };
 
 export const useUpdateStudentTrip = () => {
   return usePermissionProtectedUpdateMutation(
-    PERMISSION_RESOURCES.TRANSPORT_TRIPS,
+    PERMISSION_RESOURCES.STUDENT_TRANSPORT,
     ({ id, data }: { id: string; data: StudentTripUpdate }) => studentTripsApi.patchStudentTrip(id, data)
   );
 };
 
 export const useDeleteStudentTrip = () => {
   return usePermissionProtectedDeleteMutation(
-    PERMISSION_RESOURCES.TRANSPORT_TRIPS,
+    PERMISSION_RESOURCES.STUDENT_TRANSPORT,
     (id: string) => studentTripsApi.deleteStudentTrip(id)
   );
 };

@@ -4,6 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,18 +15,20 @@ import {
 import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { examsApi, examHallTicketsApi, HallTicketEligibility } from '@/src/api/exam';
+import apiClient from '@/src/api/client';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
 import { useToastContext } from '@/components/ToastProvider';
 
 type TabKey = 'eligible' | 'ineligible';
 
-const COL_SNO   = 44;
-const COL_NAME  = 160;
-const COL_ADM   = 100;
-const COL_ATT   = 80;
-const COL_FEE   = 80;
+const COL_SNO    = 44;
+const COL_NAME   = 160;
+const COL_ADM    = 100;
+const COL_ATT    = 80;
+const COL_FEE    = 80;
 const COL_STATUS = 90;
-const COL_ACT   = 60;
+const COL_ACT    = 60;
+const COL_DL     = 50;
 
 export default function HallTicketsScreen() {
   const { examId } = useLocalSearchParams<{ examId?: string }>();
@@ -45,9 +48,22 @@ export default function HallTicketsScreen() {
   const [selectedExamId, setSelectedExamId] = useState<string>(examId ?? '');
   const [activeTab, setActiveTab] = useState<TabKey>('eligible');
 
-  const canCompute = hasPermission?.('exam_hall_tickets', 'create');
-  const canPublish = hasPermission?.('exam_hall_tickets', 'approve');
+  const canCompute  = hasPermission?.('exam_hall_tickets', 'create');
+  const canPublish  = hasPermission?.('exam_hall_tickets', 'approve');
   const canOverride = hasPermission?.('exam_hall_tickets', 'create');
+  const canDownload = hasPermission?.('exam_hall_tickets', 'list') || hasPermission?.('exam_hall_tickets', 'read');
+
+  const handleDownloadOne = (studentId: string) => {
+    const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
+    const url = `${baseUrl}/exams/${selectedExamId}/hall-tickets/download?student_id=${studentId}`;
+    Linking.openURL(url).catch(() => showError('Error', 'Could not open download URL.'));
+  };
+
+  const handleDownloadAll = () => {
+    const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
+    const url = `${baseUrl}/exams/${selectedExamId}/hall-tickets/download-all`;
+    Linking.openURL(url).catch(() => showError('Error', 'Could not open download URL.'));
+  };
 
   const { data: examsData } = useQuery({
     queryKey: ['exams'],
@@ -110,7 +126,8 @@ export default function HallTicketsScreen() {
       <Cell w={COL_ATT}  isHeader label="Att %"    textColor={textMuted} center />
       <Cell w={COL_FEE}  isHeader label="Fee"      textColor={textMuted} center />
       <Cell w={COL_STATUS} isHeader label="Status" textColor={textMuted} center />
-      {canOverride && <Cell w={COL_ACT} isHeader label="Action" textColor={textMuted} center />}
+      {canOverride && <Cell w={COL_ACT} isHeader label="Override" textColor={textMuted} center />}
+      {canDownload && activeTab === 'eligible' && <Cell w={COL_DL} isHeader label="PDF" textColor={textMuted} center />}
     </View>
   );
 
@@ -184,7 +201,7 @@ export default function HallTicketsScreen() {
           </View>
         </View>
 
-        {/* Action */}
+        {/* Override Action */}
         {canOverride && (
           <View style={[styles.cell, { width: COL_ACT, alignItems: 'center' }]}>
             <TouchableOpacity
@@ -209,6 +226,18 @@ export default function HallTicketsScreen() {
                 size={16}
                 color={item.is_eligible ? '#EF4444' : '#10B981'}
               />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Download PDF */}
+        {canDownload && activeTab === 'eligible' && (
+          <View style={[styles.cell, { width: COL_DL, alignItems: 'center' }]}>
+            <TouchableOpacity
+              style={[styles.actionIcon, { backgroundColor: '#3B82F615' }]}
+              onPress={() => handleDownloadOne(item.student_id)}
+            >
+              <Ionicons name="download-outline" size={16} color="#3B82F6" />
             </TouchableOpacity>
           </View>
         )}
@@ -280,6 +309,20 @@ export default function HallTicketsScreen() {
               </TouchableOpacity>
             )}
 
+            {canDownload && activeTab === 'eligible' && (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: '#3B82F6' }]}
+                onPress={() =>
+                  Alert.alert('Download All', 'Download all eligible hall tickets as ZIP?', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Download', onPress: handleDownloadAll },
+                  ])
+                }
+              >
+                <Ionicons name="download" size={14} color="white" />
+                <Text style={styles.actionBtnText}>Download All</Text>
+              </TouchableOpacity>
+            )}
             {/* Summary counts */}
             <View style={{ flex: 1 }} />
             <View style={styles.countChip}>

@@ -44,8 +44,8 @@ export default function ResultsScreen() {
   const canPublish = hasPermission?.('exam_results', 'approve');
 
   const { data: examsData } = useQuery({
-    queryKey: ['exams', 'published'],
-    queryFn: () => examsApi.list({ exam_status: 'published' }),
+    queryKey: ['exams', 'results-list'],
+    queryFn: () => examsApi.list({ size: 50 }),
     enabled: !examId,
   });
 

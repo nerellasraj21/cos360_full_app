@@ -133,7 +133,6 @@ export {
   studentDocumentsApi,
   timetableApi,
   parentStudentsApi,
-  studentProfileApi,
   DocumentTypeRead,
   DocumentTypeCreate,
   DocumentTypeUpdate,

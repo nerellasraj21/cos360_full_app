@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../../../components/FeedbackToast';
+import { useToastContext as useToast } from '../../../../components/ToastProvider';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
@@ -17,17 +17,18 @@ export function useAllDocuments(params?: { student_id?: string; document_type?: 
     action: 'list',
     queryKey: ['documents', 'all', params],
     queryFn: () => studentDocumentsApi.listDocuments(params),
+    enabled: !!params?.student_id,
   });
 }
 
 export function useMyDocuments() {
-  const { studentId } = useAuth();
-  return usePermissionProtectedQuery<DocumentResponse[]>({
-    resource: PERMISSION_RESOURCES.STUDENT_DOCUMENTS,
-    action: 'read',
-    queryKey: ['documents', 'my', studentId],
-    queryFn: () => studentDocumentsApi.listDocuments({ student_id: studentId || undefined }),
-    enabled: !!studentId,
+  const { studentId, selectedStudent, role } = useAuth();
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(role?.name?.toLowerCase() ?? '');
+  const effectiveId = isParent ? selectedStudent?.id : studentId;
+  return useQuery<DocumentResponse[]>({
+    queryKey: ['documents', 'my', effectiveId],
+    queryFn: () => studentDocumentsApi.listDocuments({ student_id: effectiveId || undefined }),
+    enabled: !!effectiveId,
   });
 }
 
@@ -100,10 +101,7 @@ export function useDeleteDocument() {
 // Download document
 export function useDownloadDocument() {
   return useMutation({
-    mutationFn: async (documentId: string): Promise<Blob> => {
-      // Assuming there's a download endpoint
-      const response = await fetch(`/api/students/documents/download/${documentId}`);
-      return response.blob();
-    },
+    mutationFn: (documentId: string): Promise<Blob> =>
+      studentDocumentsApi.downloadDocument(documentId),
   });
 }

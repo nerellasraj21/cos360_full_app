@@ -7,7 +7,9 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
-import { useStudentProfile, useUpdateStudentProfile } from '@/src/api/hooks/students/useStudentProfile';
+import { useQuery } from '@tanstack/react-query';
+import { StudentProfile as StudentProfileData, useStudentProfile, useUpdateStudentProfile } from '@/src/api/hooks/students/useStudentProfile';
+import apiClient from '@/src/api/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReadPermissionGuard, UpdatePermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
@@ -15,12 +17,27 @@ import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 export default function StudentProfile() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { studentId } = useAuth();
+  const { role, selectedStudent } = useAuth();
+  const roleName = role?.name?.toLowerCase();
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName || '');
+  const pageTitle = isParent
+    ? selectedStudent ? `${selectedStudent.first_name}'s Profile` : 'Child Profile'
+    : 'Student Profile';
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingField, setEditingField] = useState<'email' | null>(null);
   const [editValue, setEditValue] = useState('');
 
-  const { data: profile, isLoading, error } = useStudentProfile();
+  const { data: myProfile, isLoading: myLoading, error: myError } = useStudentProfile();
+
+  const { data: childProfileData, isLoading: childLoading } = useQuery({
+    queryKey: ['student', 'profile', selectedStudent?.id],
+    queryFn: () =>
+      apiClient.get(`/students/profile/${selectedStudent!.id}`).then((r) => r.data as StudentProfileData),
+    enabled: isParent && !!selectedStudent?.id,
+  });
+
+  const profile = isParent ? childProfileData : myProfile;
+  const isLoading = isParent ? childLoading : myLoading;
   const updateProfileMutation = useUpdateStudentProfile();
 
   const handleEdit = (field: 'email', currentValue: string) => {
@@ -44,7 +61,7 @@ export default function StudentProfile() {
 
   if (isLoading) {
     return (
-      <AppLayout title="Student Profile">
+      <AppLayout title={pageTitle}>
         <View style={styles.loadingContainer}>
           <ThemedText>Loading profile...</ThemedText>
         </View>
@@ -52,28 +69,28 @@ export default function StudentProfile() {
     );
   }
 
-  if (error || !profile) {
+  if (!profile) {
     return (
-      <AppLayout title="Student Profile">
+      <AppLayout title={pageTitle}>
         <View style={styles.errorContainer}>
           <ThemedText style={styles.errorText}>
-            {error ? 'Failed to load profile' : 'No profile data available'}
+            {myError && !isParent ? 'Failed to load profile' : 'No profile data available'}
           </ThemedText>
-          {!studentId && (
-            <ThemedText style={styles.errorSubtext}>
-              Please select a student to view profile
-            </ThemedText>
-          )}
+          <ThemedText style={styles.errorSubtext}>
+            {isParent
+              ? 'Select a student from the header'
+              : 'Please select a student to view profile'}
+          </ThemedText>
         </View>
       </AppLayout>
     );
   }
 
   return (
-    <ReadPermissionGuard 
+    <ReadPermissionGuard
       resource={PERMISSION_RESOURCES.STUDENTS}
       fallback={
-        <AppLayout title="Student Profile">
+        <AppLayout title={pageTitle}>
           <View style={styles.accessDeniedContainer}>
             <Ionicons name="lock-closed" size={48} color={colors['muted-foreground']} />
             <ThemedText style={styles.accessDeniedText}>
@@ -83,7 +100,7 @@ export default function StudentProfile() {
         </AppLayout>
       }
     >
-      <AppLayout title="Student Profile">
+      <AppLayout title={pageTitle}>
         <ScrollView style={styles.container}>
         <ThemedView style={[styles.profileCard, { backgroundColor: colors.card }]}>
           <View style={styles.profileHeader}>
@@ -103,14 +120,16 @@ export default function StudentProfile() {
                 Admission #: {profile.admission_number}
               </ThemedText>
             </View>
-            <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENTS}>
-              <TouchableOpacity
-                style={[styles.editProfileButton, { backgroundColor: colors.primary }]}
-                onPress={() => handleEdit('email', profile.email || '')}
-              >
-                <Ionicons name="create" size={20} color="white" />
-              </TouchableOpacity>
-            </UpdatePermissionGuard>
+            {!isParent && (
+              <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENTS}>
+                <TouchableOpacity
+                  style={[styles.editProfileButton, { backgroundColor: colors.primary }]}
+                  onPress={() => handleEdit('email', profile.email || '')}
+                >
+                  <Ionicons name="create" size={20} color="white" />
+                </TouchableOpacity>
+              </UpdatePermissionGuard>
+            )}
           </View>
 
           <View style={styles.detailsSection}>
@@ -123,15 +142,17 @@ export default function StudentProfile() {
               <Ionicons name="mail" size={20} color={colors['muted-foreground']} />
               <View style={styles.editableRow}>
                 <ThemedText style={styles.detailText}>Email: {profile.email || 'Not provided'}</ThemedText>
-                <UpdatePermissionGuard 
-                  resource={PERMISSION_RESOURCES.STUDENTS}>
-                  <TouchableOpacity
-                    style={styles.editIcon}
-                    onPress={() => handleEdit('email', profile.email || '')}
-                  >
-                    <Ionicons name="pencil" size={16} color={colors.primary} />
-                  </TouchableOpacity>
-                </UpdatePermissionGuard>
+                {!isParent && (
+                  <UpdatePermissionGuard
+                    resource={PERMISSION_RESOURCES.STUDENTS}>
+                    <TouchableOpacity
+                      style={styles.editIcon}
+                      onPress={() => handleEdit('email', profile.email || '')}
+                    >
+                      <Ionicons name="pencil" size={16} color={colors.primary} />
+                    </TouchableOpacity>
+                  </UpdatePermissionGuard>
+                )}
               </View>
             </View>
             <View style={styles.detailRow}>

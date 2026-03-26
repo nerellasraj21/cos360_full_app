@@ -6,7 +6,6 @@ import {
     Alert,
     FlatList,
     Modal,
-    Platform,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -298,15 +297,12 @@ export default function HolidaysScreen() {
     is_active: true,
   });
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('');
-  const [showDropdown, setShowDropdown] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   const router = useRouter();
-  // const colorScheme = useColorScheme();
   const { theme, colors } = useTheme();
-  // const theme = colorScheme === 'dark' ? 'dark' : 'light';
   const themeColors = Colors[theme];
   const { showSuccess, showError } = useToastContext();
   const queryClient = useQueryClient();
@@ -320,19 +316,14 @@ export default function HolidaysScreen() {
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: (data: HolidayCreate) => {
-      console.log('Calling holidaysApi.createHoliday with data:', data);
-      return holidaysApi.createHoliday(data);
-    },
-    onSuccess: (data) => {
-      console.log('Holiday creation successful:', data);
+    mutationFn: (data: HolidayCreate) => holidaysApi.createHoliday(data),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
       setIsModalVisible(false);
       resetForm();
       showSuccess('Holiday Created', 'Holiday created successfully.');
     },
     onError: (error: any) => {
-      console.error('Holiday creation failed:', error);
       showError('Create Failed', error.message || 'Failed to create holiday');
     },
   });
@@ -373,30 +364,12 @@ export default function HolidaysScreen() {
   });
 
   // Fetch academic years for dropdown
-  const { data: academicYearsData, isLoading: academicYearsLoading, error: academicYearsError } = useQuery({
+  const { data: academicYearsData } = useQuery({
     queryKey: ['academicYearsDropdown'],
     queryFn: () => academicYearsApi.getAcademicYearsDropdown(),
   });
 
-  // Fallback mock data for testing
-  const mockAcademicYears = [
-    { id: '550e8400-e29b-41d4-a716-446655440000', title: '2024-2025' },
-    { id: '550e8400-e29b-41d4-a716-446655440001', title: '2025-2026' },
-  ];
-
-  const effectiveAcademicYearsData = academicYearsData || mockAcademicYears;
-
-  console.log('Academic years data:', academicYearsData);
-  console.log('Academic years loading:', academicYearsLoading);
-  console.log('Academic years error:', academicYearsError);
-  console.log('Using effective academic years:', effectiveAcademicYearsData);
-
-  // Fetch holidays dropdown
-  const { data: holidaysDropdownData } = useQuery({
-    queryKey: ['holidaysDropdown'],
-    queryFn: () => holidaysApi.getHolidaysDropdown(),
-    enabled: showDropdown,
-  });
+  const effectiveAcademicYearsData = academicYearsData || [];
 
   // Filter holidays based on search and academic year
   const filteredHolidays = useMemo(() => {
@@ -466,22 +439,11 @@ export default function HolidaysScreen() {
   };
 
   const handleSubmit = () => {
-    console.log('handleSubmit called with formData:', formData);
-    console.log('Form validation check:', {
-      name: !!formData.name,
-      start_date: !!formData.start_date,
-      end_date: !!formData.end_date,
-      academic_year_id: !!formData.academic_year_id
-    });
-
     if (!formData.name || !formData.start_date || !formData.end_date || !formData.academic_year_id) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
-    console.log('Validation passed, proceeding with API call');
-
-    // Prepare the data to send to API
     const apiData = {
       name: formData.name,
       description: formData.description || undefined,
@@ -491,13 +453,9 @@ export default function HolidaysScreen() {
       is_active: formData.is_active
     };
 
-    console.log('Prepared API data:', apiData);
-
     if (editingHoliday) {
-      console.log('Updating holiday:', editingHoliday.id);
       updateMutation.mutate({ id: editingHoliday.id, data: apiData });
     } else {
-      console.log('Creating new holiday');
       createMutation.mutate(apiData);
     }
   };
@@ -628,27 +586,6 @@ export default function HolidaysScreen() {
         >
           <Ionicons name="calendar" size={20} color={viewMode === 'calendar' ? "white" : themeColors['muted-foreground']} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.secondaryButton, { backgroundColor: themeColors.secondary }]}
-          onPress={() => setShowDropdown(!showDropdown)}
-        >
-          <Ionicons name="list" size={24} color={themeColors['secondary-foreground']} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.secondaryButton, { backgroundColor: themeColors.secondary, marginRight: 8 }]}
-          onPress={() => {
-            console.log('Testing API connection...');
-            holidaysApi.getHolidays().then(data => {
-              console.log('API test successful:', data);
-              Alert.alert('API Test', 'API connection successful!');
-            }).catch(error => {
-              console.error('API test failed:', error);
-              Alert.alert('API Test', `API connection failed: ${error.message}`);
-            });
-          }}
-        >
-          <Ionicons name="cloud" size={24} color={themeColors['secondary-foreground']} />
-        </TouchableOpacity>
         <PermissionGuard resourceConstant={PERMISSION_RESOURCES.HOLIDAYS} actionConstant="create">
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: themeColors.primary }]}
@@ -718,25 +655,6 @@ export default function HolidaysScreen() {
           ))}
         </View>
       </View>
-
-      {/* Dropdown Display */}
-      {showDropdown && (
-        <View style={[styles.dropdownContainer, { backgroundColor: themeColors.card }]}>
-          <View style={styles.dropdownHeader}>
-            <ThemedText type="subtitle" style={styles.dropdownTitle}>Holiday Dropdown</ThemedText>
-            <TouchableOpacity onPress={() => setShowDropdown(false)}>
-              <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.dropdownList}>
-            {holidaysDropdownData?.map((holiday: any) => (
-              <View key={holiday.id} style={styles.dropdownItem}>
-                <ThemedText style={styles.dropdownItemText}>{holiday.name}</ThemedText>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
 
       {/* Holidays List or Calendar View */}
       {viewMode === 'list' ? (
@@ -955,14 +873,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  secondaryButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
   viewToggleButton: {
     width: 40,
     height: 40,
@@ -1009,32 +919,6 @@ const styles = StyleSheet.create({
   },
   filterText: {
     fontSize: 14,
-  },
-  dropdownContainer: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  dropdownHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  dropdownTitle: {
-    fontSize: 18,
-  },
-  dropdownList: {
-    gap: 8,
-  },
-  dropdownItem: {
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-  },
-  dropdownItemText: {
-    fontSize: 16,
   },
   calendarContainer: {
     borderRadius: 12,

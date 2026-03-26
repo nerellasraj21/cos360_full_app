@@ -34,7 +34,7 @@ const AMBER = '#F59E0B';
 export default function StudentTransportScreen() {
   const { colors, theme } = useTheme();
   const { showSuccess, showError } = useToastContext();
-  const { role, studentId } = useAuth();
+  const { role, studentId, selectedStudent } = useAuth();
   const qc = useQueryClient();
 
   const roleName = (role?.name ?? '').toLowerCase();
@@ -61,6 +61,13 @@ export default function StudentTransportScreen() {
     queryKey: ['my-transport', studentId],
     queryFn: () => studentTransportApi.getTransportByStudent(studentId!),
     enabled: isStudent && !!studentId,
+  });
+
+  // ── Parent: selected child's assignment ───────────────────────────────────
+  const { data: childTransport, isLoading: childLoading } = useQuery({
+    queryKey: ['child-transport', selectedStudent?.id],
+    queryFn: () => studentTransportApi.getTransportByStudent(selectedStudent!.id),
+    enabled: isParent && !!selectedStudent?.id,
   });
 
   // ── Form dropdowns (admin only) ────────────────────────────────────────────
@@ -219,6 +226,44 @@ export default function StudentTransportScreen() {
             <Ionicons name="bus-outline" size={48} color={colors['muted-foreground']} />
             <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
               No transport assignment found.
+            </ThemedText>
+          </View>
+        )}
+      </AppLayout>
+    );
+  }
+
+  // ── PARENT: read-only view for selected child ──────────────────────────────
+  if (isParent) {
+    return (
+      <AppLayout title="Child Transport">
+        {!selectedStudent ? (
+          <View style={styles.centered}>
+            <Ionicons name="person-outline" size={48} color={colors['muted-foreground']} />
+            <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
+              Select a student from the header
+            </ThemedText>
+          </View>
+        ) : childLoading ? (
+          <View style={styles.centered}><ActivityIndicator color={AMBER} /></View>
+        ) : childTransport ? (
+          <View style={{ padding: 16 }}>
+            <ThemedText style={{ fontSize: 15, fontWeight: '600', marginBottom: 12, color: colors.foreground }}>
+              {selectedStudent.first_name}&apos;s Transport
+            </ThemedText>
+            <View style={[styles.readCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+              <InfoRow icon="bus-outline" label={`Route: ${childTransport.trip?.route?.route_name ?? '—'} · Trip #${childTransport.trip?.trip_number ?? '—'}`} colors={colors} />
+              <InfoRow icon="location-outline" label={`Stop: ${childTransport.stop?.name ?? '—'}`} colors={colors} />
+              {childTransport.stop?.pickup_time && <InfoRow icon="time-outline" label={`Pickup: ${childTransport.stop.pickup_time}`} colors={colors} />}
+              {childTransport.stop?.drop_time   && <InfoRow icon="time-outline" label={`Drop: ${childTransport.stop.drop_time}`} colors={colors} />}
+              <InfoRow icon="cash-outline" label={`₹${childTransport.fee_per_term}/term`} colors={colors} />
+            </View>
+          </View>
+        ) : (
+          <View style={styles.centered}>
+            <Ionicons name="bus-outline" size={48} color={colors['muted-foreground']} />
+            <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
+              No transport assignment found for {selectedStudent.first_name}.
             </ThemedText>
           </View>
         )}

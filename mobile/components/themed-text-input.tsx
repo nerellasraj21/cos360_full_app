@@ -28,6 +28,8 @@ export function ThemedTextInput({
     <TextInput
       style={[{ color }, style]}
       placeholderTextColor={placeholderTextColor || placeholderColor}
+      selectionColor="#556ee6"
+      cursorColor="#556ee6"
       {...otherProps}
     />
   );

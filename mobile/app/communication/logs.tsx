@@ -5,7 +5,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-nativ
 
 import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
-import { communicationApi, CommunicationLog } from '@/src/api/communication';
+import { communicationApi, CommunicationLog, LogsPage } from '@/src/api/communication';
 
 const STATUS_COLOR: Record<string, string> = {
   sent: '#10B981',
@@ -18,16 +18,17 @@ export default function LogsScreen() {
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
-  const { data: logs, isLoading } = useQuery({
+  const { data: logsPage, isLoading } = useQuery<LogsPage>({
     queryKey: ['comm-logs'],
     queryFn: () => communicationApi.getLogs(),
   });
+  const logs = logsPage?.items ?? [];
 
   const renderItem = ({ item }: { item: CommunicationLog }) => (
     <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
       <View style={styles.cardTop}>
         <Text style={[styles.subject, { color: colors.foreground }]} numberOfLines={1}>
-          {item.subject || '(No subject)'}
+          {item.recipient_name || '(Unknown recipient)'}
         </Text>
         <View
           style={[
@@ -41,14 +42,14 @@ export default function LogsScreen() {
         </View>
       </View>
       <Text style={[styles.body, { color: colors['muted-foreground'] }]} numberOfLines={2}>
-        {item.body}
+        {item.recipient_phone ?? item.recipient_email ?? '—'}
       </Text>
       <View style={styles.meta}>
         <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
-          {item.channel.toUpperCase()} • {item.recipient_type} • {item.recipient_count} recipients
+          {item.channel.toUpperCase()} • {item.target_type.replace(/_/g, ' ')}
         </Text>
         <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
-          {new Date(item.sent_at).toLocaleString('en-IN', {
+          {new Date(item.created_at).toLocaleString('en-IN', {
             dateStyle: 'short',
             timeStyle: 'short',
           })}
@@ -65,7 +66,7 @@ export default function LogsScreen() {
         </View>
       ) : (
         <FlatList
-          data={logs ?? []}
+          data={logs}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}

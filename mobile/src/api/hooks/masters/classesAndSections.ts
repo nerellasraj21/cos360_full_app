@@ -68,9 +68,9 @@ export function useCreateClassSection() {
 export function useUpdateSection() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToast();
-  
+
   return usePermissionProtectedMutation<any, Error, { classId: string; sectionId: string; data: any }>({
-    mutationFn: ({ classId, sectionId, data }) => classSectionsApi.updateSection(classId, sectionId, data),
+    mutationFn: ({ sectionId, data }) => classSectionsApi.updateSectionDirect(sectionId, data),
     resource: PERMISSION_RESOURCES.CLASSES_SECTIONS,
     action: 'update',
     onSuccess: () => {

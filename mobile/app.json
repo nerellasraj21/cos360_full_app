@@ -21,7 +21,8 @@
         "NSDocumentsFolderUsageDescription": "COS360 needs access to documents for file uploads.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        }
+        },
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
 

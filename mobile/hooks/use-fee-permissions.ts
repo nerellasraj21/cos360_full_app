@@ -99,7 +99,7 @@ export const useFeeTerms = (academicYearId?: string) => {
     resource: PERMISSION_RESOURCES.FEE_TERMS,
     action: 'list',
     queryKey: ['feeTerms', academicYearId],
-    queryFn: () => feeTermsApi.getFeeTerms(academicYearId)
+    queryFn: () => feeTermsApi.getFeeTerms(academicYearId ? { academic_year_id: academicYearId } : undefined)
   });
 };
 

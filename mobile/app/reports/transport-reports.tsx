@@ -1,115 +1,166 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
+import React from 'react';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
-import { AppLayout } from '@/components';
+import { ScreenLayout } from '@/components';
 import { useTheme } from '@/contexts';
+import { vehiclesApi, tripsApi } from '@/src/api/masters';
+import { routesApi } from '@/src/api/transport';
 
 const COLOR = '#F59E0B';
 
-const plannedReports = [
-  { icon: 'map' as const, title: 'Route Utilization Report', desc: 'Passenger counts and occupancy rates per route and stop' },
-  { icon: 'bus' as const, title: 'Vehicle Usage Report', desc: 'Trips completed, distance covered, and fuel usage by vehicle' },
-  { icon: 'swap-horizontal' as const, title: 'Trip Analytics', desc: 'On-time performance, delays, and trip frequency analysis' },
-  { icon: 'card' as const, title: 'Transport Fee Report', desc: 'Fees collected per route, stop, and student' },
-  { icon: 'people' as const, title: 'Student Transport Report', desc: 'Students enrolled in transport by route and stop' },
-];
-
 export default function TransportReportsScreen() {
   const { colors, theme } = useTheme();
-
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
+  const { data: routes = [], isLoading: routesLoading } = useQuery({
+    queryKey: ['transport-report-routes'],
+    queryFn: () => routesApi.getRoutes(),
+  });
+  const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery({
+    queryKey: ['transport-report-vehicles'],
+    queryFn: () => vehiclesApi.getVehicles(),
+  });
+  const { data: trips = [], isLoading: tripsLoading } = useQuery({
+    queryKey: ['transport-report-trips'],
+    queryFn: () => tripsApi.getTrips(),
+  });
+
+  const isLoading = routesLoading || vehiclesLoading || tripsLoading;
+
+  const activeRoutes = (routes as any[]).filter(r => r.is_active).length;
+  const activeVehicles = (vehicles as any[]).filter(v => v.is_active).length;
+
   return (
-    <AppLayout title="Transport Reports">
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-
-        {/* Banner */}
-        <View style={[styles.banner, { backgroundColor: COLOR }]}>
-          <View style={styles.bannerDecor} />
-          <View style={styles.bannerDecor2} />
-          <View style={styles.bannerIcon}>
-            <Ionicons name="bus" size={28} color="white" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.bannerTitle}>Transport Reports</Text>
-            <Text style={styles.bannerSub}>Routes · Vehicles · Trip Analytics</Text>
-          </View>
+    <ScreenLayout title="Transport Reports">
+      <View style={[styles.banner, { backgroundColor: COLOR }]}>
+        <View style={styles.bannerDecor} />
+        <View style={styles.bannerIcon}>
+          <Ionicons name="bus" size={24} color="white" />
         </View>
+        <Text style={styles.bannerTitle}>Transport Overview</Text>
+      </View>
 
-        {/* Coming soon */}
-        <View style={[styles.comingSoonCard, { backgroundColor: COLOR + '10', borderColor: COLOR + '30' }]}>
-          <Ionicons name="construct-outline" size={40} color={COLOR} />
-          <Text style={[styles.comingSoonTitle, { color: colors.foreground }]}>Coming Soon</Text>
-          <Text style={[styles.comingSoonDesc, { color: colors['muted-foreground'] }]}>
-            Transport report generation is currently being built. The following reports will be available:
-          </Text>
+      {isLoading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator color={COLOR} size="large" />
+          <Text style={[styles.loadingText, { color: colors['muted-foreground'] }]}>Loading...</Text>
         </View>
-
-        {/* Planned reports */}
-        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>PLANNED REPORTS</Text>
-
-        {plannedReports.map((report, i) => (
-          <View key={i} style={[styles.reportItem, { backgroundColor: cardBg, borderColor: borderCol }]}>
-            <View style={[styles.reportIcon, { backgroundColor: COLOR + '18' }]}>
-              <Ionicons name={report.icon} size={20} color={COLOR} />
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          {/* Summary Cards */}
+          <View style={styles.statsRow}>
+            <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+              <View style={[styles.statIcon, { backgroundColor: '#fef3c7' }]}>
+                <Ionicons name="map" size={20} color={COLOR} />
+              </View>
+              <Text style={[styles.statValue, { color: colors.foreground }]}>{(routes as any[]).length}</Text>
+              <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Routes</Text>
+              <Text style={[styles.statSub, { color: '#10b981' }]}>{activeRoutes} active</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.reportTitle, { color: colors.foreground }]}>{report.title}</Text>
-              <Text style={[styles.reportDesc, { color: colors['muted-foreground'] }]}>{report.desc}</Text>
+            <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+              <View style={[styles.statIcon, { backgroundColor: '#dbeafe' }]}>
+                <Ionicons name="bus" size={20} color="#3b82f6" />
+              </View>
+              <Text style={[styles.statValue, { color: colors.foreground }]}>{(vehicles as any[]).length}</Text>
+              <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Vehicles</Text>
+              <Text style={[styles.statSub, { color: '#10b981' }]}>{activeVehicles} active</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+              <View style={[styles.statIcon, { backgroundColor: '#ede9fe' }]}>
+                <Ionicons name="swap-horizontal" size={20} color="#8b5cf6" />
+              </View>
+              <Text style={[styles.statValue, { color: colors.foreground }]}>{(trips as any[]).length}</Text>
+              <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Trips</Text>
             </View>
           </View>
-        ))}
 
-      </ScrollView>
-    </AppLayout>
+          {/* Routes List */}
+          <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>ROUTES</Text>
+          {(routes as any[]).map((route, i) => (
+            <View key={route.id || i} style={[styles.rowCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+              <View style={styles.rowHeader}>
+                <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>
+                  {route.route_name}
+                </Text>
+                <View style={[styles.statusBadge, { backgroundColor: route.is_active ? '#d1fae5' : '#f1f5f9' }]}>
+                  <Text style={[styles.statusText, { color: route.is_active ? '#065f46' : '#64748b' }]}>
+                    {route.is_active ? 'Active' : 'Inactive'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.rowSub, { color: colors['muted-foreground'] }]} numberOfLines={1}>
+                {route.starting_stop} → {route.ending_stop}
+              </Text>
+            </View>
+          ))}
+          {(routes as any[]).length === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="map-outline" size={36} color={colors['muted-foreground']} />
+              <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>No routes configured</Text>
+            </View>
+          )}
+
+          {/* Vehicles List */}
+          <Text style={[styles.sectionLabel, { color: colors['muted-foreground'], marginTop: 16 }]}>VEHICLES</Text>
+          {(vehicles as any[]).map((vehicle, i) => (
+            <View key={vehicle.id || i} style={[styles.rowCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+              <View style={styles.rowHeader}>
+                <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>
+                  {vehicle.name}
+                </Text>
+                <View style={[styles.statusBadge, { backgroundColor: vehicle.is_active ? '#d1fae5' : '#f1f5f9' }]}>
+                  <Text style={[styles.statusText, { color: vehicle.is_active ? '#065f46' : '#64748b' }]}>
+                    {vehicle.is_active ? 'Active' : 'Inactive'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.rowSub, { color: colors['muted-foreground'] }]}>
+                {vehicle.registration_number}{vehicle.vehicle_type ? ` · ${vehicle.vehicle_type}` : ''}
+              </Text>
+            </View>
+          ))}
+          {(vehicles as any[]).length === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="bus-outline" size={36} color={colors['muted-foreground']} />
+              <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>No vehicles configured</Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1 },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, overflow: 'hidden' },
+  bannerDecor: { position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.12)' },
+  bannerIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loadingText: { fontSize: 14 },
   content: { padding: 16, paddingBottom: 32 },
-  banner: {
-    borderRadius: 18, padding: 18,
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    marginBottom: 16, overflow: 'hidden',
-  },
-  bannerDecor: {
-    position: 'absolute', top: -30, right: -30,
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  bannerDecor2: {
-    position: 'absolute', bottom: -40, right: 60,
-    width: 90, height: 90, borderRadius: 45,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-  },
-  bannerIcon: {
-    width: 52, height: 52, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 2 },
-  bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 16 },
-  comingSoonCard: {
-    borderRadius: 14, borderWidth: 1, padding: 24,
-    alignItems: 'center', gap: 8, marginBottom: 24,
-  },
-  comingSoonTitle: { fontSize: 18, fontWeight: '700' },
-  comingSoonDesc: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
-  sectionLabel: {
-    fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12,
-  },
-  reportItem: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 8,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
-  },
-  reportIcon: {
-    width: 40, height: 40, borderRadius: 10,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  reportTitle: { fontSize: 13, fontWeight: '600', marginBottom: 3 },
-  reportDesc: { fontSize: 12, lineHeight: 17 },
+  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  statCard: { flex: 1, borderRadius: 12, borderWidth: 1, padding: 12, alignItems: 'center', gap: 4 },
+  statIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  statValue: { fontSize: 20, fontWeight: '700' },
+  statLabel: { fontSize: 11 },
+  statSub: { fontSize: 10, fontWeight: '600' },
+  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.1, marginBottom: 10 },
+  rowCard: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8, elevation: 1 },
+  rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  rowTitle: { fontSize: 13, fontWeight: '600', flex: 1, marginRight: 8 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  statusText: { fontSize: 11, fontWeight: '600' },
+  rowSub: { fontSize: 12, marginTop: 3 },
+  emptyState: { alignItems: 'center', gap: 8, paddingTop: 32 },
+  emptyText: { fontSize: 14 },
 });

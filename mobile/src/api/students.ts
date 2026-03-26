@@ -787,7 +787,7 @@ export const studentCertificatesApi = {
     limit?: number;
   }): Promise<CertificateRead[]> => {
     const response = await apiClient.get('/certificates/', { params });
-    return response.data;
+    return response.data?.items ?? response.data ?? [];
   },
 
   /** GET /certificates/received — admin: received (uploaded) documents */

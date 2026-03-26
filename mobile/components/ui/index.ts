@@ -40,6 +40,9 @@ export {
   PermissionFeedbackUtils,
 } from './PermissionFeedbackSystem';
 
+// iOS Date/Time Picker Modal
+export { IOSDatePickerModal } from './ios-date-picker-modal';
+
 // Re-export default objects for convenience
 export { default as AccessDeniedComponents } from './AccessDeniedComponents';
 export { default as PermissionLoadingStates } from './PermissionLoadingStates';

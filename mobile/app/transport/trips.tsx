@@ -1,5 +1,4 @@
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
@@ -152,15 +151,15 @@ export default function TripsScreen() {
       return;
     }
 
-    if (!formData.driver_id) {
-      Alert.alert('Error', 'Driver is required');
-      return;
-    }
+    const payload = {
+      ...formData,
+      driver_id: formData.driver_id || undefined,
+    };
 
     if (editingTrip) {
-      updateMutation.mutate({ id: editingTrip.id, data: formData });
+      updateMutation.mutate({ id: editingTrip.id, data: payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload as any);
     }
   };
 
@@ -218,14 +217,6 @@ export default function TripsScreen() {
               Driver: {driver?.name || 'Unknown Driver'}
             </ThemedText>
           </View>
-          {item.created_at && (
-            <View style={styles.detailRow}>
-              <Ionicons name="calendar" size={16} color={colors['muted-foreground']} />
-              <ThemedText style={styles.detailText}>
-                Created: {new Date(item.created_at).toLocaleDateString()}
-              </ThemedText>
-            </View>
-          )}
         </View>
       </View>
     );
@@ -347,7 +338,7 @@ export default function TripsScreen() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.modalBody}>
+              <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.label}>Vehicle *</ThemedText>
                   <CustomDropdown
@@ -538,7 +529,8 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     borderRadius: 12,
     padding: 20,
-    maxHeight: '80%',
+    maxHeight: '85%',
+    flexDirection: 'column',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -550,7 +542,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   modalBody: {
-    marginBottom: 20,
+    flex: 1,
   },
   formGroup: {
     marginBottom: 16,

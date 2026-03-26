@@ -51,6 +51,7 @@ export interface AuthResponse {
   refresh_token: string;
   token_type: string;
   entity_id?: string;
+  requires_password_change?: boolean;
 }
 
 /**
@@ -226,7 +227,7 @@ export const refreshAccessToken = async (): Promise<AuthTokens | null> => {
 
     console.log('Attempting to refresh access token...');
     
-    const refreshResponse = await apiClient.post('/auth/login/refresh', {
+    const refreshResponse = await apiClient.post('/auth/refresh', {
       refresh_token: tokens.refresh_token
     });
 
@@ -405,8 +406,10 @@ export const loginUser = async (username: string, password: string, clientName?:
       academic_year_id: academicYearId,
     });
 
-    // Store auth data
-    await storeAuthData(response.data);
+    // Only store auth data for successful logins (not first-login password-change challenge)
+    if (!response.data?.requires_password_change) {
+      await storeAuthData(response.data);
+    }
 
     return response.data;
   } catch (error) {

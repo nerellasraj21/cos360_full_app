@@ -381,12 +381,16 @@ export const useExpenseDepartmentDropdownProtected = () => {
 };
 
 // Permission-protected Reports hooks
-export const useExpenseSummaryReportProtected = (periodDays: number = 30) => {
+export const useExpenseSummaryReportProtected = (params?: {
+  start_date?: string;
+  end_date?: string;
+  status_filter?: string;
+}) => {
   return usePermissionProtectedQuery({
     resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS,
     action: 'read',
-    queryKey: ['expense-summary-report', periodDays],
-    queryFn: () => expenseReportsApi.getSummaryReport(periodDays),
+    queryKey: ['expense-summary-report', params],
+    queryFn: () => expenseReportsApi.getSummaryReport(params),
   });
 };
 

@@ -1,115 +1,129 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
+import React from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
-import { AppLayout } from '@/components';
+import { ScreenLayout } from '@/components';
 import { useTheme } from '@/contexts';
+import { examsApi } from '@/src/api/exam';
 
 const COLOR = '#EF4444';
 
-const plannedReports = [
-  { icon: 'trophy' as const, title: 'Exam Results Report', desc: 'Pass/fail rates, toppers, and result summaries by exam and class' },
-  { icon: 'bar-chart' as const, title: 'Grade Distribution', desc: 'Grade-wise student distribution per subject and exam' },
-  { icon: 'create' as const, title: 'Marks Analysis Report', desc: 'Subject-wise average marks, highest, lowest, and percentiles' },
-  { icon: 'document-text' as const, title: 'Hall Ticket Report', desc: 'Hall tickets issued and downloaded per exam' },
-  { icon: 'trending-up' as const, title: 'Academic Progress Report', desc: 'Student academic performance trend across multiple exams' },
-];
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  draft:     { bg: '#f1f5f9', text: '#475569' },
+  active:    { bg: '#dbeafe', text: '#1e40af' },
+  locked:    { bg: '#fef3c7', text: '#92400e' },
+  published: { bg: '#d1fae5', text: '#065f46' },
+  finalized: { bg: '#ede9fe', text: '#5b21b6' },
+};
 
 export default function AcademicReportsScreen() {
   const { colors, theme } = useTheme();
-
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
+  const { data: exams = [], isLoading } = useQuery({
+    queryKey: ['academic-report-exams'],
+    queryFn: () => examsApi.list(),
+  });
+
+  const published = (exams as any[]).filter(e => e.status === 'published' || e.status === 'finalized').length;
+  const active = (exams as any[]).filter(e => e.status === 'active').length;
+  const draft = (exams as any[]).filter(e => e.status === 'draft').length;
+
   return (
-    <AppLayout title="Academic Reports">
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-
-        {/* Banner */}
-        <View style={[styles.banner, { backgroundColor: COLOR }]}>
-          <View style={styles.bannerDecor} />
-          <View style={styles.bannerDecor2} />
-          <View style={styles.bannerIcon}>
-            <Ionicons name="school" size={28} color="white" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.bannerTitle}>Academic Reports</Text>
-            <Text style={styles.bannerSub}>Exam Results · Marks · Grade Distribution</Text>
-          </View>
+    <ScreenLayout title="Academic Reports">
+      <View style={[styles.banner, { backgroundColor: COLOR }]}>
+        <View style={styles.bannerDecor} />
+        <View style={styles.bannerIcon}>
+          <Ionicons name="school" size={24} color="white" />
         </View>
+        <Text style={styles.bannerTitle}>Academic / Exam Overview</Text>
+      </View>
 
-        {/* Coming soon */}
-        <View style={[styles.comingSoonCard, { backgroundColor: COLOR + '10', borderColor: COLOR + '30' }]}>
-          <Ionicons name="construct-outline" size={40} color={COLOR} />
-          <Text style={[styles.comingSoonTitle, { color: colors.foreground }]}>Coming Soon</Text>
-          <Text style={[styles.comingSoonDesc, { color: colors['muted-foreground'] }]}>
-            Academic report generation is currently being built. The following reports will be available:
-          </Text>
+      {isLoading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator color={COLOR} size="large" />
+          <Text style={[styles.loadingText, { color: colors['muted-foreground'] }]}>Loading...</Text>
         </View>
-
-        {/* Planned reports */}
-        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>PLANNED REPORTS</Text>
-
-        {plannedReports.map((report, i) => (
-          <View key={i} style={[styles.reportItem, { backgroundColor: cardBg, borderColor: borderCol }]}>
-            <View style={[styles.reportIcon, { backgroundColor: COLOR + '18' }]}>
-              <Ionicons name={report.icon} size={20} color={COLOR} />
+      ) : (
+        <FlatList
+          data={exams}
+          keyExtractor={(item: any) => item.id}
+          contentContainerStyle={styles.listContent}
+          ListHeaderComponent={
+            <View>
+              <View style={styles.statsRow}>
+                <View style={[styles.statCard, { backgroundColor: '#d1fae5' }]}>
+                  <Text style={[styles.statValue, { color: '#065f46' }]}>{published}</Text>
+                  <Text style={[styles.statLabel, { color: '#065f46' }]}>Published</Text>
+                </View>
+                <View style={[styles.statCard, { backgroundColor: '#dbeafe' }]}>
+                  <Text style={[styles.statValue, { color: '#1e40af' }]}>{active}</Text>
+                  <Text style={[styles.statLabel, { color: '#1e40af' }]}>Active</Text>
+                </View>
+                <View style={[styles.statCard, { backgroundColor: '#f1f5f9' }]}>
+                  <Text style={[styles.statValue, { color: '#475569' }]}>{draft}</Text>
+                  <Text style={[styles.statLabel, { color: '#475569' }]}>Draft</Text>
+                </View>
+              </View>
+              <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>ALL EXAMS</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.reportTitle, { color: colors.foreground }]}>{report.title}</Text>
-              <Text style={[styles.reportDesc, { color: colors['muted-foreground'] }]}>{report.desc}</Text>
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="school-outline" size={40} color={colors['muted-foreground']} />
+              <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>No exams found</Text>
             </View>
-          </View>
-        ))}
-
-      </ScrollView>
-    </AppLayout>
+          }
+          renderItem={({ item }) => {
+            const exam = item as any;
+            const sc = STATUS_COLORS[exam.status] || STATUS_COLORS.draft;
+            return (
+              <View style={[styles.rowCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+                <View style={styles.rowHeader}>
+                  <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{exam.exam_name}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
+                    <Text style={[styles.statusText, { color: sc.text }]}>{exam.status}</Text>
+                  </View>
+                </View>
+                <Text style={[styles.rowSub, { color: colors['muted-foreground'] }]}>
+                  {exam.exam_type} · {exam.board} · {exam.academic_year_title || ""}
+                </Text>
+              </View>
+            );
+          }}
+        />
+      )}
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1 },
-  content: { padding: 16, paddingBottom: 32 },
-  banner: {
-    borderRadius: 18, padding: 18,
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    marginBottom: 16, overflow: 'hidden',
-  },
-  bannerDecor: {
-    position: 'absolute', top: -30, right: -30,
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  bannerDecor2: {
-    position: 'absolute', bottom: -40, right: 60,
-    width: 90, height: 90, borderRadius: 45,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-  },
-  bannerIcon: {
-    width: 52, height: 52, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 2 },
-  bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 16 },
-  comingSoonCard: {
-    borderRadius: 14, borderWidth: 1, padding: 24,
-    alignItems: 'center', gap: 8, marginBottom: 24,
-  },
-  comingSoonTitle: { fontSize: 18, fontWeight: '700' },
-  comingSoonDesc: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
-  sectionLabel: {
-    fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12,
-  },
-  reportItem: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 8,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
-  },
-  reportIcon: {
-    width: 40, height: 40, borderRadius: 10,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  reportTitle: { fontSize: 13, fontWeight: '600', marginBottom: 3 },
-  reportDesc: { fontSize: 12, lineHeight: 17 },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, overflow: 'hidden' },
+  bannerDecor: { position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.12)' },
+  bannerIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loadingText: { fontSize: 14 },
+  listContent: { padding: 16, paddingBottom: 32 },
+  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  statCard: { flex: 1, borderRadius: 12, padding: 12, alignItems: 'center' },
+  statValue: { fontSize: 20, fontWeight: '700' },
+  statLabel: { fontSize: 11, marginTop: 2 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.1, marginBottom: 10 },
+  rowCard: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8, elevation: 1 },
+  rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  rowTitle: { fontSize: 13, fontWeight: '600', flex: 1, marginRight: 8 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  statusText: { fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
+  rowSub: { fontSize: 12 },
+  emptyState: { alignItems: 'center', gap: 8, paddingTop: 40 },
+  emptyText: { fontSize: 14 },
 });

@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef } from 'react';
+import { useMemo, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissionCache } from './use-permission-cache';
 import { permissionAnalytics } from '../utils/permission-analytics';
@@ -95,6 +95,12 @@ export const useOptimizedMobilePermissions = (): UseOptimizedMobilePermissionRes
     cacheHits: 0,
     averageCheckTime: 0,
   });
+
+  // Clear cache whenever permissions change to prevent stale false results
+  useEffect(() => {
+    cache.clearCache();
+    performanceMetrics.current = { totalChecks: 0, cacheHits: 0, averageCheckTime: 0 };
+  }, [permissions]);
 
   // Generate context for cache key (includes student context for parent users)
   const getCacheContext = useCallback(() => {

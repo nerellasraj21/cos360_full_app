@@ -43,7 +43,7 @@ interface FormErrors {
 
 const LoginScreen: React.FC = () => {
   const router = useRouter();
-  const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
+  const { login, isLoading, error, clearError, isAuthenticated, requiresPasswordChange } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [clientSchema, setClientSchemaState] = useState<string>('');
@@ -88,10 +88,12 @@ const LoginScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && requiresPasswordChange) {
+      router.replace('/set-password');
+    } else if (isAuthenticated && !requiresPasswordChange) {
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, requiresPasswordChange, router]);
 
   useEffect(() => {
     if (error) {

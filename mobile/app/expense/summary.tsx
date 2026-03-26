@@ -38,6 +38,16 @@ type TypeRow = {
   entry_count: number;
 };
 
+// Generate last 5 financial years (Indian FY: Apr–Mar)
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = [
+  { label: 'All Years', value: '' },
+  ...Array.from({ length: 5 }, (_, i) => {
+    const yr = CURRENT_YEAR - i;
+    return { label: `FY ${yr}–${String(yr + 1).slice(2)}`, value: String(yr) };
+  }),
+];
+
 export default function ExpenseSummaryScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
@@ -133,11 +143,9 @@ export default function ExpenseSummaryScreen() {
               Category-wise breakdown of all expenses with type-level details and totals
             </Text>
           </View>
-          <View style={{ width: 140 }}>
+          <View style={{ width: 150 }}>
             <CustomDropdown
-              data={[
-                { label: 'All Years', value: '' },
-              ]}
+              data={YEAR_OPTIONS}
               value={selectedYear}
               onChange={(v: any) => setSelectedYear(v?.toString() ?? '')}
               placeholder="All Years"

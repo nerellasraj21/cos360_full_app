@@ -175,6 +175,8 @@ export const CustomDropdown: React.FC<DropdownProps> = React.memo(({
           borderColor: themeColors.border,
           borderWidth: 1,
           borderRadius: Radius.default,
+          elevation: 20,
+          zIndex: 9999,
         }}
         flatListProps={{
           showsVerticalScrollIndicator: true,

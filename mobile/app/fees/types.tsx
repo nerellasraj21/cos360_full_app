@@ -29,9 +29,7 @@ import {
 
 
 export default function FeeTypesScreen() {
-    console.log('FeeTypesScreen: Component mounted');
-
-    const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
     const [editingType, setEditingType] = useState<FeeTypeResponse | null>(null);
     const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
     const [typeToDelete, setTypeToDelete] = useState<FeeTypeResponse | null>(null);
@@ -50,57 +48,20 @@ export default function FeeTypesScreen() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToastContext();
 
-  console.log('FeeTypesScreen: activeAcademicYearId:', activeAcademicYearId);
-
   const { data: types = [], isLoading, error } = useQuery({
     queryKey: ['feeTypes'],
-    queryFn: async () => {
-      console.log('FeeTypesScreen: Starting feeTypes query');
-      try {
-        const result = await feeTypesApi.getFeeTypes();
-        console.log('FeeTypesScreen: feeTypes query success, data length:', result?.length);
-        return result;
-      } catch (err) {
-        console.error('FeeTypesScreen: feeTypes query error:', err);
-        throw err;
-      }
-    },
+    queryFn: () => feeTypesApi.getFeeTypes(),
   });
-
-  console.log('FeeTypesScreen: Query states - isLoading:', isLoading, 'error:', error, 'data length:', types?.length);
 
   const { data: feeCategories = [] } = useQuery({
     queryKey: ['feeCategoriesDropdown'],
-    queryFn: async () => {
-      console.log('FeeTypesScreen: Starting feeCategories query');
-      try {
-        const result = await feeCategoriesApi.getFeeCategoriesDropdown();
-        console.log('FeeTypesScreen: feeCategories query success, data length:', result?.length);
-        return result;
-      } catch (err) {
-        console.error('FeeTypesScreen: feeCategories query error:', err);
-        throw err;
-      }
-    },
+    queryFn: () => feeCategoriesApi.getFeeCategoriesDropdown(),
   });
 
   const { data: feeTerms = [] } = useQuery({
     queryKey: ['feeTermsDropdown', activeAcademicYearId],
-    queryFn: async () => {
-      console.log('FeeTypesScreen: Starting feeTerms query with academicYearId:', activeAcademicYearId);
-      try {
-        const result = await feeTermsApi.getFeeTermsDropdown(activeAcademicYearId || undefined);
-        console.log('FeeTypesScreen: feeTerms query success, data length:', result?.length);
-        return result;
-      } catch (err) {
-        console.error('FeeTypesScreen: feeTerms query error:', err);
-        throw err;
-      }
-    },
+    queryFn: () => feeTermsApi.getFeeTermsDropdown(activeAcademicYearId ? { academic_year_id: activeAcademicYearId } : undefined),
   });
-
-  console.log('FeeTypesScreen: Fee categories length:', feeCategories?.length);
-  console.log('FeeTypesScreen: Fee terms length:', feeTerms?.length);
 
   useEffect(() => {
     if (editingType && feeCategories.length > 0 && feeTerms.length > 0) {
@@ -169,7 +130,6 @@ export default function FeeTypesScreen() {
   const handleCreate = () => {
     setEditingType(null);
     resetForm();
-    console.log('Opening create modal, formData:', formData);
     setIsModalVisible(true);
   };
 
@@ -210,12 +170,8 @@ export default function FeeTypesScreen() {
   };
 
   const renderTypeItem = ({ item }: { item: FeeTypeResponse }) => {
-    console.log('FeeType item:', item);
     const firstFeeTermDate = item.fee_term_dates?.[0]?.fee_term_date;
-    console.log('firstFeeTermDate value:', firstFeeTermDate);
     const parsedDate = firstFeeTermDate ? new Date(firstFeeTermDate) : null;
-    console.log('Parsed date:', parsedDate);
-    console.log('Date display:', parsedDate ? parsedDate.toLocaleDateString() : 'N/A');
     return (
       <ThemedView style={[styles.typeCard, { backgroundColor: colors.card }]}>
         <View style={styles.typeInfo}>
@@ -255,7 +211,6 @@ export default function FeeTypesScreen() {
 
 
   if (isLoading) {
-    console.log('FeeTypesScreen: Showing loading state');
     return (
       <AppLayout title="Fee Types">
         <View style={styles.centerContainer}>
@@ -266,7 +221,6 @@ export default function FeeTypesScreen() {
   }
 
   if (error) {
-    console.error('FeeTypesScreen: Showing error state, error details:', error);
     return (
       <AppLayout title="Fee Types">
         <View style={styles.centerContainer}>
@@ -346,9 +300,6 @@ export default function FeeTypesScreen() {
                 data={feeCategories.map(cat => ({ label: cat.label, value: cat.id }))}
                 value={formData.fee_category_id}
                 onChange={(value) => {
-                  console.log('Fee category selected:', value);
-                  console.log('Fee categories data:', feeCategories);
-                  console.log('Mapped data:', feeCategories.map(cat => ({ label: cat.label, value: cat.id })));
                   setFormData(prev => ({ ...prev, fee_category_id: value as string }));
                 }}
                 placeholder="Select fee category"
@@ -359,9 +310,6 @@ export default function FeeTypesScreen() {
                 data={feeTerms.map(term => ({ label: term.label, value: term.id }))}
                 value={formData.fee_term_id}
                 onChange={(value) => {
-                  console.log('Fee term selected:', value);
-                  console.log('Fee terms data:', feeTerms);
-                  console.log('Mapped data:', feeTerms.map(term => ({ label: term.label, value: term.id })));
                   setFormData(prev => ({ ...prev, fee_term_id: value as string }));
                 }}
                 placeholder="Select fee term"

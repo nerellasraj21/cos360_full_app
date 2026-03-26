@@ -77,6 +77,7 @@ export interface ExpenseTransactionInput {
   payment_method: 'cash' | 'cheque' | 'bank_transfer' | 'upi';
   vendor_name: string;
   idempotency_key: string;
+  department_id?: string;
   requires_approval_override?: boolean;
 }
 

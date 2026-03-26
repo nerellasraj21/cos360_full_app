@@ -155,7 +155,11 @@ export default function SubjectCategoriesScreen() {
           <ThemedText type="subtitle" style={styles.categoryName}>
             {item.name}
           </ThemedText>
-         
+          <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#D1FAE5' : '#FEE2E2' }]}>
+            <ThemedText style={[styles.statusText, { color: item.is_active ? '#065F46' : '#991B1B' }]}>
+              {item.is_active ? 'Active' : 'Inactive'}
+            </ThemedText>
+          </View>
         </View>
         <View style={styles.actionButtons}>
           <PermissionGuard resourceConstant={PERMISSION_RESOURCES.SUBJECT_CATEGORIES} actionConstant="update">

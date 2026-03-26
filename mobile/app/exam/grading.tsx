@@ -8,6 +8,14 @@ import { useTheme } from '@/contexts';
 
 const GRADING_LINKS = [
   {
+    id: 'exams',
+    title: 'All Exams',
+    description: 'View, create, and manage exams',
+    icon: 'school',
+    color: '#556EE6',
+    route: '/exam/list',
+  },
+  {
     id: 'marks',
     title: 'Mark Entry',
     description: 'Enter subject marks per student',
@@ -18,7 +26,7 @@ const GRADING_LINKS = [
   {
     id: 'results',
     title: 'Results',
-    description: 'View and publish exam results',
+    description: 'Compute and publish exam results',
     icon: 'bar-chart',
     color: '#10B981',
     route: '/exam/results',
@@ -32,12 +40,60 @@ const GRADING_LINKS = [
     route: '/exam/hall-tickets',
   },
   {
+    id: 'dates',
+    title: 'Exam Dates',
+    description: 'Schedule subject-wise exam timetable',
+    icon: 'calendar',
+    color: '#14B8A6',
+    route: '/exam/dates',
+  },
+  {
+    id: 'permissions',
+    title: 'Mark Permissions',
+    description: 'Grant teachers permission to enter marks',
+    icon: 'key',
+    color: '#6366F1',
+    route: '/exam/permissions',
+  },
+  {
     id: 'my-marks',
     title: 'My Marks',
     description: 'View your own marks (Student / Parent)',
     icon: 'document-text',
     color: '#EC4899',
     route: '/exam/my-marks',
+  },
+  {
+    id: 'grade-schemes',
+    title: 'Grade Schemes',
+    description: 'Manage exam & subject grade bands',
+    icon: 'ribbon',
+    color: '#F59E0B',
+    route: '/exam/grade-schemes',
+  },
+  {
+    id: 'remark-sets',
+    title: 'Remark Grade Sets',
+    description: 'Configure remark-based grading',
+    icon: 'chatbubble-ellipses',
+    color: '#F97316',
+    route: '/exam/remark-sets',
+  },
+  {
+    id: 'board-patterns',
+    title: 'Board Patterns',
+    description: 'Define board exam patterns',
+    icon: 'library',
+    color: '#0EA5E9',
+    route: '/exam/board-patterns',
+  },
+  {
+    id: 'settings',
+    title: 'Exam Settings',
+    description: 'Default board, attendance threshold, grace marks',
+    icon: 'settings',
+    color: '#64748B',
+    route: '/exam/settings',
   },
 ];
 

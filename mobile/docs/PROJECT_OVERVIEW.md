@@ -1,7 +1,7 @@
 # COS360 Mobile App — Project Overview
 
 **Project Name:** COS360 School Management System — Mobile Application
-**Version:** 1.3.0
+**Version:** 1.6.0
 **Platform:** Android · iOS · Web
 **Build Date:** March 2026
 
@@ -80,7 +80,7 @@ COS360 Mobile App
 | Transport | Routes, vehicles, stops, trips, pricing, student transport | Complete |
 | Staff | Enrollment, profiles, designations, attendance | Complete |
 | Expense | Categories, transactions, approvals, audit, reports | Complete |
-| Communication | SMS/email/push messaging, templates, message logs | Complete |
+| Communication | SMS/WhatsApp/email messaging, templates, message logs | Complete |
 | Profile | Student/Parent/Staff profile view & edit | Complete |
 | Settings | Theme, academic year selector, permission debug | Complete |
 

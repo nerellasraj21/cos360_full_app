@@ -1,7 +1,7 @@
 # COS360 Mobile App — Implementation Status
 
 **As of:** March 2026
-**Version:** 1.4.0
+**Version:** 1.6.3
 
 ---
 
@@ -50,6 +50,7 @@
 | Permission cache | ✅ Complete | `utils/mobilePermissionCache.ts` |
 | Permission bulk check | ✅ Complete | `src/api/mobilePermissions.ts` |
 | Auth redirect on app start | ✅ Complete | `app/index.tsx` handles redirect |
+| First-login set-password flow | ✅ Complete | `requires_password_change` in login response → redirect to `/set-password`; endpoint `POST /auth/staff/set-password` |
 | Multi-tenant (cschema) | ✅ Complete | Header injected on every request |
 | Parent multi-student context | ✅ Complete | Student selector in auth context |
 
@@ -100,8 +101,9 @@
 |---------|--------|------|
 | Student list with search | ✅ Complete | `app/(tabs)/students.tsx` |
 | Student detail view | ✅ Complete | `app/students/[id].tsx` |
-| Student admission form (6-step) | ✅ Complete | `app/students/admission.tsx` |
-| Admission Step 1 — web-matched layout | ✅ Complete | 2-col rows, date picker, admission type, "same as" checkbox |
+| Student admission — list view + view modal | ✅ Complete | `app/students/admission.tsx` — table-style cards, eye-icon view modal with 34 fields |
+| Student admission — 6-step create form | ✅ Complete | Calendar date picker, 2-col layouts, Indian states dropdown, Yes/No prev-school, web-matched summary |
+| Student admission — toggle active status | ✅ Complete | `studentAdmissionsApi.toggleActiveStatus(id)` via useMutation |
 | Student profile view | ✅ Complete | `app/students/profile.tsx` |
 | Student profile form/edit | ✅ Complete | `components/profile/StudentProfileForm.tsx` |
 | Student profile display | ✅ Complete | `components/profile/StudentProfileView.tsx` |
@@ -111,7 +113,8 @@
 
 | Feature | Status | File |
 |---------|--------|------|
-| Attendance view | ✅ Complete | `app/students/attendance.tsx` |
+| Attendance view — staff/admin (web-style redesign) | ✅ Complete | `app/students/attendance.tsx` — compact 3-col filter row, Refresh + Save Attendance buttons, stats cards, local statusMap, P/A/L per-row buttons, bulk save |
+| Attendance view — student/parent history | ✅ Complete | `app/students/attendance.tsx` — monthly filter, stats summary, records list |
 | Attendance API hooks | ✅ Complete | `src/api/hooks/students/attendance.ts` |
 
 ### 5.3 Student Documents
@@ -193,8 +196,9 @@
 | Vehicle management | ✅ Complete | `app/transport/vehicles.tsx` |
 | Trip management | ✅ Complete | `app/transport/trips.tsx` |
 | Student transport (correct schema) | ✅ Complete | `app/transport/student-transport.tsx` — imports from `src/api/students.ts`; form: Student → Trip → Stop → `fee_per_term` |
+| Student transport — students module redesign | ✅ Complete | `app/students/transport.tsx` — table layout with horizontal scroll, S.No/Student/Trip/Route/Stop/Fee/Actions columns, search bar, Assign form in bottom-sheet modal, uses AppLayout |
 | Transport API | ✅ Complete | `src/api/transport.ts` |
-| Transport hooks | ✅ Complete | `hooks/use-transport.ts` |
+| Transport hooks | ✅ Complete | `hooks/use-transport.ts` — `useDrivers()` fetches live staff list from `staffApi.getStaff()` |
 | Student transport hooks (correct schema) | ✅ Complete | `src/api/hooks/students/transport.ts` — imports `studentTransportApi` from `students.ts`, uses `listStudentTransport()` and `StudentTransportOut` |
 | Transport type definitions | ✅ Complete | `src/types/transport.ts` |
 
@@ -338,16 +342,14 @@ Channels: **SMS · WhatsApp · Email** (Push removed). API types updated in `src
 
 | Feature | Status | File |
 |---------|--------|------|
-| Administration tab hub | ✅ Complete | `app/(tabs)/admin.tsx` — banner, coming-soon card, 4-section permission-gated grid |
-| User Management screen | 🔄 Placeholder | `app/admin/users.tsx` |
-| Role Management screen | 🔄 Placeholder | `app/admin/roles.tsx` |
-| Permission Management screen | 🔄 Placeholder | `app/admin/permissions.tsx` |
-| Menu Management screen | 🔄 Placeholder | `app/admin/menu.tsx` |
+| Administration tab hub | ✅ Complete | `app/(tabs)/admin.tsx` — banner, 4-section permission-gated grid |
+| User Management screen | ✅ Complete | `app/admin/users.tsx` — stats hub showing staff/student counts + navigation cards to staff, students, and roles screens |
+| Role Management screen | ✅ Complete | `app/admin/roles.tsx` — redirects to `app/masters/rolespermissions` (full CRUD lives there) |
+| Permission Management screen | ✅ Complete | `app/admin/permissions.tsx` — clean `<Redirect href="/masters/rolespermissions" />` |
+| Menu Management screen | ✅ Complete | `app/admin/menu.tsx` — full CRUD via `authApi.getMenus` / `authApi.createMenu`; list + create modal |
 | Admin tab in `TAB_CONFIGS` | ✅ Complete | `app/(tabs)/_layout.tsx` — gated on `users/roles/permissions/menu` resources |
 | Administration card in dashboard | ✅ Complete | `app/(tabs)/index.tsx` — color `#64748b`, `resources: ['users','roles','permissions','menu']` |
 | Admin permission resource constants | ✅ Complete | `ADMIN_USERS`, `ADMIN_ROLES`, `ADMIN_PERMISSIONS`, `ADMIN_MENU` in `src/types/permissions.ts` |
-
-> **Note:** The 4 sub-module screens are currently "coming soon" placeholders. Full CRUD implementation (API integration, list/create/edit/delete) is planned for a future phase once the backend admin endpoints are confirmed.
 
 ---
 
@@ -371,12 +373,68 @@ Channels: **SMS · WhatsApp · Email** (Push removed). API types updated in `src
 | Exam Module | 11 | 11 | 0 | 0 |
 | Communication | 7 | 7 | 0 | 0 |
 | Additional Features | 6 | 6 | 0 | 0 |
-| **Administration** | **8** | **4** | **4** | **0** |
-| **TOTAL** | **175** | **171** | **4** | **0** |
+| **Administration** | **8** | **8** | **0** | **0** |
+| **TOTAL** | **175** | **175** | **0** | **0** |
 
-Overall Completion: 97.7% (171/175 features) — 4 admin sub-screens are placeholder/in-progress
+Overall Completion: **100%** (175/175 features)
 
 ---
+
+---
+
+## Mutation Audit & Cleanup (v1.6.3)
+
+### Full Mutation Audit — March 2026
+
+All 200+ create/update/delete mutation operations across every module were audited.
+
+**Result: No functional issues found.** All mutations have:
+
+- Correct HTTP methods and endpoints
+- Proper `onSuccess` query invalidation
+- `onError` handlers with toast feedback
+- FormData handling for file uploads
+- Permission protection via `usePermissionProtectedMutation`
+
+**Modules audited:** Students, Staff, Fees, Exam, Masters, Communication, Expense (17 sub-sections, 200+ mutations total)
+
+### Console.log Cleanup
+
+| File | Location | Issue | Fix |
+| --- | --- | --- | --- |
+| `src/api/fees.ts` | `deleteFeeCategory()` | 3 debug `console.log` statements left from development | Removed; simplified to single `await apiClient.delete(...)` |
+| `src/api/fees.ts` | `deleteFeeTerm()` | 1 debug `console.log` statement | Removed |
+| `src/api/fees.ts` | `createFeeTransaction()` | 2 debug `console.log` statements (request + response) | Removed |
+
+---
+
+## Bug Fixes (v1.6.2)
+
+| File | Issue | Fix |
+|------|-------|-----|
+| `app/(tabs)/_layout.tsx:151` | Unescaped apostrophe in JSX text `"You don't have access..."` — ESLint `react/no-unescaped-entities` error | Replaced `'` with `&apos;` |
+| `app/(tabs)/profile.tsx:123` | Unescaped apostrophe in JSX text `"You don't have permission..."` — ESLint `react/no-unescaped-entities` error | Replaced `'` with `&apos;` |
+
+---
+
+## Bug Fixes & Audit (v1.6.1)
+
+### Code Audit — March 2026
+
+All app screens audited. Issues found and resolved:
+
+| File | Issue | Fix |
+|------|-------|-----|
+| `app/exam/remark-sets.tsx` | File contained only stub text `"test content"` — not a valid component | Replaced with full CRUD implementation: `remarkGradesApi` list/create/update/delete, dynamic remark items editor, `useMobilePermission` permission gates |
+| `app/reports/transport-reports.tsx` | `Trip` type has no `is_active` field — `activeTrips` count was always `0` | Replaced `activeTrips` (filtered by non-existent field) with `totalTrips` (`trips.length`); card subtitle changed from "0 active" to "X total" |
+| `hooks/use-transport.ts` | `useDrivers()` was hardcoded to return `[]` — Driver dropdown in Trips create/edit was always empty | Implemented using `staffApi.getStaff()`, mapping `first_name + last_name` to `{ id, name }` |
+| `app/admin/permissions.tsx` | Had a 300ms timer redirect with loading spinner — unnecessarily complex | Replaced with clean `<Redirect href="/masters/rolespermissions" />` |
+| `app/transport/trips.tsx` | Used `AppLayout` (tab wrapper with footer) instead of `ScreenLayout` (sub-screen wrapper) | Changed to `ScreenLayout` |
+| `app/transport/routes.tsx` | Used `AppLayout` instead of `ScreenLayout`; route list showed `route.name` (wrong field) | Changed to `ScreenLayout`; fixed display to `route.route_name` + `starting_stop → ending_stop` |
+| `app/transport/vehicles.tsx` | Used `AppLayout` instead of `ScreenLayout` | Changed to `ScreenLayout` |
+| `app/admin/users.tsx` | Used `AppLayout` instead of `ScreenLayout`; was a placeholder | Changed to `ScreenLayout`; rebuilt as user stats hub with staff/student counts |
+| `app/admin/menu.tsx` | Used `AppLayout` instead of `ScreenLayout` | Changed to `ScreenLayout` |
+| `app/reports/transport-reports.tsx` | Routes list showed `route.name` (wrong field, always undefined) | Fixed to `route.route_name`; added `starting_stop → ending_stop` subtext |
 
 ---
 
@@ -411,6 +469,25 @@ onError: (err) => { showError('Failed', err.message); },
 ```
 
 **Rule:** `Alert.alert` is preserved only for destructive confirmation dialogs (delete confirm) and form validation errors. All mutation result feedback uses toasts.
+
+---
+
+## UI Overhauls & Bug Fixes (v1.6.0)
+
+### Screen Redesigns — Matching Web App
+
+| File | Change | Details |
+|------|--------|---------|
+| `app/students/admission.tsx` | Complete rewrite | List-first with rich cards (Admission No, Name, Class, Section, Year, Date, Status, Actions); eye-icon opens scrollable view modal with 34 detail fields; 6-step create form: 2-col layouts, calendar date picker (button-triggered), Indian states dropdown, district/mandal text inputs, Yes/No previous school dropdown, web-matched card summary; toggle active status via `studentAdmissionsApi.toggleActiveStatus()` |
+| `app/students/attendance.tsx` | `StaffAttendanceView` redesign | Compact 3-column filter row (Class / Section / Date); "Refresh" and "Save Attendance" action buttons; Present / Absent / Late stats cards; local `statusMap` state pre-populated from fetched records; P/A/L segmented buttons per row; "Mark All" quick row; bulk save via `useMutation` |
+| `app/students/transport.tsx` | Complete redesign | "Student Transport Assignments" header with "+ Assign Transport" button; search bar (student/route/stop); table with horizontal scroll — columns: S.No, Student (bold), Trip, Route, Stop, Fee/Term, Edit/Delete icons; Assign form moved to bottom-sheet `Modal`; uses `ScreenLayout` |
+
+### Bug Fixes
+
+| File | Issue | Fix |
+|------|-------|-----|
+| `src/api/students.ts` | `listCertificates` returned `response.data` which was `{ items: [...] }` (paginated object, not array) — caused `t3.map is not a function` crash in `AdminCertificates` | Changed to `return response.data?.items ?? response.data ?? []` |
+| `app/students/studentcertificates.tsx` | `certsRaw` defaulted to `[]` but could be a paginated object `{ items: [...] }` when API returned it, bypassing the `= []` default | Added `Array.isArray(certsRaw) ? certsRaw : (certsRaw as any)?.items ?? []` guard in `useMemo` |
 
 ---
 

@@ -300,7 +300,7 @@ export default function StudentDetailsScreen() {
             <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENTS} fallback={null}>
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-                onPress={() => Alert.alert('Edit', 'Edit student form')}
+                onPress={() => router.push({ pathname: '/students/admission', params: { id: student.student.id } })}
               >
                 <Ionicons name="create" size={18} color="white" />
                 <ThemedText style={styles.actionBtnText}>Edit Student</ThemedText>

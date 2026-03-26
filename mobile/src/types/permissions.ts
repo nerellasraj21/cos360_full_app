@@ -40,6 +40,7 @@ export const PERMISSION_RESOURCES = {
   SUBJECT_CATEGORIES: 'subject_categories',
   HOLIDAYS: 'holidays',
   TIMETABLES: 'timetables',
+  PARENTS: 'parents',
   ROLES_PERMISSIONS: 'roles_permissions',
   CLASS_SUBJECT_MAPPINGS: 'class_subject_mappings',
   
@@ -51,6 +52,23 @@ export const PERMISSION_RESOURCES = {
   EXPENSE_AUDIT: 'expense_audit',
   EXPENSE_DEPARTMENTS: 'expense_departments',
   
+  // Exam module
+  EXAMS: 'exams',
+  EXAM_DATES: 'exam_dates',
+  EXAM_MARKS: 'exam_marks',
+  EXAM_MARK_ENTRIES: 'exam_mark_entries',
+  EXAM_SCHEDULES: 'exam_schedules',
+  EXAM_HALL_TICKETS: 'exam_hall_tickets',
+  EXAM_RESULTS: 'exam_results',
+  EXAM_GRADE_SCHEMES: 'exam_grade_schemes',
+  EXAM_REMARKS: 'exam_remarks',
+  EXAM_AUDIT: 'exam_audit',
+
+  // Communication module
+  COMMUNICATION: 'communication',
+  COMMUNICATION_TEMPLATES: 'communication_templates',
+  COMMUNICATION_LOGS: 'communication_logs',
+
   // Administration module
   ADMIN_USERS: 'users',
   ADMIN_ROLES: 'roles',

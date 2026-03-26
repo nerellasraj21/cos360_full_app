@@ -435,7 +435,7 @@ export interface StudentTripCreate {
   trip_id: string;
   student_id: string;
   stop_id: string;
-  fee_term_id: string;
+  fee_term_id?: string;
   fee_per_term: number;
 }
 

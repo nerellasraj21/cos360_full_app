@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../../../components/FeedbackToast';
+import { useToastContext as useToast } from '../../../../components/ToastProvider';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
@@ -27,15 +27,19 @@ export function useAllCertificates(params?: { student_id?: string; certificate_t
   });
 }
 
-// Get student's certificates - permission protected
+// Get student's own certificates (student: /my, parent: /my-child/{id})
 export function useMyCertificates() {
-  const { studentId } = useAuth();
-  return usePermissionProtectedQuery<CertificateResponse[]>({
-    resource: PERMISSION_RESOURCES.STUDENT_CERTIFICATES,
-    action: 'read',
-    queryKey: ['certificates', 'my', studentId],
-    queryFn: () => studentCertificatesApi.listCertificates({ student_id: studentId || undefined }),
-    enabled: !!studentId,
+  const { studentId, selectedStudent, role } = useAuth();
+  const roleName = role?.name?.toLowerCase() ?? '';
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
+  const childId = selectedStudent?.id;
+  const effectiveId = isParent ? childId : studentId;
+  return useQuery<CertificateResponse[]>({
+    queryKey: ['certificates', 'my', effectiveId],
+    queryFn: () => isParent
+      ? studentCertificatesApi.myChildCertificates(childId!)
+      : studentCertificatesApi.myCertificates(),
+    enabled: !!effectiveId,
   });
 }
 

@@ -21,11 +21,12 @@ const STATUS_COLORS: Record<ExamStatus, { bg: string; text: string }> = {
 };
 
 const sections = [
-  { title: 'All Exams',    description: 'View & manage all exams',   icon: 'list' as const,          color: RED,       route: '/exam/list',         resource: 'exams',             action: 'list' },
-  { title: 'Create Exam',  description: 'Create a new exam',         icon: 'add-circle' as const,    color: '#DC2626', route: '/exam/create',        resource: 'exams',             action: 'create' },
-  { title: 'Enter Marks',  description: 'Enter student marks',       icon: 'create' as const,        color: '#8B5CF6', route: '/exam/marks',         resource: 'exam_marks',        action: 'create' },
-  { title: 'View Results', description: 'Student exam results',      icon: 'bar-chart' as const,     color: '#10B981', route: '/exam/results',       resource: 'exam_results',      action: 'list' },
-  { title: 'Hall Tickets', description: 'Manage & publish tickets',  icon: 'document-text' as const, color: '#F59E0B', route: '/exam/hall-tickets',  resource: 'exams',             action: 'read' },
+  { title: 'All Exams',    description: 'View & manage all exams',                            icon: 'list' as const,          color: RED,       route: '/exam/list',         resource: 'exams',             action: 'list' },
+  { title: 'Create Exam',  description: 'Create a new exam',                                  icon: 'add-circle' as const,    color: '#DC2626', route: '/exam/create',        resource: 'exams',             action: 'create' },
+  { title: 'Enter Marks',  description: 'Enter student marks',                                icon: 'create' as const,        color: '#8B5CF6', route: '/exam/marks',         resource: 'exam_marks',        action: 'create' },
+  { title: 'View Results', description: 'Student exam results',                               icon: 'bar-chart' as const,     color: '#10B981', route: '/exam/results',       resource: 'exam_results',      action: 'list' },
+  { title: 'Hall Tickets', description: 'Manage & publish tickets',                           icon: 'document-text' as const, color: '#F59E0B', route: '/exam/hall-tickets',  resource: 'exams',             action: 'read' },
+  { title: 'Grading',      description: 'Grade schemes, remark sets, board patterns & more',  icon: 'trophy' as const,        color: '#7C3AED', route: '/exam/grading',       resource: 'exams',             action: 'read' },
 ];
 
 export default function ExamScreen() {
@@ -36,7 +37,7 @@ export default function ExamScreen() {
 
   const roleName = role?.name?.toLowerCase() ?? '';
   const isStudent = roleName === 'student';
-  const isParent = roleName === 'parent' || roleName === 'guardian';
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -75,8 +76,8 @@ export default function ExamScreen() {
           </View>
         </View>
 
-        {/* Stats row */}
-        <View style={styles.statsRow}>
+        {/* Stats row — admin/staff only */}
+        {!isStudent && !isParent && <View style={styles.statsRow}>
           <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
             <View style={[styles.statIconBox, { backgroundColor: RED + '18' }]}>
               <Ionicons name="school" size={20} color={RED} />
@@ -98,7 +99,7 @@ export default function ExamScreen() {
             <Text style={[styles.statNum, { color: colors.foreground }]}>{stats.published}</Text>
             <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Published</Text>
           </View>
-        </View>
+        </View>}
 
         {/* Section label */}
         <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>

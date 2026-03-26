@@ -1,3 +1,20 @@
+// Work experience entry (dynamic array)
+export interface WorkExperienceEntry {
+  employer_name: string;
+  role: string;
+  from_date: string;
+  to_date?: string;
+  description?: string;
+}
+
+// Qualification entry (dynamic array)
+export interface QualificationEntry {
+  degree_name: string;
+  institution: string;
+  year_of_passing?: number;
+  result?: string;
+}
+
 // Staff Types
 export interface Staff {
   id: string;
@@ -15,8 +32,35 @@ export interface Staff {
   department?: string;
   is_active: boolean;
   user_id: string;
+  // designation_obj is returned by GET /staff/ (StaffOut schema)
+  designation_obj?: { id: string; title: string };
   designation?: Designation;
   attendances?: StaffAttendance[];
+  // Extended fields
+  employee_id?: string;
+  current_salary?: string;        // Decimal as string from backend
+  last_drawn_salary?: string;     // Decimal as string from backend
+  bank_name?: string;
+  bank_branch?: string;
+  account_number?: string;
+  bank_ifsc_code?: string;
+  ifsc_code?: string;
+  account_holder_name?: string;
+  account_type?: string;
+  pf_account_number?: string;
+  uan_number?: string;
+  esi_number?: string;
+  previous_employer?: string;
+  previous_designation?: string;
+  // Flat work experience fields (StaffOut from GET /staff/)
+  work_org?: string;
+  work_from_date?: string;
+  work_to_date?: string;
+  subjects_dealt?: string;
+  work_remarks?: string;
+  // Dynamic arrays (from StaffEnrollmentOut)
+  work_experience?: WorkExperienceEntry[];
+  qualifications?: any[];
   created_at: string;
   updated_at: string;
 }
@@ -34,6 +78,21 @@ export interface StaffInput {
   address?: string;
   designation_id?: string;
   department?: string;
+  // Extended fields
+  employee_id?: string;
+  current_salary?: number;
+  last_drawn_salary?: number;
+  bank_name?: string;
+  account_number?: string;
+  bank_ifsc_code?: string;
+  pf_account_number?: string;
+  uan_number?: string;
+  esi_number?: string;
+  previous_employer?: string;
+  previous_designation?: string;
+  // Dynamic arrays
+  work_experience?: WorkExperienceEntry[];
+  qualifications?: QualificationEntry[];
 }
 
 export interface Designation {

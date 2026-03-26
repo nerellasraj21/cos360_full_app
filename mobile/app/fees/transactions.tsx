@@ -1,7 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { useToastContext } from '@/components/ToastProvider';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useTheme, useAcademicYear, useAuth } from '@/contexts';
@@ -42,7 +41,7 @@ export default function FeeTransactionsScreen() {
     student_admission_num: '',
     academic_year_id: '',
     total_amount: 0,
-    payment_method: 'cash' as 'cash' | 'bank_transfer' | 'cheque' | 'online',
+    payment_method: 'cash' as 'cash' | 'bank_transfer' | 'cheque' | 'upi',
     transaction_date: new Date().toISOString().split('T')[0],
     remarks: '',
     collected_by: '',
@@ -93,7 +92,7 @@ export default function FeeTransactionsScreen() {
 
   const { data: feeTerms = [] } = useQuery({
     queryKey: ['feeTerms', activeAcademicYearId],
-    queryFn: () => feeTermsApi.getFeeTerms(activeAcademicYearId || undefined),
+    queryFn: () => feeTermsApi.getFeeTerms(activeAcademicYearId ? { academic_year_id: activeAcademicYearId } : undefined),
   });
 
 
@@ -543,12 +542,12 @@ export default function FeeTransactionsScreen() {
                         { value: 'cash', label: 'Cash' },
                         { value: 'bank_transfer', label: 'Bank Transfer' },
                         { value: 'cheque', label: 'Cheque' },
-                        { value: 'online', label: 'Online' },
+                        { value: 'upi', label: 'UPI' },
                       ]}
                       value={formData.payment_method}
                       onChange={(value) => setFormData(prev => ({
                         ...prev,
-                        payment_method: (value as 'cash' | 'bank_transfer' | 'cheque' | 'online') || 'cash',
+                        payment_method: (value as 'cash' | 'bank_transfer' | 'cheque' | 'upi') || 'cash',
                         // Clear dynamic fields when payment method changes
                         upi_reference: '',
                         cheque_number: '',
@@ -558,7 +557,7 @@ export default function FeeTransactionsScreen() {
                       disabled={isSubmitting}
                     />
 
-                    {formData.payment_method === 'online' && (
+                    {formData.payment_method === 'upi' && (
                       <>
                         <ThemedText style={styles.label}>UPI Reference</ThemedText>
                         <TextInput

@@ -6,6 +6,7 @@ import { useExpensePendingApprovalsProtected, useApproveExpenseTransactionProtec
 import { ReadOrListPermissionGuard, ApprovePermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Alert,
@@ -18,6 +19,7 @@ import {
 } from 'react-native';
 
 export default function ExpenseApprovalsScreen() {
+  const router = useRouter();
   const { colors } = useTheme();
   const { data: pendingApprovals, isLoading, error } = useExpensePendingApprovalsProtected();
   const approveMutation = useApproveExpenseTransactionProtected();
@@ -30,10 +32,6 @@ export default function ExpenseApprovalsScreen() {
   const transactions = Array.isArray(pendingApprovals)
     ? pendingApprovals
     : pendingApprovals?.items || [];
-
-  // Debug logging
-  console.log('Expense Approvals - Raw data:', pendingApprovals);
-  console.log('Expense Approvals - Processed array:', transactions);
 
   const handleApprove = (id: string) => {
     setSelectedTransactionId(id);
@@ -54,65 +52,59 @@ export default function ExpenseApprovalsScreen() {
       Alert.alert('Error', 'Please enter an approval comment');
       return;
     }
-
-    console.log('Approval submit - Action:', approvalAction);
-    console.log('Approval submit - Comment:', approvalComment);
-
     approveMutation.mutate(
       { id: selectedTransactionId, data: { action: approvalAction, approval_comment: approvalComment.trim() } },
       {
-        onSuccess: () => {
-          console.log('Approval mutation success');
-          setApprovalModalVisible(false);
-        },
-        onError: (error: any) => {
-          console.log('Approval mutation error:', error);
-          Alert.alert('Error', `Failed to ${approvalAction} transaction`);
-        },
+        onSuccess: () => setApprovalModalVisible(false),
+        onError: () => Alert.alert('Error', `Failed to ${approvalAction} transaction`),
       }
     );
   };
 
   const renderTransactionItem = ({ item }: { item: any }) => (
-    <ThemedView style={[styles.transactionCard, { backgroundColor: colors.card }]}>
-      <View style={styles.transactionHeader}>
-        <ThemedText type="subtitle" style={styles.vendorName}>
-          {item.vendor_name}
-        </ThemedText>
-        <ThemedText style={[styles.amount, { color: colors.primary }]}>
-          ₹{item.amount.toLocaleString()}
-        </ThemedText>
-      </View>
-
-      <View style={styles.transactionDetails}>
-        <ThemedText style={[styles.transactionInfo, { color: colors['muted-foreground'] }]}>
-          {item.description}
-        </ThemedText>
-        <ThemedText style={[styles.transactionInfo, { color: colors['muted-foreground'] }]}>
-          {new Date(item.transaction_date).toLocaleDateString()} • Type ID: {item.expense_type_id}
-        </ThemedText>
-      </View>
-
-      <ApprovePermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_APPROVALS}>
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.rejectButton]}
-            onPress={() => handleReject(item.id)}
-          >
-            <Ionicons name="close" size={16} color="white" />
-            <ThemedText style={styles.actionButtonText}>Reject</ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionButton, styles.approveButton]}
-            onPress={() => handleApprove(item.id)}
-          >
-            <Ionicons name="checkmark" size={16} color="white" />
-            <ThemedText style={styles.actionButtonText}>Approve</ThemedText>
-          </TouchableOpacity>
+    <TouchableOpacity
+      onPress={() => router.push(`/expense/transactions/${item.id}` as any)}
+      activeOpacity={0.8}
+    >
+      <ThemedView style={[styles.transactionCard, { backgroundColor: colors.card }]}>
+        <View style={styles.transactionHeader}>
+          <ThemedText type="subtitle" style={styles.vendorName}>
+            {item.vendor_name}
+          </ThemedText>
+          <ThemedText style={[styles.amount, { color: colors.primary }]}>
+            ₹{Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </ThemedText>
         </View>
-      </ApprovePermissionGuard>
-    </ThemedView>
+
+        <View style={styles.transactionDetails}>
+          <ThemedText style={[styles.transactionInfo, { color: colors['muted-foreground'] }]}>
+            {item.description}
+          </ThemedText>
+          <ThemedText style={[styles.transactionInfo, { color: colors['muted-foreground'] }]}>
+            {new Date(item.transaction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </ThemedText>
+        </View>
+
+        <ApprovePermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_APPROVALS}>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.rejectButton]}
+              onPress={(e) => { e.stopPropagation?.(); handleReject(item.id); }}
+            >
+              <Ionicons name="close" size={16} color="white" />
+              <ThemedText style={styles.actionButtonText}>Reject</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.approveButton]}
+              onPress={(e) => { e.stopPropagation?.(); handleApprove(item.id); }}
+            >
+              <Ionicons name="checkmark" size={16} color="white" />
+              <ThemedText style={styles.actionButtonText}>Approve</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </ApprovePermissionGuard>
+      </ThemedView>
+    </TouchableOpacity>
   );
 
   if (isLoading) {

@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,11 +15,11 @@ import {
 } from 'react-native';
 
 import { AppLayout } from '@/components';
-import { useAuth, useTheme } from '@/contexts';
-import apiClient from '@/src/api/client';
+import { useAcademicYear, useAuth, useTheme } from '@/contexts';
 import {
   feeCollectionApi,
   feeConcessionsApi,
+  feeOldFeesApi,
   FeeCollectionSummary,
   FeeConcessionCreate,
 } from '@/src/api/fees';
@@ -27,6 +28,7 @@ import { useToastContext } from '@/components/ToastProvider';
 export default function FeeCollectionScreen() {
   const { role, selectedStudent } = useAuth();
   const { colors, theme } = useTheme();
+  const { activeAcademicYearId } = useAcademicYear();
 
   const roleName = role?.name?.toLowerCase() ?? '';
   const isStudent = roleName === 'student';
@@ -41,7 +43,16 @@ export default function FeeCollectionScreen() {
     amount: '',
     payment_method: 'cash' as 'cash' | 'cheque' | 'bank_transfer' | 'upi' | 'dd' | 'card',
     remarks: '',
+    upi_reference: '',
+    bank_reference: '',
+    cheque_number: '',
+    cheque_bank: '',
   });
+  const [paymentSuccess, setPaymentSuccess] = useState<{
+    receipt_number?: string;
+    transaction_number?: string;
+    amount_paid: number;
+  } | null>(null);
   const [concessionForm, setConcessionForm] = useState({
     fee_type_id: '',
     amount: '',
@@ -85,23 +96,32 @@ export default function FeeCollectionScreen() {
 
   const { data: oldFees, isLoading: oldFeesLoading } = useQuery({
     queryKey: ['old-fees', selectedStudentId],
-    queryFn: () => apiClient.get('/fee/old-fees', { params: { student_id: selectedStudentId } }).then(r => r.data.items || r.data),
+    queryFn: () => feeOldFeesApi.getOldFeesByStudent(selectedStudentId),
     enabled: !isStudent && !isParent && !!selectedStudentId && adminTab === 'old-fees',
   });
 
   const payMutation = useMutation({
     mutationFn: () => feeCollectionApi.pay({
       student_id: selectedStudentId,
-      academic_year_id: '',
+      academic_year_id: activeAcademicYearId ?? '',
       amount_to_pay: parseFloat(paymentForm.amount) || 0,
       payment_method: paymentForm.payment_method,
       remarks: paymentForm.remarks || null,
+      upi_reference: paymentForm.upi_reference || undefined,
+      bank_reference: paymentForm.bank_reference || undefined,
+      cheque_number: paymentForm.cheque_number || undefined,
+      cheque_bank: paymentForm.cheque_bank || undefined,
     } as any),
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       qc.invalidateQueries({ queryKey: ['fee-summary', selectedStudentId] });
       setAdminTab('summary');
-      setPaymentForm({ amount: '', payment_method: 'cash', remarks: '' });
-      showSuccess('Payment Recorded', 'Payment recorded successfully');
+      const paid = parseFloat(paymentForm.amount) || 0;
+      setPaymentForm({ amount: '', payment_method: 'cash', remarks: '', upi_reference: '', bank_reference: '', cheque_number: '', cheque_bank: '' });
+      setPaymentSuccess({
+        receipt_number: data?.receipt_number,
+        transaction_number: data?.transaction_number,
+        amount_paid: data?.amount_paid ?? paid,
+      });
     },
     onError: () => showError('Error', 'Failed to record payment'),
   });
@@ -110,7 +130,7 @@ export default function FeeCollectionScreen() {
     mutationFn: () => feeConcessionsApi.bulkCreate([{
       student_id: selectedStudentId,
       fee_type_id: concessionForm.fee_type_id,
-      academic_year_id: '',
+      academic_year_id: activeAcademicYearId ?? '',
       amount: parseFloat(concessionForm.amount) || 0,
       approver_role: concessionForm.approver_role,
       remarks: concessionForm.remarks || undefined,
@@ -295,6 +315,51 @@ export default function FeeCollectionScreen() {
         ))}
       </View>
 
+      {paymentForm.payment_method === 'upi' && (
+        <>
+          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>UPI Reference / Transaction ID</Text>
+          <TextInput
+            style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
+            placeholder="Enter UPI reference number"
+            placeholderTextColor={colors['muted-foreground']}
+            value={paymentForm.upi_reference}
+            onChangeText={(t) => setPaymentForm(p => ({ ...p, upi_reference: t }))}
+          />
+        </>
+      )}
+      {paymentForm.payment_method === 'bank_transfer' && (
+        <>
+          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Bank Reference / UTR Number</Text>
+          <TextInput
+            style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
+            placeholder="Enter bank reference / UTR"
+            placeholderTextColor={colors['muted-foreground']}
+            value={paymentForm.bank_reference}
+            onChangeText={(t) => setPaymentForm(p => ({ ...p, bank_reference: t }))}
+          />
+        </>
+      )}
+      {paymentForm.payment_method === 'cheque' && (
+        <>
+          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Cheque Number</Text>
+          <TextInput
+            style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
+            placeholder="Enter cheque number"
+            placeholderTextColor={colors['muted-foreground']}
+            value={paymentForm.cheque_number}
+            onChangeText={(t) => setPaymentForm(p => ({ ...p, cheque_number: t }))}
+          />
+          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Bank Name</Text>
+          <TextInput
+            style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
+            placeholder="Enter bank name"
+            placeholderTextColor={colors['muted-foreground']}
+            value={paymentForm.cheque_bank}
+            onChangeText={(t) => setPaymentForm(p => ({ ...p, cheque_bank: t }))}
+          />
+        </>
+      )}
+
       <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Remarks (optional)</Text>
       <TextInput
         style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol, minHeight: 72 }]}
@@ -442,6 +507,7 @@ export default function FeeCollectionScreen() {
 
   return (
     <AppLayout title="Fee Collection">
+      <View style={{ flex: 1 }}>
       <View style={styles.adminContainer}>
         {/* Search bar */}
         <View style={[styles.searchBar, { backgroundColor: cardBg, borderColor: borderCol }]}>
@@ -499,7 +565,7 @@ export default function FeeCollectionScreen() {
         )}
 
         {/* Tab bar — visible once a student is selected */}
-        {selectedStudentId && adminFeeSummary && (
+        {selectedStudentId && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.adminTabBar}>
             {ADMIN_TABS.map(tab => (
               <TouchableOpacity
@@ -534,6 +600,41 @@ export default function FeeCollectionScreen() {
           message={'Search and select a student\nto view their fee details'}
         />
       ) : null}
+      </View>
+
+      {/* Payment success modal */}
+      <Modal
+        visible={!!paymentSuccess}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setPaymentSuccess(null)}
+      >
+        <View style={styles.successOverlay}>
+          <View style={[styles.successModal, { backgroundColor: cardBg }]}>
+            <Ionicons name="checkmark-circle" size={60} color="#10B981" style={{ marginBottom: 12 }} />
+            <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment Recorded!</Text>
+            <Text style={[styles.successAmount, { color: '#10B981' }]}>
+              ₹{Number(paymentSuccess?.amount_paid ?? 0).toLocaleString('en-IN')}
+            </Text>
+            {paymentSuccess?.receipt_number ? (
+              <Text style={[styles.successDetail, { color: colors['muted-foreground'] }]}>
+                Receipt: {paymentSuccess.receipt_number}
+              </Text>
+            ) : null}
+            {paymentSuccess?.transaction_number ? (
+              <Text style={[styles.successDetail, { color: colors['muted-foreground'] }]}>
+                Transaction: {paymentSuccess.transaction_number}
+              </Text>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.successBtn, { backgroundColor: '#10B981' }]}
+              onPress={() => setPaymentSuccess(null)}
+            >
+              <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </AppLayout>
   );
 }
@@ -657,7 +758,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   adminContainer: {
-    flex: 1,
     padding: 16,
   },
   searchBar: {
@@ -738,5 +838,43 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '700',
     fontSize: 15,
+  },
+  successOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  successModal: {
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  successTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  successAmount: {
+    fontSize: 32,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  successDetail: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  successBtn: {
+    marginTop: 20,
+    paddingVertical: 13,
+    paddingHorizontal: 48,
+    borderRadius: 12,
   },
 });

@@ -1,11 +1,10 @@
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useTheme } from '@/contexts';
-import { useStudents, useFeeTerms, useTrips, useRouteStops } from '@/hooks';
+import { useStudents, useTrips, useRouteStops } from '@/hooks';
 import { useStudentTrips, useCreateStudentTrip, useUpdateStudentTrip, useDeleteStudentTrip } from '../../hooks/use-transport';
 import { StudentTrip } from '../../src/types/transport';
 import { PERMISSION_RESOURCES } from '../../src/types/permissions';
@@ -32,9 +31,10 @@ export default function StudentTripsScreen() {
     trip_id: '',
     student_id: '',
     stop_id: '',
-    fee_term_id: '',
     fee_per_term: 0,
   });
+  // Track the route_id for the currently selected trip so stops can be filtered
+  const [formRouteId, setFormRouteId] = useState<string | undefined>(undefined);
 
   const { colors } = useTheme();
   const { showSuccess, showError } = useToastContext();
@@ -42,9 +42,9 @@ export default function StudentTripsScreen() {
   // Fetch data using permission-protected hooks
   const { data: studentTripsData, isLoading, error, refetch } = useStudentTrips();
   const { data: studentsData } = useStudents();
-  const { data: feeTermsData } = useFeeTerms();
   const { data: tripsData } = useTrips();
-  const { data: routeStopsData } = useRouteStops();
+  // Filter stops by the selected trip's route
+  const { data: routeStopsData } = useRouteStops({ route_id: formRouteId });
 
   // Mutations using permission-protected hooks
   const createMutation = useCreateStudentTrip();
@@ -52,17 +52,8 @@ export default function StudentTripsScreen() {
   const deleteMutation = useDeleteStudentTrip();
 
   const students = studentsData || [];
-  const feeTerms = feeTermsData || [];
   const trips = tripsData || [];
   const routeStops = routeStopsData || [];
-
-  // Debug logging
-  React.useEffect(() => {
-    console.log('Students data:', students.length, students.slice(0, 2));
-    console.log('Fee terms data:', feeTerms.length, feeTerms.slice(0, 2));
-    console.log('Trips data:', trips.length, trips.slice(0, 2));
-    console.log('Route stops data:', routeStops.length, routeStops.slice(0, 2));
-  }, [students, feeTerms, trips, routeStops]);
 
   // Handle mutation success/error states
   React.useEffect(() => {
@@ -104,16 +95,14 @@ export default function StudentTripsScreen() {
     if (!studentTripsData || !Array.isArray(studentTripsData)) return [];
 
     return studentTripsData.filter((assignment: StudentTrip) => {
-      const student = students.find(s => s.id === assignment.student_id);
+      const student = students.find((s: any) => s.id === assignment.student_id);
       const searchTerm = searchQuery.toLowerCase();
 
-      // Search filter
       const matchesSearch = !searchQuery || (
         student?.display_name?.toLowerCase().includes(searchTerm) ||
         student?.admission_number?.toLowerCase().includes(searchTerm)
       );
 
-      // Status filter
       const matchesStatus = statusFilter === 'all' ||
         (statusFilter === 'active' && assignment.is_active !== false) ||
         (statusFilter === 'inactive' && assignment.is_active === false);
@@ -127,27 +116,29 @@ export default function StudentTripsScreen() {
       trip_id: '',
       student_id: '',
       stop_id: '',
-      fee_term_id: '',
       fee_per_term: 0,
     });
+    setFormRouteId(undefined);
     setEditingTrip(null);
   };
 
   const handleEdit = (assignment: StudentTrip) => {
     setEditingTrip(assignment);
+    // Derive route_id from the assignment's trip so stops are pre-filtered
+    const trip = (trips as any[]).find(t => t.id === assignment.trip_id);
+    setFormRouteId(trip?.route_id);
     setFormData({
       trip_id: assignment.trip_id,
       student_id: assignment.student_id,
       stop_id: assignment.stop_id,
-      fee_term_id: assignment.fee_term_id,
       fee_per_term: assignment.fee_per_term,
     });
     setIsModalVisible(true);
   };
 
   const handleDelete = (assignment: StudentTrip) => {
-    const student = students.find(s => s.id === assignment.student_id);
-    const trip = trips.find(t => t.id === assignment.trip_id);
+    const student = (students as any[]).find(s => s.id === assignment.student_id);
+    const trip = (trips as any[]).find(t => t.id === assignment.trip_id);
     Alert.alert(
       'Delete Student Transport Assignment',
       `Are you sure you want to delete transport assignment for ${student?.display_name || 'Unknown Student'} on Trip ${trip?.trip_number || 'Unknown Trip'}?`,
@@ -163,18 +154,15 @@ export default function StudentTripsScreen() {
   };
 
   const handleSubmit = () => {
-    // Validation for creation
     if (!editingTrip) {
       if (!formData.trip_id) {
         Alert.alert('Error', 'Trip is required');
         return;
       }
-
       if (!formData.student_id) {
         Alert.alert('Error', 'Student is required');
         return;
       }
-
       if (!formData.stop_id) {
         Alert.alert('Error', 'Stop is required');
         return;
@@ -194,18 +182,16 @@ export default function StudentTripsScreen() {
   };
 
   const renderAssignmentItem = useCallback(({ item }: { item: StudentTrip }) => {
-    const student = students.find(s => s.id === item.student_id);
-    const trip = trips.find(t => t.id === item.trip_id);
-    const stop = routeStops.find(s => s.id === item.stop_id);
-    const feeTerm = feeTerms.find(f => f.id === item.fee_term_id);
+    const student = (students as any[]).find(s => s.id === item.student_id);
+    const trip = (trips as any[]).find(t => t.id === item.trip_id);
+    const stop = (routeStopsData as any[] || []).find((s: any) => s.id === item.stop_id);
 
     const studentDisplay = student?.display_name
       ? (student.admission_number ? `${student.display_name} (${student.admission_number})` : student.display_name)
       : 'Unknown Student';
 
     const tripDisplay = trip ? `Trip ${trip.trip_number}` : 'Unknown Trip';
-    const stopDisplay = stop?.name || 'Unknown Stop';
-    const feeTermDisplay = feeTerm?.term_name || 'No Term';
+    const stopDisplay = stop?.name || item.stop_id || 'Unknown Stop';
 
     return (
       <View style={[styles.assignmentCard, { backgroundColor: colors.card }]}>
@@ -222,7 +208,7 @@ export default function StudentTripsScreen() {
           </View>
           <View style={styles.actionButtons}>
             <UpdatePermissionGuard
-              resource={PERMISSION_RESOURCES.TRANSPORT_TRIPS}>
+              resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.primary }]}
                 onPress={() => handleEdit(item)}
@@ -231,7 +217,7 @@ export default function StudentTripsScreen() {
               </TouchableOpacity>
             </UpdatePermissionGuard>
             <DeletePermissionGuard
-              resource={PERMISSION_RESOURCES.TRANSPORT_TRIPS}>
+              resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
                 onPress={() => handleDelete(item)}
@@ -256,12 +242,6 @@ export default function StudentTripsScreen() {
             </ThemedText>
           </View>
           <View style={styles.detailRow}>
-            <Ionicons name="school" size={16} color={colors['muted-foreground']} />
-            <ThemedText style={styles.detailText}>
-              Fee Term: {feeTermDisplay}
-            </ThemedText>
-          </View>
-          <View style={styles.detailRow}>
             <Ionicons name="cash" size={16} color={colors['muted-foreground']} />
             <ThemedText style={styles.detailText}>
               Fee per Term: ₹{item.fee_per_term.toLocaleString()}
@@ -278,7 +258,7 @@ export default function StudentTripsScreen() {
         </View>
       </View>
     );
-  }, [colors, students, trips, routeStops, feeTerms]);
+  }, [colors, students, trips, routeStopsData]);
 
   if (error) {
     return (
@@ -301,7 +281,7 @@ export default function StudentTripsScreen() {
   return (
     <AppLayout title="Student Transport Assignments">
       <ReadOrListPermissionGuard
-        resource={PERMISSION_RESOURCES.TRANSPORT_TRIPS}
+        resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}
         fallback={
           <View style={styles.centerContainer}>
             <Ionicons name="lock-closed" size={64} color={colors['muted-foreground']} />
@@ -318,7 +298,7 @@ export default function StudentTripsScreen() {
           {/* Header with Add Button */}
           <View style={styles.header}>
             <CreatePermissionGuard
-              resource={PERMISSION_RESOURCES.TRANSPORT_TRIPS}>
+              resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
               <TouchableOpacity
                 style={[styles.addButton, { backgroundColor: colors.primary }]}
                 onPress={() => {
@@ -334,7 +314,6 @@ export default function StudentTripsScreen() {
 
           {/* Filters Section */}
           <View style={styles.filtersContainer}>
-            {/* Search Bar */}
             <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
               <Ionicons name="search" size={20} color={colors['muted-foreground']} />
               <TextInput
@@ -351,7 +330,6 @@ export default function StudentTripsScreen() {
               ) : null}
             </View>
 
-            {/* Status Filter */}
             <View style={styles.statusFilterContainer}>
               <CustomDropdown
                 data={[
@@ -418,72 +396,48 @@ export default function StudentTripsScreen() {
                   nestedScrollEnabled={true}
                   keyboardShouldPersistTaps="handled"
                 >
-                  {/* Debug info */}
-                  <View style={{ marginBottom: 10, padding: 10, backgroundColor: colors.muted }}>
-                    <ThemedText style={{ fontSize: 12 }}>
-                      Debug: Students: {students.length}, Trips: {trips.length}, Stops: {routeStops.length}, Terms: {feeTerms.length}
-                    </ThemedText>
-                  </View>
-
                   <View style={styles.formGroup}>
                     <ThemedText style={styles.label}>Trip {!editingTrip && '*'}</ThemedText>
                     <CustomDropdown
-                      data={trips.map(trip => ({
+                      data={(trips as any[]).map(trip => ({
                         label: `Trip ${trip.trip_number}`,
-                        value: trip.id
+                        value: trip.id,
                       }))}
                       value={formData.trip_id}
-                      onChange={(value) => setFormData(prev => ({ ...prev, trip_id: value?.toString() || '' }))}
+                      onChange={(value) => {
+                        const trip = (trips as any[]).find(t => t.id === value);
+                        setFormRouteId(trip?.route_id);
+                        setFormData(prev => ({ ...prev, trip_id: value?.toString() || '', stop_id: '' }));
+                      }}
                       placeholder="Select trip"
-                      maxHeight={200}
-                      containerStyle={{ zIndex: 3000, elevation: 3000 }}
                     />
                   </View>
 
                   <View style={styles.formGroup}>
                     <ThemedText style={styles.label}>Student {!editingTrip && '*'}</ThemedText>
                     <CustomDropdown
-                      data={students.map(student => ({
+                      data={(students as any[]).map(student => ({
                         label: student.admission_number
                           ? `${student.display_name} (${student.admission_number})`
                           : student.display_name,
-                        value: student.id
+                        value: student.id,
                       }))}
                       value={formData.student_id}
                       onChange={(value) => setFormData(prev => ({ ...prev, student_id: value?.toString() || '' }))}
                       placeholder="Select student"
-                      maxHeight={200}
-                      containerStyle={{ zIndex: 2000, elevation: 2000 }}
                     />
                   </View>
 
                   <View style={styles.formGroup}>
                     <ThemedText style={styles.label}>Stop {!editingTrip && '*'}</ThemedText>
                     <CustomDropdown
-                      data={routeStops.map(stop => ({
+                      data={(routeStops as any[]).map(stop => ({
                         label: stop.name,
-                        value: stop.id
+                        value: stop.id,
                       }))}
                       value={formData.stop_id}
                       onChange={(value) => setFormData(prev => ({ ...prev, stop_id: value?.toString() || '' }))}
-                      placeholder="Select stop"
-                      maxHeight={200}
-                      containerStyle={{ zIndex: 1500, elevation: 1500 }}
-                    />
-                  </View>
-
-                  <View style={styles.formGroup}>
-                    <ThemedText style={styles.label}>Fee Term</ThemedText>
-                    <CustomDropdown
-                      data={feeTerms.map(term => ({
-                        label: term.term_name,
-                        value: term.id
-                      }))}
-                      value={formData.fee_term_id}
-                      onChange={(value) => setFormData(prev => ({ ...prev, fee_term_id: value?.toString() || '' }))}
-                      placeholder="Select fee term"
-                      maxHeight={200}
-                      containerStyle={{ zIndex: 1000, elevation: 1000 }}
+                      placeholder={formData.trip_id ? 'Select stop' : 'Select a trip first'}
                     />
                   </View>
 
@@ -658,7 +612,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 999,
   },
   modalContent: {
     width: '90%',
@@ -666,8 +619,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 20,
     maxHeight: '80%',
-    zIndex: 1000,
-    elevation: 1000,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -684,7 +635,6 @@ const styles = StyleSheet.create({
   },
   formGroup: {
     marginBottom: 16,
-    zIndex: 1,
   },
   label: {
     fontSize: 16,

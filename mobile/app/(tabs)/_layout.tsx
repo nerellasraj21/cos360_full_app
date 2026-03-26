@@ -148,7 +148,7 @@ export default function TabLayout() {
           lineHeight: 20,
           opacity: 0.7
         }}>
-          You don't have access to any modules.{'\n'}
+          You don&apos;t have access to any modules.{'\n'}
           Please contact your administrator for access permissions.
         </ThemedText>
       </ThemedView>

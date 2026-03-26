@@ -16,7 +16,7 @@ import {
   getStoredStudentId,
   storeStudentData
 } from '../services/authUtils';
-import { logPermissionDebugInfo, checkPermissionPatterns } from '../utils/permission-debug';
+// import { logPermissionDebugInfo, checkPermissionPatterns } from '../utils/permission-debug';
 import { hasPermissionWithFallbacks } from '../utils/permission-compatibility';
 
 // Auth state interface
@@ -32,6 +32,7 @@ interface AuthState {
   selectedStudent: ParentStudent | null;
   availableStudents: ParentStudent[];
   studentId: string | null;
+  requiresPasswordChange: boolean;
 }
 
 // Auth actions
@@ -75,6 +76,7 @@ const initialState: AuthState = {
   selectedStudent: null,
   availableStudents: [],
   studentId: null,
+  requiresPasswordChange: false,
 };
 
 // Auth reducer
@@ -127,10 +129,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         return map;
       }, {} as { [key: string]: Permission });
 
-      // Debug permissions after login
-      logPermissionDebugInfo(loginPermissionsArray, 'Login Success - Permissions Received');
-      const permissionPatterns = checkPermissionPatterns(loginPermissionsArray);
-      console.log('🔍 Permission Patterns Check:', permissionPatterns);
+      // Debug logging removed — use React Query DevTools or Redux DevTools for permission inspection
 
       return {
         ...state,
@@ -142,6 +141,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isAuthenticated: true,
         isLoading: false,
         error: null,
+        requiresPasswordChange: !!(action.payload as AuthResponse).requires_password_change,
       };
 
     case 'LOGOUT':
@@ -185,6 +185,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         availableStudents: action.payload.availableStudents || [],
         studentId: action.payload.studentId || null,
         isLoading: false,
+        requiresPasswordChange: false,
       };
 
     case 'SET_AVAILABLE_STUDENTS':
@@ -378,7 +379,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       state.permissionsMap,
       resource,
       action,
-      true // Enable debug logging
+      false
     );
 
     return hasPermissionResult;

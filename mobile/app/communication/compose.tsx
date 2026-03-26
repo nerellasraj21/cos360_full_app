@@ -40,7 +40,7 @@ export default function ComposeScreen() {
   const sendMutation = useMutation({
     mutationFn: (data: SendMessageRequest) => communicationApi.send(data),
     onSuccess: (res) => {
-      Alert.alert('Sent', `Message sent to ${res.recipient_count} recipients.`);
+      Alert.alert('Sent', `Message sent to ${res.queued_count} recipients.`);
       setSubject('');
       setBody('');
       setTemplateId('');
@@ -62,11 +62,15 @@ export default function ComposeScreen() {
           text: 'Send',
           onPress: () =>
             sendMutation.mutate({
-              recipient_type: recipientType,
-              subject,
-              body,
               channel,
-              template_id: templateId || undefined,
+              target_type: recipientType === 'all' ? 'all_users'
+                : recipientType === 'parent' ? 'all_parents'
+                : recipientType === 'student' ? 'all_students'
+                : recipientType === 'staff' ? 'all_staff'
+                : 'all_users',
+              target_ref: {},
+              ...(templateId ? { template_id: templateId } : {}),
+              extra_variables: body ? { body, subject } : undefined,
             }),
         },
       ],

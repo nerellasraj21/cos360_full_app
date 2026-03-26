@@ -1,43 +1,86 @@
-import React from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextInput, Linking } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
-import { useMyDocuments, useDownloadDocument } from '@/src/api/hooks/students/documents';
+import { useMyDocuments, useUploadMyDocument, useDownloadDocument } from '@/src/api/hooks/students/documents';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReadOrListPermissionGuard, CreatePermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
 export default function MyDocumentsPage() {
   const { colors } = useTheme();
-  const { studentId } = useAuth();
+  const { studentId, role, selectedStudent } = useAuth();
+  const roleName = role?.name?.toLowerCase() ?? '';
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
+  const pageTitle = isParent ? 'Child Documents' : 'My Documents';
   const { data: documentsData, isLoading, error } = useMyDocuments();
   const downloadMutation = useDownloadDocument();
+  const uploadMutation = useUploadMyDocument();
+
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadType, setUploadType] = useState('');
+  const [uploadFile, setUploadFile] = useState<{ uri: string; name: string; type: string } | null>(null);
 
   const documents = documentsData || [];
 
   const getDocumentIcon = (type: string) => {
     switch (type.toLowerCase()) {
-      case 'certificate':
-        return 'document';
-      case 'medical':
-        return 'medical';
-      case 'identification':
-        return 'card';
-      default:
-        return 'document';
+      case 'certificate': return 'document';
+      case 'medical': return 'medical';
+      case 'identification': return 'card';
+      default: return 'document';
     }
   };
 
-  const handleView = async (documentId: string) => {
+  const handlePickFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+      if (!result.canceled && result.assets?.[0]) {
+        const asset = result.assets[0];
+        setUploadFile({ uri: asset.uri, name: asset.name, type: asset.mimeType || 'application/octet-stream' });
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to pick file');
+    }
+  };
+
+  const handleUploadSubmit = () => {
+    if (!uploadType.trim() || !uploadFile) {
+      Alert.alert('Validation', 'Please enter a document type and select a file');
+      return;
+    }
+    uploadMutation.mutate(
+      { document_type: uploadType.trim(), document_file: { uri: uploadFile.uri, type: uploadFile.type, name: uploadFile.name } },
+      {
+        onSuccess: () => {
+          setShowUploadModal(false);
+          setUploadType('');
+          setUploadFile(null);
+        },
+      }
+    );
+  };
+
+  const handleDownload = async (documentId: string) => {
     try {
       const blob = await downloadMutation.mutateAsync(documentId);
-      Alert.alert('Success', 'Document opened successfully');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to open document');
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          await Linking.openURL(reader.result as string);
+        } catch {
+          Alert.alert('Info', 'Document downloaded. Check your device to open it.');
+        }
+      };
+      reader.onerror = () => Alert.alert('Error', 'Failed to process document');
+      reader.readAsDataURL(blob);
+    } catch {
+      Alert.alert('Error', 'Failed to download document');
     }
   };
 
@@ -64,14 +107,14 @@ export default function MyDocumentsPage() {
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.primary }]}
-            onPress={() => handleView(item.id)}
+            onPress={() => handleDownload(item.id)}
             disabled={downloadMutation.isPending}
           >
             <Ionicons name="eye" size={16} color="white" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
-            onPress={() => handleView(item.id)}
+            style={[styles.actionButton, { backgroundColor: '#10B981' }]}
+            onPress={() => handleDownload(item.id)}
             disabled={downloadMutation.isPending}
           >
             <Ionicons name="download" size={16} color="white" />
@@ -83,7 +126,7 @@ export default function MyDocumentsPage() {
 
   if (isLoading) {
     return (
-      <AppLayout title="My Documents">
+      <AppLayout title={pageTitle}>
         <View style={styles.loadingContainer}>
           <ThemedText>Loading documents...</ThemedText>
         </View>
@@ -93,12 +136,12 @@ export default function MyDocumentsPage() {
 
   if (error) {
     return (
-      <AppLayout title="My Documents">
+      <AppLayout title={pageTitle}>
         <View style={styles.errorContainer}>
           <ThemedText style={styles.errorText}>Failed to load documents</ThemedText>
-          {!studentId && (
+          {(isParent ? !selectedStudent : !studentId) && (
             <ThemedText style={styles.errorSubtext}>
-              Please select a student to view documents
+              {isParent ? 'Select a student from the header' : 'Please select a student to view documents'}
             </ThemedText>
           )}
         </View>
@@ -107,10 +150,10 @@ export default function MyDocumentsPage() {
   }
 
   return (
-    <ReadOrListPermissionGuard 
+    <ReadOrListPermissionGuard
       resource={PERMISSION_RESOURCES.STUDENT_DOCUMENTS}
       fallback={
-        <AppLayout title="My Documents">
+        <AppLayout title={pageTitle}>
           <View style={styles.accessDeniedContainer}>
             <Ionicons name="lock-closed" size={48} color={colors['muted-foreground']} />
             <ThemedText style={styles.accessDeniedText}>
@@ -120,15 +163,20 @@ export default function MyDocumentsPage() {
         </AppLayout>
       }
     >
-      <AppLayout title="My Documents">
+      <AppLayout title={pageTitle}>
         <View style={styles.container}>
-          <CreatePermissionGuard 
-            resource={PERMISSION_RESOURCES.STUDENT_DOCUMENTS}>
-            <TouchableOpacity style={[styles.uploadButton, { backgroundColor: colors.primary }]}>
-              <Ionicons name="cloud-upload" size={20} color="white" />
-              <ThemedText style={styles.uploadButtonText}>Upload New Document</ThemedText>
-            </TouchableOpacity>
-          </CreatePermissionGuard>
+          {!isParent && (
+            <CreatePermissionGuard
+              resource={PERMISSION_RESOURCES.STUDENT_DOCUMENTS}>
+              <TouchableOpacity
+                style={[styles.uploadButton, { backgroundColor: colors.primary }]}
+                onPress={() => setShowUploadModal(true)}
+              >
+                <Ionicons name="cloud-upload" size={20} color="white" />
+                <ThemedText style={styles.uploadButtonText}>Upload New Document</ThemedText>
+              </TouchableOpacity>
+            </CreatePermissionGuard>
+          )}
 
         <FlatList
           data={documents}
@@ -143,13 +191,61 @@ export default function MyDocumentsPage() {
                 No Documents Found
               </ThemedText>
               <ThemedText style={styles.emptyText}>
-                You don't have any documents yet
+                {isParent && !selectedStudent
+                  ? 'Select a student from the header'
+                  : isParent
+                  ? `${selectedStudent!.first_name} doesn't have any documents yet`
+                  : "You don't have any documents yet"}
               </ThemedText>
             </View>
           }
         />
         </View>
       </AppLayout>
+
+      {/* Upload Document Modal */}
+      <Modal visible={showUploadModal} transparent animationType="slide" onRequestClose={() => setShowUploadModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <ThemedText style={styles.modalTitle}>Upload Document</ThemedText>
+              <TouchableOpacity onPress={() => { setShowUploadModal(false); setUploadType(''); setUploadFile(null); }}>
+                <Ionicons name="close" size={22} color={colors['muted-foreground']} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <ThemedText style={styles.fieldLabel}>Document Type *</ThemedText>
+              <TextInput
+                style={[styles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
+                value={uploadType}
+                onChangeText={setUploadType}
+                placeholder="e.g. Birth Certificate, ID Proof..."
+                placeholderTextColor={colors['muted-foreground']}
+              />
+              <ThemedText style={[styles.fieldLabel, { marginTop: 10 }]}>File *</ThemedText>
+              <TouchableOpacity
+                style={[styles.filePicker, { borderColor: colors.border, backgroundColor: colors.background }]}
+                onPress={handlePickFile}
+              >
+                <Ionicons name="attach-outline" size={18} color={colors.primary} />
+                <ThemedText style={[styles.filePickerText, { color: uploadFile ? colors.foreground : colors['muted-foreground'] }]}>
+                  {uploadFile ? uploadFile.name : 'Tap to attach file'}
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitBtn, { backgroundColor: uploadMutation.isPending ? '#9CA3AF' : colors.primary }]}
+                onPress={handleUploadSubmit}
+                disabled={uploadMutation.isPending}
+              >
+                <Ionicons name="cloud-upload-outline" size={16} color="white" />
+                <ThemedText style={styles.submitBtnText}>
+                  {uploadMutation.isPending ? 'Uploading...' : 'Upload Document'}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ReadOrListPermissionGuard>
   );
 }
@@ -283,5 +379,71 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 16,
     opacity: 0.7,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  modalBody: {
+    padding: 16,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 6,
+    opacity: 0.75,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  filePicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 4,
+    gap: 8,
+    marginTop: 4,
+  },
+  filePickerText: {
+    fontSize: 14,
+    flex: 1,
+  },
+  submitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    borderRadius: 10,
+    gap: 8,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  submitBtnText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

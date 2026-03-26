@@ -225,12 +225,24 @@ export default function SubjectsScreen() {
       </View>
 
       <View style={styles.subjectDetails}>
+        {item.short_code ? (
+          <View style={styles.detailRow}>
+            <Ionicons name="code-slash" size={16} color={themeColors['muted-foreground']} />
+            <ThemedText style={styles.detailText}>Code: {item.short_code}</ThemedText>
+          </View>
+        ) : null}
         <View style={styles.detailRow}>
           <Ionicons name="folder" size={16} color={themeColors['muted-foreground']} />
           <ThemedText style={styles.detailText}>
             Category: {item.category ? getCategoryName(item.category.id) : 'No Category'}
           </ThemedText>
         </View>
+        {item.is_practical ? (
+          <View style={styles.detailRow}>
+            <Ionicons name="flask" size={16} color="#0891B2" />
+            <ThemedText style={[styles.detailText, { color: '#0891B2', fontWeight: '600' }]}>Practical</ThemedText>
+          </View>
+        ) : null}
       </View>
     </View>
   ), [themeColors, categoriesData, academicYearsData]);

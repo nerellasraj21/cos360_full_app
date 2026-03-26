@@ -120,7 +120,7 @@ export default function ProfileTabScreen() {
         <AppLayout title="Profile">
           <View style={styles.centerContent}>
             <ThemedText style={[styles.errorText, { color: colors.destructive }]}>
-              You don't have permission to view profile information.
+              You don&apos;t have permission to view profile information.
             </ThemedText>
           </View>
         </AppLayout>

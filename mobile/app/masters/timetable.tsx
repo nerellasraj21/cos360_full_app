@@ -14,6 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { IOSDatePickerModal } from '@/components/ui';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -239,8 +240,9 @@ export default function TimeTableEditor() {
   };
 
   const handleTimeChange = (event: any, selectedDate?: Date) => {
+    // Android only — dialog auto-dismisses after selection
     setShowTimePicker(false);
-    if (selectedDate && currentRowId && currentTimeField) {
+    if (event.type === 'set' && selectedDate && currentRowId && currentTimeField) {
       const timeString = selectedDate.toTimeString().slice(0, 5); // HH:MM
       updateRow(currentRowId, {
         time: {
@@ -249,6 +251,22 @@ export default function TimeTableEditor() {
         }
       });
     }
+    setCurrentRowId(null);
+    setCurrentTimeField(null);
+  };
+
+  const handleIOSTimeChange = (date: Date) => {
+    // iOS only — called when user taps Done in IOSDatePickerModal
+    if (currentRowId && currentTimeField) {
+      const timeString = date.toTimeString().slice(0, 5);
+      updateRow(currentRowId, {
+        time: {
+          ...rows.find(r => r.id === currentRowId)?.time || { from: '09:00', to: '09:45' },
+          [currentTimeField]: timeString
+        }
+      });
+    }
+    setShowTimePicker(false);
     setCurrentRowId(null);
     setCurrentTimeField(null);
   };
@@ -510,6 +528,7 @@ export default function TimeTableEditor() {
   }
 
   return (
+    <>
     <ThemedView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => setSelectedSection(null)} style={styles.backButton}>
@@ -656,17 +675,32 @@ export default function TimeTableEditor() {
         </View>
       )}
 
-      {/* Time Picker */}
-      {showTimePicker && (
-        <DateTimePicker
-          value={new Date(`1970-01-01T${rows.find(r => r.id === currentRowId)?.time?.[currentTimeField || 'from'] || '09:00'}:00`)}
-          mode="time"
-          is24Hour={true}
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleTimeChange}
-        />
-      )}
     </ThemedView>
+
+    {/* Time Picker (Android) */}
+    {showTimePicker && Platform.OS === 'android' && (
+      <DateTimePicker
+        value={new Date(`1970-01-01T${rows.find(r => r.id === currentRowId)?.time?.[currentTimeField || 'from'] || '09:00'}:00`)}
+        mode="time"
+        is24Hour={true}
+        display="default"
+        onChange={handleTimeChange}
+      />
+    )}
+    {/* Time Picker (iOS) */}
+    <IOSDatePickerModal
+      visible={showTimePicker && Platform.OS === 'ios'}
+      value={new Date(`1970-01-01T${rows.find(r => r.id === currentRowId)?.time?.[currentTimeField || 'from'] || '09:00'}:00`)}
+      mode="time"
+      is24Hour={true}
+      onChange={handleIOSTimeChange}
+      onDismiss={() => {
+        setShowTimePicker(false);
+        setCurrentRowId(null);
+        setCurrentTimeField(null);
+      }}
+    />
+  </>
   );
 }
 

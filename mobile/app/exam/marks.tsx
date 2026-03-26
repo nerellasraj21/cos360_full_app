@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
-import React, { useState, useMemo } from 'react';
+import * as DocumentPicker from 'expo-document-picker';
+import { useState, useMemo } from 'react';
 import {
-  Alert, FlatList, KeyboardAvoidingView, Platform,
+  Alert, FlatList, KeyboardAvoidingView, Linking, Platform,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
@@ -11,7 +12,9 @@ import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import {
   examsApi, examMarksApi, ExamListItem, ExamSubjectConfig, ExamSubjectComponent,
+  MarkUploadResponse,
 } from '@/src/api/exam';
+import apiClient from '@/src/api/client';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
 import { useToastContext } from '@/components/ToastProvider';
 
@@ -47,6 +50,7 @@ export default function MarkEntryScreen() {
   const PAGE_SIZE = 20;
 
   const canSave = hasPermission?.('exam_marks', 'create') || hasPermission?.('exam_marks', 'update');
+  const [isUploading, setIsUploading] = useState(false);
 
   const { data: examsData } = useQuery({
     queryKey: ['exams', 'active'],
@@ -125,6 +129,44 @@ export default function MarkEntryScreen() {
     },
     onError: () => showError('Error', 'Failed to save marks. Please try again.'),
   });
+
+  const handleDownloadTemplate = () => {
+    if (!selectedExamId || !selectedSubjectConfigId) {
+      Alert.alert('Select first', 'Please select an exam and subject first.');
+      return;
+    }
+    const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
+    const url = `${baseUrl}/exams/${selectedExamId}/marks/template?subject_config_id=${selectedSubjectConfigId}`;
+    Linking.openURL(url).catch(() => showError('Error', 'Could not open download URL.'));
+  };
+
+  const handleUpload = async () => {
+    if (!selectedExamId || !selectedSubjectConfigId) {
+      Alert.alert('Select first', 'Please select an exam and subject first.');
+      return;
+    }
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      setIsUploading(true);
+      const form = new FormData();
+      form.append('file', { uri: asset.uri, name: asset.name, type: asset.mimeType ?? 'text/csv' } as any);
+      const response = await apiClient.post<MarkUploadResponse>(
+        `/exams/${selectedExamId}/marks/upload`,
+        form,
+        { params: { subject_config_id: selectedSubjectConfigId }, headers: { 'Content-Type': 'multipart/form-data' } },
+      );
+      qc.invalidateQueries({ queryKey: ['exam-marks', selectedExamId] });
+      setLocalMarks({});
+      const res = response.data;
+      showSuccess('Upload Complete', `${res.written} marks written${res.errors.length ? `, ${res.errors.length} error(s)` : ''}.`);
+    } catch {
+      showError('Upload Failed', 'Could not upload file. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleSave = () => {
     if (!selectedExamId) { Alert.alert('Error', 'Please select an exam first.'); return; }
@@ -259,6 +301,20 @@ export default function MarkEntryScreen() {
             </View>
           )}
 
+          {/* Bulk Actions */}
+          {canSave && !!selectedExamId && !!selectedSubjectConfigId && (
+            <View style={styles.bulkRow}>
+              <TouchableOpacity style={[styles.bulkBtn, { borderColor: '#556ee6' }]} onPress={handleDownloadTemplate}>
+                <Ionicons name="download-outline" size={14} color="#556ee6" />
+                <Text style={[styles.bulkBtnText, { color: '#556ee6' }]}>Template</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.bulkBtn, { borderColor: '#10B981' }]} onPress={handleUpload} disabled={isUploading}>
+                <Ionicons name="cloud-upload-outline" size={14} color="#10B981" />
+                <Text style={[styles.bulkBtnText, { color: '#10B981' }]}>{isUploading ? 'Uploading…' : 'Upload CSV'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Column Headers */}
           {!!selectedExamId && !!selectedSubjectConfigId && !!selectedComponentId && (
             <View style={[styles.headerRow, { backgroundColor: colors.muted }]}>
@@ -352,6 +408,9 @@ const styles = StyleSheet.create({
   },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { marginTop: 12, fontSize: 14 },
+  bulkRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
+  bulkBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  bulkBtnText: { fontSize: 12, fontWeight: '600' },
   saveBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     padding: 16, borderTopWidth: 1,

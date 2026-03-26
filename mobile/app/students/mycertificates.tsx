@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ThemedText } from '@/components/themed-text';
@@ -13,15 +13,21 @@ import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
 export default function MyCertificatesPage() {
   const { colors } = useTheme();
-  const { studentId } = useAuth();
+  const { studentId, role, selectedStudent } = useAuth();
+  const roleName = role?.name?.toLowerCase() ?? '';
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
+  const pageTitle = isParent ? 'Child Certificates' : 'My Certificates';
   const { data: certificates, isLoading, error } = useMyCertificates();
   const downloadMutation = useDownloadCertificateDocument();
 
   const handleDownload = async (certificateId: string) => {
     try {
-      const blob = await downloadMutation.mutateAsync(certificateId);
-      // Handle download - in React Native, this would typically open the file
-      Alert.alert('Success', 'Certificate downloaded successfully');
+      const result = await downloadMutation.mutateAsync(certificateId);
+      if (result?.presigned_url) {
+        await Linking.openURL(result.presigned_url);
+      } else {
+        Alert.alert('Error', 'No download link available for this certificate');
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to download certificate');
     }
@@ -63,7 +69,7 @@ export default function MyCertificatesPage() {
 
   if (isLoading) {
     return (
-      <AppLayout title="My Certificates">
+      <AppLayout title={pageTitle}>
         <View style={styles.loadingContainer}>
           <ThemedText>Loading certificates...</ThemedText>
         </View>
@@ -73,12 +79,12 @@ export default function MyCertificatesPage() {
 
   if (error) {
     return (
-      <AppLayout title="My Certificates">
+      <AppLayout title={pageTitle}>
         <View style={styles.errorContainer}>
           <ThemedText style={styles.errorText}>Failed to load certificates</ThemedText>
-          {!studentId && (
+          {(isParent ? !selectedStudent : !studentId) && (
             <ThemedText style={styles.errorSubtext}>
-              Please select a student to view certificates
+              {isParent ? 'Select a student from the header' : 'Please select a student to view certificates'}
             </ThemedText>
           )}
         </View>
@@ -87,10 +93,10 @@ export default function MyCertificatesPage() {
   }
 
   return (
-    <ReadOrListPermissionGuard 
+    <ReadOrListPermissionGuard
       resource={PERMISSION_RESOURCES.STUDENT_CERTIFICATES}
       fallback={
-        <AppLayout title="My Certificates">
+        <AppLayout title={pageTitle}>
           <View style={styles.accessDeniedContainer}>
             <Ionicons name="lock-closed" size={48} color={colors['muted-foreground']} />
             <ThemedText style={styles.accessDeniedText}>
@@ -100,7 +106,7 @@ export default function MyCertificatesPage() {
         </AppLayout>
       }
     >
-      <AppLayout title="My Certificates">
+      <AppLayout title={pageTitle}>
         <View style={styles.container}>
         <FlatList
           data={certificates || []}
@@ -115,7 +121,11 @@ export default function MyCertificatesPage() {
                 No Certificates Found
               </ThemedText>
               <ThemedText style={styles.emptyText}>
-                You don't have any certificates yet
+                {isParent && !selectedStudent
+                  ? 'Select a student from the header'
+                  : isParent
+                  ? `${selectedStudent!.first_name} doesn't have any certificates yet`
+                  : "You don't have any certificates yet"}
               </ThemedText>
             </View>
           }

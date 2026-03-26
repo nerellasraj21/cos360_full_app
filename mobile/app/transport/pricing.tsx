@@ -14,9 +14,11 @@ import {
 } from 'react-native';
 
 import { AppLayout } from '@/components';
+import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import { useTheme } from '@/contexts';
 import { useRoutesDropdown } from '@/hooks';
 import { useToastContext } from '@/components/ToastProvider';
+import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TransportPricing {
@@ -33,7 +35,7 @@ interface TransportPricing {
 
 interface TransportPricingCreateRequest {
   route_id: string;
-  vehicle_id: string;
+  vehicle_id?: string;
   trip_type: string;
   amount: number;
   academic_year_id?: string;
@@ -153,9 +155,8 @@ export default function TransportPricingScreen() {
       Alert.alert('Error', 'Route and amount are required');
       return;
     }
-    const payload = {
+    const payload: TransportPricingCreateRequest = {
       route_id: form.route_id,
-      vehicle_id: '',
       trip_type: form.trip_type,
       amount: Number(form.amount),
       description: form.description || undefined,
@@ -186,18 +187,22 @@ export default function TransportPricingScreen() {
           ) : null}
         </View>
         <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.iconBtn, { backgroundColor: '#556ee618' }]}
-            onPress={() => openEdit(item)}
-          >
-            <Ionicons name="create-outline" size={16} color="#556ee6" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.iconBtn, { backgroundColor: '#EF444418' }]}
-            onPress={() => handleDelete(item)}
-          >
-            <Ionicons name="trash-outline" size={16} color="#EF4444" />
-          </TouchableOpacity>
+          <UpdatePermissionGuard resource={PERMISSION_RESOURCES.TRANSPORT_PRICING}>
+            <TouchableOpacity
+              style={[styles.iconBtn, { backgroundColor: '#556ee618' }]}
+              onPress={() => openEdit(item)}
+            >
+              <Ionicons name="create-outline" size={16} color="#556ee6" />
+            </TouchableOpacity>
+          </UpdatePermissionGuard>
+          <DeletePermissionGuard resource={PERMISSION_RESOURCES.TRANSPORT_PRICING}>
+            <TouchableOpacity
+              style={[styles.iconBtn, { backgroundColor: '#EF444418' }]}
+              onPress={() => handleDelete(item)}
+            >
+              <Ionicons name="trash-outline" size={16} color="#EF4444" />
+            </TouchableOpacity>
+          </DeletePermissionGuard>
         </View>
       </View>
     );
@@ -205,14 +210,27 @@ export default function TransportPricingScreen() {
 
   return (
     <AppLayout title="Transport Pricing">
+      <ReadOrListPermissionGuard
+        resource={PERMISSION_RESOURCES.TRANSPORT_PRICING}
+        fallback={
+          <View style={styles.centered}>
+            <Ionicons name="lock-closed" size={48} color={colors['muted-foreground']} />
+            <Text style={{ color: colors['muted-foreground'], marginTop: 12 }}>
+              You don't have permission to view transport pricing
+            </Text>
+          </View>
+        }
+      >
       <View style={styles.container}>
-        <TouchableOpacity
-          style={[styles.addBtn, { backgroundColor: '#556ee6' }]}
-          onPress={() => { resetForm(); setShowModal(true); }}
-        >
-          <Ionicons name="add" size={18} color="white" />
-          <Text style={styles.addBtnText}>Add Pricing</Text>
-        </TouchableOpacity>
+        <CreatePermissionGuard resource={PERMISSION_RESOURCES.TRANSPORT_PRICING}>
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: '#556ee6' }]}
+            onPress={() => { resetForm(); setShowModal(true); }}
+          >
+            <Ionicons name="add" size={18} color="white" />
+            <Text style={styles.addBtnText}>Add Pricing</Text>
+          </TouchableOpacity>
+        </CreatePermissionGuard>
 
         <FlatList
           data={pricingList ?? []}
@@ -336,6 +354,7 @@ export default function TransportPricingScreen() {
           </View>
         </Modal>
       </View>
+      </ReadOrListPermissionGuard>
     </AppLayout>
   );
 }

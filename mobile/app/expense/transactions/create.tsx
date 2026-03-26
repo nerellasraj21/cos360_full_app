@@ -36,9 +36,10 @@ export default function CreateExpenseTransactionScreen() {
     amount: '',
     transaction_date: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
     description: '',
-    payment_method: 'cash' as const,
+    payment_method: 'cash' as 'cash' | 'cheque' | 'bank_transfer' | 'upi',
     vendor_name: '',
     reference_number: '',
+    department_id: '',
   });
 
   const { data: typeOptions = [] } = useExpenseTypeDropdownProtected();
@@ -56,8 +57,6 @@ export default function CreateExpenseTransactionScreen() {
   }));
 
   const handleSubmit = () => {
-    console.log('Create Transaction - Form data:', formData);
-
     // Validation
     if (!formData.expense_type_id) {
       Alert.alert('Error', 'Please select an expense type');
@@ -84,7 +83,6 @@ export default function CreateExpenseTransactionScreen() {
       return;
     }
 
-    // Generate idempotency key
     const idempotencyKey = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const submitData = {
@@ -95,12 +93,17 @@ export default function CreateExpenseTransactionScreen() {
       payment_method: formData.payment_method,
       vendor_name: formData.vendor_name.trim(),
       reference_number: formData.reference_number.trim() || undefined,
+      department_id: formData.department_id || undefined,
       idempotency_key: idempotencyKey,
     };
 
-    console.log('Create Transaction - Submit data:', submitData);
-
-    createMutation.mutate(submitData);
+    createMutation.mutate(submitData, {
+      onSuccess: () => {
+        showSuccess('Created', 'Transaction created successfully.');
+        router.back();
+      },
+      onError: () => showError('Error', 'Failed to create transaction.'),
+    });
   };
 
   const handleAmountChange = (text: string) => {
@@ -174,7 +177,7 @@ export default function CreateExpenseTransactionScreen() {
           <CustomDropdown
             data={paymentMethodOptions}
             value={formData.payment_method}
-            onChange={(value) => setFormData(prev => ({ ...prev, payment_method: value?.toString() as any || 'cash' }))}
+            onChange={(value) => setFormData(prev => ({ ...prev, payment_method: (value?.toString() || 'cash') as 'cash' | 'cheque' | 'bank_transfer' | 'upi' }))}
             placeholder="Select payment method"
           />
 
@@ -204,6 +207,18 @@ export default function CreateExpenseTransactionScreen() {
             onChangeText={(text) => setFormData(prev => ({ ...prev, reference_number: text }))}
             placeholder="Invoice/bill number"
             placeholderTextColor={colors['muted-foreground']}
+          />
+
+          {/* Department */}
+          <ThemedText style={styles.label}>Department (Optional)</ThemedText>
+          <CustomDropdown
+            data={[
+              { label: 'No Department', value: '' },
+              ...departmentDropdownOptions,
+            ]}
+            value={formData.department_id}
+            onChange={(value) => setFormData(prev => ({ ...prev, department_id: value?.toString() || '' }))}
+            placeholder="Select department"
           />
         </View>
 

@@ -1,5 +1,4 @@
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
@@ -22,6 +21,12 @@ import {
   View,
 } from 'react-native';
 
+const VEHICLE_TYPE_OPTIONS = [
+  { label: 'Bus', value: 'Bus' },
+  { label: 'Van', value: 'Van' },
+  { label: 'Auto', value: 'Auto' },
+];
+
 export default function VehiclesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -35,8 +40,10 @@ export default function VehiclesScreen() {
     is_active: true,
   });
 
+
   const { colors } = useTheme();
   const { showSuccess, showError } = useToastContext();
+
 
   // Fetch vehicles data using permission-protected hook
   const { data: vehiclesData, isLoading, error, refetch } = useVehicles();
@@ -305,6 +312,120 @@ export default function VehiclesScreen() {
               </View>
             }
           />
+
+        {/* Add/Edit Modal */}
+        <Modal
+          visible={isModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setIsModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <View style={styles.modalHeader}>
+                <ThemedText type="title" style={styles.modalTitle}>
+                  {editingVehicle ? 'Edit Vehicle' : 'Add Vehicle'}
+                </ThemedText>
+                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.label}>Vehicle Name *</ThemedText>
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+                    placeholder="Enter vehicle name"
+                    placeholderTextColor={colors['muted-foreground']}
+                    value={formData.name}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.label}>Registration Number *</ThemedText>
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+                    placeholder="e.g. AP09AB1234"
+                    placeholderTextColor={colors['muted-foreground']}
+                    value={formData.registration_number}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, registration_number: text }))}
+                    autoCapitalize="characters"
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.label}>Vehicle Type *</ThemedText>
+                  <CustomDropdown
+                    data={VEHICLE_TYPE_OPTIONS}
+                    value={formData.vehicle_type}
+                    onChange={(v) => setFormData(prev => ({ ...prev, vehicle_type: (v as 'Bus' | 'Van' | 'Auto') || 'Bus' }))}
+                    placeholder="Select vehicle type"
+                    search={false}
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.label}>Last Inspected Date</ThemedText>
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={colors['muted-foreground']}
+                    value={formData.last_inspected_date}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, last_inspected_date: text }))}
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.label}>Pollution Renewal Date</ThemedText>
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={colors['muted-foreground']}
+                    value={formData.pollution_renewal_date}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, pollution_renewal_date: text }))}
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.label}>Status</ThemedText>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleBtn,
+                      { backgroundColor: formData.is_active ? '#10B981' : '#EF4444' },
+                    ]}
+                    onPress={() => setFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
+                  >
+                    <ThemedText style={styles.toggleText}>
+                      {formData.is_active ? 'Active' : 'Inactive'}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={[styles.cancelButton, { borderColor: colors.border }]}
+                  onPress={() => setIsModalVisible(false)}
+                >
+                  <ThemedText>Cancel</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.submitButton, { backgroundColor: colors.primary }]}
+                  onPress={handleSubmit}
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                >
+                  <ThemedText style={{ color: 'white', fontWeight: '600' }}>
+                    {createMutation.isPending || updateMutation.isPending
+                      ? 'Saving...'
+                      : editingVehicle ? 'Update' : 'Create'}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
         </View>
       </ReadOrListPermissionGuard>
     </AppLayout>
@@ -428,6 +549,79 @@ const styles = StyleSheet.create({
   retryButton: {
     marginTop: 16,
     paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalBody: {
+    padding: 20,
+  },
+  formGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    opacity: 0.8,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
+  toggleBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  toggleText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  submitButton: {
+    flex: 1,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',

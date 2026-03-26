@@ -134,7 +134,7 @@ export interface FeeTransactionCreateRequest {
   student_admission_num: string;
   academic_year_id: string;
   total_amount: number;
-  payment_method: 'cash' | 'bank_transfer' | 'cheque' | 'online';
+  payment_method: 'cash' | 'bank_transfer' | 'cheque' | 'upi';
   transaction_items: FeeTransactionItemRequest[];
   transaction_date?: string;
   remarks?: string;
@@ -460,14 +460,7 @@ export const feeCategoriesApi = {
   },
 
   deleteFeeCategory: async (id: string): Promise<void> => {
-    console.log('deleteFeeCategory API called with id:', id);
-    try {
-      const response = await apiClient.delete(`/fee/categories/${id}`);
-      console.log('deleteFeeCategory API response:', response);
-    } catch (error) {
-      console.log('deleteFeeCategory API error:', error);
-      throw error;
-    }
+    await apiClient.delete(`/fee/categories/${id}`);
   },
 
   getFeeCategory: async (id: string): Promise<FeeCategoryResponse> => {
@@ -477,7 +470,10 @@ export const feeCategoriesApi = {
 
   getFeeCategoriesDropdown: async (): Promise<{id: string, label: string}[]> => {
     const response = await apiClient.get('/fee/categories/dropdown');
-    return response.data;
+    return (response.data as { id: string; category_name: string }[]).map(item => ({
+      id: item.id,
+      label: item.category_name,
+    }));
   },
 };
 
@@ -540,7 +536,6 @@ export const feeTermsApi = {
   },
 
   deleteFeeTerm: async (id: string): Promise<void> => {
-    console.log('deleteFeeTerm API called with id:', id);
     await apiClient.delete(`/fee/terms/${id}`);
   },
 
@@ -551,7 +546,10 @@ export const feeTermsApi = {
 
   getFeeTermsDropdown: async (params?: { fee_type_id?: string; academic_year_id?: string }): Promise<{id: string, label: string}[]> => {
     const response = await apiClient.get('/fee/terms/dropdown', { params });
-    return response.data;
+    return (response.data as { id: string; term_name: string }[]).map(item => ({
+      id: item.id,
+      label: item.term_name,
+    }));
   },
 
   getFeeTermDates: async (feeTermId: string): Promise<FeeTermDateResponse[]> => {
@@ -659,9 +657,7 @@ export const feeTransactionsApi = {
   },
 
   createFeeTransaction: async (data: FeeTransactionCreateRequest): Promise<FeeTransactionResponse> => {
-    console.log('createFeeTransaction called with data:', data);
     const response = await apiClient.post('/fee/transactions/', data);
-    console.log('createFeeTransaction response:', response.data);
     return response.data;
   },
 

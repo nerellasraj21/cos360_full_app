@@ -75,14 +75,18 @@ const STUDENT_QUICK_LINKS = [
   { title: 'My Attendance',   icon: 'checkmark-circle' as const, color: '#10B981', route: '/students/attendance',    desc: 'View attendance history'           },
   { title: 'My Certificates', icon: 'ribbon' as const,           color: '#8B5CF6', route: '/students/mycertificates', desc: 'Download your certificates'        },
   { title: 'My Documents',    icon: 'folder-open' as const,      color: '#F97316', route: '/students/mydocuments',    desc: 'View & upload your documents'      },
+  { title: 'My Profile',      icon: 'person-circle' as const,    color: '#3B82F6', route: '/students/profile',        desc: 'View your profile & details'       },
+  { title: 'My Transport',    icon: 'bus' as const,              color: '#EF4444', route: '/students/transport',      desc: 'View your transport assignment'    },
   { title: 'My Fees',         icon: 'wallet' as const,           color: '#10B981', route: '/fees/collection',         desc: 'View your fee summary & payments'  },
 ];
 
 const PARENT_QUICK_LINKS = [
-  { title: 'Child Attendance',   icon: 'checkmark-circle' as const, color: '#10B981', route: '/students/attendance',    desc: 'View child attendance history'     },
-  { title: 'Child Certificates', icon: 'ribbon' as const,           color: '#8B5CF6', route: '/students/mycertificates', desc: 'Download child certificates'       },
-  { title: 'Child Documents',    icon: 'folder-open' as const,      color: '#F97316', route: '/students/mydocuments',    desc: 'View child documents'              },
-  { title: 'Child Fees',         icon: 'wallet' as const,           color: '#10B981', route: '/fees/collection',         desc: 'View child fee summary & payments' },
+  { title: 'Child Attendance',   icon: 'checkmark-circle' as const, color: '#10B981', route: '/students/attendance',       desc: 'View child attendance history'     },
+  { title: 'Child Certificates', icon: 'ribbon' as const,           color: '#8B5CF6', route: '/students/mycertificates',   desc: 'Download child certificates'       },
+  { title: 'Child Documents',    icon: 'folder-open' as const,      color: '#F97316', route: '/students/mydocuments',      desc: 'View child documents'              },
+  { title: 'Child Profile',      icon: 'person-circle' as const,    color: '#3B82F6', route: '/students/profile',          desc: 'View child profile & details'      },
+  { title: 'Child Transport',    icon: 'bus' as const,              color: '#EF4444', route: '/students/transport',        desc: 'View child transport assignment'   },
+  { title: 'Child Fees',         icon: 'wallet' as const,           color: '#10B981', route: '/fees/collection',           desc: 'View child fee summary & payments' },
 ];
 
 export default function StudentsScreen() {
@@ -99,7 +103,7 @@ export default function StudentsScreen() {
   const hasListPermission = hasPermission ? hasPermission(PERMISSION_RESOURCES.STUDENTS, 'list') : false;
   const { data: studentsData, isLoading } = useQuery({
     queryKey: ['students'],
-    queryFn: () => studentAdmissionsApi.getStudentAdmissions().then(res => res.items),
+    queryFn: () => studentAdmissionsApi.getStudentAdmissions().then(res => res?.items ?? (Array.isArray(res) ? res : [])),
     enabled: hasListPermission,
   });
 

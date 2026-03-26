@@ -17,12 +17,11 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useClassSections, useCreateClassSection, useUpdateSection, useDeleteSection, useClassList, useSectionList } from '@/src/api/hooks/masters/classesAndSections';
-import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
+import { PermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
-import { useAuth } from '@/contexts/AuthContext';
+import { useTheme, useAcademicYear } from '@/contexts';
 
 interface ClassSectionData {
   id: string;
@@ -32,18 +31,6 @@ interface ClassSectionData {
   section_name: string;
   is_active: boolean;
   created_at: string;
-}
-
-interface ClassSectionCreate {
-  class_id: string;
-  section_id: string;
-  is_active?: boolean;
-}
-
-interface ClassSectionUpdate {
-  class_id?: string;
-  section_id?: string;
-  is_active?: boolean;
 }
 
 export default function ClassesAndSectionsScreen() {
@@ -69,16 +56,10 @@ export default function ClassesAndSectionsScreen() {
   const [classType, setClassType] = useState<'existing' | 'new'>('new');
 
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? 'dark' : 'light';
+  const { theme } = useTheme();
   const themeColors = Colors[theme];
+  const { activeAcademicYearId } = useAcademicYear();
   const { showSuccess, showError } = useToastContext();
-
-
-  // Get auth context for debugging
-  const { permissions, permissionsMap, role } = useAuth();
-  
-  // Permission checking will be handled by PermissionGuard components
 
   // Fetch data using permission-protected hooks
   const { data: classSectionsData, isLoading, error, refetch } = useClassSections();
@@ -195,20 +176,37 @@ export default function ClassesAndSectionsScreen() {
         Alert.alert('Error', 'Please select class and section');
         return;
       }
-      updateMutation.mutate({ classId: editFormData.class_id, sectionId: editFormData.section_id, data: { is_active: editFormData.is_active } }, { onError: (e: any) => showError('Update Failed', e.message || 'Failed to update section') });
+      updateMutation.mutate({ classId: editingClass.class_id, sectionId: editingClass.section_id, data: { is_active: editFormData.is_active } }, { onError: (e: any) => showError('Update Failed', e.message || 'Failed to update section') });
     } else {
-      if (!formData.class.name || formData.sections.length === 0) {
-        Alert.alert('Error', 'Please provide class name and at least one section');
+      if (classType === 'existing') {
+        if (!formData.class.id || formData.sections.length === 0) {
+          Alert.alert('Error', 'Please select an existing class and add at least one section');
+          return;
+        }
+      } else {
+        if (!formData.class.name || formData.sections.length === 0) {
+          Alert.alert('Error', 'Please provide class name and at least one section');
+          return;
+        }
+      }
+      if (!activeAcademicYearId) {
+        Alert.alert('Error', 'No active academic year. Please set an academic year first.');
         return;
       }
-      const data = {
-        name: formData.class.name,
-        short_code: formData.class.short_code,
-        description: formData.class.description,
-        is_active: formData.class.is_active,
-        academic_year_id: '77334ce1-60e5-460f-a294-820bb4e0b692', // hardcoded for now
-        sections: formData.sections,
-      };
+      const data = classType === 'existing'
+        ? {
+            class_id: formData.class.id,
+            academic_year_id: activeAcademicYearId,
+            sections: formData.sections,
+          }
+        : {
+            name: formData.class.name,
+            short_code: formData.class.short_code,
+            description: formData.class.description,
+            is_active: formData.class.is_active,
+            academic_year_id: activeAcademicYearId,
+            sections: formData.sections,
+          };
       createMutation.mutate(data, { onError: (e: any) => showError('Create Failed', e.message || 'Failed to create class') });
     }
   };
@@ -313,13 +311,6 @@ export default function ClassesAndSectionsScreen() {
               {filteredClassSections.length} class section{filteredClassSections.length !== 1 ? 's' : ''}
             </ThemedText>
           </View>
-          {/* Temporary debug button */}
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: '#FF6B6B', marginRight: 8 }]}
-            onPress={() => router.push('/permission-test')}
-          >
-            <Ionicons name="bug" size={24} color="white" />
-          </TouchableOpacity>
           <PermissionGuard
             permissions={[
               [PERMISSION_RESOURCES.CLASSES, 'create'],
@@ -409,50 +400,16 @@ export default function ClassesAndSectionsScreen() {
                 // Edit form
                 <>
                   <View style={styles.formGroup}>
-                    <ThemedText style={styles.label}>Class *</ThemedText>
-                    <View style={styles.pickerContainer}>
-                      {classListData?.map((classItem: any) => (
-                        <TouchableOpacity
-                          key={classItem.id}
-                          style={[
-                            styles.pickerOption,
-                            { borderColor: themeColors.border },
-                            editFormData.class_id === classItem.id && { borderColor: themeColors.primary, backgroundColor: themeColors.primary + '10' }
-                          ]}
-                          onPress={() => setEditFormData(prev => ({ ...prev, class_id: classItem.id }))}
-                        >
-                          <ThemedText style={[
-                            styles.pickerText,
-                            editFormData.class_id === classItem.id && { color: themeColors.primary, fontWeight: '600' }
-                          ]}>
-                            {classItem.name}
-                          </ThemedText>
-                        </TouchableOpacity>
-                      ))}
+                    <ThemedText style={styles.label}>Class</ThemedText>
+                    <View style={[styles.readOnlyField, { borderColor: themeColors.border, backgroundColor: themeColors.card }]}>
+                      <ThemedText style={styles.readOnlyText}>{editingClass.class_name}</ThemedText>
                     </View>
                   </View>
 
                   <View style={styles.formGroup}>
-                    <ThemedText style={styles.label}>Section *</ThemedText>
-                    <View style={styles.pickerContainer}>
-                      {sectionListData?.map((section: any) => (
-                        <TouchableOpacity
-                          key={section.id}
-                          style={[
-                            styles.pickerOption,
-                            { borderColor: themeColors.border },
-                            editFormData.section_id === section.id && { borderColor: themeColors.primary, backgroundColor: themeColors.primary + '10' }
-                          ]}
-                          onPress={() => setEditFormData(prev => ({ ...prev, section_id: section.id }))}
-                        >
-                          <ThemedText style={[
-                            styles.pickerText,
-                            editFormData.section_id === section.id && { color: themeColors.primary, fontWeight: '600' }
-                          ]}>
-                            {section.name}
-                          </ThemedText>
-                        </TouchableOpacity>
-                      ))}
+                    <ThemedText style={styles.label}>Section</ThemedText>
+                    <View style={[styles.readOnlyField, { borderColor: themeColors.border, backgroundColor: themeColors.card }]}>
+                      <ThemedText style={styles.readOnlyText}>{editingClass.section_name}</ThemedText>
                     </View>
                   </View>
 
@@ -862,6 +819,15 @@ const styles = StyleSheet.create({
   pickerDescription: {
     fontSize: 14,
     opacity: 0.7,
+  },
+  readOnlyField: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    opacity: 0.7,
+  },
+  readOnlyText: {
+    fontSize: 16,
   },
   sectionsHeader: {
     flexDirection: 'row',

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../../../components/FeedbackToast';
+import { useToastContext as useToast } from '../../../../components/ToastProvider';
 import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import {

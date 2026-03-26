@@ -1,7 +1,7 @@
 # COS360 Mobile App — Requirements Document
 
-**Version:** 2.1
-**Date:** 2026-03-24
+**Version:** 2.4
+**Date:** 2026-03-26
 **Platform:** React Native (Expo) — Android & iOS
 **Project Path:** `cos360_mobile/cos360_mobile_app`
 
@@ -81,7 +81,9 @@ COS360 is a **multi-tenant school management system**. The mobile app mirrors th
 - Modals: React Native `Modal` with `animationType="slide"`
 - Styling: `StyleSheet.create()` (NOT Tailwind)
 - Toasts: `useToastContext()` from `components/ToastProvider.tsx`
-- Layout wrapper: `<AppLayout title="...">` from `components/AppLayout.tsx`
+- Layout wrapper (tab screens): `<AppLayout title="...">` from `components/AppLayout.tsx` — header + footer
+- Layout wrapper (sub-screens): `<ScreenLayout title="...">` from `components/ScreenLayout.tsx` — header only, no footer
+- Sub-screen action buttons: pass as `headerRight` prop to `ScreenLayout` (renders in header right section)
 - Themed text/view: `<ThemedText>` / `<ThemedView>` for dark/light support
 
 ---
@@ -235,28 +237,32 @@ Backend returns Decimal fields as **strings** (e.g., `"12500.00"`). Always use `
 |---|---|---|
 | Auth / Login | ✅ Complete | — |
 | Dashboard (Home) | ✅ Complete | — |
-| Students — Admission | ⚠️ Incomplete | Missing extended fields (see §6.2.1) |
-| Students — Attendance | ✅ Complete | — |
+| Students — Admission | ✅ Complete | List view + view modal + 6-step create form with extended fields (v1.6.0) |
+| Students — Attendance | ✅ Complete | Staff: web-style redesign with Save/Refresh, stats cards, local status map (v1.6.0) |
 | Students — Certificates | ✅ Complete | Verify presigned URL download |
 | Students — Documents | ✅ Complete | — |
-| Staff — Enrollment | ⚠️ Incomplete | Missing Work Experience, Bank, Salary, Qualifications (see §6.3.1) |
+| Staff — Enrollment | ✅ Complete | Work Experience + Qualifications dynamic arrays; Bank Details; Salary & PF fields (Mar 2026) |
 | Staff — Attendance | ✅ Complete | — |
 | Fee — Masters (categories/types/terms) | ✅ Complete | — |
 | Fee — Transactions (admin) | ✅ Complete | — |
 | Fee — Collection (role-aware) | ✅ Complete | `app/fees/collection.tsx` — admin 4-tab + student/parent views |
 | Fee — Reports | ✅ Complete | `app/fees/reports.tsx` — Collection, Pending, Structure tabs |
-| Expense — All screens | ✅ Complete | — |
-| Exam — List / Create / Detail | ✅ Complete | — |
+| Expense — All screens | ✅ Complete | Settings was stub → rebuilt with real API (Mar 2026) |
+| Exam — List / Create / Detail | ✅ Complete | Mark Permissions + Notifications + Audit Log added to detail screen |
 | Exam — Mark Entry | ✅ Complete | — |
 | Exam — My Marks (student/parent) | ✅ Complete | `app/exam/my-marks/[examId].tsx` |
-| Exam — Grading Dashboard | ✅ Complete | `app/exam/grading.tsx` — hub linking to marks, results, hall tickets |
+| Exam — Grading Dashboard | ✅ Complete | Links to Grade Schemes, Remark Sets, Board Patterns, Settings added |
 | Exam — Hall Tickets | ✅ Complete | Endpoint fixed to `/compute`; datatable layout |
+| Exam — Grade Schemes | ✅ Complete | `app/exam/grade-schemes.tsx` — 2-tab (Exam + Subject), full CRUD (Mar 2026) |
+| Exam — Remark Grade Sets | ✅ Complete | `app/exam/remark-sets.tsx` — full CRUD with dynamic items (Mar 2026) |
+| Exam — Board Patterns | ✅ Complete | `app/exam/board-patterns.tsx` — full CRUD + active/inactive toggle (Mar 2026) |
+| Exam — Settings | ✅ Complete | `app/exam/settings.tsx` — board, attendance threshold, grace marks (Mar 2026) |
 | Transport — Hub (4 sections) | ✅ Complete | Routes · Route Stops · Vehicles · Transport Trips (matches web) |
 | Transport — Routes | ✅ Complete | — |
 | Transport — Route Stops | ✅ Complete | `pickup_time` / `drop_time` fields added with time pickers |
 | Transport — Vehicles / Trips | ✅ Complete | — |
 | Transport — Pricing | ✅ Complete | `app/transport/pricing.tsx` — full CRUD (standalone, not in hub) |
-| Transport — Student Transport | ✅ Complete | Rewritten: correct API schema from `students.ts`; form: Student → Trip → Stop → `fee_per_term` (standalone, not in hub) |
+| Transport — Student Transport | ✅ Complete | Rewritten: correct API schema from `students.ts`; table layout with search; Assign form in modal (v1.6.0) |
 | Masters — All screens | ✅ Complete | — |
 | Communication | ✅ Complete | Tab + hub + compose + templates + logs — all built |
 | Profile | ✅ Complete | — |
@@ -286,9 +292,25 @@ Backend returns Decimal fields as **strings** (e.g., `"12500.00"`). Always use `
 3. `src/api/expense.ts` — global `getGlobalAuditLogs()` added; `GET /expense/audit/logs` ✅
 4. `src/api/index.ts` — `staffProfileApi` now exported ✅
 
-**Phase 4 screens — ⏳ Not yet built:**
-1. `app/students/admission.tsx` — extended fields (Aadhar, caste, photo, address cascade)
-2. `app/staff/enrollment.tsx` — Work Experience, Bank, Salary, Qualifications sections
+**Phase 4 screens — ✅ All Built (Mar 2026):**
+
+1. `app/staff/enrollment.tsx` — Work Experience dynamic array + Qualifications dynamic array ✅
+2. `app/exam/grade-schemes.tsx` — 2-tab Exam/Subject grade schemes, full CRUD with grade band editor ✅
+3. `app/exam/remark-sets.tsx` — Remark grade sets with dynamic items ✅
+4. `app/exam/board-patterns.tsx` — Board patterns CRUD + active toggle ✅
+5. `app/exam/settings.tsx` — Exam settings (board, attendance threshold, grace marks) ✅
+6. `app/exam/[id].tsx` — Mark Permissions list/revoke + Send Notification modal + Audit Log (collapsible) ✅
+7. `app/exam/grading.tsx` — Added links to Grade Schemes, Remark Sets, Board Patterns, Exam Settings ✅
+8. `app/expense/settings.tsx` — Replaced stub: grouped key-value settings list + common settings summary card ✅
+
+**v1.6.1 audit fixes — ✅ All Applied (Mar 2026):**
+
+1. `app/exam/remark-sets.tsx` — Replaced stub with full CRUD implementation ✅
+2. `app/reports/transport-reports.tsx` — Fixed `activeTrips` bug (Trip has no `is_active`); shows total count; fixed route display to use `route_name` + `starting_stop → ending_stop` ✅
+3. `hooks/use-transport.ts` — `useDrivers()` now fetches real staff list from `staffApi.getStaff()` ✅
+4. `app/admin/permissions.tsx` — Replaced 300ms-timer redirect with clean `<Redirect>` component ✅
+5. `app/transport/trips.tsx`, `routes.tsx`, `vehicles.tsx` — Changed from `AppLayout` to `ScreenLayout` (sub-screen layout) ✅
+6. `app/admin/users.tsx`, `menu.tsx` — Changed from `AppLayout` to `ScreenLayout` ✅
 
 ---
 
@@ -304,52 +326,49 @@ Role-aware landing page. Render module cards from the menu items returned by aut
 
 ### 6.2 Students Module
 
-#### 6.2.1 Admission (`app/students/admission.tsx`) — ⚠️ NEEDS EXTENDED FIELDS
+#### 6.2.1 Admission (`app/students/admission.tsx`) — ✅ COMPLETE (redesigned v1.6.0)
 
-**Existing:** Basic CRUD with name, class, section.
+**Architecture:** List-first view (default). Clicking a row opens a read-only view modal. "+ New Admission" button opens the 6-step create form.
 
-**Missing fields to add:**
+**List view cards show:** Admission No · Student Name · Class · Section · Academic Year · Admission Date · Status badge · View / Edit / Toggle Active actions.
 
-*Student Info:*
-- Aadhar Number (text input, numeric)
-- APAAR ID (text input)
-- Caste (dropdown → `GET /masters/castes/`)
-- Sub-Caste (dropdown → cascades from Caste, resets when Caste changes)
-- Community (text input)
-- Profile Photo (expo-image-picker)
+**View modal (eye icon):** Scrollable bottom-sheet with 34 detail fields grouped across Academic, Student, Parent, Address, and Previous School sections.
 
-*Father Details:*
-- Name, Email, Phone (already may exist)
-- Occupation (text input)
-- Aadhar Number
-- Gender (dropdown: Male/Female/Other)
-- Salary Range (dropdown → `GET /masters/salary-ranges/`)
+**6-step create form:**
 
-*Mother Details:* Same fields as Father
+| Step | Title | Key fields |
+|------|-------|-----------|
+| 0 | Academic Details | Academic Year, Class, Section, Admission Date (calendar picker), Admission Type (`primary`/`non_primary`) |
+| 1 | Student Info | First/Last name, DOB, Gender, Aadhar, APAAR, Nationality, Primary Status, Mother Tongue, Caste, Sub-Caste, Community, Identification Marks |
+| 2 | Parent Info | Father & Mother: name, email, phone, occupation, education |
+| 3 | Address | Address lines, City, State (static Indian states dropdown), District, Mandal, Pincode |
+| 4 | Previous School | Yes/No dropdown; if yes: school name, board, last class, passing year, TC number |
+| 5 | Review & Submit | Card-section summary; "Create Admission" button |
 
-*Address:*
-- Street (text input)
-- State (dropdown → `GET /masters/states/`)
-- District (dropdown → cascades from State, `GET /masters/districts/?state_id=`)
-- Mandal (dropdown → cascades from District, `GET /masters/mandals/?district_id=`)
-- Pincode (numeric text input)
+**Admission Type:** loaded from `GET /students/admission/admission-types/dropdown` → `{ value, label }[]`; values are `"primary"` / `"non_primary"` (not display strings); default `"non_primary"`.
 
-*Admission Info:*
-- Admission Date (DateTimePicker)
-- Admission Type (dropdown — loaded from `GET /students/admission/admission-types/dropdown`; values: `primary` / `non_primary`; default: `non_primary`)
-- Academic Year (dropdown, already exists)
-- Admitted Class (dropdown → `GET /masters/classes/`)
-- Admitted Section (dropdown → cascades from Class, `GET /masters/sections/?class_id=`)
+**Date picker:** Button-triggered `DateTimePicker` with `display="calendar"` (Android) / `display="spinner"` in a Modal (iOS). Picker rendered outside ScrollView to avoid rendering issues.
+
+**Toggle Active:** `studentAdmissionsApi.toggleActiveStatus(id)` — updates `is_active` flag.
 
 **Role behavior:**
 - Admin / Staff: Full CRUD — all fields editable
 - Student / Parent: Read-only card view of own record
 
-#### 6.2.2 Attendance (`app/students/attendance.tsx`) — ✅ EXISTS
+#### 6.2.2 Attendance (`app/students/attendance.tsx`) — ✅ COMPLETE (redesigned v1.6.0)
 
-- Admin / Staff / Teacher: Date picker + class/section filter → FlatList with mark buttons per student
-- Student: Own attendance history (calendar or list view)
-- Parent: Child selector → child attendance view
+**Staff / Admin / Teacher view:**
+- Compact 3-column filter row: Class dropdown | Section dropdown (filtered by class) | Date picker button
+- "Student Attendance" section header with **Refresh** and **Save Attendance** buttons
+- Stats cards row: Present (green) / Absent (red) / Late (amber) live counts
+- Student list: status dot (left, color-coded) | Name + Admission No | P / A / L segmented buttons (right)
+- "Mark All" quick row to set all students to P, A, or L at once
+- **Local state pattern:** statuses tracked in `statusMap` (pre-populated from fetched records via `useEffect`); saved in batch on "Save Attendance" press
+- Date picker: `DateTimePicker display="calendar"` on Android (system dialog), Modal spinner on iOS
+
+**Student view:** Monthly filter → stats summary (days/present/absent/late + progress bar) + records list
+
+**Parent view:** Child selector → child attendance history
 
 #### 6.2.3 Certificates (`app/students/certificates.tsx` / `mycertificates.tsx` / `studentcertificates.tsx`) — ✅ EXISTS
 
@@ -705,7 +724,35 @@ Logs are read-only — no create/edit/delete.
 
 ### 7.1 Screen Layout
 
-Every screen must use `<AppLayout title="Screen Title">` as the root wrapper. This provides the header, back button, and consistent padding.
+Use the correct layout wrapper based on screen type:
+
+| Screen type | Wrapper | Footer shown |
+|---|---|---|
+| Tab screens (`app/(tabs)/*.tsx`) | `<AppLayout title="...">` | Yes (bottom nav) |
+| Sub-screens (`app/staff/*.tsx`, `app/transport/*.tsx`, etc.) | `<ScreenLayout title="...">` | No |
+
+The title appears as the subtitle below the school name in the `AppHeader`. Back navigation is handled by Android back gesture / expo-router stack (no explicit back button needed).
+
+To place an action button (e.g., "+ Add") in the header for sub-screens, use the `headerRight` prop:
+
+```tsx
+import ScreenLayout from '@/components/ScreenLayout';
+
+export default function MySubScreen() {
+  return (
+    <ScreenLayout
+      title="Staff Enrollment"
+      headerRight={
+        <TouchableOpacity onPress={openModal} style={styles.addBtn}>
+          <Ionicons name="add" size={24} color="white" />
+        </TouchableOpacity>
+      }
+    >
+      {/* content */}
+    </ScreenLayout>
+  );
+}
+```
 
 ### 7.2 Lists
 
@@ -723,15 +770,17 @@ Every screen must use `<AppLayout title="Screen Title">` as the root wrapper. Th
 
 ### 7.3 Loading States
 
+For sub-screens use `ScreenLayout`; for tab screens use `AppLayout`:
+
 ```tsx
 if (isLoading) {
   return (
-    <AppLayout title="...">
+    <ScreenLayout title="...">
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={colors.primary} />
         <ThemedText style={{ marginTop: 12 }}>Loading...</ThemedText>
       </View>
-    </AppLayout>
+    </ScreenLayout>
   );
 }
 ```
@@ -741,7 +790,7 @@ if (isLoading) {
 ```tsx
 if (error) {
   return (
-    <AppLayout title="...">
+    <ScreenLayout title="...">
       <View style={styles.centerContainer}>
         <Ionicons name="alert-circle" size={48} color={colors.destructive} />
         <ThemedText style={{ color: colors.destructive }}>Error loading data</ThemedText>
@@ -749,7 +798,7 @@ if (error) {
           <ThemedText style={{ color: 'white' }}>Retry</ThemedText>
         </TouchableOpacity>
       </View>
-    </AppLayout>
+    </ScreenLayout>
   );
 }
 ```
