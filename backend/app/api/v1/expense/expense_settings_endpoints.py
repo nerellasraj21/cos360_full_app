@@ -130,7 +130,7 @@ async def update_expense_setting_endpoint(
 
 
 # Delete Expense Setting
-@router.delete("/{setting_id}")
+@router.delete("/{setting_id}", response_model=ExpenseSettingsRead, status_code=status.HTTP_200_OK)
 @rate_limit_api("10 per minute")
 async def delete_expense_setting_endpoint(
     request: Request, setting_id: UUID, db: AsyncSession = Depends(get_tenant_db)

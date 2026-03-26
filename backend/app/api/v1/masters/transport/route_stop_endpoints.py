@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -19,7 +19,7 @@ from app.tools.simple_permissions import check_role_plan_permission_with_error, 
 router = APIRouter(prefix="/masters/route-stops", tags=["Masters/Route Stops"])
 
 
-@router.post("/", response_model=RouteStopOut)
+@router.post("/", response_model=RouteStopOut, status_code=status.HTTP_201_CREATED)
 async def create_route_stop(request: Request, data: RouteStopCreate, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
@@ -78,7 +78,7 @@ async def patch_route_stop(
     return await update_partial_details_route_stop(stop_id, data, db)
 
 
-@router.delete("/{stop_id}")
+@router.delete("/{stop_id}", response_model=RouteStopOut, status_code=status.HTTP_200_OK)
 async def delete_route_stop(request: Request, stop_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get("role")

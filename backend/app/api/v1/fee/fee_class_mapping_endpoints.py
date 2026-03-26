@@ -97,7 +97,7 @@ async def update_fee_class_mapping_endpoint(
 
 
 # Delete Fee Class Mapping
-@router.delete("/{mapping_id}")
+@router.delete("/{mapping_id}", response_model=FeeClassMappingRead, status_code=status.HTTP_200_OK)
 async def delete_fee_class_mapping_endpoint(
     request: Request, mapping_id: UUID, db: AsyncSession = Depends(get_tenant_db)
 ):

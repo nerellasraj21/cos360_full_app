@@ -165,7 +165,7 @@ async def update_attachment_endpoint(
 
 
 # Delete Attachment
-@router.delete("/{attachment_id}")
+@router.delete("/{attachment_id}", response_model=ExpenseAttachmentRead, status_code=status.HTTP_200_OK)
 @rate_limit_api("20 per minute")
 async def delete_attachment_endpoint(request: Request, attachment_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     """Delete an attachment. Rate limited to 20 deletes per minute."""

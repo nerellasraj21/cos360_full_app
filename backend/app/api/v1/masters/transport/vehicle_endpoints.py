@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -28,7 +28,7 @@ from app.tools.simple_permissions import check_role_plan_permission_with_error, 
 router = APIRouter(prefix="/masters/vehicles", tags=["Masters/Vehicles"])
 
 
-@router.post("/", response_model=VehicleOut)
+@router.post("/", response_model=VehicleOut, status_code=status.HTTP_201_CREATED)
 async def create_vehicle(request: Request, data: VehicleCreate, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
@@ -127,7 +127,7 @@ async def patch_vehicle(
     return await update_partial_details_vehicle(vehicle_id, data, db)
 
 
-@router.delete("/{vehicle_id}")
+@router.delete("/{vehicle_id}", response_model=VehicleOut, status_code=status.HTTP_200_OK)
 async def delete_vehicle(request: Request, vehicle_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get("role")

@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -126,7 +126,7 @@ async def get_audit_logs_summary_endpoint(
 
 
 # Delete Audit Log
-@router.delete("/logs/{audit_log_id}")
+@router.delete("/logs/{audit_log_id}", response_model=ExpenseAuditLogRead, status_code=status.HTTP_200_OK)
 @rate_limit_api("10 per minute")
 async def delete_audit_log_endpoint(request: Request, audit_log_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     """Delete an audit log (hard delete - admin only)"""

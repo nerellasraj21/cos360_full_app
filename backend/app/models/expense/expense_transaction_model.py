@@ -50,6 +50,9 @@ class ExpenseTransaction(BaseOrg):
     approved_at = Column(TIMESTAMP, nullable=True)
     approval_comment = Column(String(500), nullable=True)  # Required for approvals
 
+    # Academic Year (for year-wise expense tracking)
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"), nullable=True, index=True)
+
     # Department & Scoping (Security)
     department_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # For department-level isolation
 

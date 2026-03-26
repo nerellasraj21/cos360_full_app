@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -20,7 +20,7 @@ from app.tools.simple_permissions import check_role_plan_permission_with_error, 
 router = APIRouter(prefix="/masters/routes", tags=["Masters/Routes"])
 
 
-@router.post("/", response_model=RouteOut)
+@router.post("/", response_model=RouteOut, status_code=status.HTTP_201_CREATED)
 @rate_limit_create("30 per minute")
 async def create_route(request: Request, data: RouteCreate, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
@@ -76,7 +76,7 @@ async def patch_route(request: Request, route_id: UUID, data: RouteUpdate, db: A
     return await update_partial_details_route(route_id, data, db)
 
 
-@router.delete("/{route_id}")
+@router.delete("/{route_id}", response_model=RouteOut, status_code=status.HTTP_200_OK)
 async def delete_route(request: Request, route_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     current_user = await get_current_user_token(request)
     role = current_user.get("role")

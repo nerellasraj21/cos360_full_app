@@ -107,7 +107,7 @@ async def update_fee_type_endpoint(
 
 
 # Delete Fee Type
-@router.delete("/{fee_type_id}")
+@router.delete("/{fee_type_id}", response_model=FeeTypeRead, status_code=status.HTTP_200_OK)
 async def delete_fee_type_endpoint(request: Request, fee_type_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     """Delete a fee type"""
     current_user = await get_current_user_token(request)

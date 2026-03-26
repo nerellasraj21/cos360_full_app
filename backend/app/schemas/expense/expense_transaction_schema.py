@@ -16,6 +16,7 @@ class ExpenseTransactionBase(BaseModel):
     payment_method: str = Field(..., description="Payment method: cash, cheque, bank_transfer, upi")
     vendor_name: str | None = Field(None, max_length=200, description="Vendor name")
     department_id: UUID | None = Field(None, description="Department ID for scoping")
+    academic_year_id: UUID | None = Field(None, description="Academic year for year-wise tracking")
 
 
 class ExpenseTransactionCreate(ExpenseTransactionBase):
@@ -36,6 +37,7 @@ class ExpenseTransactionUpdate(BaseModel):
     payment_method: str | None = Field(None, description="Payment method")
     vendor_name: str | None = Field(None, max_length=200, description="Vendor name")
     department_id: UUID | None = Field(None, description="Department ID for scoping")
+    academic_year_id: UUID | None = Field(None, description="Academic year for year-wise tracking")
 
 
 class ExpenseTransactionApproval(BaseModel):

@@ -133,7 +133,7 @@ async def update_expense_category_endpoint(
 
 
 # Delete Expense Category
-@router.delete("/{category_id}")
+@router.delete("/{category_id}", response_model=ExpenseCategoryRead, status_code=status.HTTP_200_OK)
 @rate_limit_api("20 per minute")
 async def delete_expense_category_endpoint(
     request: Request, category_id: UUID, db: AsyncSession = Depends(get_tenant_db)

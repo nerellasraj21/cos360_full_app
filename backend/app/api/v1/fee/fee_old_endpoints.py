@@ -4,7 +4,7 @@ Old Fee endpoints — manual entry, carry-forward, CRUD, settle.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -127,7 +127,7 @@ async def settle_old_fee_record(
     return await settle_old_fee(db, old_fee_id, current_user)
 
 
-@router.delete("/{old_fee_id}")
+@router.delete("/{old_fee_id}", response_model=FeeOldRead, status_code=status.HTTP_200_OK)
 @rate_limit_api()
 async def delete_old_fee_record(
     old_fee_id: UUID,

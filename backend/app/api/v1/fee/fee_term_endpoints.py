@@ -113,7 +113,7 @@ async def update_fee_term_endpoint(
 
 
 # Delete Fee Term with Dates
-@router.delete("/{fee_term_id}")
+@router.delete("/{fee_term_id}", response_model=FeeTermRead, status_code=status.HTTP_200_OK)
 async def delete_fee_term_endpoint(request: Request, fee_term_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
     """Delete a fee term and all its associated dates"""
     current_user = await get_current_user_token(request)
@@ -126,7 +126,7 @@ async def delete_fee_term_endpoint(request: Request, fee_term_id: UUID, db: Asyn
 
 
 # Delete Fee Term Date
-@router.delete("/dates/{fee_term_date_id}")
+@router.delete("/dates/{fee_term_date_id}", status_code=status.HTTP_200_OK)
 async def delete_fee_term_date_endpoint(
     request: Request, fee_term_date_id: UUID, db: AsyncSession = Depends(get_tenant_db)
 ):

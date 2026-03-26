@@ -84,6 +84,8 @@ class StaffEnrollmentCreate(StaffEnrollmentBase):
 
 
 class StaffEnrollmentUpdate(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
     email: EmailStr | None = None
     phone: str | None = None
     gender: Literal["Male", "Female", "Other"] | None = None

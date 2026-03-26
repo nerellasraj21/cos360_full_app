@@ -30,6 +30,7 @@ from app.api.v1.expense.expense_audit_endpoints import router as expense_audit_r
 from app.api.v1.expense.expense_category_endpoints import router as expense_category_router
 from app.api.v1.expense.expense_reporting_endpoints import router as expense_reporting_router
 from app.api.v1.expense.expense_settings_endpoints import router as expense_settings_router
+from app.api.v1.expense.expense_summary_endpoints import router as expense_summary_router
 from app.api.v1.expense.expense_transaction_endpoints import router as expense_transaction_router
 from app.api.v1.expense.expense_type_endpoints import router as expense_type_router
 from app.api.v1.fee.fee_category_endpoints import router as fee_category_router
@@ -151,6 +152,7 @@ router.include_router(super_admin_tenant_data_router)
 router.include_router(expense_category_router)
 router.include_router(expense_type_router)
 router.include_router(expense_transaction_router)
+router.include_router(expense_summary_router)
 router.include_router(expense_reporting_router)
 router.include_router(expense_settings_router)
 router.include_router(expense_audit_router)

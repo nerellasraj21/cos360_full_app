@@ -115,7 +115,7 @@ async def update_fee_category_endpoint(
 
 
 # Delete Fee Category
-@router.delete("/{fee_category_id}")
+@router.delete("/{fee_category_id}", response_model=FeeCategoryRead, status_code=status.HTTP_200_OK)
 async def delete_fee_category_endpoint(
     request: Request, fee_category_id: UUID, db: AsyncSession = Depends(get_tenant_db)
 ):

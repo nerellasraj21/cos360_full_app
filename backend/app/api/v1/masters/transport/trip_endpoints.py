@@ -78,7 +78,7 @@ async def patch_trip(trip_id: UUID, data: TripUpdate, request: Request, db: Asyn
     return await update_partial_details_trip(trip_id, data, db)
 
 
-@router.delete("/{trip_id}")
+@router.delete("/{trip_id}", response_model=TripOut, status_code=status.HTTP_200_OK)
 async def delete_trip(trip_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Delete trip - Admin only"""
     current_user = await get_current_user_token(request)
