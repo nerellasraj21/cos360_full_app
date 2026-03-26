@@ -31,6 +31,9 @@ import type {
   FeeCollectionStats,
   PendingFeesStats,
   FeeStructureStats,
+  FeeCollectionSummaryItem,
+  PendingFeesItem,
+  FeeStructureItem,
 } from '@/types/fee/report';
 
 function formatCurrency(amount: number): string {
@@ -209,23 +212,23 @@ function FeeReportsContent() {
       <FilterBar>
         <div className="w-[160px]">
           <ClassesDropdown
-            value={classId || null}
+            value={classId || undefined}
             onChange={(val) => {
-              setClassId(val || '');
+              setClassId(val ? String(val) : '');
               setSectionId('');
             }}
             placeholder="All Classes"
-            isClearable
+            clearable
           />
         </div>
         {classId && (
           <div className="w-[160px]">
             <SectionsByClassDropdown
               classId={classId}
-              value={sectionId || null}
-              onChange={(val) => setSectionId(val || '')}
+              value={sectionId || undefined}
+              onChange={(val) => setSectionId(val ? String(val) : '')}
               placeholder="All Sections"
-              isClearable
+              clearable
             />
           </div>
         )}
@@ -467,7 +470,7 @@ function TablePagination({ page, totalPages, totalCount, onPageChange }: { page:
   );
 }
 
-function CollectionTable({ data, isLoading, error, page, totalPages, totalCount, onPageChange }: TableProps<Record<string, unknown>>) {
+function CollectionTable({ data, isLoading, error, page, totalPages, totalCount, onPageChange }: TableProps<FeeCollectionSummaryItem>) {
   if (isLoading) return <TableLoading />;
   if (error) return <TableError message={error.message} />;
   if (!data.length) return null;
@@ -529,7 +532,7 @@ function CollectionTable({ data, isLoading, error, page, totalPages, totalCount,
   );
 }
 
-function PendingTable({ data, isLoading, error, page, totalPages, totalCount, onPageChange }: TableProps<Record<string, unknown>>) {
+function PendingTable({ data, isLoading, error, page, totalPages, totalCount, onPageChange }: TableProps<PendingFeesItem>) {
   if (isLoading) return <TableLoading />;
   if (error) return <TableError message={error.message} />;
   if (!data.length) return null;
@@ -589,7 +592,7 @@ function PendingTable({ data, isLoading, error, page, totalPages, totalCount, on
   );
 }
 
-function StructureTable({ data, isLoading, error, page, totalPages, totalCount, onPageChange }: TableProps<Record<string, unknown>>) {
+function StructureTable({ data, isLoading, error, page, totalPages, totalCount, onPageChange }: TableProps<FeeStructureItem>) {
   if (isLoading) return <TableLoading />;
   if (error) return <TableError message={error.message} />;
   if (!data.length) return null;

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { InfiniteScrollDropdown } from '../../dropdown/InfiniteScrollDropdown';
-import { DROPDOWN_ENDPOINTS } from '../../../constants/dropdown/endpoints';
+import { useSectionsByClassId } from '@/hooks/masters/useClassesAndSections';
 import type { InfiniteScrollDropdownProps, DropdownOption } from '../../../types/dropdown';
 
 /**
@@ -19,30 +19,31 @@ export interface SectionsByClassDropdownProps extends Omit<InfiniteScrollDropdow
 
 /**
  * Sections by Class Dropdown Component
- * 
- * A specialized cascading dropdown component for selecting sections based on a selected class.
- * Uses the predefined sections by class endpoint configuration with cascading logic.
- * 
- * @example
- * ```tsx
- * <SectionsByClassDropdown
- *   classId={selectedClassId}
- *   value={selectedSection}
- *   onChange={(value, option) => setSelectedSection(value)}
- *   placeholder="Select Section"
- * />
- * ```
+ *
+ * A cascading dropdown for selecting sections based on a selected class.
+ * Uses /masters/class_sections/by_class_id/{classId}/sections (path param).
  */
 export const SectionsByClassDropdown: React.FC<SectionsByClassDropdownProps> = ({
   classId,
   placeholder = 'Select Section...',
   ...props
 }) => {
+  const { data: sections, isLoading } = useSectionsByClassId(classId ? String(classId) : '');
+
+  const options = useMemo<DropdownOption[]>(() => {
+    if (!sections) return [];
+    return sections.map((s) => ({
+      id: s.id,
+      label: s.name,
+      value: s.id,
+    }));
+  }, [sections]);
+
   return (
     <InfiniteScrollDropdown
-      endpoint={DROPDOWN_ENDPOINTS.SECTIONS_BY_CLASS}
-      dependsOn={classId}
-      placeholder={placeholder}
+      data={options}
+      placeholder={isLoading ? 'Loading…' : placeholder}
+      disabled={!classId || props.disabled}
       {...props}
     />
   );

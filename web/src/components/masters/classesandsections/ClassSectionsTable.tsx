@@ -337,7 +337,7 @@ export function ClassSectionsTable({
                           </Badge>
                         )}
                         {col.key === 'is_active' && (
-                          <StatusBadge status={classItem.is_active} />
+                          <StatusBadge status={classItem.is_active ?? false} />
                         )}
                       </TableCell>
                     ))}
@@ -374,7 +374,7 @@ export function ClassSectionsTable({
                                   >
                                     <div className="flex items-center gap-2">
                                       <span className="font-medium">{section.name}</span>
-                                      <StatusBadge status={section.is_active} />
+                                      <StatusBadge status={section.is_active ?? false} />
                                     </div>
                                     <TableActionGroup>
                                       <PermissionGuard resource="sections" action="update" fallback={null}>

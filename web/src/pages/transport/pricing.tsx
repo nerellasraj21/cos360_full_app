@@ -301,7 +301,7 @@ export default function TransportPricingPage() {
           isCreatePending: createMutation.isPending,
           resetForm: () => {},
           permissions: {
-            resource: 'transport_pricing',
+            resource: 'TRANSPORT_PRICING',
             create: true,
             read: true,
             update: true,

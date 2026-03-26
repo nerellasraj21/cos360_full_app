@@ -11,7 +11,6 @@ const formFields: FormField[] = [
     { name: "trip_id", label: "Trip ID", required: true },
     { name: "student_id", label: "Student ID", required: true },
     { name: "stop_id", label: "Stop ID", required: true },
-    { name: "fee_term_id", label: "Fee Term ID", required: true },
     { name: "pricing_id", label: "Pricing ID" },
     { name: "fee_per_term", label: "Fee Per Term", type: "number", required: true },
 ];
@@ -20,7 +19,6 @@ const defaultValues: StudentTransportCreate = {
     trip_id: "",
     student_id: "",
     stop_id: "",
-    fee_term_id: "",
     pricing_id: null,
     fee_per_term: 0,
 };

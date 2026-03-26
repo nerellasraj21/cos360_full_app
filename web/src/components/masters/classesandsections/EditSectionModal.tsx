@@ -3,6 +3,7 @@ import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFo
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
 import type { SectionRead, SectionUpdate } from '@/types/masters/classesandsections';
 import { toast } from 'sonner';
 
@@ -62,9 +63,7 @@ export function EditSectionModal({
       return;
     }
 
-    if (sectionData) {
-      onSubmit(sectionData.id, formData);
-    }
+    onSubmit(sectionData?.id ?? '', formData);
   };
 
   const resetForm = () => {
@@ -126,6 +125,7 @@ export function EditSectionModal({
               <Button type="button" variant="outline">Cancel</Button>
             </DialogClose>
             <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               {isPending ? 'Saving...' : (sectionData ? 'Update Section' : 'Add Section')}
             </Button>
           </DialogFooter>

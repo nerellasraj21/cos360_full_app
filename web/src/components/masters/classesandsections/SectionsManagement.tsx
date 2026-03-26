@@ -5,7 +5,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Edit, Trash2, Plus, Filter, Download, FileText, FileSpreadsheet, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Edit, Trash2, Plus, Filter, Download, FileText, FileSpreadsheet, Search, ChevronUp, ChevronDown, ChevronsUpDown, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import * as XLSX from 'xlsx';
 import type { ClassRead, SectionRead } from '@/types/masters/classesandsections';
-import { useUpdateSectionById, useDeleteSectionById } from '@/api/hooks/masters/classesandsections';
 
 interface SectionsManagementProps {
   data: ClassRead[];
@@ -23,6 +22,7 @@ interface SectionsManagementProps {
   onDeleteSection: (sectionId: string) => void;
   onAddSection: (classId: string) => void;
   isLoading?: boolean;
+  deletingId?: string;
 }
 
 export function SectionsManagement({
@@ -30,10 +30,9 @@ export function SectionsManagement({
   onEditSection,
   onDeleteSection,
   onAddSection,
-  isLoading
+  isLoading,
+  deletingId,
 }: SectionsManagementProps) {
-  const updateSectionMutation = useUpdateSectionById();
-  const deleteSectionMutation = useDeleteSectionById();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [classFilter, setClassFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -358,31 +357,37 @@ export function SectionsManagement({
                       </div>
                     )}
                     {col.key === 'classIsActive' && (
-                      <StatusBadge status={section.classIsActive} />
+                      <StatusBadge status={section.classIsActive ?? false} />
                     )}
                     {col.key === 'is_active' && (
-                      <StatusBadge status={section.is_active} />
+                      <StatusBadge status={section.is_active ?? false} />
                     )}
                   </TableCell>
                 ))}
                 <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="h-8 w-8 p-0"
                       onClick={() => onEditSection(section)}
                       title="Edit Section"
+                      disabled={deletingId === section.id}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
                       onClick={() => onDeleteSection(section.id)}
                       title="Delete Section"
-                      className="text-red-600 hover:text-red-700"
+                      disabled={deletingId === section.id}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {deletingId === section.id
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <Trash2 className="h-4 w-4" />
+                      }
                     </Button>
                   </div>
                 </TableCell>

@@ -21,15 +21,11 @@ export const DROPDOWN_ENDPOINTS: Record<string, DropdownEndpoint> = {
 
   CLASSES: {
     key: 'classes',
-    url: '/masters/classes',
+    url: '/masters/class_sections/dropdown',
     method: 'GET',
-    labelField: 'class_name',
+    labelField: 'name',
     valueField: 'id',
-    dataPath: 'data',
-    pageParam: 'page',
-    pageSizeParam: 'limit',
-    pageSize: 20,
-    searchParam: 'search',
+    dataPath: '',
     cacheTime: 5 * 60 * 1000,
     staleTime: 2 * 60 * 1000,
   },

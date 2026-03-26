@@ -571,7 +571,7 @@ function StaffView() {
               <span>Student Attendance</span>
               <div className="flex items-center gap-2">
                 {hasUnsavedChanges && <Badge variant="secondary">Unsaved Changes</Badge>}
-                <Button variant="outline" onClick={loadExistingAttendance} disabled={isLoadingAttendance}>
+                <Button variant="outline" onClick={() => loadExistingAttendance()} disabled={isLoadingAttendance}>
                   {isLoadingAttendance ? <Loader2 className="h-4 w-4 animate-spin" /> : '🔄'}
                   Refresh
                 </Button>

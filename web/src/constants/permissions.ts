@@ -407,6 +407,13 @@ export const PERMISSIONS = {
     LIST: 'expense_reports:list',
     EXPORT: 'expense_reports:export',
   },
+  TRANSPORT_PRICING: {
+    CREATE: 'transport_pricing:create',
+    READ: 'transport_pricing:read',
+    UPDATE: 'transport_pricing:update',
+    DELETE: 'transport_pricing:delete',
+    LIST: 'transport_pricing:list',
+  },
 } as const;
 
 // Helper function to get all permissions for a resource

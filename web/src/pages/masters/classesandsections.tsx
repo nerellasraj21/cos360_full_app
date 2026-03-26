@@ -346,8 +346,12 @@ export default function ClassesAndSectionsPage() {
                   deleteSectionByIdMutation.status === "pending"
                 }
               >
+                {(deleteClassMutation.status === "pending" ||
+                  deleteSectionByIdMutation.status === "pending") && (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                )}
                 {deleteClassMutation.status === "pending" ||
-                deleteSectionMutation.status === "pending"
+                deleteSectionByIdMutation.status === "pending"
                   ? "Deleting..."
                   : "Delete"}
               </AlertDialogAction>

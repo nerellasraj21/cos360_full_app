@@ -78,14 +78,14 @@ function normalizeAmounts<T>(obj: T): T {
 }
 
 function normalizeResponseAmounts<T extends Record<string, unknown>>(data: T): T {
-  const normalized = normalizeAmounts(data);
-  if ('items' in normalized && Array.isArray(normalized.items)) {
-    normalized.items = (normalized.items as Record<string, unknown>[]).map(normalizeAmounts);
+  const norm = normalizeAmounts(data) as Record<string, unknown>;
+  if ('items' in norm && Array.isArray(norm.items)) {
+    norm.items = (norm.items as Record<string, unknown>[]).map(normalizeAmounts);
   }
-  if ('items_paid' in normalized && Array.isArray(normalized.items_paid)) {
-    normalized.items_paid = (normalized.items_paid as Record<string, unknown>[]).map(normalizeAmounts);
+  if ('items_paid' in norm && Array.isArray(norm.items_paid)) {
+    norm.items_paid = (norm.items_paid as Record<string, unknown>[]).map(normalizeAmounts);
   }
-  return normalized as T;
+  return norm as T;
 }
 
 // ===== API FUNCTIONS =====

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
 import { Button } from "@/components/ui/button";
@@ -106,6 +106,8 @@ export function MasterPage<
 >({ config }: MasterPageProps<T, TInput>) {
   const [formData, setFormData] = useState<TInput>(config.defaultValues);
   const [localModalOpen, setLocalModalOpen] = useState(false);
+  const pendingCloseRef = useRef(false);
+  const prevIsPendingRef = useRef(false);
   const isModalOpen = config.addOpen !== undefined ? config.addOpen : localModalOpen;
   const setIsModalOpen = (open: boolean) => {
     setLocalModalOpen(open);
@@ -246,15 +248,28 @@ export function MasterPage<
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
+    pendingCloseRef.current = true;
     config.onCreate(formData);
-    config.resetForm();
-    setFormData(config.defaultValues);
-    setIsModalOpen(false);
   };
+
+  // Auto-close the Add dialog once the create mutation finishes
+  useEffect(() => {
+    if (config.isCreatePending) {
+      prevIsPendingRef.current = true;
+    } else if (prevIsPendingRef.current && pendingCloseRef.current) {
+      prevIsPendingRef.current = false;
+      pendingCloseRef.current = false;
+      setIsModalOpen(false);
+      setFormData(config.defaultValues);
+      config.resetForm();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.isCreatePending]);
 
   const isFormDirty = JSON.stringify(formData) !== JSON.stringify(config.defaultValues);
 
   const handleConfirmClose = () => {
+    pendingCloseRef.current = false;
     setIsModalOpen(false);
     setFormData(config.defaultValues);
     config.resetForm();
@@ -445,6 +460,7 @@ export function MasterPage<
                           <Button type="button" variant="outline">Cancel</Button>
                         </DialogClose>
                         <Button type="submit" disabled={config.isCreatePending}>
+                          {config.isCreatePending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                           {config.addButtonLabel || `Add ${config.title.slice(0, -1)}`}
                         </Button>
                       </DialogFooter>

@@ -58,7 +58,7 @@ const addOldFeeSchema = z.object({
   academic_year_label: z.string().min(1, 'Academic year is required'),
   fee_type_name: z.string().min(1, 'Fee type name is required'),
   original_amount: z.number({ required_error: 'Original amount is required' }).positive('Must be > 0'),
-  paid_amount: z.number().min(0, 'Cannot be negative').default(0),
+  paid_amount: z.number().min(0, 'Cannot be negative'),
   receipt_manual: z.string().optional(),
   remarks: z.string().optional(),
 }).refine((data) => data.paid_amount <= data.original_amount, {

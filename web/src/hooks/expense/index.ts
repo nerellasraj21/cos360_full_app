@@ -517,7 +517,7 @@ export function useExpenseSummary(periodDays: number = 30) {
 export function useExpenseSummaryReport(filters?: ExpenseReportFilter) {
   return usePermissionProtectedQuery<any>({
     queryKey: ['expense-summary-report', filters],
-    queryFn: () => expenseApi.getSummaryReport(filters || {}),
+    queryFn: () => expenseApi.getSummaryReport((filters || {}) as { [key: string]: string | number | string[] | undefined }),
     resource: 'expense_transactions',
     action: 'list',
     enabled: !filters || Object.keys(filters).length > 0,

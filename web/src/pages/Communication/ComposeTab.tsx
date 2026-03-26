@@ -12,7 +12,7 @@ import { ClassesDropdown } from '@/components/dropdown-system/components/Classes
 import { SectionsByClassDropdown } from '@/components/dropdown-system/components/SectionsByClassDropdown';
 import { StudentsDropdown } from '@/components/dropdown-system/components/StudentsDropdown';
 import { useTemplates, usePreviewCount, useSendNotification } from '@/api/hooks/communication/communication';
-import type { Channel, TargetType, Template, PreviewCountParams } from '@/types/communication';
+import type { Channel, TargetType, Template, PreviewCountParams, TargetRef } from '@/types/communication';
 
 // ─── System-resolved variables (never ask user to fill these) ─────────────────
 const SYSTEM_VARS = new Set([
@@ -289,7 +289,7 @@ export default function ComposeTab({ onSendSuccess }: ComposeTabProps) {
                   Class <span aria-hidden="true">*</span>
                 </label>
                 <ClassesDropdown
-                  value={classId}
+                  value={classId ?? undefined}
                   onChange={(val, opt) => {
                     setClassId(val as string | null);
                     setClassLabel((opt as { label?: string })?.label ?? '');
@@ -305,7 +305,7 @@ export default function ComposeTab({ onSendSuccess }: ComposeTabProps) {
                 </label>
                 <SectionsByClassDropdown
                   classId={classId ?? undefined}
-                  value={sectionId}
+                  value={sectionId ?? undefined}
                   onChange={(val, opt) => {
                     setSectionId(val as string | null);
                     setSectionLabel((opt as { label?: string })?.label ?? '');
@@ -322,7 +322,7 @@ export default function ComposeTab({ onSendSuccess }: ComposeTabProps) {
                 Student <span aria-hidden="true">*</span>
               </label>
               <StudentsDropdown
-                value={individualId}
+                value={individualId ?? undefined}
                 onChange={(val, opt) => {
                   setIndividualId(val as string | null);
                   setIndividualLabel((opt as { label?: string })?.label ?? '');
@@ -656,7 +656,7 @@ function buildTargetRef(
   sectionId: string | null,
   individualId: string | null,
   role: string,
-): Record<string, string> {
+): TargetRef {
   if (targetType === 'class_section_parents' || targetType === 'class_section_students') {
     return { class_id: classId!, section_id: sectionId! };
   }
