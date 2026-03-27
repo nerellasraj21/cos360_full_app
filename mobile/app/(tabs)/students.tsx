@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useAuth, useTheme } from '@/contexts';
@@ -72,21 +72,25 @@ const sections = [
 ];
 
 const STUDENT_QUICK_LINKS = [
-  { title: 'My Attendance',   icon: 'checkmark-circle' as const, color: '#10B981', route: '/students/attendance',    desc: 'View attendance history'           },
-  { title: 'My Certificates', icon: 'ribbon' as const,           color: '#8B5CF6', route: '/students/mycertificates', desc: 'Download your certificates'        },
-  { title: 'My Documents',    icon: 'folder-open' as const,      color: '#F97316', route: '/students/mydocuments',    desc: 'View & upload your documents'      },
-  { title: 'My Profile',      icon: 'person-circle' as const,    color: '#3B82F6', route: '/students/profile',        desc: 'View your profile & details'       },
-  { title: 'My Transport',    icon: 'bus' as const,              color: '#EF4444', route: '/students/transport',      desc: 'View your transport assignment'    },
-  { title: 'My Fees',         icon: 'wallet' as const,           color: '#10B981', route: '/fees/collection',         desc: 'View your fee summary & payments'  },
+  { title: 'My Attendance',   icon: 'checkmark-circle' as const,  color: '#10B981', route: '/students/attendance',    desc: 'View attendance history'           },
+  { title: 'My Certificates', icon: 'ribbon' as const,            color: '#8B5CF6', route: '/students/mycertificates', desc: 'Download your certificates'        },
+  { title: 'My Documents',    icon: 'folder-open' as const,       color: '#F97316', route: '/students/mydocuments',    desc: 'View & upload your documents'      },
+  { title: 'My Profile',      icon: 'person-circle' as const,     color: '#3B82F6', route: '/students/profile',        desc: 'View your profile & details'       },
+  { title: 'My Transport',    icon: 'bus' as const,               color: '#EF4444', route: '/students/transport',      desc: 'View your transport assignment'    },
+  { title: 'My Fees',         icon: 'wallet' as const,            color: '#10B981', route: '/fees/collection',         desc: 'View your fee summary & payments'  },
+  { title: 'My Timetable',    icon: 'calendar' as const,          color: '#556ee6', route: '/timetable',               desc: 'View your class timetable'         },
+  { title: 'School Calendar', icon: 'calendar-number' as const,   color: '#F59E0B', route: '/calendar',                desc: 'View holidays & school events'     },
 ];
 
 const PARENT_QUICK_LINKS = [
-  { title: 'Child Attendance',   icon: 'checkmark-circle' as const, color: '#10B981', route: '/students/attendance',       desc: 'View child attendance history'     },
-  { title: 'Child Certificates', icon: 'ribbon' as const,           color: '#8B5CF6', route: '/students/mycertificates',   desc: 'Download child certificates'       },
-  { title: 'Child Documents',    icon: 'folder-open' as const,      color: '#F97316', route: '/students/mydocuments',      desc: 'View child documents'              },
-  { title: 'Child Profile',      icon: 'person-circle' as const,    color: '#3B82F6', route: '/students/profile',          desc: 'View child profile & details'      },
-  { title: 'Child Transport',    icon: 'bus' as const,              color: '#EF4444', route: '/students/transport',        desc: 'View child transport assignment'   },
-  { title: 'Child Fees',         icon: 'wallet' as const,           color: '#10B981', route: '/fees/collection',           desc: 'View child fee summary & payments' },
+  { title: 'Child Attendance',   icon: 'checkmark-circle' as const,  color: '#10B981', route: '/students/attendance',       desc: 'View child attendance history'     },
+  { title: 'Child Certificates', icon: 'ribbon' as const,            color: '#8B5CF6', route: '/students/mycertificates',   desc: 'Download child certificates'       },
+  { title: 'Child Documents',    icon: 'folder-open' as const,       color: '#F97316', route: '/students/mydocuments',      desc: 'View child documents'              },
+  { title: 'Child Profile',      icon: 'person-circle' as const,     color: '#3B82F6', route: '/students/profile',          desc: 'View child profile & details'      },
+  { title: 'Child Transport',    icon: 'bus' as const,               color: '#EF4444', route: '/students/transport',        desc: 'View child transport assignment'   },
+  { title: 'Child Fees',         icon: 'wallet' as const,            color: '#10B981', route: '/fees/collection',           desc: 'View child fee summary & payments' },
+  { title: 'Timetable',          icon: 'calendar' as const,          color: '#556ee6', route: '/timetable',                 desc: 'View child class timetable'        },
+  { title: 'School Calendar',    icon: 'calendar-number' as const,   color: '#F59E0B', route: '/calendar',                  desc: 'View holidays & school events'     },
 ];
 
 export default function StudentsScreen() {
@@ -94,44 +98,20 @@ export default function StudentsScreen() {
   const { colors, theme } = useTheme();
   const { role } = useAuth();
   const { hasPermission } = useMobilePermission();
-  const queryClient = useQueryClient();
 
   const roleName = role?.name?.toLowerCase() ?? '';
   const isStudent = roleName === 'student';
   const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
 
   const hasListPermission = hasPermission ? hasPermission(PERMISSION_RESOURCES.STUDENTS, 'list') : false;
-  const { data: studentsData, isLoading } = useQuery({
+  const { data: studentsResponse } = useQuery({
     queryKey: ['students'],
-    queryFn: () => studentAdmissionsApi.getStudentAdmissions().then(res => res?.items ?? (Array.isArray(res) ? res : [])),
+    queryFn: () => studentAdmissionsApi.getStudentAdmissions(),
     enabled: hasListPermission,
   });
 
-  const toggleActiveMutation = useMutation({
-    mutationFn: ({ id }: { id: string }) =>
-      studentAdmissionsApi.toggleActiveStatus(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['students'] }),
-    onError: () => Alert.alert('Error', 'Failed to update student status.'),
-  });
-
-  const handleToggleActive = (student: Student) => {
-    const action = student.is_active ? 'deactivate' : 'activate';
-    Alert.alert(
-      `${student.is_active ? 'Deactivate' : 'Activate'} Student`,
-      `Are you sure you want to ${action} ${student.student.first_name} ${student.student.last_name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: student.is_active ? 'Deactivate' : 'Activate',
-          style: student.is_active ? 'destructive' : 'default',
-          onPress: () => toggleActiveMutation.mutate({ id: student.id }),
-        },
-      ],
-    );
-  };
-
-  const totalStudents = studentsData?.length ?? 0;
-  const activeStudents = studentsData?.filter((s: Student) => s.is_active).length ?? 0;
+  const totalStudents = studentsResponse?.total_count ?? studentsResponse?.items?.length ?? 0;
+  const activeStudents = studentsResponse?.items?.filter((s: Student) => s.is_active).length ?? 0;
   const inactiveStudents = totalStudents - activeStudents;
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
@@ -269,103 +249,6 @@ export default function StudentsScreen() {
           })}
         </View>
 
-        {/* Recent students */}
-        <View style={styles.recentHeader}>
-          <Text style={[styles.listTitle, { color: colors.foreground }]}>Recent Students</Text>
-          <TouchableOpacity onPress={() => router.push('/students/admission' as any)}>
-            <Text style={[styles.addNew, { color: colors.primary }]}>+ Add New</Text>
-          </TouchableOpacity>
-        </View>
-
-        {isLoading && (
-          <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
-            <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>Loading students…</Text>
-          </View>
-        )}
-
-        {!isLoading && (studentsData ?? []).length === 0 && (
-          <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
-            <Ionicons name="people-outline" size={44} color={colors['muted-foreground']} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Students Yet</Text>
-            <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>Start by adding your first student</Text>
-            <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: colors.primary }]} onPress={() => router.push('/students/admission' as any)}>
-              <Ionicons name="add" size={18} color="white" />
-              <Text style={styles.emptyBtnText}>Add First Student</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {(studentsData ?? []).slice(0, 5).map((student) => (
-          <View
-            key={student.id}
-            style={[styles.studentCard, { backgroundColor: cardBg, borderColor: borderCol }]}
-          >
-            <TouchableOpacity
-              style={styles.studentRow}
-              onPress={() => router.push(`/students/${student.id}` as any)}
-              activeOpacity={0.75}
-            >
-              <View style={[styles.studentAvatarBox, { backgroundColor: BLUE + '18' }]}>
-                <Text style={[styles.studentAvatarText, { color: BLUE }]}>
-                  {student.student.first_name?.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.studentInfo}>
-                <Text style={[styles.studentName, { color: colors.foreground }]}>
-                  {student.student.first_name} {student.student.last_name}
-                </Text>
-                <View style={styles.studentMetaRow}>
-                  <Text style={[styles.studentMeta, { color: colors['muted-foreground'] }]}>
-                    {student.admission_number}
-                  </Text>
-                  <View style={[styles.statusPill, { backgroundColor: student.is_active ? '#dcfce7' : '#fee2e2' }]}>
-                    <Text style={[styles.statusText, { color: student.is_active ? '#16a34a' : '#ef4444' }]}>
-                      {student.is_active ? 'Active' : 'Inactive'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors['muted-foreground']} />
-            </TouchableOpacity>
-
-            <View style={[styles.actionBar, { borderTopColor: borderCol }]}>
-              <TouchableOpacity
-                style={styles.actionIconBtn}
-                onPress={() => router.push(`/students/${student.id}` as any)}
-              >
-                <Ionicons name="eye-outline" size={17} color={BLUE} />
-                <Text style={[styles.actionIconLabel, { color: BLUE }]}>View</Text>
-              </TouchableOpacity>
-
-              <View style={[styles.actionDivider, { backgroundColor: borderCol }]} />
-
-              <TouchableOpacity
-                style={styles.actionIconBtn}
-                onPress={() => router.push(`/students/admission?edit=${student.id}` as any)}
-              >
-                <Ionicons name="create-outline" size={17} color="#556ee6" />
-                <Text style={[styles.actionIconLabel, { color: '#556ee6' }]}>Edit</Text>
-              </TouchableOpacity>
-
-              <View style={[styles.actionDivider, { backgroundColor: borderCol }]} />
-
-              <TouchableOpacity
-                style={styles.actionIconBtn}
-                onPress={() => handleToggleActive(student)}
-                disabled={toggleActiveMutation.isPending}
-              >
-                <Ionicons
-                  name={student.is_active ? 'ban-outline' : 'checkmark-circle-outline'}
-                  size={17}
-                  color={student.is_active ? '#EF4444' : '#10B981'}
-                />
-                <Text style={[styles.actionIconLabel, { color: student.is_active ? '#EF4444' : '#10B981' }]}>
-                  {student.is_active ? 'Deactivate' : 'Activate'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
       </ScrollView>
     </AppLayout>
   );

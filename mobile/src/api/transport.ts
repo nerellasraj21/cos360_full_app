@@ -6,9 +6,12 @@ export {
   vehiclesApi,
   routeStopsApi,
   tripsApi,
-  studentTransportApi,
   studentTripsApi,
 } from './masters';
+
+// studentTransportApi comes from students.ts — it uses the current schema (trip_id, pricing_id)
+// masters.ts has an old definition with the legacy schema (route_id, fare_amount) — do NOT use it
+export { studentTransportApi } from './students';
 
 // Transport-specific API functions
 export const transportApi = {

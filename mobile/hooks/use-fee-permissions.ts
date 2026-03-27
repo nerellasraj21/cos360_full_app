@@ -238,10 +238,10 @@ export const useCreateFeeRefund = () => {
 };
 
 export const useApproveFeeRefund = () => {
-  return usePermissionProtectedMutation<any, Error, { refund_id: string }>({
+  return usePermissionProtectedMutation<any, Error, { refund_id: string; action: 'approve' | 'reject'; approval_remarks: string }>({
     resource: PERMISSION_RESOURCES.FEE_REFUNDS,
     action: 'approve',
-    mutationFn: ({ refund_id }) => feeRefundsApi.approveFeeRefund({ refund_id })
+    mutationFn: (data) => feeRefundsApi.approveFeeRefund(data),
   });
 };
 

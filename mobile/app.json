@@ -8,7 +8,6 @@
     "scheme": "cos360",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
     "ios": {
       "bundleIdentifier": "com.cos360.mobile",
       "buildNumber": "1",
@@ -25,7 +24,6 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-
     "android": {
       "package": "com.cos360.mobile",
       "versionCode": 1,
@@ -48,13 +46,11 @@
         "android.permission.ACCESS_NETWORK_STATE"
       ]
     },
-
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
     },
-
     "plugins": [
       "expo-router",
       [
@@ -72,15 +68,14 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
-
     "extra": {
       "eas": {
         "projectId": "your-eas-project-id-here"
       }
     },
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

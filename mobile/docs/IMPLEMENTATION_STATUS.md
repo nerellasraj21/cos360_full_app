@@ -1,7 +1,7 @@
 # COS360 Mobile App — Implementation Status
 
 **As of:** March 2026
-**Version:** 1.6.3
+**Version:** 1.9.0
 
 ---
 
@@ -29,7 +29,7 @@
 | Error boundary | ✅ Complete | `components/ErrorBoundary.tsx` |
 | Toast notifications | ✅ Complete | `components/ToastProvider.tsx` |
 | Loading indicators | ✅ Complete | `components/LoadingIndicator.tsx` |
-| Offline sync queue | ✅ Complete | `services/offlineStorage.ts` |
+| Offline sync queue | ❌ Removed | Queue was written but never drained — dead code removed from `src/api/client.ts`. `services/offlineStorage.ts` retained for reference. |
 | App icons (Android) | ✅ Complete | Adaptive icon (foreground/background/monochrome) |
 | Splash screen | ✅ Complete | Custom splash with dark/light variant |
 | Deep linking | ✅ Complete | `cos360://` scheme configured |
@@ -40,15 +40,15 @@
 
 | Feature | Status | Details |
 |---------|--------|---------|
-| Login screen | ✅ Complete | Email + password, form validation |
-| JWT token storage | ✅ Complete | Access token + refresh token in AsyncStorage |
+| Login screen | ✅ Complete | Email + password + Academic Year picker; form validation; auto-retry years on picker open; error banner |
+| JWT token storage | ✅ Complete | Native: `expo-secure-store` (iOS Keychain / Android Keystore). Web: `AsyncStorage` with `@secure/` prefix fallback |
 | Automatic token refresh | ✅ Complete | Intercepts 401, refreshes, retries request |
 | Logout | ✅ Complete | Clears tokens, redirects to login |
 | Auth context | ✅ Complete | `contexts/AuthContext.tsx` |
-| Mobile auth store (Zustand) | ✅ Complete | `src/stores/mobileAuthStore.ts` |
-| Permission sync on login | ✅ Complete | Calls `/auth/mobile/permissions/sync` |
+| Mobile auth store (Zustand) | ℹ️ Dead code | `src/stores/mobileAuthStore.ts` — not used by main auth flow; `AuthContext` is the single source of truth |
+| Permission sync on login | ✅ Complete | Permissions embedded in login response — no separate sync endpoint exists on backend |
 | Permission cache | ✅ Complete | `utils/mobilePermissionCache.ts` |
-| Permission bulk check | ✅ Complete | `src/api/mobilePermissions.ts` |
+| Permission bulk check | ✅ Complete | `src/api/mobilePermissions.ts` — cache-only reads, no HTTP calls |
 | Auth redirect on app start | ✅ Complete | `app/index.tsx` handles redirect |
 | First-login set-password flow | ✅ Complete | `requires_password_change` in login response → redirect to `/set-password`; endpoint `POST /auth/staff/set-password` |
 | Multi-tenant (cschema) | ✅ Complete | Header injected on every request |
@@ -86,8 +86,8 @@
 | Feature | Status | Details |
 |---------|--------|---------|
 | Dashboard screen | ✅ Complete | `app/(tabs)/index.tsx` |
-| Quick action cards | ✅ Complete | 10 module cards: Students, Fees, Masters, Transport, Staff, Expense, Exam, Communication, Reports, Administration |
-| Permission-filtered cards | ✅ Complete | `accessibleModules` filter — only shows cards with `read` or `list` permission |
+| Quick action cards | ✅ Complete | 9 permission-gated + 3 always-visible module cards (Transport, Communication, Reports); Administration now permission-gated via `resources: ['users','roles','staff']` |
+| Permission-filtered cards | ✅ Complete | `accessibleModules` filter — only shows cards with `read`, `list`, or `read_own` permission |
 | Empty state for restricted roles | ✅ Complete | Lock icon + message when user has no module permissions |
 | Greeting hero card | ✅ Complete | Greeting, username, date — no hardcoded stats |
 
@@ -142,11 +142,11 @@
 
 ## 6. Fees Module
 
-**Hub sections (matches web app):** Fee Categories · Fee Types · Fee Terms · Fee Mappings · Fee Term Amounts · Fee Collection · Fee Receipts · Fee Refunds
+**Hub sections (matches web app):** Fee Categories · Fee Types · Fee Terms · Fee Mappings · Fee Term Amounts · Fee Collection · Fee Receipts · Fee Refunds · Fee Reports
 
 | Feature | Status | File |
 |---------|--------|------|
-| Fee hub (8 sections) | ✅ Complete | `app/(tabs)/fees.tsx` |
+| Fee hub (9 sections) | ✅ Complete | `app/(tabs)/fees.tsx` |
 | Fee categories | ✅ Complete | `app/fees/categories.tsx` |
 | Fee types | ✅ Complete | `app/fees/types.tsx` |
 | Fee terms | ✅ Complete | `app/fees/terms.tsx` |
@@ -186,15 +186,17 @@
 
 ## 8. Transport Module
 
-**Hub sections (matches web app):** Routes · Route Stops · Vehicles · Transport Trips
+**Hub sections (matches web app):** Routes · Route Stops · Vehicles · Transport Trips · Transport Pricing · Student Transport
 
 | Feature | Status | File |
 |---------|--------|------|
-| Transport hub (4 sections) | ✅ Complete | `app/(tabs)/transport.tsx` |
+| Transport hub (6 sections) | ✅ Complete | `app/(tabs)/transport.tsx` |
 | Route management | ✅ Complete | `app/transport/routes.tsx` |
 | Route stops | ✅ Complete | `app/transport/route-stops.tsx` |
 | Vehicle management | ✅ Complete | `app/transport/vehicles.tsx` |
 | Trip management | ✅ Complete | `app/transport/trips.tsx` |
+| Transport Pricing hub link | ✅ Complete | `app/(tabs)/transport.tsx` → `app/transport/pricing.tsx` (was orphaned — now linked) |
+| Student Transport hub link | ✅ Complete | `app/(tabs)/transport.tsx` → `app/transport/student-transport.tsx` (was orphaned — now linked) |
 | Student transport (correct schema) | ✅ Complete | `app/transport/student-transport.tsx` — imports from `src/api/students.ts`; form: Student → Trip → Stop → `fee_per_term` |
 | Student transport — students module redesign | ✅ Complete | `app/students/transport.tsx` — table layout with horizontal scroll, S.No/Student/Trip/Route/Stop/Fee/Actions columns, search bar, Assign form in bottom-sheet modal, uses AppLayout |
 | Transport API | ✅ Complete | `src/api/transport.ts` |
@@ -230,7 +232,7 @@
 | Expense hub (6 sections) | ✅ Complete | `app/(tabs)/expense.tsx` |
 | Expense categories | ✅ Complete | `app/expense/categories.tsx` |
 | Expense types | ✅ Complete | `app/expense/types.tsx` |
-| Expense departments | ✅ Complete | `app/expense/departments.tsx` |
+| Expense departments | ⚠️ Placeholder | `app/expense/departments.tsx` — shows "Not Available"; backend endpoints `GET /expense/departments` and `/dropdown` not implemented |
 | Expense transactions | ✅ Complete | `app/expense/transactions.tsx` |
 | Transaction detail | ✅ Complete | `app/expense/transactions/[id].tsx` |
 | Create transaction | ✅ Complete | `app/expense/transactions/create.tsx` |
@@ -268,7 +270,7 @@
 | Settings screen | ✅ Complete | `app/(tabs)/settings.tsx` |
 | Theme toggle (light/dark) | ✅ Complete | `components/ThemeToggle.tsx` |
 | Academic year selector | ✅ Complete | Via `AcademicYearContext` |
-| Permission test screen | ✅ Complete | `app/permission-test.tsx` |
+| Permission test screen | ✅ Complete | `app/permission-test.tsx` — dev-only (`if (!__DEV__) return null`), invisible in production |
 
 ---
 
@@ -330,9 +332,10 @@ Channels: **SMS · WhatsApp · Email** (Push removed). API types updated in `src
 | Fee Collection screen (role-aware) | ✅ Complete | `app/fees/collection.tsx` |
 | Fee Term Amounts screen | ✅ Complete | `app/fees/term-amounts.tsx` |
 | Fee Receipts screen | ✅ Complete | `app/fees/receipts.tsx` |
-| Fee Reports screen (3 tabs) | ✅ Complete | `app/fees/reports.tsx` (standalone, not in fees hub) |
-| Transport Pricing CRUD | ✅ Complete | `app/transport/pricing.tsx` (not in transport hub — standalone screen) |
-| Student Transport CRUD | ✅ Complete | `app/transport/student-transport.tsx` (not in transport hub — role-based access) |
+| Fee Reports hub link | ✅ Complete | `app/(tabs)/fees.tsx` → `app/fees/reports.tsx` (was orphaned — now linked) |
+| Fee Reports screen (3 tabs) | ✅ Complete | `app/fees/reports.tsx` — linked from fees hub (v1.8.0) |
+| Transport Pricing CRUD | ✅ Complete | `app/transport/pricing.tsx` — linked from transport hub (v1.8.0) |
+| Student Transport CRUD | ✅ Complete | `app/transport/student-transport.tsx` — linked from transport hub (v1.8.0) |
 
 ---
 
@@ -379,6 +382,36 @@ Channels: **SMS · WhatsApp · Email** (Push removed). API types updated in `src
 Overall Completion: **100%** (175/175 features)
 
 ---
+
+---
+
+## Login Flow Fixes (v1.9.0) — March 2026
+
+### Academic Year Picker & Sign-In Bug Fixes
+
+| File | Issue | Fix |
+|------|-------|-----|
+| `app/login.tsx` | Academic year picker showed "No academic years available" — initial fetch used `showErrors=false`, silently swallowing `cschema`-not-set errors | Added `useEffect` that auto-retries `fetchAcademicYears(true)` when picker is opened with an empty list; added Retry button to `ListEmptyComponent` |
+| `app/login.tsx` | Sign In button could be pressed before academic years loaded, sending empty string as `academic_year_id` (422 from backend) | Added `academicYear` field to `FormErrors`; `validateForm()` checks `!selectedAcademicYearId && !academicYearLoading`; Sign In button disabled while `academicYearLoading` |
+| `app/login.tsx` | Academic year field had no visual error state | Field border turns red + error text shown below when validation fails |
+| `app/login.tsx` | Login errors were silently cleared — `clearError` is not memoized in `AuthContext` so the `useEffect([formData, clearError])` fired on every render, wiping freshly-set errors before they displayed | Removed `clearError` from `useEffect` dependency array; effect now only fires when `formData` changes (user types), with an ESLint suppression comment explaining why |
+| `contexts/AuthContext.tsx` | Login error message showed generic Axios `"Request failed with status code 401"` — not helpful | Error extraction now reads `error.response.data.detail` first (string or array of `{msg}`); falls back to `error.message` |
+| `services/authUtils.ts` | `loginUser` sent `academic_year_id: ""` (empty string) when no year selected — Pydantic rejects empty string for UUID field (422) | `loginUser` now only adds `academic_year_id` to payload when truthy: `if (academicYearId) payload.academic_year_id = academicYearId` |
+| `services/authUtils.ts` | `expo-secure-store` is native-only; calling `secureSet`/`secureGet`/`secureDelete` on web threw "Not supported" → `storeAuthData` threw "Failed to store authentication data" → login appeared to fail even after successful API response | Added `Platform.OS === 'web'` check in all three helpers; web falls back to `AsyncStorage` with `@secure/` key prefix (tokens less secure on web but app remains functional for dev/web testing) |
+
+---
+
+## Hub Navigation Fixes (v1.8.0)
+
+### Orphaned Screens Linked to Hub — March 2026
+
+Three screens existed in the codebase but had no navigation entry point from their module hubs. Users could not reach them without deep-linking.
+
+| File | Issue | Fix |
+|------|-------|-----|
+| `app/(tabs)/transport.tsx` | `Transport Pricing` and `Student Transport` screens existed at `app/transport/pricing.tsx` and `app/transport/student-transport.tsx` but were absent from the transport hub grid (only 4 sections shown) | Added both as sections 5 and 6; hub now shows 6 sections with correct `TRANSPORT_PRICING` / `STUDENT_TRANSPORT` permission guards |
+| `app/(tabs)/fees.tsx` | `Fee Reports` screen existed at `app/fees/reports.tsx` but was absent from the fees hub grid (only 8 sections shown) | Added as section 9 with `FEE_REPORTS` permission guard, `bar-chart` icon, green accent |
+| `app/(tabs)/students.tsx` | `STUDENT_QUICK_LINKS` and `PARENT_QUICK_LINKS` had 6 items; timetable was inaccessible for students/parents | Added `My Timetable` / `Timetable` quick link → `/masters/timetable` to both arrays (7 items each) |
 
 ---
 
@@ -549,5 +582,43 @@ onError: (err) => { showError('Failed', err.message); },
 
 ---
 
+---
+
+## Security & Functional Audit (v1.6.5) — March 2026
+
+Backend audit performed against 588 API endpoints. All issues verified against Python source before fixing.
+Full details: `memory/security-audit.md`
+
+### Fixes Applied
+
+| ID | Severity | File(s) | Fix |
+| --- | --- | --- | --- |
+| S-2 | Security | `services/authUtils.ts` | JWT tokens (`access_token`, `refresh_token`, `token_expiry`, `change_password_token`) migrated from `AsyncStorage` to `expo-secure-store` (OS Keychain / Keystore); non-sensitive data (user, role, permissions, menu, student) stays in `AsyncStorage`; `secureDelete` wraps `deleteItemAsync` to silently ignore missing keys (iOS safety). On web, `Platform.OS === 'web'` check falls back to `AsyncStorage` with `@secure/` prefix (v1.9.0) |
+| H-1 | High | `contexts/AuthContext.tsx` | `refreshAuth()` now restores `selectedStudent`, `availableStudents`, `studentId` from AsyncStorage and calls `setSelectedStudentForInterceptor` — parent context no longer lost after set-password redirect |
+| H-4 | High | `contexts/AuthContext.tsx` | `setSelectedStudentForInterceptor` moved before `dispatch(LOGIN_SUCCESS)` — X-Student-ID headers are set before navigation fires |
+| M-1 | Medium | `contexts/AuthContext.tsx`, `services/authUtils.ts` | All auth `console.log`/`console.warn` calls wrapped in `if (__DEV__)` — usernames and token lifecycle events no longer written to device log in production |
+| M-1 | Medium | `src/api/client.ts` | `console.log(config.data)` removed from request interceptor (prevented plaintext password exposure via `adb logcat`); all remaining interceptor logs gated behind `__DEV__` |
+| M-2 | Medium | `services/authUtils.ts` | `initializeAuth()` now runs `isAuthenticated()` sequentially first — prevents stale user data being returned while tokens are being cleared |
+| M-3 | Medium | `src/api/mobilePermissions.ts` | Removed broken `useMobileAuthStore` import; `checkPermission`/`checkBulkPermissions` now accept explicit `userId`; `initializePermissionSync` returns unsubscribe handle to prevent listener leaks |
+| M-3 | Medium | `src/api/client.ts` | Removed dead offline sync queue — `offlineStorage.addToSyncQueue` was called but queue was never drained; removed unused `offlineStorage` import |
+| M-4 | Medium | `contexts/AuthContext.tsx` | `LOGIN_SUCCESS` action now carries `selectedStudent` + `availableStudents`; all three fields (auth + student context) committed atomically in one dispatch — React state no longer lags behind axios headers |
+| M-5 | Medium | `services/authUtils.ts` | `clearAuthData()` wrapped in inner try/catch inside `refreshAccessToken` catch — guaranteed to return `null`, never re-throws |
+| H-fee | High | `src/api/fees.ts`, `app/fees/refunds.tsx`, `hooks/use-fee-permissions.ts` | `FeeRefundApproveRequest` fields `action` and `approval_remarks` were always required by backend but never sent; added approve/reject modal with required remarks `TextInput`; updated `useApproveFeeRefund` to pass full payload |
+| S-3 | Security | `components/PermissionDebugger.tsx`, `components/AuthStateDebugger.tsx`, `components/QuickDiagnostic.tsx`, `app/permission-test.tsx` | Added `if (!__DEV__) return null` guard — debug screens exposing full auth state are invisible in production builds |
+| L-2 | Low | `services/authUtils.ts`, `contexts/AuthContext.tsx` | Extracted `normalisePermissions()` helper; all 3 copy-paste sites replaced |
+| L-3 | Low | `contexts/AuthContext.tsx` | Added `stateRef = useRef(state)` + sync `useEffect`; `selectStudent`/`setAvailableStudents` now read `stateRef.current` — stale closure eliminated |
+| L-4 | Low | `contexts/AuthContext.tsx` | `import { ActivityIndicator, Text, View }` moved from bottom of file to line 2 |
+| L-5 | Low | `app/(tabs)/index.tsx` | Administration tile `alwaysShow: true` replaced with `resources: ['users','roles','staff']` — hidden from students/parents |
+| L-6 | Low | `app/set-password.tsx` | Password validation changed to `newPassword.trim().length < 8` — spaces-only passwords rejected |
+| L-1 | Low | `src/api/mobilePermissions.ts` | `getCacheMetadata` parameter renamed to `_userId` to suppress unused-parameter lint warning |
+
+### Known Remaining Issues
+
+| ID | Severity | Description |
+| --- | --- | --- |
+| S-4 | Security | No SSL certificate pinning — standard axios with no pinning |
+
+---
+
 *COS360 School Management System — Implementation Status*
-*March 2026*
+*v1.9.0 — March 2026*

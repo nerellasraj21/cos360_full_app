@@ -39,6 +39,7 @@ export const PERMISSION_RESOURCES = {
   SUBJECTS: 'subjects',
   SUBJECT_CATEGORIES: 'subject_categories',
   HOLIDAYS: 'holidays',
+  LOCATIONS: 'locations',
   TIMETABLES: 'timetables',
   PARENTS: 'parents',
   ROLES_PERMISSIONS: 'roles_permissions',

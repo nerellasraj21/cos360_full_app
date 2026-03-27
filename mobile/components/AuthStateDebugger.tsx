@@ -4,6 +4,7 @@ import { ThemedText } from './themed-text';
 import { useAuth } from '../contexts/AuthContext';
 
 export const AuthStateDebugger: React.FC = () => {
+  if (!__DEV__) return null;
   const authState = useAuth();
   
   const {

@@ -4,6 +4,7 @@ import { ThemedText } from './themed-text';
 import { useAuth } from '../contexts/AuthContext';
 
 export const QuickDiagnostic: React.FC = () => {
+  if (!__DEV__) return null;
   const { permissions, permissionsMap, hasPermission, isAuthenticated, user, role } = useAuth();
 
   useEffect(() => {

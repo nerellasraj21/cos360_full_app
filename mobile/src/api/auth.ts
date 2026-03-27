@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from './client';
 
-const TOKEN_KEY = 'auth_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
+// M-1: must match authUtils.ts canonical keys — old keys ('auth_token', 'refresh_token') caused reads to return null
+const TOKEN_KEY = '@auth/access_token';
+const REFRESH_TOKEN_KEY = '@auth/refresh_token';
 
 export const getAuthToken = async (): Promise<string | null> => {
   try {
@@ -93,8 +94,12 @@ export interface AuthBasePermissionCreate {
 // ─── Auth API ─────────────────────────────────────────────────────────────────
 
 export const authApi = {
-  /** POST /auth/staff/set-password */
-  setStaffPassword: async (data: { current_password: string; new_password: string }): Promise<void> => {
+  /** POST /auth/staff/set-password — used for first-login password change */
+  setStaffPassword: async (data: {
+    change_password_token: string;
+    new_password: string;
+    confirm_password: string;
+  }): Promise<void> => {
     await apiClient.post('/auth/staff/set-password', data);
   },
 

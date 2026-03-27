@@ -28,7 +28,7 @@ const sections = [
     description: 'Configure roles and fine-grained access control',
     icon: 'shield-checkmark' as const,
     color: '#10B981',
-    route: '/masters/rolespermissions',
+    route: '/admin/roles',
     resource: PERMISSION_RESOURCES.ADMIN_ROLES,
   },
   {
@@ -36,7 +36,7 @@ const sections = [
     description: 'Manage granular permissions for each role',
     icon: 'lock-closed' as const,
     color: '#F59E0B',
-    route: '/masters/rolespermissions',
+    route: '/admin/permissions',
     resource: PERMISSION_RESOURCES.ADMIN_PERMISSIONS,
   },
   {

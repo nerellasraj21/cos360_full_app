@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -12,6 +12,7 @@ import {
   View,
   Share,
   Platform,
+  Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IOSDatePickerModal } from '@/components/ui';
@@ -54,6 +55,11 @@ export default function TimeTableEditor() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [currentTimeField, setCurrentTimeField] = useState<'from' | 'to' | null>(null);
   const [currentRowId, setCurrentRowId] = useState<string | null>(null);
+  const [repeatModalVisible, setRepeatModalVisible] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<'all' | 'one' | null>(null);
+  const [repeatSelectedRow, setRepeatSelectedRow] = useState<string | null>(null);
+
+  const rowCounter = useRef(0);
 
   const router = useRouter();
   const { colors } = useTheme();
@@ -199,7 +205,7 @@ export default function TimeTableEditor() {
 
   const addRow = (type: 'subject' | 'special') => {
     const newRow: RowData = {
-      id: `row-${Date.now()}`,
+      id: `row-${++rowCounter.current}`,
       time: { from: '09:00', to: '09:45' },
       type,
       ...(type === 'subject' ? { subjects: {} } : { label: 'SNACKS' })
@@ -276,6 +282,35 @@ export default function TimeTableEditor() {
     return subject ? subject.name : '';
   };
 
+  const closeRepeatModal = () => {
+    setRepeatModalVisible(false);
+    setRepeatMode(null);
+    setRepeatSelectedRow(null);
+  };
+
+  const handleRepeatAllForWeek = (sourceDay: string) => {
+    setRows(prev => prev.map(row => {
+      if (row.type !== 'subject') return row;
+      const srcSubject = row.subjects?.[sourceDay] ?? '';
+      const newSubjects: Record<string, string> = { ...row.subjects };
+      days.forEach(d => { if (d !== sourceDay) newSubjects[d] = srcSubject; });
+      return { ...row, subjects: newSubjects };
+    }));
+    closeRepeatModal();
+  };
+
+  const handleRepeatOneSubject = (sourceDay: string) => {
+    if (!repeatSelectedRow) return;
+    setRows(prev => prev.map(row => {
+      if (row.id !== repeatSelectedRow || row.type !== 'subject') return row;
+      const srcSubject = row.subjects?.[sourceDay] ?? '';
+      const newSubjects: Record<string, string> = { ...row.subjects };
+      days.forEach(d => { if (d !== sourceDay) newSubjects[d] = srcSubject; });
+      return { ...row, subjects: newSubjects };
+    }));
+    closeRepeatModal();
+  };
+
   const handleExport = async (format: 'png' | 'csv' | 'excel' = 'csv') => {
     if (format === 'csv') {
       exportToCSV();
@@ -340,8 +375,8 @@ export default function TimeTableEditor() {
   };
 
   const days = useMemo(() => {
-    const baseDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-    return includeSaturday ? [...baseDays, 'saturday'] : baseDays;
+    const baseDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    return includeSaturday ? [...baseDays, 'Saturday'] : baseDays;
   }, [includeSaturday]);
 
   const renderTimetableRow = useCallback(({ item, index }: { item: RowData; index: number }) => (
@@ -660,6 +695,26 @@ export default function TimeTableEditor() {
         </View>
       )}
 
+      {/* Repeat Buttons */}
+      {isEditing && rows.some(r => r.type === 'subject') && (
+        <View style={styles.repeatButtons}>
+          <TouchableOpacity
+            style={[styles.repeatButton, { borderColor: themeColors.primary }]}
+            onPress={() => { setRepeatMode('all'); setRepeatModalVisible(true); }}
+          >
+            <Ionicons name="copy-outline" size={16} color={themeColors.primary} />
+            <ThemedText style={[styles.repeatButtonText, { color: themeColors.primary }]}>Repeat All for Week</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.repeatButton, { borderColor: themeColors['muted-foreground'] }]}
+            onPress={() => { setRepeatMode('one'); setRepeatSelectedRow(null); setRepeatModalVisible(true); }}
+          >
+            <Ionicons name="copy-outline" size={16} color={themeColors['muted-foreground']} />
+            <ThemedText style={[styles.repeatButtonText, { color: themeColors['muted-foreground'] }]}>Repeat One Subject</ThemedText>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Save Button */}
       {isEditing && (
         <View style={styles.saveContainer}>
@@ -700,6 +755,80 @@ export default function TimeTableEditor() {
         setCurrentTimeField(null);
       }}
     />
+
+    {/* Repeat Day / Row Picker Modal */}
+    <Modal
+      visible={repeatModalVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={closeRepeatModal}
+    >
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeRepeatModal}>
+        <TouchableOpacity activeOpacity={1} style={[styles.modalContainer, { backgroundColor: themeColors.card }]}>
+          <ThemedText style={styles.modalTitle}>
+            {repeatMode === 'all'
+              ? 'Repeat All for Week'
+              : repeatSelectedRow
+              ? 'Select Source Day'
+              : 'Select Period to Repeat'}
+          </ThemedText>
+          <ThemedText style={[styles.modalSubtitle, { color: themeColors['muted-foreground'] }]}>
+            {repeatMode === 'all'
+              ? 'Copy this day\'s subjects to all other days'
+              : repeatSelectedRow
+              ? 'Copy this day\'s subject to all other days in that period'
+              : 'Pick which period\'s assignments to repeat'}
+          </ThemedText>
+
+          {/* Row list — only for 'one' mode before a row is chosen */}
+          {repeatMode === 'one' && !repeatSelectedRow && (
+            <FlatList
+              data={rows.filter(r => r.type === 'subject')}
+              keyExtractor={item => item.id}
+              style={{ maxHeight: 220 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.modalOption, { borderBottomColor: themeColors.border }]}
+                  onPress={() => setRepeatSelectedRow(item.id)}
+                >
+                  <Ionicons name="time-outline" size={16} color={themeColors['muted-foreground']} />
+                  <ThemedText style={[styles.modalOptionText, { marginLeft: 8 }]}>
+                    {item.time.from} – {item.time.to}
+                  </ThemedText>
+                  <Ionicons name="chevron-forward" size={16} color={themeColors['muted-foreground']} style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
+              )}
+            />
+          )}
+
+          {/* Day list — for 'all' mode, or 'one' mode after row is chosen */}
+          {(repeatMode === 'all' || (repeatMode === 'one' && repeatSelectedRow)) && (
+            <FlatList
+              data={days}
+              keyExtractor={d => d}
+              style={{ maxHeight: 280 }}
+              renderItem={({ item: day }) => (
+                <TouchableOpacity
+                  style={[styles.modalOption, { borderBottomColor: themeColors.border }]}
+                  onPress={() => repeatMode === 'all' ? handleRepeatAllForWeek(day) : handleRepeatOneSubject(day)}
+                >
+                  <ThemedText style={styles.modalOptionText}>
+                    {day.charAt(0).toUpperCase() + day.slice(1)}
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
+            />
+          )}
+
+          <TouchableOpacity
+            style={[styles.modalCancel, { backgroundColor: themeColors.muted ?? themeColors.border }]}
+            onPress={closeRepeatModal}
+          >
+            <ThemedText style={[styles.modalCancelText, { color: themeColors['muted-foreground'] }]}>Cancel</ThemedText>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
   </>
   );
 }
@@ -928,6 +1057,78 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  repeatButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  repeatButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  repeatButtonText: {
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 360,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+  },
+  modalOptionText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  modalCancel: {
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 15,
     fontWeight: '600',
   },
 });

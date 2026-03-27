@@ -22,9 +22,13 @@ import {
   feeOldFeesApi,
   FeeCollectionSummary,
   FeeConcessionCreate,
+  FeeSearchStudentResult,
 } from '@/src/api/fees';
 import { useToastContext } from '@/components/ToastProvider';
 
+// M-1: INR currency formatter
+const formatINR = (amount: number | string | null | undefined) =>
+  '₹' + Number(amount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export default function FeeCollectionScreen() {
   const { role, selectedStudent } = useAuth();
   const { colors, theme } = useTheme();
@@ -37,6 +41,8 @@ export default function FeeCollectionScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState('');
 
+  const [selectedStudentInfo, setSelectedStudentInfo] = useState(null as any);
+
   type AdminTab = 'summary' | 'payment' | 'concessions' | 'old-fees';
   const [adminTab, setAdminTab] = useState<AdminTab>('summary');
   const [paymentForm, setPaymentForm] = useState({
@@ -48,8 +54,11 @@ export default function FeeCollectionScreen() {
     cheque_number: '',
     cheque_bank: '',
   });
+  // C-6: max-amount guard error state
+  const [amountError, setAmountError] = useState(null as any);
   const [paymentSuccess, setPaymentSuccess] = useState<{
     receipt_number?: string;
+    receipt_id?: string;
     transaction_number?: string;
     amount_paid: number;
   } | null>(null);
@@ -100,9 +109,19 @@ export default function FeeCollectionScreen() {
     enabled: !isStudent && !isParent && !!selectedStudentId && adminTab === 'old-fees',
   });
 
+  // C-7: fetch existing concessions for the selected student
+  const { data: existingConcessions } = useQuery({
+    queryKey: ['fee-concessions', selectedStudentId, activeAcademicYearId],
+    queryFn: () =>
+      feeConcessionsApi.getByStudent(selectedStudentId, {
+        academic_year_id: activeAcademicYearId ?? undefined,
+      }),
+    enabled: !isStudent && !isParent && !!selectedStudentId && adminTab === 'concessions',
+  });
+
   const payMutation = useMutation({
-    mutationFn: () => feeCollectionApi.pay({
-      student_id: selectedStudentId,
+    mutationFn: (capturedStudentId: string) => feeCollectionApi.pay({
+      student_id: capturedStudentId,
       academic_year_id: activeAcademicYearId ?? '',
       amount_to_pay: parseFloat(paymentForm.amount) || 0,
       payment_method: paymentForm.payment_method,
@@ -112,13 +131,17 @@ export default function FeeCollectionScreen() {
       cheque_number: paymentForm.cheque_number || undefined,
       cheque_bank: paymentForm.cheque_bank || undefined,
     } as any),
-    onSuccess: (data: any) => {
-      qc.invalidateQueries({ queryKey: ['fee-summary', selectedStudentId] });
+    onSuccess: (data: any, capturedStudentId: string) => {
+      qc.invalidateQueries({ queryKey: ['fee-summary', capturedStudentId] });
+      qc.invalidateQueries({ queryKey: ['fee-my-summary'] });
+      qc.invalidateQueries({ queryKey: ['fee-child-summary'] });
       setAdminTab('summary');
+      setAmountError(null);
       const paid = parseFloat(paymentForm.amount) || 0;
       setPaymentForm({ amount: '', payment_method: 'cash', remarks: '', upi_reference: '', bank_reference: '', cheque_number: '', cheque_bank: '' });
       setPaymentSuccess({
         receipt_number: data?.receipt_number,
+        receipt_id: data?.receipt_id,
         transaction_number: data?.transaction_number,
         amount_paid: data?.amount_paid ?? paid,
       });
@@ -127,16 +150,19 @@ export default function FeeCollectionScreen() {
   });
 
   const concessionMutation = useMutation({
-    mutationFn: () => feeConcessionsApi.bulkCreate([{
-      student_id: selectedStudentId,
+    mutationFn: (capturedStudentId: string) => feeConcessionsApi.bulkCreate([{
+      student_id: capturedStudentId,
       fee_type_id: concessionForm.fee_type_id,
       academic_year_id: activeAcademicYearId ?? '',
       amount: parseFloat(concessionForm.amount) || 0,
       approver_role: concessionForm.approver_role,
       remarks: concessionForm.remarks || undefined,
     } as FeeConcessionCreate]),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['fee-summary', selectedStudentId] });
+    onSuccess: (_: any, capturedStudentId: string) => {
+      qc.invalidateQueries({ queryKey: ['fee-summary', capturedStudentId] });
+      qc.invalidateQueries({ queryKey: ['fee-my-summary'] });
+      qc.invalidateQueries({ queryKey: ['TEMP_MARKER'] });
+      qc.invalidateQueries({ queryKey: ['fee-concessions', capturedStudentId] });
       setAdminTab('summary');
       setConcessionForm({ fee_type_id: '', amount: '', approver_role: 'admin', remarks: '' });
       showSuccess('Concession Applied', 'Concession applied successfully');
@@ -148,7 +174,7 @@ export default function FeeCollectionScreen() {
   const SummaryView = ({ data }: { data: FeeCollectionSummary }) => (
     <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
       {/* Student header */}
-      <View style={styles.summaryHeader}>
+      <View style={[styles.summaryHeader,{backgroundColor:colors.primary}]}>
         <Text style={styles.summaryName}>{data.student_name}</Text>
         <Text style={styles.summarySub}>
           {data.class_name} – {data.section_name} • {data.admission_number}
@@ -161,13 +187,13 @@ export default function FeeCollectionScreen() {
         <View style={[styles.totalCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
           <Text style={[styles.totalLabel, { color: colors['muted-foreground'] }]}>Total Fee</Text>
           <Text style={[styles.totalAmount, { color: colors.foreground }]}>
-            ₹{Number(data.grand_total_fee).toLocaleString('en-IN')}
+            {formatINR(data.grand_total_fee)}
           </Text>
         </View>
         <View style={[styles.totalCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
           <Text style={[styles.totalLabel, { color: colors['muted-foreground'] }]}>Paid</Text>
           <Text style={[styles.totalAmount, { color: '#10B981' }]}>
-            ₹{Number(data.grand_total_paid).toLocaleString('en-IN')}
+            {formatINR(data.grand_total_paid)}
           </Text>
         </View>
         <View style={[styles.totalCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
@@ -175,7 +201,7 @@ export default function FeeCollectionScreen() {
           <Text style={[styles.totalAmount, {
             color: Number(data.grand_total_due) > 0 ? '#EF4444' : '#10B981',
           }]}>
-            ₹{Number(data.grand_total_due).toLocaleString('en-IN')}
+            {formatINR(data.grand_total_due)}
           </Text>
         </View>
       </View>
@@ -185,7 +211,7 @@ export default function FeeCollectionScreen() {
         <View style={styles.oldFeeAlert}>
           <Ionicons name="warning" size={14} color="#D97706" />
           <Text style={styles.oldFeeText}>
-            Previous year pending: ₹{Number(data.old_fee_pending_amount).toLocaleString('en-IN')}
+            Previous year pending: {formatINR(data.old_fee_pending_amount)}
           </Text>
         </View>
       )}
@@ -198,8 +224,8 @@ export default function FeeCollectionScreen() {
           style={[styles.feeCard, { backgroundColor: cardBg, borderColor: borderCol }]}
         >
           <View style={styles.feeCardRow}>
-            <View style={styles.feeIndex}>
-              <Text style={styles.feeIndexText}>{idx + 1}</Text>
+            <View style={[styles.feeIndex,{backgroundColor:colors.primary+'18'}]}>
+              <Text style={[styles.feeIndexText,{color:colors.primary}]}>{idx + 1}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.feeTypeName, { color: colors.foreground }]}>
@@ -207,15 +233,15 @@ export default function FeeCollectionScreen() {
               </Text>
               <View style={styles.feeAmounts}>
                 <Text style={[styles.feeAmountChip, { color: colors['muted-foreground'] }]}>
-                  Assigned: ₹{Number(item.assigned_fee).toLocaleString('en-IN')}
+                  Assigned: {formatINR(item.assigned_fee)}
                 </Text>
                 <Text style={[styles.feeAmountChip, { color: '#10B981' }]}>
-                  Paid: ₹{Number(item.paid_amount).toLocaleString('en-IN')}
+                  Paid: {formatINR(item.paid_amount)}
                 </Text>
                 <Text style={[styles.feeAmountChip, {
                   color: Number(item.due_amount) > 0 ? '#EF4444' : '#10B981',
                 }]}>
-                  Due: ₹{Number(item.due_amount).toLocaleString('en-IN')}
+                  Due: {formatINR(item.due_amount)}
                 </Text>
               </View>
               {item.last_paid_date && (
@@ -245,7 +271,7 @@ export default function FeeCollectionScreen() {
       <AppLayout title="My Fees">
         {myLoading ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#556ee6" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : myFeeSummary ? (
           <SummaryView data={myFeeSummary} />
@@ -267,7 +293,7 @@ export default function FeeCollectionScreen() {
           />
         ) : childLoading ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#556ee6" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : childFeeSummary ? (
           <SummaryView data={childFeeSummary} />
@@ -296,16 +322,17 @@ export default function FeeCollectionScreen() {
         placeholder="Enter amount"
         placeholderTextColor={colors['muted-foreground']}
         value={paymentForm.amount}
-        onChangeText={(t) => setPaymentForm(p => ({ ...p, amount: t }))}
+        onChangeText={(t) => { setPaymentForm(pr => ({ ...pr, amount: t })); const v=parseFloat(t); if(v===v && Number(adminFeeSummary?.grand_total_due??0)>0 && v>Number(adminFeeSummary?.grand_total_due??0)){setAmountError(String.fromCharCode(65,109,111,117,110,116,32,99,97,110,110,111,116,32,101,120,99,101,101,100,32,111,117,116,115,116,97,110,100,105,110,103,32,98,97,108,97,110,99,101));}else{setAmountError(null);} }}
         keyboardType="numeric"
       />
+      {amountError ? <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '500' }}>{amountError}</Text> : null}
 
       <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Payment Method</Text>
       <View style={styles.chipRow}>
         {(['cash', 'cheque', 'bank_transfer', 'upi', 'dd'] as const).map(method => (
           <TouchableOpacity
             key={method}
-            style={[styles.methodChip, paymentForm.payment_method === method && { backgroundColor: '#556ee6' }]}
+            style={[styles.methodChip, paymentForm.payment_method === method && { backgroundColor: colors.primary }]}
             onPress={() => setPaymentForm(p => ({ ...p, payment_method: method }))}
           >
             <Text style={{ color: paymentForm.payment_method === method ? 'white' : colors['muted-foreground'], fontSize: 12, fontWeight: '600' }}>
@@ -373,8 +400,8 @@ export default function FeeCollectionScreen() {
 
       <TouchableOpacity
         style={[styles.submitBtn, { backgroundColor: '#10B981', opacity: payMutation.isPending ? 0.6 : 1 }]}
-        onPress={() => payMutation.mutate()}
-        disabled={payMutation.isPending || !paymentForm.amount}
+        onPress={() => payMutation.mutate(selectedStudentId)}
+        disabled={payMutation.isPending || !paymentForm.amount || !!amountError}
       >
         <Text style={styles.submitBtnText}>{payMutation.isPending ? 'Processing...' : 'Record Payment'}</Text>
       </TouchableOpacity>
@@ -384,6 +411,19 @@ export default function FeeCollectionScreen() {
 
   const ConcessionTabContent = () => (
     <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
+      {/* C-7: Existing concessions */}
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Applied Concessions</Text>
+      {existingConcessions && existingConcessions.length > 0 ? existingConcessions.map((con) => (
+        <View key={con.id} style={[styles.feeCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.feeTypeName, { color: colors.foreground }]}>{con.fee_type_id}</Text>
+              <Text style={[styles.feeSub, { color: colors['muted-foreground'] }]}>Approved by: {con.approver_role}</Text>
+            </View>
+            <Text style={[styles.feeTypeName, { color: '#8B5CF6' }]}>{formatINR(con.amount)}</Text>
+          </View>
+        </View>)) : <Text style={[styles.feeSub, { color: colors['muted-foreground'] }]}>No concessions applied</Text>}
+      <View style={styles.divider} />
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Apply Concession</Text>
 
       <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Fee Type *</Text>
@@ -391,7 +431,7 @@ export default function FeeCollectionScreen() {
         {(adminFeeSummary?.items ?? []).map(item => (
           <TouchableOpacity
             key={item.fee_type_id}
-            style={[styles.methodChip, concessionForm.fee_type_id === item.fee_type_id && { backgroundColor: '#556ee6' }]}
+            style={[styles.methodChip, concessionForm.fee_type_id === item.fee_type_id && { backgroundColor: colors.primary }]}
             onPress={() => setConcessionForm(p => ({ ...p, fee_type_id: item.fee_type_id }))}
           >
             <Text style={{ color: concessionForm.fee_type_id === item.fee_type_id ? 'white' : colors['muted-foreground'], fontSize: 12, fontWeight: '600' }}>
@@ -416,7 +456,7 @@ export default function FeeCollectionScreen() {
         {(['principal', 'management', 'accountant', 'admin'] as FeeConcessionCreate['approver_role'][]).map(role => (
           <TouchableOpacity
             key={role}
-            style={[styles.methodChip, concessionForm.approver_role === role && { backgroundColor: '#556ee6' }]}
+            style={[styles.methodChip, concessionForm.approver_role === role && { backgroundColor: colors.primary }]}
             onPress={() => setConcessionForm(p => ({ ...p, approver_role: role }))}
           >
             <Text style={{ color: concessionForm.approver_role === role ? 'white' : colors['muted-foreground'], fontSize: 12, fontWeight: '600' }}>
@@ -439,7 +479,7 @@ export default function FeeCollectionScreen() {
 
       <TouchableOpacity
         style={[styles.submitBtn, { backgroundColor: '#8B5CF6', opacity: concessionMutation.isPending ? 0.6 : 1 }]}
-        onPress={() => concessionMutation.mutate()}
+        onPress={() => concessionMutation.mutate(selectedStudentId)}
         disabled={concessionMutation.isPending || !concessionForm.fee_type_id || !concessionForm.amount}
       >
         <Text style={styles.submitBtnText}>{concessionMutation.isPending ? 'Applying...' : 'Apply Concession'}</Text>
@@ -454,12 +494,12 @@ export default function FeeCollectionScreen() {
         <View style={[styles.oldFeeAlert, { margin: 16, marginBottom: 0 }]}>
           <Ionicons name="warning" size={14} color="#D97706" />
           <Text style={styles.oldFeeText}>
-            Total carry-forward pending: ₹{Number(adminFeeSummary.old_fee_pending_amount).toLocaleString('en-IN')}
+            Total carry-forward pending: {formatINR(adminFeeSummary.old_fee_pending_amount)}
           </Text>
         </View>
       )}
       {oldFeesLoading ? (
-        <View style={styles.centered}><ActivityIndicator size="large" color="#556ee6" /></View>
+        <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>
       ) : (
         <FlatList
           data={oldFees ?? []}
@@ -484,17 +524,17 @@ export default function FeeCollectionScreen() {
                 )}
                 {item.original_amount != null && (
                   <Text style={[styles.feeAmountChip, { color: colors['muted-foreground'] }]}>
-                    Total: ₹{Number(item.original_amount).toLocaleString('en-IN')}
+                    Total: {formatINR(item.original_amount)}
                   </Text>
                 )}
                 {item.paid_amount != null && (
                   <Text style={[styles.feeAmountChip, { color: '#10B981' }]}>
-                    Paid: ₹{Number(item.paid_amount).toLocaleString('en-IN')}
+                    Paid: {formatINR(item.paid_amount)}
                   </Text>
                 )}
                 {item.balance != null && (
                   <Text style={[styles.feeAmountChip, { color: '#EF4444' }]}>
-                    Due: ₹{Number(item.balance).toLocaleString('en-IN')}
+                    Due: {formatINR(item.balance)}
                   </Text>
                 )}
               </View>
@@ -509,6 +549,13 @@ export default function FeeCollectionScreen() {
     <AppLayout title="Fee Collection">
       <View style={{ flex: 1 }}>
       <View style={styles.adminContainer}>
+        {/* M-9: Page header */}
+        <View style={styles.pageHeader}>
+          <Text style={[styles.pageTitle, { color: colors.foreground }]}>Fee Collection</Text>
+          <Text style={[styles.pageSubtitle, { color: colors['muted-foreground'] }]}>
+            Search students and manage fee payments
+          </Text>
+        </View>
         {/* Search bar */}
         <View style={[styles.searchBar, { backgroundColor: cardBg, borderColor: borderCol }]}>
           <Ionicons name="search" size={18} color={colors['muted-foreground']} />
@@ -520,11 +567,12 @@ export default function FeeCollectionScreen() {
             onChangeText={(t) => {
               setSearchQuery(t);
               setSelectedStudentId('');
+              setSelectedStudentInfo(null);
               setAdminTab('summary');
             }}
           />
           {searchQuery ? (
-            <TouchableOpacity onPress={() => { setSearchQuery(''); setSelectedStudentId(''); setAdminTab('summary'); }}>
+            <TouchableOpacity onPress={() => { setSearchQuery(''); setSelectedStudentId(''); setSelectedStudentInfo(null); setAdminTab('summary'); }}>
               <Ionicons name="close" size={18} color={colors['muted-foreground']} />
             </TouchableOpacity>
           ) : null}
@@ -535,11 +583,11 @@ export default function FeeCollectionScreen() {
           <View style={[styles.searchDropdown, { backgroundColor: cardBg, borderColor: borderCol }]}>
             {searchLoading ? (
               <View style={styles.dropdownItem}>
-                <ActivityIndicator size="small" color="#556ee6" />
+                <ActivityIndicator size="small" color={colors.primary} />
               </View>
             ) : (searchResults ?? []).length === 0 ? (
               <View style={styles.dropdownItem}>
-                <Text style={{ color: colors['muted-foreground'], fontSize: 13 }}>No students found</Text>
+                <Text style={{ color: colors['muted-foreground'], fontSize: 14 }}>No students found</Text>
               </View>
             ) : (
               (searchResults ?? []).map((s) => (
@@ -547,7 +595,7 @@ export default function FeeCollectionScreen() {
                   key={s.student_id}
                   style={[styles.dropdownItem, { borderBottomColor: borderCol }]}
                   onPress={() => {
-                    setSelectedStudentId(s.student_id);
+                    setSelectedStudentId(s.student_id); setSelectedStudentInfo(s);
                     setSearchQuery(s.student_name);
                   }}
                 >
@@ -555,7 +603,7 @@ export default function FeeCollectionScreen() {
                   <Text style={[styles.dropdownSub, { color: colors['muted-foreground'] }]}>
                     {s.admission_number} • {s.class_name}
                     {Number(s.outstanding_amount) > 0
-                      ? ` • Due: ₹${Number(s.outstanding_amount).toLocaleString('en-IN')}`
+                      ? (' • Due: ' + formatINR(s.outstanding_amount))
                       : ''}
                   </Text>
                 </TouchableOpacity>
@@ -564,13 +612,41 @@ export default function FeeCollectionScreen() {
           </View>
         )}
 
+        {/* C-5: Student info card after selection */}
+        {selectedStudentId && selectedStudentInfo && (
+          <View style={[styles.studentInfoCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <View style={styles.studentAvatar}>
+              <Ionicons name='person' size={28} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.studentInfoName, { color: colors.foreground }]}>
+                {selectedStudentInfo.student_name}
+              </Text>
+              <View style={styles.studentInfoRow}>
+                <View style={[styles.admissionBadge, { backgroundColor: colors.primary+'22' }]}>
+                  <Text style={[styles.admissionBadgeText, { color: colors.primary }]}>
+                    {selectedStudentInfo.admission_number}
+                  </Text>
+                </View>
+                <Text style={[styles.studentInfoSub, { color: colors['muted-foreground'] }]}>
+                  {selectedStudentInfo.class_name}{selectedStudentInfo.section_name ? '  ' + selectedStudentInfo.section_name : ''}
+                </Text>
+              </View>
+              {selectedStudentInfo.father_phone ? (
+                <Text style={[styles.studentInfoSub, { color: colors['muted-foreground'] }]}>
+                  Ph: {selectedStudentInfo.father_phone}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        )}
         {/* Tab bar — visible once a student is selected */}
         {selectedStudentId && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.adminTabBar}>
             {ADMIN_TABS.map(tab => (
               <TouchableOpacity
                 key={tab.key}
-                style={[styles.adminTab, adminTab === tab.key && { backgroundColor: '#556ee6', borderRadius: 8 }]}
+                style={[styles.adminTab, adminTab === tab.key && { backgroundColor: colors.primary, borderRadius: 8 }]}
                 onPress={() => setAdminTab(tab.key)}
               >
                 <Text style={{ color: adminTab === tab.key ? 'white' : colors['muted-foreground'], fontWeight: '600', fontSize: 13 }}>
@@ -585,7 +661,7 @@ export default function FeeCollectionScreen() {
       {/* Tab content */}
       {adminLoading ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#556ee6" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : adminFeeSummary ? (
         <>
@@ -612,9 +688,9 @@ export default function FeeCollectionScreen() {
         <View style={styles.successOverlay}>
           <View style={[styles.successModal, { backgroundColor: cardBg }]}>
             <Ionicons name="checkmark-circle" size={60} color="#10B981" style={{ marginBottom: 12 }} />
-            <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment Recorded!</Text>
+            <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment Successful!</Text>
             <Text style={[styles.successAmount, { color: '#10B981' }]}>
-              ₹{Number(paymentSuccess?.amount_paid ?? 0).toLocaleString('en-IN')}
+              {formatINR(paymentSuccess?.amount_paid ?? 0)}
             </Text>
             {paymentSuccess?.receipt_number ? (
               <Text style={[styles.successDetail, { color: colors['muted-foreground'] }]}>
@@ -626,6 +702,15 @@ export default function FeeCollectionScreen() {
                 Transaction: {paymentSuccess.transaction_number}
               </Text>
             ) : null}
+            {paymentSuccess?.receipt_id ? (
+              <TouchableOpacity
+                style={[styles.downloadBtn, { borderColor: colors.primary }]}
+                onPress={async () => { try { await feeCollectionApi.getReceiptPdf(paymentSuccess.receipt_id!); showSuccess('Receipt', 'Receipt will be emailed to parent'); } catch { showError('Error', 'Unable to download receipt'); } }}
+              >
+                <Ionicons name='download-outline' size={16} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>Download Receipt</Text>
+              </TouchableOpacity>
+) : null}
             <TouchableOpacity
               style={[styles.successBtn, { backgroundColor: '#10B981' }]}
               onPress={() => setPaymentSuccess(null)}
@@ -877,4 +962,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 48,
     borderRadius: 12,
   },
+
+  pageHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+  pageTitle: { fontSize: 22, fontWeight: '700', marginBottom: 2 },
+  pageSubtitle: { fontSize: 14, marginBottom: 12 },
+  studentInfoCard: { marginHorizontal: 16, marginBottom: 12, borderRadius: 14, borderWidth: 1, padding: 14, flexDirection: 'row' },
+  studentAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  studentInfoName: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  studentInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  studentInfoSub: { fontSize: 13 },
+  admissionBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: '#556ee618' },
+  admissionBadgeText: { fontSize: 12, fontWeight: '600', color: '#556ee6' },
+  divider: { height: 1, marginVertical: 12 },
+  downloadBtn: { marginTop: 10, paddingVertical: 11, paddingHorizontal: 32, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
 });

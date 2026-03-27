@@ -199,29 +199,38 @@ class ErrorHandler {
   }
 
   private getApiErrorMessage(status: number, data?: any): string {
+    // FastAPI returns { detail: string } or { detail: [{loc, msg, type}] } (422)
+    const detail = data?.detail;
+    const detailStr: string | undefined =
+      typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail)
+        ? detail.map((e: any) => e?.msg ?? String(e)).join('; ')
+        : undefined;
+
     switch (status) {
       case 400:
-        return data?.message || 'Bad request. Please check your input.';
+        return detailStr || data?.message || 'Bad request. Please check your input.';
       case 401:
         return 'Authentication failed. Please log in again.';
       case 403:
-        return 'You do not have permission to perform this action.';
+        return detailStr || 'You do not have permission to perform this action.';
       case 404:
-        return 'The requested resource was not found.';
+        return detailStr || 'The requested resource was not found.';
       case 409:
-        return 'Conflict with existing data.';
+        return detailStr || 'Conflict with existing data.';
       case 422:
-        return data?.message || 'Validation failed. Please check your input.';
+        return detailStr || data?.message || 'Validation failed. Please check your input.';
       case 429:
         return 'Too many requests. Please try again later.';
       case 500:
-        return 'Server error. Please try again later.';
+        return detailStr || 'Server error. Please try again later.';
       case 502:
       case 503:
       case 504:
         return 'Service temporarily unavailable. Please try again later.';
       default:
-        return data?.message || `Request failed with status ${status}`;
+        return detailStr || data?.message || `Request failed with status ${status}`;
     }
   }
 

@@ -1,6 +1,7 @@
-import apiClient from './client'
+// NOTE: This file is not currently called anywhere in the app. Permission checking
+// is handled entirely by AuthContext + useMobilePermission (which delegates to useAuth).
+// Kept for future use but should not be wired up without resolving H-2 (dual auth stores).
 import { MobilePermissionCache, permissionUtils } from '../utils/mobilePermissionCache'
-import { useMobileAuthStore } from '../stores/mobileAuthStore'
 
 export interface PermissionSyncResponse {
   permissions: Array<{
@@ -16,89 +17,40 @@ export interface BulkPermissionCheckResponse {
 
 export const mobilePermissionsApi = {
   /**
-   * Sync permissions from server and cache them
+   * Returns cached permissions for the user.
+   * Note: The backend has no dedicated mobile-permissions sync endpoint.
+   * Permissions are embedded in the login response and cached at login time.
    */
   async syncPermissions(userId: string): Promise<PermissionSyncResponse> {
-    try {
-      const response = await apiClient.get('/auth/mobile/permissions/sync')
-      const data = response.data
-
-      // Cache the permissions for offline use
-      const permissionsMap = data.permissions.reduce((acc: Record<string, string[]>, perm: any) => {
-        acc[perm.resource] = perm.actions
-        return acc
-      }, {})
-
-      await MobilePermissionCache.setCachedPermissions(userId, permissionsMap)
-
-      // Update the store
-      useMobileAuthStore.getState().login({
-        user: useMobileAuthStore.getState().user!,
-        role: useMobileAuthStore.getState().role,
-        permissions: data.permissions.flatMap((perm: any) =>
-          perm.actions.map((action: string) => ({
-            resource: perm.resource,
-            action,
-            is_granted: true
-          }))
-        ),
-        access_token: useMobileAuthStore.getState().accessToken!,
-        refresh_token: useMobileAuthStore.getState().refreshToken!,
-      })
-
-      return data
-    } catch (error) {
-      console.error('Failed to sync permissions:', error)
-      throw error
-    }
+    const cached = await MobilePermissionCache.getCachedPermissions(userId)
+    const permissions = cached
+      ? Object.entries(cached).map(([resource, actions]) => ({ resource, actions }))
+      : []
+    return { permissions, last_sync: new Date().toISOString() }
   },
 
   /**
-   * Check a single permission online
+   * Check a single permission from cache.
+   * Caller must supply userId (obtain from AuthContext).
    */
-  async checkPermission(resource: string, action: string): Promise<boolean> {
-    try {
-      const response = await apiClient.post('/auth/permissions/check', {
-        resource,
-        action,
-      })
-      return response.data.granted
-    } catch (error) {
-      console.warn('Online permission check failed, using cache')
-      // Fallback to cached permissions
-      const userId = useMobileAuthStore.getState().user?.id
-      if (userId) {
-        const cached = await MobilePermissionCache.getCachedPermissions(userId)
-        return cached?.[resource]?.includes(action) || false
-      }
-      return false
-    }
+  async checkPermission(userId: string, resource: string, action: string): Promise<boolean> {
+    if (!userId) return false
+    const cached = await MobilePermissionCache.getCachedPermissions(userId)
+    return cached?.[resource]?.includes(action) ?? false
   },
 
   /**
-   * Check multiple permissions at once
+   * Check multiple permissions from cache.
+   * Caller must supply userId (obtain from AuthContext).
    */
-  async checkBulkPermissions(resources: string[]): Promise<Record<string, string[]>> {
-    try {
-      const response = await apiClient.post('/auth/permissions/bulk-check', {
-        resources,
-      })
-      return response.data.permissions
-    } catch (error) {
-      console.warn('Bulk permission check failed, using cache')
-      // Fallback to cached permissions
-      const userId = useMobileAuthStore.getState().user?.id
-      if (userId) {
-        const cached = await MobilePermissionCache.getCachedPermissions(userId)
-        if (cached) {
-          return resources.reduce((acc, resource) => {
-            acc[resource] = cached[resource] || []
-            return acc
-          }, {} as Record<string, string[]>)
-        }
-      }
-      return {}
-    }
+  async checkBulkPermissions(userId: string, resources: string[]): Promise<Record<string, string[]>> {
+    if (!userId) return {}
+    const cached = await MobilePermissionCache.getCachedPermissions(userId)
+    if (!cached) return {}
+    return resources.reduce((acc, resource) => {
+      acc[resource] = cached[resource] || []
+      return acc
+    }, {} as Record<string, string[]>)
   },
 
   /**
@@ -135,7 +87,7 @@ export const mobilePermissionsApi = {
   /**
    * Get permission cache metadata
    */
-  async getCacheMetadata(userId: string) {
+  async getCacheMetadata(_userId: string) {
     return MobilePermissionCache.getCacheMetadata()
   },
 
@@ -147,34 +99,33 @@ export const mobilePermissionsApi = {
   },
 }
 
-// Auto-sync permissions when coming online
-export const initializePermissionSync = () => {
+// Auto-sync permissions when coming online.
+// Returns a cleanup function — MUST be called when the caller unmounts/deinitialises
+// to prevent the subscription from leaking across sessions.
+// userId and isOnline must be supplied by the caller (obtain from AuthContext).
+export const initializePermissionSync = (userId: string, isOnline: boolean, onlineStream: {
+  subscribe: (cb: (isOnline: boolean) => void) => () => void
+}) => {
   const syncPermissions = async () => {
-    const userId = useMobileAuthStore.getState().user?.id
-    const isOnline = useMobileAuthStore.getState().isOnline
-
-    if (userId && isOnline) {
-      const shouldSync = await mobilePermissionsApi.shouldSyncPermissions(userId)
-      if (shouldSync) {
-        try {
-          await mobilePermissionsApi.syncPermissions(userId)
-          console.log('Permissions auto-synced successfully')
-        } catch (error) {
-          console.error('Failed to auto-sync permissions:', error)
-        }
+    if (!userId || !isOnline) return
+    const shouldSync = await mobilePermissionsApi.shouldSyncPermissions(userId)
+    if (shouldSync) {
+      try {
+        await mobilePermissionsApi.syncPermissions(userId)
+        if (__DEV__) console.log('Permissions auto-synced successfully')
+      } catch (error) {
+        console.error('Failed to auto-sync permissions:', error)
       }
     }
   }
 
-  // Sync when coming online
-  useMobileAuthStore.subscribe((state, prevState) => {
-    if (!prevState.isOnline && state.isOnline) {
-      syncPermissions()
-    }
+  // Subscribe to online-state changes; store the unsubscribe handle to prevent leaks
+  const unsubscribe = onlineStream.subscribe((nowOnline) => {
+    if (nowOnline) syncPermissions()
   })
 
-  // Initial sync if online
-  if (useMobileAuthStore.getState().isOnline) {
-    syncPermissions()
-  }
+  // Initial sync if already online
+  if (isOnline) syncPermissions()
+
+  return unsubscribe
 }

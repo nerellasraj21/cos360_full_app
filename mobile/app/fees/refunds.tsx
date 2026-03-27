@@ -1,31 +1,30 @@
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { useToastContext } from '@/components/ToastProvider';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useTheme, useAcademicYear, useAuth } from '@/contexts';
 import { FeeRefundResponse, FeeRefundRequest, feeRefundsApi, feeTransactionsApi } from '@/src/api/fees';
 import { studentAdmissionsApi } from '@/src/api/students';
 import { academicYearsApi } from '@/src/api/masters';
-import { staffApi } from '@/src/api/staff';
+import { useStaffEnrollments } from '../../hooks/use-staff-api';
 import { 
   ReadOrListPermissionGuard, 
   CreatePermissionGuard, 
   ApprovePermissionGuard 
 } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
-import type { Staff } from '@/src/types/masters/staff';
+
 import { FeeRefundWithStatus, CreateRefundFormState, RefundReason } from '@/src/types/fees';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState, useEffect } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Modal,
   StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
   View,
@@ -33,12 +32,32 @@ import {
 } from 'react-native';
 
 
+// Inline INR currency formatter
+const formatINR = (amount: number | string | undefined | null): string => {
+  const num = Number(amount ?? 0);
+  return `₹${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 export default function FeeRefundsScreen() {
    const { isAuthenticated, isLoading: authLoading } = useAuth();
    const router = useRouter();
 
    const [isModalVisible, setIsModalVisible] = useState(false);
    const [editingRefund, setEditingRefund] = useState<FeeRefundWithStatus | null>(null);
+   // M-5: Combined approve/reject action modal
+   const [actionModal, setActionModal] = useState<{
+     visible: boolean;
+     refund: FeeRefundWithStatus | null;
+     action: 'approve' | 'reject';
+   }>({ visible: false, refund: null, action: 'approve' });
+   const [actionRemarks, setActionRemarks] = useState('');
+
+   // M-6: Process refund modal with reference number
+   const [processModal, setProcessModal] = useState<{
+     visible: boolean;
+     refund: FeeRefundWithStatus | null;
+   }>({ visible: false, refund: null });
+   const [processReferenceNumber, setProcessReferenceNumber] = useState('');
 
   const [filters, setFilters] = useState({
     status: '',
@@ -110,8 +129,9 @@ export default function FeeRefundsScreen() {
     queryFn: academicYearsApi.getAcademicYearsDropdown,
   });
 
-  // TODO: Add staff query when API is fixed
-  const staff: Staff[] = [];
+  // C-4: Fetch real staff list from API using the existing hook
+  const { data: staffQueryData } = useStaffEnrollments({ limit: 200 });
+  const staffList = staffQueryData?.items || [];
 
   // Summary query
   const { data: refundSummary = null } = useQuery({
@@ -167,10 +187,10 @@ export default function FeeRefundsScreen() {
     },
   });
 
-  // Calculate status for each refund (simplified logic)
-  const refundsWithStatus: FeeRefundWithStatus[] = refunds.map(refund => ({
+  // C-1: Use actual status from API response; fallback to 'pending' if absent
+  const refundsWithStatus: FeeRefundWithStatus[] = refunds.map((refund: any) => ({
     ...refund,
-    status: 'pending' as const, // Default to pending, would be determined by backend workflow
+    status: (refund.status as FeeRefundWithStatus['status']) ?? 'pending',
   }));
 
   // Calculate statistics
@@ -209,42 +229,56 @@ export default function FeeRefundsScreen() {
     setIsModalVisible(true);
   };
 
+  // M-5: open combined action modal
   const handleApprove = (refund: FeeRefundWithStatus) => {
-    Alert.alert(
-      'Approve Refund',
-      `Are you sure you want to approve refund ${refund.id}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Approve',
-          onPress: () => approveMutation.mutate({ refund_id: refund.id }),
-        },
-      ]
-    );
+    setActionRemarks('');
+    setActionModal({ visible: true, refund, action: 'approve' });
   };
 
+  const handleReject = (refund: FeeRefundWithStatus) => {
+    setActionRemarks('');
+    setActionModal({ visible: true, refund, action: 'reject' });
+  };
+
+  const submitActionModal = () => {
+    if (!actionModal.refund) return;
+    if (!actionRemarks.trim()) {
+      Alert.alert('Required', 'Please enter remarks before continuing.');
+      return;
+    }
+    approveMutation.mutate({
+      refund_id: actionModal.refund.id,
+      action: actionModal.action,
+      approval_remarks: actionRemarks.trim(),
+    });
+    setActionModal({ visible: false, refund: null, action: 'approve' });
+  };
+
+  // M-6: open process modal with reference number field
   const handleProcess = (refund: FeeRefundWithStatus) => {
-    Alert.alert(
-      'Process Refund',
-      `Are you sure you want to process refund ${refund.id}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Process',
-          onPress: () => processMutation.mutate({ refund_id: refund.id }),
-        },
-      ]
-    );
+    setProcessReferenceNumber('');
+    setProcessModal({ visible: true, refund });
   };
 
+  const submitProcessModal = () => {
+    if (!processModal.refund) return;
+    processMutation.mutate({
+      refund_id: processModal.refund.id,
+      ...(processReferenceNumber.trim() ? { reference_number: processReferenceNumber.trim() } : {}),
+    });
+    setProcessModal({ visible: false, refund: null });
+  };
+
+  // C-3: dismiss = 'Keep', destructive = 'Confirm Cancellation'
   const handleCancel = (refund: FeeRefundWithStatus) => {
+    const refNum = (refund as any).refund_number ?? refund.id?.slice(-8) ?? 'N/A';
     Alert.alert(
       'Cancel Refund',
-      `Are you sure you want to cancel refund ${refund.id}?`,
+      `Are you sure you want to cancel refund ${refNum}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Cancel',
+          text: 'Confirm Cancellation',
           style: 'destructive',
           onPress: () => deleteMutation.mutate(refund.id),
         },
@@ -309,7 +343,8 @@ export default function FeeRefundsScreen() {
   const renderRefundItem = ({ item }: { item: FeeRefundWithStatus }) => {
     const transaction = transactions.find(t => t.id === item.transaction_id);
     const student = students.find(s => s.id === transaction?.student_id);
-    const staffMember = staff.find(s => s.id === item.processed_by);
+    const staffMember = staffList.find((s: any) => s.id === item.processed_by);
+    const refundRef = (item as any).refund_number ?? item.id?.slice(-8) ?? 'N/A';
 
     const getStatusColor = (status: string) => {
       switch (status) {
@@ -323,35 +358,35 @@ export default function FeeRefundsScreen() {
     };
 
     return (
-      <ThemedView style={[styles.refundCard, { backgroundColor: colors.card }]}>
+      <View style={[styles.refundCard, { backgroundColor: colors.card }]}>
         <View style={styles.refundInfo}>
-          <ThemedText type="subtitle" style={styles.refundId}>
-            Refund #{item.id?.slice(-8) || 'N/A'}
-          </ThemedText>
-          <ThemedText style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
+          <Text style={[styles.refundIdText, { color: colors.foreground }]}>
+            Refund #{refundRef}
+          </Text>
+          <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
             Student: {student?.display_name || 'Unknown'}
-          </ThemedText>
-          <ThemedText style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
+          </Text>
+          <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
             Transaction: {transaction?.id?.slice(-8) || item.transaction_id?.slice(-8) || 'N/A'}
-          </ThemedText>
-          <ThemedText style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
-            Amount: ₹{item.refund_amount ?? 0}
-          </ThemedText>
-          <ThemedText style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
+          </Text>
+          <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
+            Amount: {formatINR(item.refund_amount)}
+          </Text>
+          <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
             Reason: {item.refund_reason}
-          </ThemedText>
-          <ThemedText style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
+          </Text>
+          <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
             Date: {new Date(item.refund_date).toLocaleDateString()}
-          </ThemedText>
+          </Text>
           <View style={styles.statusContainer}>
-            <ThemedText style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
               {item.status.toUpperCase()}
-            </ThemedText>
+            </Text>
           </View>
           {staffMember && (
-            <ThemedText style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
+            <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
               Processed By: {staffMember.first_name} {staffMember.last_name}
-            </ThemedText>
+            </Text>
           )}
         </View>
 
@@ -391,7 +426,7 @@ export default function FeeRefundsScreen() {
             </TouchableOpacity>
           )}
         </View>
-      </ThemedView>
+      </View>
     );
   };
 
@@ -400,7 +435,7 @@ export default function FeeRefundsScreen() {
     return (
       <AppLayout title="Fee Refunds">
         <View style={styles.centerContainer}>
-          <ThemedText>Loading...</ThemedText>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </AppLayout>
     );
@@ -415,7 +450,7 @@ export default function FeeRefundsScreen() {
     return (
       <AppLayout title="Fee Refunds">
         <View style={styles.centerContainer}>
-          <ThemedText>Loading fee refunds...</ThemedText>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </AppLayout>
     );
@@ -425,14 +460,14 @@ export default function FeeRefundsScreen() {
     return (
       <AppLayout title="Fee Refunds">
         <View style={styles.centerContainer}>
-          <ThemedText style={{ color: colors.destructive }}>
+          <Text style={{ color: colors.destructive }}>
             Error loading fee refunds
-          </ThemedText>
+          </Text>
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: colors.primary }]}
             onPress={() => queryClient.invalidateQueries({ queryKey: ['feeRefunds'] })}
           >
-            <ThemedText style={{ color: 'white' }}>Retry</ThemedText>
+            <Text style={{ color: 'white' }}>Retry</Text>
           </TouchableOpacity>
         </View>
       </AppLayout>
@@ -445,22 +480,22 @@ export default function FeeRefundsScreen() {
         <View style={styles.container}>
         {/* Statistics */}
         <View style={styles.statsContainer}>
-          <ThemedView style={[styles.statCard, { backgroundColor: colors.card }]}>
-            <ThemedText style={styles.statValue}>{statistics.totalRefunds}</ThemedText>
-            <ThemedText style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Total Refunds</ThemedText>
-          </ThemedView>
-          <ThemedView style={[styles.statCard, { backgroundColor: colors.card }]}>
-            <ThemedText style={styles.statValue}>₹{statistics.totalAmount.toFixed(2)}</ThemedText>
-            <ThemedText style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Total Amount</ThemedText>
-          </ThemedView>
-          <ThemedView style={[styles.statCard, { backgroundColor: colors.card }]}>
-            <ThemedText style={styles.statValue}>{statistics.pendingCount}</ThemedText>
-            <ThemedText style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Pending</ThemedText>
-          </ThemedView>
-          <ThemedView style={[styles.statCard, { backgroundColor: colors.card }]}>
-            <ThemedText style={styles.statValue}>{statistics.approvedCount}</ThemedText>
-            <ThemedText style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Approved</ThemedText>
-          </ThemedView>
+          <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{statistics.totalRefunds}</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Total Refunds</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{formatINR(statistics.totalAmount)}</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Total Amount</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{statistics.pendingCount}</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Pending</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{statistics.approvedCount}</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Approved</Text>
+          </View>
         </View>
 
         {/* Filters */}
@@ -493,7 +528,7 @@ export default function FeeRefundsScreen() {
               onPress={handleCreate}
             >
               <Ionicons name="add" size={20} color="white" />
-              <ThemedText style={styles.addButtonText}>Request Refund</ThemedText>
+              <Text style={styles.addButtonText}>Request Refund</Text>
             </TouchableOpacity>
           </CreatePermissionGuard>
         </View>
@@ -505,12 +540,12 @@ export default function FeeRefundsScreen() {
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <ThemedView style={styles.emptyContainer}>
+            <View style={styles.emptyContainer}>
               <Ionicons name="cash-outline" size={48} color={colors['muted-foreground']} />
-              <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
+              <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
                 No fee refunds found
-              </ThemedText>
-            </ThemedView>
+              </Text>
+            </View>
           }
         />
 
@@ -522,16 +557,16 @@ export default function FeeRefundsScreen() {
           onRequestClose={() => setIsModalVisible(false)}
         >
           <View style={styles.modalOverlay}>
-            <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
-                <ThemedText type="subtitle">Create Refund</ThemedText>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>Create Refund</Text>
                 <TouchableOpacity onPress={() => setIsModalVisible(false)}>
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.form}>
-                <ThemedText style={styles.label}>Student *</ThemedText>
+                <Text style={styles.label}>Student *</Text>
                 <CustomDropdown
                   data={students.map(s => ({
                     value: s.id,
@@ -552,11 +587,11 @@ export default function FeeRefundsScreen() {
                   placeholder="Select Student"
                 />
 
-                <ThemedText style={styles.label}>Fee Transaction *</ThemedText>
+                <Text style={styles.label}>Fee Transaction *</Text>
                 <CustomDropdown
                   data={formData.student_id ? transactions.filter(t => t.student_id === formData.student_id).map(t => ({
                     value: t.id,
-                    label: `${new Date(t.transaction_date || '').toLocaleDateString()} - ₹${t.total_amount} (${t.payment_method})`
+                    label: `${new Date(t.transaction_date || '').toLocaleDateString()} - ${formatINR(t.total_amount)} (${t.payment_method})`
                   })) : []}
                   value={formData.fee_transaction_id}
                   onChange={(value) => {
@@ -572,7 +607,7 @@ export default function FeeRefundsScreen() {
                   disabled={!formData.student_id}
                 />
 
-                <ThemedText style={styles.label}>Refund Amount *</ThemedText>
+                <Text style={styles.label}>Refund Amount *</Text>
                 <TextInput
                   style={[styles.input, {
                     backgroundColor: colors.background,
@@ -586,7 +621,7 @@ export default function FeeRefundsScreen() {
                   keyboardType="numeric"
                 />
 
-                <ThemedText style={styles.label}>Refund Reason *</ThemedText>
+                <Text style={styles.label}>Refund Reason *</Text>
                 <CustomDropdown
                   data={[
                     { value: 'fee_adjustment', label: 'Fee Adjustment' },
@@ -601,7 +636,7 @@ export default function FeeRefundsScreen() {
 
                 {formData.refund_reason === 'other' && (
                   <>
-                    <ThemedText style={styles.label}>Detailed Reason *</ThemedText>
+                    <Text style={styles.label}>Detailed Reason *</Text>
                     <TextInput
                       style={[styles.input, {
                         backgroundColor: colors.background,
@@ -624,7 +659,7 @@ export default function FeeRefundsScreen() {
                   style={[styles.cancelButton, { borderColor: colors.border }]}
                   onPress={() => setIsModalVisible(false)}
                 >
-                  <ThemedText style={{ color: colors.foreground }}>Cancel</ThemedText>
+                  <Text style={{ color: colors.foreground }}>Cancel</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -632,12 +667,12 @@ export default function FeeRefundsScreen() {
                   onPress={handleSubmit}
                   disabled={createMutation.isPending}
                 >
-                  <ThemedText style={styles.submitButtonText}>
+                  <Text style={styles.submitButtonText}>
                     {createMutation.isPending ? 'Creating...' : 'Create Refund'}
-                  </ThemedText>
+                  </Text>
                 </TouchableOpacity>
               </View>
-            </ThemedView>
+            </View>
           </View>
         </Modal>
 
@@ -649,11 +684,11 @@ export default function FeeRefundsScreen() {
           onRequestClose={() => setSummaryModal(prev => ({ ...prev, visible: false }))}
         >
           <View style={styles.modalOverlay}>
-            <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
-                <ThemedText type="subtitle">
+                <Text>
                   Refund Summary - Transaction {summaryModal.transactionId?.slice(-8) || 'N/A'}
-                </ThemedText>
+                </Text>
                 <TouchableOpacity onPress={() => setSummaryModal(prev => ({ ...prev, visible: false }))}>
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
@@ -662,30 +697,30 @@ export default function FeeRefundsScreen() {
               <ScrollView style={styles.form}>
                 {refundSummary ? (
                   <View>
-                    <ThemedText style={styles.summaryText}>
-                      Total Refunded: ₹{refundSummary.total_refunded ?? 0}
-                    </ThemedText>
-                    <ThemedText style={styles.summaryText}>
+                    <Text style={[styles.summaryText, { color: colors.foreground }]}>
+                      Total Refunded: {formatINR(refundSummary.total_refunded)}
+                    </Text>
+                    <Text style={[styles.summaryText, { color: colors.foreground }]}>
                       Number of Refunds: {refundSummary.refunds?.length ?? 0}
-                    </ThemedText>
+                    </Text>
                     {refundSummary.refunds?.map((refund, index) => (
-                      <ThemedView key={index} style={[styles.summaryRefundItem, { backgroundColor: colors.background }]}>
-                        <ThemedText style={styles.summaryRefundText}>
-                          Amount: ₹{refund.refund_amount ?? 0}
-                        </ThemedText>
-                        <ThemedText style={[styles.summaryRefundText, { color: colors['muted-foreground'] }]}>
+                      <View key={index} style={[styles.summaryRefundItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                        <Text style={[styles.summaryRefundText, { color: colors.foreground }]}>
+                          Amount: {formatINR(refund.refund_amount)}
+                        </Text>
+                        <Text style={[styles.summaryRefundText, { color: colors['muted-foreground'] }]}>
                           Reason: {refund.refund_reason}
-                        </ThemedText>
-                        <ThemedText style={[styles.summaryRefundText, { color: colors['muted-foreground'] }]}>
+                        </Text>
+                        <Text style={[styles.summaryRefundText, { color: colors['muted-foreground'] }]}>
                           Date: {new Date(refund.refund_date).toLocaleDateString()}
-                        </ThemedText>
-                      </ThemedView>
+                        </Text>
+                      </View>
                     ))}
                   </View>
                 ) : (
-                  <ThemedText style={[styles.summaryText, { textAlign: 'center' }]}>
-                    Loading summary...
-                  </ThemedText>
+                  <View style={styles.centerContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                  </View>
                 )}
               </ScrollView>
 
@@ -694,12 +729,142 @@ export default function FeeRefundsScreen() {
                   style={[styles.cancelButton, { borderColor: colors.border }]}
                   onPress={() => setSummaryModal(prev => ({ ...prev, visible: false }))}
                 >
-                  <ThemedText style={{ color: colors.foreground }}>Close</ThemedText>
+                  <Text style={{ color: colors.foreground }}>Close</Text>
                 </TouchableOpacity>
               </View>
-            </ThemedView>
+            </View>
           </View>
         </Modal>
+
+        {/* M-5: Combined Approve / Reject Action Modal with action selector */}
+        <Modal
+          visible={actionModal.visible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setActionModal({ visible: false, refund: null, action: 'approve' })}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>Process Refund Action</Text>
+                <TouchableOpacity onPress={() => setActionModal({ visible: false, refund: null, action: 'approve' })}>
+                  <Ionicons name="close" size={24} color={colors['muted-foreground']} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.form}>
+                <Text style={[styles.label, { color: colors.foreground }]}>Action *</Text>
+                <CustomDropdown
+                  data={[
+                    { value: 'approve', label: 'Approve' },
+                    { value: 'reject', label: 'Reject' },
+                  ]}
+                  value={actionModal.action}
+                  onChange={(value) =>
+                    setActionModal(prev => ({
+                      ...prev,
+                      action: ((value as string) || 'approve') as 'approve' | 'reject',
+                    }))
+                  }
+                  placeholder="Select Action"
+                />
+
+                <Text style={[styles.label, { color: colors.foreground, marginTop: 12 }]}>Remarks *</Text>
+                <TextInput
+                  value={actionRemarks}
+                  onChangeText={setActionRemarks}
+                  placeholder="Enter remarks..."
+                  placeholderTextColor={colors['muted-foreground']}
+                  multiline
+                  numberOfLines={3}
+                  style={[styles.textInput, {
+                    borderColor: colors.border,
+                    color: colors.foreground,
+                    backgroundColor: colors.background,
+                  }]}
+                />
+              </ScrollView>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.cancelButton, { borderColor: colors.border }]}
+                  onPress={() => setActionModal({ visible: false, refund: null, action: 'approve' })}
+                >
+                  <Text style={{ color: colors.foreground }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.submitButton, {
+                    backgroundColor: actionModal.action === 'approve' ? '#10B981' : '#EF4444',
+                  }]}
+                  onPress={submitActionModal}
+                  disabled={approveMutation.isPending}
+                >
+                  <Text style={{ color: 'white', fontWeight: '600' }}>
+                    {actionModal.action === 'approve' ? 'Approve' : 'Reject'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* M-6: Process Refund Modal with Reference Number input */}
+        <Modal
+          visible={processModal.visible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setProcessModal({ visible: false, refund: null })}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>Process Refund</Text>
+                <TouchableOpacity onPress={() => setProcessModal({ visible: false, refund: null })}>
+                  <Ionicons name="close" size={24} color={colors['muted-foreground']} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.form}>
+                {processModal.refund && (
+                  <Text style={[styles.refundDetails, { color: colors['muted-foreground'], marginBottom: 12 }]}>
+                    Processing refund {(processModal.refund as any).refund_number ?? processModal.refund.id?.slice(-8) ?? 'N/A'} for {formatINR(processModal.refund.refund_amount)}
+                  </Text>
+                )}
+                <Text style={[styles.label, { color: colors.foreground }]}>Reference Number (optional)</Text>
+                <TextInput
+                  value={processReferenceNumber}
+                  onChangeText={setProcessReferenceNumber}
+                  placeholder="Enter reference number"
+                  placeholderTextColor={colors['muted-foreground']}
+                  style={[styles.input, {
+                    borderColor: colors.border,
+                    color: colors.foreground,
+                    backgroundColor: colors.background,
+                  }]}
+                />
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.cancelButton, { borderColor: colors.border }]}
+                  onPress={() => setProcessModal({ visible: false, refund: null })}
+                >
+                  <Text style={{ color: colors.foreground }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.submitButton, { backgroundColor: colors.primary }]}
+                  onPress={submitProcessModal}
+                  disabled={processMutation.isPending}
+                >
+                  <Text style={{ color: 'white', fontWeight: '600' }}>
+                    {processMutation.isPending ? 'Processing...' : 'Process'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         </View>
       </AppLayout>
     </ReadOrListPermissionGuard>
@@ -784,6 +949,11 @@ const styles = StyleSheet.create({
   refundId: {
     marginBottom: 4,
   },
+  refundIdText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
   refundDetails: {
     fontSize: 14,
     marginBottom: 2,
@@ -827,6 +997,12 @@ const styles = StyleSheet.create({
     padding: 20,
     maxHeight: '80%',
   },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 8,
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -868,6 +1044,14 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: 'white',
     fontWeight: '600',
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    minHeight: 72,
+    textAlignVertical: 'top',
+    fontSize: 14,
   },
   retryButton: {
     marginTop: 16,

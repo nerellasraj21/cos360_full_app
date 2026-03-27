@@ -7,6 +7,8 @@ import {
   usePermissionProtectedDeleteMutation
 } from './use-permission-protected-api';
 import { routesApi, vehiclesApi, tripsApi, studentTransportApi, routeStopsApi, studentTripsApi } from '../src/api/transport';
+import { legacyStaffApi } from '../src/api/staff';
+import { studentAdmissionsApi } from '../src/api/students';
 import { PERMISSION_RESOURCES } from '../src/types/permissions';
 import type {
   Route,
@@ -21,12 +23,14 @@ import type {
   StudentTrip,
   StudentTripCreate,
   StudentTripUpdate,
-  StudentTransport,
-  StudentTransportCreate,
-  StudentTransportUpdate,
   RouteStopCreate,
   RouteStopUpdate
 } from '../src/types/transport';
+import type {
+  StudentTransport,
+  StudentTransportCreate,
+  StudentTransportUpdate,
+} from '../src/api/students';
 
 // Routes hooks with permission protection
 export const useRoutes = () => {
@@ -225,7 +229,7 @@ export const useStudentTransports = (params?: {
   return usePermissionProtectedListQuery(
     PERMISSION_RESOURCES.STUDENT_TRANSPORT,
     ['student-transport', params],
-    () => studentTransportApi.getStudentTransports(params)
+    () => studentTransportApi.listStudentTransport(params)
   );
 };
 
@@ -264,13 +268,13 @@ export const useDrivers = () => {
   return useQuery({
     queryKey: ['drivers'],
     queryFn: async (): Promise<Array<{ id: string, name: string }>> => {
-      const { legacyStaffApi } = await import('../src/api/staff');
       const staff = await legacyStaffApi.getStaff();
       return staff.map(s => ({
         id: s.id,
         name: [s.first_name, s.last_name].filter(Boolean).join(' '),
       }));
     },
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -278,10 +282,8 @@ export const useDrivers = () => {
 export const useStudents = () => {
   return useQuery({
     queryKey: ['students-dropdown'],
-    queryFn: async () => {
-      const { studentAdmissionsApi } = await import('../src/api/students');
-      return studentAdmissionsApi.studentsDropdown({ active_only: true }); // Only active students
-    },
+    queryFn: () => studentAdmissionsApi.studentsDropdown({ active_only: true }),
+    staleTime: 5 * 60 * 1000,
   });
 };
 

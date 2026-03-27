@@ -7,6 +7,7 @@ import { useMobilePermission } from '../src/hooks/useMobilePermission';
 import { PERMISSION_RESOURCES } from '../src/types/permissions';
 
 export const PermissionDebugger: React.FC = () => {
+  if (!__DEV__) return null;
   const { permissions, permissionsMap, user, role } = useAuth();
   const { 
     checkPermission, 

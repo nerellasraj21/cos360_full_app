@@ -37,9 +37,9 @@ export default function StudentTransportScreen() {
   const { role, studentId, selectedStudent } = useAuth();
   const qc = useQueryClient();
 
-  const roleName = (role?.name ?? '').toLowerCase();
+  const roleName = (role?.name ?? '').toLowerCase().trim();
   const isStudent = roleName === 'student';
-  const isParent = ['parent', 'guardian', 'father', 'mother'].some(r => roleName.includes(r));
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editing, setEditing] = useState<StudentTransportOut | null>(null);
@@ -61,6 +61,7 @@ export default function StudentTransportScreen() {
     queryKey: ['my-transport', studentId],
     queryFn: () => studentTransportApi.getTransportByStudent(studentId!),
     enabled: isStudent && !!studentId,
+    retry: false,
   });
 
   // ── Parent: selected child's assignment ───────────────────────────────────
@@ -68,6 +69,7 @@ export default function StudentTransportScreen() {
     queryKey: ['child-transport', selectedStudent?.id],
     queryFn: () => studentTransportApi.getTransportByStudent(selectedStudent!.id),
     enabled: isParent && !!selectedStudent?.id,
+    retry: false,
   });
 
   // ── Form dropdowns (admin only) ────────────────────────────────────────────

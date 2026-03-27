@@ -1,15 +1,17 @@
-import React, { createContext, ReactNode, useContext, useEffect, useReducer } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useReducer, useRef } from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
 import {
   AuthResponse,
   getValidAccessToken,
   initializeAuth,
   loginUser,
   logoutUser,
+  normalisePermissions,
   User,
   Permission
 } from '../services/authUtils';
 import { ParentStudent, parentStudentsApi } from '../src/api/students';
-import { setSelectedStudentForInterceptor } from '../src/api/client';
+import { setSelectedStudentForInterceptor, setSessionExpiredCallback } from '../src/api/client';
 import {
   getStoredSelectedStudent,
   getStoredAvailableStudents,
@@ -44,7 +46,7 @@ type AuthAction =
   | { type: 'SET_MENU'; payload: any[] }
   | { type: 'SET_AUTHENTICATED'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'LOGIN_SUCCESS'; payload: AuthResponse }
+  | { type: 'LOGIN_SUCCESS'; payload: AuthResponse; selectedStudent?: ParentStudent | null; availableStudents?: ParentStudent[] }
   | { type: 'LOGOUT' }
   | { type: 'INITIALIZE_AUTH'; payload: { user: User | null; role: any | null; permissions: Permission[]; menu: any[]; isAuthenticated: boolean; selectedStudent?: ParentStudent | null; availableStudents?: ParentStudent[]; studentId?: string | null } }
   | { type: 'SET_AVAILABLE_STUDENTS'; payload: ParentStudent[] }
@@ -107,29 +109,13 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
     case 'SET_ERROR':
       return { ...state, error: action.payload, isLoading: false };
 
-    case 'LOGIN_SUCCESS':
-      // Handle permissions that come as object format from backend
-      let loginPermissionsArray: Permission[] = [];
-      if (Array.isArray(action.payload.permissions)) {
-        loginPermissionsArray = action.payload.permissions;
-      } else if (action.payload.permissions && typeof action.payload.permissions === 'object') {
-        // Convert object format {"resource": ["action1", "action2"]} to array format
-        loginPermissionsArray = Object.entries(action.payload.permissions).flatMap(([resource, actions]) =>
-          Array.isArray(actions) ? actions.map(actionItem => ({
-            id: `${resource}:${actionItem}`, // Generate unique ID
-            resource,
-            action: actionItem,
-            is_granted: true
-          })) : []
-        );
-      }
+    case 'LOGIN_SUCCESS': {
+      const loginPermissionsArray = normalisePermissions(action.payload.permissions as any);
 
       const loginPermissionsMap = loginPermissionsArray.reduce((map, perm) => {
         map[`${perm.resource}:${perm.action}`] = perm;
         return map;
       }, {} as { [key: string]: Permission });
-
-      // Debug logging removed — use React Query DevTools or Redux DevTools for permission inspection
 
       return {
         ...state,
@@ -142,7 +128,11 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLoading: false,
         error: null,
         requiresPasswordChange: !!(action.payload as AuthResponse).requires_password_change,
+        // Commit student context atomically so components never see a half-initialised state
+        selectedStudent: action.selectedStudent !== undefined ? action.selectedStudent : state.selectedStudent,
+        availableStudents: action.availableStudents !== undefined ? action.availableStudents : state.availableStudents,
       };
+    }
 
     case 'LOGOUT':
       return {
@@ -153,21 +143,8 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         studentId: null,
       };
 
-    case 'INITIALIZE_AUTH':
-      let permissionsArray: Permission[] = [];
-      if (Array.isArray(action.payload.permissions)) {
-        permissionsArray = action.payload.permissions;
-      } else if (action.payload.permissions && typeof action.payload.permissions === 'object') {
-        // Convert object format {"resource": ["action1", "action2"]} to array format
-        permissionsArray = Object.entries(action.payload.permissions).flatMap(([resource, actions]) =>
-          Array.isArray(actions) ? actions.map(actionItem => ({
-            id: `${resource}:${actionItem}`, // Generate unique ID
-            resource,
-            action: actionItem,
-            is_granted: true
-          })) : []
-        );
-      }
+    case 'INITIALIZE_AUTH': {
+      const permissionsArray = normalisePermissions(action.payload.permissions as any);
 
       const initPermissionsMap = permissionsArray.reduce((map, perm) => {
         map[`${perm.resource}:${perm.action}`] = perm;
@@ -187,6 +164,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLoading: false,
         requiresPasswordChange: false,
       };
+    }
 
     case 'SET_AVAILABLE_STUDENTS':
       return {
@@ -224,11 +202,25 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
+  // L-3: Keep a ref that always points to the latest state so async callbacks
+  // (selectStudent, setAvailableStudents) read current values, not stale closures.
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+
+  // Register session-expired callback so client.ts can trigger logout when refresh fails.
+  // Runs once on mount; AuthProvider wraps the entire app and never unmounts mid-session.
+  useEffect(() => {
+    setSessionExpiredCallback(() => {
+      setSelectedStudentForInterceptor(null);
+      dispatch({ type: 'LOGOUT' });
+    });
+  }, []);
+
   // Initialize auth on mount
   useEffect(() => {
     const initAuth = async () => {
       try {
-        console.log('Initializing authentication...');
+        if (__DEV__) console.log('Initializing authentication...');
         const authData = await initializeAuth();
 
         // Load persisted student data
@@ -251,7 +243,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Set interceptor with persisted student
         setSelectedStudentForInterceptor(selectedStudent);
 
-        console.log('Authentication initialization complete:', {
+        if (__DEV__) console.log('Authentication initialization complete:', {
           isAuthenticated: authData.isAuthenticated,
           hasUser: !!authData.user
         });
@@ -280,7 +272,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
-      console.log('Attempting login for user:', username);
+      if (__DEV__) console.log('Attempting login for user:', username);
       const response = await loginUser(username, password, clientName, academicYearId);
 
       // Fetch parent students BEFORE setting authenticated (to prevent navigation)
@@ -288,9 +280,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       let availableStudents: ParentStudent[] = [];
       let selectedStudent: ParentStudent | null = null;
       if (roleName === 'student') {
-        console.log("Student logged in, setting studentId to entity_id:", response.entity_id);
+        if (__DEV__) console.log("Student logged in, setting studentId to entity_id:", response.entity_id);
         dispatch({ type: 'SET_STUDENT_ID', payload: response.entity_id || null });
       }
+      let studentFetchFailed = false;
       if (roleName === 'parent' || roleName === 'guardian' || roleName === 'father' || roleName === 'mother') {
         try {
           const students = await parentStudentsApi.getParentStudents();
@@ -302,34 +295,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         } catch (studentsError) {
           console.error('Failed to fetch parent students:', studentsError);
-          // Don't fail login if student fetching fails
+          studentFetchFailed = true;
         }
       }
 
-      // Dispatch login success first
-      dispatch({ type: 'LOGIN_SUCCESS', payload: response });
-
-      // Then set student data and persist
-      if (availableStudents.length > 0) {
-        // Set available students first
-        dispatch({ type: 'SET_AVAILABLE_STUDENTS', payload: availableStudents });
-
-        // Persist available students
+      // H-4: Set interceptor headers BEFORE dispatching LOGIN_SUCCESS so the very first
+      // API calls fired by navigation effects (e.g. dashboard queries) already carry
+      // the correct X-Student-ID / X-Academic-Year-ID headers.
+      if (availableStudents.length > 0 && selectedStudent) {
         try {
           await storeStudentData(selectedStudent, availableStudents, selectedStudent?.id || null);
+          setSelectedStudentForInterceptor(selectedStudent);
         } catch (persistError) {
           console.error('Failed to persist student data during login:', persistError);
         }
+      }
 
-        // Then select student
-        if (selectedStudent) {
-          dispatch({ type: 'SELECT_STUDENT', payload: selectedStudent });
-          setSelectedStudentForInterceptor(selectedStudent);
-        }
+      // M-4: Commit user + student context atomically so components never observe
+      // isAuthenticated=true with selectedStudent=null during the first render cycle.
+      dispatch({
+        type: 'LOGIN_SUCCESS',
+        payload: response,
+        selectedStudent: selectedStudent || null,
+        availableStudents,
+      });
+
+      // Surface parent-student fetch failure so user is not silently left without context
+      if (studentFetchFailed) {
+        dispatch({ type: 'SET_ERROR', payload: 'Could not load student information. Please refresh.' });
       }
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      const axiosError = error as any;
+      const backendDetail = axiosError?.response?.data?.detail;
+      const detailStr = typeof backendDetail === 'string'
+        ? backendDetail
+        : Array.isArray(backendDetail)
+        ? backendDetail.map((e: any) => e?.msg ?? String(e)).join('; ')
+        : null;
+      const errorMessage = detailStr || (error instanceof Error ? error.message : 'Login failed');
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error;
     }
@@ -342,6 +346,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // H1: Clear interceptor state so old student headers are not sent for the next session
+      setSelectedStudentForInterceptor(null);
       dispatch({ type: 'LOGOUT' });
     }
   };
@@ -350,7 +356,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const refreshAuth = async (): Promise<void> => {
     try {
       const authData = await initializeAuth();
-      dispatch({ type: 'INITIALIZE_AUTH', payload: authData });
+      const [selectedStudent, availableStudents, studentId] = await Promise.all([
+        getStoredSelectedStudent(),
+        getStoredAvailableStudents(),
+        getStoredStudentId(),
+      ]);
+      dispatch({
+        type: 'INITIALIZE_AUTH',
+        payload: {
+          ...authData,
+          selectedStudent,
+          availableStudents,
+          studentId,
+        },
+      });
+      // Restore interceptor headers so API calls after password change still carry student context
+      setSelectedStudentForInterceptor(selectedStudent);
     } catch (error) {
       console.error('Failed to refresh auth:', error);
       dispatch({ type: 'SET_ERROR', payload: 'Failed to refresh authentication' });
@@ -392,7 +413,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Persist student selection
     try {
-      const currentState = state;
+      const currentState = stateRef.current;
       await storeStudentData(student, currentState.availableStudents, student?.id || null);
     } catch (error) {
       console.error('Failed to persist student selection:', error);
@@ -405,7 +426,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Persist available students
     try {
-      const currentState = state;
+      const currentState = stateRef.current;
       await storeStudentData(currentState.selectedStudent, students, currentState.studentId);
     } catch (error) {
       console.error('Failed to persist available students:', error);
@@ -460,8 +481,6 @@ export const withAuth = <P extends object>(
     return <Component {...props} />;
   };
 };
-
-import { ActivityIndicator, Text, View } from 'react-native';
 
 // Loading component (can be customized)
 const AuthLoadingComponent: React.FC = () => (

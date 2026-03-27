@@ -30,7 +30,7 @@ import {
   SendRequest,
   TargetType,
 } from '@/src/api/communication';
-import { classSectionsApi } from '@/src/api/masters';
+import { classSectionsApi, rolesApi } from '@/src/api/masters';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -83,13 +83,6 @@ const VARIABLE_SUGGESTIONS = [
   'class_name', 'section_name', 'amount', 'due_date',
 ];
 
-const ROLES_DROPDOWN = [
-  { label: 'Teacher', value: 'Teacher' },
-  { label: 'Admin', value: 'Admin' },
-  { label: 'Accountant', value: 'Accountant' },
-  { label: 'Librarian', value: 'Librarian' },
-  { label: 'Receptionist', value: 'Receptionist' },
-];
 
 /** Variables that are auto-resolved by the system — users don't fill these. */
 const SYSTEM_VARS = new Set([
@@ -324,6 +317,18 @@ export default function CommunicationTab() {
     queryFn: () => communicationApi.getLogDetail(selectedLogId!),
     enabled: !!selectedLogId,
   });
+
+  const {
+    data: rolesData = [],
+    isLoading: rolesLoading,
+    isError: rolesError,
+  } = useQuery({
+    queryKey: ['roles-list'],
+    queryFn: () => rolesApi.getRoles(),
+  });
+  const rolesDropdown = (rolesData as { name: string }[])
+    .filter((r) => !!r.name)
+    .map((r) => ({ label: r.name, value: r.name }));
 
   // ── Mutations ────────────────────────────────────────────────────────────
 
@@ -713,11 +718,16 @@ export default function CommunicationTab() {
             <>
               <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Role *</Text>
               <CustomDropdown
-                data={ROLES_DROPDOWN}
-                placeholder="Select role..."
+                data={rolesDropdown}
+                placeholder={
+                  rolesLoading ? 'Loading roles...' :
+                  rolesError ? 'Failed to load roles — pull to refresh' :
+                  'Select role...'
+                }
                 value={selectedRole}
                 onChange={(v) => setSelectedRole(v as string)}
                 search={false}
+                disabled={rolesLoading || rolesError}
               />
             </>
           )}

@@ -1,12 +1,23 @@
 import axios, { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { errorHandler } from '../../services/errorHandler';
-import { offlineStorage } from '../../services/offlineStorage';
 import { getValidAccessToken, refreshAccessToken } from '../../services/authUtils';
+import type { AuthTokens } from '../../services/authUtils';
 import { getClientSchema } from '../../services/authUtils';
 import { ParentStudent } from './students';
 
 // Module-level variable to store selected student for interceptor
 let selectedStudentForInterceptor: ParentStudent | null = null;
+
+// Shared refresh lock — prevents multiple concurrent 401s from each triggering their own refresh
+let refreshPromise: Promise<AuthTokens | null> | null = null;
+
+// Session-expired callback — registered by AuthProvider; called when refresh fails so the app
+// can dispatch LOGOUT and navigate to the login screen instead of showing silent errors
+let onSessionExpired: (() => void) | null = null;
+
+export const setSessionExpiredCallback = (cb: () => void): void => {
+  onSessionExpired = cb;
+};
 
 // Function to update selected student for interceptor
 export const setSelectedStudentForInterceptor = (student: ParentStudent | null) => {
@@ -18,13 +29,15 @@ const API_BASE_URL =
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000,
 });
 
 // Request interceptor for authentication
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig): Promise<InternalAxiosRequestConfig> => {
-    console.log('API Request:', config.method?.toUpperCase(), config.url, config.data);
+    if (__DEV__) {
+      console.log('API Request:', config.method?.toUpperCase(), config.url);
+    }
 
     // Note: Permission checks are handled at the component level using MobilePermissionGuard
     // This ensures unauthorized API calls are prevented by UI-level permission enforcement
@@ -35,10 +48,9 @@ apiClient.interceptors.request.use(
     if (!isAuthEndpoint) {
       // Only try to get token for non-auth endpoints, and don't allow refresh during request
       const token = await getValidAccessToken(false); // Don't allow refresh in request interceptor
-      console.log('Token available:', !!token);
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-      } else {
+      } else if (__DEV__) {
         console.warn('API Request: No token available for', config.url);
       }
     }
@@ -46,15 +58,21 @@ apiClient.interceptors.request.use(
     const clientSchema = await getClientSchema();
     if (clientSchema) {
       config.headers.cschema = clientSchema;
-    } else {
+    } else if (__DEV__) {
       console.warn('API Request: No client schema available');
     }
 
-    // Add student context headers for parent users
+    // Add student context headers for parent users — guard each value to avoid "undefined" strings
     if (selectedStudentForInterceptor) {
-      config.headers['X-Student-ID'] = selectedStudentForInterceptor.id;
-      config.headers['X-Academic-Year-ID'] = selectedStudentForInterceptor.academic_year_id;
-      config.headers['X-Class-ID'] = selectedStudentForInterceptor.class_id;
+      if (selectedStudentForInterceptor.id) {
+        config.headers['X-Student-ID'] = selectedStudentForInterceptor.id;
+      }
+      if (selectedStudentForInterceptor.academic_year_id) {
+        config.headers['X-Academic-Year-ID'] = selectedStudentForInterceptor.academic_year_id;
+      }
+      if (selectedStudentForInterceptor.class_id) {
+        config.headers['X-Class-ID'] = selectedStudentForInterceptor.class_id;
+      }
     }
 
     return config;
@@ -64,13 +82,12 @@ apiClient.interceptors.request.use(
 
 // Response interceptor for error handling and token refresh
 apiClient.interceptors.response.use(
-  (response: AxiosResponse) => {
-    console.log('API Response:', response.status, response.config.method?.toUpperCase(), response.config.url);
-    return response;
-  },
+  (response: AxiosResponse) => response,
   async (error) => {
     const originalRequest = error.config;
-    console.error('API Error:', error.response?.status, originalRequest?.method?.toUpperCase(), originalRequest?.url, error.message);
+    if (__DEV__) {
+      console.error('API Error:', error.response?.status, originalRequest?.method?.toUpperCase(), originalRequest?.url, error.message);
+    }
 
     // Skip token refresh for auth endpoints
     const isAuthEndpoint = originalRequest?.url?.includes('/auth/login') || originalRequest?.url?.includes('/auth/refresh');
@@ -78,38 +95,31 @@ apiClient.interceptors.response.use(
     // Handle token refresh for 401 errors (but not for auth endpoints)
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
-      console.log('Attempting token refresh due to 401 error...');
+      if (__DEV__) console.log('Attempting token refresh due to 401 error...');
 
       try {
-        const newTokens = await refreshAccessToken();
+        // Use shared promise so concurrent 401s share one refresh call, not N parallel refreshes
+        if (!refreshPromise) {
+          refreshPromise = refreshAccessToken().finally(() => { refreshPromise = null; });
+        }
+        const newTokens = await refreshPromise;
         if (newTokens) {
-          console.log('Token refresh successful, retrying original request');
+          if (__DEV__) console.log('Token refresh successful, retrying original request');
           originalRequest.headers.Authorization = `Bearer ${newTokens.access_token}`;
           return apiClient(originalRequest);
         } else {
-          console.log('Token refresh failed, no new tokens received');
+          if (__DEV__) console.log('Token refresh failed, no new tokens received — forcing logout');
+          onSessionExpired?.();
         }
       } catch (refreshError) {
         console.error('Token refresh failed with error:', refreshError);
-        // Token refresh failed, handle authentication error
         errorHandler.handleError(refreshError as Error, {
           screen: 'API',
           action: 'token_refresh',
-          showAlert: false, // Don't show alert for failed refresh during normal operation
+          showAlert: false,
         });
-      }
-    }
-
-    // Handle network errors with offline support
-    if (!error.response && error.code === 'NETWORK_ERROR') {
-      console.error('API Network Error: Server unreachable');
-      // Network is down, queue for later sync
-      if (originalRequest.method && ['post', 'put', 'delete'].includes(originalRequest.method.toLowerCase())) {
-        await offlineStorage.addToSyncQueue({
-          type: originalRequest.method.toLowerCase() as 'create' | 'update' | 'delete',
-          endpoint: originalRequest.url || '',
-          data: originalRequest.data,
-        });
+        // Refresh threw — session is unrecoverable, force logout
+        onSessionExpired?.();
       }
     }
 

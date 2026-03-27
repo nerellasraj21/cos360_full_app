@@ -27,6 +27,7 @@ const sections = [
   { title: 'View Results', description: 'Student exam results',                               icon: 'bar-chart' as const,     color: '#10B981', route: '/exam/results',       resource: 'exam_results',      action: 'list' },
   { title: 'Hall Tickets', description: 'Manage & publish tickets',                           icon: 'document-text' as const, color: '#F59E0B', route: '/exam/hall-tickets',  resource: 'exams',             action: 'read' },
   { title: 'Grading',      description: 'Grade schemes, remark sets, board patterns & more',  icon: 'trophy' as const,        color: '#7C3AED', route: '/exam/grading',       resource: 'exams',             action: 'read' },
+  { title: 'Notify',       description: 'Send notifications to students & parents',            icon: 'notifications' as const, color: '#F97316', route: '/exam/notify',        resource: 'exams',             action: 'create' },
 ];
 
 export default function ExamScreen() {

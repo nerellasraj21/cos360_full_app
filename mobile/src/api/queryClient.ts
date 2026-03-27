@@ -6,11 +6,9 @@ export const queryClient = new QueryClient({
       staleTime: 1000 * 60 * 5, // 5 minutes
       gcTime: 1000 * 60 * 10, // 10 minutes (formerly cacheTime)
       retry: (failureCount, error: any) => {
-        // Don't retry on 401 unauthorized or 403 forbidden
-        if (error?.response?.status === 401 || error?.response?.status === 403) return false;
-
-        // Don't retry on validation errors (400)
-        if (error?.response?.status === 400) return false;
+        const status = error?.response?.status;
+        // Don't retry on client errors — these won't change on retry
+        if (status === 400 || status === 401 || status === 403 || status === 404 || status === 409 || status === 422) return false;
 
         // Retry on network errors and server errors
         return failureCount < 3;

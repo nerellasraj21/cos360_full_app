@@ -547,9 +547,9 @@ export default function StudentAttendanceScreen() {
   const { role, studentId, selectedStudent } = useAuth();
   const { colors } = useTheme();
 
-  const roleName = role?.name?.toLowerCase();
+  const roleName = role?.name?.toLowerCase() ?? '';
   const isStudent = roleName === 'student';
-  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName || '');
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
 
   let content: React.ReactNode;
 

@@ -8,6 +8,7 @@ import {
   useApproveExpenseTransactionProtected,
   useExpenseAttachmentsProtected,
   useExpenseTypeDropdownProtected,
+  useUploadExpenseAttachmentProtected,
 } from '@/hooks/use-expense-protected';
 import { ReadPermissionGuard, ApprovePermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
@@ -15,6 +16,7 @@ import type { ExpenseTypeDropdown } from '@/src/types/expense';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
+import * as DocumentPicker from 'expo-document-picker';
 import {
   Alert,
   Linking,
@@ -52,6 +54,9 @@ export default function ExpenseTransactionDetailScreen() {
   const [approvalModalVisible, setApprovalModalVisible] = useState(false);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
   const [approvalComment, setApprovalComment] = useState('');
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
+  const [uploadDocType, setUploadDocType] = useState('');
+  const [uploadFile, setUploadFile] = useState<{ uri: string; name: string; type: string } | null>(null);
 
   const transactionId = Array.isArray(id) ? id[0] : id;
 
@@ -59,6 +64,7 @@ export default function ExpenseTransactionDetailScreen() {
   const { data: attachments = [] } = useExpenseAttachmentsProtected(transactionId);
   const { data: typeDropdown = [] } = useExpenseTypeDropdownProtected();
   const approveMutation = useApproveExpenseTransactionProtected();
+  const uploadMutation = useUploadExpenseAttachmentProtected();
 
   const getTypeName = (typeId: string) => {
     const found = (typeDropdown as ExpenseTypeDropdown[]).find((t) => t.id === typeId);
@@ -95,6 +101,45 @@ export default function ExpenseTransactionDetailScreen() {
           );
         },
         onError: () => showError('Error', `Failed to ${approvalAction} transaction.`),
+      }
+    );
+  };
+
+  const handlePickFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+      if (!result.canceled && result.assets?.[0]) {
+        const asset = result.assets[0];
+        setUploadFile({ uri: asset.uri, name: asset.name, type: asset.mimeType || 'application/octet-stream' });
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to pick file');
+    }
+  };
+
+  const handleUploadSubmit = () => {
+    if (!uploadDocType.trim()) {
+      Alert.alert('Validation', 'Please enter a document type');
+      return;
+    }
+    if (!uploadFile) {
+      Alert.alert('Validation', 'Please select a file');
+      return;
+    }
+    uploadMutation.mutate(
+      {
+        transactionId,
+        file: uploadFile as any,
+        documentType: uploadDocType.trim(),
+      },
+      {
+        onSuccess: () => {
+          setUploadModalVisible(false);
+          setUploadDocType('');
+          setUploadFile(null);
+          showSuccess('Uploaded', 'Attachment uploaded successfully.');
+        },
+        onError: () => showError('Upload Failed', 'Failed to upload attachment.'),
       }
     );
   };
@@ -221,12 +266,27 @@ export default function ExpenseTransactionDetailScreen() {
           </ThemedView>
 
           {/* Attachments */}
-          {attachments && (attachments as any[]).length > 0 && (
-            <ThemedView style={[styles.detailCard, { backgroundColor: colors.card }]}>
-              <ThemedText type="subtitle" style={styles.sectionTitle}>
-                Attachments ({(attachments as any[]).length})
+          <ThemedView style={[styles.detailCard, { backgroundColor: colors.card }]}>
+            <View style={styles.attachmentsHeader}>
+              <ThemedText type="subtitle" style={[styles.sectionTitle, { marginBottom: 0 }]}>
+                Attachments {(attachments as any[]).length > 0 ? `(${(attachments as any[]).length})` : ''}
               </ThemedText>
-              {(attachments as any[]).map((attachment: any) => (
+              {transaction.status !== 'approved' && transaction.status !== 'cancelled' && (
+                <TouchableOpacity
+                  style={[styles.addAttachmentBtn, { backgroundColor: colors.primary + '18', borderColor: colors.primary }]}
+                  onPress={() => { setUploadDocType(''); setUploadFile(null); setUploadModalVisible(true); }}
+                >
+                  <Ionicons name="attach" size={15} color={colors.primary} />
+                  <ThemedText style={[styles.addAttachmentText, { color: colors.primary }]}>Add</ThemedText>
+                </TouchableOpacity>
+              )}
+            </View>
+            {(attachments as any[]).length === 0 ? (
+              <ThemedText style={[styles.noAttachmentsText, { color: colors['muted-foreground'] }]}>
+                No attachments yet
+              </ThemedText>
+            ) : (
+              (attachments as any[]).map((attachment: any) => (
                 <View key={attachment.id} style={[styles.attachmentRow, { backgroundColor: colors.background }]}>
                   <Ionicons name="document-outline" size={20} color={colors.primary} />
                   <View style={styles.attachmentInfo}>
@@ -244,9 +304,9 @@ export default function ExpenseTransactionDetailScreen() {
                     <Ionicons name="download-outline" size={20} color={colors.primary} />
                   </TouchableOpacity>
                 </View>
-              ))}
-            </ThemedView>
-          )}
+              ))
+            )}
+          </ThemedView>
 
           {/* Bottom actions: Edit + Approve/Reject */}
           <View style={styles.bottomActions}>
@@ -284,6 +344,80 @@ export default function ExpenseTransactionDetailScreen() {
 
           <View style={{ height: 32 }} />
         </ScrollView>
+
+        {/* Upload Attachment Modal */}
+        <Modal
+          visible={uploadModalVisible}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setUploadModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <ThemedText type="subtitle">Add Attachment</ThemedText>
+                <TouchableOpacity onPress={() => setUploadModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={colors['muted-foreground']} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalBody}>
+                <ThemedText style={styles.modalLabel}>Document Type *</ThemedText>
+                <TextInput
+                  style={[styles.commentInput, {
+                    backgroundColor: colors.background,
+                    color: colors.foreground,
+                    borderColor: colors.border,
+                    minHeight: 44,
+                  }]}
+                  value={uploadDocType}
+                  onChangeText={setUploadDocType}
+                  placeholder="e.g. invoice, receipt, quote"
+                  placeholderTextColor={colors['muted-foreground']}
+                />
+                <TouchableOpacity
+                  style={[styles.filePickerBtn, {
+                    backgroundColor: colors.background,
+                    borderColor: uploadFile ? colors.primary : colors.border,
+                  }]}
+                  onPress={handlePickFile}
+                >
+                  <Ionicons
+                    name={uploadFile ? 'document-text' : 'cloud-upload-outline'}
+                    size={20}
+                    color={uploadFile ? colors.primary : colors['muted-foreground']}
+                  />
+                  <ThemedText style={{ color: uploadFile ? colors.primary : colors['muted-foreground'], flex: 1 }} numberOfLines={1}>
+                    {uploadFile ? uploadFile.name : 'Tap to select file'}
+                  </ThemedText>
+                  {uploadFile && (
+                    <TouchableOpacity onPress={() => setUploadFile(null)}>
+                      <Ionicons name="close-circle" size={18} color={colors['muted-foreground']} />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.cancelButton, { borderColor: colors.border }]}
+                  onPress={() => setUploadModalVisible(false)}
+                >
+                  <ThemedText style={{ color: colors.foreground }}>Cancel</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.submitButton, { backgroundColor: colors.primary }]}
+                  onPress={handleUploadSubmit}
+                  disabled={uploadMutation.isPending}
+                >
+                  <ThemedText style={styles.submitButtonText}>
+                    {uploadMutation.isPending ? 'Uploading...' : 'Upload'}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </ThemedView>
+          </View>
+        </Modal>
 
         {/* Approval Modal */}
         <Modal
@@ -378,6 +512,17 @@ const styles = StyleSheet.create({
   attachmentName: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
   attachmentMeta: { fontSize: 12 },
   downloadButton: { padding: 8 },
+  attachmentsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  addAttachmentBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1,
+  },
+  addAttachmentText: { fontSize: 13, fontWeight: '600' },
+  noAttachmentsText: { fontSize: 13, fontStyle: 'italic', paddingVertical: 8 },
+  filePickerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderWidth: 1, borderRadius: 8, padding: 12, marginTop: 12,
+  },
   bottomActions: { marginBottom: 12 },
   editButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

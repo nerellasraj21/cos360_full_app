@@ -68,7 +68,7 @@ export default function StudentDetailsScreen() {
 
   const { data: transport } = useQuery({
     queryKey: ['student-detail-transport', studentEntityId],
-    queryFn: () => studentTransportApi.getStudentTransports({ student_id: studentEntityId }),
+    queryFn: () => studentTransportApi.listStudentTransport({ student_id: studentEntityId }),
     enabled: !!studentEntityId,
   });
 

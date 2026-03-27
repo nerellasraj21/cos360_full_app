@@ -353,7 +353,7 @@ export default function MarkEntryScreen() {
           ) : (
             <FlatList
               data={mergedRows}
-              keyExtractor={item => item.student_id + item.component_id}
+              keyExtractor={(item, index) => (item.student_id && item.component_id) ? item.student_id + item.component_id : String(index)}
               renderItem={renderRow}
               style={{ flex: 1 }}
               contentContainerStyle={{ paddingTop: 8, paddingBottom: 100 }}

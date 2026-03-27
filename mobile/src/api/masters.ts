@@ -995,6 +995,11 @@ export const parentsApi = {
     const response = await apiClient.put('/profile/parent/me', data);
     return response.data;
   },
+
+  getSalaryRangesDropdown: async (): Promise<SalaryRangeOption[]> => {
+    const response = await apiClient.get('/parents/salary-ranges/dropdown');
+    return response.data;
+  },
 };
 
 // Trips API
@@ -1175,44 +1180,6 @@ export const permissionsApi = {
   },
 };
 
-// Student Transport API
-export const studentTransportApi = {
-  getStudentTransports: async (params?: {
-    skip?: number;
-    limit?: number;
-    student_id?: string;
-    route_id?: string;
-    is_active?: boolean;
-  }): Promise<StudentTransport[]> => {
-    const response = await apiClient.get('/students/student-transport/', { params });
-    return response.data;
-  },
-
-  getStudentTransport: async (id: string): Promise<StudentTransport> => {
-    const response = await apiClient.get(`/students/student-transport/${id}`);
-    return response.data;
-  },
-
-  createStudentTransport: async (data: StudentTransportCreate): Promise<StudentTransport> => {
-    const response = await apiClient.post('/students/student-transport/', data);
-    return response.data;
-  },
-
-  updateStudentTransport: async (id: string, data: StudentTransportUpdate): Promise<StudentTransport> => {
-    const response = await apiClient.put(`/students/student-transport/${id}`, data);
-    return response.data;
-  },
-
-  patchStudentTransport: async (id: string, data: Partial<StudentTransportUpdate>): Promise<StudentTransport> => {
-    const response = await apiClient.patch(`/students/student-transport/${id}`, data);
-    return response.data;
-  },
-
-  deleteStudentTransport: async (id: string): Promise<void> => {
-    await apiClient.delete(`/students/student-transport/${id}`);
-  },
-};
-
 // Student Trips API
 export const studentTripsApi = {
   getStudentTrips: async (params?: {
@@ -1353,3 +1320,56 @@ export const transportPricingApi = {
     await apiClient.delete(`/masters/transport-pricing/${id}`);
   },
 };
+
+// ─── Parents / Salary Ranges ──────────────────────────────────────────────────
+
+export interface SalaryRangeOption {
+  value: string;
+  label: string;
+  display: string;
+}
+
+// ─── Locations ────────────────────────────────────────────────────────────────
+
+export interface LocationOut {
+  id: string;
+  name: string;
+  description?: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LocationIn {
+  name: string;
+  description?: string;
+  is_active?: boolean;
+}
+
+export type LocationUpdate = Partial<LocationIn>;
+
+export const locationsApi = {
+  /** GET /masters/locations/ */
+  getAll: async (): Promise<LocationOut[]> => {
+    const response = await apiClient.get('/masters/locations/');
+    return Array.isArray(response.data) ? response.data : response.data.items ?? [];
+  },
+
+  /** POST /masters/locations/ */
+  create: async (data: LocationIn): Promise<LocationOut> => {
+    const response = await apiClient.post('/masters/locations/', data);
+    return response.data;
+  },
+
+  /** PUT /masters/locations/{id} */
+  update: async (id: string, data: LocationUpdate): Promise<LocationOut> => {
+    const response = await apiClient.put(`/masters/locations/${id}`, data);
+    return response.data;
+  },
+
+  /** DELETE /masters/locations/{id} */
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/masters/locations/${id}`);
+  },
+};
+

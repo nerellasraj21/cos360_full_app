@@ -24,8 +24,7 @@ export default function StudentProfile() {
     ? selectedStudent ? `${selectedStudent.first_name}'s Profile` : 'Child Profile'
     : 'Student Profile';
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editingField, setEditingField] = useState<'email' | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const [editForm, setEditForm] = useState({ email: '', phone: '', address: '' });
 
   const { data: myProfile, isLoading: myLoading, error: myError } = useStudentProfile();
 
@@ -40,20 +39,23 @@ export default function StudentProfile() {
   const isLoading = isParent ? childLoading : myLoading;
   const updateProfileMutation = useUpdateStudentProfile();
 
-  const handleEdit = (field: 'email', currentValue: string) => {
-    setEditingField(field);
-    setEditValue(currentValue || '');
+  const handleOpenEdit = () => {
+    setEditForm({
+      email: profile?.email || '',
+      phone: profile?.phone || '',
+      address: profile?.address || '',
+    });
     setEditModalVisible(true);
   };
 
   const handleSaveEdit = async () => {
-    if (!editingField || !editValue.trim()) return;
-
     try {
-      await updateProfileMutation.mutateAsync({ [editingField]: editValue.trim() });
+      await updateProfileMutation.mutateAsync({
+        email: editForm.email.trim() || undefined,
+        phone: editForm.phone.trim() || undefined,
+        address: editForm.address.trim() || undefined,
+      });
       setEditModalVisible(false);
-      setEditingField(null);
-      setEditValue('');
     } catch (error) {
       Alert.alert('Error', 'Failed to update profile');
     }
@@ -124,7 +126,7 @@ export default function StudentProfile() {
               <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENTS}>
                 <TouchableOpacity
                   style={[styles.editProfileButton, { backgroundColor: colors.primary }]}
-                  onPress={() => handleEdit('email', profile.email || '')}
+                  onPress={handleOpenEdit}
                 >
                   <Ionicons name="create" size={20} color="white" />
                 </TouchableOpacity>
@@ -140,20 +142,7 @@ export default function StudentProfile() {
             </View>
             <View style={styles.detailRow}>
               <Ionicons name="mail" size={20} color={colors['muted-foreground']} />
-              <View style={styles.editableRow}>
-                <ThemedText style={styles.detailText}>Email: {profile.email || 'Not provided'}</ThemedText>
-                {!isParent && (
-                  <UpdatePermissionGuard
-                    resource={PERMISSION_RESOURCES.STUDENTS}>
-                    <TouchableOpacity
-                      style={styles.editIcon}
-                      onPress={() => handleEdit('email', profile.email || '')}
-                    >
-                      <Ionicons name="pencil" size={16} color={colors.primary} />
-                    </TouchableOpacity>
-                  </UpdatePermissionGuard>
-                )}
-              </View>
+              <ThemedText style={styles.detailText}>Email: {profile.email || 'Not provided'}</ThemedText>
             </View>
             <View style={styles.detailRow}>
               <Ionicons name="calendar" size={20} color={colors['muted-foreground']} />
@@ -207,7 +196,7 @@ export default function StudentProfile() {
         </ThemedView>
         </ScrollView>
 
-        {/* Edit Modal */}
+        {/* Edit Profile Modal */}
       <Modal
         visible={editModalVisible}
         transparent
@@ -217,22 +206,50 @@ export default function StudentProfile() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
-              <ThemedText type="subtitle" style={styles.modalTitle}>
-                Edit {editingField === 'email' ? 'Email' : 'Field'}
-              </ThemedText>
+              <ThemedText type="subtitle" style={styles.modalTitle}>Edit Profile</ThemedText>
               <TouchableOpacity onPress={() => setEditModalVisible(false)}>
                 <Ionicons name="close" size={24} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </View>
 
-            <TextInput
-              style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]}
-              value={editValue}
-              onChangeText={setEditValue}
-              placeholder={`Enter ${editingField}`}
-              keyboardType={editingField === 'email' ? 'email-address' : 'default'}
-              autoCapitalize="none"
-            />
+            <View style={styles.modalFieldGroup}>
+              <ThemedText style={styles.modalFieldLabel}>Email</ThemedText>
+              <TextInput
+                style={[styles.modalInput, { borderColor: colors.border, color: colors.foreground }]}
+                value={editForm.email}
+                onChangeText={v => setEditForm(p => ({ ...p, email: v }))}
+                placeholder="Enter email address"
+                placeholderTextColor={colors['muted-foreground']}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.modalFieldGroup}>
+              <ThemedText style={styles.modalFieldLabel}>Phone</ThemedText>
+              <TextInput
+                style={[styles.modalInput, { borderColor: colors.border, color: colors.foreground }]}
+                value={editForm.phone}
+                onChangeText={v => setEditForm(p => ({ ...p, phone: v }))}
+                placeholder="Enter phone number"
+                placeholderTextColor={colors['muted-foreground']}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={styles.modalFieldGroup}>
+              <ThemedText style={styles.modalFieldLabel}>Address</ThemedText>
+              <TextInput
+                style={[styles.modalInput, styles.modalTextarea, { borderColor: colors.border, color: colors.foreground }]}
+                value={editForm.address}
+                onChangeText={v => setEditForm(p => ({ ...p, address: v }))}
+                placeholder="Enter address"
+                placeholderTextColor={colors['muted-foreground']}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+            </View>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -350,6 +367,18 @@ const styles = StyleSheet.create({
   },
   editIcon: {
     padding: 4,
+  },
+  modalFieldGroup: {
+    marginBottom: 14,
+  },
+  modalFieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+    opacity: 0.75,
+  },
+  modalTextarea: {
+    minHeight: 72,
   },
   modalOverlay: {
     flex: 1,

@@ -12,6 +12,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { runPermissionTests } from '@/utils/verify-permissions';
 
 export default function PermissionTestScreen() {
+  if (!__DEV__) return null;
   const router = useRouter();
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? 'dark' : 'light';

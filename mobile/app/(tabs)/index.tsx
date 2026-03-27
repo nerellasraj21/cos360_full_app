@@ -62,16 +62,6 @@ const MODULES: {
     alwaysShow: true,
   },
   {
-    id: 'staff',
-    title: 'Staff',
-    icon: 'person' as const,
-    color: '#8B5CF6',
-    bg: '#F5F3FF',
-    darkBg: '#8B5CF620',
-    route: '/(tabs)/staff',
-    resource: 'staff',
-  },
-  {
     id: 'expense',
     title: 'Expense',
     icon: 'wallet' as const,
@@ -119,7 +109,7 @@ const MODULES: {
     bg: '#F8FAFC',
     darkBg: '#64748b20',
     route: '/(tabs)/admin',
-    resources: ['users', 'roles', 'permissions', 'menu'],
+    resources: ['users', 'roles', 'staff'],
   },
 ];
 

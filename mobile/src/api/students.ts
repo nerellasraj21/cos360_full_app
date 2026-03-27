@@ -18,6 +18,7 @@ export interface ParentCreate {
   aadhar_number?: string;
   gender?: string;
   relation_to_student: string;
+  salary_range?: string;
 }
 
 // ─── Admissions ───────────────────────────────────────────────────────────────

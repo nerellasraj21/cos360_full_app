@@ -113,7 +113,7 @@ export interface FeeClassMappingBulkResponse {
 // Fee Transaction Items
 export interface FeeTransactionItemRequest {
   fee_type_id: string;
-  fee_term_id: string;
+  term_date_id: string; // C-2: backend schema uses term_date_id, not fee_term_id
   amount_due: number;
   amount_paid: number;
   description?: string;
@@ -122,7 +122,7 @@ export interface FeeTransactionItemRequest {
 export interface FeeTransactionItemResponse {
   id: string;
   fee_type_id: string;
-  fee_term_id: string;
+  term_date_id: string; // C-2: backend schema uses term_date_id, not fee_term_id
   amount_due: number;
   amount_paid: number;
   description?: string;
@@ -141,7 +141,10 @@ export interface FeeTransactionCreateRequest {
   collected_by?: string;
   upi_reference?: string;
   cheque_number?: string;
+  cheque_date?: string;    // C-3: backend requires for cheque payments
+  cheque_bank?: string;    // C-3: backend requires for cheque payments
   bank_reference?: string;
+  bank_name?: string;      // C-3: backend requires for bank_transfer
 }
 
 export interface FeeTransactionResponse {
@@ -157,7 +160,10 @@ export interface FeeTransactionResponse {
   collected_by?: string;
   upi_reference?: string;
   cheque_number?: string;
+  cheque_date?: string;
+  cheque_bank?: string;
   bank_reference?: string;
+  bank_name?: string;
   created_at: string;
   updated_at: string;
 }
@@ -209,6 +215,8 @@ export interface FeeRefundHealthResponse {
 
 export interface FeeRefundApproveRequest {
   refund_id: string;
+  action: 'approve' | 'reject';
+  approval_remarks: string;
 }
 
 export interface FeeRefundApproveResponse {

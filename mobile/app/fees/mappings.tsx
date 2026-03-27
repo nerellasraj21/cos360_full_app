@@ -3,76 +3,59 @@ import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
-import { useAuth, useTheme } from '@/contexts';
+import { useTheme } from '@/contexts';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
-const AMBER = '#F59E0B';
+const PURPLE = '#8B5CF6';
 
 const sections = [
-  { title: 'Routes',              description: 'Manage transport routes and their configurations',      icon: 'map' as const,           color: AMBER,     route: '/transport/routes',           resource: PERMISSION_RESOURCES.TRANSPORT_ROUTES,      action: 'list' },
-  { title: 'Route Stops',         description: 'Configure pickup and drop-off stops along routes',      icon: 'location' as const,      color: '#D97706', route: '/transport/route-stops',      resource: PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS, action: 'list' },
-  { title: 'Vehicles',            description: 'Manage the school vehicle fleet and details',           icon: 'bus' as const,           color: AMBER,     route: '/transport/vehicles',         resource: PERMISSION_RESOURCES.TRANSPORT_VEHICLES,    action: 'list' },
-  { title: 'Transport Trips',     description: 'Schedule and track vehicle trips',                      icon: 'navigate' as const,      color: '#B45309', route: '/transport/trips',            resource: PERMISSION_RESOURCES.TRANSPORT_TRIPS,       action: 'list' },
-  { title: 'Transport Pricing',   description: 'Configure fare pricing for routes and stops',           icon: 'card' as const,          color: '#10B981', route: '/transport/pricing',          resource: PERMISSION_RESOURCES.TRANSPORT_PRICING,     action: 'list' },
-  { title: 'Student Transport',   description: 'Assign and manage student transport allocations',       icon: 'people' as const,        color: '#556ee6', route: '/transport/student-transport', resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,     action: 'list' },
+  {
+    title: 'Class Mappings',
+    description: 'Configure fee mappings for classes and term amounts',
+    icon: 'school-outline' as const,
+    color: '#8B5CF6',
+    route: '/fees/class-mappings',
+    resource: PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS,
+    action: 'list',
+  },
+  {
+    title: 'Student Mappings',
+    description: 'Assign fee types to individual students',
+    icon: 'person-outline' as const,
+    color: '#3B82F6',
+    route: '/fees/student-mappings',
+    resource: PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS,
+    action: 'list',
+  },
 ];
 
-export default function TransportScreen() {
+export default function FeeMappingsScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
-  const { role } = useAuth();
   const { hasPermission } = useMobilePermission();
-
-  const roleName = role?.name?.toLowerCase() ?? '';
-  const isStudentOrParent = ['student', 'parent', 'guardian', 'father', 'mother'].includes(roleName);
-
-  // Student/parent: go directly to their own transport view
-  if (isStudentOrParent) {
-    const studentRoute = '/transport/student-transport';
-    return (
-      <AppLayout title="My Transport">
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
-          <Ionicons name="bus" size={56} color={AMBER} />
-          <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: '700', textAlign: 'center' }}>
-            Transport Information
-          </Text>
-          <Text style={{ color: colors['muted-foreground'], fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
-            View your transport assignment, route, stop and timings.
-          </Text>
-          <TouchableOpacity
-            style={{ backgroundColor: AMBER, borderRadius: 12, paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 }}
-            onPress={() => router.push(studentRoute as any)}
-          >
-            <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>View My Transport</Text>
-          </TouchableOpacity>
-        </View>
-      </AppLayout>
-    );
-  }
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
   return (
-    <AppLayout title="Transport">
+    <AppLayout title="Fee Mappings">
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
         {/* Banner */}
-        <View style={[styles.banner, { backgroundColor: AMBER }]}>
+        <View style={[styles.banner, { backgroundColor: PURPLE }]}>
           <View style={styles.bannerDecor} />
           <View style={styles.bannerDecor2} />
           <View style={styles.bannerIcon}>
-            <Ionicons name="bus" size={28} color="white" />
+            <Ionicons name="git-merge" size={28} color="white" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.bannerTitle}>Transport Management</Text>
-            <Text style={styles.bannerSub}>Routes · Stops · Vehicles · Trips · Pricing · Students</Text>
+            <Text style={styles.bannerTitle}>Fee Mappings</Text>
+            <Text style={styles.bannerSub}>Map fee types to classes or individual students</Text>
           </View>
         </View>
 
-        {/* Section label */}
-        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>TRANSPORT SECTIONS</Text>
+        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>MAPPING SECTIONS</Text>
 
         {/* Grid */}
         <View style={styles.grid}>

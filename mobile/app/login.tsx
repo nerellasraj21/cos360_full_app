@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -39,6 +40,7 @@ interface FormErrors {
   username?: string;
   password?: string;
   clientName?: string;
+  academicYear?: string;
 }
 
 const LoginScreen: React.FC = () => {
@@ -95,11 +97,12 @@ const LoginScreen: React.FC = () => {
     }
   }, [isAuthenticated, requiresPasswordChange, router]);
 
-  useEffect(() => {
-    if (error) {
-      clearError();
-    }
-  }, [formData, clearError]);
+  // Clear auth context error when the user changes form data (so stale errors don't persist).
+  // clearError is intentionally excluded from deps — it's a stable callback that changes
+  // reference on every render (not memoized), which would cause this effect to fire on
+  // every render and immediately clear any freshly-set error before the user sees it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { clearError(); }, [formData]);
 
   const fetchAcademicYears = async (showErrors = false) => {
     setAcademicYearLoading(true);
@@ -138,12 +141,24 @@ const LoginScreen: React.FC = () => {
     }
   }, [showClientSelection]);
 
+  // When the picker opens and we have no years, retry with errors visible
+  useEffect(() => {
+    if (showAcademicYearPicker && academicYears.length === 0 && !academicYearLoading) {
+      fetchAcademicYears(true);
+    }
+  }, [showAcademicYearPicker]);
+
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
     if (!formData.username.trim()) newErrors.username = 'Username is required';
     if (!formData.password.trim()) newErrors.password = 'Password is required';
     else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
     if (!formData.clientName.trim()) newErrors.clientName = 'Organization name is required';
+    if (!selectedAcademicYearId && !academicYearLoading) {
+      newErrors.academicYear = academicYears.length === 0
+        ? 'Could not load academic years. Tap to retry.'
+        : 'Please select an academic year';
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -179,8 +194,7 @@ const LoginScreen: React.FC = () => {
         <View style={styles.loadingContainer}>
           <StatusBar style="light" backgroundColor={BRAND_COLOR} />
           <View style={styles.loadingLogo}>
-            <Text style={styles.loadingLogoText}>COS</Text>
-            <Text style={styles.loadingLogo360}>360</Text>
+            <Image source={require('../assets/images/cos360-logo.jpg')} style={styles.logoImage} resizeMode="contain" />
           </View>
           <ActivityIndicator size="large" color="white" style={{ marginTop: 32 }} />
           <Text style={styles.loadingText}>Initializing...</Text>
@@ -204,8 +218,7 @@ const LoginScreen: React.FC = () => {
             <View style={styles.brandDecorCircle1} />
             <View style={styles.brandDecorCircle2} />
             <View style={styles.logoCircle}>
-              <Text style={styles.logoInitials}>COS</Text>
-              <Text style={styles.logo360}>360</Text>
+              <Image source={require('../assets/images/cos360-logo.jpg')} style={styles.logoImage} resizeMode="contain" />
             </View>
             <Text style={styles.appName}>COS360</Text>
             <Text style={styles.appTagline}>School Management System</Text>
@@ -271,8 +284,7 @@ const LoginScreen: React.FC = () => {
           <View style={styles.brandDecorCircle1} />
           <View style={styles.brandDecorCircle2} />
           <View style={styles.logoCircle}>
-            <Text style={styles.logoInitials}>COS</Text>
-            <Text style={styles.logo360}>360</Text>
+            <Image source={require('../assets/images/cos360-logo.jpg')} style={styles.logoImage} resizeMode="contain" />
           </View>
           <Text style={styles.appName}>COS360</Text>
           <Text style={styles.appTagline}>School Management System</Text>
@@ -340,11 +352,22 @@ const LoginScreen: React.FC = () => {
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Academic Year</Text>
             <TouchableOpacity
-              style={[styles.inputContainer, selectedAcademicYearId ? styles.inputFocused : {}]}
-              onPress={() => setShowAcademicYearPicker(true)}
+              style={[
+                styles.inputContainer,
+                errors.academicYear ? styles.inputError : selectedAcademicYearId ? styles.inputFocused : {},
+              ]}
+              onPress={() => {
+                setErrors(prev => ({ ...prev, academicYear: undefined }));
+                setShowAcademicYearPicker(true);
+              }}
               disabled={isLoading || academicYearLoading}
             >
-              <Ionicons name="calendar-outline" size={20} color={selectedAcademicYearId ? ACCENT_COLOR : '#9ca3af'} style={styles.inputIcon} />
+              <Ionicons
+                name="calendar-outline"
+                size={20}
+                color={errors.academicYear ? '#ef4444' : selectedAcademicYearId ? ACCENT_COLOR : '#9ca3af'}
+                style={styles.inputIcon}
+              />
               {academicYearLoading ? (
                 <ActivityIndicator size="small" color={ACCENT_COLOR} style={{ flex: 1 }} />
               ) : (
@@ -354,6 +377,12 @@ const LoginScreen: React.FC = () => {
               )}
               <Ionicons name="chevron-down" size={18} color="#9ca3af" style={{ marginRight: 12 }} />
             </TouchableOpacity>
+            {errors.academicYear && (
+              <View style={styles.fieldErrorRow}>
+                <Ionicons name="alert-circle" size={12} color="#ef4444" />
+                <Text style={styles.fieldErrorText}>{errors.academicYear}</Text>
+              </View>
+            )}
           </View>
 
           {/* Client Name */}
@@ -390,11 +419,11 @@ const LoginScreen: React.FC = () => {
 
           {/* Sign In Button */}
           <TouchableOpacity
-            style={[styles.primaryButton, { opacity: isLoading ? 0.75 : 1, marginTop: 8 }]}
+            style={[styles.primaryButton, { opacity: (isLoading || academicYearLoading) ? 0.75 : 1, marginTop: 8 }]}
             onPress={handleLogin}
-            disabled={isLoading}
+            disabled={isLoading || academicYearLoading}
           >
-            {isLoading ? (
+            {isLoading || academicYearLoading ? (
               <ActivityIndicator color="white" />
             ) : (
               <>
@@ -402,6 +431,15 @@ const LoginScreen: React.FC = () => {
                 <Ionicons name="arrow-forward" size={18} color="white" />
               </>
             )}
+          </TouchableOpacity>
+
+          {/* Forgot Password Link */}
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => router.push('/forgot-password' as any)}
+          >
+            <Ionicons name="lock-open-outline" size={15} color={ACCENT_COLOR} />
+            <Text style={styles.linkButtonText}>Forgot Password?</Text>
           </TouchableOpacity>
 
           {/* Change Org Link */}
@@ -479,6 +517,13 @@ const LoginScreen: React.FC = () => {
                   <View style={styles.modalCenter}>
                     <Ionicons name="calendar-outline" size={40} color="#9ca3af" />
                     <Text style={styles.modalCenterText}>No academic years available</Text>
+                    <TouchableOpacity
+                      style={styles.retryButton}
+                      onPress={() => fetchAcademicYears(true)}
+                    >
+                      <Ionicons name="refresh" size={16} color="white" />
+                      <Text style={styles.retryButtonText}>Retry</Text>
+                    </TouchableOpacity>
                   </View>
                 }
               />
@@ -512,20 +557,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  loadingLogoText: {
-    color: 'white',
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: 2,
-    lineHeight: 26,
-  },
-  loadingLogo360: {
-    color: '#60a5fa',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 1,
-    lineHeight: 20,
   },
   loadingText: {
     marginTop: 16,
@@ -571,19 +602,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 18,
   },
-  logoInitials: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: 2,
-    lineHeight: 24,
-  },
-  logo360: {
-    color: '#93c5fd',
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 1,
-    lineHeight: 19,
+  logoImage: {
+    width: 72,
+    height: 72,
   },
   appName: {
     color: 'white',

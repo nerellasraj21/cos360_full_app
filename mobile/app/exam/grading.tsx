@@ -95,6 +95,14 @@ const GRADING_LINKS = [
     color: '#64748B',
     route: '/exam/settings',
   },
+  {
+    id: 'audit',
+    title: 'Audit Logs',
+    description: 'View exam activity and change history',
+    icon: 'document-text-outline',
+    color: '#7C3AED',
+    route: '/exam/audit',
+  },
 ];
 
 export default function GradingDashboardScreen() {

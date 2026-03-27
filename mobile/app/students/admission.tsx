@@ -21,7 +21,7 @@ import { AppLayout } from '@/components';
 import { CustomDropdown } from '@/components/ui/dropdown';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { studentAdmissionsApi, classSectionsApi, academicYearsApi, castesApi, StudentAdmissionCreate, StudentAdmissionUpdate } from '@/src/api';
+import { studentAdmissionsApi, classSectionsApi, academicYearsApi, castesApi, parentsApi, StudentAdmissionCreate, StudentAdmissionUpdate } from '@/src/api';
 import { useCreateAdmission, useUpdateAdmission, useDeleteAdmission, useAdmissionByStudentId, useAdmissions, useStudentsSearch } from '@/src/api/hooks/students/admissions';
 import { useTheme } from '@/contexts';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
@@ -111,6 +111,7 @@ interface FormData {
     email?: string;
     phone?: string;
     occupation?: string;
+    salary_range?: string;
     aadhar_number?: string;
     gender?: string;
     relation_to_student: string;
@@ -120,11 +121,26 @@ interface FormData {
     email?: string;
     phone?: string;
     occupation?: string;
+    salary_range?: string;
     aadhar_number?: string;
     gender?: string;
     relation_to_student: string;
   };
 }
+
+const SALARY_RANGE_OPTIONS = [
+  { label: 'Below 1L', value: 'below_1l' },
+  { label: '1L - 3L', value: '1l_3l' },
+  { label: '3L - 5L', value: '3l_5l' },
+  { label: '5L - 10L', value: '5l_10l' },
+  { label: 'Above 10L', value: 'above_10l' },
+];
+
+const GENDER_OPTIONS = [
+  { label: 'Male', value: 'male' },
+  { label: 'Female', value: 'female' },
+  { label: 'Other', value: 'other' },
+];
 
 const STEPS = [
   'Academic Details',
@@ -161,9 +177,20 @@ const INITIAL_FORM: FormData = {
     caste_id: '', sub_caste_id: '', community: '', nationality: '',
     mother_tongue: '', identification_marks: '',
   },
-  father: { name: '', email: '', phone: '', occupation: '', aadhar_number: '', gender: '', relation_to_student: 'Father' },
-  mother: { name: '', email: '', phone: '', occupation: '', aadhar_number: '', gender: '', relation_to_student: 'Mother' },
+  father: { name: '', email: '', phone: '', occupation: '', salary_range: '', aadhar_number: '', gender: '', relation_to_student: 'Father' },
+  mother: { name: '', email: '', phone: '', occupation: '', salary_range: '', aadhar_number: '', gender: '', relation_to_student: 'Mother' },
 };
+
+// ─── Table column widths ──────────────────────────────────────────────────────
+const COL_SNO    = 48;
+const COL_ADMNO  = 120;
+const COL_NAME   = 160;
+const COL_CLASS  = 120;
+const COL_SEC    = 100;
+const COL_YEAR   = 100;
+const COL_DATE   = 110;
+const COL_STATUS = 88;
+const COL_ACTS   = 116;
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
@@ -189,6 +216,25 @@ export default function StudentAdmissionScreen() {
 
   // ── date picker ────────────────────────────────────────────────────────────
   const [activeDateField, setActiveDateField] = useState<string | null>(null);
+  const [dateDisplayValues, setDateDisplayValues] = useState<Record<string, string>>({});
+
+  const toDisplayDMY = (iso: string): string => {
+    if (!iso?.match(/^\d{4}-\d{2}-\d{2}$/)) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  };
+  const autoFormatDate = (t: string): string => {
+    const d = t.replace(/\D/g, '').slice(0, 8);
+    if (d.length <= 2) return d;
+    if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+    return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+  };
+  const parseDMY = (s: string): string | null => {
+    const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return null;
+    const iso = `${m[3]}-${m[2]}-${m[1]}`;
+    return isNaN(new Date(iso + 'T00:00:00').getTime()) ? null : iso;
+  };
 
   // ── list state ─────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -264,6 +310,15 @@ export default function StudentAdmissionScreen() {
       return data.map((item: any) => ({ label: item.name, value: item.id }));
     },
     enabled: !!formData.student.caste_id,
+  });
+
+  const { data: salaryRangesData = SALARY_RANGE_OPTIONS } = useQuery({
+    queryKey: ['salary-ranges-dropdown'],
+    queryFn: async () => {
+      const data = await parentsApi.getSalaryRangesDropdown();
+      return data.map((item) => ({ label: item.label, value: item.value }));
+    },
+    staleTime: 30 * 60 * 1000,
   });
 
   // Sub-castes for view modal (keyed on selected admission's caste_id, not form data)
@@ -344,6 +399,7 @@ export default function StudentAdmissionScreen() {
           email: a.father?.email ?? '',
           phone: a.father?.phone ?? '',
           occupation: a.father?.occupation ?? '',
+          salary_range: a.father?.salary_range ?? '',
           aadhar_number: a.father?.aadhar_number ?? '',
           gender: a.father?.gender ?? '',
           relation_to_student: 'Father',
@@ -353,6 +409,7 @@ export default function StudentAdmissionScreen() {
           email: a.mother?.email ?? '',
           phone: a.mother?.phone ?? '',
           occupation: a.mother?.occupation ?? '',
+          salary_range: a.mother?.salary_range ?? '',
           aadhar_number: a.mother?.aadhar_number ?? '',
           gender: a.mother?.gender ?? '',
           relation_to_student: 'Mother',
@@ -565,12 +622,14 @@ export default function StudentAdmissionScreen() {
         father_phone: formData.father.phone,
         father_occupation: formData.father.occupation,
         father_aadhar_number: formData.father.aadhar_number,
+        father_salary_range: formData.father.salary_range,
         father_gender: formData.father.gender,
         // Mother
         mother_name: formData.mother.name,
         mother_email: formData.mother.email,
         mother_phone: formData.mother.phone,
         mother_occupation: formData.mother.occupation,
+        mother_salary_range: formData.mother.salary_range,
         mother_aadhar_number: formData.mother.aadhar_number,
         mother_gender: formData.mother.gender,
       };
@@ -652,6 +711,7 @@ export default function StudentAdmissionScreen() {
       // Use local date methods — toISOString() converts to UTC and gives wrong date in IST
       const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       updateFormData(field, iso);
+      setDateDisplayValues(p => ({ ...p, [field]: toDisplayDMY(iso) }));
     }
   };
 
@@ -708,21 +768,30 @@ export default function StudentAdmissionScreen() {
   };
 
   const renderDateButton = (label: string, field: string) => {
-    const iso = getFieldValue(field);
-    const displayDate = iso ? new Date(iso + 'T00:00:00').toLocaleDateString() : '';
     const err = getFieldError(field);
+    const displayVal = dateDisplayValues[field] ?? toDisplayDMY(getFieldValue(field));
     return (
       <View style={fStyles.inputContainer}>
         <ThemedText style={[fStyles.label, { color: themeColors.foreground }]}>{label}</ThemedText>
-        <TouchableOpacity
-          style={[fStyles.dateBtn, { backgroundColor: themeColors.background, borderColor: err ? themeColors.destructive : themeColors.border }]}
-          onPress={() => setActiveDateField(field)}
-        >
-          <ThemedText style={{ color: iso ? themeColors['card-foreground'] : themeColors['muted-foreground'], fontSize: 15 }}>
-            {displayDate || 'Select date'}
-          </ThemedText>
-          <Ionicons name="calendar-outline" size={18} color={themeColors.primary} />
-        </TouchableOpacity>
+        <View style={[fStyles.dateRow, { backgroundColor: themeColors.background, borderColor: err ? themeColors.destructive : themeColors.border }]}>
+          <TextInput
+            style={[fStyles.dateInput, { color: themeColors['card-foreground'] }]}
+            placeholder="DD/MM/YYYY"
+            placeholderTextColor={themeColors['muted-foreground']}
+            value={displayVal}
+            keyboardType="numeric"
+            maxLength={10}
+            onChangeText={(t) => {
+              const fmt = autoFormatDate(t);
+              setDateDisplayValues(p => ({ ...p, [field]: fmt }));
+              const iso = parseDMY(fmt);
+              if (iso) updateFormData(field, iso);
+            }}
+          />
+          <TouchableOpacity onPress={() => setActiveDateField(field)} style={{ padding: 4 }}>
+            <Ionicons name="calendar-outline" size={20} color={themeColors.primary} />
+          </TouchableOpacity>
+        </View>
         {err ? <ThemedText style={[fStyles.errorText, { color: themeColors.destructive }]}>{err}</ThemedText> : null}
       </View>
     );
@@ -813,34 +882,34 @@ export default function StudentAdmissionScreen() {
       <ThemedText type="subtitle" style={fStyles.sectionTitle}>Father Information</ThemedText>
       <View style={fStyles.row}>
         <View style={fStyles.half}>{renderInput('Name *', 'father.name', 'Father name')}</View>
-        <View style={fStyles.half}>{renderInput('Email', 'father.email', 'Email', 'email-address')}</View>
+        <View style={fStyles.half}>{renderInput('Email *', 'father.email', 'Email', 'email-address')}</View>
       </View>
       <View style={fStyles.row}>
-        <View style={fStyles.half}>{renderInput('Phone', 'father.phone', 'Phone', 'phone-pad')}</View>
-        <View style={fStyles.half}>{renderInput('Occupation', 'father.occupation', 'Occupation')}</View>
+        <View style={fStyles.half}>{renderInput('Phone (Optional)', 'father.phone', 'Phone', 'phone-pad')}</View>
+        <View style={fStyles.half}>{renderInput('Occupation (Optional)', 'father.occupation', 'Occupation')}</View>
       </View>
+      {renderDropdown('Salary Range (Optional)', 'father.salary_range', salaryRangesData, '-- Select Salary Range --')}
       <View style={fStyles.row}>
-        <View style={fStyles.half}>{renderInput('Aadhar', 'father.aadhar_number', 'Aadhar')}</View>
-        <View style={fStyles.half}>{renderDropdown('Gender', 'father.gender', [
-          { label: 'Male', value: 'male' }, { label: 'Female', value: 'female' }, { label: 'Other', value: 'other' }
-        ], 'Select')}</View>
+        <View style={fStyles.half}>{renderInput('Aadhar Number (Optional)', 'father.aadhar_number', 'Aadhar')}</View>
+        <View style={fStyles.half}>{renderDropdown('Gender (Optional)', 'father.gender', GENDER_OPTIONS, 'Select Gender')}</View>
       </View>
+      {renderInput('Relation to Student', 'father.relation_to_student', 'Relation')}
 
       <ThemedText type="subtitle" style={[fStyles.sectionTitle, { marginTop: 20 }]}>Mother Information</ThemedText>
       <View style={fStyles.row}>
         <View style={fStyles.half}>{renderInput('Name *', 'mother.name', 'Mother name')}</View>
-        <View style={fStyles.half}>{renderInput('Email', 'mother.email', 'Email', 'email-address')}</View>
+        <View style={fStyles.half}>{renderInput('Email *', 'mother.email', 'Email', 'email-address')}</View>
       </View>
       <View style={fStyles.row}>
-        <View style={fStyles.half}>{renderInput('Phone', 'mother.phone', 'Phone', 'phone-pad')}</View>
-        <View style={fStyles.half}>{renderInput('Occupation', 'mother.occupation', 'Occupation')}</View>
+        <View style={fStyles.half}>{renderInput('Phone (Optional)', 'mother.phone', 'Phone', 'phone-pad')}</View>
+        <View style={fStyles.half}>{renderInput('Occupation (Optional)', 'mother.occupation', 'Occupation')}</View>
       </View>
+      {renderDropdown('Salary Range (Optional)', 'mother.salary_range', salaryRangesData, '-- Select Salary Range --')}
       <View style={fStyles.row}>
-        <View style={fStyles.half}>{renderInput('Aadhar', 'mother.aadhar_number', 'Aadhar')}</View>
-        <View style={fStyles.half}>{renderDropdown('Gender', 'mother.gender', [
-          { label: 'Male', value: 'male' }, { label: 'Female', value: 'female' }, { label: 'Other', value: 'other' }
-        ], 'Select')}</View>
+        <View style={fStyles.half}>{renderInput('Aadhar Number (Optional)', 'mother.aadhar_number', 'Aadhar')}</View>
+        <View style={fStyles.half}>{renderDropdown('Gender (Optional)', 'mother.gender', GENDER_OPTIONS, 'Select Gender')}</View>
       </View>
+      {renderInput('Relation to Student', 'mother.relation_to_student', 'Relation')}
     </View>
   );
 
@@ -925,6 +994,7 @@ export default function StudentAdmissionScreen() {
           <SummaryRow label="Email" value={formData.father.email} />
           <SummaryRow label="Phone" value={formData.father.phone} />
           <SummaryRow label="Occupation" value={formData.father.occupation} />
+          <SummaryRow label="Salary Range" value={salaryRangesData.find(o => o.value === formData.father.salary_range)?.label} />
           <SummaryRow label="Aadhar" value={formData.father.aadhar_number} />
           <SummaryRow label="Gender" value={formData.father.gender ? formData.father.gender.charAt(0).toUpperCase() : ''} />
           <SummaryRow label="Relation" value={formData.father.relation_to_student} />
@@ -933,6 +1003,7 @@ export default function StudentAdmissionScreen() {
           <SummaryRow label="Email" value={formData.mother.email} />
           <SummaryRow label="Phone" value={formData.mother.phone} />
           <SummaryRow label="Occupation" value={formData.mother.occupation} />
+          <SummaryRow label="Salary Range" value={salaryRangesData.find(o => o.value === formData.mother.salary_range)?.label} />
           <SummaryRow label="Aadhar" value={formData.mother.aadhar_number} />
           <SummaryRow label="Gender" value={formData.mother.gender ? formData.mother.gender.charAt(0).toUpperCase() : ''} />
           <SummaryRow label="Relation" value={formData.mother.relation_to_student} />
@@ -997,100 +1068,95 @@ export default function StudentAdmissionScreen() {
           </CreatePermissionGuard>
         </View>
 
-        <ScrollView style={{ flex: 1, padding: 12 }} showsVerticalScrollIndicator={false}>
-          {isLoadingAdmissions ? (
-            <View style={{ alignItems: 'center', padding: 40 }}>
-              <ThemedText style={{ color: themeColors['muted-foreground'] }}>Loading admissions...</ThemedText>
-            </View>
-          ) : listData.length === 0 ? (
-            <View style={{ alignItems: 'center', padding: 40 }}>
-              <Ionicons name="people-outline" size={40} color={themeColors['muted-foreground']} />
-              <ThemedText style={{ marginTop: 8, color: themeColors['muted-foreground'] }}>No admissions found</ThemedText>
-            </View>
-          ) : listData.map((admission: any) => {
-            const isAdmObj = 'student' in admission;
-            const studentName = isAdmObj
-              ? `${admission.student?.first_name || ''} ${admission.student?.last_name || ''}`.trim()
-              : `${admission.first_name || ''} ${admission.last_name || ''}`.trim();
-            const admNum = admission.admission_number ?? '—';
-            const isActive = admission.student?.is_active ?? admission.is_active ?? true;
-            const className = getClassName(admission.current_class_id);
-            const sectionName = getSectionName(admission.current_class_id, admission.current_section_id);
-            const yearName = getYearName(admission.admitted_academic_year_id ?? admission.academic_year_id);
-            const dateStr = admission.admission_date
-              ? new Date(admission.admission_date + 'T00:00:00').toLocaleDateString() : '—';
-            const studentEntityId = isAdmObj ? admission.student?.id : admission.id;
-
-            return (
-              <View key={admission.id} style={[lStyles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
-                {/* Header row */}
-                <View style={lStyles.cardHeader}>
-                  <ThemedText style={[lStyles.admNo, { color: themeColors.foreground }]}>{admNum}</ThemedText>
-                  <View style={[lStyles.statusBadge, { backgroundColor: isActive ? '#dcfce7' : '#fee2e2' }]}>
-                    <ThemedText style={[lStyles.statusText, { color: isActive ? '#16a34a' : '#ef4444' }]}>
-                      {isActive ? 'Active' : 'Inactive'}
-                    </ThemedText>
-                  </View>
-                </View>
-
-                {/* Name */}
-                <ThemedText style={[lStyles.studentName, { color: themeColors.foreground }]}>{studentName}</ThemedText>
-
-                {/* Class / Section */}
-                <View style={lStyles.metaRow}>
-                  <View style={lStyles.metaItem}>
-                    <ThemedText style={[lStyles.metaLabel, { color: themeColors['muted-foreground'] }]}>CLASS</ThemedText>
-                    <ThemedText style={[lStyles.metaValue, { color: themeColors.foreground }]} numberOfLines={1}>{className}</ThemedText>
-                  </View>
-                  <View style={[lStyles.metaDivider, { backgroundColor: borderCol }]} />
-                  <View style={lStyles.metaItem}>
-                    <ThemedText style={[lStyles.metaLabel, { color: themeColors['muted-foreground'] }]}>SECTION</ThemedText>
-                    <ThemedText style={[lStyles.metaValue, { color: themeColors.foreground }]} numberOfLines={1}>{sectionName}</ThemedText>
-                  </View>
-                </View>
-
-                {/* Year / Date */}
-                <View style={lStyles.metaRow}>
-                  <View style={lStyles.metaItem}>
-                    <ThemedText style={[lStyles.metaLabel, { color: themeColors['muted-foreground'] }]}>ACADEMIC YEAR</ThemedText>
-                    <ThemedText style={[lStyles.metaValue, { color: themeColors.foreground }]}>{yearName}</ThemedText>
-                  </View>
-                  <View style={[lStyles.metaDivider, { backgroundColor: borderCol }]} />
-                  <View style={lStyles.metaItem}>
-                    <ThemedText style={[lStyles.metaLabel, { color: themeColors['muted-foreground'] }]}>ADMISSION DATE</ThemedText>
-                    <ThemedText style={[lStyles.metaValue, { color: themeColors.foreground }]}>{dateStr}</ThemedText>
-                  </View>
-                </View>
-
-                {/* Actions */}
-                <View style={[lStyles.actionBar, { borderTopColor: borderCol }]}>
-                  <TouchableOpacity
-                    style={lStyles.actionBtn}
-                    onPress={() => { setSelectedViewAdmission(admission); setViewModalVisible(true); }}
-                  >
-                    <Ionicons name="eye-outline" size={15} color={BLUE} />
-                    <ThemedText style={[lStyles.actionLabel, { color: BLUE }]}>View</ThemedText>
-                  </TouchableOpacity>
-                  <View style={[lStyles.actionDivider, { backgroundColor: borderCol }]} />
-                  <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_ADMISSIONS}>
-                    <TouchableOpacity style={lStyles.actionBtn} onPress={() => handleEditAdmission(studentEntityId)}>
-                      <Ionicons name="create-outline" size={15} color={themeColors.primary} />
-                      <ThemedText style={[lStyles.actionLabel, { color: themeColors.primary }]}>Edit</ThemedText>
-                    </TouchableOpacity>
-                    <View style={[lStyles.actionDivider, { backgroundColor: borderCol }]} />
-                  </UpdatePermissionGuard>
-                  <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_ADMISSIONS}>
-                    <TouchableOpacity style={lStyles.actionBtn} onPress={() => handleToggleActive(admission)} disabled={toggleActiveMutation.isPending}>
-                      <Ionicons name={isActive ? 'ban-outline' : 'checkmark-circle-outline'} size={15} color={isActive ? '#EF4444' : '#10B981'} />
-                      <ThemedText style={[lStyles.actionLabel, { color: isActive ? '#EF4444' : '#10B981' }]}>
-                        {isActive ? 'Deactivate' : 'Activate'}
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </UpdatePermissionGuard>
-                </View>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View>
+              {/* Table header */}
+              <View style={[lStyles.tableHeader, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#f8fafc', borderBottomColor: borderCol }]}>
+                <ThemedText style={[lStyles.thCell, { width: COL_SNO, textAlign: 'center' }]}>S.No.</ThemedText>
+                <ThemedText style={[lStyles.thCell, { width: COL_ADMNO }]}>Admission No.</ThemedText>
+                <ThemedText style={[lStyles.thCell, { width: COL_NAME }]}>Student Name</ThemedText>
+                <ThemedText style={[lStyles.thCell, { width: COL_CLASS }]}>Class</ThemedText>
+                <ThemedText style={[lStyles.thCell, { width: COL_SEC }]}>Section</ThemedText>
+                <ThemedText style={[lStyles.thCell, { width: COL_YEAR }]}>Acad. Year</ThemedText>
+                <ThemedText style={[lStyles.thCell, { width: COL_DATE }]}>Adm. Date</ThemedText>
+                <ThemedText style={[lStyles.thCell, { width: COL_STATUS }]}>Status</ThemedText>
+                <ThemedText style={[lStyles.thCell, { width: COL_ACTS, textAlign: 'center' }]}>Actions</ThemedText>
               </View>
-            );
-          })}
+
+              {/* Loading / empty */}
+              {isLoadingAdmissions ? (
+                <View style={[lStyles.emptyRow, { borderBottomColor: borderCol, backgroundColor: cardBg }]}>
+                  <ThemedText style={{ color: themeColors['muted-foreground'] }}>Loading admissions...</ThemedText>
+                </View>
+              ) : listData.length === 0 ? (
+                <View style={[lStyles.emptyRow, { borderBottomColor: borderCol, backgroundColor: cardBg }]}>
+                  <Ionicons name="people-outline" size={28} color={themeColors['muted-foreground']} />
+                  <ThemedText style={{ marginTop: 6, color: themeColors['muted-foreground'] }}>No admissions found</ThemedText>
+                </View>
+              ) : listData.map((admission: any, idx: number) => {
+                const isAdmObj = 'student' in admission;
+                const studentName = isAdmObj
+                  ? `${admission.student?.first_name || ''} ${admission.student?.last_name || ''}`.trim()
+                  : `${admission.first_name || ''} ${admission.last_name || ''}`.trim();
+                const admNum = admission.admission_number ?? '—';
+                const isActive = admission.student?.is_active ?? admission.is_active ?? true;
+                const className = getClassName(admission.current_class_id);
+                const sectionName = getSectionName(admission.current_class_id, admission.current_section_id);
+                const yearName = getYearName(admission.admitted_academic_year_id ?? admission.academic_year_id);
+                const dateStr = admission.admission_date
+                  ? new Date(admission.admission_date + 'T00:00:00').toLocaleDateString() : '—';
+                const studentEntityId = isAdmObj ? admission.student?.id : admission.id;
+                const rowBg = idx % 2 === 0 ? cardBg : (theme === 'dark' ? 'rgba(255,255,255,0.02)' : '#fafafa');
+
+                return (
+                  <View key={admission.id} style={[lStyles.tableRow, { backgroundColor: rowBg, borderBottomColor: borderCol }]}>
+                    <ThemedText style={[lStyles.tdNum, { width: COL_SNO }]}>{(currentPage - 1) * pageSize + idx + 1}</ThemedText>
+                    <View style={[lStyles.tdCell, { width: COL_ADMNO }]}>
+                      <ThemedText style={lStyles.admNoText} numberOfLines={1}>{admNum}</ThemedText>
+                    </View>
+                    <View style={[lStyles.tdCell, { width: COL_NAME }]}>
+                      <ThemedText style={lStyles.nameText} numberOfLines={1}>{studentName || '—'}</ThemedText>
+                    </View>
+                    <View style={[lStyles.tdCell, { width: COL_CLASS }]}>
+                      <ThemedText style={lStyles.cellText} numberOfLines={1}>{className}</ThemedText>
+                    </View>
+                    <View style={[lStyles.tdCell, { width: COL_SEC }]}>
+                      <ThemedText style={lStyles.cellText} numberOfLines={1}>{sectionName}</ThemedText>
+                    </View>
+                    <View style={[lStyles.tdCell, { width: COL_YEAR }]}>
+                      <ThemedText style={lStyles.cellText} numberOfLines={1}>{yearName}</ThemedText>
+                    </View>
+                    <View style={[lStyles.tdCell, { width: COL_DATE }]}>
+                      <ThemedText style={lStyles.cellText} numberOfLines={1}>{dateStr}</ThemedText>
+                    </View>
+                    <View style={[lStyles.tdCell, { width: COL_STATUS }]}>
+                      <View style={[lStyles.statusBadge, { backgroundColor: isActive ? '#dcfce7' : '#fee2e2' }]}>
+                        <ThemedText style={[lStyles.statusText, { color: isActive ? '#16a34a' : '#ef4444' }]}>
+                          {isActive ? 'Active' : 'Inactive'}
+                        </ThemedText>
+                      </View>
+                    </View>
+                    <View style={[lStyles.tdActions, { width: COL_ACTS }]}>
+                      <TouchableOpacity style={lStyles.iconBtn} onPress={() => { setSelectedViewAdmission(admission); setViewModalVisible(true); }}>
+                        <Ionicons name="eye-outline" size={17} color={BLUE} />
+                      </TouchableOpacity>
+                      <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_ADMISSIONS}>
+                        <TouchableOpacity style={lStyles.iconBtn} onPress={() => handleEditAdmission(studentEntityId)}>
+                          <Ionicons name="create-outline" size={17} color={themeColors.primary} />
+                        </TouchableOpacity>
+                      </UpdatePermissionGuard>
+                      <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_ADMISSIONS}>
+                        <TouchableOpacity style={lStyles.iconBtn} onPress={() => handleToggleActive(admission)} disabled={toggleActiveMutation.isPending}>
+                          <Ionicons name={isActive ? 'ban-outline' : 'checkmark-circle-outline'} size={17} color={isActive ? '#EF4444' : '#10B981'} />
+                        </TouchableOpacity>
+                      </UpdatePermissionGuard>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
 
           {/* Pagination */}
           {!searchQuery && admissionsData && admissionsData.total_count > pageSize && (
@@ -1112,6 +1178,7 @@ export default function StudentAdmissionScreen() {
               </TouchableOpacity>
             </View>
           )}
+          <View style={{ height: 32 }} />
         </ScrollView>
       </View>
     );
@@ -1243,6 +1310,7 @@ export default function StudentAdmissionScreen() {
           if (activeDateField) {
             const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
             updateFormData(activeDateField, iso);
+            setDateDisplayValues(p => ({ ...p, [activeDateField]: toDisplayDMY(iso) }));
           }
         }}
         onDismiss={() => setActiveDateField(null)}
@@ -1339,11 +1407,7 @@ const lStyles = StyleSheet.create({
     borderWidth: 1,
     height: 40,
   },
-  searchInput: {
-    flex: 1,
-    paddingHorizontal: 8,
-    fontSize: 13,
-  },
+  searchInput: { flex: 1, paddingHorizontal: 8, fontSize: 13 },
   newBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1352,43 +1416,26 @@ const lStyles = StyleSheet.create({
     borderRadius: 8,
     gap: 4,
   },
-  newBtnText: {
-    color: 'white',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  card: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 10,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
-  admNo: { fontSize: 13, fontWeight: '700' },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  newBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
+  // Table
+  tableHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4, borderBottomWidth: 1 },
+  thCell: { fontSize: 11, fontWeight: '700', opacity: 0.55, paddingHorizontal: 8, textTransform: 'uppercase', letterSpacing: 0.4 },
+  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1 },
+  tdNum: { fontSize: 13, textAlign: 'center', opacity: 0.5, paddingHorizontal: 8 },
+  tdCell: { paddingHorizontal: 8, justifyContent: 'center' },
+  tdActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: 4 },
+  admNoText: { fontSize: 13, fontWeight: '700' },
+  nameText: { fontSize: 13, fontWeight: '600' },
+  cellText: { fontSize: 13 },
+  statusBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 10 },
   statusText: { fontSize: 11, fontWeight: '700' },
-  studentName: { fontSize: 15, fontWeight: '600', paddingHorizontal: 14, paddingBottom: 8 },
-  metaRow: { flexDirection: 'row', paddingHorizontal: 14, paddingBottom: 8 },
-  metaItem: { flex: 1 },
-  metaDivider: { width: 1, marginHorizontal: 8, marginVertical: 2 },
-  metaLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 0.5, marginBottom: 2 },
-  metaValue: { fontSize: 13, fontWeight: '500' },
-  actionBar: { flexDirection: 'row', borderTopWidth: 1 },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10 },
-  actionLabel: { fontSize: 12, fontWeight: '600' },
-  actionDivider: { width: 1, marginVertical: 6 },
+  iconBtn: { width: 30, height: 30, justifyContent: 'center', alignItems: 'center', borderRadius: 6 },
+  emptyRow: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    borderBottomWidth: 1,
+    width: COL_SNO + COL_ADMNO + COL_NAME + COL_CLASS + COL_SEC + COL_YEAR + COL_DATE + COL_STATUS + COL_ACTS,
+  },
   pageBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 });
 
@@ -1432,6 +1479,15 @@ const fStyles = StyleSheet.create({
     borderWidth: 1,
     padding: 11,
   },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 4,
+  },
+  dateInput: { flex: 1, fontSize: 14, paddingVertical: 7 },
   errorText: { fontSize: 11, marginTop: 3 },
   checkboxRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 10 },
   checkbox: { width: 20, height: 20, borderWidth: 2, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },

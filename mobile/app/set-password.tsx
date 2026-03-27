@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../contexts';
 import { authApi } from '../src/api/auth';
+import { getChangePasswordToken, clearChangePasswordToken } from '../services/authUtils';
 
 const BRAND_COLOR = '#556ee6';
 const ACCENT_COLOR = '#556ee6';
@@ -15,19 +16,16 @@ const SetPasswordScreen: React.FC = () => {
   const { refreshAuth } = useAuth();
   const insets = useSafeAreaInsets();
 
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const validate = (): string => {
-    if (currentPassword.trim().length === 0) return 'Current password is required';
     if (newPassword.trim().length === 0) return 'New password is required';
-    if (newPassword.length < 8) return 'New password must be at least 8 characters';
+    if (newPassword.trim().length < 8) return 'New password must be at least 8 characters';
     if (confirmPassword.trim().length === 0) return 'Please confirm your new password';
     if (newPassword !== confirmPassword) return 'New passwords do not match';
     return '';
@@ -43,14 +41,26 @@ const SetPasswordScreen: React.FC = () => {
     setIsLoading(true);
     setError('');
     try {
+      const token = await getChangePasswordToken();
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        router.replace('/login');
+        return;
+      }
       await authApi.setStaffPassword({
-        current_password: currentPassword,
+        change_password_token: token,
         new_password: newPassword,
+        confirm_password: confirmPassword,
       });
+      // Token consumed — clean it up
+      await clearChangePasswordToken();
       await refreshAuth();
       router.replace('/(tabs)');
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Failed to update password. Please try again.';
+      const detail = err?.response?.data?.detail;
+      const msg = Array.isArray(detail)
+        ? detail.map((d: any) => d.msg || d).join(', ')
+        : detail || err?.response?.data?.message || err?.message || 'Failed to update password. Please try again.';
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -85,28 +95,6 @@ const SetPasswordScreen: React.FC = () => {
           <View style={styles.formCardHandle} />
           <Text style={styles.cardTitle}>Set New Password</Text>
           <Text style={styles.cardSubtitle}>Please set a new password for your account</Text>
-
-          {/* Current Password */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Current Password</Text>
-            <View style={[styles.inputContainer, currentPassword ? styles.inputFocused : {}]}>
-              <Ionicons name='lock-closed-outline' size={20} color={currentPassword ? ACCENT_COLOR : '#9ca3af'} style={styles.inputIcon} />
-              <TextInput
-                style={[styles.textInput, { flex: 1 }]}
-                placeholder='Enter your current password'
-                placeholderTextColor='#9ca3af'
-                value={currentPassword}
-                onChangeText={(v) => { setCurrentPassword(v); setError(''); }}
-                secureTextEntry={!showCurrentPassword}
-                autoCapitalize='none'
-                autoCorrect={false}
-                editable={!isLoading}
-              />
-              <TouchableOpacity onPress={() => setShowCurrentPassword(!showCurrentPassword)} style={styles.eyeButton} disabled={isLoading}>
-                <Ionicons name={showCurrentPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color='#9ca3af' />
-              </TouchableOpacity>
-            </View>
-          </View>
 
           {/* New Password */}
           <View style={styles.inputGroup}>

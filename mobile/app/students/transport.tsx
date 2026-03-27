@@ -20,7 +20,7 @@ import { useTheme } from '@/contexts';
 import { useAuth } from '@/contexts/AuthContext';
 import { studentAdmissionsApi, studentTransportApi } from '@/src/api/students';
 import type { StudentTransportOut } from '@/src/api/students';
-import { tripsApi, routeStopsApi } from '@/src/api/masters';
+import { tripsApi, routeStopsApi, transportPricingApi } from '@/src/api/masters';
 import type { Trip } from '@/src/api/masters';
 import {
   CreatePermissionGuard,
@@ -75,20 +75,31 @@ function StudentTransportView() {
   const colors = Colors[theme];
   const { studentId } = useAuth();
 
-  const { data: transportData = [], isLoading } = useQuery({
+  const { data: transportData = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['my-transport', studentId],
-    queryFn: () => studentTransportApi.listStudentTransport(),
+    queryFn: () => studentTransportApi.listStudentTransport({ student_id: studentId! }),
     enabled: !!studentId,
   });
 
-  const myItems = (transportData as StudentTransportOut[]).filter(
-    (t) => t.student_id === studentId,
-  );
+  const myItems = transportData as StudentTransportOut[];
 
   if (isLoading) {
     return (
       <View style={styles.emptyState}>
         <ThemedText style={{ color: colors['muted-foreground'], fontSize: 14 }}>Loading...</ThemedText>
+      </View>
+    );
+  }
+  if (isError) {
+    return (
+      <View style={styles.emptyState}>
+        <Ionicons name="cloud-offline-outline" size={44} color={colors['muted-foreground']} />
+        <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
+          Failed to load transport info
+        </ThemedText>
+        <TouchableOpacity onPress={() => refetch()} style={styles.retryBtn}>
+          <ThemedText style={[styles.retryBtnText, { color: colors.primary }]}>Tap to retry</ThemedText>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -116,15 +127,13 @@ function ParentTransportView() {
   const colors = Colors[theme];
   const { selectedStudent } = useAuth();
 
-  const { data: transportData = [], isLoading } = useQuery({
+  const { data: transportData = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['transport-child', selectedStudent?.id],
-    queryFn: () => studentTransportApi.listStudentTransport(),
+    queryFn: () => studentTransportApi.listStudentTransport({ student_id: selectedStudent!.id }),
     enabled: !!selectedStudent?.id,
   });
 
-  const childItems = (transportData as StudentTransportOut[]).filter(
-    (t) => t.student_id === selectedStudent?.id,
-  );
+  const childItems = transportData as StudentTransportOut[];
 
   if (!selectedStudent) {
     return (
@@ -145,6 +154,16 @@ function ParentTransportView() {
       {isLoading ? (
         <View style={styles.emptyState}>
           <ThemedText style={{ color: colors['muted-foreground'], fontSize: 14 }}>Loading...</ThemedText>
+        </View>
+      ) : isError ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="cloud-offline-outline" size={44} color={colors['muted-foreground']} />
+          <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
+            Failed to load transport info
+          </ThemedText>
+          <TouchableOpacity onPress={() => refetch()} style={styles.retryBtn}>
+            <ThemedText style={[styles.retryBtnText, { color: colors.primary }]}>Tap to retry</ThemedText>
+          </TouchableOpacity>
         </View>
       ) : childItems.length === 0 ? (
         <View style={styles.emptyState}>
@@ -176,12 +195,14 @@ function AdminTransportView() {
   const [selectedStudent, setSelectedStudent] = useState('');
   const [selectedTrip, setSelectedTrip] = useState('');
   const [selectedStop, setSelectedStop] = useState('');
+  const [selectedPricing, setSelectedPricing] = useState('');
   const [feePerTerm, setFeePerTerm] = useState('');
 
   const resetForm = () => {
     setSelectedStudent('');
     setSelectedTrip('');
     setSelectedStop('');
+    setSelectedPricing('');
     setFeePerTerm('');
     setEditingItem(null);
   };
@@ -196,6 +217,7 @@ function AdminTransportView() {
     setSelectedStudent(item.student_id);
     setSelectedTrip(item.trip_id);
     setSelectedStop(item.stop_id);
+    setSelectedPricing(item.pricing_id ?? '');
     setFeePerTerm(item.fee_per_term != null ? String(item.fee_per_term) : '');
     setShowAssignModal(true);
   };
@@ -231,9 +253,22 @@ function AdminTransportView() {
     queryKey: ['route-stops', selectedTripRoute],
     queryFn: async () => {
       const stops = await routeStopsApi.getRouteStops({ route_id: selectedTripRoute! });
-      return stops.map((s) => ({ label: s.name || '', value: s.id }));
+      return stops.map((s) => ({ label: `#${s.number} – ${s.name}`, value: s.id }));
     },
     enabled: !!selectedTripRoute,
+  });
+
+  const selectedTripVehicleId = (rawTrips as Trip[]).find((t) => t.id === selectedTrip)?.vehicle_id;
+
+  const { data: pricingData = [] } = useQuery({
+    queryKey: ['transport-pricing-dropdown', selectedTripVehicleId],
+    queryFn: () => transportPricingApi.getDropdown({ vehicle_id: selectedTripVehicleId }),
+    enabled: !!selectedTripVehicleId,
+    select: (d) => d.map((p) => ({
+      label: `${p.cycle_name} — ₹${Number(p.amount).toLocaleString('en-IN')}`,
+      value: p.id,
+      amount: Number(p.amount),
+    })),
   });
 
   // ── Filtered list ─────────────────────────────────────────────────────────
@@ -266,7 +301,7 @@ function AdminTransportView() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { trip_id?: string; stop_id?: string; fee_per_term?: number } }) =>
+    mutationFn: ({ id, data }: { id: string; data: { trip_id?: string; stop_id?: string; fee_per_term?: number; pricing_id?: string } }) =>
       studentTransportApi.updateStudentTransport(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-transport'] });
@@ -289,8 +324,8 @@ function AdminTransportView() {
   });
 
   const handleSubmit = () => {
-    if (!selectedTrip || !selectedStop || !feePerTerm) {
-      Alert.alert('Validation', 'Please fill in all fields');
+    if (!selectedTrip || !selectedStop) {
+      Alert.alert('Validation', 'Please select a trip and stop');
       return;
     }
     if (!editingItem && !selectedStudent) {
@@ -305,7 +340,12 @@ function AdminTransportView() {
     if (editingItem) {
       updateMutation.mutate({
         id: editingItem.id,
-        data: { trip_id: selectedTrip, stop_id: selectedStop, fee_per_term: fee },
+        data: {
+          trip_id: selectedTrip,
+          stop_id: selectedStop,
+          fee_per_term: fee,
+          pricing_id: selectedPricing || undefined,
+        },
       });
     } else {
       createMutation.mutate({
@@ -313,6 +353,7 @@ function AdminTransportView() {
         trip_id: selectedTrip,
         stop_id: selectedStop,
         fee_per_term: fee,
+        pricing_id: selectedPricing || undefined,
       });
     }
   };
@@ -515,23 +556,23 @@ function AdminTransportView() {
         <Modal
           visible={showAssignModal}
           transparent
-          animationType="slide"
-          onRequestClose={() => setShowAssignModal(false)}
+          animationType="fade"
+          onRequestClose={() => { setShowAssignModal(false); resetForm(); }}
         >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
-              {/* Modal header */}
-              <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <View style={[styles.modalDialog, { backgroundColor: colors.card }]}>
+              {/* Header */}
+              <View style={styles.modalHeader}>
                 <ThemedText style={styles.modalTitle}>
                   {editingItem ? 'Edit Transport' : 'Assign Transport'}
                 </ThemedText>
-                <TouchableOpacity onPress={() => { setShowAssignModal(false); resetForm(); }}>
-                  <Ionicons name="close" size={22} color={colors['muted-foreground']} />
+                <TouchableOpacity onPress={() => { setShowAssignModal(false); resetForm(); }} style={styles.modalCloseBtn}>
+                  <Ionicons name="close" size={20} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-                <ThemedText style={styles.fieldLabel}>Student *</ThemedText>
+              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <ThemedText style={[styles.fieldLabel, { color: colors.foreground }]}>Student</ThemedText>
                 <CustomDropdown
                   data={studentsData}
                   placeholder="Select student"
@@ -540,7 +581,7 @@ function AdminTransportView() {
                   disabled={!!editingItem}
                 />
 
-                <ThemedText style={styles.fieldLabel}>Trip *</ThemedText>
+                <ThemedText style={[styles.fieldLabel, { color: colors.foreground }]}>Trip</ThemedText>
                 <CustomDropdown
                   data={tripsDropdown}
                   placeholder="Select trip"
@@ -548,10 +589,12 @@ function AdminTransportView() {
                   onChange={(v) => {
                     setSelectedTrip(v as string);
                     setSelectedStop('');
+                    setSelectedPricing('');
+                    setFeePerTerm('');
                   }}
                 />
 
-                <ThemedText style={styles.fieldLabel}>Stop *</ThemedText>
+                <ThemedText style={[styles.fieldLabel, { color: colors.foreground }]}>Stop</ThemedText>
                 <CustomDropdown
                   data={stopsData}
                   placeholder={selectedTrip ? 'Select stop' : 'Select trip first'}
@@ -560,43 +603,55 @@ function AdminTransportView() {
                   disabled={!selectedTrip}
                 />
 
-                <ThemedText style={styles.fieldLabel}>Fee per Term (₹) *</ThemedText>
+                <ThemedText style={[styles.fieldLabel, { color: colors.foreground }]}>Pricing Plan <ThemedText style={{ opacity: 0.55 }}>(optional)</ThemedText></ThemedText>
+                <CustomDropdown
+                  data={pricingData}
+                  placeholder={selectedTripVehicleId ? 'Select pricing plan' : 'Select trip first'}
+                  value={selectedPricing}
+                  onChange={(v) => {
+                    const id = v as string;
+                    setSelectedPricing(id);
+                    const plan = (pricingData as any[]).find((p) => p.value === id);
+                    if (plan?.amount != null) setFeePerTerm(String(plan.amount));
+                  }}
+                  disabled={!selectedTripVehicleId}
+                />
+
+                <ThemedText style={[styles.fieldLabel, { color: colors.foreground }]}>Fee per Term (₹)</ThemedText>
                 <TextInput
                   style={[styles.textInput, {
                     backgroundColor: colors.background,
                     borderColor: colors.border,
                     color: colors.foreground,
                   }]}
-                  placeholder="e.g. 3000"
+                  placeholder="0.00"
                   placeholderTextColor={colors['muted-foreground']}
                   keyboardType="numeric"
                   value={feePerTerm}
                   onChangeText={setFeePerTerm}
                 />
 
+                <View style={{ height: 8 }} />
+              </ScrollView>
+
+              {/* Footer: Cancel + Assign */}
+              <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
                 <TouchableOpacity
-                  style={[
-                    styles.submitBtn,
-                    {
-                      backgroundColor:
-                        (createMutation.isPending || updateMutation.isPending)
-                          ? colors['muted']
-                          : colors.primary,
-                    },
-                  ]}
+                  style={[styles.cancelBtn, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  onPress={() => { setShowAssignModal(false); resetForm(); }}
+                >
+                  <ThemedText style={{ fontSize: 15, fontWeight: '600', color: colors.foreground }}>Cancel</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.assignBtn2, { backgroundColor: colors.primary, opacity: (createMutation.isPending || updateMutation.isPending) ? 0.6 : 1 }]}
                   onPress={handleSubmit}
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
-                  <Ionicons name="bus" size={16} color="white" />
-                  <ThemedText style={styles.submitBtnText}>
-                    {createMutation.isPending || updateMutation.isPending
-                      ? 'Saving...'
-                      : editingItem
-                      ? 'Update Transport'
-                      : 'Assign Transport'}
+                  <ThemedText style={{ fontSize: 15, fontWeight: '600', color: 'white' }}>
+                    {createMutation.isPending || updateMutation.isPending ? 'Saving...' : editingItem ? 'Update' : 'Assign'}
                   </ThemedText>
                 </TouchableOpacity>
-              </ScrollView>
+              </View>
             </View>
           </View>
         </Modal>
@@ -609,9 +664,9 @@ function AdminTransportView() {
 
 export default function StudentTransportScreen() {
   const { role } = useAuth();
-  const roleName = role?.name?.toLowerCase();
+  const roleName = role?.name?.toLowerCase() ?? '';
   const isStudent = roleName === 'student';
-  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName || '');
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
 
   if (isStudent) {
     return (
@@ -784,6 +839,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
   },
+  retryBtn: {
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  retryBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
 
   // Column widths
   colNo,
@@ -798,34 +862,61 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 20,
   },
-  modalSheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '85%',
+  modalDialog: {
+    width: '100%',
+    borderRadius: 16,
+    maxHeight: '88%',
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+  },
+  modalCloseBtn: {
+    padding: 4,
   },
   modalTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
   },
   modalBody: {
+    paddingHorizontal: 20,
+    paddingBottom: 4,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 10,
     padding: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  cancelBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  assignBtn2: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    borderRadius: 10,
   },
   fieldLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 6,
-    marginTop: 10,
-    opacity: 0.75,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 14,
   },
   textInput: {
     height: 50,
@@ -833,22 +924,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 14,
     fontSize: 15,
-    marginBottom: 4,
-  },
-  submitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  submitBtnText: {
-    color: 'white',
-    fontSize: 15,
-    fontWeight: '600',
   },
 });
 

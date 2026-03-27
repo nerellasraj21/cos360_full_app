@@ -64,11 +64,6 @@ export {
   StudentTripCreate,
   StudentTripUpdate,
   studentTripsApi,
-  // Masters-authoritative StudentTransport types (used by transport screens)
-  StudentTransport,
-  StudentTransportCreate,
-  StudentTransportUpdate,
-  studentTransportApi,
   CasteDropdownOption,
   SubCasteDropdownOption,
   castesApi,
@@ -76,6 +71,12 @@ export {
   TransportPricingCreate,
   TransportPricingUpdate,
   transportPricingApi,
+  SalaryRangeOption,
+  parentsApi,
+  locationsApi,
+  LocationOut,
+  LocationIn,
+  LocationUpdate,
 } from './masters';
 // Explicit student exports, excluding types that conflict with masters
 export {
@@ -119,6 +120,11 @@ export {
   TransportStudentInfo,
   TransportPricingInfo,
   StudentTransportOut,
+  // Canonical StudentTransport types — current schema (trip_id, pricing_id, fee_per_term)
+  StudentTransport,
+  StudentTransportCreate,
+  StudentTransportUpdate,
+  studentTransportApi,
   TimetableSlot,
   BulkTimetableCreate,
   BulkTimetableUpdate,
