@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-    Alert,
     FlatList,
     Modal,
     RefreshControl,
@@ -24,6 +23,7 @@ import { useTheme } from '@/contexts';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 export default function SubjectCategoriesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,6 +39,7 @@ export default function SubjectCategoriesScreen() {
   const { theme, colors } = useTheme();
   const themeColors = Colors[theme];
   const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
   const queryClient = useQueryClient();
   // Permission checking will be handled by PermissionGuard components
 
@@ -121,23 +122,18 @@ export default function SubjectCategoriesScreen() {
   };
 
   const handleDelete = (category: SubjectCategory) => {
-    Alert.alert(
-      'Delete Subject Category',
-      `Are you sure you want to delete "${category.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(category.id),
-        },
-      ]
-    );
+    confirm({
+      title: 'Delete Subject Category',
+      message: `Are you sure you want to delete "${category.name}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(category.id),
+    });
   };
 
   const handleSubmit = () => {
     if (!formData.name.trim()) {
-      Alert.alert('Error', 'Category name is required');
+      showError('Error', 'Category name is required');
       return;
     }
 
@@ -366,6 +362,7 @@ export default function SubjectCategoriesScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
       </ThemedView>
     </ReadOrListPermissionGuard>
   );

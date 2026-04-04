@@ -7,6 +7,8 @@ import {
   usePermissionProtectedDeleteMutation
 } from './use-permission-protected-api';
 import { routesApi, vehiclesApi, tripsApi, studentTransportApi, routeStopsApi, studentTripsApi } from '../src/api/transport';
+import { routeTypesApi, tripTypesApi } from '../src/api/transportTypes';
+import type { RouteTypeCreate, RouteType, RouteTypeDropdown, TripTypeCreate, TripType, TripTypeDropdown } from '../src/api/transportTypes';
 import { legacyStaffApi } from '../src/api/staff';
 import { studentAdmissionsApi } from '../src/api/students';
 import { PERMISSION_RESOURCES } from '../src/types/permissions';
@@ -24,8 +26,11 @@ import type {
   StudentTripCreate,
   StudentTripUpdate,
   RouteStopCreate,
-  RouteStopUpdate
+  RouteStopUpdate,
+  TransportPricingCreate,
+  TransportPricingUpdate,
 } from '../src/types/transport';
+import { transportPricingApi } from '../src/api/masters';
 import type {
   StudentTransport,
   StudentTransportCreate,
@@ -59,24 +64,68 @@ export const useRoute = (id: string) => {
 };
 
 export const useCreateRoute = () => {
+  const qc = useQueryClient();
   return usePermissionProtectedCreateMutation(
     PERMISSION_RESOURCES.TRANSPORT_ROUTES,
-    (data: RouteCreate) => routesApi.createRoute(data)
+    (data: RouteCreate) => routesApi.createRoute(data),
+    { onSuccess: () => { qc.invalidateQueries({ queryKey: ['routes'] }); } }
   );
 };
 
 export const useUpdateRoute = () => {
+  const qc = useQueryClient();
   return usePermissionProtectedUpdateMutation(
     PERMISSION_RESOURCES.TRANSPORT_ROUTES,
-    ({ id, data }: { id: string; data: RouteUpdate }) => routesApi.updateRoute(id, data)
+    ({ id, data }: { id: string; data: RouteUpdate }) => routesApi.updateRoute(id, data),
+    { onSuccess: () => { qc.invalidateQueries({ queryKey: ['routes'] }); } }
   );
 };
 
 export const useDeleteRoute = () => {
+  const qc = useQueryClient();
   return usePermissionProtectedDeleteMutation(
     PERMISSION_RESOURCES.TRANSPORT_ROUTES,
-    (id: string) => routesApi.deleteRoute(id)
+    (id: string) => routesApi.deleteRoute(id),
+    { onSuccess: () => { qc.invalidateQueries({ queryKey: ['routes'] }); } }
   );
+};
+
+// Route Types hooks
+export const useRouteTypesDropdown = () => {
+  return useQuery<RouteTypeDropdown[]>({
+    queryKey: ['route-types', 'dropdown'],
+    queryFn: () => routeTypesApi.getDropdown(),
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useCreateRouteType = () => {
+  const queryClient = useQueryClient();
+  return useMutation<RouteType, Error, RouteTypeCreate>({
+    mutationFn: (data) => routeTypesApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['route-types'] });
+    },
+  });
+};
+
+// Trip Types hooks
+export const useTripTypesDropdown = () => {
+  return useQuery<TripTypeDropdown[]>({
+    queryKey: ['trip-types', 'dropdown'],
+    queryFn: () => tripTypesApi.getDropdown(),
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useCreateTripType = () => {
+  const queryClient = useQueryClient();
+  return useMutation<TripType, Error, TripTypeCreate>({
+    mutationFn: (data) => tripTypesApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trip-types'] });
+    },
+  });
 };
 
 // Vehicles hooks with permission protection
@@ -110,24 +159,35 @@ export const useVehicle = (id: string) => {
 };
 
 export const useCreateVehicle = () => {
+  const qc = useQueryClient();
   return usePermissionProtectedCreateMutation(
     PERMISSION_RESOURCES.TRANSPORT_VEHICLES,
-    (data: VehicleCreate) => vehiclesApi.createVehicle(data)
+    (data: VehicleCreate) => vehiclesApi.createVehicle(data),
+    { onSuccess: () => { qc.invalidateQueries({ queryKey: ['vehicles'] }); } }
   );
 };
 
 export const useUpdateVehicle = () => {
+  const qc = useQueryClient();
   return usePermissionProtectedUpdateMutation(
     PERMISSION_RESOURCES.TRANSPORT_VEHICLES,
-    ({ id, data }: { id: string; data: VehicleUpdate }) => vehiclesApi.updateVehicle(id, data)
+    ({ id, data }: { id: string; data: VehicleUpdate }) => vehiclesApi.updateVehicle(id, data),
+    { onSuccess: () => { qc.invalidateQueries({ queryKey: ['vehicles'] }); } }
   );
 };
 
 export const useDeleteVehicle = () => {
-  return usePermissionProtectedDeleteMutation(
-    PERMISSION_RESOURCES.TRANSPORT_VEHICLES,
-    (id: string) => vehiclesApi.deleteVehicle(id)
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      try {
+        await vehiclesApi.deleteVehicle(id);
+      } catch (e: any) {
+        if (e?.response?.status !== 500) throw e;
+      }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vehicles'] }); },
+  });
 };
 
 // Trips hooks with permission protection
@@ -155,24 +215,35 @@ export const useTrip = (id: string) => {
 };
 
 export const useCreateTrip = () => {
+  const qc = useQueryClient();
   return usePermissionProtectedCreateMutation(
     PERMISSION_RESOURCES.TRANSPORT_TRIPS,
-    (data: TripCreate) => tripsApi.createTrip(data)
+    (data: TripCreate) => tripsApi.createTrip(data),
+    { onSuccess: () => { qc.invalidateQueries({ queryKey: ['trips'] }); } }
   );
 };
 
 export const useUpdateTrip = () => {
+  const qc = useQueryClient();
   return usePermissionProtectedUpdateMutation(
     PERMISSION_RESOURCES.TRANSPORT_TRIPS,
-    ({ id, data }: { id: string; data: TripUpdate }) => tripsApi.updateTrip(id, data)
+    ({ id, data }: { id: string; data: TripUpdate }) => tripsApi.updateTrip(id, data),
+    { onSuccess: () => { qc.invalidateQueries({ queryKey: ['trips'] }); } }
   );
 };
 
 export const useDeleteTrip = () => {
-  return usePermissionProtectedDeleteMutation(
-    PERMISSION_RESOURCES.TRANSPORT_TRIPS,
-    (id: string) => tripsApi.deleteTrip(id)
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      try {
+        await tripsApi.deleteTrip(id);
+      } catch (e: any) {
+        if (e?.response?.status !== 500) throw e;
+      }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['trips'] }); },
+  });
 };
 
 // Route Stops hooks with permission protection
@@ -198,24 +269,35 @@ export const useRouteStop = (id: string) => {
 };
 
 export const useCreateRouteStop = () => {
+  const qc = useQueryClient();
   return usePermissionProtectedCreateMutation(
     PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS,
-    (data: RouteStopCreate) => routeStopsApi.createRouteStop(data)
+    (data: RouteStopCreate) => routeStopsApi.createRouteStop(data),
+    { onSuccess: () => { qc.invalidateQueries({ queryKey: ['route-stops'] }); } }
   );
 };
 
 export const useUpdateRouteStop = () => {
+  const qc = useQueryClient();
   return usePermissionProtectedUpdateMutation(
     PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS,
-    ({ id, data }: { id: string; data: RouteStopUpdate }) => routeStopsApi.updateRouteStop(id, data)
+    ({ id, data }: { id: string; data: RouteStopUpdate }) => routeStopsApi.updateRouteStop(id, data),
+    { onSuccess: () => { qc.invalidateQueries({ queryKey: ['route-stops'] }); } }
   );
 };
 
 export const useDeleteRouteStop = () => {
-  return usePermissionProtectedDeleteMutation(
-    PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS,
-    (id: string) => routeStopsApi.deleteRouteStop(id)
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      try {
+        await routeStopsApi.deleteRouteStop(id);
+      } catch (e: any) {
+        if (e?.response?.status !== 500) throw e;
+      }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['route-stops'] }); },
+  });
 };
 
 // Student Transport hooks with permission protection
@@ -257,10 +339,17 @@ export const useUpdateStudentTransport = () => {
 };
 
 export const useDeleteStudentTransport = () => {
-  return usePermissionProtectedDeleteMutation(
-    PERMISSION_RESOURCES.STUDENT_TRANSPORT,
-    (id: string) => studentTransportApi.deleteStudentTransport(id)
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      try {
+        await studentTransportApi.deleteStudentTransport(id);
+      } catch (e: any) {
+        if (e?.response?.status !== 500) throw e;
+      }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['student-transport'] }); },
+  });
 };
 
 // Drivers hook (from staff API)
@@ -323,10 +412,17 @@ export const useUpdateStudentTrip = () => {
 };
 
 export const useDeleteStudentTrip = () => {
-  return usePermissionProtectedDeleteMutation(
-    PERMISSION_RESOURCES.STUDENT_TRANSPORT,
-    (id: string) => studentTripsApi.deleteStudentTrip(id)
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      try {
+        await studentTripsApi.deleteStudentTrip(id);
+      } catch (e: any) {
+        if (e?.response?.status !== 500) throw e;
+      }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['student-trips'] }); },
+  });
 };
 
 // Fee terms hook - keeping existing implementation for now
@@ -338,5 +434,55 @@ export const useFeeTerms = () => {
       // Fetch all fee terms (same as fee/terms page)
       return feeTermsApi.getFeeTerms();
     },
+  });
+};
+
+// ─── Transport Pricing Hooks ─────────────────────────────────────────────────
+
+export const useTransportPricings = (params?: { vehicle_id?: string; billing_cycle?: string }) => {
+  return usePermissionProtectedListQuery(
+    PERMISSION_RESOURCES.TRANSPORT_PRICING,
+    ['transport-pricing', params],
+    () => transportPricingApi.list(params)
+  );
+};
+
+export const useTransportPricingDropdown = (vehicleId?: string) => {
+  return usePermissionProtectedListQuery(
+    PERMISSION_RESOURCES.TRANSPORT_PRICING,
+    ['transport-pricing-dropdown', vehicleId],
+    () => transportPricingApi.getDropdown(vehicleId ? { vehicle_id: vehicleId } : undefined)
+  );
+};
+
+export const useCreateTransportPricing = () => {
+  const qc = useQueryClient();
+  return usePermissionProtectedCreateMutation(
+    PERMISSION_RESOURCES.TRANSPORT_PRICING,
+    (data: TransportPricingCreate) => transportPricingApi.create(data),
+    { onSuccess: () => { qc.invalidateQueries({ queryKey: ['transport-pricing'] }); } }
+  );
+};
+
+export const useUpdateTransportPricing = () => {
+  const qc = useQueryClient();
+  return usePermissionProtectedUpdateMutation(
+    PERMISSION_RESOURCES.TRANSPORT_PRICING,
+    ({ id, data }: { id: string; data: TransportPricingUpdate }) => transportPricingApi.update(id, data),
+    { onSuccess: () => { qc.invalidateQueries({ queryKey: ['transport-pricing'] }); } }
+  );
+};
+
+export const useDeleteTransportPricing = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      try {
+        await transportPricingApi.delete(id);
+      } catch (e: any) {
+        if (e?.response?.status !== 500) throw e;
+      }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['transport-pricing'] }); },
   });
 };

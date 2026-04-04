@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-    Alert,
     FlatList,
     Modal,
     RefreshControl,
@@ -22,6 +21,7 @@ import { useTheme } from '@/contexts';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 export default function AcademicYearsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,6 +37,7 @@ export default function AcademicYearsScreen() {
   const { theme } = useTheme();
   const themeColors = Colors[theme];
   const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
 
   const { data: academicYearsData, isLoading, error, refetch } = useAcademicYears();
   const createMutation = useCreateAcademicYear();
@@ -94,25 +95,20 @@ export default function AcademicYearsScreen() {
   };
 
   const handleDelete = (year: AcademicYear) => {
-    Alert.alert(
-      'Delete Academic Year',
-      `Are you sure you want to delete "${year.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(year.id, {
-            onError: (e: any) => showError('Delete Failed', e.message || 'Failed to delete academic year'),
-          }),
-        },
-      ]
-    );
+    confirm({
+      title: 'Delete Academic Year',
+      message: `Are you sure you want to delete "${year.title}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(year.id, {
+        onError: (e: any) => showError('Delete Failed', e.message || 'Failed to delete academic year'),
+      }),
+    });
   };
 
   const handleSubmit = () => {
     if (!formData.title || !formData.start_date || !formData.end_date) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      showError('Error', 'Please fill in all required fields');
       return;
     }
     if (editingYear) {
@@ -373,6 +369,7 @@ export default function AcademicYearsScreen() {
             </View>
           </View>
         </Modal>
+        <ConfirmModal {...modalProps} />
       </AppLayout>
     </ReadOrListPermissionGuard>
   );

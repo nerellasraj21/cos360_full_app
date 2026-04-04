@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import {
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useTheme } from '@/contexts';
 import {
@@ -36,11 +36,11 @@ export default function ExpenseTypesScreen() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<ExpenseType | null>(null);
   const [form, setForm] = useState({ name: '', category_id: '', description: '', is_active: true });
+  const { confirm, modalProps } = useConfirmModal();
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const inputBg = theme === 'dark' ? '#0f0f23' : '#f8fafc';
-  const headerBg = theme === 'dark' ? '#13132b' : '#f8fafc';
 
   const { data: raw, isLoading } = useExpenseTypesProtected();
   const { data: categoriesDropdown = [] } = useExpenseCategoryDropdownProtected();
@@ -80,21 +80,22 @@ export default function ExpenseTypesScreen() {
   };
 
   const handleDelete = (item: ExpenseType) => {
-    Alert.alert('Delete Type', `Delete "${item.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: () =>
-          deleteMutation.mutate(item.id, {
-            onSuccess: () => showSuccess('Deleted', `"${item.name}" has been deleted.`),
-            onError: () => showError('Delete Failed', 'Could not delete expense type.'),
-          }),
-      },
-    ]);
+    confirm({
+      title: 'Delete Type',
+      message: `Delete "${item.name}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () =>
+        deleteMutation.mutate(item.id, {
+          onSuccess: () => showSuccess('Deleted', `"${item.name}" has been deleted.`),
+          onError: () => showError('Delete Failed', 'Could not delete expense type.'),
+        }),
+    });
   };
 
   const handleSubmit = () => {
-    if (!form.name.trim()) { Alert.alert('Error', 'Name is required'); return; }
-    if (!form.category_id) { Alert.alert('Error', 'Category is required'); return; }
+    if (!form.name.trim()) { showError('Error', 'Name is required'); return; }
+    if (!form.category_id) { showError('Error', 'Category is required'); return; }
     const opts = {
       onSuccess: () => {
         setShowModal(false);
@@ -139,70 +140,52 @@ export default function ExpenseTypesScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Table */}
-      <View style={[styles.tableCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={{ minWidth: 620 }}>
-            {/* Header */}
-            <View style={[styles.row, { backgroundColor: headerBg, borderBottomColor: borderCol }]}>
-              <Text style={[styles.c0, styles.hCell, { color: colors['muted-foreground'] }]}>S.No.</Text>
-              <Text style={[styles.c1, styles.hCell, { color: colors['muted-foreground'] }]}>Name</Text>
-              <Text style={[styles.c2, styles.hCell, { color: colors['muted-foreground'] }]}>Category</Text>
-              <Text style={[styles.c3, styles.hCell, { color: colors['muted-foreground'] }]}>Description</Text>
-              <Text style={[styles.c4, styles.hCell, { color: colors['muted-foreground'] }]}>Status</Text>
-              <Text style={[styles.c5, styles.hCell, { color: colors['muted-foreground'] }]}>Created</Text>
-              <Text style={[styles.c6, styles.hCell, { color: colors['muted-foreground'] }]}>Actions</Text>
-            </View>
-
-            {/* Body */}
-            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
-              {isLoading ? (
-                <View style={styles.centered}><ActivityIndicator color={ORANGE} /></View>
-              ) : types.length === 0 ? (
-                <View style={styles.centered}>
-                  <Ionicons name="pricetag-outline" size={36} color={colors['muted-foreground']} />
-                  <Text style={[{ color: colors['muted-foreground'], marginTop: 8, fontSize: 13 }]}>
-                    No types found
+      {/* Cards */}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        {isLoading ? (
+          <View style={styles.centered}><ActivityIndicator color={ORANGE} /></View>
+        ) : types.length === 0 ? (
+          <View style={styles.centered}>
+            <Ionicons name="pricetag-outline" size={48} color={colors['muted-foreground']} />
+            <Text style={[{ color: colors['muted-foreground'], marginTop: 12, fontSize: 14 }]}>No types found</Text>
+          </View>
+        ) : types.map((item) => (
+          <View key={item.id} style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <View style={[styles.cardAccent, { backgroundColor: ORANGE }]} />
+            <View style={{ flex: 1, padding: 12 }}>
+              <View style={styles.cardTop}>
+                <Text style={[styles.cardName, { color: colors.foreground }]} numberOfLines={1}>{item.name}</Text>
+                <View style={[styles.badge, { backgroundColor: item.is_active ? '#10B98120' : '#6b728020' }]}>
+                  <Text style={[styles.badgeText, { color: item.is_active ? '#10B981' : '#6b7280' }]}>
+                    {item.is_active ? 'Active' : 'Inactive'}
                   </Text>
                 </View>
-              ) : (
-                types.map((item, index) => (
-                  <View key={item.id} style={[styles.row, { borderBottomColor: borderCol }]}>
-                    <Text style={[styles.c0, { color: colors['muted-foreground'], fontSize: 12 }]}>{index + 1}</Text>
-                    <Text style={[styles.c1, { color: colors.foreground, fontWeight: '600', fontSize: 13 }]} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={[styles.c2, { color: colors['muted-foreground'], fontSize: 12 }]} numberOfLines={1}>
-                      {categoryMap[item.category_id] ?? '—'}
-                    </Text>
-                    <Text style={[styles.c3, { color: colors['muted-foreground'], fontSize: 12 }]} numberOfLines={1}>
-                      {item.description || '—'}
-                    </Text>
-                    <View style={styles.c4}>
-                      <View style={[styles.badge, { backgroundColor: item.is_active ? '#10B98120' : '#6b728020' }]}>
-                        <Text style={[styles.badgeText, { color: item.is_active ? '#10B981' : '#6b7280' }]}>
-                          {item.is_active ? 'Active' : 'Inactive'}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={[styles.c5, { color: colors['muted-foreground'], fontSize: 11 }]}>
-                      {new Date(item.created_at).toLocaleDateString('en-US')}
-                    </Text>
-                    <View style={[styles.c6, { flexDirection: 'row', gap: 12, alignItems: 'center' }]}>
-                      <TouchableOpacity onPress={() => openEdit(item)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                        <Ionicons name="create-outline" size={17} color={colors['muted-foreground']} />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                        <Ionicons name="trash-outline" size={17} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))
-              )}
-            </ScrollView>
+              </View>
+              <View style={styles.cardMeta}>
+                <Ionicons name="folder-outline" size={13} color={colors['muted-foreground']} />
+                <Text style={[styles.cardMetaText, { color: colors['muted-foreground'] }]}>{categoryMap[item.category_id] ?? '—'}</Text>
+              </View>
+              {item.description ? (
+                <Text style={[styles.cardDesc, { color: colors['muted-foreground'] }]} numberOfLines={2}>{item.description}</Text>
+              ) : null}
+              <Text style={[styles.cardDate, { color: colors['muted-foreground'] }]}>
+                Created {new Date(item.created_at).toLocaleDateString('en-US')}
+              </Text>
+              <View style={[styles.cardFooter, { borderTopColor: borderCol }]}>
+                <TouchableOpacity style={styles.cardAction} onPress={() => openEdit(item)}>
+                  <Ionicons name="create-outline" size={15} color={colors['muted-foreground']} />
+                  <Text style={[styles.cardActionText, { color: colors['muted-foreground'] }]}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.cardAction} onPress={() => handleDelete(item)}>
+                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                  <Text style={[styles.cardActionText, { color: '#EF4444' }]}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        </ScrollView>
-      </View>
+        ))}
+        <View style={{ height: 32 }} />
+      </ScrollView>
 
       {/* Create / Edit Modal */}
       <Modal visible={showModal} animationType="slide" transparent onRequestClose={() => setShowModal(false)}>
@@ -275,6 +258,7 @@ export default function ExpenseTypesScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
     </AppLayout>
   );
 }
@@ -295,23 +279,18 @@ const styles = StyleSheet.create({
     borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8,
   },
   newBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
-  tableCard: {
-    flex: 1, marginHorizontal: 16, marginBottom: 16,
-    borderRadius: 12, borderWidth: 1, overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 11, paddingHorizontal: 12,
-    borderBottomWidth: 1,
-  },
-  hCell: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
-  c0: { width: 36 },
-  c1: { width: 120 },
-  c2: { width: 100 },
-  c3: { width: 110 },
-  c4: { width: 74 },
-  c5: { width: 84 },
-  c6: { width: 56 },
+  listContent: { padding: 12 },
+  card: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
+  cardAccent: { width: 4, alignSelf: 'stretch' },
+  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  cardName: { fontSize: 15, fontWeight: '700', flex: 1, marginRight: 8 },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 },
+  cardMetaText: { fontSize: 12 },
+  cardDesc: { fontSize: 13, marginBottom: 4 },
+  cardDate: { fontSize: 11, marginBottom: 6 },
+  cardFooter: { flexDirection: 'row', gap: 4, paddingTop: 8, borderTopWidth: 1, marginTop: 4 },
+  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  cardActionText: { fontSize: 13, fontWeight: '600' },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start' },
   badgeText: { fontSize: 11, fontWeight: '600' },
   centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },

@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useState, useEffect } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,6 +26,7 @@ import { useTheme } from '@/contexts';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -182,16 +182,6 @@ const INITIAL_FORM: FormData = {
 };
 
 // ─── Table column widths ──────────────────────────────────────────────────────
-const COL_SNO    = 48;
-const COL_ADMNO  = 120;
-const COL_NAME   = 160;
-const COL_CLASS  = 120;
-const COL_SEC    = 100;
-const COL_YEAR   = 100;
-const COL_DATE   = 110;
-const COL_STATUS = 88;
-const COL_ACTS   = 116;
-
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function StudentAdmissionScreen() {
@@ -200,6 +190,7 @@ export default function StudentAdmissionScreen() {
   const themeColors = Colors[theme];
   const { id: studentId } = useLocalSearchParams<{ id?: string }>();
   const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
   const queryClient = useQueryClient();
 
   const cardBg = themeColors.card;
@@ -213,6 +204,11 @@ export default function StudentAdmissionScreen() {
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<any>({});
   const [sameAsAdmission, setSameAsAdmission] = useState(false);
+
+  // editStudentId: set when Edit is clicked from list (bypasses useAdmissionByStudentId re-fetch)
+  const [editStudentId, setEditStudentId] = useState<string>('');
+  // Resolved student ID for mutations — list-click takes priority over URL param
+  const activeStudentId = editStudentId || studentId || '';
 
   // ── date picker ────────────────────────────────────────────────────────────
   const [activeDateField, setActiveDateField] = useState<string | null>(null);
@@ -395,23 +391,23 @@ export default function StudentAdmissionScreen() {
           identification_marks: a.student?.identification_marks ?? '',
         },
         father: {
-          name: a.father?.name ?? '',
-          email: a.father?.email ?? '',
-          phone: a.father?.phone ?? '',
-          occupation: a.father?.occupation ?? '',
-          salary_range: a.father?.salary_range ?? '',
-          aadhar_number: a.father?.aadhar_number ?? '',
-          gender: a.father?.gender ?? '',
+          name: a.student?.father?.name ?? a.father?.name ?? '',
+          email: a.student?.father?.email ?? a.father?.email ?? '',
+          phone: a.student?.father?.phone ?? a.father?.phone ?? '',
+          occupation: a.student?.father?.occupation ?? a.father?.occupation ?? '',
+          salary_range: a.student?.father?.salary_range ?? a.father?.salary_range ?? '',
+          aadhar_number: a.student?.father?.aadhar_number ?? a.father?.aadhar_number ?? '',
+          gender: a.student?.father?.gender ?? a.father?.gender ?? '',
           relation_to_student: 'Father',
         },
         mother: {
-          name: a.mother?.name ?? '',
-          email: a.mother?.email ?? '',
-          phone: a.mother?.phone ?? '',
-          occupation: a.mother?.occupation ?? '',
-          salary_range: a.mother?.salary_range ?? '',
-          aadhar_number: a.mother?.aadhar_number ?? '',
-          gender: a.mother?.gender ?? '',
+          name: a.student?.mother?.name ?? a.mother?.name ?? '',
+          email: a.student?.mother?.email ?? a.mother?.email ?? '',
+          phone: a.student?.mother?.phone ?? a.mother?.phone ?? '',
+          occupation: a.student?.mother?.occupation ?? a.mother?.occupation ?? '',
+          salary_range: a.student?.mother?.salary_range ?? a.mother?.salary_range ?? '',
+          aadhar_number: a.student?.mother?.aadhar_number ?? a.mother?.aadhar_number ?? '',
+          gender: a.student?.mother?.gender ?? a.mother?.gender ?? '',
           relation_to_student: 'Mother',
         },
       });
@@ -584,7 +580,7 @@ export default function StudentAdmissionScreen() {
       return;
     }
 
-    if (isEditMode && studentId) {
+    if (isEditMode && activeStudentId) {
       const updateData: StudentAdmissionUpdate = {
         // Academic
         admission_date: formData.admission_date,
@@ -633,7 +629,7 @@ export default function StudentAdmissionScreen() {
         mother_aadhar_number: formData.mother.aadhar_number,
         mother_gender: formData.mother.gender,
       };
-      updateAdmissionMutation.mutate({ studentId, data: updateData });
+      updateAdmissionMutation.mutate({ studentId: activeStudentId, data: updateData });
     } else {
       const apiData: StudentAdmissionCreate = {
         admission_date: formData.admission_date,
@@ -664,6 +660,7 @@ export default function StudentAdmissionScreen() {
 
   const handleCreateNew = () => {
     setIsEditMode(false);
+    setEditStudentId('');
     setFormData(INITIAL_FORM);
     setErrors({});
     setCurrentStep(0);
@@ -671,35 +668,96 @@ export default function StudentAdmissionScreen() {
     setViewMode('form');
   };
 
-  const handleEditAdmission = (sId: string) => {
+  const handleEditAdmission = (admission: any) => {
+    // Populate form directly from list data — list items already have student.father/mother
+    // Do NOT rely on useAdmissionByStudentId re-fetch which may not return parent data
+    const a = admission;
+    const sId = a.student?.id || a.id;
+    setEditStudentId(sId);
     setIsEditMode(true);
     setViewMode('form');
-    router.setParams({ id: sId });
+    setCurrentStep(0);
+    setSameAsAdmission(false);
+    setErrors({});
+    setFormData({
+      admission_date: a.admission_date ?? INITIAL_FORM.admission_date,
+      admission_type: a.admission_type ?? INITIAL_FORM.admission_type,
+      academic_year_id: a.academic_year_id ?? '',
+      admitted_academic_year_id: a.admitted_academic_year_id ?? '',
+      admitted_class_id: a.admitted_class_id ?? '',
+      admitted_section_id: a.admitted_section_id ?? '',
+      current_class_id: a.current_class_id ?? '',
+      current_section_id: a.current_section_id ?? '',
+      address_line1: a.address_line1 ?? '',
+      address_line2: a.address_line2 ?? '',
+      city: a.city ?? '',
+      state: a.state ?? '',
+      district: a.district ?? '',
+      mandal: a.mandal ?? '',
+      pincode: a.pincode ?? '',
+      is_previous_school: a.is_previous_school ?? false,
+      previous_school_name: a.previous_school_name ?? '',
+      previous_class: a.previous_class ?? '',
+      previous_school_remark: a.previous_school_remark ?? '',
+      student: {
+        first_name: a.student?.first_name ?? '',
+        last_name: a.student?.last_name ?? '',
+        date_of_birth: a.student?.date_of_birth ?? '',
+        gender: a.student?.gender ?? '',
+        is_primary: a.student?.is_primary ?? 'not_primary',
+        aadhar_number: a.student?.aadhar_number ?? '',
+        apaar_number: a.student?.apaar_number ?? '',
+        caste_id: a.student?.caste ?? '',
+        sub_caste_id: a.student?.sub_caste ?? '',
+        community: a.student?.community ?? '',
+        nationality: a.student?.nationality ?? '',
+        mother_tongue: a.student?.mother_tongue ?? '',
+        identification_marks: a.student?.identification_marks ?? '',
+      },
+      father: {
+        name: a.student?.father?.name ?? '',
+        email: a.student?.father?.email ?? '',
+        phone: a.student?.father?.phone ?? '',
+        occupation: a.student?.father?.occupation ?? '',
+        salary_range: a.student?.father?.salary_range ?? '',
+        aadhar_number: a.student?.father?.aadhar_number ?? '',
+        gender: a.student?.father?.gender ?? '',
+        relation_to_student: 'Father',
+      },
+      mother: {
+        name: a.student?.mother?.name ?? '',
+        email: a.student?.mother?.email ?? '',
+        phone: a.student?.mother?.phone ?? '',
+        occupation: a.student?.mother?.occupation ?? '',
+        salary_range: a.student?.mother?.salary_range ?? '',
+        aadhar_number: a.student?.mother?.aadhar_number ?? '',
+        gender: a.student?.mother?.gender ?? '',
+        relation_to_student: 'Mother',
+      },
+    });
   };
 
   const handleDelete = () => {
-    if (!studentId) return;
-    Alert.alert('Delete Admission', 'Are you sure you want to delete this admission? This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteAdmissionMutation.mutate(studentId) },
-    ]);
+    if (!activeStudentId) return;
+    confirm({
+      title: 'Delete Admission',
+      message: 'Are you sure you want to delete this admission? This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteAdmissionMutation.mutate(activeStudentId),
+    });
   };
 
   const handleToggleActive = (admission: any) => {
     const isActive = admission.student?.is_active ?? true;
     const name = `${admission.student?.first_name || ''} ${admission.student?.last_name || ''}`.trim();
-    Alert.alert(
-      `${isActive ? 'Deactivate' : 'Activate'} Student`,
-      `Are you sure you want to ${isActive ? 'deactivate' : 'activate'} ${name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: isActive ? 'Deactivate' : 'Activate',
-          style: isActive ? 'destructive' : 'default',
-          onPress: () => toggleActiveMutation.mutate(admission.student?.id || admission.id),
-        },
-      ]
-    );
+    confirm({
+      title: `${isActive ? 'Deactivate' : 'Activate'} Student`,
+      message: `Are you sure you want to ${isActive ? 'deactivate' : 'activate'} ${name}?`,
+      confirmLabel: isActive ? 'Deactivate' : 'Activate',
+      destructive: isActive,
+      onConfirm: () => toggleActiveMutation.mutate(admission.student?.id || admission.id),
+    });
   };
 
   // ─── Date picker handler ──────────────────────────────────────────────────
@@ -1068,95 +1126,79 @@ export default function StudentAdmissionScreen() {
           </CreatePermissionGuard>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <View>
-              {/* Table header */}
-              <View style={[lStyles.tableHeader, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#f8fafc', borderBottomColor: borderCol }]}>
-                <ThemedText style={[lStyles.thCell, { width: COL_SNO, textAlign: 'center' }]}>S.No.</ThemedText>
-                <ThemedText style={[lStyles.thCell, { width: COL_ADMNO }]}>Admission No.</ThemedText>
-                <ThemedText style={[lStyles.thCell, { width: COL_NAME }]}>Student Name</ThemedText>
-                <ThemedText style={[lStyles.thCell, { width: COL_CLASS }]}>Class</ThemedText>
-                <ThemedText style={[lStyles.thCell, { width: COL_SEC }]}>Section</ThemedText>
-                <ThemedText style={[lStyles.thCell, { width: COL_YEAR }]}>Acad. Year</ThemedText>
-                <ThemedText style={[lStyles.thCell, { width: COL_DATE }]}>Adm. Date</ThemedText>
-                <ThemedText style={[lStyles.thCell, { width: COL_STATUS }]}>Status</ThemedText>
-                <ThemedText style={[lStyles.thCell, { width: COL_ACTS, textAlign: 'center' }]}>Actions</ThemedText>
-              </View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 12 }}>
+          {isLoadingAdmissions ? (
+            <View style={lStyles.emptyRow}>
+              <ThemedText style={{ color: themeColors['muted-foreground'] }}>Loading admissions...</ThemedText>
+            </View>
+          ) : listData.length === 0 ? (
+            <View style={lStyles.emptyRow}>
+              <Ionicons name="people-outline" size={28} color={themeColors['muted-foreground']} />
+              <ThemedText style={{ marginTop: 6, color: themeColors['muted-foreground'] }}>No admissions found</ThemedText>
+            </View>
+          ) : listData.map((admission: any, idx: number) => {
+            const isAdmObj = 'student' in admission;
+            const studentName = isAdmObj
+              ? `${admission.student?.first_name || ''} ${admission.student?.last_name || ''}`.trim()
+              : `${admission.first_name || ''} ${admission.last_name || ''}`.trim();
+            const admNum = admission.admission_number ?? '—';
+            const isActive = admission.student?.is_active ?? admission.is_active ?? true;
+            const className = getClassName(admission.current_class_id);
+            const sectionName = getSectionName(admission.current_class_id, admission.current_section_id);
+            const yearName = getYearName(admission.admitted_academic_year_id ?? admission.academic_year_id);
+            const dateStr = admission.admission_date
+              ? new Date(admission.admission_date + 'T00:00:00').toLocaleDateString() : '—';
+            const studentEntityId = isAdmObj ? admission.student?.id : admission.id;
 
-              {/* Loading / empty */}
-              {isLoadingAdmissions ? (
-                <View style={[lStyles.emptyRow, { borderBottomColor: borderCol, backgroundColor: cardBg }]}>
-                  <ThemedText style={{ color: themeColors['muted-foreground'] }}>Loading admissions...</ThemedText>
-                </View>
-              ) : listData.length === 0 ? (
-                <View style={[lStyles.emptyRow, { borderBottomColor: borderCol, backgroundColor: cardBg }]}>
-                  <Ionicons name="people-outline" size={28} color={themeColors['muted-foreground']} />
-                  <ThemedText style={{ marginTop: 6, color: themeColors['muted-foreground'] }}>No admissions found</ThemedText>
-                </View>
-              ) : listData.map((admission: any, idx: number) => {
-                const isAdmObj = 'student' in admission;
-                const studentName = isAdmObj
-                  ? `${admission.student?.first_name || ''} ${admission.student?.last_name || ''}`.trim()
-                  : `${admission.first_name || ''} ${admission.last_name || ''}`.trim();
-                const admNum = admission.admission_number ?? '—';
-                const isActive = admission.student?.is_active ?? admission.is_active ?? true;
-                const className = getClassName(admission.current_class_id);
-                const sectionName = getSectionName(admission.current_class_id, admission.current_section_id);
-                const yearName = getYearName(admission.admitted_academic_year_id ?? admission.academic_year_id);
-                const dateStr = admission.admission_date
-                  ? new Date(admission.admission_date + 'T00:00:00').toLocaleDateString() : '—';
-                const studentEntityId = isAdmObj ? admission.student?.id : admission.id;
-                const rowBg = idx % 2 === 0 ? cardBg : (theme === 'dark' ? 'rgba(255,255,255,0.02)' : '#fafafa');
-
-                return (
-                  <View key={admission.id} style={[lStyles.tableRow, { backgroundColor: rowBg, borderBottomColor: borderCol }]}>
-                    <ThemedText style={[lStyles.tdNum, { width: COL_SNO }]}>{(currentPage - 1) * pageSize + idx + 1}</ThemedText>
-                    <View style={[lStyles.tdCell, { width: COL_ADMNO }]}>
-                      <ThemedText style={lStyles.admNoText} numberOfLines={1}>{admNum}</ThemedText>
+            return (
+              <View key={admission.id} style={[lStyles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
+                <View style={[lStyles.cardAccent, { backgroundColor: themeColors.primary }]} />
+                <View style={{ flex: 1, padding: 12 }}>
+                  <View style={lStyles.cardTop}>
+                    <View style={{ flex: 1 }}>
+                      <ThemedText style={[lStyles.admNoText, { color: themeColors.foreground }]}>{admNum}</ThemedText>
+                      <ThemedText style={[lStyles.nameText, { color: themeColors.foreground }]} numberOfLines={1}>{studentName || '—'}</ThemedText>
                     </View>
-                    <View style={[lStyles.tdCell, { width: COL_NAME }]}>
-                      <ThemedText style={lStyles.nameText} numberOfLines={1}>{studentName || '—'}</ThemedText>
-                    </View>
-                    <View style={[lStyles.tdCell, { width: COL_CLASS }]}>
-                      <ThemedText style={lStyles.cellText} numberOfLines={1}>{className}</ThemedText>
-                    </View>
-                    <View style={[lStyles.tdCell, { width: COL_SEC }]}>
-                      <ThemedText style={lStyles.cellText} numberOfLines={1}>{sectionName}</ThemedText>
-                    </View>
-                    <View style={[lStyles.tdCell, { width: COL_YEAR }]}>
-                      <ThemedText style={lStyles.cellText} numberOfLines={1}>{yearName}</ThemedText>
-                    </View>
-                    <View style={[lStyles.tdCell, { width: COL_DATE }]}>
-                      <ThemedText style={lStyles.cellText} numberOfLines={1}>{dateStr}</ThemedText>
-                    </View>
-                    <View style={[lStyles.tdCell, { width: COL_STATUS }]}>
-                      <View style={[lStyles.statusBadge, { backgroundColor: isActive ? '#dcfce7' : '#fee2e2' }]}>
-                        <ThemedText style={[lStyles.statusText, { color: isActive ? '#16a34a' : '#ef4444' }]}>
-                          {isActive ? 'Active' : 'Inactive'}
-                        </ThemedText>
-                      </View>
-                    </View>
-                    <View style={[lStyles.tdActions, { width: COL_ACTS }]}>
-                      <TouchableOpacity style={lStyles.iconBtn} onPress={() => { setSelectedViewAdmission(admission); setViewModalVisible(true); }}>
-                        <Ionicons name="eye-outline" size={17} color={BLUE} />
-                      </TouchableOpacity>
-                      <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_ADMISSIONS}>
-                        <TouchableOpacity style={lStyles.iconBtn} onPress={() => handleEditAdmission(studentEntityId)}>
-                          <Ionicons name="create-outline" size={17} color={themeColors.primary} />
-                        </TouchableOpacity>
-                      </UpdatePermissionGuard>
-                      <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_ADMISSIONS}>
-                        <TouchableOpacity style={lStyles.iconBtn} onPress={() => handleToggleActive(admission)} disabled={toggleActiveMutation.isPending}>
-                          <Ionicons name={isActive ? 'ban-outline' : 'checkmark-circle-outline'} size={17} color={isActive ? '#EF4444' : '#10B981'} />
-                        </TouchableOpacity>
-                      </UpdatePermissionGuard>
+                    <View style={[lStyles.statusBadge, { backgroundColor: isActive ? '#dcfce7' : '#fee2e2' }]}>
+                      <ThemedText style={[lStyles.statusText, { color: isActive ? '#16a34a' : '#ef4444' }]}>
+                        {isActive ? 'Active' : 'Inactive'}
+                      </ThemedText>
                     </View>
                   </View>
-                );
-              })}
-            </View>
-          </ScrollView>
+                  <View style={lStyles.cardMeta}>
+                    <Ionicons name="school-outline" size={13} color={themeColors['muted-foreground']} />
+                    <ThemedText style={[lStyles.cardMetaText, { color: themeColors['muted-foreground'] }]} numberOfLines={1}>
+                      {className || '—'} · {sectionName || '—'} · {yearName || '—'}
+                    </ThemedText>
+                  </View>
+                  <View style={lStyles.cardMeta}>
+                    <Ionicons name="calendar-outline" size={13} color={themeColors['muted-foreground']} />
+                    <ThemedText style={[lStyles.cardMetaText, { color: themeColors['muted-foreground'] }]}>Admitted: {dateStr}</ThemedText>
+                  </View>
+                  <View style={[lStyles.cardFooter, { borderTopColor: borderCol }]}>
+                    <TouchableOpacity style={lStyles.cardAction} onPress={() => { setSelectedViewAdmission(admission); setViewModalVisible(true); }}>
+                      <Ionicons name="eye-outline" size={15} color={BLUE} />
+                      <ThemedText style={[lStyles.cardActionText, { color: BLUE }]}>View</ThemedText>
+                    </TouchableOpacity>
+                    <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_ADMISSIONS}>
+                      <TouchableOpacity style={lStyles.cardAction} onPress={() => handleEditAdmission(admission)}>
+                        <Ionicons name="create-outline" size={15} color={themeColors.primary} />
+                        <ThemedText style={[lStyles.cardActionText, { color: themeColors.primary }]}>Edit</ThemedText>
+                      </TouchableOpacity>
+                    </UpdatePermissionGuard>
+                    <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_ADMISSIONS}>
+                      <TouchableOpacity style={lStyles.cardAction} onPress={() => handleToggleActive(admission)} disabled={toggleActiveMutation.isPending}>
+                        <Ionicons name={isActive ? 'ban-outline' : 'checkmark-circle-outline'} size={15} color={isActive ? '#EF4444' : '#10B981'} />
+                        <ThemedText style={[lStyles.cardActionText, { color: isActive ? '#EF4444' : '#10B981' }]}>
+                          {isActive ? 'Deactivate' : 'Activate'}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    </UpdatePermissionGuard>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
 
           {/* Pagination */}
           {!searchQuery && admissionsData && admissionsData.total_count > pageSize && (
@@ -1385,6 +1427,7 @@ export default function StudentAdmissionScreen() {
         </AppLayout>
       </ReadOrListPermissionGuard>
       {renderViewModal()}
+      <ConfirmModal {...modalProps} />
     </>
   );
 }
@@ -1417,25 +1460,20 @@ const lStyles = StyleSheet.create({
     gap: 4,
   },
   newBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
-  // Table
-  tableHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4, borderBottomWidth: 1 },
-  thCell: { fontSize: 11, fontWeight: '700', opacity: 0.55, paddingHorizontal: 8, textTransform: 'uppercase', letterSpacing: 0.4 },
-  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1 },
-  tdNum: { fontSize: 13, textAlign: 'center', opacity: 0.5, paddingHorizontal: 8 },
-  tdCell: { paddingHorizontal: 8, justifyContent: 'center' },
-  tdActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: 4 },
-  admNoText: { fontSize: 13, fontWeight: '700' },
-  nameText: { fontSize: 13, fontWeight: '600' },
-  cellText: { fontSize: 13 },
+  // Cards
+  card: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
+  cardAccent: { width: 4, alignSelf: 'stretch' },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 },
+  admNoText: { fontSize: 12, fontWeight: '700', opacity: 0.6 },
+  nameText: { fontSize: 15, fontWeight: '700' },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 },
+  cardMetaText: { fontSize: 12, flex: 1 },
   statusBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 10 },
   statusText: { fontSize: 11, fontWeight: '700' },
-  iconBtn: { width: 30, height: 30, justifyContent: 'center', alignItems: 'center', borderRadius: 6 },
-  emptyRow: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    borderBottomWidth: 1,
-    width: COL_SNO + COL_ADMNO + COL_NAME + COL_CLASS + COL_SEC + COL_YEAR + COL_DATE + COL_STATUS + COL_ACTS,
-  },
+  cardFooter: { flexDirection: 'row', gap: 4, paddingTop: 8, borderTopWidth: 1, marginTop: 6 },
+  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  cardActionText: { fontSize: 12, fontWeight: '600' },
+  emptyRow: { alignItems: 'center', paddingVertical: 48 },
   pageBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 });
 

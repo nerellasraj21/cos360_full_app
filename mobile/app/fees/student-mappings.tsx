@@ -1,6 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import CustomDropdown from '@/components/ui/dropdown';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -21,7 +22,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState, useEffect } from 'react';
 import {
-  Alert,
   FlatList,
   Modal,
   ScrollView,
@@ -80,6 +80,7 @@ export default function FeeStudentMappingsScreen() {
   const colors = Colors[theme];
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToastContext();
+  const { confirm: confirmModal, modalProps } = useConfirmModal();
 
   const { data: mappings = [], isLoading, error } = useQuery({
     queryKey: ['feeStudentMappings', filters],
@@ -258,46 +259,41 @@ export default function FeeStudentMappingsScreen() {
     console.log('Delete button pressed for mapping:', mapping.id);
     const studentName = mapping.student_details?.name || `Student ${mapping.student_details?.admission_num || 'Unknown'}`;
 
-    Alert.alert(
-      'Delete Fee Student Mapping',
-      `Are you sure you want to delete the mapping for ${studentName}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            console.log('Delete confirmed for mapping:', mapping.id);
-            deleteMutation.mutate(mapping.id);
-          },
-        },
-      ]
-    );
+    confirmModal({
+      title: 'Delete Fee Student Mapping',
+      message: `Are you sure you want to delete the mapping for ${studentName}?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => {
+        console.log('Delete confirmed for mapping:', mapping.id);
+        deleteMutation.mutate(mapping.id);
+      },
+    });
   };
 
   const handleSubmit = () => {
     if (!formData.student_id) {
-      Alert.alert('Error', 'Student is required');
+      showError('Error', 'Student is required');
       return;
     }
     if (!formData.student_admission_num) {
-      Alert.alert('Error', 'Student admission number is required');
+      showError('Error', 'Student admission number is required');
       return;
     }
     if (!formData.class_id) {
-      Alert.alert('Error', 'Class is required');
+      showError('Error', 'Class is required');
       return;
     }
     if (!formData.section_id) {
-      Alert.alert('Error', 'Section is required');
+      showError('Error', 'Section is required');
       return;
     }
     if (!formData.fee_type_id) {
-      Alert.alert('Error', 'Fee type is required');
+      showError('Error', 'Fee type is required');
       return;
     }
     if (!formData.total_fee || formData.total_fee <= 0) {
-      Alert.alert('Error', 'Total fee must be greater than 0');
+      showError('Error', 'Total fee must be greater than 0');
       return;
     }
 
@@ -323,23 +319,23 @@ export default function FeeStudentMappingsScreen() {
 
   const handleBulkSubmit = () => {
     if (bulkFormData.student_ids.length === 0) {
-      Alert.alert('Error', 'At least one student must be selected');
+      showError('Error', 'At least one student must be selected');
       return;
     }
     if (!bulkFormData.class_id) {
-      Alert.alert('Error', 'Class is required');
+      showError('Error', 'Class is required');
       return;
     }
     if (!bulkFormData.section_id) {
-      Alert.alert('Error', 'Section is required');
+      showError('Error', 'Section is required');
       return;
     }
     if (!bulkFormData.fee_type_id) {
-      Alert.alert('Error', 'Fee type is required');
+      showError('Error', 'Fee type is required');
       return;
     }
     if (!bulkFormData.total_fee || bulkFormData.total_fee <= 0) {
-      Alert.alert('Error', 'Total fee must be greater than 0');
+      showError('Error', 'Total fee must be greater than 0');
       return;
     }
 
@@ -904,6 +900,7 @@ export default function FeeStudentMappingsScreen() {
           </View>
         </Modal>
       </ThemedView>
+      <ConfirmModal {...modalProps} />
       </AppLayout>
     </ReadOrListPermissionGuard>
   );

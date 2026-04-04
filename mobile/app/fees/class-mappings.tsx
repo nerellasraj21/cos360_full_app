@@ -1,16 +1,17 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import CustomDropdown from '@/components/ui/dropdown';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { FeeClassMappingResponse, FeeClassMappingRequest, FeeClassMappingBulkRequest, feeClassMappingsApi, FeeTypeResponse, feeTypesApi, getFeeTermsByFeeType } from '@/src/api/fees';
 import { classSectionsApi } from '@/src/api/masters';
-import { 
-  ReadOrListPermissionGuard, 
-  CreatePermissionGuard, 
-  UpdatePermissionGuard, 
-  DeletePermissionGuard 
+import {
+  ReadOrListPermissionGuard,
+  CreatePermissionGuard,
+  UpdatePermissionGuard,
+  DeletePermissionGuard
 } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
@@ -19,7 +20,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { useAcademicYear } from '@/contexts/AcademicYearContext';
 import {
-  Alert,
   FlatList,
   Modal,
   ScrollView,
@@ -58,6 +58,7 @@ export default function FeeClassMappingsScreen() {
   const queryClient = useQueryClient();
   const { activeAcademicYearId } = useAcademicYear();
   const { showSuccess, showError } = useToastContext();
+  const { confirm: confirmModal, modalProps } = useConfirmModal();
 
   const { data: mappings = [], isLoading, error } = useQuery({
     queryKey: ['feeClassMappings', activeAcademicYearId],
@@ -187,14 +188,13 @@ export default function FeeClassMappingsScreen() {
   };
 
   const handleDelete = (mapping: FeeClassMappingResponse) => {
-    Alert.alert(
-      'Delete Class Mapping',
-      `Are you sure you want to delete the mapping for Class ${mapping.class_name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(mapping.id) },
-      ]
-    );
+    confirmModal({
+      title: 'Delete Class Mapping',
+      message: `Are you sure you want to delete the mapping for Class ${mapping.class_name}?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(mapping.id),
+    });
   };
 
   const handleSubmit = () => {
@@ -213,7 +213,7 @@ export default function FeeClassMappingsScreen() {
       return;
     }
     if (!activeAcademicYearId) {
-      Alert.alert('Error', 'No active academic year selected');
+      showError('Error', 'No active academic year selected');
       return;
     }
 
@@ -239,19 +239,19 @@ export default function FeeClassMappingsScreen() {
 
   const handleBulkSubmit = () => {
     if (bulkFormData.class_ids.length === 0) {
-      Alert.alert('Error', 'At least one class is required');
+      showError('Error', 'At least one class is required');
       return;
     }
     if (!bulkFormData.fee_type_id) {
-      Alert.alert('Error', 'Fee type is required');
+      showError('Error', 'Fee type is required');
       return;
     }
     if (!activeAcademicYearId) {
-      Alert.alert('Error', 'No active academic year selected');
+      showError('Error', 'No active academic year selected');
       return;
     }
     if (bulkFormData.total_fee <= 0) {
-      Alert.alert('Error', 'Total fee must be greater than 0');
+      showError('Error', 'Total fee must be greater than 0');
       return;
     }
 
@@ -352,8 +352,8 @@ export default function FeeClassMappingsScreen() {
               style={[styles.bulkButton, { backgroundColor: colors.secondary }]}
               onPress={() => setIsBulkModalVisible(true)}
             >
-              <Ionicons name="layers-outline" size={16} color="white" />
-              <ThemedText style={[styles.bulkButtonText, { color: 'white' }]}>Bulk Add</ThemedText>
+              <Ionicons name="layers-outline" size={16} color={colors['secondary-foreground']} />
+              <ThemedText style={[styles.bulkButtonText, { color: colors['secondary-foreground'] }]}>Bulk Add</ThemedText>
             </TouchableOpacity>
           </CreatePermissionGuard>
           <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS}>
@@ -563,8 +563,8 @@ export default function FeeClassMappingsScreen() {
                     {bulkFormData.class_ids.map(id => {
                       const classOption = classOptions.find(c => c.value === id);
                       return (
-                        <View key={id} style={styles.selectedClassChip}>
-                          <ThemedText style={styles.chipText}>{classOption?.label}</ThemedText>
+                        <View key={id} style={[styles.selectedClassChip, { backgroundColor: colors.muted }]}>
+                          <ThemedText style={[styles.chipText, { color: colors['muted-foreground'] }]}>{classOption?.label}</ThemedText>
                           <TouchableOpacity
                             onPress={() => setBulkFormData(prev => ({
                               ...prev,
@@ -639,6 +639,7 @@ export default function FeeClassMappingsScreen() {
         </View>
       </Modal>
       </ThemedView>
+      <ConfirmModal {...modalProps} />
       </AppLayout>
     </ReadOrListPermissionGuard>
   );

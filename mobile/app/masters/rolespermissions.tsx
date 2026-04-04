@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -24,6 +23,7 @@ import { useTheme } from '@/contexts';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 
 export default function RolesPermissionsScreen() {
@@ -55,6 +55,7 @@ export default function RolesPermissionsScreen() {
   const { theme, colors } = useTheme();
   const themeColors = Colors[theme];
   const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
 
   const queryClient = useQueryClient();
 
@@ -267,7 +268,7 @@ export default function RolesPermissionsScreen() {
 
   const handleCreateRole = () => {
     if (!roleForm.name.trim()) {
-      Alert.alert('Error', 'Role name is required');
+      showError('Error', 'Role name is required');
       return;
     }
     createRoleMutation.mutate(roleForm);
@@ -275,25 +276,20 @@ export default function RolesPermissionsScreen() {
 
   const handleUpdateRole = () => {
     if (!editingRole || !roleForm.name.trim()) {
-      Alert.alert('Error', 'Role name is required');
+      showError('Error', 'Role name is required');
       return;
     }
     updateRoleMutation.mutate({ id: editingRole.id, data: roleForm });
   };
 
   const handleDeleteRole = (role: Role) => {
-    Alert.alert(
-      'Delete Role',
-      `Are you sure you want to delete "${role.name}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteRoleMutation.mutate(role.id),
-        },
-      ]
-    );
+    confirm({
+      title: 'Delete Role',
+      message: `Are you sure you want to delete "${role.name}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteRoleMutation.mutate(role.id),
+    });
   };
 
   const handleEditRole = (role: Role) => {
@@ -308,7 +304,7 @@ export default function RolesPermissionsScreen() {
 
   const handleCreatePermission = () => {
     if (!permissionForm.role_id || !permissionForm.resource || !permissionForm.action) {
-      Alert.alert('Error', 'All fields are required');
+      showError('Error', 'All fields are required');
       return;
     }
     createPermissionMutation.mutate(permissionForm);
@@ -320,18 +316,13 @@ export default function RolesPermissionsScreen() {
   };
 
   const handleDeletePermission = (permission: Permission) => {
-    Alert.alert(
-      'Delete Permission',
-      `Are you sure you want to delete this permission?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deletePermissionMutation.mutate(permission.id),
-        },
-      ]
-    );
+    confirm({
+      title: 'Delete Permission',
+      message: 'Are you sure you want to delete this permission?',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deletePermissionMutation.mutate(permission.id),
+    });
   };
 
   const handleEditPermission = (permission: Permission) => {
@@ -347,7 +338,7 @@ export default function RolesPermissionsScreen() {
 
   const handleBulkCreatePermissions = () => {
     if (!bulkForm.role_id || bulkForm.permissions.length === 0) {
-      Alert.alert('Error', 'Please select a role and add at least one permission');
+      showError('Error', 'Please select a role and add at least one permission');
       return;
     }
     bulkCreatePermissionsMutation.mutate(bulkForm);
@@ -1270,6 +1261,7 @@ export default function RolesPermissionsScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
       </ThemedView>
     </ReadOrListPermissionGuard>
   );

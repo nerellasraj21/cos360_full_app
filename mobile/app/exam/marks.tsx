@@ -4,7 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { useState, useMemo } from 'react';
 import {
-  Alert, FlatList, KeyboardAvoidingView, Linking, Platform,
+  FlatList, KeyboardAvoidingView, Platform,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
@@ -15,6 +15,10 @@ import {
   MarkUploadResponse,
 } from '@/src/api/exam';
 import apiClient from '@/src/api/client';
+// expo-file-system used for authenticated Excel download — Linking.openURL cannot send auth headers
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { getValidAccessToken, getClientSchema } from '../../services/authUtils';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
 import { useToastContext } from '@/components/ToastProvider';
 
@@ -38,7 +42,7 @@ export default function MarkEntryScreen() {
   const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
   const qc = useQueryClient();
-  const { showSuccess, showError } = useToastContext();
+  const { showSuccess, showError, showWarning } = useToastContext();
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -130,19 +134,34 @@ export default function MarkEntryScreen() {
     onError: () => showError('Error', 'Failed to save marks. Please try again.'),
   });
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
     if (!selectedExamId || !selectedSubjectConfigId) {
-      Alert.alert('Select first', 'Please select an exam and subject first.');
+      showError('Select first', 'Please select an exam and subject first.');
       return;
     }
-    const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
-    const url = `${baseUrl}/exams/${selectedExamId}/marks/template?subject_config_id=${selectedSubjectConfigId}`;
-    Linking.openURL(url).catch(() => showError('Error', 'Could not open download URL.'));
+    try {
+      // Must use FileSystem.downloadAsync (not Linking.openURL) — backend requires Authorization header
+      const token = await getValidAccessToken(false);
+      const schema = await getClientSchema();
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (schema) headers.cschema = schema;
+
+      const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
+      const url = `${baseUrl}/exams/${selectedExamId}/marks/template?subject_config_id=${selectedSubjectConfigId}`;
+      const localUri = FileSystem.documentDirectory + 'marks_template.xlsx';
+      const result = await FileSystem.downloadAsync(url, localUri, { headers });
+      await Sharing.shareAsync(result.uri, {
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+    } catch {
+      showError('Error', 'Could not download template. Please try again.');
+    }
   };
 
   const handleUpload = async () => {
     if (!selectedExamId || !selectedSubjectConfigId) {
-      Alert.alert('Select first', 'Please select an exam and subject first.');
+      showError('Select first', 'Please select an exam and subject first.');
       return;
     }
     try {
@@ -169,11 +188,11 @@ export default function MarkEntryScreen() {
   };
 
   const handleSave = () => {
-    if (!selectedExamId) { Alert.alert('Error', 'Please select an exam first.'); return; }
-    if (!selectedSubjectConfigId) { Alert.alert('Error', 'Please select a subject first.'); return; }
-    if (!selectedComponentId) { Alert.alert('Error', 'Please select a component first.'); return; }
+    if (!selectedExamId) { showError('Error', 'Please select an exam first.'); return; }
+    if (!selectedSubjectConfigId) { showError('Error', 'Please select a subject first.'); return; }
+    if (!selectedComponentId) { showError('Error', 'Please select a component first.'); return; }
     const changed = Object.keys(localMarks).length;
-    if (changed === 0) { Alert.alert('No Changes', 'No marks have been modified.'); return; }
+    if (changed === 0) { showWarning('No Changes', 'No marks have been modified.'); return; }
     saveMarksMutation.mutate();
   };
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, ScrollView } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ThemedText } from '@/components/themed-text';
@@ -14,9 +14,13 @@ import {
   useDeleteCertificateType
 } from '@/src/api/hooks/students/certificates';
 import { CertificateTypeRead } from '@/src/api/students';
+import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 export default function CertificateTypesPage() {
   const { colors } = useTheme();
+  const { showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
   const [newTypeDescription, setNewTypeDescription] = useState('');
@@ -36,7 +40,7 @@ export default function CertificateTypesPage() {
 
   const handleAddType = () => {
     if (!newTypeName.trim()) {
-      Alert.alert('Error', 'Please enter a certificate type name');
+      showError('Error', 'Please enter a certificate type name');
       return;
     }
 
@@ -60,7 +64,7 @@ export default function CertificateTypesPage() {
 
   const handleUpdateType = () => {
     if (!editingType || !editName.trim()) {
-      Alert.alert('Error', 'Please enter a certificate type name');
+      showError('Error', 'Please enter a certificate type name');
       return;
     }
     updateCertificateType.mutate(
@@ -70,20 +74,13 @@ export default function CertificateTypesPage() {
   };
 
   const handleDeleteType = (id: string) => {
-    Alert.alert(
-      'Delete Certificate Type',
-      'Are you sure you want to delete this certificate type?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            deleteCertificateType.mutate(id);
-          }
-        }
-      ]
-    );
+    confirm({
+      title: 'Delete Certificate Type',
+      message: 'Are you sure you want to delete this certificate type?',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteCertificateType.mutate(id),
+    });
   };
 
   const renderCertificateType = ({ item }: { item: CertificateTypeRead }) => (
@@ -255,6 +252,7 @@ export default function CertificateTypesPage() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
     </AppLayout>
   );
 }

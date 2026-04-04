@@ -2,8 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
-  FlatList,
   Modal,
   ScrollView,
   StyleSheet,
@@ -30,6 +28,7 @@ import {
 } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 // ─── Shared read-only transport card ─────────────────────────────────────────
 
@@ -187,6 +186,8 @@ function AdminTransportView() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToastContext();
 
+  const { confirm, modalProps: confirmModalProps } = useConfirmModal();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [editingItem, setEditingItem] = useState<StudentTransportOut | null>(null);
@@ -325,16 +326,16 @@ function AdminTransportView() {
 
   const handleSubmit = () => {
     if (!selectedTrip || !selectedStop) {
-      Alert.alert('Validation', 'Please select a trip and stop');
+      showError('Validation', 'Please select a trip and stop');
       return;
     }
     if (!editingItem && !selectedStudent) {
-      Alert.alert('Validation', 'Please select a student');
+      showError('Validation', 'Please select a student');
       return;
     }
     const fee = parseFloat(feePerTerm);
     if (isNaN(fee) || fee < 0) {
-      Alert.alert('Validation', 'Enter a valid fee amount');
+      showError('Validation', 'Enter a valid fee amount');
       return;
     }
     if (editingItem) {
@@ -362,14 +363,13 @@ function AdminTransportView() {
     const name = item.student
       ? `${item.student.first_name} ${item.student.last_name}`
       : 'this student';
-    Alert.alert('Remove Assignment', `Remove transport for ${name}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => deleteMutation.mutate(item.id),
-      },
-    ]);
+    confirm({
+      title: 'Remove Assignment',
+      message: `Remove transport for ${name}?`,
+      confirmLabel: 'Remove',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(item.id),
+    });
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -424,133 +424,88 @@ function AdminTransportView() {
           </View>
         </View>
 
-        {/* Table */}
-        <ScrollView style={styles.tableScroll} showsVerticalScrollIndicator={false}>
-          {/* Column headers */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={{ minWidth: 760 }}>
-              {/* Header row */}
-              <View style={[styles.tableHeaderRow, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-                <ThemedText style={[styles.th, styles.colNo]}>S.No.</ThemedText>
-                <ThemedText style={[styles.th, styles.colStudent]}>Student</ThemedText>
-                <ThemedText style={[styles.th, styles.colTrip]}>Trip</ThemedText>
-                <ThemedText style={[styles.th, styles.colRoute]}>Route</ThemedText>
-                <ThemedText style={[styles.th, styles.colStop]}>Stop</ThemedText>
-                <ThemedText style={[styles.th, styles.colPricing]}>Pricing</ThemedText>
-                <ThemedText style={[styles.th, styles.colFee]}>Fee / Term</ThemedText>
-                <ThemedText style={[styles.th, styles.colActions]}>Actions</ThemedText>
-              </View>
+        {/* Cards */}
+        <ScrollView style={styles.tableScroll} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 12 }}>
+          {isLoading ? (
+            <View style={styles.emptyState}>
+              <ThemedText style={{ color: colors['muted-foreground'], fontSize: 14 }}>Loading...</ThemedText>
+            </View>
+          ) : filtered.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="bus-outline" size={44} color={colors['muted-foreground']} />
+              <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
+                {searchQuery ? 'No results found' : 'No transport assignments yet'}
+              </ThemedText>
+            </View>
+          ) : filtered.map((item) => {
+            const studentName = item.student
+              ? `${item.student.first_name} ${item.student.last_name}`
+              : '—';
+            const tripLabel = item.trip?.trip_number != null ? `Trip #${item.trip.trip_number}` : '—';
+            const routeName = item.trip?.route?.route_name ?? '—';
+            const routeSubtitle = item.trip?.route
+              ? `${item.trip.route.starting_stop} → ${item.trip.route.ending_stop}`
+              : null;
+            const stopNum = item.stop?.number != null ? ` (#${item.stop.number})` : '';
+            const stopName = item.stop?.name ? `${item.stop.name}${stopNum}` : '—';
+            const pricingName = item.pricing?.cycle_name ?? null;
+            const pricingAmount = item.pricing?.amount != null
+              ? `₹${Number(item.pricing.amount).toLocaleString('en-IN')}`
+              : null;
+            const fee = item.fee_per_term;
 
-              {/* Loading */}
-              {isLoading && (
-                <View style={styles.emptyState}>
-                  <ThemedText style={{ color: colors['muted-foreground'], fontSize: 14 }}>Loading...</ThemedText>
-                </View>
-              )}
-
-              {/* Empty */}
-              {!isLoading && filtered.length === 0 && (
-                <View style={styles.emptyState}>
-                  <Ionicons name="bus-outline" size={44} color={colors['muted-foreground']} />
-                  <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
-                    {searchQuery ? 'No results found' : 'No transport assignments yet'}
-                  </ThemedText>
-                </View>
-              )}
-
-              {/* Data rows */}
-              {filtered.map((item, idx) => {
-                const studentName = item.student
-                  ? `${item.student.first_name} ${item.student.last_name}`
-                  : '—';
-                const tripLabel = item.trip?.trip_number != null ? `Trip #${item.trip.trip_number}` : '—';
-                const routeName = item.trip?.route?.route_name ?? '—';
-                const routeSubtitle = item.trip?.route
-                  ? `${item.trip.route.starting_stop} → ${item.trip.route.ending_stop}`
-                  : null;
-                const stopNum = item.stop?.number != null ? ` (#${item.stop.number})` : '';
-                const stopName = item.stop?.name ? `${item.stop.name}${stopNum}` : '—';
-                const pricingName = item.pricing?.cycle_name ?? null;
-                const pricingAmount = item.pricing?.amount != null
-                  ? `₹${item.pricing.amount.toLocaleString('en-IN')}`
-                  : null;
-                const fee = item.fee_per_term;
-
-                return (
-                  <View
-                    key={item.id}
-                    style={[
-                      styles.tableDataRow,
-                      { borderBottomColor: colors.border },
-                      idx % 2 === 0
-                        ? { backgroundColor: colors.card }
-                        : { backgroundColor: colors.background },
-                    ]}
-                  >
-                    <ThemedText style={[styles.td, styles.colNo, { color: colors['muted-foreground'] }]}>
-                      {idx + 1}
+            return (
+              <View key={item.id} style={[styles.assignCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.assignCardAccent, { backgroundColor: colors.primary }]} />
+                <View style={{ flex: 1, padding: 12 }}>
+                  <View style={styles.assignCardTop}>
+                    <ThemedText style={[styles.studentNameBold, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>
+                      {studentName}
                     </ThemedText>
-                    <View style={[styles.colStudent]}>
-                      <ThemedText style={styles.studentNameBold} numberOfLines={1}>
-                        {studentName}
-                      </ThemedText>
-                    </View>
-                    <ThemedText style={[styles.td, styles.colTrip]} numberOfLines={1}>
-                      {tripLabel}
-                    </ThemedText>
-                    <View style={styles.colRoute}>
-                      <ThemedText style={styles.routeName} numberOfLines={1}>{routeName}</ThemedText>
-                      {routeSubtitle ? (
-                        <ThemedText style={[styles.routeSubtitle, { color: colors['muted-foreground'] }]} numberOfLines={1}>
-                          {routeSubtitle}
-                        </ThemedText>
-                      ) : null}
-                    </View>
-                    <ThemedText style={[styles.td, styles.colStop]} numberOfLines={1}>
-                      {stopName}
-                    </ThemedText>
-                    <View style={styles.colPricing}>
-                      {pricingName ? (
-                        <>
-                          <ThemedText style={styles.pricingName} numberOfLines={1}>{pricingName}</ThemedText>
-                          {pricingAmount ? (
-                            <ThemedText style={[styles.pricingAmount, { color: colors['muted-foreground'] }]}>
-                              {pricingAmount}
-                            </ThemedText>
-                          ) : null}
-                        </>
-                      ) : (
-                        <ThemedText style={[styles.td, { color: colors['muted-foreground'] }]}>—</ThemedText>
-                      )}
-                    </View>
-                    <ThemedText style={[styles.td, styles.colFee, styles.feeText]}>
-                      ₹{fee != null ? fee.toLocaleString('en-IN') : '—'}
-                    </ThemedText>
-                    <View style={[styles.colActions, styles.actionsCell]}>
-                      <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
-                        <TouchableOpacity
-                          style={styles.iconBtn}
-                          onPress={() => openEditModal(item)}
-                        >
-                          <Ionicons name="create-outline" size={18} color={colors.primary} />
-                        </TouchableOpacity>
-                      </UpdatePermissionGuard>
-                      <DeletePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
-                        <TouchableOpacity
-                          style={styles.iconBtn}
-                          onPress={() => handleDelete(item)}
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                        </TouchableOpacity>
-                      </DeletePermissionGuard>
+                    <View style={[styles.tripBadge, { backgroundColor: colors.primary + '20' }]}>
+                      <ThemedText style={[styles.tripBadgeText, { color: colors.primary }]}>{tripLabel}</ThemedText>
                     </View>
                   </View>
-                );
-              })}
-            </View>
-          </ScrollView>
+                  <View style={styles.assignCardMeta}>
+                    <Ionicons name="navigate-outline" size={13} color={colors['muted-foreground']} />
+                    <ThemedText style={[styles.assignCardMetaText, { color: colors['muted-foreground'] }]} numberOfLines={1}>
+                      {routeName}{routeSubtitle ? ` · ${routeSubtitle}` : ''}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.assignCardMeta}>
+                    <Ionicons name="location-outline" size={13} color={colors['muted-foreground']} />
+                    <ThemedText style={[styles.assignCardMetaText, { color: colors['muted-foreground'] }]}>{stopName}</ThemedText>
+                  </View>
+                  {(pricingName || fee != null) && (
+                    <View style={styles.assignCardMeta}>
+                      <Ionicons name="pricetag-outline" size={13} color={colors['muted-foreground']} />
+                      <ThemedText style={[styles.assignCardMetaText, { color: colors['muted-foreground'] }]}>
+                        {pricingName ?? '—'}{pricingAmount ? ` (${pricingAmount})` : ''}
+                        {fee != null ? ` · Fee: ₹${fee.toLocaleString('en-IN')}` : ''}
+                      </ThemedText>
+                    </View>
+                  )}
+                  <View style={[styles.assignCardFooter, { borderTopColor: colors.border }]}>
+                    <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
+                      <TouchableOpacity style={styles.assignCardAction} onPress={() => openEditModal(item)}>
+                        <Ionicons name="create-outline" size={15} color={colors.primary} />
+                        <ThemedText style={[styles.assignCardActionText, { color: colors.primary }]}>Edit</ThemedText>
+                      </TouchableOpacity>
+                    </UpdatePermissionGuard>
+                    <DeletePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
+                      <TouchableOpacity style={styles.assignCardAction} onPress={() => handleDelete(item)} disabled={deleteMutation.isPending}>
+                        <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                        <ThemedText style={[styles.assignCardActionText, { color: '#EF4444' }]}>Delete</ThemedText>
+                      </TouchableOpacity>
+                    </DeletePermissionGuard>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
         </ScrollView>
+
+        <ConfirmModal {...confirmModalProps} />
 
         {/* Assign Transport Modal */}
         <Modal
@@ -687,17 +642,6 @@ export default function StudentTransportScreen() {
   return <AdminTransportView />;
 }
 
-// ─── Column widths ─────────────────────────────────────────────────────────────
-
-const colNo = { width: 44 };
-const colStudent = { width: 110 };
-const colTrip = { width: 70 };
-const colRoute = { width: 110 };
-const colStop = { width: 130 };
-const colPricing = { width: 130 };
-const colFee = { width: 90 };
-const colActions = { width: 76 };
-
 const styles = StyleSheet.create({
   permDenied: {
     flex: 1,
@@ -770,94 +714,23 @@ const styles = StyleSheet.create({
     padding: 0,
   },
 
-  // Table
-  tableScroll: {
-    flex: 1,
-  },
-  tableHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  th: {
-    fontSize: 12,
-    fontWeight: '600',
-    opacity: 0.55,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  tableDataRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  td: {
-    fontSize: 13,
-  },
-  studentNameBold: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  routeName: {
-    fontSize: 13,
-  },
-  routeSubtitle: {
-    fontSize: 11,
-    opacity: 0.55,
-    marginTop: 1,
-  },
-  pricingName: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  pricingAmount: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  feeText: {
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  actionsCell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  iconBtn: {
-    padding: 4,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    gap: 10,
-  },
-  emptyText: {
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  retryBtn: {
-    marginTop: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  retryBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  // Column widths
-  colNo,
-  colStudent,
-  colTrip,
-  colRoute,
-  colStop,
-  colPricing,
-  colFee,
-  colActions,
+  // Cards
+  tableScroll: { flex: 1 },
+  studentNameBold: { fontSize: 15, fontWeight: '700' },
+  assignCard: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
+  assignCardAccent: { width: 4, alignSelf: 'stretch' },
+  assignCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  assignCardMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 },
+  assignCardMetaText: { fontSize: 12, flex: 1 },
+  tripBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  tripBadgeText: { fontSize: 11, fontWeight: '700' },
+  assignCardFooter: { flexDirection: 'row', gap: 4, paddingTop: 8, borderTopWidth: 1, marginTop: 6 },
+  assignCardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  assignCardActionText: { fontSize: 12, fontWeight: '600' },
+  emptyState: { alignItems: 'center', paddingVertical: 48, gap: 10 },
+  emptyText: { fontSize: 13, textAlign: 'center' },
+  retryBtn: { marginTop: 8, paddingHorizontal: 20, paddingVertical: 8 },
+  retryBtnText: { fontSize: 14, fontWeight: '600' },
 
   // Modal
   modalOverlay: {

@@ -99,6 +99,7 @@ class ErrorHandler {
     this.handleError(new Error(message), {
       screen: 'API',
       action: `${context?.method || 'UNKNOWN'} ${context?.endpoint || 'unknown endpoint'}`,
+      showAlert: false, // API errors are surfaced via onError toast callbacks, not native alerts
       metadata: {
         status: error?.response?.status,
         endpoint: context?.endpoint,

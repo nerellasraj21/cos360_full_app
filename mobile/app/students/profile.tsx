@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
@@ -13,10 +13,12 @@ import apiClient from '@/src/api/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReadPermissionGuard, UpdatePermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 export default function StudentProfile() {
   const router = useRouter();
   const { colors } = useTheme();
+  const { showError } = useToastContext();
   const { role, selectedStudent } = useAuth();
   const roleName = role?.name?.toLowerCase();
   const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName || '');
@@ -57,7 +59,7 @@ export default function StudentProfile() {
       });
       setEditModalVisible(false);
     } catch (error) {
-      Alert.alert('Error', 'Failed to update profile');
+      showError('Error', 'Failed to update profile');
     }
   };
 

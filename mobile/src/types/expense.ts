@@ -81,6 +81,17 @@ export interface ExpenseTransactionInput {
   requires_approval_override?: boolean;
 }
 
+// Client-side only — used for amount calculation, NOT sent to API
+export interface TransactionItem {
+  item_name: string;
+  item_description: string;
+  unit_price: number;
+  quantity: number;
+  tax_rate: number;
+  discount_rate: number;
+  final_amount: number;
+}
+
 export interface ExpenseTransactionListResponse {
   items: ExpenseTransaction[];
   total: number;

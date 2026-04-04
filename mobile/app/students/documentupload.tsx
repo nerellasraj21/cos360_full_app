@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 
@@ -10,6 +10,7 @@ import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUploadMyDocument } from '@/src/api/hooks/students/documents';
+import { useToastContext } from '@/components/ToastProvider';
 
 interface DocumentForm {
   documentName: string;
@@ -34,6 +35,7 @@ const documentTypes = [
 
 export default function DocumentUploadPage() {
   const { colors } = useTheme();
+  const { showError } = useToastContext();
   const { studentId, selectedStudent, role } = useAuth();
   const [selectedFile, setSelectedFile] = useState<MockFile | null>(null);
   const [formData, setFormData] = useState<DocumentForm>({
@@ -58,14 +60,14 @@ export default function DocumentUploadPage() {
         // Validate file size (5MB max)
         const maxSize = 5 * 1024 * 1024; // 5MB in bytes
         if (asset.size && asset.size > maxSize) {
-          Alert.alert('Error', 'File size must be less than 5MB');
+          showError('Error', 'File size must be less than 5MB');
           return;
         }
 
         // Validate file type
         const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
         if (!allowedTypes.includes(asset.mimeType || '')) {
-          Alert.alert('Error', 'Only PDF, JPG, and PNG files are allowed');
+          showError('Error', 'Only PDF, JPG, and PNG files are allowed');
           return;
         }
 
@@ -77,7 +79,7 @@ export default function DocumentUploadPage() {
         });
       }
     } catch (err) {
-      Alert.alert('Error', 'Failed to pick document');
+      showError('Error', 'Failed to pick document');
     }
   };
 
@@ -90,7 +92,7 @@ export default function DocumentUploadPage() {
     console.log('role:', role);
 
     if (!selectedFile) {
-      Alert.alert('Error', 'Please select a document file');
+      showError('Error', 'Please select a document file');
       return;
     }
 
@@ -102,7 +104,7 @@ export default function DocumentUploadPage() {
         documentType: formData.documentType,
         studentId: currentStudentId
       });
-      Alert.alert('Error', 'Please fill in all required fields');
+      showError('Error', 'Please fill in all required fields');
       return;
     }
 

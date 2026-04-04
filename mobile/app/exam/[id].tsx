@@ -3,12 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert, Modal, ScrollView, StyleSheet, Text,
+  Modal, ScrollView, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts';
 import {
   examAuditApi, examDatesApi, examNotificationsApi,
@@ -42,6 +43,7 @@ export default function ExamDetailScreen() {
   const qc = useQueryClient();
   const { showSuccess, showError } = useToastContext();
 
+  const { confirm, modalProps } = useConfirmModal();
   const [notifModalVisible, setNotifModalVisible] = useState(false);
   const [notifForm, setNotifForm] = useState<NotificationRequest>({ ...EMPTY_NOTIF });
   const [showAudit, setShowAudit] = useState(false);
@@ -49,6 +51,9 @@ export default function ExamDetailScreen() {
   const [cloneName, setCloneName] = useState('');
   const [grantModalVisible, setGrantModalVisible] = useState(false);
   const [grantForm, setGrantForm] = useState<MarkPermissionCreate>({ user_id: '', teacher_id: '', subject_config_id: '', class_id: '' });
+  // Fix #8: unlock requires reason (required field in backend UnlockExamRequest)
+  const [unlockModalVisible, setUnlockModalVisible] = useState(false);
+  const [unlockReason, setUnlockReason] = useState('');
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -134,7 +139,8 @@ export default function ExamDetailScreen() {
   });
 
   const unlockMutation = useMutation({
-    mutationFn: () => examsApi.unlock(id),
+    // Fix #8: pass reason — backend requires it (reason: str, non-optional)
+    mutationFn: (reason: string) => examsApi.unlock(id, reason),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['exam', id] });
       showSuccess('Exam Unlocked', 'Exam unlocked for corrections.');
@@ -399,12 +405,15 @@ export default function ExamDetailScreen() {
                     </Text>
                   </View>
                   <TouchableOpacity
-                    onPress={() =>
-                      Alert.alert('Revoke Permission', 'Remove this teacher\'s mark entry permission?', [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Revoke', style: 'destructive', onPress: () => revokePermissionMutation.mutate(perm.id) },
-                      ])
-                    }
+                    onPress={() => {
+                      confirm({
+                        title: 'Revoke Permission',
+                        message: "Remove this teacher's mark entry permission?",
+                        confirmLabel: 'Revoke',
+                        destructive: true,
+                        onConfirm: () => revokePermissionMutation.mutate(perm.id),
+                      });
+                    }}
                     style={{ padding: 6 }}
                   >
                     <Ionicons name="close-circle" size={20} color="#EF4444" />
@@ -473,12 +482,8 @@ export default function ExamDetailScreen() {
             {canUnlock && (
               <TouchableOpacity
                 style={[styles.dangerBtn, { borderColor: '#F59E0B' }]}
-                onPress={() =>
-                  Alert.alert('Unlock Exam', 'This will allow mark corrections. Continue?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Unlock', style: 'destructive', onPress: () => unlockMutation.mutate() },
-                  ])
-                }
+                // Fix #8: open reason modal instead of Alert (reason is required by backend)
+                onPress={() => { setUnlockReason(''); setUnlockModalVisible(true); }}
               >
                 <Ionicons name="lock-open-outline" size={18} color="#F59E0B" />
                 <Text style={[styles.dangerBtnText, { color: '#F59E0B' }]}>Unlock for Corrections</Text>
@@ -487,12 +492,15 @@ export default function ExamDetailScreen() {
             {canDelete && (
               <TouchableOpacity
                 style={[styles.dangerBtn, { borderColor: '#EF4444' }]}
-                onPress={() =>
-                  Alert.alert('Delete Exam', `Delete "${exam.exam_name}"? This cannot be undone.`, [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate() },
-                  ])
-                }
+                onPress={() => {
+                  confirm({
+                    title: 'Delete Exam',
+                    message: `Delete "${exam.exam_name}"? This cannot be undone.`,
+                    confirmLabel: 'Delete',
+                    destructive: true,
+                    onConfirm: () => deleteMutation.mutate(),
+                  });
+                }}
               >
                 <Ionicons name="trash-outline" size={18} color="#EF4444" />
                 <Text style={[styles.dangerBtnText, { color: '#EF4444' }]}>Delete Exam</Text>
@@ -501,6 +509,42 @@ export default function ExamDetailScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Unlock Reason Modal — Fix #8 */}
+      <Modal visible={unlockModalVisible} animationType="slide" transparent onRequestClose={() => setUnlockModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
+            <View style={styles.rowBetween}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Unlock for Corrections</Text>
+              <TouchableOpacity onPress={() => setUnlockModalVisible(false)}>
+                <Ionicons name="close" size={22} color={colors['muted-foreground']} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Reason for unlocking *</Text>
+            <TextInput
+              style={[styles.notifInput, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol, minHeight: 72 }]}
+              value={unlockReason}
+              onChangeText={setUnlockReason}
+              placeholder="e.g. Marks entry error for Section A"
+              placeholderTextColor={colors['muted-foreground']}
+              multiline
+              autoFocus
+            />
+            <TouchableOpacity
+              style={[styles.saveBtn2, { backgroundColor: '#F59E0B', opacity: (!unlockReason.trim() || unlockMutation.isPending) ? 0.5 : 1 }]}
+              onPress={() => {
+                if (!unlockReason.trim()) { showError('Validation', 'Reason is required.'); return; }
+                unlockMutation.mutate(unlockReason.trim());
+                setUnlockModalVisible(false);
+              }}
+              disabled={!unlockReason.trim() || unlockMutation.isPending}
+            >
+              <Ionicons name="lock-open-outline" size={16} color="white" />
+              <Text style={styles.saveBtnText}>Unlock Exam</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Clone Modal */}
       <Modal visible={cloneModalVisible} animationType="slide" transparent onRequestClose={() => setCloneModalVisible(false)}>
@@ -670,6 +714,7 @@ export default function ExamDetailScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
     </AppLayout>
   );
 }

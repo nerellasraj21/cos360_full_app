@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ThemedText } from '@/components/themed-text';
@@ -10,9 +10,11 @@ import { useMyCertificates, useDownloadCertificateDocument } from '@/src/api/hoo
 import { useAuth } from '@/contexts/AuthContext';
 import { ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 export default function MyCertificatesPage() {
   const { colors } = useTheme();
+  const { showError } = useToastContext();
   const { studentId, role, selectedStudent } = useAuth();
   const roleName = role?.name?.toLowerCase() ?? '';
   const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
@@ -26,10 +28,10 @@ export default function MyCertificatesPage() {
       if (result?.presigned_url) {
         await Linking.openURL(result.presigned_url);
       } else {
-        Alert.alert('Error', 'No download link available for this certificate');
+        showError('Error', 'No download link available for this certificate');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to download certificate');
+      showError('Error', 'Failed to download certificate');
     }
   };
 

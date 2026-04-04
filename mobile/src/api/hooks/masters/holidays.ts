@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../../../components/FeedbackToast';
+import { useToastContext } from '../../../../components/ToastProvider';
 import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { holidaysApi, HolidayRead, HolidayCreate, HolidayUpdate } from '../../index';
@@ -38,7 +38,7 @@ export function useHoliday(id: string) {
 // Create holiday - permission protected
 export function useCreateHoliday() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<HolidayRead, Error, HolidayCreate>({
     mutationFn: (data) => holidaysApi.createHoliday(data),
@@ -57,7 +57,7 @@ export function useCreateHoliday() {
 // Update holiday - permission protected
 export function useUpdateHoliday() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<HolidayRead, Error, { id: string; data: HolidayUpdate }>({
     mutationFn: ({ id, data }) => holidaysApi.updateHoliday(id, data),
@@ -76,7 +76,7 @@ export function useUpdateHoliday() {
 // Delete holiday - permission protected
 export function useDeleteHoliday() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<void, Error, string>({
     mutationFn: (id) => holidaysApi.deleteHoliday(id),
@@ -95,7 +95,7 @@ export function useDeleteHoliday() {
 // Activate holiday - permission protected
 export function useActivateHoliday() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<HolidayRead, Error, string>({
     mutationFn: (id) => holidaysApi.activateHoliday(id),

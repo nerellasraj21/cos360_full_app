@@ -29,6 +29,7 @@ export const useStaffEnrollments = (params?: {
   skip?: number;
   limit?: number;
   gender?: string;
+  is_active?: boolean; // Added to support filtering active staff for attendance
 }) => {
   return usePermissionProtectedListQuery(
     PERMISSION_RESOURCES.STAFF,

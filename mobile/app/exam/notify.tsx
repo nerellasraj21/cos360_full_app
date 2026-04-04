@@ -3,7 +3,6 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -72,19 +71,19 @@ export default function ExamNotifyScreen() {
 
   const handleSend = () => {
     if (!selectedExamId) {
-      Alert.alert('Validation', 'Please select an exam');
+      showError('Validation', 'Please select an exam');
       return;
     }
     if (!notificationType.trim()) {
-      Alert.alert('Validation', 'Please enter a notification type');
+      showError('Validation', 'Please enter a notification type');
       return;
     }
     if (!message.trim()) {
-      Alert.alert('Validation', 'Please enter a message');
+      showError('Validation', 'Please enter a message');
       return;
     }
     if (!sendPush && !sendEmail && !sendSms) {
-      Alert.alert('Validation', 'Please select at least one delivery channel');
+      showError('Validation', 'Please select at least one delivery channel');
       return;
     }
 

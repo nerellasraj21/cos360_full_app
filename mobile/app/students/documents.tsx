@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import {
-  Alert,
   Linking,
   ScrollView,
   StyleSheet,
@@ -48,6 +47,7 @@ const getDocIcon = (type: string) => {
 // ─── Document card ─────────────────────────────────────────────────────────
 
 function DocumentCard({ doc, colors }: { doc: any; colors: any }) {
+  const { showInfo } = useToastContext();
   return (
     <View style={[styles.docCard, { backgroundColor: colors.background }]}>
       <View style={[styles.docIcon, { backgroundColor: `${colors.primary}15` }]}>
@@ -61,7 +61,7 @@ function DocumentCard({ doc, colors }: { doc: any; colors: any }) {
       </View>
       <TouchableOpacity
         style={[styles.docAction, { backgroundColor: `${colors.primary}18` }]}
-        onPress={() => Alert.alert('View', 'Document viewer coming soon')}
+        onPress={() => showInfo('View', 'Document viewer coming soon')}
       >
         <Ionicons name="eye-outline" size={16} color={colors.primary} />
       </TouchableOpacity>
@@ -105,7 +105,7 @@ function MyDocumentsView({ studentId, title }: { studentId?: string; title?: str
 function AdminDocumentsView() {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToastContext();
+  const { showSuccess, showError, showInfo } = useToastContext();
   const [selectedStudent, setSelectedStudent] = useState('');
 
   const { data: studentsData } = useQuery({
@@ -138,21 +138,10 @@ function AdminDocumentsView() {
 
   const handleUpload = (docType: string) => {
     if (!selectedStudent) {
-      Alert.alert('Required', 'Please select a student first');
+      showError('Required', 'Please select a student first');
       return;
     }
-    Alert.alert(
-      `Upload ${docType}`,
-      'Select a file to upload',
-      [
-        {
-          text: 'Choose File',
-          onPress: () =>
-            Alert.alert('Info', 'File picker integration needed for device files'),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    );
+    showInfo('Info', 'File picker integration needed for device files');
   };
 
   return (

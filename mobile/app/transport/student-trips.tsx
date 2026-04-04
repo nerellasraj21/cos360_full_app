@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { AppLayout } from '@/components';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useToastContext } from '@/components/ToastProvider';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import CustomDropdown from '@/components/ui/dropdown';
@@ -11,7 +12,6 @@ import { PERMISSION_RESOURCES } from '../../src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -38,6 +38,7 @@ export default function StudentTripsScreen() {
 
   const { colors } = useTheme();
   const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps: confirmModalProps } = useConfirmModal();
 
   // Fetch data using permission-protected hooks
   const { data: studentTripsData, isLoading, error, refetch } = useStudentTrips();
@@ -139,38 +140,34 @@ export default function StudentTripsScreen() {
   const handleDelete = (assignment: StudentTrip) => {
     const student = (students as any[]).find(s => s.id === assignment.student_id);
     const trip = (trips as any[]).find(t => t.id === assignment.trip_id);
-    Alert.alert(
-      'Delete Student Transport Assignment',
-      `Are you sure you want to delete transport assignment for ${student?.display_name || 'Unknown Student'} on Trip ${trip?.trip_number || 'Unknown Trip'}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(assignment.id),
-        },
-      ]
-    );
+    const msg = `Remove transport for ${student?.display_name || 'Unknown Student'} on Trip ${trip?.trip_number || 'Unknown Trip'}?`;
+    confirm({
+      title: 'Delete Student Transport Assignment',
+      message: msg,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(assignment.id),
+    });
   };
 
   const handleSubmit = () => {
     if (!editingTrip) {
       if (!formData.trip_id) {
-        Alert.alert('Error', 'Trip is required');
+        showError('Error', 'Trip is required');
         return;
       }
       if (!formData.student_id) {
-        Alert.alert('Error', 'Student is required');
+        showError('Error', 'Student is required');
         return;
       }
       if (!formData.stop_id) {
-        Alert.alert('Error', 'Stop is required');
+        showError('Error', 'Stop is required');
         return;
       }
     }
 
     if (formData.fee_per_term <= 0) {
-      Alert.alert('Error', 'Fee per term must be a positive number');
+      showError('Error', 'Fee per term must be a positive number');
       return;
     }
 
@@ -474,6 +471,7 @@ export default function StudentTripsScreen() {
               </View>
             </View>
           </Modal>
+          <ConfirmModal {...confirmModalProps} />
         </View>
       </ReadOrListPermissionGuard>
     </AppLayout>

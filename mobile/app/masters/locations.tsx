@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -18,6 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts';
 import { locationsApi } from '@/src/api';
 import type { LocationOut, LocationIn, LocationUpdate } from '@/src/api';
@@ -34,6 +34,7 @@ export default function LocationsScreen() {
   const router = useRouter();
   const { theme, colors } = useTheme();
   const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
   const queryClient = useQueryClient();
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
@@ -95,15 +96,18 @@ export default function LocationsScreen() {
   };
 
   const handleDelete = (item: LocationOut) => {
-    Alert.alert('Delete Location', `Are you sure you want to delete "${item.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(item.id) },
-    ]);
+    confirm({
+      title: 'Delete Location',
+      message: `Are you sure you want to delete "${item.name}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(item.id),
+    });
   };
 
   const handleSubmit = () => {
     if (!formData.name.trim()) {
-      Alert.alert('Validation', 'Location name is required');
+      showError('Validation', 'Location name is required');
       return;
     }
     const payload: LocationIn = {
@@ -305,6 +309,7 @@ export default function LocationsScreen() {
             </View>
           </View>
         </Modal>
+        <ConfirmModal {...modalProps} />
       </ThemedView>
     </ReadOrListPermissionGuard>
   );

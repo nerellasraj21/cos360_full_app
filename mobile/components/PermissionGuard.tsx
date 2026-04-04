@@ -95,7 +95,7 @@ export const PermissionGuard: React.FC<PermissionGuardProps> = (props) => {
 
   // Show loading state
   if (isLoading) {
-    if (loadingFallback) {
+    if (loadingFallback !== undefined) {
       return <>{loadingFallback}</>;
     }
 

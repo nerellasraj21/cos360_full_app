@@ -1,59 +1,397 @@
 import { Ionicons } from '@expo/vector-icons';
-
 import { useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Modal,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
-import { useClassSections, useCreateClassSection, useUpdateSection, useDeleteSection, useClassList, useSectionList } from '@/src/api/hooks/masters/classesAndSections';
-import { PermissionGuard } from '@/components/PermissionGuards';
+import {
+  useClassSections,
+  useCreateClassSection,
+  useCreateSectionForClass,
+  useUpdateClass,
+  useDeleteClass,
+  useUpdateSection,
+  useDeleteSection,
+} from '@/src/api/hooks/masters/classesAndSections';
+import type { ClassRead, SectionRead } from '@/src/api';
+import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useTheme, useAcademicYear } from '@/contexts';
 
-interface ClassSectionData {
-  id: string;
-  class_id: string;
-  class_name: string;
-  section_id: string;
-  section_name: string;
-  is_active: boolean;
-  created_at: string;
+// ─── Edit Class Modal ────────────────────────────────────────────────────────
+
+function EditClassModal({
+  visible,
+  classData,
+  onClose,
+  onSubmit,
+  isPending,
+  themeColors,
+}: {
+  visible: boolean;
+  classData: ClassRead | null;
+  onClose: () => void;
+  onSubmit: (classId: string, data: { name: string; short_code: string; description: string; is_active: boolean; academic_year_id: string }) => void;
+  isPending: boolean;
+  themeColors: any;
+}) {
+  const [name, setName] = useState('');
+  const [shortCode, setShortCode] = useState('');
+  const [description, setDescription] = useState('');
+  const [isActive, setIsActive] = useState(true);
+
+  React.useEffect(() => {
+    if (classData) {
+      setName(classData.name);
+      setShortCode(classData.short_code || '');
+      setDescription(classData.description || '');
+      setIsActive(classData.is_active ?? true);
+    }
+  }, [classData]);
+
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    if (!classData) return;
+    onSubmit(classData.id, { name: name.trim(), short_code: shortCode.trim(), description: description.trim(), is_active: isActive, academic_year_id: classData.academic_year_id });
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
+            <ThemedText type="title" style={styles.modalTitle}>Edit Class</ThemedText>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalBody}>
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Class Name *</ThemedText>
+              <TextInput
+                style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border, backgroundColor: themeColors.card }]}
+                placeholder="e.g., Class 1"
+                placeholderTextColor={themeColors['muted-foreground']}
+                value={name}
+                onChangeText={setName}
+              />
+            </View>
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Class Code</ThemedText>
+              <TextInput
+                style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border, backgroundColor: themeColors.card }]}
+                placeholder="e.g., C1"
+                placeholderTextColor={themeColors['muted-foreground']}
+                value={shortCode}
+                onChangeText={setShortCode}
+              />
+            </View>
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Description</ThemedText>
+              <TextInput
+                style={[styles.input, styles.textArea, { color: themeColors['card-foreground'], borderColor: themeColors.border, backgroundColor: themeColors.card }]}
+                placeholder="Optional description..."
+                placeholderTextColor={themeColors['muted-foreground']}
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+            </View>
+            <View style={styles.formRowGroup}>
+              <ThemedText style={styles.formRowLabel}>Active</ThemedText>
+              <TouchableOpacity
+                style={styles.checkboxContainer}
+                onPress={() => setIsActive(v => !v)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={isActive ? 'checkbox' : 'square-outline'} size={24} color={themeColors.primary} />
+                <ThemedText style={styles.checkboxLabel}>Class is active</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+          <View style={[styles.modalFooter, { borderTopColor: themeColors.border }]}>
+            <TouchableOpacity style={[styles.button, styles.cancelBtn]} onPress={onClose}>
+              <ThemedText style={styles.cancelBtnText}>Cancel</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.submitBtn, { backgroundColor: themeColors.primary }]}
+              onPress={handleSubmit}
+              disabled={isPending || !name.trim()}
+            >
+              <ThemedText style={styles.submitBtnText}>{isPending ? 'Saving...' : 'Update Class'}</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 }
+
+// ─── Edit / Add Section Modal ─────────────────────────────────────────────────
+
+function SectionModal({
+  visible,
+  sectionData,
+  className,
+  onClose,
+  onSubmit,
+  isPending,
+  themeColors,
+}: {
+  visible: boolean;
+  sectionData: SectionRead | null; // null = create mode
+  className: string;
+  onClose: () => void;
+  onSubmit: (name: string, isActive: boolean) => void;
+  isPending: boolean;
+  themeColors: any;
+}) {
+  const [name, setName] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const { showError } = useToastContext();
+
+  React.useEffect(() => {
+    if (sectionData) {
+      setName(sectionData.name);
+      setIsActive(sectionData.is_active ?? true);
+    } else {
+      setName('');
+      setIsActive(true);
+    }
+  }, [sectionData, visible]);
+
+  const handleSubmit = () => {
+    if (!name.trim()) {
+      showError('Validation', 'Section name is required');
+      return;
+    }
+    onSubmit(name.trim(), isActive);
+  };
+
+  const isEdit = !!sectionData;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
+            <View>
+              <ThemedText type="title" style={styles.modalTitle}>
+                {isEdit ? 'Edit Section' : 'Add New Section'}
+              </ThemedText>
+              <ThemedText style={[styles.modalSubtitle, { color: themeColors['muted-foreground'] }]}>
+                Class: {className}
+              </ThemedText>
+            </View>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalBody}>
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Section Name *</ThemedText>
+              <TextInput
+                style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border, backgroundColor: themeColors.card }]}
+                placeholder="e.g., A, B, C"
+                placeholderTextColor={themeColors['muted-foreground']}
+                value={name}
+                onChangeText={setName}
+                autoFocus
+              />
+            </View>
+            <View style={styles.formRowGroup}>
+              <ThemedText style={styles.formRowLabel}>Active</ThemedText>
+              <TouchableOpacity
+                style={styles.checkboxContainer}
+                onPress={() => setIsActive(v => !v)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={isActive ? 'checkbox' : 'square-outline'} size={24} color={themeColors.primary} />
+                <ThemedText style={styles.checkboxLabel}>Section is active</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+          <View style={[styles.modalFooter, { borderTopColor: themeColors.border }]}>
+            <TouchableOpacity style={[styles.button, styles.cancelBtn]} onPress={onClose}>
+              <ThemedText style={styles.cancelBtnText}>Cancel</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.submitBtn, { backgroundColor: themeColors.primary }]}
+              onPress={handleSubmit}
+              disabled={isPending}
+            >
+              <ThemedText style={styles.submitBtnText}>
+                {isPending ? 'Saving...' : (isEdit ? 'Update Section' : 'Add Section')}
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Create Class + Sections Modal ───────────────────────────────────────────
+
+function CreateClassModal({
+  visible,
+  onClose,
+  onSubmit,
+  isPending,
+  themeColors,
+  activeAcademicYearId,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+  isPending: boolean;
+  themeColors: any;
+  activeAcademicYearId: string | null;
+}) {
+  const [className, setClassName] = useState('');
+  const [shortCode, setShortCode] = useState('');
+  const [sections, setSections] = useState<string[]>(['']);
+  const { showError } = useToastContext();
+
+  const reset = () => {
+    setClassName('');
+    setShortCode('');
+    setSections(['']);
+  };
+
+  const handleClose = () => { reset(); onClose(); };
+
+  const handleSubmit = () => {
+    if (!className.trim()) { showError('Validation', 'Class name is required'); return; }
+    if (!shortCode.trim()) { showError('Validation', 'Short code is required'); return; }
+    if (!activeAcademicYearId) { showError('Error', 'No active academic year'); return; }
+    const validSections = sections.filter(s => s.trim());
+    if (validSections.length === 0) { showError('Validation', 'At least one section is required'); return; }
+    onSubmit({
+      name: className.trim(),
+      short_code: shortCode.trim(),
+      is_active: true,
+      academic_year_id: activeAcademicYearId,
+      sections: validSections.map(s => ({ name: s.trim() })),
+    });
+    reset();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
+            <ThemedText type="title" style={styles.modalTitle}>Add Class & Sections</ThemedText>
+            <TouchableOpacity onPress={handleClose}>
+              <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalBody}>
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Class Name *</ThemedText>
+              <TextInput
+                style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border, backgroundColor: themeColors.card }]}
+                placeholder="e.g., Class 1"
+                placeholderTextColor={themeColors['muted-foreground']}
+                value={className}
+                onChangeText={setClassName}
+              />
+            </View>
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Short Code *</ThemedText>
+              <TextInput
+                style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border, backgroundColor: themeColors.card }]}
+                placeholder="e.g., C1"
+                placeholderTextColor={themeColors['muted-foreground']}
+                value={shortCode}
+                onChangeText={setShortCode}
+              />
+            </View>
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Sections *</ThemedText>
+              {sections.map((s, i) => (
+                <View key={i} style={styles.sectionRow}>
+                  <TextInput
+                    style={[styles.sectionInput, { color: themeColors['card-foreground'], borderColor: themeColors.border, backgroundColor: themeColors.card }]}
+                    placeholder={`Section ${i + 1} (e.g., A)`}
+                    placeholderTextColor={themeColors['muted-foreground']}
+                    value={s}
+                    onChangeText={text => setSections(prev => prev.map((v, idx) => idx === i ? text : v))}
+                  />
+                  {sections.length > 1 && (
+                    <TouchableOpacity
+                      style={[styles.removeSectionBtn, { backgroundColor: '#EF4444' }]}
+                      onPress={() => setSections(prev => prev.filter((_, idx) => idx !== i))}
+                    >
+                      <Ionicons name="trash" size={16} color="white" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+              <TouchableOpacity
+                style={[styles.addSectionBtn, { backgroundColor: themeColors.primary + '20', borderColor: themeColors.primary }]}
+                onPress={() => setSections(prev => [...prev, ''])}
+              >
+                <Ionicons name="add" size={16} color={themeColors.primary} />
+                <ThemedText style={[styles.addSectionBtnText, { color: themeColors.primary }]}>Add Section</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+          <View style={[styles.modalFooter, { borderTopColor: themeColors.border }]}>
+            <TouchableOpacity style={[styles.button, styles.cancelBtn]} onPress={handleClose}>
+              <ThemedText style={styles.cancelBtnText}>Cancel</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.submitBtn, { backgroundColor: themeColors.primary }]}
+              onPress={handleSubmit}
+              disabled={isPending}
+            >
+              <ThemedText style={styles.submitBtnText}>{isPending ? 'Creating...' : 'Create'}</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ClassesAndSectionsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingClass, setEditingClass] = useState<ClassSectionData | null>(null);
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState({
-    class: {
-      id: '',
-      name: '',
-      short_code: '',
-      description: '',
-      is_active: true,
-    },
-    sections: [] as { name: string; description: string; is_active: boolean }[],
+  const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set());
+
+  // Create class modal
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+
+  // Edit class modal
+  const [editClassModal, setEditClassModal] = useState<{ visible: boolean; classData: ClassRead | null }>({
+    visible: false, classData: null,
   });
-  const [editFormData, setEditFormData] = useState({
-    class_id: '',
-    section_id: '',
-    is_active: true,
-  });
-  const [classType, setClassType] = useState<'existing' | 'new'>('new');
+
+  // Section modal (edit OR add)
+  const [sectionModal, setSectionModal] = useState<{
+    visible: boolean;
+    section: SectionRead | null;
+    classId: string;
+    className: string;
+  }>({ visible: false, section: null, classId: '', className: '' });
 
   const router = useRouter();
   const { theme } = useTheme();
@@ -61,219 +399,235 @@ export default function ClassesAndSectionsScreen() {
   const { activeAcademicYearId } = useAcademicYear();
   const { showSuccess, showError } = useToastContext();
 
-  // Fetch data using permission-protected hooks
+  // Delete confirmation modal state
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ visible: false, title: '', message: '', onConfirm: () => {} });
+
   const { data: classSectionsData, isLoading, error, refetch } = useClassSections();
-  const { data: classListData } = useClassList();
-  const { data: sectionListData } = useSectionList();
 
-  // Mutations using permission-protected hooks
   const createMutation = useCreateClassSection();
-  const updateMutation = useUpdateSection();
-  const deleteMutation = useDeleteSection();
+  const updateClassMutation = useUpdateClass();
+  const deleteClassMutation = useDeleteClass();
+  const createSectionMutation = useCreateSectionForClass();
+  const updateSectionMutation = useUpdateSection();
+  const deleteSectionMutation = useDeleteSection();
 
-  // Handle mutation success/error states
-  React.useEffect(() => {
-    if (createMutation.isSuccess) {
-      setIsModalVisible(false);
-      resetForm();
-      showSuccess('Created', 'Class & sections have been created.');
-      createMutation.reset();
-    }
-  }, [createMutation.isSuccess]);
-
-  React.useEffect(() => {
-    if (updateMutation.isSuccess) {
-      setIsModalVisible(false);
-      resetForm();
-      showSuccess('Updated', 'Section has been updated.');
-      updateMutation.reset();
-    }
-  }, [updateMutation.isSuccess]);
-
-  React.useEffect(() => {
-    if (deleteMutation.isSuccess) {
-      showSuccess('Deleted', 'Section has been deleted.');
-      deleteMutation.reset();
-    }
-  }, [deleteMutation.isSuccess]);
-
-  // Flatten class sections data and filter based on search
-  const filteredClassSections = useMemo(() => {
+  // Filter classes by search query
+  const filteredData = useMemo((): ClassRead[] => {
     if (!classSectionsData || !Array.isArray(classSectionsData)) return [];
-
-    const flattened = classSectionsData.flatMap(cls =>
-      (cls.sections || []).map((section: any) => ({
-        id: section.id,
-        class_id: cls.id,
-        class_name: cls.name,
-        section_id: section.id,
-        section_name: section.name,
-        is_active: section.is_active,
-        created_at: (cls as any).created_at || new Date().toISOString(),
-      }))
+    const q = searchQuery.toLowerCase();
+    if (!q) return classSectionsData;
+    return classSectionsData.filter((cls: ClassRead) =>
+      cls.name.toLowerCase().includes(q) ||
+      (cls.short_code || '').toLowerCase().includes(q) ||
+      cls.sections.some((s: SectionRead) => s.name.toLowerCase().includes(q))
     );
-
-    return flattened.filter((classSection) => {
-      const className = classSection.class_name || '';
-      const sectionName = classSection.section_name || '';
-      const matchesSearch =
-        className.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        sectionName.toLowerCase().includes(searchQuery.toLowerCase());
-
-      return matchesSearch;
-    });
   }, [classSectionsData, searchQuery]);
 
-  const resetForm = () => {
-    setFormData({
-      class: {
-        id: '',
-        name: '',
-        short_code: '',
-        description: '',
-        is_active: true,
-      },
-      sections: [],
+  const toggleExpand = (classId: string) => {
+    setExpandedClasses(prev => {
+      const next = new Set(prev);
+      if (next.has(classId)) next.delete(classId); else next.add(classId);
+      return next;
     });
-    setEditFormData({
-      class_id: '',
-      section_id: '',
-      is_active: true,
-    });
-    setEditingClass(null);
-    setCurrentStep(1);
-    setClassType('new');
   };
 
-  const handleEdit = (classItem: ClassSectionData) => {
-    setEditingClass(classItem);
-    setEditFormData({
-      class_id: classItem.class_id,
-      section_id: classItem.section_id,
-      is_active: classItem.is_active,
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
+  const handleEditClass = (cls: ClassRead) =>
+    setEditClassModal({ visible: true, classData: cls });
+
+  const handleDeleteClass = (cls: ClassRead) => {
+    setDeleteConfirm({
+      visible: true,
+      title: 'Delete Class',
+      message: `Delete "${cls.name}"? This will also delete all associated sections. This action cannot be undone.`,
+      onConfirm: () =>
+        deleteClassMutation.mutate(cls.id, {
+          onError: (e: any) => showError('Delete Failed', e.message || 'Failed to delete class'),
+        }),
     });
-    setIsModalVisible(true);
   };
 
-  const handleDelete = (classItem: ClassSectionData) => {
-    Alert.alert(
-      'Delete Section',
-      `Are you sure you want to delete "${classItem.class_name} - ${classItem.section_name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
+  const handleAddSection = (cls: ClassRead) =>
+    setSectionModal({ visible: true, section: null, classId: cls.id, className: cls.name });
+
+  const handleEditSection = (section: SectionRead, cls: ClassRead) =>
+    setSectionModal({ visible: true, section, classId: cls.id, className: cls.name });
+
+  const handleDeleteSection = (section: SectionRead) => {
+    setDeleteConfirm({
+      visible: true,
+      title: 'Delete Section',
+      message: `Delete section "${section.name}"? This action cannot be undone.`,
+      onConfirm: () =>
+        deleteSectionMutation.mutate(section.id, {
+          onError: (e: any) => showError('Delete Failed', e.message || 'Failed to delete section'),
+        }),
+    });
+  };
+
+  const handleUpdateClass = (classId: string, data: { name: string; short_code: string; description: string; is_active: boolean; academic_year_id: string }) => {
+    updateClassMutation.mutate({ classId, data }, {
+      onSuccess: () => setEditClassModal({ visible: false, classData: null }),
+    });
+  };
+
+  const handleSectionSubmit = (name: string, isActive: boolean) => {
+    if (sectionModal.section) {
+      // Edit existing section
+      updateSectionMutation.mutate(
+        { sectionId: sectionModal.section.id, data: { name, is_active: isActive } },
         {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate({ classId: classItem.class_id, sectionId: classItem.id }, { onError: (e: any) => showError('Delete Failed', e.message || 'Failed to delete section') }),
-        },
-      ]
-    );
-  };
-
-  const handleSubmit = () => {
-    if (editingClass) {
-      if (!editFormData.class_id || !editFormData.section_id) {
-        Alert.alert('Error', 'Please select class and section');
-        return;
-      }
-      updateMutation.mutate({ classId: editingClass.class_id, sectionId: editingClass.section_id, data: { is_active: editFormData.is_active } }, { onError: (e: any) => showError('Update Failed', e.message || 'Failed to update section') });
+          onSuccess: () => setSectionModal({ visible: false, section: null, classId: '', className: '' }),
+          onError: (e: any) => showError('Update Failed', e.message || 'Failed to update section'),
+        }
+      );
     } else {
-      if (classType === 'existing') {
-        if (!formData.class.id || formData.sections.length === 0) {
-          Alert.alert('Error', 'Please select an existing class and add at least one section');
-          return;
+      // Add new section to class
+      createSectionMutation.mutate(
+        { classId: sectionModal.classId, data: { name, is_active: isActive } },
+        {
+          onSuccess: () => setSectionModal({ visible: false, section: null, classId: '', className: '' }),
+          onError: (e: any) => showError('Create Failed', e.message || 'Failed to create section'),
         }
-      } else {
-        if (!formData.class.name || formData.sections.length === 0) {
-          Alert.alert('Error', 'Please provide class name and at least one section');
-          return;
-        }
-      }
-      if (!activeAcademicYearId) {
-        Alert.alert('Error', 'No active academic year. Please set an academic year first.');
-        return;
-      }
-      const data = classType === 'existing'
-        ? {
-            class_id: formData.class.id,
-            academic_year_id: activeAcademicYearId,
-            sections: formData.sections,
-          }
-        : {
-            name: formData.class.name,
-            short_code: formData.class.short_code,
-            description: formData.class.description,
-            is_active: formData.class.is_active,
-            academic_year_id: activeAcademicYearId,
-            sections: formData.sections,
-          };
-      createMutation.mutate(data, { onError: (e: any) => showError('Create Failed', e.message || 'Failed to create class') });
+      );
     }
   };
 
+  // ── Render class card ────────────────────────────────────────────────────────
 
-  const renderClassItem = useCallback(({ item }: { item: ClassSectionData }) => (
-    <View style={[styles.classCard, { backgroundColor: themeColors.card }]}>
-      <View style={styles.classHeader}>
-        <View style={styles.classInfo}>
-          <ThemedText type="subtitle" style={styles.className}>
-            {item.class_name} - {item.section_name}
-          </ThemedText>
-          <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#10B981' : '#EF4444' }]}>
-            <ThemedText style={styles.statusText}>
-              {item.is_active ? 'Active' : 'Inactive'}
+  const renderClassItem = ({ item: cls }: { item: ClassRead }) => {
+    const isExpanded = expandedClasses.has(cls.id);
+    const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
+    const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
+    const accentColor = cls.is_active ? themeColors.primary : themeColors['muted-foreground'];
+
+    return (
+      <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
+        <View style={[styles.cardAccent, { backgroundColor: accentColor }]} />
+        <View style={{ flex: 1 }}>
+          {/* Class header */}
+          <View style={styles.cardTop}>
+            <View style={{ flex: 1 }}>
+              <ThemedText style={styles.cardName}>{cls.name}</ThemedText>
+              {!!cls.short_code && (
+                <ThemedText style={[styles.cardMeta, { color: themeColors['muted-foreground'] }]}>
+                  Code: {cls.short_code}
+                </ThemedText>
+              )}
+            </View>
+            <View style={styles.cardActions}>
+              {/* Active badge */}
+              <View style={[styles.badge, { backgroundColor: cls.is_active ? '#10B98120' : '#EF444420' }]}>
+                <ThemedText style={[styles.badgeText, { color: cls.is_active ? '#10B981' : '#EF4444' }]}>
+                  {cls.is_active ? 'Active' : 'Inactive'}
+                </ThemedText>
+              </View>
+              <PermissionGuard permissions={[[PERMISSION_RESOURCES.SECTIONS, 'create']]} requireAll={false} fallback={null} loadingFallback={null}>
+                <TouchableOpacity
+                  style={[styles.iconBtn, { backgroundColor: themeColors.primary + '20' }]}
+                  onPress={() => handleAddSection(cls)}
+                >
+                  <Ionicons name="add" size={16} color={themeColors.primary} />
+                </TouchableOpacity>
+              </PermissionGuard>
+              <PermissionGuard permissions={[[PERMISSION_RESOURCES.CLASSES, 'update']]} requireAll={false} fallback={null} loadingFallback={null}>
+                <TouchableOpacity
+                  style={[styles.iconBtn, { backgroundColor: themeColors.primary + '20' }]}
+                  onPress={() => handleEditClass(cls)}
+                >
+                  <Ionicons name="create-outline" size={16} color={themeColors.primary} />
+                </TouchableOpacity>
+              </PermissionGuard>
+              <PermissionGuard permissions={[[PERMISSION_RESOURCES.CLASSES, 'delete']]} requireAll={false} fallback={null} loadingFallback={null}>
+                <TouchableOpacity
+                  style={[styles.iconBtn, { backgroundColor: '#EF444420' }]}
+                  onPress={() => handleDeleteClass(cls)}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                </TouchableOpacity>
+              </PermissionGuard>
+              {/* Expand toggle */}
+              <TouchableOpacity
+                style={[styles.iconBtn, { backgroundColor: themeColors.border }]}
+                onPress={() => toggleExpand(cls.id)}
+              >
+                <Ionicons
+                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={themeColors['muted-foreground']}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Section count summary */}
+          <View style={[styles.metaRow, { marginTop: 4 }]}>
+            <Ionicons name="layers-outline" size={13} color={themeColors['muted-foreground']} />
+            <ThemedText style={[styles.metaText, { color: themeColors['muted-foreground'] }]}>
+              {cls.sections.length} section{cls.sections.length !== 1 ? 's' : ''}
             </ThemedText>
           </View>
-        </View>
-        <View style={styles.actionButtons}>
-          <PermissionGuard
-            permissions={[
-              [PERMISSION_RESOURCES.CLASSES, 'update'],
-              [PERMISSION_RESOURCES.SECTIONS, 'update'],
-              [PERMISSION_RESOURCES.CLASSES_SECTIONS, 'update']
-            ]}
-            requireAll={false}
-          >
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: themeColors.primary }]}
-              onPress={() => handleEdit(item)}
-            >
-              <Ionicons name="create" size={16} color="white" />
-            </TouchableOpacity>
-          </PermissionGuard>
-          <PermissionGuard
-            permissions={[
-              [PERMISSION_RESOURCES.CLASSES, 'delete'],
-              [PERMISSION_RESOURCES.SECTIONS, 'delete'],
-              [PERMISSION_RESOURCES.CLASSES_SECTIONS, 'delete']
-            ]}
-            requireAll={false}
-          >
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
-              onPress={() => handleDelete(item)}
-            >
-              <Ionicons name="trash" size={16} color="white" />
-            </TouchableOpacity>
-          </PermissionGuard>
-        </View>
-      </View>
 
-      <View style={styles.classFooter}>
-        <ThemedText style={styles.createdText}>
-          Created: {new Date(item.created_at).toLocaleDateString()}
-        </ThemedText>
+          {/* Sections list (when expanded) */}
+          {isExpanded && (
+            <View style={[styles.sectionsContainer, { borderTopColor: borderCol }]}>
+              {cls.sections.length === 0 ? (
+                <ThemedText style={[styles.noSections, { color: themeColors['muted-foreground'] }]}>
+                  No sections — tap + to add one
+                </ThemedText>
+              ) : (
+                cls.sections.map((section: SectionRead) => (
+                  <View
+                    key={section.id}
+                    style={[styles.sectionRow2, { backgroundColor: themeColors.background, borderColor: borderCol }]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <ThemedText style={styles.sectionName}>{section.name}</ThemedText>
+                    </View>
+                    <View style={[styles.badge, { backgroundColor: section.is_active ? '#10B98120' : '#EF444420', marginRight: 8 }]}>
+                      <ThemedText style={[styles.badgeText, { color: section.is_active ? '#10B981' : '#EF4444' }]}>
+                        {section.is_active ? 'Active' : 'Inactive'}
+                      </ThemedText>
+                    </View>
+                    <PermissionGuard permissions={[[PERMISSION_RESOURCES.SECTIONS, 'update']]} requireAll={false} fallback={null} loadingFallback={null}>
+                      <TouchableOpacity
+                        style={[styles.iconBtn, { backgroundColor: themeColors.primary + '20' }]}
+                        onPress={() => handleEditSection(section, cls)}
+                      >
+                        <Ionicons name="create-outline" size={14} color={themeColors.primary} />
+                      </TouchableOpacity>
+                    </PermissionGuard>
+                    <PermissionGuard permissions={[[PERMISSION_RESOURCES.SECTIONS, 'delete']]} requireAll={false} fallback={null} loadingFallback={null}>
+                      <TouchableOpacity
+                        style={[styles.iconBtn, { backgroundColor: '#EF444420' }]}
+                        onPress={() => handleDeleteSection(section)}
+                      >
+                        <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                      </TouchableOpacity>
+                    </PermissionGuard>
+                  </View>
+                ))
+              )}
+            </View>
+          )}
+        </View>
       </View>
-    </View>
-  ), [themeColors]);
+    );
+  };
 
   if (error) {
     return (
       <ThemedView style={styles.container}>
         <ThemedText type="title">Error</ThemedText>
         <ThemedText>Failed to load classes data</ThemedText>
-        <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
-          <ThemedText style={styles.retryText}>Retry</ThemedText>
+        <TouchableOpacity style={[styles.retryBtn, { backgroundColor: themeColors.primary }]} onPress={() => refetch()}>
+          <ThemedText style={{ color: 'white', fontWeight: '600' }}>Retry</ThemedText>
         </TouchableOpacity>
       </ThemedView>
     );
@@ -283,16 +637,12 @@ export default function ClassesAndSectionsScreen() {
     <PermissionGuard
       permissions={[
         [PERMISSION_RESOURCES.CLASSES, 'list'],
-        [PERMISSION_RESOURCES.CLASSES, 'read'],
         [PERMISSION_RESOURCES.SECTIONS, 'list'],
-        [PERMISSION_RESOURCES.SECTIONS, 'read'],
-        [PERMISSION_RESOURCES.CLASSES_SECTIONS, 'list'], // Fallback for combined resource
-        [PERMISSION_RESOURCES.CLASSES_SECTIONS, 'read']
       ]}
       requireAll={false}
       fallback={
         <ThemedView style={styles.container}>
-          <View style={styles.centerContainer}>
+          <View style={styles.center}>
             <ThemedText type="title">Access Denied</ThemedText>
             <ThemedText>You don't have permission to view classes and sections</ThemedText>
           </View>
@@ -302,608 +652,196 @@ export default function ClassesAndSectionsScreen() {
       <ThemedView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
           </TouchableOpacity>
-          <View style={styles.headerContent}>
+          <View style={{ flex: 1 }}>
             <ThemedText type="title">Classes & Sections</ThemedText>
-            <ThemedText style={styles.subtitle}>
-              {filteredClassSections.length} class section{filteredClassSections.length !== 1 ? 's' : ''}
+            <ThemedText style={[styles.subtitle, { color: themeColors['muted-foreground'] }]}>
+              {filteredData.length} class{filteredData.length !== 1 ? 'es' : ''}
             </ThemedText>
           </View>
-          <PermissionGuard
-            permissions={[
-              [PERMISSION_RESOURCES.CLASSES, 'create'],
-              [PERMISSION_RESOURCES.SECTIONS, 'create'],
-              [PERMISSION_RESOURCES.CLASSES_SECTIONS, 'create']
-            ]}
-            requireAll={false}
-          >
+          <PermissionGuard permissions={[[PERMISSION_RESOURCES.CLASSES, 'create']]} requireAll={false} fallback={null} loadingFallback={null}>
             <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: themeColors.primary }]}
-              onPress={() => {
-                resetForm();
-                setIsModalVisible(true);
-              }}
+              style={[styles.addBtn, { backgroundColor: themeColors.primary }]}
+              onPress={() => setCreateModalVisible(true)}
             >
               <Ionicons name="add" size={24} color="white" />
             </TouchableOpacity>
           </PermissionGuard>
         </View>
 
-      {/* Search Bar */}
-      <View style={[styles.searchContainer, { backgroundColor: themeColors.card }]}>
-        <Ionicons name="search" size={20} color={themeColors['muted-foreground']} />
-        <TextInput
-          style={[styles.searchInput, { color: themeColors['card-foreground'] }]}
-          placeholder="Search classes or sections..."
-          placeholderTextColor={themeColors['muted-foreground']}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close" size={20} color={themeColors['muted-foreground']} />
-          </TouchableOpacity>
-        ) : null}
-      </View>
-
-      {/* Classes List */}
-      <FlatList
-        data={filteredClassSections}
-        renderItem={renderClassItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
-            onRefresh={refetch}
-            tintColor={themeColors.primary}
+        {/* Search */}
+        <View style={[styles.searchBar, { backgroundColor: themeColors.card }]}>
+          <Ionicons name="search" size={18} color={themeColors['muted-foreground']} />
+          <TextInput
+            style={[styles.searchInput, { color: themeColors['card-foreground'] }]}
+            placeholder="Search classes or sections..."
+            placeholderTextColor={themeColors['muted-foreground']}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="school" size={64} color={themeColors['muted-foreground']} />
-            <ThemedText type="subtitle" style={styles.emptyTitle}>
-              No Classes Found
-            </ThemedText>
-            <ThemedText style={styles.emptyText}>
-              {searchQuery
-                ? 'Try adjusting your search query'
-                : 'Add your first class to get started'}
-            </ThemedText>
-          </View>
-        }
-      />
-
-      {/* Add/Edit Modal */}
-      <Modal
-        visible={isModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
-            <View style={styles.modalHeader}>
-              <ThemedText type="title" style={styles.modalTitle}>
-                {editingClass ? 'Edit Section' : `Add Class & Sections - Step ${currentStep}`}
-              </ThemedText>
-              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-                <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              {editingClass ? (
-                // Edit form
-                <>
-                  <View style={styles.formGroup}>
-                    <ThemedText style={styles.label}>Class</ThemedText>
-                    <View style={[styles.readOnlyField, { borderColor: themeColors.border, backgroundColor: themeColors.card }]}>
-                      <ThemedText style={styles.readOnlyText}>{editingClass.class_name}</ThemedText>
-                    </View>
-                  </View>
-
-                  <View style={styles.formGroup}>
-                    <ThemedText style={styles.label}>Section</ThemedText>
-                    <View style={[styles.readOnlyField, { borderColor: themeColors.border, backgroundColor: themeColors.card }]}>
-                      <ThemedText style={styles.readOnlyText}>{editingClass.section_name}</ThemedText>
-                    </View>
-                  </View>
-
-                  <View style={styles.checkboxContainer}>
-                    <TouchableOpacity
-                      style={styles.checkbox}
-                      onPress={() => setEditFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
-                    >
-                      <Ionicons
-                        name={editFormData.is_active ? "checkbox" : "square-outline"}
-                        size={24}
-                        color={themeColors.primary}
-                      />
-                    </TouchableOpacity>
-                    <ThemedText style={styles.checkboxLabel}>Active</ThemedText>
-                  </View>
-                </>
-              ) : (
-                // Create wizard
-                <>
-                  {currentStep === 1 && (
-                    <View style={styles.formGroup}>
-                      <ThemedText style={styles.label}>Class Type</ThemedText>
-                      <View style={styles.pickerContainer}>
-                        <TouchableOpacity
-                          style={[
-                            styles.pickerOption,
-                            { borderColor: themeColors.border },
-                            classType === 'new' && { borderColor: themeColors.primary, backgroundColor: themeColors.primary + '10' }
-                          ]}
-                          onPress={() => setClassType('new')}
-                        >
-                          <ThemedText style={[
-                            styles.pickerText,
-                            classType === 'new' && { color: themeColors.primary, fontWeight: '600' }
-                          ]}>
-                            Create New Class
-                          </ThemedText>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[
-                            styles.pickerOption,
-                            { borderColor: themeColors.border },
-                            classType === 'existing' && { borderColor: themeColors.primary, backgroundColor: themeColors.primary + '10' }
-                          ]}
-                          onPress={() => setClassType('existing')}
-                        >
-                          <ThemedText style={[
-                            styles.pickerText,
-                            classType === 'existing' && { color: themeColors.primary, fontWeight: '600' }
-                          ]}>
-                            Select Existing Class
-                          </ThemedText>
-                        </TouchableOpacity>
-                      </View>
-                      {classType === 'existing' ? (
-                        <View style={styles.pickerContainer}>
-                          {classListData?.map((classItem: any) => (
-                            <TouchableOpacity
-                              key={classItem.id}
-                              style={[
-                                styles.pickerOption,
-                                { borderColor: themeColors.border },
-                                formData.class.id === classItem.id && { borderColor: themeColors.primary, backgroundColor: themeColors.primary + '10' }
-                              ]}
-                              onPress={() => setFormData(prev => ({ ...prev, class: { ...prev.class, id: classItem.id, name: classItem.name } }))}
-                            >
-                              <ThemedText style={[
-                                styles.pickerText,
-                                formData.class.id === classItem.id && { color: themeColors.primary, fontWeight: '600' }
-                              ]}>
-                                {classItem.name}
-                              </ThemedText>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      ) : (
-                        <>
-                          <TextInput
-                            style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border }]}
-                            placeholder="Class Name"
-                            placeholderTextColor={themeColors['muted-foreground']}
-                            value={formData.class.name}
-                            onChangeText={(text) => setFormData(prev => ({ ...prev, class: { ...prev.class, name: text } }))}
-                          />
-                          <TextInput
-                            style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border }]}
-                            placeholder="Short Code"
-                            placeholderTextColor={themeColors['muted-foreground']}
-                            value={formData.class.short_code}
-                            onChangeText={(text) => setFormData(prev => ({ ...prev, class: { ...prev.class, short_code: text } }))}
-                          />
-                          <TextInput
-                            style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border }]}
-                            placeholder="Description"
-                            placeholderTextColor={themeColors['muted-foreground']}
-                            value={formData.class.description}
-                            onChangeText={(text) => setFormData(prev => ({ ...prev, class: { ...prev.class, description: text } }))}
-                          />
-                          <View style={styles.checkboxContainer}>
-                            <TouchableOpacity
-                              style={styles.checkbox}
-                              onPress={() => setFormData(prev => ({ ...prev, class: { ...prev.class, is_active: !prev.class.is_active } }))}
-                            >
-                              <Ionicons
-                                name={formData.class.is_active ? "checkbox" : "square-outline"}
-                                size={24}
-                                color={themeColors.primary}
-                              />
-                            </TouchableOpacity>
-                            <ThemedText style={styles.checkboxLabel}>Active</ThemedText>
-                          </View>
-                        </>
-                      )}
-                    </View>
-                  )}
-
-                  {currentStep === 2 && (
-                    <View style={styles.formGroup}>
-                      <ThemedText style={styles.label}>Sections</ThemedText>
-                      {formData.sections.map((section, index) => (
-                        <View key={index} style={styles.sectionInputRow}>
-                          <TextInput
-                            style={[styles.sectionInput, { color: themeColors['card-foreground'], borderColor: themeColors.border }]}
-                            placeholder="Section Name"
-                            placeholderTextColor={themeColors['muted-foreground']}
-                            value={section.name}
-                            onChangeText={(text) => {
-                              const newSections = [...formData.sections];
-                              newSections[index].name = text;
-                              setFormData(prev => ({ ...prev, sections: newSections }));
-                            }}
-                          />
-                          <TouchableOpacity
-                            style={[styles.removeSectionButton, { backgroundColor: '#EF4444' }]}
-                            onPress={() => {
-                              const newSections = formData.sections.filter((_, i) => i !== index);
-                              setFormData(prev => ({ ...prev, sections: newSections }));
-                            }}
-                          >
-                            <Ionicons name="trash" size={16} color="white" />
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                      <TouchableOpacity
-                        style={[styles.addSectionButton, { backgroundColor: themeColors.primary }]}
-                        onPress={() => setFormData(prev => ({ ...prev, sections: [...prev.sections, { name: '', description: '', is_active: true }] }))}
-                      >
-                        <Ionicons name="add" size={16} color="white" />
-                        <ThemedText style={styles.addSectionText}>Add Section</ThemedText>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {currentStep === 3 && (
-                    <View style={styles.formGroup}>
-                      <ThemedText style={styles.label}>Review</ThemedText>
-                      <ThemedText>Class: {formData.class.name || classListData?.find(c => c.id === formData.class.id)?.name}</ThemedText>
-                      <ThemedText>Sections: {formData.sections.map(s => s.name).join(', ')}</ThemedText>
-                    </View>
-                  )}
-                </>
-              )}
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                onPress={() => setIsModalVisible(false)}
-              >
-                <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-              </TouchableOpacity>
-              {!editingClass && currentStep > 1 && (
-                <TouchableOpacity
-                  style={[styles.button, styles.cancelButton]}
-                  onPress={() => setCurrentStep(currentStep - 1)}
-                >
-                  <ThemedText style={styles.cancelButtonText}>Previous</ThemedText>
-                </TouchableOpacity>
-              )}
-              {!editingClass && currentStep < 3 ? (
-                <TouchableOpacity
-                  style={[styles.button, styles.submitButton, { backgroundColor: themeColors.primary }]}
-                  onPress={() => setCurrentStep(currentStep + 1)}
-                >
-                  <ThemedText style={styles.submitButtonText}>Next</ThemedText>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.button, styles.submitButton, { backgroundColor: themeColors.primary }]}
-                  onPress={handleSubmit}
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                >
-                  <ThemedText style={styles.submitButtonText}>
-                    {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingClass ? 'Update' : 'Create')}
-                  </ThemedText>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
+          {!!searchQuery && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color={themeColors['muted-foreground']} />
+            </TouchableOpacity>
+          )}
         </View>
-      </Modal>
+
+        {/* List */}
+        <FlatList
+          data={filteredData}
+          renderItem={renderClassItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={themeColors.primary} />
+          }
+          ListEmptyComponent={
+            <View style={styles.center}>
+              <Ionicons name="school-outline" size={56} color={themeColors['muted-foreground']} />
+              <ThemedText type="subtitle" style={{ marginTop: 16 }}>
+                {searchQuery ? 'No results found' : 'No classes yet'}
+              </ThemedText>
+              <ThemedText style={{ color: themeColors['muted-foreground'], marginTop: 4, textAlign: 'center' }}>
+                {searchQuery ? 'Try a different search' : 'Tap + to add the first class'}
+              </ThemedText>
+            </View>
+          }
+        />
+
+        {/* Modals */}
+        <CreateClassModal
+          visible={createModalVisible}
+          onClose={() => setCreateModalVisible(false)}
+          onSubmit={(data) => {
+            createMutation.mutate(data, {
+              onSuccess: () => setCreateModalVisible(false),
+              onError: (e: any) => showError('Create Failed', e.message || 'Failed to create class'),
+            });
+          }}
+          isPending={createMutation.isPending}
+          themeColors={themeColors}
+          activeAcademicYearId={activeAcademicYearId}
+        />
+
+        <EditClassModal
+          visible={editClassModal.visible}
+          classData={editClassModal.classData}
+          onClose={() => setEditClassModal({ visible: false, classData: null })}
+          onSubmit={handleUpdateClass}
+          isPending={updateClassMutation.isPending}
+          themeColors={themeColors}
+        />
+
+        <SectionModal
+          visible={sectionModal.visible}
+          sectionData={sectionModal.section}
+          className={sectionModal.className}
+          onClose={() => setSectionModal({ visible: false, section: null, classId: '', className: '' })}
+          onSubmit={handleSectionSubmit}
+          isPending={updateSectionMutation.isPending || createSectionMutation.isPending}
+          themeColors={themeColors}
+        />
+
+        <ConfirmModal
+          visible={deleteConfirm.visible}
+          title={deleteConfirm.title}
+          message={deleteConfirm.message}
+          confirmText="Delete"
+          cancelText="Cancel"
+          destructive
+          onConfirm={() => {
+            setDeleteConfirm(prev => ({ ...prev, visible: false }));
+            deleteConfirm.onConfirm();
+          }}
+          onCancel={() => setDeleteConfirm(prev => ({ ...prev, visible: false }))}
+        />
       </ThemedView>
     </PermissionGuard>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
+  container: { flex: 1, padding: 16 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 64 },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  backBtn: { marginRight: 16 },
+  addBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  subtitle: { fontSize: 13, marginTop: 2 },
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 12, marginBottom: 12,
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
+  searchInput: { flex: 1, fontSize: 15 },
+  listContent: { paddingBottom: 32 },
+
+  // Card
+  card: {
+    flexDirection: 'row', borderRadius: 12, borderWidth: 1,
+    marginBottom: 10, overflow: 'hidden',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
+  cardAccent: { width: 4, alignSelf: 'stretch' },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', padding: 12, paddingBottom: 6 },
+  cardName: { fontSize: 15, fontWeight: '700', flex: 1 },
+  cardMeta: { fontSize: 12, marginTop: 2 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingBottom: 10 },
+  metaText: { fontSize: 12 },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  badgeText: { fontSize: 11, fontWeight: '600' },
+  iconBtn: { width: 28, height: 28, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+
+  // Sections
+  sectionsContainer: { borderTopWidth: 1, paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
+  sectionRow2: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderRadius: 8, borderWidth: 1,
   },
-  backButton: {
-    marginRight: 16,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  subtitle: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginTop: 4,
-  },
-  addButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-  },
-  listContainer: {
-    paddingBottom: 20,
-  },
-  classCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  classHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  classInfo: {
-    flex: 1,
-  },
-  className: {
-    marginBottom: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sectionsContainer: {
-    marginBottom: 12,
-  },
-  sectionsLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  sectionsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  sectionChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  sectionText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  classFooter: {
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingTop: 8,
-  },
-  createdText: {
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 64,
-  },
-  emptyTitle: {
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyText: {
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  retryButton: {
-    marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#3B82F6',
-    borderRadius: 8,
-  },
-  retryText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-  },
+  sectionName: { fontSize: 14, fontWeight: '500' },
+  noSections: { fontSize: 13, fontStyle: 'italic', textAlign: 'center', paddingVertical: 8 },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+    padding: 20, borderBottomWidth: 1,
   },
-  modalTitle: {
-    fontSize: 20,
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalSubtitle: { fontSize: 13, marginTop: 2 },
+  modalBody: { padding: 20 },
+  modalFooter: { flexDirection: 'row', gap: 12, padding: 20, borderTopWidth: 1 },
+  formGroup: { marginBottom: 16 },
+  formRowGroup: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  formRowLabel: { fontSize: 15, fontWeight: '600', minWidth: 80 },
+  label: { fontSize: 14, fontWeight: '500', marginBottom: 6 },
+  input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 15 },
+  textArea: { minHeight: 80, paddingTop: 10 },
+  checkboxContainer: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+  checkboxLabel: { fontSize: 15 },
+
+  // Section rows in Create modal
+  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  sectionInput: { flex: 1, borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 15 },
+  removeSectionBtn: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  addSectionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 8, borderWidth: 1, marginTop: 4,
   },
-  modalBody: {
-    padding: 20,
-  },
-  formGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  pickerContainer: {
-    gap: 8,
-  },
-  pickerOption: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-  },
-  pickerText: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  pickerDescription: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  readOnlyField: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    opacity: 0.7,
-  },
-  readOnlyText: {
-    fontSize: 16,
-  },
-  sectionsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  addSectionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  addSectionText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
-    marginLeft: 4,
-  },
-  sectionInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  sectionInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginRight: 8,
-  },
-  removeSectionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  checkbox: {
-    marginRight: 8,
-  },
-  checkboxLabel: {
-    fontSize: 16,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#F3F4F6',
-  },
-  cancelButtonText: {
-    color: '#374151',
-    fontWeight: '600',
-  },
-  submitButton: {
-    backgroundColor: '#3B82F6',
-  },
-  submitButtonText: {
-    color: 'white',
-    fontWeight: '600',
-  },
+  addSectionBtnText: { fontSize: 14, fontWeight: '600' },
+
+  // Buttons
+  button: { flex: 1, paddingVertical: 13, borderRadius: 10, alignItems: 'center' },
+  cancelBtn: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#9CA3AF' },
+  cancelBtnText: { fontWeight: '600', color: '#6B7280' },
+  submitBtn: {},
+  submitBtnText: { color: 'white', fontWeight: '700', fontSize: 15 },
+  retryBtn: { marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
 });

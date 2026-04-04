@@ -5,6 +5,7 @@ import {
     Animated,
     Dimensions,
     Easing,
+    Image,
     Modal,
     Platform,
     Pressable,
@@ -298,9 +299,7 @@ const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose, menuItems }) =>
                         {/* ── Brand header ── */}
                         <View style={styles.brandHeader}>
                             <View style={styles.brandLogoRow}>
-                                <View style={styles.brandIconBox}>
-                                    <Ionicons name="school" size={18} color="white" />
-                                </View>
+                                <Image source={require('../../assets/images/cos360-logo.jpg')} style={styles.brandLogoImg} resizeMode="contain" />
                                 <Text style={styles.brandTitle}>COS360</Text>
                             </View>
                             <TouchableOpacity
@@ -465,13 +464,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 10,
     },
-    brandIconBox: {
+    brandLogoImg: {
         width: 32,
         height: 32,
-        borderRadius: 8,
-        backgroundColor: '#556ee6',
-        justifyContent: 'center',
-        alignItems: 'center',
+        borderRadius: 6,
     },
     brandTitle: {
         color: '#fff',

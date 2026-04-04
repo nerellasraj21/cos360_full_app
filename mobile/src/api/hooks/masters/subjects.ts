@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../../../components/FeedbackToast';
+import { useToastContext } from '../../../../components/ToastProvider';
 import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { subjectsApi, Subject, SubjectInput, SubjectUpdate } from '../../index';
@@ -7,10 +7,11 @@ import { subjectsApi, Subject, SubjectInput, SubjectUpdate } from '../../index';
 // Get all subjects - permission protected
 export function useSubjects(params?: { academic_year_id?: string; active_only?: boolean; limit?: number }) {
   return usePermissionProtectedQuery<Subject[]>({
-    queryKey: ['subjects', params],
+    queryKey: ['subjects', params?.academic_year_id, params?.active_only, params?.limit],
     queryFn: () => subjectsApi.getSubjects(params),
     resource: PERMISSION_RESOURCES.SUBJECTS,
     action: 'list',
+    enabled: !params?.academic_year_id || !!params?.academic_year_id,
   });
 }
 
@@ -28,7 +29,7 @@ export function useSubject(id: string) {
 // Create subject - permission protected
 export function useCreateSubject() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<Subject, Error, SubjectInput>({
     mutationFn: (data) => subjectsApi.createSubject(data),
@@ -47,7 +48,7 @@ export function useCreateSubject() {
 // Update subject - permission protected
 export function useUpdateSubject() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<Subject, Error, { id: string; data: SubjectUpdate }>({
     mutationFn: ({ id, data }) => subjectsApi.updateSubject(id, data),
@@ -66,7 +67,7 @@ export function useUpdateSubject() {
 // Delete subject - permission protected
 export function useDeleteSubject() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<void, Error, string>({
     mutationFn: (id) => subjectsApi.deleteSubject(id),

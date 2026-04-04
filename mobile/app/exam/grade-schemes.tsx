@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import {
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -14,6 +13,7 @@ import {
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts';
 import {
   ExamGradeScheme,
@@ -45,6 +45,7 @@ export default function GradeSchemesScreen() {
   const { showSuccess, showError } = useToastContext();
   const qc = useQueryClient();
 
+  const { confirm, modalProps } = useConfirmModal();
   const [activeTab, setActiveTab] = useState<TabKey>('exam');
   const [modalVisible, setModalVisible] = useState(false);
   const [editItem, setEditItem] = useState<ExamGradeScheme | null>(null);
@@ -146,16 +147,16 @@ export default function GradeSchemesScreen() {
   };
 
   const handleDelete = (item: ExamGradeScheme) => {
-    Alert.alert('Delete Scheme', `Delete "${item.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: () => {
-          if (activeTab === 'exam') deleteExamMutation.mutate(item.id);
-          else deleteSubjectMutation.mutate(item.id);
-        },
+    confirm({
+      title: 'Delete Scheme',
+      message: `Delete "${item.name}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => {
+        if (activeTab === 'exam') deleteExamMutation.mutate(item.id);
+        else deleteSubjectMutation.mutate(item.id);
       },
-    ]);
+    });
   };
 
   const updateBand = (idx: number, field: keyof GradeBand, value: string | boolean | number) => {
@@ -399,6 +400,7 @@ export default function GradeSchemesScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
     </AppLayout>
   );
 }

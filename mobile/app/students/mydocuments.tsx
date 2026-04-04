@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextInput, Linking } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Linking } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -11,9 +11,11 @@ import { useMyDocuments, useUploadMyDocument, useDownloadDocument } from '@/src/
 import { useAuth } from '@/contexts/AuthContext';
 import { ReadOrListPermissionGuard, CreatePermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 export default function MyDocumentsPage() {
   const { colors } = useTheme();
+  const { showError, showInfo } = useToastContext();
   const { studentId, role, selectedStudent } = useAuth();
   const roleName = role?.name?.toLowerCase() ?? '';
   const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
@@ -45,13 +47,13 @@ export default function MyDocumentsPage() {
         setUploadFile({ uri: asset.uri, name: asset.name, type: asset.mimeType || 'application/octet-stream' });
       }
     } catch {
-      Alert.alert('Error', 'Failed to pick file');
+      showError('Error', 'Failed to pick file');
     }
   };
 
   const handleUploadSubmit = () => {
     if (!uploadType.trim() || !uploadFile) {
-      Alert.alert('Validation', 'Please enter a document type and select a file');
+      showError('Validation', 'Please enter a document type and select a file');
       return;
     }
     uploadMutation.mutate(
@@ -74,13 +76,13 @@ export default function MyDocumentsPage() {
         try {
           await Linking.openURL(reader.result as string);
         } catch {
-          Alert.alert('Info', 'Document downloaded. Check your device to open it.');
+          showInfo('Info', 'Document downloaded. Check your device to open it.');
         }
       };
-      reader.onerror = () => Alert.alert('Error', 'Failed to process document');
+      reader.onerror = () => showError('Error', 'Failed to process document');
       reader.readAsDataURL(blob);
     } catch {
-      Alert.alert('Error', 'Failed to download document');
+      showError('Error', 'Failed to download document');
     }
   };
 

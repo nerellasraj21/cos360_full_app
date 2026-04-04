@@ -14,11 +14,8 @@ const sections = [
   { title: 'Subject Categories',    description: 'Organize subjects into categories',                 icon: 'folder' as const,           color: '#0E7490', route: '/masters/subjectcategories',    resource: PERMISSION_RESOURCES.SUBJECT_CATEGORIES },
   { title: 'Subjects',              description: 'Define subjects and subject details',               icon: 'book' as const,             color: '#06B6D4', route: '/masters/subjects',             resource: PERMISSION_RESOURCES.SUBJECTS },
   { title: 'Class Subject Mappings',description: 'Map subjects to classes and sections',              icon: 'git-branch' as const,       color: '#0891B2', route: '/masters/classsubjectmappings', resource: PERMISSION_RESOURCES.CLASS_SUBJECT_MAPPINGS },
-  { title: 'Holidays',              description: 'Manage holiday calendar',                           icon: 'sunny' as const,            color: '#06B6D4', route: '/masters/holidays',             resource: PERMISSION_RESOURCES.HOLIDAYS },
-  { title: 'Locations',             description: 'Manage location master data',                        icon: 'location' as const,         color: '#0891B2', route: '/masters/locations',            resource: PERMISSION_RESOURCES.LOCATIONS },
-  { title: 'Timetable Management',  description: 'Create and manage class timetables',                icon: 'time' as const,             color: '#0E7490', route: '/masters/timetable',            resource: PERMISSION_RESOURCES.TIMETABLES },
-  { title: 'Roles & Permissions',   description: 'Manage roles and permission assignments',           icon: 'shield-checkmark' as const, color: '#0891B2', route: '/masters/rolespermissions',     resource: PERMISSION_RESOURCES.ROLES_PERMISSIONS },
-  { title: 'Parents',               description: 'View and manage parent records',                    icon: 'person-circle' as const,    color: '#0E7490', route: '/masters/parents',              resource: PERMISSION_RESOURCES.PARENTS },
+  { title: 'Holidays',              description: 'Configure school holidays and calendar events',     icon: 'sunny' as const,            color: '#06B6D4', route: '/masters/holidays',             resource: PERMISSION_RESOURCES.HOLIDAYS },
+  { title: 'Timetable Management',  description: 'Manage class timetables and schedules',             icon: 'time' as const,             color: '#0E7490', route: '/masters/timetable',            resource: PERMISSION_RESOURCES.TIMETABLES },
 ];
 
 export default function MastersScreen() {

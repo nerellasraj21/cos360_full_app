@@ -16,6 +16,11 @@ import {
 
 import { AppLayout } from '@/components';
 import { useAcademicYear, useAuth, useTheme } from '@/contexts';
+// Fix #3: Authenticated PDF receipt download via FileSystem (Blob responseType doesn't work in RN)
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { apiClient } from '@/src/api';
+import { getValidAccessToken, getClientSchema } from '../../services/authUtils';
 import {
   feeCollectionApi,
   feeConcessionsApi,
@@ -53,6 +58,8 @@ export default function FeeCollectionScreen() {
     bank_reference: '',
     cheque_number: '',
     cheque_bank: '',
+    // Fix #4: cheque_date required by backend for cheque/dd methods
+    cheque_date: '',
   });
   // C-6: max-amount guard error state
   const [amountError, setAmountError] = useState(null as any);
@@ -130,6 +137,8 @@ export default function FeeCollectionScreen() {
       bank_reference: paymentForm.bank_reference || undefined,
       cheque_number: paymentForm.cheque_number || undefined,
       cheque_bank: paymentForm.cheque_bank || undefined,
+      // Fix #4: pass cheque_date — backend requires it for cheque/dd
+      cheque_date: paymentForm.cheque_date || undefined,
     } as any),
     onSuccess: (data: any, capturedStudentId: string) => {
       qc.invalidateQueries({ queryKey: ['fee-summary', capturedStudentId] });
@@ -138,7 +147,7 @@ export default function FeeCollectionScreen() {
       setAdminTab('summary');
       setAmountError(null);
       const paid = parseFloat(paymentForm.amount) || 0;
-      setPaymentForm({ amount: '', payment_method: 'cash', remarks: '', upi_reference: '', bank_reference: '', cheque_number: '', cheque_bank: '' });
+      setPaymentForm({ amount: '', payment_method: 'cash', remarks: '', upi_reference: '', bank_reference: '', cheque_number: '', cheque_bank: '', cheque_date: '' });
       setPaymentSuccess({
         receipt_number: data?.receipt_number,
         receipt_id: data?.receipt_id,
@@ -366,23 +375,33 @@ export default function FeeCollectionScreen() {
           />
         </>
       )}
-      {paymentForm.payment_method === 'cheque' && (
+      {/* Fix #4: Show cheque fields for both 'cheque' AND 'dd' — backend requires all 3 for both */}
+      {(['cheque', 'dd'] as const).includes(paymentForm.payment_method as 'cheque' | 'dd') && (
         <>
-          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Cheque Number</Text>
+          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Cheque / DD Number *</Text>
           <TextInput
             style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
-            placeholder="Enter cheque number"
+            placeholder="Enter cheque or DD number"
             placeholderTextColor={colors['muted-foreground']}
             value={paymentForm.cheque_number}
             onChangeText={(t) => setPaymentForm(p => ({ ...p, cheque_number: t }))}
           />
-          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Bank Name</Text>
+          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Bank Name *</Text>
           <TextInput
             style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
             placeholder="Enter bank name"
             placeholderTextColor={colors['muted-foreground']}
             value={paymentForm.cheque_bank}
             onChangeText={(t) => setPaymentForm(p => ({ ...p, cheque_bank: t }))}
+          />
+          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Cheque / DD Date * (YYYY-MM-DD)</Text>
+          <TextInput
+            style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
+            placeholder="e.g. 2026-03-28"
+            placeholderTextColor={colors['muted-foreground']}
+            value={paymentForm.cheque_date}
+            onChangeText={(t) => setPaymentForm(p => ({ ...p, cheque_date: t }))}
+            keyboardType="numeric"
           />
         </>
       )}
@@ -401,7 +420,14 @@ export default function FeeCollectionScreen() {
       <TouchableOpacity
         style={[styles.submitBtn, { backgroundColor: '#10B981', opacity: payMutation.isPending ? 0.6 : 1 }]}
         onPress={() => payMutation.mutate(selectedStudentId)}
-        disabled={payMutation.isPending || !paymentForm.amount || !!amountError}
+        disabled={
+          payMutation.isPending || !paymentForm.amount || !!amountError
+          // Fix #4: enforce conditional required fields before submit to avoid 422 from backend
+          || (paymentForm.payment_method === 'upi' && !paymentForm.upi_reference)
+          || (paymentForm.payment_method === 'bank_transfer' && !paymentForm.bank_reference)
+          || ((['cheque', 'dd'] as const).includes(paymentForm.payment_method as 'cheque' | 'dd')
+              && (!paymentForm.cheque_number || !paymentForm.cheque_bank || !paymentForm.cheque_date))
+        }
       >
         <Text style={styles.submitBtnText}>{payMutation.isPending ? 'Processing...' : 'Record Payment'}</Text>
       </TouchableOpacity>
@@ -705,7 +731,23 @@ export default function FeeCollectionScreen() {
             {paymentSuccess?.receipt_id ? (
               <TouchableOpacity
                 style={[styles.downloadBtn, { borderColor: colors.primary }]}
-                onPress={async () => { try { await feeCollectionApi.getReceiptPdf(paymentSuccess.receipt_id!); showSuccess('Receipt', 'Receipt will be emailed to parent'); } catch { showError('Error', 'Unable to download receipt'); } }}
+                onPress={async () => {
+                  try {
+                    // Fix #3: Build authenticated request — Linking.openURL/Blob can't send auth headers
+                    const token = await getValidAccessToken(false);
+                    const schema = await getClientSchema();
+                    const headers: Record<string, string> = {};
+                    if (token) headers.Authorization = `Bearer ${token}`;
+                    if (schema) headers.cschema = schema;
+                    const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
+                    const url = `${baseUrl}/fee/collection/receipts/${paymentSuccess.receipt_id!}/pdf`;
+                    const localUri = FileSystem.documentDirectory + `receipt_${paymentSuccess.receipt_id}.pdf`;
+                    const result = await FileSystem.downloadAsync(url, localUri, { headers });
+                    await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf' });
+                  } catch {
+                    showError('Error', 'Unable to download receipt');
+                  }
+                }}
               >
                 <Ionicons name='download-outline' size={16} color={colors.primary} />
                 <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>Download Receipt</Text>

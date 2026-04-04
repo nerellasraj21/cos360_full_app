@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { ConfirmModal } from '@/components/ui';
 import { useQuery } from '@tanstack/react-query';
 
 import { AppLayout, PermissionGuard, ReadPermissionGuard } from '@/components';
@@ -35,27 +36,18 @@ export default function SettingsScreen() {
   const { role, user, logout } = useAuth();
   const { colors, theme } = useTheme();
   const router = useRouter();
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-            } catch (e) {
-              // ignore — logout clears locally regardless
-            }
-            router.replace('/login');
-          },
-        },
-      ]
-    );
+  const handleLogout = () => setShowSignOutModal(true);
+
+  const confirmSignOut = async () => {
+    setShowSignOutModal(false);
+    try {
+      await logout();
+    } catch (e) {
+      // ignore — logout clears locally regardless
+    }
+    router.replace('/login');
   };
 
   const { data: academicYearOptions = [], isLoading } = useQuery({
@@ -75,6 +67,7 @@ export default function SettingsScreen() {
   const textColor = colors.foreground;
 
   return (
+    <>
     <AppLayout title="Settings">
       <ScrollView
         style={styles.scroll}
@@ -257,6 +250,17 @@ export default function SettingsScreen() {
 
       </ScrollView>
     </AppLayout>
+    <ConfirmModal
+      visible={showSignOutModal}
+      title="Sign Out"
+      message="Are you sure you want to sign out?"
+      confirmText="Sign Out"
+      cancelText="Cancel"
+      destructive
+      onConfirm={confirmSignOut}
+      onCancel={() => setShowSignOutModal(false)}
+    />
+    </>
   );
 }
 

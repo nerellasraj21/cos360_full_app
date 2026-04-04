@@ -14,8 +14,6 @@ const sections = [
   { title: 'Route Stops',         description: 'Configure pickup and drop-off stops along routes',      icon: 'location' as const,      color: '#D97706', route: '/transport/route-stops',      resource: PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS, action: 'list' },
   { title: 'Vehicles',            description: 'Manage the school vehicle fleet and details',           icon: 'bus' as const,           color: AMBER,     route: '/transport/vehicles',         resource: PERMISSION_RESOURCES.TRANSPORT_VEHICLES,    action: 'list' },
   { title: 'Transport Trips',     description: 'Schedule and track vehicle trips',                      icon: 'navigate' as const,      color: '#B45309', route: '/transport/trips',            resource: PERMISSION_RESOURCES.TRANSPORT_TRIPS,       action: 'list' },
-  { title: 'Transport Pricing',   description: 'Configure fare pricing for routes and stops',           icon: 'card' as const,          color: '#10B981', route: '/transport/pricing',          resource: PERMISSION_RESOURCES.TRANSPORT_PRICING,     action: 'list' },
-  { title: 'Student Transport',   description: 'Assign and manage student transport allocations',       icon: 'people' as const,        color: '#556ee6', route: '/transport/student-transport', resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,     action: 'list' },
 ];
 
 export default function TransportScreen() {
@@ -67,7 +65,7 @@ export default function TransportScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.bannerTitle}>Transport Management</Text>
-            <Text style={styles.bannerSub}>Routes · Stops · Vehicles · Trips · Pricing · Students</Text>
+            <Text style={styles.bannerSub}>Routes · Stops · Vehicles · Trips</Text>
           </View>
         </View>
 

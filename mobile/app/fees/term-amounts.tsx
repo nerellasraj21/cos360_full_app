@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   ScrollView,
@@ -86,7 +85,7 @@ export default function FeeTermAmountsScreen() {
     for (const draft of termAmountDrafts) {
       const amount = parseFloat(draft.amount);
       if (isNaN(amount) || amount < 0) {
-        Alert.alert('Error', 'All amounts must be valid numbers');
+        showError('Error', 'All amounts must be valid numbers');
         return;
       }
       if (draft.id) {

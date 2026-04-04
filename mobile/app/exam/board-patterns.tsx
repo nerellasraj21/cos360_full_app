@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import {
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -14,6 +13,7 @@ import {
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts';
 import { BoardPattern, BoardPatternCreate, boardPatternsApi } from '@/src/api/exam';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
@@ -26,6 +26,7 @@ export default function BoardPatternsScreen() {
   const { showSuccess, showError } = useToastContext();
   const qc = useQueryClient();
 
+  const { confirm, modalProps } = useConfirmModal();
   const [modalVisible, setModalVisible] = useState(false);
   const [editItem, setEditItem] = useState<BoardPattern | null>(null);
   const [form, setForm] = useState<BoardPatternCreate>({ ...EMPTY_FORM });
@@ -79,10 +80,13 @@ export default function BoardPatternsScreen() {
   };
 
   const handleDelete = (item: BoardPattern) => {
-    Alert.alert('Delete Pattern', `Delete "${item.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(item.id) },
-    ]);
+    confirm({
+      title: 'Delete Pattern',
+      message: `Delete "${item.name}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(item.id),
+    });
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
@@ -186,6 +190,7 @@ export default function BoardPatternsScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
     </AppLayout>
   );
 }

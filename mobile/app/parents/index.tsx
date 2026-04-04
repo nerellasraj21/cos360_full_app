@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -63,7 +62,7 @@ export default function ParentsScreen() {
   const renderParentItem = ({ item }: { item: Parent }) => (
     <TouchableOpacity
       style={[styles.parentCard, { backgroundColor: themeColors.card }]}
-      onPress={() => Alert.alert('Parent Details', `View details for ${item.first_name} ${item.last_name}`)}
+      onPress={() => {}}
     >
       <View style={styles.parentHeader}>
         <View style={styles.parentInfo}>
@@ -184,7 +183,7 @@ export default function ParentsScreen() {
             resource={PERMISSION_RESOURCES.PARENT_PROFILE}>
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: themeColors.primary }]}
-              onPress={() => Alert.alert('Add Parent', 'Navigate to parent enrollment form')}
+              onPress={() => {}}
             >
               <Ionicons name="add" size={24} color="white" />
             </TouchableOpacity>

@@ -78,10 +78,11 @@ export function useUpdateAdmission() {
     resource: PERMISSION_RESOURCES.STUDENT_ADMISSIONS,
     action: 'update',
     mutationFn: ({ studentId, data }) => studentAdmissionsApi.updateStudentAdmission(studentId, data),
-    onSuccess: (data) => {
+    onSuccess: (_data, variables) => {
       showSuccess('Success', 'Student admission updated successfully!');
       queryClient.invalidateQueries({ queryKey: ['admissions'] });
       queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['admission', 'student', variables.studentId] });
     },
     onError: (error: any) => {
       showError('Error', `Failed to update admission: ${error.message}`);

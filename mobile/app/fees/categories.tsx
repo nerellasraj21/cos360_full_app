@@ -1,30 +1,27 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { useToastContext } from '@/components/ToastProvider';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useTheme, useAcademicYear } from '@/contexts';
-import { FeeCategoryResponse, FeeCategoryRequest } from '@/src/api/fees';
-import { 
-  useFeeCategories, 
-  useCreateFeeCategory, 
-  useUpdateFeeCategory, 
-  useDeleteFeeCategory 
+import { FeeCategoryResponse } from '@/src/api/fees';
+import {
+  useFeeCategories,
+  useCreateFeeCategory,
+  useUpdateFeeCategory,
+  useDeleteFeeCategory
 } from '@/hooks/use-fee-permissions';
-import { 
-  PermissionGuard, 
-  ReadOrListPermissionGuard, 
-  CreatePermissionGuard, 
-  UpdatePermissionGuard, 
-  DeletePermissionGuard 
+import {
+  ReadOrListPermissionGuard,
+  CreatePermissionGuard,
+  UpdatePermissionGuard,
+  DeletePermissionGuard
 } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import React, { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import {
-  Alert,
   FlatList,
   Modal,
   StyleSheet,
@@ -56,40 +53,6 @@ export default function FeeCategoriesScreen() {
   const updateMutation = useUpdateFeeCategory();
   const deleteMutation = useDeleteFeeCategory();
 
-  // Handle mutation success/error with toast notifications
-  React.useEffect(() => {
-    if (createMutation.isSuccess) {
-      queryClient.invalidateQueries({ queryKey: ['feeCategories'] });
-      setIsModalVisible(false);
-      resetForm();
-      showSuccess('Fee category created successfully');
-    }
-    if (createMutation.isError) {
-      showError('Failed to create fee category', 'An error occurred');
-    }
-  }, [createMutation.isSuccess, createMutation.isError]);
-
-  React.useEffect(() => {
-    if (updateMutation.isSuccess) {
-      queryClient.invalidateQueries({ queryKey: ['feeCategories'] });
-      setIsModalVisible(false);
-      resetForm();
-      showSuccess('Fee category updated successfully');
-    }
-    if (updateMutation.isError) {
-      showError('Failed to update fee category', 'An error occurred');
-    }
-  }, [updateMutation.isSuccess, updateMutation.isError]);
-
-  React.useEffect(() => {
-    if (deleteMutation.isSuccess) {
-      queryClient.invalidateQueries({ queryKey: ['feeCategories'] });
-      showSuccess('Fee category deleted successfully');
-    }
-    if (deleteMutation.isError) {
-      showError('Failed to delete fee category', 'An error occurred');
-    }
-  }, [deleteMutation.isSuccess, deleteMutation.isError]);
 
   const resetForm = () => {
     setFormData({
@@ -124,20 +87,33 @@ export default function FeeCategoriesScreen() {
 
   const handleSubmit = () => {
     if (!formData.category_name.trim()) {
-      Alert.alert('Error', 'Category name is required');
+      showError('Error', 'Category name is required');
       return;
     }
 
     if (editingCategory) {
-      updateMutation.mutate({
-        id: editingCategory.id,
-        data: formData,
+      updateMutation.mutate({ id: editingCategory.id, data: formData }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['feeCategories'] });
+          setIsModalVisible(false);
+          resetForm();
+          showSuccess('Fee category updated successfully');
+        },
+        onError: () => showError('Error', 'Failed to update fee category'),
       });
     } else {
       createMutation.mutate({
         category_name: formData.category_name,
         academic_year_id: formData.academic_year_id,
         category_status: formData.category_status,
+      }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['feeCategories'] });
+          setIsModalVisible(false);
+          resetForm();
+          showSuccess('Fee category created successfully');
+        },
+        onError: () => showError('Error', 'Failed to create fee category'),
       });
     }
   };
@@ -348,10 +324,17 @@ export default function FeeCategoriesScreen() {
                     style={[styles.deleteButton, { backgroundColor: colors.destructive }]}
                     onPress={() => {
                       if (categoryToDelete) {
-                        deleteMutation.mutate(categoryToDelete.id);
+                        const id = categoryToDelete.id;
+                        setIsDeleteModalVisible(false);
+                        setCategoryToDelete(null);
+                        deleteMutation.mutate(id, {
+                          onSuccess: () => {
+                            queryClient.invalidateQueries({ queryKey: ['feeCategories'] });
+                            showSuccess('Fee category deleted successfully');
+                          },
+                          onError: (err: any) => showError('Delete Failed', err?.message || 'Cannot delete this category — it may have associated fee types'),
+                        });
                       }
-                      setIsDeleteModalVisible(false);
-                      setCategoryToDelete(null);
                     }}
                   >
                     <ThemedText style={styles.deleteButtonText}>Delete</ThemedText>

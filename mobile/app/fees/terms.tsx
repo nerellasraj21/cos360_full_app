@@ -1,6 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { FeeTermResponse, FeeTermRequest, feeTermsApi } from '@/src/api/fees';
@@ -19,7 +20,6 @@ import { useAcademicYear } from '@/contexts/AcademicYearContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IOSDatePickerModal } from '@/components/ui';
 import {
-    Alert,
     Modal,
     Platform,
     ScrollView,
@@ -53,13 +53,6 @@ const autoFormatDateInput = (text: string): string => {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 };
 
-// Column widths
-const COL_SNO = 48;
-const COL_NAME = 130;
-const COL_TERMS = 72;
-const COL_STATUS = 80;
-const COL_DATES = 150;
-const COL_ACTIONS = 80;
 
 export default function FeeTermsScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -82,6 +75,7 @@ export default function FeeTermsScreen() {
   const queryClient = useQueryClient();
   const { activeAcademicYearId } = useAcademicYear();
   const { showSuccess, showError } = useToastContext();
+  const { confirm: confirmModal, modalProps } = useConfirmModal();
 
   const { data: terms = [], isLoading, error } = useQuery({
     queryKey: ['feeTerms', activeAcademicYearId],
@@ -123,8 +117,8 @@ export default function FeeTermsScreen() {
       queryClient.invalidateQueries({ queryKey: ['feeTerms'] });
       showSuccess('Term Deleted', 'Fee term deleted successfully');
     },
-    onError: (error) => {
-      showError('Error', 'Failed to delete fee term');
+    onError: (error: any) => {
+      showError('Delete Failed', error?.message || 'Cannot delete this term — it may be linked to active fee types');
       console.error('Delete error:', error);
     },
   });
@@ -165,41 +159,36 @@ export default function FeeTermsScreen() {
   };
 
   const handleDelete = (term: FeeTermResponse) => {
-    Alert.alert(
-      'Delete Fee Term',
-      `Are you sure you want to delete "${term.term_name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(term.id),
-        },
-      ]
-    );
+    confirmModal({
+      title: 'Delete Fee Term',
+      message: `Are you sure you want to delete "${term.term_name}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(term.id),
+    });
   };
 
   const handleSubmit = () => {
     if (!formData.term_name.trim()) {
-      Alert.alert('Error', 'Term name is required');
+      showError('Error', 'Term name is required');
       return;
     }
     if (!formData.academic_year_id) {
-      Alert.alert('Error', 'Academic year is required');
+      showError('Error', 'Academic year is required');
       return;
     }
     if (formData.number_of_terms < 1) {
-      Alert.alert('Error', 'Number of terms must be at least 1');
+      showError('Error', 'Number of terms must be at least 1');
       return;
     }
     for (let i = 0; i < formData.fee_term_dates.length; i++) {
       if (!formData.fee_term_dates[i].fee_term_date) {
-        Alert.alert('Error', `Due date for Term ${i + 1} is required`);
+        showError('Error', `Due date for Term ${i + 1} is required`);
         return;
       }
     }
     if (formData.fee_term_dates.length !== formData.number_of_terms) {
-      Alert.alert('Error', 'Number of term dates must equal number of terms');
+      showError('Error', 'Number of term dates must equal number of terms');
       return;
     }
 
@@ -271,68 +260,58 @@ export default function FeeTermsScreen() {
             </CreatePermissionGuard>
           </View>
 
-          {/* Table */}
-          <View style={[styles.tableContainer, { borderColor: colors.border }]}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <View>
-                {/* Header */}
-                <View style={[styles.tableRow, styles.tableHeader, { backgroundColor: colors.primary }]}>
-                  <ThemedText style={[styles.headerCell, { width: COL_SNO, color: '#fff' }]}>S.No.</ThemedText>
-                  <ThemedText style={[styles.headerCell, { width: COL_NAME, color: '#fff' }]}>Term Name</ThemedText>
-                  <ThemedText style={[styles.headerCell, { width: COL_TERMS, color: '#fff' }]}># Terms</ThemedText>
-                  <ThemedText style={[styles.headerCell, { width: COL_STATUS, color: '#fff' }]}>Status</ThemedText>
-                  <ThemedText style={[styles.headerCell, { width: COL_DATES, color: '#fff' }]}>Date Range</ThemedText>
-                  <ThemedText style={[styles.headerCell, { width: COL_ACTIONS, color: '#fff', textAlign: 'center' }]}>Actions</ThemedText>
-                </View>
-                {/* Rows */}
-                {terms.length === 0 ? (
-                  <View style={[styles.emptyRow, { width: COL_SNO + COL_NAME + COL_TERMS + COL_STATUS + COL_DATES + COL_ACTIONS }]}>
-                    <Ionicons name="calendar-outline" size={32} color={colors['muted-foreground']} />
-                    <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
-                      No fee terms found
-                    </ThemedText>
-                  </View>
-                ) : (
-                  terms.map((item, index) => (
-                    <View
-                      key={item.id}
-                      style={[styles.tableRow, { backgroundColor: index % 2 === 0 ? colors.card : colors.background }]}
-                    >
-                      <ThemedText style={[styles.cell, { width: COL_SNO }]}>{index + 1}</ThemedText>
-                      <ThemedText style={[styles.cell, { width: COL_NAME }]} numberOfLines={2}>{item.term_name}</ThemedText>
-                      <ThemedText style={[styles.cell, { width: COL_TERMS, textAlign: 'center' }]}>{item.number_of_terms}</ThemedText>
-                      <View style={{ width: COL_STATUS, justifyContent: 'center', paddingHorizontal: 4 }}>
-                        <View style={[styles.statusBadge, { backgroundColor: item.term_status === 'active' ? '#16a34a20' : '#dc262620' }]}>
-                          <ThemedText style={[styles.statusText, { color: item.term_status === 'active' ? '#16a34a' : '#dc2626' }]}>
-                            {item.term_status === 'active' ? 'Active' : 'Inactive'}
-                          </ThemedText>
-                        </View>
-                      </View>
-                      <ThemedText style={[styles.cell, { width: COL_DATES, fontSize: 12 }]}>{getDateRange(item)}</ThemedText>
-                      <View style={[styles.actionsCell, { width: COL_ACTIONS }]}>
-                        <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS}>
-                          <TouchableOpacity
-                            style={[styles.iconBtn, { backgroundColor: colors.primary }]}
-                            onPress={() => handleEdit(item)}
-                          >
-                            <Ionicons name="pencil" size={14} color="#fff" />
-                          </TouchableOpacity>
-                        </UpdatePermissionGuard>
-                        <DeletePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS}>
-                          <TouchableOpacity
-                            style={[styles.iconBtn, { backgroundColor: colors.destructive }]}
-                            onPress={() => handleDelete(item)}
-                          >
-                            <Ionicons name="trash" size={14} color="#fff" />
-                          </TouchableOpacity>
-                        </DeletePermissionGuard>
+          {/* Cards */}
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled">
+            {terms.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <Ionicons name="calendar-outline" size={48} color={colors['muted-foreground']} />
+                <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'] }]}>No fee terms found</ThemedText>
+              </View>
+            ) : (
+              terms.map((item) => (
+                <View key={item.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.cardAccent, { backgroundColor: colors.primary }]} />
+                  <View style={{ flex: 1, padding: 12 }}>
+                    <View style={styles.cardTop}>
+                      <ThemedText style={[styles.cardName, { color: colors.foreground }]} numberOfLines={1}>{item.term_name}</ThemedText>
+                      <View style={[styles.statusBadge, { backgroundColor: item.term_status === 'active' ? '#16a34a20' : '#dc262620' }]}>
+                        <ThemedText style={[styles.statusText, { color: item.term_status === 'active' ? '#16a34a' : '#dc2626' }]}>
+                          {item.term_status === 'active' ? 'Active' : 'Inactive'}
+                        </ThemedText>
                       </View>
                     </View>
-                  ))
-                )}
-              </View>
-            </ScrollView>
-          </View>
+                    <View style={styles.cardMeta}>
+                      <Ionicons name="layers-outline" size={13} color={colors['muted-foreground']} />
+                      <ThemedText style={[styles.cardMetaText, { color: colors['muted-foreground'] }]}>
+                        {item.number_of_terms} term{item.number_of_terms !== 1 ? 's' : ''}
+                      </ThemedText>
+                      {getDateRange(item) !== '—' ? (
+                        <>
+                          <Ionicons name="calendar-outline" size={13} color={colors['muted-foreground']} />
+                          <ThemedText style={[styles.cardMetaText, { color: colors['muted-foreground'] }]}>{getDateRange(item)}</ThemedText>
+                        </>
+                      ) : null}
+                    </View>
+                    <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
+                      <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS}>
+                        <TouchableOpacity style={styles.cardAction} onPress={() => handleEdit(item)}>
+                          <Ionicons name="pencil" size={15} color={colors.primary} />
+                          <ThemedText style={[styles.cardActionText, { color: colors.primary }]}>Edit</ThemedText>
+                        </TouchableOpacity>
+                      </UpdatePermissionGuard>
+                      <DeletePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS}>
+                        <TouchableOpacity style={styles.cardAction} onPress={() => handleDelete(item)}>
+                          <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                          <ThemedText style={[styles.cardActionText, { color: '#EF4444' }]}>Delete</ThemedText>
+                        </TouchableOpacity>
+                      </DeletePermissionGuard>
+                    </View>
+                  </View>
+                </View>
+              ))
+            )}
+            <View style={{ height: 32 }} />
+          </ScrollView>
         </ThemedView>
 
         {/* Create / Edit Modal */}
@@ -513,6 +492,7 @@ export default function FeeTermsScreen() {
           }}
           onDismiss={() => setShowPicker(false)}
         />
+        <ConfirmModal {...modalProps} />
       </AppLayout>
     </ReadOrListPermissionGuard>
   );
@@ -550,69 +530,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
-  // ── Table ────────────────────────────────────────────────────────────────
-  tableContainer: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 48,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(150,150,150,0.2)',
-  },
-  tableHeader: {
-    minHeight: 44,
-  },
-  headerCell: {
-    fontSize: 12,
-    fontWeight: '700',
-    paddingHorizontal: 8,
-    paddingVertical: 10,
-    letterSpacing: 0.3,
-  },
-  cell: {
-    fontSize: 13,
-    paddingHorizontal: 8,
-    paddingVertical: 10,
-  },
-  statusBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  actionsCell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 6,
-  },
-  iconBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyRow: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-    gap: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
+  // ── Cards ────────────────────────────────────────────────────────────────
+  listContent: { padding: 12 },
+  card: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
+  cardAccent: { width: 4, alignSelf: 'stretch' },
+  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  cardName: { fontSize: 15, fontWeight: '700', flex: 1, marginRight: 8 },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 },
+  cardMetaText: { fontSize: 12 },
+  cardFooter: { flexDirection: 'row', gap: 4, paddingTop: 8, borderTopWidth: 1, marginTop: 4 },
+  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  cardActionText: { fontSize: 13, fontWeight: '600' },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  statusText: { fontSize: 11, fontWeight: '700' },
+  emptyBox: { alignItems: 'center', justifyContent: 'center', paddingVertical: 64, gap: 12 },
+  emptyText: { fontSize: 14, textAlign: 'center' },
   // ── Modal form ───────────────────────────────────────────────────────────
   modalOverlay: {
     flex: 1,

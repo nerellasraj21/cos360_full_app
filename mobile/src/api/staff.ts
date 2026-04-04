@@ -84,8 +84,8 @@ export const staffAttendanceApi = {
     skip?: number;
     limit?: number;
   }): Promise<{ items: StaffAttendance[]; total: number }> => {
-    const queryParams = params ? new URLSearchParams(params as any).toString() : '';
-    const response = await apiClient.get(`/staff/attendance${queryParams ? '?' + queryParams : ''}`);
+    // Pass params directly to axios — it strips undefined values automatically (no URLSearchParams serialization)
+    const response = await apiClient.get('/staff/attendance', { params });
     return response.data;
   },
 

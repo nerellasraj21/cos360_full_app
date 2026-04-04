@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../../../components/FeedbackToast';
+import { useToastContext } from '../../../../components/ToastProvider';
 import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { timetableApi, FrontendTimetableCreate } from '../../index';
@@ -18,7 +18,7 @@ export function useFrontendTimetable(sectionId: string) {
 // Create frontend timetable - permission protected
 export function useCreateFrontendTimetable() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<any, Error, FrontendTimetableCreate>({
     mutationFn: (data) => timetableApi.createFrontendTimetable(data),
@@ -37,7 +37,7 @@ export function useCreateFrontendTimetable() {
 // Update frontend timetable - permission protected
 export function useUpdateFrontendTimetable() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<any, Error, { sectionId: string; data: FrontendTimetableCreate }>({
     mutationFn: ({ sectionId, data }) => timetableApi.updateFrontendTimetable(sectionId, data),

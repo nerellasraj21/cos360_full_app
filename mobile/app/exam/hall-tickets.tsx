@@ -3,8 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,22 +11,19 @@ import {
 } from 'react-native';
 
 import { AppLayout } from '@/components';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts';
 import { examsApi, examHallTicketsApi, HallTicketEligibility } from '@/src/api/exam';
 import apiClient from '@/src/api/client';
+// expo-file-system + expo-sharing used for authenticated binary downloads
+// Linking.openURL cannot send auth headers, so authenticated PDF/ZIP endpoints need this pattern
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { getValidAccessToken, getClientSchema } from '../../services/authUtils';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
 import { useToastContext } from '@/components/ToastProvider';
 
 type TabKey = 'eligible' | 'ineligible';
-
-const COL_SNO    = 44;
-const COL_NAME   = 160;
-const COL_ADM    = 100;
-const COL_ATT    = 80;
-const COL_FEE    = 80;
-const COL_STATUS = 90;
-const COL_ACT    = 60;
-const COL_DL     = 50;
 
 export default function HallTicketsScreen() {
   const { examId } = useLocalSearchParams<{ examId?: string }>();
@@ -37,14 +32,13 @@ export default function HallTicketsScreen() {
   const qc = useQueryClient();
   const { showSuccess, showError } = useToastContext();
 
-  const isDark     = theme === 'dark';
-  const cardBg     = isDark ? '#1a1a2e' : '#ffffff';
-  const headerBg   = isDark ? '#111827' : '#f8fafc';
-  const borderCol  = isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0';
-  const rowAlt     = isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc';
-  const textMain   = colors.foreground as string;
-  const textMuted  = colors['muted-foreground'] as string;
+  const isDark    = theme === 'dark';
+  const cardBg    = isDark ? '#1a1a2e' : '#ffffff';
+  const borderCol = isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0';
+  const textMain  = colors.foreground as string;
+  const textMuted = colors['muted-foreground'] as string;
 
+  const { confirm, modalProps } = useConfirmModal();
   const [selectedExamId, setSelectedExamId] = useState<string>(examId ?? '');
   const [activeTab, setActiveTab] = useState<TabKey>('eligible');
 
@@ -53,16 +47,34 @@ export default function HallTicketsScreen() {
   const canOverride = hasPermission?.('exam_hall_tickets', 'create');
   const canDownload = hasPermission?.('exam_hall_tickets', 'list') || hasPermission?.('exam_hall_tickets', 'read');
 
+  // Downloads a file from an authenticated endpoint using FileSystem (not Linking.openURL,
+  // which cannot send auth headers and returns 401 for protected download endpoints)
+  const downloadAuthenticatedFile = async (url: string, filename: string, mimeType: string) => {
+    try {
+      const token = await getValidAccessToken(false);
+      const schema = await getClientSchema();
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (schema) headers.cschema = schema;
+
+      const localUri = FileSystem.documentDirectory + filename;
+      const result = await FileSystem.downloadAsync(url, localUri, { headers });
+      await Sharing.shareAsync(result.uri, { mimeType, UTI: mimeType });
+    } catch {
+      showError('Download Failed', 'Could not download file. Please try again.');
+    }
+  };
+
   const handleDownloadOne = (studentId: string) => {
     const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
     const url = `${baseUrl}/exams/${selectedExamId}/hall-tickets/download?student_id=${studentId}`;
-    Linking.openURL(url).catch(() => showError('Error', 'Could not open download URL.'));
+    downloadAuthenticatedFile(url, `hall_ticket_${studentId}.pdf`, 'application/pdf');
   };
 
   const handleDownloadAll = () => {
     const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
     const url = `${baseUrl}/exams/${selectedExamId}/hall-tickets/download-all`;
-    Linking.openURL(url).catch(() => showError('Error', 'Could not open download URL.'));
+    downloadAuthenticatedFile(url, `hall_tickets_${selectedExamId}.zip`, 'application/zip');
   };
 
   const { data: examsData } = useQuery({
@@ -113,137 +125,21 @@ export default function HallTicketsScreen() {
     onError: () => showError('Error', 'Failed to override eligibility.'),
   });
 
+  const handleOverride = (item: HallTicketEligibility) => {
+    const title = item.is_eligible ? 'Mark Ineligible' : 'Mark Eligible';
+    const message = `Override ${item.student_name ?? 'this student'} to ${item.is_eligible ? 'ineligible' : 'eligible'}?`;
+    confirm({
+      title,
+      message,
+      confirmLabel: 'Override',
+      destructive: false,
+      onConfirm: () => overrideMutation.mutate({ studentId: item.student_id, eligible: !item.is_eligible }),
+    });
+  };
+
   const activeData: HallTicketEligibility[] =
     activeTab === 'eligible' ? (eligibleData ?? []) : (ineligibleData ?? []);
   const isLoading = activeTab === 'eligible' ? loadingEligible : loadingIneligible;
-
-  /* ── Header row ── */
-  const TableHeader = () => (
-    <View style={[styles.row, { backgroundColor: headerBg, borderBottomColor: borderCol, borderBottomWidth: 1 }]}>
-      <Cell w={COL_SNO}  isHeader label="S.No."    textColor={textMuted} />
-      <Cell w={COL_NAME} isHeader label="Student"  textColor={textMuted} />
-      <Cell w={COL_ADM}  isHeader label="Adm No."  textColor={textMuted} />
-      <Cell w={COL_ATT}  isHeader label="Att %"    textColor={textMuted} center />
-      <Cell w={COL_FEE}  isHeader label="Fee"      textColor={textMuted} center />
-      <Cell w={COL_STATUS} isHeader label="Status" textColor={textMuted} center />
-      {canOverride && <Cell w={COL_ACT} isHeader label="Override" textColor={textMuted} center />}
-      {canDownload && activeTab === 'eligible' && <Cell w={COL_DL} isHeader label="PDF" textColor={textMuted} center />}
-    </View>
-  );
-
-  /* ── Data row ── */
-  const renderRow = (item: HallTicketEligibility, index: number) => {
-    const bg = index % 2 === 1 ? rowAlt : cardBg;
-    const attColor = item.attendance_percent != null
-      ? (item.attendance_percent >= 75 ? '#10B981' : '#EF4444')
-      : textMuted;
-
-    return (
-      <View
-        key={item.student_id}
-        style={[styles.row, { backgroundColor: bg, borderBottomColor: borderCol, borderBottomWidth: 1 }]}
-      >
-        {/* S.No */}
-        <View style={[styles.cell, { width: COL_SNO }]}>
-          <Text style={[styles.cellText, { color: textMuted }]}>{index + 1}</Text>
-        </View>
-
-        {/* Student name + override note */}
-        <View style={[styles.cell, { width: COL_NAME }]}>
-          <Text style={[styles.cellText, { color: textMain, fontWeight: '600' }]} numberOfLines={1}>
-            {item.student_name ?? item.student_id}
-          </Text>
-          {(item.attendance_override || item.fee_override) && (
-            <View style={styles.overrideBadge}>
-              <Text style={styles.overrideBadgeText}>Overridden</Text>
-            </View>
-          )}
-          {item.ineligibility_reason && !item.is_eligible && (
-            <Text style={styles.reasonText} numberOfLines={1}>{item.ineligibility_reason}</Text>
-          )}
-        </View>
-
-        {/* Adm No */}
-        <View style={[styles.cell, { width: COL_ADM }]}>
-          <Text style={[styles.cellText, { color: textMuted }]} numberOfLines={1}>
-            {item.admission_number ?? '—'}
-          </Text>
-        </View>
-
-        {/* Attendance */}
-        <View style={[styles.cell, { width: COL_ATT, alignItems: 'center' }]}>
-          {item.attendance_percent != null ? (
-            <View style={[styles.badge, { backgroundColor: `${attColor}18` }]}>
-              <Text style={[styles.badgeText, { color: attColor }]}>
-                {item.attendance_percent.toFixed(0)}%
-              </Text>
-            </View>
-          ) : (
-            <Text style={[styles.cellText, { color: textMuted }]}>—</Text>
-          )}
-        </View>
-
-        {/* Fee */}
-        <View style={[styles.cell, { width: COL_FEE, alignItems: 'center' }]}>
-          <View style={[styles.badge, { backgroundColor: item.fee_paid ? '#10B98118' : '#EF444418' }]}>
-            <Text style={[styles.badgeText, { color: item.fee_paid ? '#10B981' : '#EF4444' }]}>
-              {item.fee_paid ? 'Paid' : 'Unpaid'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Status */}
-        <View style={[styles.cell, { width: COL_STATUS, alignItems: 'center' }]}>
-          <View style={[styles.badge, { backgroundColor: item.is_eligible ? '#10B98118' : '#EF444418' }]}>
-            <Text style={[styles.badgeText, { color: item.is_eligible ? '#10B981' : '#EF4444' }]}>
-              {item.is_eligible ? 'Eligible' : 'Ineligible'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Override Action */}
-        {canOverride && (
-          <View style={[styles.cell, { width: COL_ACT, alignItems: 'center' }]}>
-            <TouchableOpacity
-              style={[styles.actionIcon, { backgroundColor: item.is_eligible ? '#EF444415' : '#10B98115' }]}
-              onPress={() =>
-                Alert.alert(
-                  item.is_eligible ? 'Mark Ineligible' : 'Mark Eligible',
-                  `Override ${item.student_name ?? 'this student'} to ${item.is_eligible ? 'ineligible' : 'eligible'}?`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Override',
-                      onPress: () =>
-                        overrideMutation.mutate({ studentId: item.student_id, eligible: !item.is_eligible }),
-                    },
-                  ]
-                )
-              }
-            >
-              <Ionicons
-                name={item.is_eligible ? 'close-circle-outline' : 'checkmark-circle-outline'}
-                size={16}
-                color={item.is_eligible ? '#EF4444' : '#10B981'}
-              />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Download PDF */}
-        {canDownload && activeTab === 'eligible' && (
-          <View style={[styles.cell, { width: COL_DL, alignItems: 'center' }]}>
-            <TouchableOpacity
-              style={[styles.actionIcon, { backgroundColor: '#3B82F615' }]}
-              onPress={() => handleDownloadOne(item.student_id)}
-            >
-              <Ionicons name="download-outline" size={16} color="#3B82F6" />
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
-  };
 
   return (
     <AppLayout title="Hall Tickets">
@@ -281,12 +177,14 @@ export default function HallTicketsScreen() {
             {canCompute && (
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: '#8B5CF6' }]}
-                onPress={() =>
-                  Alert.alert('Compute Eligibility', 'Check attendance and fee status for all students?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Compute', onPress: () => computeMutation.mutate() },
-                  ])
-                }
+                onPress={() => {
+                  confirm({
+                    title: 'Compute Eligibility',
+                    message: 'Check attendance and fee status for all students?',
+                    confirmLabel: 'Compute',
+                    onConfirm: () => computeMutation.mutate(),
+                  });
+                }}
                 disabled={computeMutation.isPending}
               >
                 <Ionicons name="calculator" size={14} color="white" />
@@ -296,34 +194,36 @@ export default function HallTicketsScreen() {
             {canPublish && (
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: '#10B981' }]}
-                onPress={() =>
-                  Alert.alert('Publish Hall Tickets', 'Publish hall tickets to all eligible students?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Publish', onPress: () => publishMutation.mutate() },
-                  ])
-                }
+                onPress={() => {
+                  confirm({
+                    title: 'Publish Hall Tickets',
+                    message: 'Publish hall tickets to all eligible students?',
+                    confirmLabel: 'Publish',
+                    onConfirm: () => publishMutation.mutate(),
+                  });
+                }}
                 disabled={publishMutation.isPending}
               >
                 <Ionicons name="send" size={14} color="white" />
                 <Text style={styles.actionBtnText}>{publishMutation.isPending ? 'Publishing…' : 'Publish'}</Text>
               </TouchableOpacity>
             )}
-
             {canDownload && activeTab === 'eligible' && (
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: '#3B82F6' }]}
-                onPress={() =>
-                  Alert.alert('Download All', 'Download all eligible hall tickets as ZIP?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Download', onPress: handleDownloadAll },
-                  ])
-                }
+                onPress={() => {
+                  confirm({
+                    title: 'Download All',
+                    message: 'Download all eligible hall tickets as ZIP?',
+                    confirmLabel: 'Download',
+                    onConfirm: handleDownloadAll,
+                  });
+                }}
               >
                 <Ionicons name="download" size={14} color="white" />
                 <Text style={styles.actionBtnText}>Download All</Text>
               </TouchableOpacity>
             )}
-            {/* Summary counts */}
             <View style={{ flex: 1 }} />
             <View style={styles.countChip}>
               <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
@@ -360,7 +260,7 @@ export default function HallTicketsScreen() {
           </View>
         )}
 
-        {/* Table */}
+        {/* Content */}
         {!selectedExamId ? (
           <View style={styles.centered}>
             <Ionicons name="document-text-outline" size={48} color={textMuted} />
@@ -385,37 +285,115 @@ export default function HallTicketsScreen() {
             )}
           </View>
         ) : (
-          <View style={{ flex: 1 }}>
-            {/* Outer card wrapper */}
-            <View style={[styles.tableCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View>
-                  <TableHeader />
-                  <ScrollView showsVerticalScrollIndicator={false}>
-                    {activeData.map((item, idx) => renderRow(item, idx))}
-                  </ScrollView>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+            {activeData.map((item, index) => {
+              const attColor = item.attendance_percent != null
+                ? (item.attendance_percent >= 75 ? '#10B981' : '#EF4444')
+                : textMuted;
+              const accentColor = item.is_eligible ? '#10B981' : '#EF4444';
+
+              return (
+                <View key={item.student_id} style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
+                  <View style={[styles.cardAccent, { backgroundColor: accentColor }]} />
+                  <View style={{ flex: 1, padding: 12 }}>
+
+                    {/* Header: index + name + badges */}
+                    <View style={styles.cardTop}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.cardSno, { color: textMuted }]}>{'#' + (index + 1)}</Text>
+                        <Text style={[styles.cardName, { color: textMain }]} numberOfLines={1}>
+                          {item.student_name ?? item.student_id}
+                        </Text>
+                        <Text style={[styles.cardAdmNo, { color: textMuted }]}>
+                          {item.admission_number ?? '—'}
+                        </Text>
+                      </View>
+                      <View style={styles.badgeStack}>
+                        <View style={[styles.eligBadge, { backgroundColor: `${accentColor}18` }]}>
+                          <Text style={[styles.eligBadgeText, { color: accentColor }]}>
+                            {item.is_eligible ? 'Eligible' : 'Ineligible'}
+                          </Text>
+                        </View>
+                        {(item.attendance_override || item.fee_override) ? (
+                          <View style={styles.overrideBadge}>
+                            <Text style={styles.overrideBadgeText}>Overridden</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+
+                    {/* Ineligibility reason */}
+                    {!!item.ineligibility_reason && !item.is_eligible ? (
+                      <Text style={styles.reasonText}>{item.ineligibility_reason}</Text>
+                    ) : null}
+
+                    {/* Stats: Attendance + Fee */}
+                    <View style={styles.cardStats}>
+                      <View style={styles.statItem}>
+                        <Ionicons name="calendar-outline" size={13} color={textMuted} />
+                        <Text style={[styles.statLabel, { color: textMuted }]}>Att.</Text>
+                        {item.attendance_percent != null ? (
+                          <View style={[styles.statBadge, { backgroundColor: `${attColor}18` }]}>
+                            <Text style={[styles.statBadgeText, { color: attColor }]}>
+                              {item.attendance_percent.toFixed(0)}%
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text style={[styles.statLabel, { color: textMuted }]}>—</Text>
+                        )}
+                      </View>
+                      <View style={[styles.statDivider, { backgroundColor: borderCol }]} />
+                      <View style={styles.statItem}>
+                        <Ionicons name="card-outline" size={13} color={textMuted} />
+                        <Text style={[styles.statLabel, { color: textMuted }]}>Fee</Text>
+                        <View style={[styles.statBadge, { backgroundColor: item.fee_paid ? '#10B98118' : '#EF444418' }]}>
+                          <Text style={[styles.statBadgeText, { color: item.fee_paid ? '#10B981' : '#EF4444' }]}>
+                            {item.fee_paid ? 'Paid' : 'Unpaid'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Footer: Override + Download */}
+                    {(canOverride || (canDownload && activeTab === 'eligible')) ? (
+                      <View style={[styles.cardFooter, { borderTopColor: borderCol }]}>
+                        {canOverride ? (
+                          <TouchableOpacity
+                            style={styles.cardAction}
+                            onPress={() => handleOverride(item)}
+                          >
+                            <Ionicons
+                              name={item.is_eligible ? 'close-circle-outline' : 'checkmark-circle-outline'}
+                              size={15}
+                              color={item.is_eligible ? '#EF4444' : '#10B981'}
+                            />
+                            <Text style={[styles.cardActionText, { color: item.is_eligible ? '#EF4444' : '#10B981' }]}>
+                              {item.is_eligible ? 'Mark Ineligible' : 'Mark Eligible'}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : null}
+                        {canDownload && activeTab === 'eligible' ? (
+                          <TouchableOpacity
+                            style={styles.cardAction}
+                            onPress={() => handleDownloadOne(item.student_id)}
+                          >
+                            <Ionicons name="download-outline" size={15} color="#3B82F6" />
+                            <Text style={[styles.cardActionText, { color: '#3B82F6' }]}>Download PDF</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    ) : null}
+
+                  </View>
                 </View>
-              </ScrollView>
-            </View>
-          </View>
+              );
+            })}
+            <View style={{ height: 32 }} />
+          </ScrollView>
         )}
       </View>
+      <ConfirmModal {...modalProps} />
     </AppLayout>
-  );
-}
-
-/* ── Cell helper ── */
-function Cell({
-  w, label, isHeader = false, textColor, center = false,
-}: {
-  w: number; label: string; isHeader?: boolean; textColor: string; center?: boolean;
-}) {
-  return (
-    <View style={[styles.cell, { width: w, alignItems: center ? 'center' : 'flex-start' }]}>
-      <Text style={[styles.cellText, { color: textColor }, isHeader && styles.headerText]} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
   );
 }
 
@@ -451,30 +429,39 @@ const styles = StyleSheet.create({
   },
   tabText: { fontSize: 12 },
 
-  /* Table */
-  tableCard: {
-    marginHorizontal: 16, marginBottom: 16, borderRadius: 14,
-    borderWidth: 1, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 3,
-    flex: 1,
-  },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  cell: { paddingHorizontal: 10, paddingVertical: 11 },
-  cellText: { fontSize: 12 },
-  headerText: { fontWeight: '700', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 },
+  /* Cards */
+  listContent: { padding: 12 },
+  card: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
+  cardAccent: { width: 4, alignSelf: 'stretch' },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 },
+  cardSno: { fontSize: 11, fontWeight: '500', marginBottom: 2 },
+  cardName: { fontSize: 15, fontWeight: '700' },
+  cardAdmNo: { fontSize: 12, marginTop: 2 },
+  badgeStack: { alignItems: 'flex-end', gap: 4 },
 
-  /* Badges */
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  badgeText: { fontSize: 11, fontWeight: '600' },
+  /* Eligibility badge */
+  eligBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  eligBadgeText: { fontSize: 11, fontWeight: '600' },
 
-  overrideBadge: { backgroundColor: '#F59E0B18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginTop: 2, alignSelf: 'flex-start' },
+  /* Override / reason */
+  overrideBadge: { backgroundColor: '#F59E0B18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
   overrideBadgeText: { fontSize: 10, color: '#F59E0B', fontWeight: '600' },
-  reasonText: { fontSize: 10, color: '#EF4444', marginTop: 2 },
+  reasonText: { fontSize: 12, color: '#EF4444', marginBottom: 6 },
 
-  actionIcon: { padding: 7, borderRadius: 8 },
+  /* Stats row */
+  cardStats: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  statLabel: { fontSize: 12 },
+  statBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20 },
+  statBadgeText: { fontSize: 11, fontWeight: '600' },
+  statDivider: { width: 1, height: 16, marginHorizontal: 4 },
 
-  /* Empty */
+  /* Footer actions */
+  cardFooter: { flexDirection: 'row', gap: 4, paddingTop: 8, borderTopWidth: 1, marginTop: 6 },
+  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  cardActionText: { fontSize: 13, fontWeight: '600' },
+
+  /* Empty / loading */
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyText: { marginTop: 12, fontSize: 14, textAlign: 'center' },
 });

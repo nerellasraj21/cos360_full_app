@@ -89,6 +89,10 @@ export interface ExamCreateRequest {
   nature?: ExamNature;
   mark_entry_deadline?: string;
   hall_ticket_min_attendance?: number;
+  attendance_from_date?: string;
+  attendance_to_date?: string;
+  publish_rank?: boolean;
+  term?: string;
 }
 
 export interface ExamUpdateRequest extends Partial<ExamCreateRequest> {}
@@ -343,15 +347,73 @@ export interface ApplyTemplateRequest {
   section_id?: string;
 }
 
+// ─── Types: Create Exam Full (wizard) ────────────────────────────────────────
+
+export interface ClassSectionPayload {
+  class_id: string;
+  section_id: string | null;
+}
+
+export interface ComponentPayload {
+  component_name: string;
+  entry_type: EntryType;
+  max_marks: number | null;
+  min_pass_marks?: number | null;
+  include_in_total: boolean;
+  sort_order?: number;
+}
+
+export interface SubjectConfigPayload {
+  class_id: string;
+  section_id: string | null;
+  subject_id: string;
+  subject_grade_scheme_id?: string | null;
+  credit_hours?: number | null;
+  components: ComponentPayload[];
+}
+
+export interface ExamDatePayload {
+  class_id: string;
+  section_id: string | null;
+  subject_id: string;
+  exam_date: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  venue?: string | null;
+}
+
+export interface ExamCreateFull {
+  exam: ExamCreateRequest & {
+    is_internal?: boolean;
+    hall_ticket_min_attendance?: number | null;
+    exam_grade_scheme_id?: string | null;
+  };
+  class_sections: ClassSectionPayload[];
+  subject_configs: SubjectConfigPayload[];
+  exam_dates: ExamDatePayload[];
+}
+
+export interface ExamCreateFullResponse {
+  id: string;
+  exam_name: string;
+  status: ExamStatus;
+  created_at: string;
+  class_section_count: number;
+  subject_config_count: number;
+  exam_date_count: number;
+}
+
 // ─── Types: Exam Settings ─────────────────────────────────────────────────────
 
 export interface ExamSettings {
   id?: string;
   default_board?: string;
+  custom_board_name?: string;
   hall_ticket_min_attendance?: number;
   grace_max_per_subject?: number;
   grace_max_subjects?: number;
   grace_auto_apply?: boolean;
+  reconduct_max_failed_subjects?: number;
   updated_at?: string;
 }
 
@@ -473,6 +535,9 @@ export const examsApi = {
 
   create: (data: ExamCreateRequest) =>
     apiClient.post<Exam>('/exams', data).then(r => r.data),
+
+  createFull: (data: ExamCreateFull) =>
+    apiClient.post<ExamCreateFullResponse>('/exams', data).then(r => r.data),
 
   getById: (examId: string) =>
     apiClient.get<Exam>(`/exams/${examId}`).then(r => r.data),

@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { AppLayout } from '@/components';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { useToastContext } from '@/components/ToastProvider';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import CustomDropdown from '@/components/ui/dropdown';
@@ -10,7 +11,6 @@ import { PERMISSION_RESOURCES } from '../../src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -41,9 +41,10 @@ export default function VehiclesScreen() {
   });
 
 
+  const [pendingDeleteVehicle, setPendingDeleteVehicle] = useState<Vehicle | null>(null);
+
   const { colors } = useTheme();
   const { showSuccess, showError } = useToastContext();
-
 
   // Fetch vehicles data using permission-protected hook
   const { data: vehiclesData, isLoading, error, refetch } = useVehicles();
@@ -126,23 +127,12 @@ export default function VehiclesScreen() {
   };
 
   const handleDelete = (vehicle: Vehicle) => {
-    Alert.alert(
-      'Delete Vehicle',
-      `Are you sure you want to delete "${vehicle.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(vehicle.id),
-        },
-      ]
-    );
+    setPendingDeleteVehicle(vehicle);
   };
 
   const handleSubmit = () => {
     if (!formData.name.trim()) {
-      Alert.alert('Error', 'Vehicle name is required');
+      showError('Error', 'Vehicle name is required');
       return;
     }
 
@@ -426,6 +416,18 @@ export default function VehiclesScreen() {
             </View>
           </View>
         </Modal>
+        <ConfirmModal
+          visible={pendingDeleteVehicle !== null}
+          title="Delete Vehicle"
+          message={`Are you sure you want to delete "${pendingDeleteVehicle?.name}"?`}
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => {
+            if (pendingDeleteVehicle) deleteMutation.mutate(pendingDeleteVehicle.id);
+            setPendingDeleteVehicle(null);
+          }}
+          onCancel={() => setPendingDeleteVehicle(null)}
+        />
         </View>
       </ReadOrListPermissionGuard>
     </AppLayout>

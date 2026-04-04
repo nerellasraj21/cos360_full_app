@@ -1,7 +1,7 @@
 # COS360 Mobile App — Implementation Status
 
-**As of:** March 2026
-**Version:** 1.9.0
+**As of:** April 2026
+**Version:** 2.5.0 (Exam Module — Full Web Parity + Shared Date/Time Pickers)
 
 ---
 
@@ -28,6 +28,9 @@
 | AsyncStorage integration | ✅ Complete | Token & permission persistence |
 | Error boundary | ✅ Complete | `components/ErrorBoundary.tsx` |
 | Toast notifications | ✅ Complete | `components/ToastProvider.tsx` |
+| Confirm modal (in-app) | ✅ Complete | `components/ConfirmModal.tsx` + `useConfirmModal()` hook — replaces browser `window.confirm()` (v2.2.0) |
+| Time picker modal | ✅ Complete | `components/ui/time-picker-modal.tsx` — 12h display with AM/PM toggle, up/down arrows, quick presets; exported as `TimePickerModal` + `formatTime12h` from `components/ui` (v2.5.0) |
+| Date picker modal | ✅ Complete | `components/ui/date-picker-modal.tsx` — Day/Month/Year columns, Today/Tomorrow/+1 Week presets, outputs `YYYY-MM-DD`; exported as `DatePickerModal` + `formatDate` from `components/ui` (v2.5.0) |
 | Loading indicators | ✅ Complete | `components/LoadingIndicator.tsx` |
 | Offline sync queue | ❌ Removed | Queue was written but never drained — dead code removed from `src/api/client.ts`. `services/offlineStorage.ts` retained for reference. |
 | App icons (Android) | ✅ Complete | Adaptive icon (foreground/background/monochrome) |
@@ -40,7 +43,7 @@
 
 | Feature | Status | Details |
 |---------|--------|---------|
-| Login screen | ✅ Complete | Email + password + Academic Year picker; form validation; auto-retry years on picker open; error banner |
+| Login screen | ✅ Complete | Email + password + Academic Year picker; form validation; auto-retry years on picker open; error banner; COS360 brand logo image (v1.9.0) |
 | JWT token storage | ✅ Complete | Native: `expo-secure-store` (iOS Keychain / Android Keystore). Web: `AsyncStorage` with `@secure/` prefix fallback |
 | Automatic token refresh | ✅ Complete | Intercepts 401, refreshes, retries request |
 | Logout | ✅ Complete | Clears tokens, redirects to login |
@@ -103,6 +106,7 @@
 | Student detail view | ✅ Complete | `app/students/[id].tsx` |
 | Student admission — list view + view modal | ✅ Complete | `app/students/admission.tsx` — table-style cards, eye-icon view modal with 34 fields |
 | Student admission — 6-step create form | ✅ Complete | Calendar date picker, 2-col layouts, Indian states dropdown, Yes/No prev-school, web-matched summary |
+| Student admission — edit form (parent data) | ✅ Fixed (v2.3.0) | Edit used to open with empty father/mother fields. Fixed: `handleEditAdmission(admission)` takes full list object, populates form directly without re-fetch. `editStudentId` state + `activeStudentId = editStudentId \|\| studentId` pattern. |
 | Student admission — toggle active status | ✅ Complete | `studentAdmissionsApi.toggleActiveStatus(id)` via useMutation |
 | Student profile view | ✅ Complete | `app/students/profile.tsx` |
 | Student profile form/edit | ✅ Complete | `components/profile/StudentProfileForm.tsx` |
@@ -113,7 +117,7 @@
 
 | Feature | Status | File |
 |---------|--------|------|
-| Attendance view — staff/admin (web-style redesign) | ✅ Complete | `app/students/attendance.tsx` — compact 3-col filter row, Refresh + Save Attendance buttons, stats cards, local statusMap, P/A/L per-row buttons, bulk save |
+| Attendance view — staff/admin (web-style redesign) | ✅ Complete | `app/students/attendance.tsx` — compact 3-col filter row, Refresh + Save Attendance buttons, stats cards, local statusMap, P/A/L per-row buttons, bulk save. Refresh now reloads Class/Section dropdowns (v2.3.0) |
 | Attendance view — student/parent history | ✅ Complete | `app/students/attendance.tsx` — monthly filter, stats summary, records list |
 | Attendance API hooks | ✅ Complete | `src/api/hooks/students/attendance.ts` |
 
@@ -191,18 +195,19 @@
 | Feature | Status | File |
 |---------|--------|------|
 | Transport hub (6 sections) | ✅ Complete | `app/(tabs)/transport.tsx` |
-| Route management | ✅ Complete | `app/transport/routes.tsx` |
+| Route management (dynamic route/trip types) | ✅ Complete | `app/transport/routes.tsx` — picker modals + create type on-the-fly via `src/api/transportTypes.ts` (v2.2.0) |
 | Route stops | ✅ Complete | `app/transport/route-stops.tsx` |
 | Vehicle management | ✅ Complete | `app/transport/vehicles.tsx` |
 | Trip management | ✅ Complete | `app/transport/trips.tsx` |
 | Transport Pricing hub link | ✅ Complete | `app/(tabs)/transport.tsx` → `app/transport/pricing.tsx` (was orphaned — now linked) |
 | Student Transport hub link | ✅ Complete | `app/(tabs)/transport.tsx` → `app/transport/student-transport.tsx` (was orphaned — now linked) |
 | Student transport (correct schema) | ✅ Complete | `app/transport/student-transport.tsx` — imports from `src/api/students.ts`; form: Student → Trip → Stop → `fee_per_term` |
-| Student transport — students module redesign | ✅ Complete | `app/students/transport.tsx` — table layout with horizontal scroll, S.No/Student/Trip/Route/Stop/Fee/Actions columns, search bar, Assign form in bottom-sheet modal, uses AppLayout |
+| Student transport — students module redesign | ✅ Complete | `app/students/transport.tsx` — table layout with horizontal scroll, S.No/Student/Trip/Route/Stop/Fee/Actions columns, search bar, Assign form in bottom-sheet modal, uses AppLayout. Delete now uses `ConfirmModal` (v2.3.0) |
 | Transport API | ✅ Complete | `src/api/transport.ts` |
 | Transport hooks | ✅ Complete | `hooks/use-transport.ts` — `useDrivers()` fetches live staff list from `staffApi.getStaff()` |
 | Student transport hooks (correct schema) | ✅ Complete | `src/api/hooks/students/transport.ts` — imports `studentTransportApi` from `students.ts`, uses `listStudentTransport()` and `StudentTransportOut` |
-| Transport type definitions | ✅ Complete | `src/types/transport.ts` |
+| Transport type definitions | ✅ Complete | `src/types/transport.ts` — includes `BillingCycle`, `TransportPricing*` types (v2.1.0) |
+| Route/Trip type API | ✅ Complete | `src/api/transportTypes.ts` — `/masters/route-types` + `/masters/trip-types` dropdown & create (v2.2.0) |
 
 ---
 
@@ -235,7 +240,7 @@
 | Expense departments | ⚠️ Placeholder | `app/expense/departments.tsx` — shows "Not Available"; backend endpoints `GET /expense/departments` and `/dropdown` not implemented |
 | Expense transactions | ✅ Complete | `app/expense/transactions.tsx` |
 | Transaction detail | ✅ Complete | `app/expense/transactions/[id].tsx` |
-| Create transaction | ✅ Complete | `app/expense/transactions/create.tsx` |
+| Create transaction (with line items) | ✅ Complete | `app/expense/transactions/create.tsx` — itemized breakdown with auto-calculation (v2.2.0) |
 | Expense approvals | ✅ Complete | `app/expense/approvals.tsx` |
 | Expense audit | ✅ Complete | `app/expense/audit.tsx` — full implementation: filterable list, action badges, category chips, search; calls `GET /expense/audit/logs` |
 | Global audit logs hook | ✅ Complete | `useExpenseGlobalAuditLogsProtected` in `hooks/use-expense-protected.ts` |
@@ -287,19 +292,30 @@
 
 ## 14. Exam Module
 
+> **v2.5.0 — Full Web Parity Pass (2026-04-04)**
+> All four exam screens rewritten to match the web app exactly. Shared `TimePickerModal` and new `DatePickerModal` components introduced.
+
 | Feature | Backend Status | Mobile Status | File |
 |---------|---------------|---------------|------|
-| Exam list screen | ✅ Complete | ✅ Complete | `app/exam/list.tsx` |
+| Exam list screen | ✅ Complete | ✅ Complete | `app/exam/list.tsx` — nature filter chips, edit/clone/delete modals, `ConfirmModal` for delete (v2.5.0) |
 | Exam tab entry | ✅ Complete | ✅ Complete | `app/(tabs)/exam.tsx` |
-| Create / Edit exam form | ✅ Complete | ✅ Complete | `app/exam/create.tsx` |
+| Create exam — 5-step accordion wizard | ✅ Complete | ✅ Complete | `app/exam/create.tsx` — matches web: Exam Details → Class & Sections → Subject Config → Exam Dates → Review & Submit; `POST /exams` full payload; `CustomDropdown` for board/level/nature/academic year/grade scheme; `DatePickerModal` for all dates; `TimePickerModal` for start/end time (v2.5.0) |
 | Exam detail screen | ✅ Complete | ✅ Complete | `app/exam/[id].tsx` |
 | Mark entry screen | ✅ Complete | ✅ Complete | `app/exam/marks.tsx` |
 | Results screen | ✅ Complete | ✅ Complete | `app/exam/results.tsx` |
-| Hall tickets screen (datatable) | ✅ Complete | ✅ Complete | `app/exam/hall-tickets.tsx` |
+| Hall tickets screen (card layout) | ✅ Complete | ✅ Complete | `app/exam/hall-tickets.tsx` — converted from horizontal scroll table to vertical card layout (v1.9.1) |
 | My Marks screen (student/parent) | ✅ Complete | ✅ Complete | `app/exam/my-marks/[examId].tsx` |
-| Grading dashboard | ✅ Complete | ✅ Complete | `app/exam/grading.tsx` |
-| Exam API layer | ✅ Complete | ✅ Complete | `src/api/exam.ts` |
+| Grading dashboard | ✅ Complete | ✅ Complete | `app/exam/grading.tsx` — matches web: header card, 5 quick-link grid, 4 status stat cards, Active/Draft exam sections, role-aware for student/parent (v2.5.0) |
+| Exam settings | ✅ Complete | ✅ Complete | `app/exam/settings.tsx` — board chip selector (CBSE/ICSE/State/BTech/Custom), custom board name field, reconduct policy section (v2.5.0) |
+| Exam API layer | ✅ Complete | ✅ Complete | `src/api/exam.ts` — added `ClassSectionPayload`, `ComponentPayload`, `SubjectConfigPayload`, `ExamDatePayload`, `ExamCreateFull`, `ExamCreateFullResponse` types; `examsApi.createFull()` calling `POST /exams` (v2.5.0) |
 | Exam permissions | ✅ Complete | ✅ Complete | `src/constants/permissions.ts` |
+
+### Exam Module — Subject Configuration Detail (v2.5.0)
+
+- Per class-section: subjects fetched from `/masters/class-subject-mappings/by-class/{classId}`
+- Per subject: **Grade Scheme** dropdown + **Credit Hours** input + **Mark Components** (name, type Marks/Remarks, max marks, min pass, In Total toggle)
+- Components only appear after clicking **+ Add Component** (not auto-added)
+- Each component has a **Remove** button always visible
 
 ---
 
@@ -311,15 +327,19 @@ Channels: **SMS · WhatsApp · Email** (Push removed). API types updated in `src
 | Feature | Status | File |
 | ------- | ------ | ---- |
 | Communication tab (single page, 3 in-page tabs) | ✅ Complete | `app/(tabs)/communication.tsx` |
-| **Compose** — SMS/WhatsApp/Email channel cards | ✅ Complete | `app/(tabs)/communication.tsx` |
-| **Compose** — Target Type dropdown (All Students/Parents/Staff + Class+Section variants) | ✅ Complete | `app/(tabs)/communication.tsx` |
-| **Compose** — Class + Section dropdowns (conditional, `classSectionsApi`) | ✅ Complete | `app/(tabs)/communication.tsx` |
-| **Compose** — Template dropdown (filtered by selected channel) → `POST /send/` | ✅ Complete | `app/(tabs)/communication.tsx` |
-| **Templates** — filter bar (channel chips, status chips, search, New Template button) | ✅ Complete | `app/(tabs)/communication.tsx` |
-| **Templates** — list with Name/Channel badge/Variables/Status/Date/Edit/Delete | ✅ Complete | `app/(tabs)/communication.tsx` |
-| **Templates** — CRUD modal → `GET/POST/PUT/DELETE /send/templates/` | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Compose** — 4-step wizard with progress bars (Step X of 4) matching web | ✅ Complete (v2.4.0) | `app/(tabs)/communication.tsx` |
+| **Compose** — Step 1: SMS/WhatsApp/Email channel cards + Next button | ✅ Complete (v2.4.0) | `app/(tabs)/communication.tsx` |
+| **Compose** — Step 2: Target Type + Class/Section (full-width stacked) / individual IDs / role + recipient count + Back/Next | ✅ Complete (v2.4.0) | `app/(tabs)/communication.tsx` |
+| **Compose** — Step 3: Template dropdown (filtered by channel) + preview + Back/Next or Send Now | ✅ Complete (v2.4.0) | `app/(tabs)/communication.tsx` |
+| **Compose** — Step 4: Fill variables (conditional, only if template has user vars) + Back/Send Now | ✅ Complete (v2.4.0) | `app/(tabs)/communication.tsx` |
+| **Compose** — Confirmation modal (channel, target, recipients, preview, warning) | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Templates** — filter bar (channel chips, status chips, search, **New Template** button) | ✅ Complete (v2.4.0) | `app/(tabs)/communication.tsx` |
+| **Templates** — list with Name/Channel badge/Variables/Status/Date/Edit/Deactivate | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Templates** — CRUD modal → `GET/POST/PUT/DELETE /communication/templates/` | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Templates** — deactivate uses `ConfirmModal` (no `Alert.alert`) | ✅ Complete (v2.4.0) | `app/(tabs)/communication.tsx` |
 | **Logs** — filter bar (All Channels dropdown, All Status dropdown, From/To date) | ✅ Complete | `app/(tabs)/communication.tsx` |
-| **Logs** — filtered list with channel/status badges → `GET /send/logs` (lazy) | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Logs** — filtered list with channel/status badges, pagination | ✅ Complete | `app/(tabs)/communication.tsx` |
+| **Logs** — detail modal (full message, error, provider ID) | ✅ Complete | `app/(tabs)/communication.tsx` |
 | Communication API layer (`CommChannel` type, `whatsapp` support) | ✅ Complete | `src/api/communication.ts` |
 | Tab gating in `TAB_CONFIGS` | ✅ Complete | `app/(tabs)/_layout.tsx` |
 
@@ -334,7 +354,7 @@ Channels: **SMS · WhatsApp · Email** (Push removed). API types updated in `src
 | Fee Receipts screen | ✅ Complete | `app/fees/receipts.tsx` |
 | Fee Reports hub link | ✅ Complete | `app/(tabs)/fees.tsx` → `app/fees/reports.tsx` (was orphaned — now linked) |
 | Fee Reports screen (3 tabs) | ✅ Complete | `app/fees/reports.tsx` — linked from fees hub (v1.8.0) |
-| Transport Pricing CRUD | ✅ Complete | `app/transport/pricing.tsx` — linked from transport hub (v1.8.0) |
+| Transport Pricing CRUD (schema aligned with web) | ✅ Complete | `app/transport/pricing.tsx` — billing_cycle model with vehicle/route dropdowns, date pickers (v2.1.0) |
 | Student Transport CRUD | ✅ Complete | `app/transport/student-transport.tsx` — linked from transport hub (v1.8.0) |
 
 ---
@@ -360,14 +380,14 @@ Channels: **SMS · WhatsApp · Email** (Push removed). API types updated in `src
 
 | Category | Total Features | Complete | In Progress | Planned |
 |----------|---------------|----------|-------------|---------|
-| Core Infrastructure | 15 | 15 | 0 | 0 |
+| Core Infrastructure | 16 | 16 | 0 | 0 |
 | Authentication | 12 | 12 | 0 | 0 |
 | Permission System | 18 | 18 | 0 | 0 |
 | Dashboard | 5 | 5 | 0 | 0 |
 | Students | 18 | 18 | 0 | 0 |
 | Fees | 14 | 14 | 0 | 0 |
 | Masters | 14 | 14 | 0 | 0 |
-| Transport | 8 | 8 | 0 | 0 |
+| Transport | 9 | 9 | 0 | 0 |
 | Staff | 10 | 10 | 0 | 0 |
 | Expense | 13 | 13 | 0 | 0 |
 | Profile | 8 | 8 | 0 | 0 |
@@ -377,9 +397,9 @@ Channels: **SMS · WhatsApp · Email** (Push removed). API types updated in `src
 | Communication | 7 | 7 | 0 | 0 |
 | Additional Features | 6 | 6 | 0 | 0 |
 | **Administration** | **8** | **8** | **0** | **0** |
-| **TOTAL** | **175** | **175** | **0** | **0** |
+| **TOTAL** | **177** | **177** | **0** | **0** |
 
-Overall Completion: **100%** (175/175 features)
+Overall Completion: **100%** (177/177 features)
 
 ---
 
@@ -398,6 +418,44 @@ Overall Completion: **100%** (175/175 features)
 | `contexts/AuthContext.tsx` | Login error message showed generic Axios `"Request failed with status code 401"` — not helpful | Error extraction now reads `error.response.data.detail` first (string or array of `{msg}`); falls back to `error.message` |
 | `services/authUtils.ts` | `loginUser` sent `academic_year_id: ""` (empty string) when no year selected — Pydantic rejects empty string for UUID field (422) | `loginUser` now only adds `academic_year_id` to payload when truthy: `if (academicYearId) payload.academic_year_id = academicYearId` |
 | `services/authUtils.ts` | `expo-secure-store` is native-only; calling `secureSet`/`secureGet`/`secureDelete` on web threw "Not supported" → `storeAuthData` threw "Failed to store authentication data" → login appeared to fail even after successful API response | Added `Platform.OS === 'web'` check in all three helpers; web falls back to `AsyncStorage` with `@secure/` key prefix (tokens less secure on web but app remains functional for dev/web testing) |
+
+---
+
+## Table-to-Card Conversions & Text Node Fix (v1.9.1)
+
+### Hall Tickets — Card Layout — March 2026
+
+Converted `app/exam/hall-tickets.tsx` from a horizontal-scroll COL_*-based data table to a vertical ScrollView of mobile-friendly cards.
+
+| Change | Details |
+| ------ | ------- |
+| Removed | `COL_SNO`, `COL_NAME`, `COL_ADM`, `COL_ATT`, `COL_FEE`, `COL_STATUS`, `COL_ACT`, `COL_DL` width constants |
+| Removed | `TableHeader` component, `Cell` helper, `renderRow` function, horizontal `ScrollView` table |
+| Added | Vertical `ScrollView` + per-student cards: green/red accent bar, name + S.No. + admission number, Eligible/Ineligible badge, Overridden badge, ineligibility reason, Attendance % + Fee Paid/Unpaid stats row, Override + Download PDF footer actions |
+| Fixed | Missing `Platform.OS === 'web'` guard on override action (`Alert.alert`) — now uses `window.confirm` on web |
+| Fixed | Empty-string text node bug: `{item.ineligibility_reason && ...}` → `{!!item.ineligibility_reason && ...}` — prevents "Unexpected text node: ." crash on React Native web when field is `""` |
+
+### Empty-String Text Node Pattern (React Native Web)
+
+**Bug:** `{someString && <Component />}` where `someString` can be `""` causes `"Unexpected text node: . A text node cannot be a child of a <View>."` on React Native web. The `&&` operator returns the left operand (`""`) when it is falsy, and React Native web tries to render that empty string as a text node.
+
+**Fix:** Always use `{!!someString && <Component />}` or `{someString ? <Component /> : null}` for string-based conditionals inside View children.
+
+---
+
+## Brand Logo Update (v1.9.0)
+
+### COS360 Logo Applied — March 2026
+
+Replaced placeholder text-circle ("COS/360") and generic icon with the actual COS360 brand logo image throughout the app.
+
+| File | Change |
+|------|--------|
+| `assets/images/cos360-logo.jpg` | Added — copied from web app `public/ICON.jpg` |
+| `app/login.tsx` | 3 occurrences: loading screen, org selection screen, login form brand header — now use `<Image>` with `logoImage` style (72×72) |
+| `components/navigation/AppDrawer.tsx` | Sidebar header — replaced `<Ionicons name="school">` in `brandIconBox` with `<Image>` (`brandLogoImg` style, 32×32, borderRadius 6) |
+
+`AppHeader.tsx` `logoCircle` is a user/school **initial avatar** — intentionally not changed.
 
 ---
 

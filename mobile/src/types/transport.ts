@@ -6,8 +6,8 @@ export interface Route {
   starting_stop: string;
   ending_stop: string;
   number_of_stops: number;
-  route_type: 'upward' | 'downward';
-  trip_type: 'first trip' | 'second trip';
+  route_type: string;  // Dynamic — fetched from /masters/route-types
+  trip_type: string;   // Dynamic — fetched from /masters/trip-types
   start_time: string; // HH:MM:SS format
   end_time: string; // HH:MM:SS format
   is_active: boolean;
@@ -20,8 +20,8 @@ export interface RouteCreate {
   starting_stop: string;
   ending_stop: string;
   number_of_stops: number;
-  route_type: 'upward' | 'downward';
-  trip_type: 'first trip' | 'second trip';
+  route_type: string;
+  trip_type: string;
   start_time: string;
   end_time: string;
   is_active?: boolean;
@@ -32,8 +32,8 @@ export interface RouteUpdate {
   starting_stop?: string;
   ending_stop?: string;
   number_of_stops?: number;
-  route_type?: 'upward' | 'downward';
-  trip_type?: 'first trip' | 'second trip';
+  route_type?: string;
+  trip_type?: string;
   start_time?: string;
   end_time?: string;
   is_active?: boolean;
@@ -194,6 +194,47 @@ export interface StudentTripUpdate {
   student_id?: string;
   stop_id?: string;
   fee_per_term?: number;
+  is_active?: boolean;
+}
+
+// Transport Pricing Types (aligned with backend schema)
+export type BillingCycle = 'annual' | 'semester' | 'monthly' | 'custom';
+
+export interface TransportPricing {
+  id: string;
+  vehicle_id: string;
+  route_id: string | null;
+  billing_cycle: BillingCycle;
+  cycle_name: string;
+  amount: number; // Decimal from backend — use Number() if returned as string
+  start_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  vehicle_name: string;
+  route_name: string | null;
+}
+
+export interface TransportPricingCreate {
+  vehicle_id: string;
+  route_id?: string | null;
+  billing_cycle: BillingCycle;
+  cycle_name: string;
+  amount: number;
+  start_date: string;
+  end_date: string;
+  is_active?: boolean;
+}
+
+export interface TransportPricingUpdate {
+  vehicle_id?: string;
+  route_id?: string | null;
+  billing_cycle?: BillingCycle;
+  cycle_name?: string;
+  amount?: number;
+  start_date?: string;
+  end_date?: string;
   is_active?: boolean;
 }
 

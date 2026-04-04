@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   Share,
   StyleSheet,
@@ -14,6 +13,7 @@ import {
 } from 'react-native';
 
 import { AppLayout } from '@/components';
+import { useToastContext } from '@/components/ToastProvider';
 import { useAcademicYear, useTheme } from '@/contexts';
 import {
   feeReportsApi,
@@ -23,6 +23,14 @@ import {
 } from '@/src/api/fees';
 
 type Tab = 'collection' | 'pending' | 'structure';
+
+const FEE_STATUSES = [
+  { label: 'All', value: '' },
+  { label: 'Completed', value: 'completed' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Cancelled', value: 'cancelled' },
+  { label: 'Bounced', value: 'bounced' },
+];
 
 const PAYMENT_METHODS = [
   { label: 'All', value: '' },
@@ -40,12 +48,14 @@ const formatINR = (val: string | number | null | undefined) =>
 export default function FeeReportsScreen() {
   const { colors, theme } = useTheme();
   const { activeAcademicYearId } = useAcademicYear();
+  const { showError } = useToastContext();
   const [activeTab, setActiveTab] = useState<Tab>('collection');
 
   // ── Collection filters ────────────────────────────────────────────────────
   const [colDateFrom, setColDateFrom]   = useState('');
   const [colDateTo, setColDateTo]       = useState('');
   const [colMethod, setColMethod]       = useState('');
+  const [colStatus, setColStatus]       = useState('');
   const [colApplied, setColApplied]     = useState(false);
 
   // ── Pending filters ───────────────────────────────────────────────────────
@@ -68,6 +78,7 @@ export default function FeeReportsScreen() {
     date_from: colDateFrom || undefined,
     date_to:   colDateTo   || undefined,
     payment_method: colMethod || undefined,
+    status: colStatus || undefined,
   } : { academic_year_id: activeAcademicYearId ?? undefined };
 
   const { data: collectionStats, isLoading: statsLoading } = useQuery<FeeCollectionStats>({
@@ -142,7 +153,7 @@ export default function FeeReportsScreen() {
       const text = await (blob as any).text?.() ?? '';
       await Share.share({ message: text, title: `fee_${activeTab}_report.csv` });
     } catch {
-      Alert.alert('Export failed', 'Unable to export report. Please try again.');
+      showError('Export failed', 'Unable to export report. Please try again.');
     } finally {
       setExporting(false);
     }
@@ -218,6 +229,20 @@ export default function FeeReportsScreen() {
                   >
                     <Text style={{ color: colMethod === m.value ? 'white' : colors['muted-foreground'], fontSize: 12, fontWeight: '600' }}>
                       {m.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <Text style={[styles.filterLabel, { color: colors['muted-foreground'] }]}>Status</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {FEE_STATUSES.map(s => (
+                  <TouchableOpacity
+                    key={s.value}
+                    style={[styles.methodChip, colStatus === s.value && { backgroundColor: colors.primary }]}
+                    onPress={() => setColStatus(s.value)}
+                  >
+                    <Text style={{ color: colStatus === s.value ? 'white' : colors['muted-foreground'], fontSize: 12, fontWeight: '600' }}>
+                      {s.label}
                     </Text>
                   </TouchableOpacity>
                 ))}

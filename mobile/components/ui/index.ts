@@ -43,6 +43,15 @@ export {
 // iOS Date/Time Picker Modal
 export { IOSDatePickerModal } from './ios-date-picker-modal';
 
+// Time Picker Modal (cross-platform, no native dependency)
+export { TimePickerModal, formatTime12h } from './time-picker-modal';
+
+// Date Picker Modal (cross-platform, no native dependency)
+export { DatePickerModal, formatDate } from './date-picker-modal';
+
+// Confirm Modal
+export { ConfirmModal } from './ConfirmModal';
+
 // Re-export default objects for convenience
 export { default as AccessDeniedComponents } from './AccessDeniedComponents';
 export { default as PermissionLoadingStates } from './PermissionLoadingStates';

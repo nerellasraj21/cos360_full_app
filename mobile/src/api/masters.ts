@@ -177,6 +177,21 @@ export interface BulkClassSubjectMapping {
   mappings: ClassSubjectMappingCreate[];
 }
 
+// Correct bulk create format matching the backend API
+export interface SubjectMappingItem {
+  subject_id: string;
+  exclude_marks?: boolean;
+  order?: number;
+  is_active?: boolean;
+}
+
+export interface ClassSubjectMappingBulkCreate {
+  class_id: string;
+  section_id?: string | null;   // null = apply to ALL sections
+  academic_year_id: string;
+  subjects: SubjectMappingItem[];
+}
+
 export interface HolidayRead {
   id: string;
   name: string;
@@ -263,8 +278,8 @@ export interface Route {
   starting_stop: string;
   ending_stop: string;
   number_of_stops: number;
-  route_type: 'upward' | 'downward';
-  trip_type: 'first trip' | 'second trip';
+  route_type: string;  // Dynamic — fetched from /masters/route-types
+  trip_type: string;   // Dynamic — fetched from /masters/trip-types
   start_time: string; // HH:MM:SS format
   end_time: string; // HH:MM:SS format
   is_active: boolean;
@@ -277,8 +292,8 @@ export interface RouteCreate {
   starting_stop: string;
   ending_stop: string;
   number_of_stops: number;
-  route_type: 'upward' | 'downward';
-  trip_type: 'first trip' | 'second trip';
+  route_type: string;
+  trip_type: string;
   start_time: string;
   end_time: string;
   is_active?: boolean;
@@ -289,8 +304,8 @@ export interface RouteUpdate {
   starting_stop?: string;
   ending_stop?: string;
   number_of_stops?: number;
-  route_type?: 'upward' | 'downward';
-  trip_type?: 'first trip' | 'second trip';
+  route_type?: string;
+  trip_type?: string;
   start_time?: string;
   end_time?: string;
   is_active?: boolean;
@@ -790,7 +805,7 @@ export const classSubjectMappingsApi = {
     return response.data;
   },
 
-  bulkCreateClassSubjectMappings: async (data: BulkClassSubjectMapping): Promise<any> => {
+  bulkCreateClassSubjectMappings: async (data: ClassSubjectMappingBulkCreate): Promise<any> => {
     const response = await apiClient.post('/masters/class-subject-mappings/bulk', data);
     return response.data;
   },
@@ -1250,33 +1265,9 @@ export const castesApi = {
 };
 
 // ─── Transport Pricing API ────────────────────────────────────────────────────
-
-export interface TransportPricing {
-  id: string;
-  vehicle_id: string;
-  billing_cycle: string;
-  cycle_name: string;
-  amount: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface TransportPricingCreate {
-  vehicle_id: string;
-  billing_cycle: string;
-  cycle_name: string;
-  amount: number;
-  is_active?: boolean;
-}
-
-export interface TransportPricingUpdate {
-  vehicle_id?: string;
-  billing_cycle?: string;
-  cycle_name?: string;
-  amount?: number;
-  is_active?: boolean;
-}
+// Types imported from src/types/transport.ts — use those for components
+import type { TransportPricing, TransportPricingCreate, TransportPricingUpdate } from '@/src/types/transport';
+export type { TransportPricing, TransportPricingCreate, TransportPricingUpdate };
 
 export const transportPricingApi = {
   /** GET /masters/transport-pricing/ */

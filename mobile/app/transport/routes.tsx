@@ -1,17 +1,17 @@
 import { ThemedText } from '@/components/themed-text';
 import { AppLayout } from '@/components';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useToastContext } from '@/components/ToastProvider';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useTheme } from '@/contexts';
 import type { Route as TransportRoute, RouteCreate, RouteUpdate } from '../../src/api';
-import { useRoutes, useCreateRoute, useUpdateRoute, useDeleteRoute } from '../../hooks/use-transport';
+import { useRoutes, useCreateRoute, useUpdateRoute, useDeleteRoute, useRouteTypesDropdown, useTripTypesDropdown, useCreateRouteType, useCreateTripType } from '../../hooks/use-transport';
 import { PERMISSION_RESOURCES } from '../../src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
 
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -31,23 +31,36 @@ export default function RoutesScreen() {
     starting_stop: '',
     ending_stop: '',
     number_of_stops: 8,
-    route_type: 'upward' as 'upward' | 'downward',
-    trip_type: 'first trip' as 'first trip' | 'second trip',
+    route_type: '' as string,
+    trip_type: '' as string,
     start_time: '07:00:00',
     end_time: '08:30:00',
     is_active: true,
   });
+  const [showRouteTypePicker, setShowRouteTypePicker] = useState(false);
+  const [showTripTypePicker, setShowTripTypePicker] = useState(false);
+  const [showCreateRouteTypeModal, setShowCreateRouteTypeModal] = useState(false);
+  const [showCreateTripTypeModal, setShowCreateTripTypeModal] = useState(false);
+  const [newRouteTypeName, setNewRouteTypeName] = useState('');
+  const [newTripTypeName, setNewTripTypeName] = useState('');
 
   const { colors } = useTheme();
   const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps: confirmModalProps } = useConfirmModal();
 
   // Fetch routes data using permission-protected hook
   const { data: routesData, isLoading, error, refetch } = useRoutes();
+
+  // Fetch available route and trip types
+  const { data: routeTypeOptions = [] } = useRouteTypesDropdown();
+  const { data: tripTypeOptions = [] } = useTripTypesDropdown();
 
   // Mutations using permission-protected hooks
   const createMutation = useCreateRoute();
   const updateMutation = useUpdateRoute();
   const deleteMutation = useDeleteRoute();
+  const createRouteTypeMutation = useCreateRouteType();
+  const createTripTypeMutation = useCreateTripType();
 
   // Handle mutation success/error states
   React.useEffect(() => {
@@ -84,6 +97,34 @@ export default function RoutesScreen() {
     }
   }, [deleteMutation.isSuccess, deleteMutation.isError]);
 
+  // Handle create route type success
+  React.useEffect(() => {
+    if (createRouteTypeMutation.isSuccess && createRouteTypeMutation.data) {
+      setFormData(prev => ({ ...prev, route_type: createRouteTypeMutation.data!.type_name }));
+      setShowCreateRouteTypeModal(false);
+      setNewRouteTypeName('');
+      showSuccess(`Route type "${createRouteTypeMutation.data.type_name}" created successfully`);
+      createRouteTypeMutation.reset();
+    }
+    if (createRouteTypeMutation.isError) {
+      showError('Failed to create route type', createRouteTypeMutation.error?.message || 'Unknown error');
+    }
+  }, [createRouteTypeMutation.isSuccess, createRouteTypeMutation.isError]);
+
+  // Handle create trip type success
+  React.useEffect(() => {
+    if (createTripTypeMutation.isSuccess && createTripTypeMutation.data) {
+      setFormData(prev => ({ ...prev, trip_type: createTripTypeMutation.data!.type_name }));
+      setShowCreateTripTypeModal(false);
+      setNewTripTypeName('');
+      showSuccess(`Trip type "${createTripTypeMutation.data.type_name}" created successfully`);
+      createTripTypeMutation.reset();
+    }
+    if (createTripTypeMutation.isError) {
+      showError('Failed to create trip type', createTripTypeMutation.error?.message || 'Unknown error');
+    }
+  }, [createTripTypeMutation.isSuccess, createTripTypeMutation.isError]);
+
   // Filter routes based on search
   const filteredRoutes = useMemo(() => {
     if (!routesData || !Array.isArray(routesData)) return [];
@@ -102,13 +143,15 @@ export default function RoutesScreen() {
       starting_stop: '',
       ending_stop: '',
       number_of_stops: 8,
-      route_type: 'upward',
-      trip_type: 'first trip',
+      route_type: '',
+      trip_type: '',
       start_time: '07:00:00',
       end_time: '08:30:00',
       is_active: true,
     });
     setEditingRoute(null);
+    setNewRouteTypeName('');
+    setNewTripTypeName('');
   };
 
   const handleEdit = (route: TransportRoute) => {
@@ -128,23 +171,18 @@ export default function RoutesScreen() {
   };
 
   const handleDelete = (route: TransportRoute) => {
-    Alert.alert(
-      'Delete Route',
-      `Are you sure you want to delete "${route.route_name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(route.id),
-        },
-      ]
-    );
+    confirm({
+      title: 'Delete Route',
+      message: `Are you sure you want to delete "${route.route_name}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(route.id),
+    });
   };
 
   const handleSubmit = () => {
     if (!formData.route_name.trim()) {
-      Alert.alert('Error', 'Route name is required');
+      showError('Error', 'Route name is required');
       return;
     }
 
@@ -382,17 +420,21 @@ export default function RoutesScreen() {
                     <ThemedText style={styles.label}>Route Type *</ThemedText>
                     <TouchableOpacity
                       style={[styles.dropdown, { borderColor: colors.border }]}
-                      onPress={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          route_type: prev.route_type === 'upward' ? 'downward' : 'upward'
-                        }));
-                      }}
+                      onPress={() => setShowRouteTypePicker(true)}
                     >
-                      <ThemedText style={{ color: colors.foreground }}>
-                        {formData.route_type === 'upward' ? 'Upward' : 'Downward'}
+                      <ThemedText style={{ color: formData.route_type ? colors.foreground : colors['muted-foreground'] }}>
+                        {formData.route_type || 'Select Route Type'}
                       </ThemedText>
                       <Ionicons name="chevron-down" size={16} color={colors['muted-foreground']} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.createTypeButton, { marginTop: 8 }]}
+                      onPress={() => setShowCreateRouteTypeModal(true)}
+                    >
+                      <Ionicons name="add" size={16} color={colors.primary} />
+                      <ThemedText style={[styles.createTypeButtonText, { color: colors.primary }]}>
+                        Create Type
+                      </ThemedText>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -402,17 +444,21 @@ export default function RoutesScreen() {
                     <ThemedText style={styles.label}>Trip Type *</ThemedText>
                     <TouchableOpacity
                       style={[styles.dropdown, { borderColor: colors.border }]}
-                      onPress={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          trip_type: prev.trip_type === 'first trip' ? 'second trip' : 'first trip'
-                        }));
-                      }}
+                      onPress={() => setShowTripTypePicker(true)}
                     >
-                      <ThemedText style={{ color: colors.foreground }}>
-                        {formData.trip_type === 'first trip' ? 'First Trip' : 'Second Trip'}
+                      <ThemedText style={{ color: formData.trip_type ? colors.foreground : colors['muted-foreground'] }}>
+                        {formData.trip_type || 'Select Trip Type'}
                       </ThemedText>
                       <Ionicons name="chevron-down" size={16} color={colors['muted-foreground']} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.createTypeButton, { marginTop: 8 }]}
+                      onPress={() => setShowCreateTripTypeModal(true)}
+                    >
+                      <Ionicons name="add" size={16} color={colors.primary} />
+                      <ThemedText style={[styles.createTypeButtonText, { color: colors.primary }]}>
+                        Create Type
+                      </ThemedText>
                     </TouchableOpacity>
                   </View>
                   <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
@@ -455,10 +501,10 @@ export default function RoutesScreen() {
 
               <View style={styles.modalFooter}>
                 <TouchableOpacity
-                  style={[styles.button, styles.cancelButton]}
+                  style={[styles.button, { backgroundColor: colors.primary }]}
                   onPress={() => setIsModalVisible(false)}
                 >
-                  <ThemedText style={{ color: colors.foreground }}>Cancel</ThemedText>
+                  <ThemedText style={{ color: 'white' }}>Cancel</ThemedText>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.button, styles.submitButton, { backgroundColor: colors.primary }]}
@@ -473,6 +519,217 @@ export default function RoutesScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Route Type Picker Modal */}
+        <Modal
+          visible={showRouteTypePicker}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setShowRouteTypePicker(false)}
+        >
+          <TouchableOpacity
+            style={styles.pickerOverlay}
+            activeOpacity={1}
+            onPress={() => setShowRouteTypePicker(false)}
+          >
+            <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
+              <View style={styles.pickerHeader}>
+                <ThemedText style={styles.pickerTitle}>Select Route Type</ThemedText>
+                <TouchableOpacity onPress={() => setShowRouteTypePicker(false)}>
+                  <Ionicons name="close" size={24} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.pickerList}>
+                {routeTypeOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.type_name}
+                    style={[styles.pickerOption, formData.route_type === option.type_name && { backgroundColor: colors.primary }]}
+                    onPress={() => {
+                      setFormData(prev => ({ ...prev, route_type: option.type_name }));
+                      setShowRouteTypePicker(false);
+                    }}
+                  >
+                    <ThemedText style={[styles.pickerOptionText, formData.route_type === option.type_name && { color: 'white', fontWeight: '600' }]}>
+                      {option.type_name}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Trip Type Picker Modal */}
+        <Modal
+          visible={showTripTypePicker}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setShowTripTypePicker(false)}
+        >
+          <TouchableOpacity
+            style={styles.pickerOverlay}
+            activeOpacity={1}
+            onPress={() => setShowTripTypePicker(false)}
+          >
+            <View style={[styles.pickerContent, { backgroundColor: colors.card }]}>
+              <View style={styles.pickerHeader}>
+                <ThemedText style={styles.pickerTitle}>Select Trip Type</ThemedText>
+                <TouchableOpacity onPress={() => setShowTripTypePicker(false)}>
+                  <Ionicons name="close" size={24} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.pickerList}>
+                {tripTypeOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.type_name}
+                    style={[styles.pickerOption, formData.trip_type === option.type_name && { backgroundColor: colors.primary }]}
+                    onPress={() => {
+                      setFormData(prev => ({ ...prev, trip_type: option.type_name }));
+                      setShowTripTypePicker(false);
+                    }}
+                  >
+                    <ThemedText style={[styles.pickerOptionText, formData.trip_type === option.type_name && { color: 'white', fontWeight: '600' }]}>
+                      {option.type_name}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Create Route Type Modal */}
+        <Modal
+          visible={showCreateRouteTypeModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowCreateRouteTypeModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <View style={styles.modalHeader}>
+                <ThemedText type="title" style={styles.modalTitle}>
+                  Create Route Type
+                </ThemedText>
+                <TouchableOpacity onPress={() => setShowCreateRouteTypeModal(false)}>
+                  <Ionicons name="close" size={24} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalBody}>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.label}>Route Type Name *</ThemedText>
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+                    placeholder="e.g., Upward, Downward, Express"
+                    placeholderTextColor={colors['muted-foreground']}
+                    value={newRouteTypeName}
+                    onChangeText={setNewRouteTypeName}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={[styles.button, { backgroundColor: colors.primary }]}
+                  onPress={() => setShowCreateRouteTypeModal(false)}
+                >
+                  <ThemedText style={{ color: 'white' }}>Cancel</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.submitButton, { backgroundColor: colors.primary }]}
+                  onPress={() => {
+                    const trimmed = newRouteTypeName.trim();
+                    if (!trimmed) {
+                      showError('Error', 'Route type name is required');
+                      return;
+                    }
+                    if (routeTypeOptions.some(rt => rt.type_name.toLowerCase() === trimmed.toLowerCase())) {
+                      showError('Error', `Route type "${trimmed}" already exists`);
+                      return;
+                    }
+                    createRouteTypeMutation.mutate({
+                      type_name: trimmed,
+                      is_active: true
+                    });
+                  }}
+                  disabled={createRouteTypeMutation.isPending}
+                >
+                  <ThemedText style={styles.submitButtonText}>
+                    {createRouteTypeMutation.isPending ? 'Creating...' : 'Create'}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Create Trip Type Modal */}
+        <Modal
+          visible={showCreateTripTypeModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowCreateTripTypeModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <View style={styles.modalHeader}>
+                <ThemedText type="title" style={styles.modalTitle}>
+                  Create Trip Type
+                </ThemedText>
+                <TouchableOpacity onPress={() => setShowCreateTripTypeModal(false)}>
+                  <Ionicons name="close" size={24} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalBody}>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.label}>Trip Type Name *</ThemedText>
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+                    placeholder="e.g., First Trip, Second Trip, Afternoon"
+                    placeholderTextColor={colors['muted-foreground']}
+                    value={newTripTypeName}
+                    onChangeText={setNewTripTypeName}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={[styles.button, { backgroundColor: colors.primary }]}
+                  onPress={() => setShowCreateTripTypeModal(false)}
+                >
+                  <ThemedText style={{ color: 'white' }}>Cancel</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.submitButton, { backgroundColor: colors.primary }]}
+                  onPress={() => {
+                    const trimmed = newTripTypeName.trim();
+                    if (!trimmed) {
+                      showError('Error', 'Trip type name is required');
+                      return;
+                    }
+                    if (tripTypeOptions.some(tt => tt.type_name.toLowerCase() === trimmed.toLowerCase())) {
+                      showError('Error', `Trip type "${trimmed}" already exists`);
+                      return;
+                    }
+                    createTripTypeMutation.mutate({
+                      type_name: trimmed,
+                      is_active: true
+                    });
+                  }}
+                  disabled={createTripTypeMutation.isPending}
+                >
+                  <ThemedText style={styles.submitButtonText}>
+                    {createTripTypeMutation.isPending ? 'Creating...' : 'Create'}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+        <ConfirmModal {...confirmModalProps} />
         </View>
       </ReadOrListPermissionGuard>
     </AppLayout>
@@ -683,5 +940,53 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: 'white',
     fontWeight: '600',
+  },
+  createTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  createTypeButtonText: {
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  pickerContent: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '60%',
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  pickerList: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  pickerOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginVertical: 4,
+  },
+  pickerOptionText: {
+    fontSize: 16,
   },
 });

@@ -16,9 +16,8 @@ import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
-    Alert,
     FlatList,
     Modal,
     StyleSheet,
@@ -63,17 +62,6 @@ export default function FeeTypesScreen() {
     queryFn: () => feeTermsApi.getFeeTermsDropdown(activeAcademicYearId ? { academic_year_id: activeAcademicYearId } : undefined),
   });
 
-  useEffect(() => {
-    if (editingType && feeCategories.length > 0 && feeTerms.length > 0) {
-      setFormData({
-        type_name: editingType.type_name,
-        fee_category_id: editingType.fee_category_id,
-        academic_year_id: editingType.academic_year_id,
-        fee_status: editingType.fee_status,
-        fee_term_id: editingType.fee_term_id,
-      });
-    }
-  }, [editingType, feeCategories, feeTerms]);
 
   const createMutation = useMutation({
     mutationFn: feeTypesApi.createFeeType,
@@ -135,6 +123,13 @@ export default function FeeTypesScreen() {
 
   const handleEdit = (type: FeeTypeResponse) => {
     setEditingType(type);
+    setFormData({
+      type_name: type.type_name,
+      fee_category_id: type.fee_category_id,
+      academic_year_id: type.academic_year_id,
+      fee_status: type.fee_status,
+      fee_term_id: type.fee_term_id,
+    });
     setIsModalVisible(true);
   };
 
@@ -145,17 +140,17 @@ export default function FeeTypesScreen() {
 
   const handleSubmit = () => {
     if (!formData.type_name.trim()) {
-      Alert.alert('Error', 'Type name is required');
+      showError('Error', 'Type name is required');
       return;
     }
 
     if (!formData.fee_category_id) {
-      Alert.alert('Error', 'Fee category is required');
+      showError('Error', 'Fee category is required');
       return;
     }
 
     if (!formData.fee_term_id) {
-      Alert.alert('Error', 'Fee term is required');
+      showError('Error', 'Fee term is required');
       return;
     }
 

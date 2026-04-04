@@ -17,9 +17,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { getValidAccessToken, getClientSchema } from '../../../services/authUtils';
 import {
-  Alert,
-  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -87,7 +88,7 @@ export default function ExpenseTransactionDetailScreen() {
 
   const handleApprovalSubmit = () => {
     if (!approvalComment.trim()) {
-      Alert.alert('Error', 'Please enter an approval comment');
+      showError('Error', 'Please enter an approval comment');
       return;
     }
     approveMutation.mutate(
@@ -113,17 +114,17 @@ export default function ExpenseTransactionDetailScreen() {
         setUploadFile({ uri: asset.uri, name: asset.name, type: asset.mimeType || 'application/octet-stream' });
       }
     } catch {
-      Alert.alert('Error', 'Failed to pick file');
+      showError('Error', 'Failed to pick file');
     }
   };
 
   const handleUploadSubmit = () => {
     if (!uploadDocType.trim()) {
-      Alert.alert('Validation', 'Please enter a document type');
+      showError('Validation', 'Please enter a document type');
       return;
     }
     if (!uploadFile) {
-      Alert.alert('Validation', 'Please select a file');
+      showError('Validation', 'Please select a file');
       return;
     }
     uploadMutation.mutate(
@@ -144,17 +145,21 @@ export default function ExpenseTransactionDetailScreen() {
     );
   };
 
+  // Parity fix: use FileSystem.downloadAsync with auth headers — Linking.openURL returns 401
+  // on authenticated endpoints in both dev and production Play Store builds
   const handleDownload = async (attachmentId: string, filename: string) => {
-    const url = `${API_BASE_URL}/expense/attachments/${attachmentId}/download`;
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert('Download', `File: ${filename}\nCannot open this URL automatically.`);
-      }
+      const token = await getValidAccessToken(false);
+      const schema = await getClientSchema();
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (schema) headers.cschema = schema;
+      const url = `${API_BASE_URL}/expense/attachments/${attachmentId}/download`;
+      const localUri = FileSystem.documentDirectory + filename;
+      const result = await FileSystem.downloadAsync(url, localUri, { headers });
+      await Sharing.shareAsync(result.uri);
     } catch {
-      Alert.alert('Download', `File: ${filename}`);
+      showError('Download Failed', `Could not download ${filename}. Please try again.`);
     }
   };
 

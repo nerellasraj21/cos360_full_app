@@ -3,12 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert, FlatList, Modal, ScrollView, StyleSheet,
+  FlatList, Modal, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts';
 import {
   examsApi, markPermissionsApi,
@@ -37,6 +38,7 @@ export default function MarkPermissionsScreen() {
   const borderCol = isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const inputBg = isDark ? '#0f0f23' : '#f8fafc';
 
+  const { confirm, modalProps } = useConfirmModal();
   const [selectedExamId, setSelectedExamId] = useState<string>(examId ?? '');
   const [grantModalVisible, setGrantModalVisible] = useState(false);
   const [form, setForm] = useState<MarkPermissionCreate>({ ...EMPTY_FORM });
@@ -100,10 +102,13 @@ export default function MarkPermissionsScreen() {
   };
 
   const handleRevoke = (perm: MarkPermission) => {
-    Alert.alert('Revoke Permission', `Remove mark entry access for teacher ${perm.teacher_id}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Revoke', style: 'destructive', onPress: () => revokeMutation.mutate(perm.id) },
-    ]);
+    confirm({
+      title: 'Revoke Permission',
+      message: `Remove mark entry access for teacher ${perm.teacher_id}?`,
+      confirmLabel: 'Revoke',
+      destructive: true,
+      onConfirm: () => revokeMutation.mutate(perm.id),
+    });
   };
 
   const renderPermission = ({ item }: { item: MarkPermission }) => (
@@ -304,6 +309,7 @@ export default function MarkPermissionsScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
     </AppLayout>
   );
 }

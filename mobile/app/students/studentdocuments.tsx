@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Alert, FlatList, Linking } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, FlatList, Linking } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAllDocuments, useMyDocuments } from '@/src/api/hooks/students/documents';
 import { studentDocumentsApi, studentAdmissionsApi } from '@/src/api/students';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { useToastContext } from '@/components/ToastProvider';
 
 const getDocIcon = (type: string) => {
   const t = (type || '').toLowerCase();
@@ -27,6 +28,7 @@ const getDocIcon = (type: string) => {
 // ─── Document item ─────────────────────────────────────────────────────────
 
 function DocumentItem({ item, colors }: { item: any; colors: any }) {
+  const { showError, showInfo } = useToastContext();
   const downloadMutation = useMutation({
     mutationFn: () => studentDocumentsApi.downloadDocument(item.id),
   });
@@ -39,13 +41,13 @@ function DocumentItem({ item, colors }: { item: any; colors: any }) {
         try {
           await Linking.openURL(reader.result as string);
         } catch {
-          Alert.alert('Info', 'Document downloaded. Check your device to open it.');
+          showInfo('Info', 'Document downloaded. Check your device to open it.');
         }
       };
-      reader.onerror = () => Alert.alert('Error', 'Failed to process document');
+      reader.onerror = () => showError('Error', 'Failed to process document');
       reader.readAsDataURL(blob);
     } catch {
-      Alert.alert('Error', 'Failed to download document');
+      showError('Error', 'Failed to download document');
     }
   };
 

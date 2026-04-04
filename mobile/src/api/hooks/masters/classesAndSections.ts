@@ -1,20 +1,20 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../../../components/FeedbackToast';
+import { useToastContext } from '../../../../components/ToastProvider';
 import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { classSectionsApi } from '../../index';
 
-// Get all class sections - permission protected
+// ─── READ ────────────────────────────────────────────────────────────────────
+
 export function useClassSections() {
   return usePermissionProtectedQuery<any[]>({
     queryKey: ['classSections'],
     queryFn: () => classSectionsApi.getClassSections(),
-    resource: PERMISSION_RESOURCES.CLASSES_SECTIONS,
+    resource: PERMISSION_RESOURCES.CLASSES,
     action: 'list',
   });
 }
 
-// Get class list - permission protected
 export function useClassList() {
   return usePermissionProtectedQuery<any[]>({
     queryKey: ['classList'],
@@ -24,7 +24,6 @@ export function useClassList() {
   });
 }
 
-// Get section list - permission protected
 export function useSectionList() {
   return usePermissionProtectedQuery<any[]>({
     queryKey: ['sectionList'],
@@ -34,7 +33,6 @@ export function useSectionList() {
   });
 }
 
-// Get sections by class - permission protected
 export function useSectionsByClass(classId: string) {
   return usePermissionProtectedQuery<any[]>({
     queryKey: ['sections', classId],
@@ -45,14 +43,15 @@ export function useSectionsByClass(classId: string) {
   });
 }
 
-// Create class section - permission protected
+// ─── CLASS MUTATIONS ─────────────────────────────────────────────────────────
+
 export function useCreateClassSection() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
-  
+  const { showSuccess, showError } = useToastContext();
+
   return usePermissionProtectedMutation<any, Error, any>({
     mutationFn: (data) => classSectionsApi.createClassSection(data),
-    resource: PERMISSION_RESOURCES.CLASSES_SECTIONS,
+    resource: PERMISSION_RESOURCES.CLASSES,
     action: 'create',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classSections'] });
@@ -64,14 +63,72 @@ export function useCreateClassSection() {
   });
 }
 
-// Update section - permission protected
+export function useUpdateClass() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
+
+  return usePermissionProtectedMutation<any, Error, { classId: string; data: { name?: string; short_code?: string; description?: string; is_active?: boolean; academic_year_id?: string } }>({
+    mutationFn: ({ classId, data }) => classSectionsApi.updateClassSection(classId, data),
+    resource: PERMISSION_RESOURCES.CLASSES,
+    action: 'update',
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['classSections'] });
+      showSuccess('Class updated successfully');
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to update class');
+    },
+  });
+}
+
+export function useDeleteClass() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
+
+  return usePermissionProtectedMutation<void, Error, string>({
+    mutationFn: (classId) => classSectionsApi.deleteClassSection(classId),
+    resource: PERMISSION_RESOURCES.CLASSES,
+    action: 'delete',
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['classSections'] });
+      showSuccess('Class deleted successfully');
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to delete class');
+    },
+  });
+}
+
+// ─── SECTION MUTATIONS ────────────────────────────────────────────────────────
+
+// Create a new section inside an existing class
+export function useCreateSectionForClass() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
+
+  return usePermissionProtectedMutation<any, Error, { classId: string; data: { name: string; description?: string; is_active?: boolean } }>({
+    mutationFn: ({ classId, data }) => classSectionsApi.createSection(classId, data),
+    resource: PERMISSION_RESOURCES.SECTIONS,
+    action: 'create',
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['classSections'] });
+      showSuccess('Section created successfully');
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to create section');
+    },
+  });
+}
+
+// Update a section — sends id in the body to match web behaviour
 export function useUpdateSection() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
 
-  return usePermissionProtectedMutation<any, Error, { classId: string; sectionId: string; data: any }>({
-    mutationFn: ({ sectionId, data }) => classSectionsApi.updateSectionDirect(sectionId, data),
-    resource: PERMISSION_RESOURCES.CLASSES_SECTIONS,
+  return usePermissionProtectedMutation<any, Error, { sectionId: string; data: { name?: string; is_active?: boolean } }>({
+    mutationFn: ({ sectionId, data }) =>
+      classSectionsApi.updateSectionDirect(sectionId, { ...data, id: sectionId }),
+    resource: PERMISSION_RESOURCES.SECTIONS,
     action: 'update',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classSections'] });
@@ -83,14 +140,14 @@ export function useUpdateSection() {
   });
 }
 
-// Delete section - permission protected
+// Delete a section — uses direct endpoint (no classId needed), matching web
 export function useDeleteSection() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
-  
-  return usePermissionProtectedMutation<void, Error, { classId: string; sectionId: string }>({
-    mutationFn: ({ classId, sectionId }) => classSectionsApi.deleteSection(classId, sectionId),
-    resource: PERMISSION_RESOURCES.CLASSES_SECTIONS,
+  const { showSuccess, showError } = useToastContext();
+
+  return usePermissionProtectedMutation<void, Error, string>({
+    mutationFn: (sectionId) => classSectionsApi.deleteSectionDirect(sectionId),
+    resource: PERMISSION_RESOURCES.SECTIONS,
     action: 'delete',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classSections'] });

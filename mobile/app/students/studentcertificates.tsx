@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Linking, Modal, ScrollView } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Linking, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
@@ -13,11 +13,13 @@ import { studentCertificatesApi, studentAdmissionsApi } from '@/src/api/students
 import { DeletePermissionGuard, CreatePermissionGuard } from '@/src/components/mobile/MobilePermissionGuard';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 // ─── Shared certificate item ───────────────────────────────────────────────
 
 function CertificateItem({ item, colors, onRevoked }: { item: any; colors: any; onRevoked?: () => void }) {
   const { showError, showSuccess } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
   const queryClient = useQueryClient();
 
   const handleDownload = async () => {
@@ -86,12 +88,15 @@ function CertificateItem({ item, colors, onRevoked }: { item: any; colors: any; 
         <DeletePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_CERTIFICATES}>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: '#EF4444', opacity: revokeMutation.isPending ? 0.6 : 1 }]}
-            onPress={() =>
-              Alert.alert('Revoke Certificate', 'Revoke this certificate? This cannot be undone.', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Revoke', style: 'destructive', onPress: () => revokeMutation.mutate() },
-              ])
-            }
+            onPress={() => {
+              confirm({
+                title: 'Revoke Certificate',
+                message: 'Revoke this certificate? This cannot be undone.',
+                confirmLabel: 'Revoke',
+                destructive: true,
+                onConfirm: () => revokeMutation.mutate(),
+              });
+            }}
             disabled={revokeMutation.isPending}
           >
             <Ionicons name="close-circle-outline" size={15} color="white" />
@@ -101,11 +106,12 @@ function CertificateItem({ item, colors, onRevoked }: { item: any; colors: any; 
           </TouchableOpacity>
         </DeletePermissionGuard>
       </View>
+      <ConfirmModal {...modalProps} />
     </View>
   );
 }
 
-// ─── Read-only view (student / parent) ────────────────────────────────────
+// ─── Read-only view (student / parent) ────────────────��───────────────────
 
 function ReadOnlyCertificates({ title }: { title?: string }) {
   const { colors } = useTheme();

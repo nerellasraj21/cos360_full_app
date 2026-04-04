@@ -13,7 +13,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -86,23 +85,23 @@ export default function EditExpenseTransactionScreen() {
 
   const handleSubmit = () => {
     if (!formData.expense_type_id) {
-      Alert.alert('Validation', 'Please select an expense type.');
+      showError('Validation', 'Please select an expense type.');
       return;
     }
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
-      Alert.alert('Validation', 'Please enter a valid amount.');
+      showError('Validation', 'Please enter a valid amount.');
       return;
     }
     if (!formData.description.trim()) {
-      Alert.alert('Validation', 'Please enter a description.');
+      showError('Validation', 'Please enter a description.');
       return;
     }
     if (!formData.vendor_name.trim()) {
-      Alert.alert('Validation', 'Please enter a vendor name.');
+      showError('Validation', 'Please enter a vendor name.');
       return;
     }
     if (!formData.transaction_date) {
-      Alert.alert('Validation', 'Please enter a transaction date.');
+      showError('Validation', 'Please enter a transaction date.');
       return;
     }
 

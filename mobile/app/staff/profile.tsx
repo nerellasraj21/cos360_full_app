@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -19,6 +18,7 @@ import { useStaffProfile, useUpdateStaffProfile } from '@/hooks/use-staff-api';
 import type { StaffProfile } from '@/src/types/masters/staff';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useTheme } from '@/contexts';
+import { useToastContext } from '@/components/ToastProvider';
 
 function StaffProfileScreenContent() {
   const [isEditing, setIsEditing] = useState(false);
@@ -31,6 +31,7 @@ function StaffProfileScreenContent() {
   const { theme, colors } = useTheme();
   const themeColors = Colors[theme];
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
 
   // Fetch staff profile
   const { data: profile, isLoading, error, refetch } = useStaffProfile();
@@ -40,10 +41,10 @@ function StaffProfileScreenContent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff-profile'] });
       setIsEditing(false);
-      Alert.alert('Success', 'Profile updated successfully');
+      showSuccess('Success', 'Profile updated successfully');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to update profile');
+      showError('Error', error.response?.data?.detail || 'Failed to update profile');
       console.error('Update profile error:', error);
     },
   });
@@ -51,11 +52,11 @@ function StaffProfileScreenContent() {
   const handleSave = () => {
     // Basic validation
     if (formData.email && !formData.email.includes('@')) {
-      Alert.alert('Validation Error', 'Please enter a valid email address');
+      showError('Validation Error', 'Please enter a valid email address');
       return;
     }
     if (formData.phone && formData.phone.length < 10) {
-      Alert.alert('Validation Error', 'Please enter a valid phone number');
+      showError('Validation Error', 'Please enter a valid phone number');
       return;
     }
 

@@ -3,12 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert, FlatList, Modal, ScrollView, StyleSheet,
+  FlatList, Modal, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
+import { TimePickerModal, formatTime12h } from '@/components/ui';
 import { useTheme } from '@/contexts';
 import {
   examDatesApi, examsApi, ExamDate, ExamDateCreateRequest, ExamListItem,
@@ -36,10 +38,22 @@ export default function ExamDatesScreen() {
   const borderCol = isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const inputBg = isDark ? '#0f0f23' : '#f8fafc';
 
+  const { confirm, modalProps } = useConfirmModal();
   const [selectedExamId, setSelectedExamId] = useState<string>(examId ?? '');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ExamDateCreateRequest>({ ...EMPTY_FORM });
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [activeTimeField, setActiveTimeField] = useState<'start_time' | 'end_time'>('start_time');
+
+  const openTimePicker = (field: 'start_time' | 'end_time') => {
+    setActiveTimeField(field);
+    setShowTimePicker(true);
+  };
+  const confirmTime = (time: string) => {
+    setForm(f => ({ ...f, [activeTimeField]: time }));
+    setShowTimePicker(false);
+  };
 
   const canCreate = hasPermission?.('exam_dates', 'create');
   const canUpdate = hasPermission?.('exam_dates', 'update');
@@ -129,10 +143,13 @@ export default function ExamDatesScreen() {
   };
 
   const handleDelete = (d: ExamDate) => {
-    Alert.alert('Delete Date', `Delete schedule for ${d.subject_name ?? d.subject_id}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(d.id) },
-    ]);
+    confirm({
+      title: 'Delete Date',
+      message: `Delete schedule for ${d.subject_name ?? d.subject_id}?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(d.id),
+    });
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
@@ -148,8 +165,8 @@ export default function ExamDatesScreen() {
         </Text>
         <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
           {new Date(item.exam_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-          {item.start_time ? ` · ${item.start_time}` : ''}
-          {item.end_time ? ` – ${item.end_time}` : ''}
+          {item.start_time ? ` · ${formatTime12h(item.start_time)}` : ''}
+          {item.end_time ? ` – ${formatTime12h(item.end_time)}` : ''}
         </Text>
         {item.venue && (
           <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
@@ -284,23 +301,41 @@ export default function ExamDatesScreen() {
                 keyboardType="numbers-and-punctuation"
               />
 
-              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Start Time (HH:MM, optional)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-                value={form.start_time ?? ''}
-                onChangeText={v => setForm(f => ({ ...f, start_time: v }))}
-                placeholder="09:00"
-                placeholderTextColor={colors['muted-foreground']}
-              />
+              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Start Time (optional)</Text>
+              <TouchableOpacity
+                style={[styles.input, { backgroundColor: inputBg, borderColor: borderCol, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                onPress={() => openTimePicker('start_time')}
+              >
+                <Text style={{ color: form.start_time ? colors.foreground : colors['muted-foreground'], fontSize: 14 }}>
+                  {formatTime12h(form.start_time) || 'Tap to set'}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {!!form.start_time && (
+                    <TouchableOpacity onPress={() => setForm(f => ({ ...f, start_time: '' }))}>
+                      <Ionicons name="close-circle" size={16} color={colors['muted-foreground']} />
+                    </TouchableOpacity>
+                  )}
+                  <Ionicons name="time-outline" size={16} color={colors['muted-foreground']} />
+                </View>
+              </TouchableOpacity>
 
-              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>End Time (HH:MM, optional)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-                value={form.end_time ?? ''}
-                onChangeText={v => setForm(f => ({ ...f, end_time: v }))}
-                placeholder="12:00"
-                placeholderTextColor={colors['muted-foreground']}
-              />
+              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>End Time (optional)</Text>
+              <TouchableOpacity
+                style={[styles.input, { backgroundColor: inputBg, borderColor: borderCol, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                onPress={() => openTimePicker('end_time')}
+              >
+                <Text style={{ color: form.end_time ? colors.foreground : colors['muted-foreground'], fontSize: 14 }}>
+                  {formatTime12h(form.end_time) || 'Tap to set'}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {!!form.end_time && (
+                    <TouchableOpacity onPress={() => setForm(f => ({ ...f, end_time: '' }))}>
+                      <Ionicons name="close-circle" size={16} color={colors['muted-foreground']} />
+                    </TouchableOpacity>
+                  )}
+                  <Ionicons name="time-outline" size={16} color={colors['muted-foreground']} />
+                </View>
+              </TouchableOpacity>
 
               <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Venue (optional)</Text>
               <TextInput
@@ -325,6 +360,13 @@ export default function ExamDatesScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
+      <TimePickerModal
+        visible={showTimePicker}
+        initialTime={form[activeTimeField] ?? ''}
+        onConfirm={confirmTime}
+        onCancel={() => setShowTimePicker(false)}
+      />
     </AppLayout>
   );
 }

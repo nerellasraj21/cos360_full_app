@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   FlatList,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -14,8 +14,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { IOSDatePickerModal } from '@/components/ui';
+import { TimePickerModal, formatTime12h } from '@/components/ui';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -64,7 +63,7 @@ export default function TimeTableEditor() {
   const router = useRouter();
   const { colors } = useTheme();
   const themeColors = colors;
-  const { showSuccess, showError } = useToastContext();
+  const { showSuccess, showError, showInfo } = useToastContext();
   const queryClient = useQueryClient();
   const { activeAcademicYearId } = useAcademicYear();
 
@@ -153,7 +152,10 @@ export default function TimeTableEditor() {
         label: item.label
       }));
       setRows(rows);
-      setIncludeSaturday(false); // TODO: determine from data
+      const hasSaturday = timetableData.timetable_data.some(
+        item => item.type === 'subject' && item.subjects && 'Saturday' in item.subjects
+      );
+      setIncludeSaturday(hasSaturday);
       setIsEditing(false);
     } else if (selectedSection) {
       // Create default timetable
@@ -245,31 +247,13 @@ export default function TimeTableEditor() {
     setShowTimePicker(true);
   };
 
-  const handleTimeChange = (event: any, selectedDate?: Date) => {
-    // Android only — dialog auto-dismisses after selection
-    setShowTimePicker(false);
-    if (event.type === 'set' && selectedDate && currentRowId && currentTimeField) {
-      const timeString = selectedDate.toTimeString().slice(0, 5); // HH:MM
-      updateRow(currentRowId, {
-        time: {
-          ...rows.find(r => r.id === currentRowId)?.time || { from: '09:00', to: '09:45' },
-          [currentTimeField]: timeString
-        }
-      });
-    }
-    setCurrentRowId(null);
-    setCurrentTimeField(null);
-  };
-
-  const handleIOSTimeChange = (date: Date) => {
-    // iOS only — called when user taps Done in IOSDatePickerModal
+  const confirmTime = (timeString: string) => {
     if (currentRowId && currentTimeField) {
-      const timeString = date.toTimeString().slice(0, 5);
       updateRow(currentRowId, {
         time: {
           ...rows.find(r => r.id === currentRowId)?.time || { from: '09:00', to: '09:45' },
-          [currentTimeField]: timeString
-        }
+          [currentTimeField]: timeString,
+        },
       });
     }
     setShowTimePicker(false);
@@ -313,12 +297,11 @@ export default function TimeTableEditor() {
 
   const handleExport = async (format: 'png' | 'csv' | 'excel' = 'csv') => {
     if (format === 'csv') {
-      exportToCSV();
+      await exportToCSV();
     } else if (format === 'excel') {
       exportToExcel();
-    } else {
-      // PNG export for React Native would require a different library
-      Alert.alert('PNG Export', 'PNG export not implemented for mobile. Use CSV or Excel.');
+    } else if (format === 'png') {
+      exportToPNG();
     }
   };
 
@@ -327,18 +310,163 @@ export default function TimeTableEditor() {
       const csvData = generateCSVData();
       const csvContent = csvData.map(row => row.join(',')).join('\n');
 
-      // Share the CSV content directly
-      await Share.share({
-        message: csvContent,
-        title: `Timetable - ${selectedClass?.name} ${selectedSection?.name}`,
-      });
+      if (Platform.OS === 'web') {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Timetable - ${selectedClass?.name} - ${selectedSection?.name}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      } else {
+        await Share.share({
+          message: csvContent,
+          title: `Timetable - ${selectedClass?.name} ${selectedSection?.name}`,
+        });
+      }
     } catch {
-      Alert.alert('Error', 'Failed to export CSV');
+      showError('Error', 'Failed to export CSV');
     }
   };
 
   const exportToExcel = () => {
-    Alert.alert('Excel Export', 'Excel export would be implemented with xlsx library');
+    if (Platform.OS !== 'web') {
+      showInfo('Excel Export', 'Excel export is only available on web.');
+      return;
+    }
+    try {
+      const data = generateCSVData();
+      const htmlTable = `<table>${data.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}</table>`;
+      const blob = new Blob([htmlTable], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Timetable - ${selectedClass?.name} - ${selectedSection?.name}.xls`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch {
+      showError('Error', 'Failed to export Excel');
+    }
+  };
+
+  const exportToPNG = () => {
+    if (Platform.OS !== 'web') {
+      showInfo('PNG Export', 'PNG export is only available on web.');
+      return;
+    }
+    try {
+      const SCALE = 2;
+      const PAD = 28;
+      const ROW_H = 44;
+      const TIME_W = 110;
+      const DAY_W = 130;
+      const HEADER_H = 44;
+      const TITLE_H = 48;
+
+      const cols = days.length;
+      const totalW = (TIME_W + DAY_W * cols + PAD * 2) * SCALE;
+      const totalH = (TITLE_H + HEADER_H + ROW_H * rows.length + PAD * 2) * SCALE;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = totalW;
+      canvas.height = totalH;
+      const ctx = canvas.getContext('2d')!;
+      ctx.scale(SCALE, SCALE);
+
+      // Background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, totalW, totalH);
+
+      // Title
+      ctx.fillStyle = '#111827';
+      ctx.font = 'bold 16px system-ui, sans-serif';
+      ctx.fillText(`${selectedClass?.name} – ${selectedSection?.name}  Timetable`, PAD, PAD + 20);
+
+      const tableTop = PAD + TITLE_H;
+
+      // Header row background
+      ctx.fillStyle = '#e0e7ff';
+      ctx.fillRect(PAD, tableTop, TIME_W + DAY_W * cols, HEADER_H);
+
+      // Header text
+      ctx.fillStyle = '#3730a3';
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Time', PAD + 8, tableTop + HEADER_H / 2);
+      days.forEach((day, i) => {
+        ctx.fillText(day.slice(0, 3), PAD + TIME_W + DAY_W * i + 8, tableTop + HEADER_H / 2);
+      });
+
+      // Data rows
+      rows.forEach((row, rowIdx) => {
+        const y = tableTop + HEADER_H + ROW_H * rowIdx;
+        const bg = rowIdx % 2 === 0 ? '#ffffff' : '#f9fafb';
+        ctx.fillStyle = bg;
+        ctx.fillRect(PAD, y, TIME_W + DAY_W * cols, ROW_H);
+
+        // Time cell
+        ctx.fillStyle = '#374151';
+        ctx.font = 'bold 11px system-ui, sans-serif';
+        ctx.fillText(`${row.time.from}–${row.time.to}`, PAD + 8, y + ROW_H / 2);
+
+        if (row.type === 'special') {
+          const label = row.label || '';
+          ctx.fillStyle = '#fef3c7';
+          ctx.fillRect(PAD + TIME_W, y, DAY_W * cols, ROW_H);
+          ctx.fillStyle = '#92400e';
+          ctx.font = 'bold 11px system-ui, sans-serif';
+          const labelX = PAD + TIME_W + (DAY_W * cols) / 2;
+          ctx.textAlign = 'center';
+          ctx.fillText(label, labelX, y + ROW_H / 2);
+          ctx.textAlign = 'left';
+        } else {
+          days.forEach((day, i) => {
+            const subjectId = row.subjects?.[day];
+            const name = subjectId ? getSubjectNameById(subjectId) : '';
+            ctx.fillStyle = '#374151';
+            ctx.font = '11px system-ui, sans-serif';
+            // Truncate long names
+            const maxW = DAY_W - 16;
+            let text = name;
+            while (text.length > 0 && ctx.measureText(text).width > maxW) {
+              text = text.slice(0, -1);
+            }
+            if (text !== name) text += '…';
+            ctx.fillText(text, PAD + TIME_W + DAY_W * i + 8, y + ROW_H / 2);
+          });
+        }
+      });
+
+      // Grid lines
+      ctx.strokeStyle = '#d1d5db';
+      ctx.lineWidth = 1;
+      const tableBottom = tableTop + HEADER_H + ROW_H * rows.length;
+      const tableRight = PAD + TIME_W + DAY_W * cols;
+
+      // Outer border
+      ctx.strokeRect(PAD, tableTop, TIME_W + DAY_W * cols, HEADER_H + ROW_H * rows.length);
+
+      // Horizontal lines
+      for (let r = 0; r <= rows.length; r++) {
+        const y = tableTop + HEADER_H + ROW_H * r;
+        ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(tableRight, y); ctx.stroke();
+      }
+      // Vertical lines
+      ctx.beginPath(); ctx.moveTo(PAD + TIME_W, tableTop); ctx.lineTo(PAD + TIME_W, tableBottom); ctx.stroke();
+      for (let c = 1; c < cols; c++) {
+        const x = PAD + TIME_W + DAY_W * c;
+        ctx.beginPath(); ctx.moveTo(x, tableTop); ctx.lineTo(x, tableBottom); ctx.stroke();
+      }
+
+      const dataUrl = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `Timetable - ${selectedClass?.name} - ${selectedSection?.name}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('PNG export error:', err);
+      showError('Error', 'Failed to export PNG');
+    }
   };
 
   const generateCSVData = (): string[][] => {
@@ -384,7 +512,7 @@ export default function TimeTableEditor() {
       {/* Time */}
       <View style={styles.timeSection}>
         <TouchableOpacity
-          style={styles.timeInputContainer}
+          style={[styles.timeInputContainer, { opacity: isEditing ? 1 : 0.6 }]}
           onPress={() => isEditing && openTimePicker(item.id, 'from')}
           disabled={!isEditing}
         >
@@ -392,30 +520,32 @@ export default function TimeTableEditor() {
           <TextInput
             style={[styles.timeInput, {
               color: themeColors['card-foreground'],
-              borderColor: themeColors.border,
-              backgroundColor: themeColors.background
+              borderColor: isEditing ? themeColors.primary : themeColors.border,
+              backgroundColor: isEditing ? themeColors.primary + '10' : themeColors.background,
+              borderWidth: isEditing ? 2 : 1
             }]}
-            value={item.time.from}
+            value={formatTime12h(item.time.from)}
             editable={false}
-            placeholder="09:00"
+            placeholder="9:00 AM"
             placeholderTextColor={themeColors['muted-foreground']}
           />
         </TouchableOpacity>
         <ThemedText style={[styles.timeSeparator, { color: themeColors['muted-foreground'] }]}>to</ThemedText>
         <TouchableOpacity
-          style={styles.timeInputContainer}
+          style={[styles.timeInputContainer, { opacity: isEditing ? 1 : 0.6 }]}
           onPress={() => isEditing && openTimePicker(item.id, 'to')}
           disabled={!isEditing}
         >
           <TextInput
             style={[styles.timeInput, {
               color: themeColors['card-foreground'],
-              borderColor: themeColors.border,
-              backgroundColor: themeColors.background
+              borderColor: isEditing ? themeColors.primary : themeColors.border,
+              backgroundColor: isEditing ? themeColors.primary + '10' : themeColors.background,
+              borderWidth: isEditing ? 2 : 1
             }]}
-            value={item.time.to}
+            value={formatTime12h(item.time.to)}
             editable={false}
-            placeholder="09:45"
+            placeholder="9:45 AM"
             placeholderTextColor={themeColors['muted-foreground']}
           />
         </TouchableOpacity>
@@ -594,53 +724,63 @@ export default function TimeTableEditor() {
               }}
             >
               <Ionicons name={isEditing ? "checkmark" : "create"} size={20} color="white" />
+              <ThemedText style={styles.editButtonText}>{isEditing ? "Save" : "Edit"}</ThemedText>
             </TouchableOpacity>
           </PermissionGuard>
         </View>
 
-        {/* Export Options */}
-        {showExportOptions && (
-          <>
-            <TouchableOpacity
-              style={styles.exportOverlay}
-              onPress={() => setShowExportOptions(false)}
-              activeOpacity={1}
-            />
-            <View style={[styles.exportOptions, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
-              <TouchableOpacity
-                style={styles.exportOption}
-                onPress={() => {
-                  handleExport('csv');
-                  setShowExportOptions(false);
-                }}
-              >
-                <Ionicons name="document-text" size={16} color={themeColors['card-foreground']} />
-                <ThemedText style={styles.exportOptionText}>Export CSV</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.exportOption}
-                onPress={() => {
-                  handleExport('excel');
-                  setShowExportOptions(false);
-                }}
-              >
-                <Ionicons name="grid" size={16} color={themeColors['card-foreground']} />
-                <ThemedText style={styles.exportOptionText}>Export Excel</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.exportOption}
-                onPress={() => {
-                  handleExport('png');
-                  setShowExportOptions(false);
-                }}
-              >
-                <Ionicons name="image" size={16} color={themeColors['card-foreground']} />
-                <ThemedText style={styles.exportOptionText}>Export PNG</ThemedText>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
       </View>
+
+      {/* Export Options Modal */}
+      <Modal
+        visible={showExportOptions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowExportOptions(false)}
+      >
+        <TouchableOpacity
+          style={styles.exportOverlay}
+          onPress={() => setShowExportOptions(false)}
+          activeOpacity={1}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.exportOptions, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
+          >
+            <ThemedText style={[styles.exportOptionTitle, { color: themeColors['muted-foreground'] }]}>Export As</ThemedText>
+            <TouchableOpacity
+              style={styles.exportOption}
+              onPress={() => {
+                handleExport('csv');
+                setShowExportOptions(false);
+              }}
+            >
+              <Ionicons name="document-text" size={18} color={themeColors['card-foreground']} />
+              <ThemedText style={styles.exportOptionText}>Export CSV</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.exportOption}
+              onPress={() => {
+                handleExport('excel');
+                setShowExportOptions(false);
+              }}
+            >
+              <Ionicons name="grid" size={18} color={themeColors['card-foreground']} />
+              <ThemedText style={styles.exportOptionText}>Export Excel</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.exportOption}
+              onPress={() => {
+                handleExport('png');
+                setShowExportOptions(false);
+              }}
+            >
+              <Ionicons name="image" size={18} color={themeColors['card-foreground']} />
+              <ThemedText style={styles.exportOptionText}>Export PNG</ThemedText>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Saturday Toggle */}
       {isEditing && (
@@ -659,21 +799,96 @@ export default function TimeTableEditor() {
         </View>
       )}
 
-      {/* Timetable Rows */}
-      <FlatList
-        data={rows}
-        renderItem={renderTimetableRow}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.timetableList}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
-            onRefresh={refetch}
-            tintColor={themeColors.primary}
-          />
-        }
-      />
+      {/* Timetable content — read-only table grid or edit cards */}
+      {!isEditing ? (
+        <ScrollView
+          style={{ flex: 1 }}
+          refreshControl={
+            <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={themeColors.primary} />
+          }
+        >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View>
+              {/* Header row */}
+              <View style={[styles.tableHeaderRow, { backgroundColor: themeColors.primary + '20', borderColor: themeColors.border }]}>
+                <View style={[styles.tableTimeCell, { borderColor: themeColors.border }]}>
+                  <ThemedText style={[styles.tableHeaderText, { color: themeColors.primary }]}>Time</ThemedText>
+                </View>
+                {days.map(day => (
+                  <View key={day} style={[styles.tableDayCell, { borderColor: themeColors.border }]}>
+                    <ThemedText style={[styles.tableHeaderText, { color: themeColors.primary }]}>{day.slice(0, 3)}</ThemedText>
+                  </View>
+                ))}
+              </View>
+              {/* Data rows */}
+              {rows.map((row, idx) => (
+                <View
+                  key={row.id}
+                  style={[
+                    styles.tableRow,
+                    {
+                      backgroundColor: idx % 2 === 0 ? themeColors.card : themeColors.background,
+                      borderColor: themeColors.border,
+                    },
+                  ]}
+                >
+                  <View style={[styles.tableTimeCell, { borderColor: themeColors.border }]}>
+                    <ThemedText style={[styles.tableTimeCellText, { color: themeColors['card-foreground'] }]}>
+                      {formatTime12h(row.time.from)}–{formatTime12h(row.time.to)}
+                    </ThemedText>
+                  </View>
+                  {row.type === 'special' ? (
+                    <View
+                      style={[
+                        styles.tableSpecialCell,
+                        { width: 100 * days.length, backgroundColor: '#F59E0B20', borderColor: themeColors.border },
+                      ]}
+                    >
+                      <ThemedText style={styles.tableSpecialText}>{row.label}</ThemedText>
+                    </View>
+                  ) : (
+                    days.map(day => {
+                      const subjectId = row.subjects?.[day];
+                      const subjectName = subjectId ? getSubjectNameById(subjectId) : '';
+                      return (
+                        <View key={day} style={[styles.tableDayCell, { borderColor: themeColors.border }]}>
+                          {!!subjectName && (
+                            <View style={[styles.subjectPill, { backgroundColor: themeColors.primary + '20' }]}>
+                              <ThemedText style={[styles.subjectPillText, { color: themeColors.primary }]} numberOfLines={2}>
+                                {subjectName}
+                              </ThemedText>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })
+                  )}
+                </View>
+              ))}
+              {rows.length === 0 && (
+                <View style={styles.emptyTableRow}>
+                  <ThemedText style={{ color: themeColors['muted-foreground'] }}>No timetable data</ThemedText>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={rows}
+          renderItem={renderTimetableRow}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.timetableList}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={refetch}
+              tintColor={themeColors.primary}
+            />
+          }
+        />
+      )}
 
       {/* Action Buttons */}
       {isEditing && (
@@ -732,24 +947,12 @@ export default function TimeTableEditor() {
 
     </ThemedView>
 
-    {/* Time Picker (Android) */}
-    {showTimePicker && Platform.OS === 'android' && (
-      <DateTimePicker
-        value={new Date(`1970-01-01T${rows.find(r => r.id === currentRowId)?.time?.[currentTimeField || 'from'] || '09:00'}:00`)}
-        mode="time"
-        is24Hour={true}
-        display="default"
-        onChange={handleTimeChange}
-      />
-    )}
-    {/* Time Picker (iOS) */}
-    <IOSDatePickerModal
-      visible={showTimePicker && Platform.OS === 'ios'}
-      value={new Date(`1970-01-01T${rows.find(r => r.id === currentRowId)?.time?.[currentTimeField || 'from'] || '09:00'}:00`)}
-      mode="time"
-      is24Hour={true}
-      onChange={handleIOSTimeChange}
-      onDismiss={() => {
+    {/* Time Picker */}
+    <TimePickerModal
+      visible={showTimePicker}
+      initialTime={rows.find(r => r.id === currentRowId)?.time?.[currentTimeField || 'from'] || '09:00'}
+      onConfirm={confirmTime}
+      onCancel={() => {
         setShowTimePicker(false);
         setCurrentRowId(null);
         setCurrentTimeField(null);
@@ -793,7 +996,7 @@ export default function TimeTableEditor() {
                 >
                   <Ionicons name="time-outline" size={16} color={themeColors['muted-foreground']} />
                   <ThemedText style={[styles.modalOptionText, { marginLeft: 8 }]}>
-                    {item.time.from} – {item.time.to}
+                    {formatTime12h(item.time.from)} – {formatTime12h(item.time.to)}
                   </ThemedText>
                   <Ionicons name="chevron-forward" size={16} color={themeColors['muted-foreground']} style={{ marginLeft: 'auto' }} />
                 </TouchableOpacity>
@@ -867,37 +1070,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   exportOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 999,
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
   },
   exportOptions: {
-    position: 'absolute',
-    top: 50,
-    right: 8,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     padding: 8,
-    minWidth: 150,
-    zIndex: 1000,
+    minWidth: 200,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  exportOptionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   exportOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    gap: 10,
+    borderRadius: 8,
   },
   exportOptionText: {
-    marginLeft: 8,
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '500',
   },
   subtitle: {
     fontSize: 14,
@@ -905,11 +1113,18 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   editButton: {
-    width: 40,
-    height: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 20,
     justifyContent: 'center',
-    alignItems: 'center',
+  },
+  editButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   selectionContainer: {
     flex: 1,
@@ -1130,5 +1345,62 @@ const styles = StyleSheet.create({
   modalCancelText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  // Read-only table grid styles
+  tableHeaderRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tableTimeCell: {
+    width: 90,
+    padding: 8,
+    borderRightWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tableDayCell: {
+    width: 100,
+    padding: 8,
+    borderRightWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  tableHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  tableTimeCellText: {
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  tableSpecialCell: {
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  tableSpecialText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B45309',
+  },
+  subjectPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  subjectPillText: {
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  emptyTableRow: {
+    padding: 24,
+    alignItems: 'center',
   },
 });

@@ -3,11 +3,11 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth, useTheme } from '@/contexts';
+import { ConfirmModal } from '@/components/ui';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -34,6 +34,7 @@ export default function ProfileTabScreen() {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Determine user role
   const roleName = role?.name?.toLowerCase();
@@ -75,26 +76,16 @@ export default function ProfileTabScreen() {
     profileResource = 'profile';
   }
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-            } catch (e) {
-              // ignore — clears locally regardless
-            }
-            router.replace('/login');
-          },
-        },
-      ]
-    );
+  const handleLogout = () => setShowLogoutModal(true);
+
+  const confirmLogout = async () => {
+    setShowLogoutModal(false);
+    try {
+      await logout();
+    } catch (e) {
+      // ignore — clears locally regardless
+    }
+    router.replace('/login');
   };
 
   if (!user) {
@@ -108,6 +99,7 @@ export default function ProfileTabScreen() {
   }
 
   return (
+    <>
     <PermissionGuard
       permissions={[
         ['student_profile', 'read_own'],
@@ -223,6 +215,17 @@ export default function ProfileTabScreen() {
         </View>
       </AppLayout>
     </PermissionGuard>
+    <ConfirmModal
+      visible={showLogoutModal}
+      title="Logout"
+      message="Are you sure you want to logout?"
+      confirmText="Logout"
+      cancelText="Cancel"
+      destructive
+      onConfirm={confirmLogout}
+      onCancel={() => setShowLogoutModal(false)}
+    />
+    </>
   );
 }
 

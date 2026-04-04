@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +16,7 @@ import {
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useTheme } from '@/contexts';
 import {
@@ -49,6 +51,7 @@ export default function ExpenseTransactionsScreen() {
   const { showSuccess, showError } = useToastContext();
 
   const [activeTab, setActiveTab] = useState<StatusTab>('all');
+  const { confirm, modalProps } = useConfirmModal();
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [vendorFilter, setVendorFilter] = useState('');
@@ -96,16 +99,17 @@ export default function ExpenseTransactionsScreen() {
   ], [typesDropdown]);
 
   const handleDelete = (item: ExpenseTransaction) => {
-    Alert.alert('Delete Transaction', `Delete this transaction of ₹${item.amount}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: () =>
-          deleteMutation.mutate(item.id, {
-            onSuccess: () => showSuccess('Deleted', 'Transaction has been deleted.'),
-            onError: () => showError('Delete Failed', 'Could not delete transaction.'),
-          }),
-      },
-    ]);
+    confirm({
+      title: 'Delete Transaction',
+      message: `Delete this transaction of ₹${item.amount}?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () =>
+        deleteMutation.mutate(item.id, {
+          onSuccess: () => showSuccess('Deleted', 'Transaction has been deleted.'),
+          onError: () => showError('Delete Failed', 'Could not delete transaction.'),
+        }),
+    });
   };
 
   const TABS: { key: StatusTab; label: string }[] = [
@@ -299,6 +303,7 @@ export default function ExpenseTransactionsScreen() {
 
         <View style={{ height: 32 }} />
       </ScrollView>
+      <ConfirmModal {...modalProps} />
     </AppLayout>
   );
 }

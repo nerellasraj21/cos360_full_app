@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   ScrollView,
@@ -16,6 +15,7 @@ import {
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { CustomDropdown } from '@/components/ui/dropdown';
 import { useAuth, useTheme } from '@/contexts';
 import {
@@ -216,8 +216,12 @@ export default function CommunicationTab() {
   const { role } = useAuth();
   const qc = useQueryClient();
   const { showSuccess, showError } = useToastContext();
+  const { confirm: confirmModal, modalProps } = useConfirmModal();
 
   const [activeTab, setActiveTab] = useState<Tab>('compose');
+
+  // Compose wizard step
+  const [step, setStep] = useState(1);
 
   // Compose state
   const [channel, setChannel] = useState<CommChannel>('sms');
@@ -346,6 +350,7 @@ export default function CommunicationTab() {
       setSelectedRole(null);
       setTemplateId(null);
       setExtraVars({});
+      setStep(1);
       qc.invalidateQueries({ queryKey: ['comm-logs'] });
       setActiveTab('logs');
     },
@@ -448,25 +453,20 @@ export default function CommunicationTab() {
   };
 
   const handleDeactivate = (t: CommunicationTemplate) => {
-    Alert.alert(
-      'Deactivate Template',
-      `Deactivate "${t.name}"? It will no longer be available for sending.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Deactivate',
-          style: 'destructive',
-          onPress: () => deactivateMutation.mutate(t.id),
-        },
-      ],
-    );
+    confirmModal({
+      title: 'Deactivate Template',
+      message: `Deactivate "${t.name}"? It will no longer be available for sending.`,
+      confirmLabel: 'Deactivate',
+      destructive: true,
+      onConfirm: () => deactivateMutation.mutate(t.id),
+    });
   };
 
   const handleTemplateSubmit = () => {
-    if (!form.name.trim()) { Alert.alert('Error', 'Template name is required'); return; }
-    if (!form.body.trim()) { Alert.alert('Error', 'Message body is required'); return; }
+    if (!form.name.trim()) { showError('Error', 'Template name is required'); return; }
+    if (!form.body.trim()) { showError('Error', 'Message body is required'); return; }
     if (form.channel === 'email' && !form.subject?.trim()) {
-      Alert.alert('Error', 'Subject is required for email templates');
+      showError('Error', 'Subject is required for email templates');
       return;
     }
     const detectedVars = extractVariables(form.body);
@@ -492,13 +492,13 @@ export default function CommunicationTab() {
   };
 
   const handleSend = () => {
-    if (!targetType) { Alert.alert('Error', 'Please select a target type'); return; }
+    if (!targetType) { showError('Error', 'Please select a target type'); return; }
     if (!isRefComplete(targetType, classId, sectionId, parentId, studentId, staffId, selectedRole)) {
-      Alert.alert('Error', 'Please complete all recipient fields'); return;
+      showError('Error', 'Please complete all recipient fields'); return;
     }
-    if (!templateId) { Alert.alert('Error', 'Please select a template'); return; }
+    if (!templateId) { showError('Error', 'Please select a template'); return; }
     if (userVars.some((v) => !extraVars[v]?.trim())) {
-      Alert.alert('Error', 'Please fill all required template variables'); return;
+      showError('Error', 'Please fill all required template variables'); return;
     }
     setShowConfirm(true);
   };
@@ -576,7 +576,7 @@ export default function CommunicationTab() {
       </View>
 
       {/* ════════════════════════════════════
-          COMPOSE TAB
+          COMPOSE TAB  (step wizard)
       ════════════════════════════════════ */}
       {activeTab === 'compose' && (
         <ScrollView
@@ -584,207 +584,286 @@ export default function CommunicationTab() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-
-          {/* 1. SELECT CHANNEL */}
-          <Text style={[styles.sectionHeading, { color: colors['muted-foreground'] }]}>
-            1. SELECT CHANNEL
-          </Text>
-          <View style={styles.channelRow}>
-            {CHANNELS.map((c) => {
-              const active = channel === c.key;
-              return (
-                <TouchableOpacity
-                  key={c.key}
-                  style={[
-                    styles.channelCard,
-                    {
-                      backgroundColor: cardBg,
-                      borderColor: active ? '#556ee6' : borderCol,
-                      borderWidth: active ? 2 : 1,
-                    },
-                  ]}
-                  onPress={() => { setChannel(c.key); setTemplateId(null); setExtraVars({}); }}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons
-                    name={c.icon as any}
-                    size={28}
-                    color={active ? '#556ee6' : colors['muted-foreground']}
-                  />
-                  <Text style={[styles.channelLabel, { color: active ? '#556ee6' : colors.foreground }]}>
-                    {c.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          {/* ── Step progress indicator ── */}
+          <View style={styles.stepIndicatorRow}>
+            {[1, 2, 3, 4].map((s) => (
+              <View
+                key={s}
+                style={[
+                  styles.stepBar,
+                  { backgroundColor: s <= step ? '#556ee6' : borderCol },
+                ]}
+              />
+            ))}
+            <Text style={[styles.stepLabel, { color: colors['muted-foreground'] }]}>
+              Step {step} of {userVars.length > 0 ? 4 : 3}
+            </Text>
           </View>
 
-          {/* 2. SELECT RECIPIENTS */}
-          <Text style={[styles.sectionHeading, { color: colors['muted-foreground'] }]}>
-            2. SELECT RECIPIENTS
-          </Text>
-
-          <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Target Type *</Text>
-          <CustomDropdown
-            data={TARGET_TYPES}
-            placeholder="Select target type..."
-            value={targetType}
-            onChange={(v) => {
-              setTargetType(v as TargetType);
-              setClassId(null);
-              setSectionId(null);
-              setParentId('');
-              setStudentId('');
-              setStaffId('');
-              setSelectedRole(null);
-            }}
-            search={false}
-          />
-
-          {/* Class + Section */}
-          {!!targetType && CLASS_SPECIFIC.includes(targetType) && (
-            <View style={styles.classRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Class *</Text>
-                <CustomDropdown
-                  data={classesDropdown}
-                  placeholder="Select Class"
-                  value={classId}
-                  onChange={(v) => { setClassId(v as string); setSectionId(null); }}
-                  search={false}
-                />
+          {/* ── STEP 1: SELECT CHANNEL ── */}
+          {step === 1 && (
+            <>
+              <Text style={[styles.sectionHeading, { color: colors['muted-foreground'] }]}>
+                1. SELECT CHANNEL
+              </Text>
+              <View style={styles.channelRow}>
+                {CHANNELS.map((c) => {
+                  const active = channel === c.key;
+                  return (
+                    <TouchableOpacity
+                      key={c.key}
+                      style={[
+                        styles.channelCard,
+                        {
+                          backgroundColor: cardBg,
+                          borderColor: active ? '#556ee6' : borderCol,
+                          borderWidth: active ? 2 : 1,
+                        },
+                      ]}
+                      onPress={() => { setChannel(c.key); setTemplateId(null); setExtraVars({}); }}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons
+                        name={c.icon as any}
+                        size={28}
+                        color={active ? '#556ee6' : colors['muted-foreground']}
+                      />
+                      <Text style={[styles.channelLabel, { color: active ? '#556ee6' : colors.foreground }]}>
+                        {c.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Section *</Text>
-                <CustomDropdown
-                  data={sectionsDropdown}
-                  placeholder="Select Section"
-                  value={sectionId}
-                  onChange={(v) => setSectionId(v as string)}
-                  disabled={!classId}
-                  search={false}
-                />
+              <View style={styles.stepNav}>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity
+                  style={[styles.navBtn, { backgroundColor: '#556ee6', opacity: !channel ? 0.4 : 1 }]}
+                  onPress={() => setStep(2)}
+                  disabled={!channel}
+                >
+                  <Text style={styles.navBtnText}>Next</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-          )}
-
-          {/* Individual Parent ID */}
-          {targetType === 'individual_parent' && (
-            <>
-              <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Parent ID (UUID) *</Text>
-              <TextInput
-                style={[styles.input, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
-                placeholder="Enter parent UUID..."
-                placeholderTextColor={colors['muted-foreground']}
-                value={parentId}
-                onChangeText={setParentId}
-                autoCapitalize="none"
-              />
             </>
           )}
 
-          {/* Individual Student ID */}
-          {targetType === 'individual_student' && (
+          {/* ── STEP 2: SELECT RECIPIENTS ── */}
+          {step === 2 && (
             <>
-              <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Student ID (UUID) *</Text>
-              <TextInput
-                style={[styles.input, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
-                placeholder="Enter student UUID..."
-                placeholderTextColor={colors['muted-foreground']}
-                value={studentId}
-                onChangeText={setStudentId}
-                autoCapitalize="none"
-              />
-            </>
-          )}
+              <Text style={[styles.sectionHeading, { color: colors['muted-foreground'] }]}>
+                2. SELECT RECIPIENTS
+              </Text>
 
-          {/* Individual Staff ID */}
-          {targetType === 'individual_staff' && (
-            <>
-              <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Staff ID (UUID) *</Text>
-              <TextInput
-                style={[styles.input, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
-                placeholder="Enter staff UUID..."
-                placeholderTextColor={colors['muted-foreground']}
-                value={staffId}
-                onChangeText={setStaffId}
-                autoCapitalize="none"
-              />
-            </>
-          )}
-
-          {/* Role selector */}
-          {targetType === 'role_based' && (
-            <>
-              <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Role *</Text>
+              <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Target Type *</Text>
               <CustomDropdown
-                data={rolesDropdown}
-                placeholder={
-                  rolesLoading ? 'Loading roles...' :
-                  rolesError ? 'Failed to load roles — pull to refresh' :
-                  'Select role...'
-                }
-                value={selectedRole}
-                onChange={(v) => setSelectedRole(v as string)}
+                data={TARGET_TYPES}
+                placeholder="Select target type..."
+                value={targetType}
+                onChange={(v) => {
+                  setTargetType(v as TargetType);
+                  setClassId(null);
+                  setSectionId(null);
+                  setParentId('');
+                  setStudentId('');
+                  setStaffId('');
+                  setSelectedRole(null);
+                }}
                 search={false}
-                disabled={rolesLoading || rolesError}
               />
+
+              {/* Class + Section */}
+              {!!targetType && CLASS_SPECIFIC.includes(targetType) && (
+                <>
+                  <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 10 }]}>Class *</Text>
+                  <CustomDropdown
+                    data={classesDropdown}
+                    placeholder="Select Class"
+                    value={classId}
+                    onChange={(v) => { setClassId(v as string); setSectionId(null); }}
+                    search={false}
+                  />
+                  <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 10 }]}>Section *</Text>
+                  <CustomDropdown
+                    data={sectionsDropdown}
+                    placeholder="Select Section"
+                    value={sectionId}
+                    onChange={(v) => setSectionId(v as string)}
+                    disabled={!classId}
+                    search={false}
+                  />
+                </>
+              )}
+
+              {/* Individual Parent ID */}
+              {targetType === 'individual_parent' && (
+                <>
+                  <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Parent ID (UUID) *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
+                    placeholder="Enter parent UUID..."
+                    placeholderTextColor={colors['muted-foreground']}
+                    value={parentId}
+                    onChangeText={setParentId}
+                    autoCapitalize="none"
+                  />
+                </>
+              )}
+
+              {/* Individual Student ID */}
+              {targetType === 'individual_student' && (
+                <>
+                  <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Student ID (UUID) *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
+                    placeholder="Enter student UUID..."
+                    placeholderTextColor={colors['muted-foreground']}
+                    value={studentId}
+                    onChangeText={setStudentId}
+                    autoCapitalize="none"
+                  />
+                </>
+              )}
+
+              {/* Individual Staff ID */}
+              {targetType === 'individual_staff' && (
+                <>
+                  <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Staff ID (UUID) *</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
+                    placeholder="Enter staff UUID..."
+                    placeholderTextColor={colors['muted-foreground']}
+                    value={staffId}
+                    onChangeText={setStaffId}
+                    autoCapitalize="none"
+                  />
+                </>
+              )}
+
+              {/* Role selector */}
+              {targetType === 'role_based' && (
+                <>
+                  <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Role *</Text>
+                  <CustomDropdown
+                    data={rolesDropdown}
+                    placeholder={
+                      rolesLoading ? 'Loading roles...' :
+                      rolesError ? 'Failed to load roles' :
+                      'Select role...'
+                    }
+                    value={selectedRole}
+                    onChange={(v) => setSelectedRole(v as string)}
+                    search={false}
+                    disabled={rolesLoading || rolesError}
+                  />
+                </>
+              )}
+
+              {/* Estimated recipients */}
+              {!!targetType && (
+                <View style={[styles.previewCount, { backgroundColor: '#556ee610', borderColor: '#556ee640' }]}>
+                  <Ionicons name="people-outline" size={14} color="#556ee6" />
+                  <Text style={[styles.previewCountText, { color: '#556ee6' }]}>
+                    {previewFetching
+                      ? 'Fetching recipients...'
+                      : previewData
+                      ? `Estimated recipients: ~${previewData.estimated_count}`
+                      : isRefComplete(targetType, classId, sectionId, parentId, studentId, staffId, selectedRole)
+                      ? 'Fetching recipients...'
+                      : 'Complete fields to see recipient count'}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.stepNav}>
+                <TouchableOpacity
+                  style={[styles.navBtn, styles.navBtnBack, { borderColor: borderCol }]}
+                  onPress={() => setStep(1)}
+                >
+                  <Text style={{ color: colors.foreground, fontWeight: '600' }}>Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.navBtn,
+                    { backgroundColor: '#556ee6',
+                      opacity: isRefComplete(targetType, classId, sectionId, parentId, studentId, staffId, selectedRole) ? 1 : 0.4 },
+                  ]}
+                  onPress={() => setStep(3)}
+                  disabled={!isRefComplete(targetType, classId, sectionId, parentId, studentId, staffId, selectedRole)}
+                >
+                  <Text style={styles.navBtnText}>Next</Text>
+                </TouchableOpacity>
+              </View>
             </>
           )}
 
-          {/* Preview count */}
-          {targetType && (
-            <View style={[styles.previewCount, { backgroundColor: '#556ee610', borderColor: '#556ee640' }]}>
-              <Ionicons name="people-outline" size={14} color="#556ee6" />
-              <Text style={[styles.previewCountText, { color: '#556ee6' }]}>
-                {previewFetching
-                  ? 'Fetching recipients...'
-                  : previewData
-                  ? `Estimated recipients: ~${previewData.estimated_count}`
-                  : isRefComplete(targetType, classId, sectionId, parentId, studentId, staffId, selectedRole)
-                  ? 'Fetching recipients...'
-                  : 'Complete fields to see recipient count'}
+          {/* ── STEP 3: SELECT TEMPLATE ── */}
+          {step === 3 && (
+            <>
+              <Text style={[styles.sectionHeading, { color: colors['muted-foreground'] }]}>
+                3. SELECT TEMPLATE
               </Text>
-            </View>
-          )}
+              <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Template *</Text>
+              <CustomDropdown
+                data={composeTemplatesDropdown}
+                placeholder={
+                  composeTemplatesDropdown.length === 0
+                    ? `No active ${channel.toUpperCase()} templates`
+                    : 'Select template...'
+                }
+                value={templateId}
+                onChange={(v) => { setTemplateId(v as string); setExtraVars({}); }}
+              />
 
-          {/* 3. SELECT TEMPLATE */}
-          <Text style={[styles.sectionHeading, { color: colors['muted-foreground'] }]}>
-            3. SELECT TEMPLATE
-          </Text>
-          <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Template *</Text>
-          <CustomDropdown
-            data={composeTemplatesDropdown}
-            placeholder={
-              composeTemplatesDropdown.length === 0
-                ? `No active ${channel.toUpperCase()} templates`
-                : 'Select template...'
-            }
-            value={templateId}
-            onChange={(v) => { setTemplateId(v as string); setExtraVars({}); }}
-          />
-
-          {/* Template preview */}
-          {selectedTemplate && (
-            <View style={[styles.previewBox, { backgroundColor: inputBg, borderColor: borderCol }]}>
-              <Text style={[styles.previewLabel, { color: colors['muted-foreground'] }]}>
-                Preview
-              </Text>
-              <Text style={[styles.previewText, { color: colors.foreground }]}>
-                {buildPreviewText(selectedTemplate.body ?? '', extraVars)}
-              </Text>
-              {channel === 'sms' && (
-                <Text style={[styles.smsHint, { color: colors['muted-foreground'] }]}>
-                  {selectedTemplate.body?.length ?? 0} chars ·{' '}
-                  {Math.ceil((selectedTemplate.body?.length ?? 0) / 160)} SMS credit
-                  {Math.ceil((selectedTemplate.body?.length ?? 0) / 160) !== 1 ? 's' : ''}
-                </Text>
+              {selectedTemplate && (
+                <View style={[styles.previewBox, { backgroundColor: inputBg, borderColor: borderCol }]}>
+                  <Text style={[styles.previewLabel, { color: colors['muted-foreground'] }]}>Preview</Text>
+                  <Text style={[styles.previewText, { color: colors.foreground }]}>
+                    {buildPreviewText(selectedTemplate.body ?? '', extraVars)}
+                  </Text>
+                  {channel === 'sms' && (
+                    <Text style={[styles.smsHint, { color: colors['muted-foreground'] }]}>
+                      {selectedTemplate.body?.length ?? 0} chars ·{' '}
+                      {Math.ceil((selectedTemplate.body?.length ?? 0) / 160)} SMS credit
+                      {Math.ceil((selectedTemplate.body?.length ?? 0) / 160) !== 1 ? 's' : ''}
+                    </Text>
+                  )}
+                </View>
               )}
-            </View>
+
+              <View style={styles.stepNav}>
+                <TouchableOpacity
+                  style={[styles.navBtn, styles.navBtnBack, { borderColor: borderCol }]}
+                  onPress={() => setStep(2)}
+                >
+                  <Text style={{ color: colors.foreground, fontWeight: '600' }}>Back</Text>
+                </TouchableOpacity>
+                {userVars.length > 0 ? (
+                  <TouchableOpacity
+                    style={[styles.navBtn, { backgroundColor: '#556ee6', opacity: !templateId ? 0.4 : 1 }]}
+                    onPress={() => setStep(4)}
+                    disabled={!templateId}
+                  >
+                    <Text style={styles.navBtnText}>Next</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.sendBtn, { opacity: !templateId || sendMutation.isPending ? 0.5 : 1 }]}
+                    onPress={handleSend}
+                    disabled={!templateId || sendMutation.isPending}
+                  >
+                    <Ionicons name="send" size={18} color="white" />
+                    <Text style={styles.sendBtnText}>
+                      {sendMutation.isPending ? 'Sending...' : 'Send Now'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </>
           )}
 
-          {/* 4. FILL IN VARIABLES */}
-          {userVars.length > 0 && (
+          {/* ── STEP 4: FILL IN VARIABLES ── */}
+          {step === 4 && userVars.length > 0 && (
             <>
               <Text style={[styles.sectionHeading, { color: colors['muted-foreground'] }]}>
                 4. FILL IN VARIABLES
@@ -803,23 +882,30 @@ export default function CommunicationTab() {
                   />
                 </View>
               ))}
+
+              <View style={styles.stepNav}>
+                <TouchableOpacity
+                  style={[styles.navBtn, styles.navBtnBack, { borderColor: borderCol }]}
+                  onPress={() => setStep(3)}
+                >
+                  <Text style={{ color: colors.foreground, fontWeight: '600' }}>Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.sendBtn,
+                    { opacity: userVars.some((v) => !extraVars[v]?.trim()) || sendMutation.isPending ? 0.5 : 1 },
+                  ]}
+                  onPress={handleSend}
+                  disabled={userVars.some((v) => !extraVars[v]?.trim()) || sendMutation.isPending}
+                >
+                  <Ionicons name="send" size={18} color="white" />
+                  <Text style={styles.sendBtnText}>
+                    {sendMutation.isPending ? 'Sending...' : 'Send Now'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </>
           )}
-
-          {/* Send button */}
-          <TouchableOpacity
-            style={[
-              styles.sendBtn,
-              { backgroundColor: '#556ee6', opacity: sendMutation.isPending ? 0.7 : 1 },
-            ]}
-            onPress={handleSend}
-            disabled={sendMutation.isPending}
-          >
-            <Ionicons name="send" size={18} color="white" />
-            <Text style={styles.sendBtnText}>
-              {sendMutation.isPending ? 'Sending...' : 'Send Now'}
-            </Text>
-          </TouchableOpacity>
 
           <View style={{ height: 48 }} />
         </ScrollView>
@@ -885,7 +971,7 @@ export default function CommunicationTab() {
                 onPress={() => { resetForm(); setShowModal(true); }}
               >
                 <Ionicons name="add" size={16} color="white" />
-                <Text style={styles.addBtnText}>New</Text>
+                <Text style={styles.addBtnText}>New Template</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1459,6 +1545,7 @@ export default function CommunicationTab() {
         </View>
       </Modal>
 
+      <ConfirmModal {...modalProps} />
     </AppLayout>
   );
 }
@@ -1485,6 +1572,16 @@ const styles = StyleSheet.create({
 
   // Compose
   container: { padding: 16 },
+
+  // Step wizard
+  stepIndicatorRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
+  stepBar: { flex: 1, height: 4, borderRadius: 2 },
+  stepLabel: { fontSize: 11, fontWeight: '600', marginLeft: 6, whiteSpace: 'nowrap' } as any,
+  stepNav: { flexDirection: 'row', gap: 10, marginTop: 24 },
+  navBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  navBtnBack: { borderWidth: 1, backgroundColor: 'transparent' },
+  navBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
+
   sectionHeading: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginTop: 20, marginBottom: 10 },
   fieldLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 14, marginBottom: 4 },
@@ -1496,8 +1593,6 @@ const styles = StyleSheet.create({
     gap: 8, paddingVertical: 18, borderRadius: 14, borderWidth: 1,
   },
   channelLabel: { fontSize: 13, fontWeight: '600' },
-
-  classRow: { flexDirection: 'row', gap: 10 },
 
   previewCount: {
     flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10,

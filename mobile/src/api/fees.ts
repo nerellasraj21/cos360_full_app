@@ -327,14 +327,14 @@ export interface FeeConcessionCreate {
 }
 
 export const feeCollectionApi = {
-  /** GET /fee/collection/search */
+  /** GET /fee/collection/search-student — backend uses hyphenated path, not /search */
   searchStudent: async (params: {
     q?: string;
     class_id?: string;
     section_id?: string;
     academic_year_id?: string;
   }): Promise<FeeSearchStudentResult[]> => {
-    const response = await apiClient.get('/fee/collection/search', { params });
+    const response = await apiClient.get('/fee/collection/search-student', { params });
     return response.data;
   },
 

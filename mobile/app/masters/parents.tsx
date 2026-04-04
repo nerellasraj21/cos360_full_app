@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -16,6 +15,8 @@ import {
   View,
 } from 'react-native';
 
+import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts';
 import { parentsApi, type Parent } from '@/src/api/masters';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
@@ -44,6 +45,8 @@ const emptyForm: ParentFormData = {
 
 export default function ParentsScreen() {
   const { colors, theme } = useTheme();
+  const { showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -77,7 +80,7 @@ export default function ParentsScreen() {
       queryClient.invalidateQueries({ queryKey: ['parents'] });
       closeModal();
     },
-    onError: () => Alert.alert('Error', 'Failed to create parent'),
+    onError: () => showError('Error', 'Failed to create parent'),
   });
 
   const updateMutation = useMutation({
@@ -87,13 +90,13 @@ export default function ParentsScreen() {
       queryClient.invalidateQueries({ queryKey: ['parents'] });
       closeModal();
     },
-    onError: () => Alert.alert('Error', 'Failed to update parent'),
+    onError: () => showError('Error', 'Failed to update parent'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => parentsApi.deleteParent(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['parents'] }),
-    onError: () => Alert.alert('Error', 'Failed to delete parent'),
+    onError: () => showError('Error', 'Failed to delete parent'),
   });
 
   const openCreate = () => {
@@ -124,11 +127,11 @@ export default function ParentsScreen() {
 
   const handleSubmit = () => {
     if (!form.first_name.trim() || !form.last_name.trim()) {
-      Alert.alert('Validation', 'First and last name are required');
+      showError('Validation', 'First and last name are required');
       return;
     }
     if (!form.email.trim()) {
-      Alert.alert('Validation', 'Email is required');
+      showError('Validation', 'Email is required');
       return;
     }
     if (editingParent) {
@@ -139,14 +142,13 @@ export default function ParentsScreen() {
   };
 
   const handleDelete = (parent: Parent) => {
-    Alert.alert(
-      'Delete Parent',
-      `Delete "${parent.first_name} ${parent.last_name}"? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(parent.id) },
-      ]
-    );
+    confirm({
+      title: 'Delete Parent',
+      message: `Delete "${parent.first_name} ${parent.last_name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(parent.id),
+    });
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
@@ -369,6 +371,7 @@ export default function ParentsScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
     </View>
   );
 }

@@ -220,7 +220,7 @@ function StaffAttendanceView() {
   const dateStr = selectedDate.toISOString().split('T')[0];
 
   // Classes with nested sections
-  const { data: classesData = [] } = useQuery({
+  const { data: classesData = [], refetch: refetchClasses } = useQuery({
     queryKey: ['classes-sections-att'],
     queryFn: () => classSectionsApi.getClassSections({ active_only: true }),
   });
@@ -300,6 +300,7 @@ function StaffAttendanceView() {
   });
 
   const handleRefresh = () => {
+    refetchClasses();
     refetchStudents();
     refetchAttendance();
   };

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../../../components/FeedbackToast';
+import { useToastContext } from '../../../../components/ToastProvider';
 import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { academicYearsApi, AcademicYear } from '../../index';
@@ -27,7 +27,7 @@ export function useAcademicYearsDropdown() {
 // Create academic year - permission protected
 export function useCreateAcademicYear() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<AcademicYear, Error, any>({
     mutationFn: (data) => academicYearsApi.createAcademicYear(data),
@@ -46,7 +46,7 @@ export function useCreateAcademicYear() {
 // Update academic year - permission protected
 export function useUpdateAcademicYear() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<AcademicYear, Error, { id: string; data: any }>({
     mutationFn: ({ id, data }) => academicYearsApi.updateAcademicYear(id, data),
@@ -65,7 +65,7 @@ export function useUpdateAcademicYear() {
 // Delete academic year - permission protected
 export function useDeleteAcademicYear() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<void, Error, string>({
     mutationFn: (id) => academicYearsApi.deleteAcademicYear(id),

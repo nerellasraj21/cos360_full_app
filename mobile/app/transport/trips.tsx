@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { AppLayout } from '@/components';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { useToastContext } from '@/components/ToastProvider';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import CustomDropdown from '@/components/ui/dropdown';
@@ -11,7 +12,6 @@ import { PERMISSION_RESOURCES } from '../../src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -32,6 +32,8 @@ export default function TripsScreen() {
     driver_id: '',
     trip_number: 1,
   });
+
+  const [pendingDeleteTrip, setPendingDeleteTrip] = useState<Trip | null>(null);
 
   const { colors } = useTheme();
   const { showSuccess, showError } = useToastContext();
@@ -117,37 +119,26 @@ export default function TripsScreen() {
   const handleEdit = (trip: Trip) => {
     setEditingTrip(trip);
     setFormData({
-      vehicle_id: trip.vehicle_id,
-      route_id: trip.route_id,
-      driver_id: trip.driver_id,
+      vehicle_id: trip.vehicle_id ?? '',
+      route_id: trip.route_id ?? '',
+      driver_id: trip.driver_id ?? '',
       trip_number: trip.trip_number,
     });
     setIsModalVisible(true);
   };
 
   const handleDelete = (trip: Trip) => {
-    Alert.alert(
-      'Delete Trip',
-      `Are you sure you want to delete Trip #${trip.trip_number}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(trip.id),
-        },
-      ]
-    );
+    setPendingDeleteTrip(trip);
   };
 
   const handleSubmit = () => {
     if (!formData.vehicle_id) {
-      Alert.alert('Error', 'Vehicle is required');
+      showError('Error', 'Vehicle is required');
       return;
     }
 
     if (!formData.route_id) {
-      Alert.alert('Error', 'Route is required');
+      showError('Error', 'Route is required');
       return;
     }
 
@@ -384,10 +375,10 @@ export default function TripsScreen() {
 
               <View style={styles.modalFooter}>
                 <TouchableOpacity
-                  style={[styles.button, styles.cancelButton]}
+                  style={[styles.button, { backgroundColor: colors.primary }]}
                   onPress={() => setIsModalVisible(false)}
                 >
-                  <ThemedText style={{ color: colors.foreground }}>Cancel</ThemedText>
+                  <ThemedText style={{ color: 'white' }}>Cancel</ThemedText>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.button, styles.submitButton, { backgroundColor: colors.primary }]}
@@ -402,6 +393,18 @@ export default function TripsScreen() {
             </View>
           </View>
         </Modal>
+        <ConfirmModal
+          visible={pendingDeleteTrip !== null}
+          title="Delete Trip"
+          message={`Are you sure you want to delete Trip #${pendingDeleteTrip?.trip_number}?`}
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => {
+            if (pendingDeleteTrip) deleteMutation.mutate(pendingDeleteTrip.id);
+            setPendingDeleteTrip(null);
+          }}
+          onCancel={() => setPendingDeleteTrip(null)}
+        />
         </View>
       </ReadOrListPermissionGuard>
     </AppLayout>
@@ -568,9 +571,6 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#F3F4F6',
   },
   submitButton: {
     backgroundColor: '#3B82F6',

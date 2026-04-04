@@ -42,10 +42,12 @@ export default function ExamSettingsScreen() {
     if (settings) {
       setForm({
         default_board: settings.default_board ?? '',
+        custom_board_name: settings.custom_board_name ?? '',
         hall_ticket_min_attendance: settings.hall_ticket_min_attendance ?? 75,
         grace_max_per_subject: settings.grace_max_per_subject ?? 0,
         grace_max_subjects: settings.grace_max_subjects ?? 0,
         grace_auto_apply: settings.grace_auto_apply ?? false,
+        reconduct_max_failed_subjects: settings.reconduct_max_failed_subjects ?? 2,
       });
       setDirty(false);
     }
@@ -84,18 +86,47 @@ export default function ExamSettingsScreen() {
         <View style={[styles.section, { backgroundColor: cardBg, borderColor: borderCol }]}>
           <View style={styles.sectionHeader}>
             <Ionicons name="settings-outline" size={18} color="#556ee6" />
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>General</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Board Configuration</Text>
           </View>
 
           <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Default Board</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-            value={form.default_board ?? ''}
-            onChangeText={v => setField('default_board', v)}
-            placeholder="e.g. CBSE"
-            placeholderTextColor={colors['muted-foreground']}
-            editable={!!canUpdate}
-          />
+          <View style={styles.chipRow}>
+            {(['CBSE', 'ICSE', 'State', 'BTech', 'Custom'] as const).map(b => (
+              <TouchableOpacity
+                key={b}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: form.default_board === b ? '#556ee6' : inputBg,
+                    borderColor: form.default_board === b ? '#556ee6' : borderCol,
+                  },
+                ]}
+                onPress={() => {
+                  setField('default_board', b);
+                  if (b !== 'Custom') setField('custom_board_name', '');
+                }}
+                disabled={!canUpdate}
+              >
+                <Text style={[styles.chipText, { color: form.default_board === b ? 'white' : colors['muted-foreground'] as string }]}>
+                  {b}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {form.default_board === 'Custom' && (
+            <>
+              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'], marginTop: 12 }]}>Custom Board Name</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
+                value={form.custom_board_name ?? ''}
+                onChangeText={v => setField('custom_board_name', v)}
+                placeholder="Enter custom board name"
+                placeholderTextColor={colors['muted-foreground']}
+                editable={!!canUpdate}
+              />
+            </>
+          )}
         </View>
 
         {/* Hall Ticket */}
@@ -172,6 +203,28 @@ export default function ExamSettingsScreen() {
           </View>
         </View>
 
+        {/* Reconduct Policy */}
+        <View style={[styles.section, { backgroundColor: cardBg, borderColor: borderCol }]}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="refresh-circle-outline" size={18} color="#8B5CF6" />
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reconduct Policy</Text>
+          </View>
+
+          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Max Failed Subjects for Reconduct</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
+            value={String(form.reconduct_max_failed_subjects ?? '')}
+            onChangeText={v => setField('reconduct_max_failed_subjects', Number(v) || 0)}
+            keyboardType="numeric"
+            placeholder="2"
+            placeholderTextColor={colors['muted-foreground']}
+            editable={!!canUpdate}
+          />
+          <Text style={[styles.hint, { color: colors['muted-foreground'] }]}>
+            Students with more failed subjects than this cannot appear for re-examination.
+          </Text>
+        </View>
+
         {/* Updated at */}
         {settings?.updated_at && (
           <Text style={[styles.updatedAt, { color: colors['muted-foreground'] }]}>
@@ -213,6 +266,9 @@ const styles = StyleSheet.create({
   hint: { fontSize: 12, marginTop: 4, lineHeight: 17 },
   row: { flexDirection: 'row' },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  chipText: { fontSize: 13, fontWeight: '500' },
   updatedAt: { fontSize: 12, textAlign: 'center', marginBottom: 16 },
   saveBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

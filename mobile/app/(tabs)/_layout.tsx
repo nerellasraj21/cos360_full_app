@@ -22,22 +22,12 @@ const TAB_CONFIGS: TabConfig[] = [
     alwaysShow: true,
   },
   {
-    name: 'students',
-    moduleResources: [],
-    alwaysShow: true,
-  },
-  {
-    name: 'fees',
-    moduleResources: [],
-    alwaysShow: true,
-  },
-  {
     name: 'masters',
     moduleResources: ['academic_years', 'classes', 'subjects', 'holidays', 'timetables'],
     requireAll: false,
   },
   {
-    name: 'transport',
+    name: 'students',
     moduleResources: [],
     alwaysShow: true,
   },
@@ -47,8 +37,23 @@ const TAB_CONFIGS: TabConfig[] = [
     requireAll: false,
   },
   {
-    name: 'expense',
-    moduleResources: ['expense_categories', 'expense_transactions', 'expense_types'],
+    name: 'fees',
+    moduleResources: [],
+    alwaysShow: true,
+  },
+  {
+    name: 'transport',
+    moduleResources: [],
+    alwaysShow: true,
+  },
+  {
+    name: 'reports',
+    moduleResources: [],
+    alwaysShow: true,
+  },
+  {
+    name: 'admin',
+    moduleResources: ['users', 'roles', 'permissions', 'menu'],
     requireAll: false,
   },
   {
@@ -62,14 +67,9 @@ const TAB_CONFIGS: TabConfig[] = [
     alwaysShow: true,
   },
   {
-    name: 'admin',
-    moduleResources: ['users', 'roles', 'permissions', 'menu'],
+    name: 'expense',
+    moduleResources: ['expense_categories', 'expense_transactions', 'expense_types'],
     requireAll: false,
-  },
-  {
-    name: 'reports',
-    moduleResources: [],
-    alwaysShow: true,
   },
   {
     name: 'profile',
@@ -118,6 +118,11 @@ export default function TabLayout() {
   const hasAnyModuleAccess = useMemo(() => {
     return accessibleTabs.some(tab => !tab.alwaysShow);
   }, [accessibleTabs]);
+
+  // While unauthenticated, render nothing — the useEffect above will redirect to /login
+  if (!isAuthenticated) {
+    return null;
+  }
 
   // Show loading state during permission verification
   if (isLoading) {

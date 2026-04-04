@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../../../components/FeedbackToast';
+import { useToastContext } from '../../../../components/ToastProvider';
 import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { subjectCategoriesApi, SubjectCategory, SubjectCategoryCreate, SubjectCategoryUpdate } from '../../index';
@@ -29,7 +29,7 @@ export function useSubjectCategory(id: string) {
 // Create subject category - permission protected
 export function useCreateSubjectCategory() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<SubjectCategory, Error, SubjectCategoryCreate>({
     mutationFn: (data) => subjectCategoriesApi.createSubjectCategory(data),
@@ -48,7 +48,7 @@ export function useCreateSubjectCategory() {
 // Update subject category - permission protected
 export function useUpdateSubjectCategory() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<SubjectCategory, Error, { id: string; data: SubjectCategoryUpdate }>({
     mutationFn: ({ id, data }) => subjectCategoriesApi.updateSubjectCategory(id, data),
@@ -67,7 +67,7 @@ export function useUpdateSubjectCategory() {
 // Delete subject category - permission protected
 export function useDeleteSubjectCategory() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<void, Error, string>({
     mutationFn: (id) => subjectCategoriesApi.deleteSubjectCategory(id),

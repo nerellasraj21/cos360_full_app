@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useAuth, useTheme } from '@/contexts';
 import { examsApi, examResultsApi, StudentExamResult } from '@/src/api/exam';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
@@ -34,6 +35,7 @@ export default function ResultsScreen() {
     }
   }, [isStudentOrParent, examId]);
 
+  const { confirm, modalProps } = useConfirmModal();
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
@@ -221,12 +223,14 @@ export default function ResultsScreen() {
             {canCompute && (
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: '#8B5CF6' }]}
-                onPress={() =>
-                  Alert.alert('Compute Results', 'Recompute all results for this exam?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Compute', onPress: () => computeMutation.mutate() },
-                  ])
-                }
+                onPress={() => {
+                  confirm({
+                    title: 'Compute Results',
+                    message: 'Recompute all results for this exam?',
+                    confirmLabel: 'Compute',
+                    onConfirm: () => computeMutation.mutate(),
+                  });
+                }}
                 disabled={computeMutation.isPending}
               >
                 <Ionicons name="calculator" size={16} color="white" />
@@ -236,12 +240,14 @@ export default function ResultsScreen() {
             {canPublish && (
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: '#10B981' }]}
-                onPress={() =>
-                  Alert.alert('Publish Results', 'Publish results to students and parents?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Publish', onPress: () => publishMutation.mutate() },
-                  ])
-                }
+                onPress={() => {
+                  confirm({
+                    title: 'Publish Results',
+                    message: 'Publish results to students and parents?',
+                    confirmLabel: 'Publish',
+                    onConfirm: () => publishMutation.mutate(),
+                  });
+                }}
                 disabled={publishMutation.isPending}
               >
                 <Ionicons name="send" size={16} color="white" />
@@ -294,6 +300,7 @@ export default function ResultsScreen() {
           />
         )}
       </View>
+      <ConfirmModal {...modalProps} />
     </AppLayout>
   );
 }

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
-import { Platform } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -118,13 +117,13 @@ export default function CertificateUploadPage() {
 
     if (!selectedFile) {
       console.log('DEBUG: No file selected');
-      Alert.alert('Error', 'Please select a certificate file');
+      showError('Error', 'Please select a certificate file');
       return;
     }
 
     if (!formData.certificateName || !formData.certificateTypeId || !selectedStudent) {
       console.log('DEBUG: Missing required fields');
-      Alert.alert('Error', 'Please fill in all required fields');
+      showError('Error', 'Please fill in all required fields');
       return;
     }
 

@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-    Alert,
     FlatList,
     Modal,
     RefreshControl,
@@ -22,6 +21,8 @@ import { useDesignations, useCreateDesignation, useUpdateDesignation, useDeleteD
 import type { Designation, DesignationInput } from '@/src/types/masters/staff';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useTheme } from '@/contexts';
+import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 function StaffDesignationsScreenContent() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,6 +36,8 @@ function StaffDesignationsScreenContent() {
   const { theme, colors } = useTheme();
   const themeColors = Colors[theme];
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
 
   // Fetch designations data
   const { data: designationsData, isLoading, error, refetch } = useDesignations({ skip: 0, limit: 100 });
@@ -45,10 +48,10 @@ function StaffDesignationsScreenContent() {
       queryClient.invalidateQueries({ queryKey: ['designations'] });
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Designation created successfully');
+      showSuccess('Success', 'Designation created successfully');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to create designation');
+      showError('Error', error.response?.data?.detail || 'Failed to create designation');
       console.error('Create designation error:', error);
     },
   });
@@ -58,10 +61,10 @@ function StaffDesignationsScreenContent() {
       queryClient.invalidateQueries({ queryKey: ['designations'] });
       setIsModalVisible(false);
       resetForm();
-      Alert.alert('Success', 'Designation updated successfully');
+      showSuccess('Success', 'Designation updated successfully');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to update designation');
+      showError('Error', error.response?.data?.detail || 'Failed to update designation');
       console.error('Update designation error:', error);
     },
   });
@@ -69,10 +72,10 @@ function StaffDesignationsScreenContent() {
   const deleteMutation = useDeleteDesignation({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['designations'] });
-      Alert.alert('Success', 'Designation deleted successfully');
+      showSuccess('Success', 'Designation deleted successfully');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to delete designation');
+      showError('Error', error.response?.data?.detail || 'Failed to delete designation');
       console.error('Delete designation error:', error);
     },
   });
@@ -89,23 +92,18 @@ function StaffDesignationsScreenContent() {
   };
 
   const handleDelete = (designation: Designation) => {
-    Alert.alert(
-      'Delete Designation',
-      `Are you sure you want to delete "${designation.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(designation.id),
-        },
-      ]
-    );
+    confirm({
+      title: 'Delete Designation',
+      message: `Are you sure you want to delete "${designation.title}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(designation.id),
+    });
   };
 
   const handleSubmit = () => {
     if (!formData.title.trim()) {
-      Alert.alert('Validation Error', 'Please enter designation title');
+      showError('Validation Error', 'Please enter designation title');
       return;
     }
 
@@ -319,6 +317,7 @@ function StaffDesignationsScreenContent() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
     </ThemedView>
   );
 }

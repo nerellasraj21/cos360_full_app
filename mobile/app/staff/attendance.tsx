@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -13,48 +12,65 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard } from '@/components/PermissionGuards';
+import { ReadOrListPermissionGuard, UpdatePermissionGuard } from '@/components/PermissionGuards';
 import { Colors } from '@/constants/theme';
-import { useStaffAttendance, useBulkUpdateStaffAttendance } from '@/hooks/use-staff-api';
-import type { StaffAttendance, StaffAttendanceInput } from '@/src/types/masters/staff';
+import {
+  useStaffAttendance,
+  useStaffEnrollments,
+  useCreateStaffAttendance,
+  useUpdateStaffAttendance,
+  useDeleteStaffAttendance
+} from '@/hooks/use-staff-api';
+import type { Staff, StaffAttendance, StaffAttendanceInput } from '@/src/types/masters/staff';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useTheme } from '@/contexts';
+import { useToastContext } from '@/components/ToastProvider';
 
 function StaffAttendanceScreenContent() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [editingMode, setEditingMode] = useState(false);
+  // Keyed by staff_id — tracks pending status changes before save
   const [attendanceUpdates, setAttendanceUpdates] = useState<Record<string, StaffAttendanceInput>>({});
 
   const router = useRouter();
-  const { theme, colors } = useTheme();
+  const { theme } = useTheme();
   const themeColors = Colors[theme];
   const queryClient = useQueryClient();
+  const { showSuccess, showError, showWarning } = useToastContext();
 
-  // Fetch attendance data for selected date
-  const { data: attendanceData, isLoading, error, refetch } = useStaffAttendance({
+  // Bug 1 fix: fetch ALL active staff — this is the source of truth for who to display.
+  // Previously the screen only fetched attendance records, which are empty on unmarked days.
+  const { data: staffData, isLoading: staffLoading, refetch: refetchStaff } = useStaffEnrollments({
+    is_active: true,
+    limit: 200
+  });
+
+  // Fetch existing attendance records for the selected date (used for lookup, not display)
+  const { data: attendanceData, isLoading: attendanceLoading, error, refetch: refetchAttendance } = useStaffAttendance({
     start_date: selectedDate,
     end_date: selectedDate,
     skip: 0,
-    limit: 100
+    limit: 500
   });
 
-  // Update attendance mutation
-  const updateAttendanceMutation = useBulkUpdateStaffAttendance({
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['staff-attendance'] });
-      setAttendanceUpdates({});
-      setEditingMode(false);
-      Alert.alert('Success', 'Attendance updated successfully');
-    },
-    onError: (error: any) => {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to update attendance');
-      console.error('Update attendance error:', error);
-    },
-  });
+  // Bug 2 fix: use individual create/update/delete mutations — matches web page pattern.
+  // Previously used useBulkUpdateStaffAttendance which called PATCH with staff_id as the record id.
+  const createAttendanceMutation = useCreateStaffAttendance();
+  const updateAttendanceMutation = useUpdateStaffAttendance();
+  const deleteAttendanceMutation = useDeleteStaffAttendance();
 
-  const attendanceRecords = useMemo(() => {
-    return attendanceData?.items || [];
+  const staffList = useMemo(() => staffData?.items || [], [staffData]);
+
+  // O(1) lookup: staff_id → existing attendance record
+  const attendanceMap = useMemo(() => {
+    const map = new Map<string, StaffAttendance>();
+    for (const r of (attendanceData?.items || [])) {
+      map.set(r.staff_id, r);
+    }
+    return map;
   }, [attendanceData]);
+
+  const isLoading = staffLoading || attendanceLoading;
 
   const handleAttendanceChange = (staffId: string, status: 'present' | 'absent' | 'late', remarks?: string) => {
     setAttendanceUpdates(prev => ({
@@ -68,18 +84,49 @@ function StaffAttendanceScreenContent() {
     }));
   };
 
-  const handleSaveAttendance = () => {
+  const handleSaveAttendance = async () => {
     if (Object.keys(attendanceUpdates).length === 0) {
-      Alert.alert('No Changes', 'No attendance changes to save');
+      showWarning('No Changes', 'No attendance changes to save');
       return;
     }
-    updateAttendanceMutation.mutate(attendanceUpdates);
+
+    try {
+      const promises = Object.entries(attendanceUpdates).map(([staffId, update]) => {
+        const existing = attendanceMap.get(staffId);
+
+        if (update.status === 'present') {
+          // 'present' is the default — delete existing record if any (no record = present)
+          if (existing) {
+            return deleteAttendanceMutation.mutateAsync(existing.id);
+          }
+          return Promise.resolve();
+        } else {
+          // absent/late: update existing record by its own id, or create a new one
+          if (existing) {
+            return updateAttendanceMutation.mutateAsync({
+              id: existing.id,
+              data: { status: update.status, remarks: update.remarks }
+            });
+          } else {
+            return createAttendanceMutation.mutateAsync(update);
+          }
+        }
+      });
+
+      await Promise.all(promises);
+      queryClient.invalidateQueries({ queryKey: ['staff-attendance'] });
+      setAttendanceUpdates({});
+      setEditingMode(false);
+      showSuccess('Success', 'Attendance updated successfully');
+    } catch (error: any) {
+      showError('Error', error.response?.data?.detail || 'Failed to update attendance');
+      console.error('Update attendance error:', error);
+    }
   };
 
-  const getAttendanceStatus = (staffId: string) => {
-    const existing = attendanceRecords.find(r => r.staff_id === staffId);
-    const pending = attendanceUpdates[staffId];
-    return pending || existing;
+  // Returns effective state: pending update takes priority over the stored record
+  const getAttendanceStatus = (staffId: string): StaffAttendanceInput | StaffAttendance | undefined => {
+    return attendanceUpdates[staffId] || attendanceMap.get(staffId);
   };
 
   const getStatusColor = (status?: string) => {
@@ -91,9 +138,10 @@ function StaffAttendanceScreenContent() {
     }
   };
 
-  const renderAttendanceItem = ({ item }: { item: { staff_id: string; staff?: { first_name: string; last_name?: string } } }) => {
-    const attendance = getAttendanceStatus(item.staff_id);
-    const staffName = item.staff ? `${item.staff.first_name} ${item.staff.last_name || ''}`.trim() : 'Unknown Staff';
+  // Bug 1 fix: item is Staff (not an attendance record)
+  const renderAttendanceItem = ({ item }: { item: Staff }) => {
+    const attendance = getAttendanceStatus(item.id);
+    const staffName = `${item.first_name} ${item.last_name || ''}`.trim();
 
     return (
       <View style={[styles.attendanceCard, { backgroundColor: themeColors.card }]}>
@@ -115,7 +163,7 @@ function StaffAttendanceScreenContent() {
                     borderColor: themeColors.border
                   }
                 ]}
-                onPress={() => handleAttendanceChange(item.staff_id, status)}
+                onPress={() => handleAttendanceChange(item.id, status)}
               >
                 <ThemedText
                   style={[
@@ -133,14 +181,18 @@ function StaffAttendanceScreenContent() {
             <View
               style={[
                 styles.statusBadge,
-                { backgroundColor: getStatusColor(attendance?.status) }
+                // No record = present (default), show green
+                { backgroundColor: attendance?.status ? getStatusColor(attendance.status) : '#10B981' }
               ]}
             >
               <ThemedText style={styles.statusBadgeText}>
-                {attendance?.status ? attendance.status.charAt(0).toUpperCase() + attendance.status.slice(1) : 'Not Marked'}
+                {attendance?.status
+                  ? attendance.status.charAt(0).toUpperCase() + attendance.status.slice(1)
+                  : 'Present'}
               </ThemedText>
             </View>
-            {attendance?.remarks && (
+            {/* Bug 4 fix: use !!str to avoid "" rendering as a bare text node in React Native View */}
+            {!!attendance?.remarks && (
               <ThemedText style={styles.remarksText}>
                 {attendance.remarks}
               </ThemedText>
@@ -155,9 +207,17 @@ function StaffAttendanceScreenContent() {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + days);
     setSelectedDate(newDate.toISOString().split('T')[0]);
+    // Clear pending changes when navigating dates
+    setAttendanceUpdates({});
+    setEditingMode(false);
   };
 
   const isFutureDate = new Date(selectedDate) > new Date();
+
+  const refetch = () => {
+    refetchStaff();
+    refetchAttendance();
+  };
 
   if (error) {
     const isAuthError = (error as any)?.response?.status === 401 || (error as any)?.response?.status === 403;
@@ -181,13 +241,25 @@ function StaffAttendanceScreenContent() {
             <ThemedText style={styles.retryText}>Go to Login</ThemedText>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+          <TouchableOpacity style={styles.retryButton} onPress={refetch}>
             <ThemedText style={styles.retryText}>Retry</ThemedText>
           </TouchableOpacity>
         )}
       </ThemedView>
     );
   }
+
+  // Summary counts — absent/late from records; present = everyone else (default)
+  const absentCount = staffList.filter(s => getAttendanceStatus(s.id)?.status === 'absent').length;
+  const presentCount = staffList.filter(s => {
+    const att = getAttendanceStatus(s.id);
+    return !att || att.status === 'present';
+  }).length;
+
+  const isSaving =
+    createAttendanceMutation.isPending ||
+    updateAttendanceMutation.isPending ||
+    deleteAttendanceMutation.isPending;
 
   return (
     <ThemedView style={styles.container}>
@@ -257,19 +329,19 @@ function StaffAttendanceScreenContent() {
         <View style={styles.summaryItem}>
           <ThemedText style={styles.summaryLabel}>Total Staff</ThemedText>
           <ThemedText type="subtitle" style={styles.summaryValue}>
-            {attendanceRecords.length}
+            {staffList.length}
           </ThemedText>
         </View>
         <View style={styles.summaryItem}>
           <ThemedText style={styles.summaryLabel}>Present</ThemedText>
           <ThemedText type="subtitle" style={[styles.summaryValue, { color: '#10B981' }]}>
-            {attendanceRecords.filter(r => getAttendanceStatus(r.staff_id)?.status === 'present').length}
+            {presentCount}
           </ThemedText>
         </View>
         <View style={styles.summaryItem}>
           <ThemedText style={styles.summaryLabel}>Absent</ThemedText>
           <ThemedText type="subtitle" style={[styles.summaryValue, { color: '#EF4444' }]}>
-            {attendanceRecords.filter(r => getAttendanceStatus(r.staff_id)?.status === 'absent').length}
+            {absentCount}
           </ThemedText>
         </View>
       </View>
@@ -280,20 +352,20 @@ function StaffAttendanceScreenContent() {
           <TouchableOpacity
             style={[styles.saveButton, { backgroundColor: themeColors.primary }]}
             onPress={handleSaveAttendance}
-            disabled={updateAttendanceMutation.isPending}
+            disabled={isSaving}
           >
             <ThemedText style={styles.saveButtonText}>
-              {updateAttendanceMutation.isPending ? 'Saving...' : 'Save Attendance'}
+              {isSaving ? 'Saving...' : 'Save Attendance'}
             </ThemedText>
           </TouchableOpacity>
         </UpdatePermissionGuard>
       )}
 
-      {/* Attendance List */}
+      {/* Attendance List — renders all staff, not just those with records */}
       <FlatList
-        data={attendanceRecords}
+        data={staffList}
         renderItem={renderAttendanceItem}
-        keyExtractor={(item) => item.staff_id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -497,9 +569,9 @@ const styles = StyleSheet.create({
 
 export default function StaffAttendanceScreen() {
   const router = useRouter();
-  
+
   return (
-    <ReadOrListPermissionGuard 
+    <ReadOrListPermissionGuard
       resource={PERMISSION_RESOURCES.STAFF_ATTENDANCE}
       fallback={
         <ThemedView style={styles.container}>

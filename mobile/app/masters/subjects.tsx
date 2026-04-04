@@ -3,7 +3,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-    Alert,
     FlatList,
     Modal,
     RefreshControl,
@@ -26,6 +25,7 @@ import { useTheme, useAcademicYear } from '@/contexts';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 
 export default function SubjectsScreen() {
@@ -51,6 +51,7 @@ export default function SubjectsScreen() {
   const { activeAcademicYearId } = useAcademicYear();
   const themeColors = Colors[theme];
   const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
 
   // Fetch data using permission-protected hooks
   const { data: subjectsData, isLoading, error, refetch } = useSubjects(
@@ -140,23 +141,18 @@ export default function SubjectsScreen() {
   };
 
   const handleDelete = (subject: Subject) => {
-    Alert.alert(
-      'Delete Subject',
-      `Are you sure you want to delete "${subject.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(subject.id, { onError: (e: any) => showError('Delete Failed', e.message || 'Failed to delete subject') }),
-        },
-      ]
-    );
+    confirm({
+      title: 'Delete Subject',
+      message: `Are you sure you want to delete "${subject.name}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(subject.id, { onError: (e: any) => showError('Delete Failed', e.message || 'Failed to delete subject') }),
+    });
   };
 
   const handleSubmit = () => {
     if (!formData.name) {
-      Alert.alert('Error', 'Subject name is required');
+      showError('Error', 'Subject name is required');
       return;
     }
 
@@ -175,7 +171,7 @@ export default function SubjectsScreen() {
 
   const handleCreateCategory = () => {
     if (!newCategoryName.trim()) {
-      Alert.alert('Error', 'Category name is required');
+      showError('Error', 'Category name is required');
       return;
     }
     createCategoryMutation.mutate({ name: newCategoryName.trim() }, { onError: (e: any) => showError('Create Failed', e.message || 'Failed to create category') });
@@ -523,6 +519,7 @@ export default function SubjectsScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
       </ThemedView>
     </ReadOrListPermissionGuard>
   );

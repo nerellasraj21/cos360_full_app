@@ -107,7 +107,7 @@ export const expenseTransactionsApi = {
     limit?: number;
     category_id?: string;
     type_id?: string;
-    status?: string;
+    // Fix #5: backend query param is 'status_filter' (not 'status') — removed stale 'status' field
     status_filter?: string;
     start_date?: string;
     end_date?: string;

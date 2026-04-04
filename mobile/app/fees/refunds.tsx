@@ -1,4 +1,5 @@
 import { AppLayout } from '@/components';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useToastContext } from '@/components/ToastProvider';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useTheme, useAcademicYear, useAuth } from '@/contexts';
@@ -20,7 +21,6 @@ import { useRouter } from 'expo-router';
 import React, { useState, useEffect } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   StyleSheet,
@@ -62,6 +62,9 @@ export default function FeeRefundsScreen() {
   const [filters, setFilters] = useState({
     status: '',
     student_id: '',
+    refund_reason: '',
+    requested_date_from: '',
+    requested_date_to: '',
   });
 
   const [summaryModal, setSummaryModal] = useState({
@@ -76,6 +79,7 @@ export default function FeeRefundsScreen() {
     pendingCount: 0,
     approvedCount: 0,
     processedCount: 0,
+    rejectedCount: 0,
   });
 
   const { colors } = useTheme();
@@ -83,6 +87,7 @@ export default function FeeRefundsScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToastContext();
+  const { confirm: confirmModal, modalProps } = useConfirmModal();
 
   const [formData, setFormData] = useState<CreateRefundFormState>({
     fee_transaction_id: '',
@@ -202,9 +207,10 @@ export default function FeeRefundsScreen() {
         if (refund.status === 'pending') acc.pendingCount += 1;
         if (refund.status === 'approved') acc.approvedCount += 1;
         if (refund.status === 'processed') acc.processedCount += 1;
+        if (refund.status === 'rejected') acc.rejectedCount += 1;
         return acc;
       },
-      { totalRefunds: 0, totalAmount: 0, pendingCount: 0, approvedCount: 0, processedCount: 0 }
+      { totalRefunds: 0, totalAmount: 0, pendingCount: 0, approvedCount: 0, processedCount: 0, rejectedCount: 0 }
     );
     setStatistics(stats);
   }, [refundsWithStatus]);
@@ -243,7 +249,7 @@ export default function FeeRefundsScreen() {
   const submitActionModal = () => {
     if (!actionModal.refund) return;
     if (!actionRemarks.trim()) {
-      Alert.alert('Required', 'Please enter remarks before continuing.');
+      showError('Required', 'Please enter remarks before continuing.');
       return;
     }
     approveMutation.mutate({
@@ -272,18 +278,13 @@ export default function FeeRefundsScreen() {
   // C-3: dismiss = 'Keep', destructive = 'Confirm Cancellation'
   const handleCancel = (refund: FeeRefundWithStatus) => {
     const refNum = (refund as any).refund_number ?? refund.id?.slice(-8) ?? 'N/A';
-    Alert.alert(
-      'Cancel Refund',
-      `Are you sure you want to cancel refund ${refNum}?`,
-      [
-        { text: 'Keep', style: 'cancel' },
-        {
-          text: 'Confirm Cancellation',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(refund.id),
-        },
-      ]
-    );
+    confirmModal({
+      title: 'Cancel Refund',
+      message: `Are you sure you want to cancel refund ${refNum}?`,
+      confirmLabel: 'Confirm Cancellation',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(refund.id),
+    });
   };
 
   const handleViewSummary = (transactionId: string) => {
@@ -297,24 +298,24 @@ export default function FeeRefundsScreen() {
 
   const handleSubmit = () => {
     if (!formData.fee_transaction_id || !formData.refund_amount || !formData.refund_reason) {
-      Alert.alert('Error', 'Please fill all required fields');
+      showError('Error', 'Please fill all required fields');
       return;
     }
 
     if (formData.refund_reason === 'other' && !formData.detailed_reason.trim()) {
-      Alert.alert('Error', 'Detailed reason is required when reason is "other"');
+      showError('Error', 'Detailed reason is required when reason is "other"');
       return;
     }
 
     if (formData.refund_amount <= 0) {
-      Alert.alert('Error', 'Please enter a valid refund amount');
+      showError('Error', 'Please enter a valid refund amount');
       return;
     }
 
     // Validate against transaction amount
     const transaction = transactions.find(t => t.id === formData.fee_transaction_id);
     if (transaction && formData.refund_amount > transaction.total_amount) {
-      Alert.alert('Error', 'Refund amount cannot exceed transaction amount');
+      showError('Error', 'Refund amount cannot exceed transaction amount');
       return;
     }
 
@@ -337,6 +338,9 @@ export default function FeeRefundsScreen() {
 
     if (filters.status && refund.status !== filters.status) return false;
     if (filters.student_id && student?.id !== filters.student_id) return false;
+    if (filters.refund_reason && !(refund.refund_reason ?? '').toLowerCase().includes(filters.refund_reason.toLowerCase())) return false;
+    if (filters.requested_date_from && refund.refund_date < filters.requested_date_from) return false;
+    if (filters.requested_date_to && refund.refund_date > filters.requested_date_to) return false;
     return true;
   });
 
@@ -482,19 +486,29 @@ export default function FeeRefundsScreen() {
         <View style={styles.statsContainer}>
           <View style={[styles.statCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.statValue, { color: colors.foreground }]}>{statistics.totalRefunds}</Text>
-            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Total Refunds</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Total</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.statValue, { color: colors.foreground }]}>{formatINR(statistics.totalAmount)}</Text>
-            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Total Amount</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Amount</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.statValue, { color: colors.foreground }]}>{statistics.pendingCount}</Text>
+            <Text style={[styles.statValue, { color: '#F59E0B' }]}>{statistics.pendingCount}</Text>
             <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Pending</Text>
           </View>
+        </View>
+        <View style={styles.statsContainer}>
           <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.statValue, { color: colors.foreground }]}>{statistics.approvedCount}</Text>
+            <Text style={[styles.statValue, { color: '#10B981' }]}>{statistics.approvedCount}</Text>
             <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Approved</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.statValue, { color: '#3B82F6' }]}>{statistics.processedCount}</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Processed</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.statValue, { color: colors.destructive }]}>{statistics.rejectedCount}</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Rejected</Text>
           </View>
         </View>
 
@@ -519,6 +533,31 @@ export default function FeeRefundsScreen() {
             onChange={(value) => setFilters(prev => ({ ...prev, student_id: String(value || '') }))}
             placeholder="Filter by Student"
           />
+          <TextInput
+            style={[styles.filterInput, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
+            value={filters.refund_reason}
+            onChangeText={(text) => setFilters(prev => ({ ...prev, refund_reason: text }))}
+            placeholder="Filter by reason..."
+            placeholderTextColor={colors['muted-foreground']}
+          />
+          <View style={styles.filterRow}>
+            <TextInput
+              style={[styles.filterInput, styles.filterHalf, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
+              value={filters.requested_date_from}
+              onChangeText={(text) => setFilters(prev => ({ ...prev, requested_date_from: text }))}
+              placeholder="From YYYY-MM-DD"
+              placeholderTextColor={colors['muted-foreground']}
+              keyboardType="numeric"
+            />
+            <TextInput
+              style={[styles.filterInput, styles.filterHalf, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
+              value={filters.requested_date_to}
+              onChangeText={(text) => setFilters(prev => ({ ...prev, requested_date_to: text }))}
+              placeholder="To YYYY-MM-DD"
+              placeholderTextColor={colors['muted-foreground']}
+              keyboardType="numeric"
+            />
+          </View>
         </View>
 
         <View style={styles.header}>
@@ -866,6 +905,7 @@ export default function FeeRefundsScreen() {
         </Modal>
 
         </View>
+        <ConfirmModal {...modalProps} />
       </AppLayout>
     </ReadOrListPermissionGuard>
   );
@@ -1074,5 +1114,20 @@ const styles = StyleSheet.create({
   summaryRefundText: {
     fontSize: 14,
     marginBottom: 4,
+  },
+  filterInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterHalf: {
+    flex: 1,
   },
 });

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../../../../components/FeedbackToast';
+import { useToastContext } from '../../../../components/ToastProvider';
 import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { rolesApi, permissionsApi, Role, RoleCreate, RoleUpdate, Permission, PermissionCreate, PermissionUpdate } from '../../index';
@@ -28,7 +28,7 @@ export function useRole(id: string) {
 // Create role - permission protected
 export function useCreateRole() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<Role, Error, RoleCreate>({
     mutationFn: (data) => rolesApi.createRole(data),
@@ -48,7 +48,7 @@ export function useCreateRole() {
 // Update role - permission protected
 export function useUpdateRole() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<Role, Error, { id: string; data: RoleUpdate }>({
     mutationFn: ({ id, data }) => rolesApi.updateRole(id, data),
@@ -68,7 +68,7 @@ export function useUpdateRole() {
 // Delete role - permission protected
 export function useDeleteRole() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<void, Error, string>({
     mutationFn: (id) => rolesApi.deleteRole(id),
@@ -130,7 +130,7 @@ export function useAvailableActions() {
 // Create permission - permission protected
 export function useCreatePermission() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<Permission, Error, PermissionCreate>({
     mutationFn: (data) => permissionsApi.createPermission(data),
@@ -150,7 +150,7 @@ export function useCreatePermission() {
 // Update permission - permission protected
 export function useUpdatePermission() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<Permission, Error, { id: string; data: PermissionUpdate }>({
     mutationFn: ({ id, data }) => permissionsApi.updatePermission(id, data),
@@ -170,7 +170,7 @@ export function useUpdatePermission() {
 // Delete permission - permission protected
 export function useDeletePermission() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<void, Error, string>({
     mutationFn: (id) => permissionsApi.deletePermission(id),
@@ -190,7 +190,7 @@ export function useDeletePermission() {
 // Bulk create permissions - permission protected
 export function useBulkCreatePermissions() {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError } = useToastContext();
   
   return usePermissionProtectedMutation<any, Error, any>({
     mutationFn: (data) => permissionsApi.bulkCreatePermissions(data),

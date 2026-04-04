@@ -123,12 +123,18 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Use global error handler for API errors
+    // Use global error handler for API errors — extract the human-readable
+    // message (includes FastAPI `detail` for 422/400/etc) and override
+    // error.message so onError callbacks receive the useful string, not the
+    // generic axios "Request failed with status NNN".
     const { message } = errorHandler.handleApiError(error, {
       endpoint: originalRequest?.url,
       method: originalRequest?.method,
       retryable: !error.response || error.response.status >= 500,
     });
+    if (error?.response && message) {
+      error.message = message;
+    }
 
     return Promise.reject(error);
   }

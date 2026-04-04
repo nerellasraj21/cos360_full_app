@@ -1,4 +1,5 @@
 import { AppLayout } from '@/components';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { CreatePermissionGuard, DeletePermissionGuard, ReadOrListPermissionGuard, UpdatePermissionGuard } from '@/components/PermissionGuards';
 import { ThemedText } from '@/components/themed-text';
 import { useToastContext } from '@/components/ToastProvider';
@@ -17,7 +18,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -34,6 +34,7 @@ const AMBER = '#F59E0B';
 export default function StudentTransportScreen() {
   const { colors, theme } = useTheme();
   const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps: confirmModalProps } = useConfirmModal();
   const { role, studentId, selectedStudent } = useAuth();
   const qc = useQueryClient();
 
@@ -183,18 +184,21 @@ export default function StudentTransportScreen() {
     const name = item.student
       ? `${item.student.first_name} ${item.student.last_name}`
       : 'this student';
-    Alert.alert('Delete Assignment', `Remove transport for ${name}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(item.id) },
-    ]);
+    confirm({
+      title: 'Delete Assignment',
+      message: `Remove transport for ${name}?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(item.id),
+    });
   };
 
   const handleSubmit = () => {
-    if (!form.student_id) { Alert.alert('Error', 'Student is required'); return; }
-    if (!form.trip_id)    { Alert.alert('Error', 'Trip is required'); return; }
-    if (!form.stop_id)    { Alert.alert('Error', 'Stop is required'); return; }
+    if (!form.student_id) { showError('Error', 'Student is required'); return; }
+    if (!form.trip_id)    { showError('Error', 'Trip is required'); return; }
+    if (!form.stop_id)    { showError('Error', 'Stop is required'); return; }
     const fee = parseFloat(form.fee_per_term);
-    if (isNaN(fee) || fee < 0) { Alert.alert('Error', 'Enter a valid fee amount'); return; }
+    if (isNaN(fee) || fee < 0) { showError('Error', 'Enter a valid fee amount'); return; }
 
     const payload: StudentTransportCreate = {
       student_id: form.student_id,
@@ -412,6 +416,7 @@ export default function StudentTransportScreen() {
             </View>
           </View>
         </Modal>
+        <ConfirmModal {...confirmModalProps} />
       </ReadOrListPermissionGuard>
     </AppLayout>
   );

@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   Modal,
   Platform,
   RefreshControl,
@@ -29,17 +28,11 @@ import type { Staff, StaffInput, QualificationEntry } from '@/src/types/masters/
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useTheme } from '@/contexts';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STAFF_COLOR  = '#8B5CF6';
 const STAFF_LIGHT  = '#EDE9FE';
-const COL_SNO      = 48;
-const COL_NAME     = 180;
-const COL_CONTACT  = 190;
-const COL_DESIG    = 170;
-const COL_DEPT     = 110;
-const COL_STATUS   = 88;
-const COL_ACTIONS  = 116;
 
 const GENDERS       = ['Male', 'Female', 'Other'] as const;
 const ACCOUNT_TYPES = ['Savings', 'Current'] as const;
@@ -170,6 +163,7 @@ function StaffEnrollmentScreenContent() {
   const { colors, theme } = useTheme();
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
 
   const [search, setSearch] = useState('');
   const [viewStaff, setViewStaff] = useState<Staff | null>(null);
@@ -276,10 +270,13 @@ function StaffEnrollmentScreenContent() {
   };
 
   const confirmDelete = (staff: Staff) => {
-    Alert.alert('Delete Staff Member', `Remove "${staff.first_name} ${staff.last_name ?? ''}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(staff.id) },
-    ]);
+    confirm({
+      title: 'Delete Staff Member',
+      message: `Remove "${staff.first_name} ${staff.last_name ?? ''}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(staff.id),
+    });
   };
 
   const handleSubmit = () => {
@@ -346,11 +343,7 @@ function StaffEnrollmentScreenContent() {
 
   const setField = (key: keyof StaffInput, val: any) => setFormData((p) => ({ ...p, [key]: val }));
 
-  // ── Table colors ──────────────────────────────────────────────────────────
-  const headerBg = theme === 'dark' ? '#1e1e3a' : '#f8f8ff';
-  const rowOdd   = theme === 'dark' ? '#12122a' : '#ffffff';
-  const rowEven  = theme === 'dark' ? '#16163088' : '#f9f9ff';
-  const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#e5e7eb';
+  const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.08)' : '#e5e7eb';
 
   const addButton = (
     <CreatePermissionGuard resource={PERMISSION_RESOURCES.STAFF}>
@@ -386,66 +379,76 @@ function StaffEnrollmentScreenContent() {
             {search ? <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={17} color={colors['muted-foreground']} /></TouchableOpacity> : null}
           </View>
 
-          {/* Table */}
+          {/* Cards */}
           <ScrollView refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={STAFF_COLOR} />} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <View>
-                <View style={[ss.tableHeader, { backgroundColor: headerBg, borderBottomColor: borderCol }]}>
-                  <ThemedText style={[ss.thCell, { width: COL_SNO, textAlign: 'center' }]}>S.No.</ThemedText>
-                  <ThemedText style={[ss.thCell, { width: COL_NAME }]}>Name</ThemedText>
-                  <ThemedText style={[ss.thCell, { width: COL_CONTACT }]}>Contact</ThemedText>
-                  <ThemedText style={[ss.thCell, { width: COL_DESIG }]}>Designation</ThemedText>
-                  <ThemedText style={[ss.thCell, { width: COL_DEPT }]}>Department</ThemedText>
-                  <ThemedText style={[ss.thCell, { width: COL_STATUS }]}>Status</ThemedText>
-                  <ThemedText style={[ss.thCell, { width: COL_ACTIONS, textAlign: 'center' }]}>Actions</ThemedText>
-                </View>
-                {filteredStaff.length === 0 && !isLoading ? (
-                  <View style={[ss.emptyRow, { backgroundColor: rowOdd, borderBottomColor: borderCol }]}>
-                    <Ionicons name="people-outline" size={32} color="#9CA3AF" />
-                    <ThemedText style={{ color: colors['muted-foreground'], marginTop: 8 }}>{search ? 'No results' : 'No staff members yet'}</ThemedText>
-                  </View>
-                ) : null}
-                {filteredStaff.map((item, idx) => {
-                  const rowBg = idx % 2 === 0 ? rowOdd : rowEven;
-                  const title = desigTitle(item);
-                  return (
-                    <View key={item.id} style={[ss.tableRow, { backgroundColor: rowBg, borderBottomColor: borderCol }]}>
-                      <ThemedText style={[ss.tdNum, { width: COL_SNO }]}>{idx + 1}</ThemedText>
-                      <View style={[ss.tdCell, { width: COL_NAME }]}>
-                        <ThemedText style={ss.nameText} numberOfLines={1}>{item.first_name} {item.last_name ?? ''}</ThemedText>
-                        {item.gender ? <View style={ss.genderBadge}><ThemedText style={ss.genderText}>{item.gender}</ThemedText></View> : null}
+            {filteredStaff.length === 0 && !isLoading ? (
+              <View style={ss.emptyBox}>
+                <Ionicons name="people-outline" size={48} color="#9CA3AF" />
+                <ThemedText style={[ss.emptyText, { color: colors['muted-foreground'] }]}>{search ? 'No results found' : 'No staff members yet'}</ThemedText>
+              </View>
+            ) : null}
+            {filteredStaff.map((item) => {
+              const title = desigTitle(item);
+              return (
+                <View key={item.id} style={[ss.card, { backgroundColor: colors.card, borderColor: borderCol }]}>
+                  <View style={[ss.cardAccent, { backgroundColor: STAFF_COLOR }]} />
+                  <View style={{ flex: 1, padding: 12 }}>
+                    {/* Top row: avatar + name/desig + status */}
+                    <View style={ss.cardTop}>
+                      <View style={[ss.avatar, { backgroundColor: STAFF_LIGHT }]}>
+                        <ThemedText style={[ss.avatarText, { color: STAFF_COLOR }]}>{initials(item.first_name, item.last_name)}</ThemedText>
                       </View>
-                      <View style={[ss.tdCell, { width: COL_CONTACT }]}>
-                        {item.email ? <View style={ss.contactRow}><Ionicons name="mail-outline" size={12} color={colors['muted-foreground']} /><ThemedText style={ss.contactText} numberOfLines={1}>{item.email}</ThemedText></View> : null}
-                        {item.phone ? <View style={ss.contactRow}><Ionicons name="call-outline" size={12} color={colors['muted-foreground']} /><ThemedText style={ss.contactText}>{item.phone}</ThemedText></View> : null}
-                        {!item.email && !item.phone ? <ThemedText style={[ss.contactText, { color: colors['muted-foreground'] }]}>—</ThemedText> : null}
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <ThemedText style={[ss.cardName, { color: colors.foreground }]} numberOfLines={1}>{item.first_name} {item.last_name ?? ''}</ThemedText>
+                        <ThemedText style={[ss.cardSub, { color: colors['muted-foreground'] }]} numberOfLines={1}>{title || 'No Designation'}{item.department ? ` · ${item.department}` : ''}</ThemedText>
                       </View>
-                      <View style={[ss.tdCell, { width: COL_DESIG }]}>
-                        <ThemedText style={ss.desigText} numberOfLines={1}>{title || 'Unknown'}</ThemedText>
-                        {item.qualification ? <View style={ss.qualRow}><Ionicons name="school-outline" size={11} color={colors['muted-foreground']} /><ThemedText style={ss.qualText} numberOfLines={1}>{item.qualification}</ThemedText></View> : null}
-                      </View>
-                      <View style={[ss.tdCell, { width: COL_DEPT }]}>
-                        <ThemedText style={ss.deptText} numberOfLines={1}>{item.department || '—'}</ThemedText>
-                      </View>
-                      <View style={[ss.tdCell, { width: COL_STATUS }]}>
-                        <View style={[ss.statusBadge, item.is_active ? ss.activeBadge : ss.inactiveBadge]}>
-                          <ThemedText style={[ss.statusText, { color: item.is_active ? '#16a34a' : '#dc2626' }]}>{item.is_active ? 'Active' : 'Inactive'}</ThemedText>
-                        </View>
-                      </View>
-                      <View style={[ss.tdActions, { width: COL_ACTIONS }]}>
-                        <TouchableOpacity style={ss.iconBtn} onPress={() => setViewStaff(item)}><Ionicons name="eye-outline" size={18} color="#0EA5E9" /></TouchableOpacity>
-                        <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STAFF}>
-                          <TouchableOpacity style={ss.iconBtn} onPress={() => openEdit(item)}><Ionicons name="create-outline" size={18} color={STAFF_COLOR} /></TouchableOpacity>
-                        </UpdatePermissionGuard>
-                        <DeletePermissionGuard resource={PERMISSION_RESOURCES.STAFF}>
-                          <TouchableOpacity style={ss.iconBtn} onPress={() => confirmDelete(item)}><Ionicons name="trash-outline" size={18} color="#EF4444" /></TouchableOpacity>
-                        </DeletePermissionGuard>
+                      <View style={[ss.statusBadge, item.is_active ? ss.activeBadge : ss.inactiveBadge]}>
+                        <ThemedText style={[ss.statusText, { color: item.is_active ? '#16a34a' : '#dc2626' }]}>{item.is_active ? 'Active' : 'Inactive'}</ThemedText>
                       </View>
                     </View>
-                  );
-                })}
-              </View>
-            </ScrollView>
+                    {/* Info rows */}
+                    <View style={ss.cardInfoRow}>
+                      {item.email ? (
+                        <View style={ss.cardInfoItem}>
+                          <Ionicons name="mail-outline" size={13} color={colors['muted-foreground']} />
+                          <ThemedText style={[ss.cardInfoText, { color: colors['muted-foreground'] }]} numberOfLines={1}>{item.email}</ThemedText>
+                        </View>
+                      ) : null}
+                      {item.phone ? (
+                        <View style={ss.cardInfoItem}>
+                          <Ionicons name="call-outline" size={13} color={colors['muted-foreground']} />
+                          <ThemedText style={[ss.cardInfoText, { color: colors['muted-foreground'] }]}>{item.phone}</ThemedText>
+                        </View>
+                      ) : null}
+                      {item.gender ? (
+                        <View style={ss.genderBadge}>
+                          <ThemedText style={ss.genderText}>{item.gender}</ThemedText>
+                        </View>
+                      ) : null}
+                    </View>
+                    {/* Actions */}
+                    <View style={[ss.cardFooter, { borderTopColor: borderCol }]}>
+                      <TouchableOpacity style={ss.cardAction} onPress={() => setViewStaff(item)}>
+                        <Ionicons name="eye-outline" size={16} color="#0EA5E9" />
+                        <ThemedText style={[ss.cardActionText, { color: '#0EA5E9' }]}>View</ThemedText>
+                      </TouchableOpacity>
+                      <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STAFF}>
+                        <TouchableOpacity style={ss.cardAction} onPress={() => openEdit(item)}>
+                          <Ionicons name="create-outline" size={16} color={STAFF_COLOR} />
+                          <ThemedText style={[ss.cardActionText, { color: STAFF_COLOR }]}>Edit</ThemedText>
+                        </TouchableOpacity>
+                      </UpdatePermissionGuard>
+                      <DeletePermissionGuard resource={PERMISSION_RESOURCES.STAFF}>
+                        <TouchableOpacity style={ss.cardAction} onPress={() => confirmDelete(item)}>
+                          <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                          <ThemedText style={[ss.cardActionText, { color: '#EF4444' }]}>Delete</ThemedText>
+                        </TouchableOpacity>
+                      </DeletePermissionGuard>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
             {filteredStaff.length > 0 ? (
               <ThemedText style={[ss.countFooter, { color: colors['muted-foreground'], borderTopColor: borderCol }]}>{filteredStaff.length} staff member{filteredStaff.length !== 1 ? 's' : ''}</ThemedText>
             ) : null}
@@ -782,6 +785,7 @@ function StaffEnrollmentScreenContent() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
     </>
   );
 }
@@ -794,28 +798,28 @@ const ss = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, marginHorizontal: 12, marginTop: 10, marginBottom: 8, borderRadius: 10, borderWidth: 1 },
   searchInput: { flex: 1, fontSize: 14 },
 
-  // Table
-  tableHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4, borderBottomWidth: 1 },
-  thCell: { fontSize: 12, fontWeight: '700', opacity: 0.55, paddingHorizontal: 8, textTransform: 'uppercase', letterSpacing: 0.4 },
-  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1 },
-  tdNum: { fontSize: 13, textAlign: 'center', opacity: 0.5, paddingHorizontal: 8 },
-  tdCell: { paddingHorizontal: 8, justifyContent: 'center' },
-  tdActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 8 },
-  nameText: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  // Cards
+  card: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, marginHorizontal: 12, marginBottom: 10, overflow: 'hidden' },
+  cardAccent: { width: 4, alignSelf: 'stretch' },
+  cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  avatar: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontSize: 15, fontWeight: '700' },
+  cardName: { fontSize: 15, fontWeight: '700' },
+  cardSub: { fontSize: 12, marginTop: 1 },
+  cardInfoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  cardInfoItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  cardInfoText: { fontSize: 12 },
   genderBadge: { alignSelf: 'flex-start', backgroundColor: STAFF_LIGHT, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
   genderText: { fontSize: 11, fontWeight: '600', color: STAFF_COLOR },
-  contactRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 },
-  contactText: { fontSize: 12, flex: 1 },
-  desigText: { fontSize: 14, fontWeight: '600', marginBottom: 3 },
-  qualRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  qualText: { fontSize: 11, opacity: 0.7, flex: 1 },
-  deptText: { fontSize: 13 },
+  cardFooter: { flexDirection: 'row', gap: 4, paddingTop: 8, borderTopWidth: 1, marginTop: 2 },
+  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  cardActionText: { fontSize: 13, fontWeight: '600' },
   statusBadge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 10 },
   activeBadge: { backgroundColor: '#DCFCE7' },
   inactiveBadge: { backgroundColor: '#FEE2E2' },
   statusText: { fontSize: 11, fontWeight: '700' },
-  iconBtn: { width: 30, height: 30, justifyContent: 'center', alignItems: 'center', borderRadius: 6 },
-  emptyRow: { alignItems: 'center', paddingVertical: 48, borderBottomWidth: 1, width: COL_SNO + COL_NAME + COL_CONTACT + COL_DESIG + COL_DEPT + COL_STATUS + COL_ACTIONS },
+  emptyBox: { alignItems: 'center', justifyContent: 'center', paddingVertical: 64, gap: 12 },
+  emptyText: { fontSize: 14 },
   countFooter: { fontSize: 12, textAlign: 'center', paddingVertical: 10, borderTopWidth: 1, marginHorizontal: 12 },
   centeredBox: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48 },
   retryBtn: { marginTop: 16, paddingHorizontal: 28, paddingVertical: 10, borderRadius: 20 },

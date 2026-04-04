@@ -3,9 +3,10 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
+import { ConfirmModal } from '@/components/ui';
+import { useRouter } from 'expo-router';
 import { useAuth, useTheme } from '@/contexts';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -31,8 +32,10 @@ import {
 export default function ProfileScreen() {
   const { user, logout, role } = useAuth();
   const { colors } = useTheme();
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Determine user role
   const roleName = role?.name?.toLowerCase();
@@ -83,15 +86,16 @@ export default function ProfileScreen() {
     profileResource = 'profile';
   }
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: async () => { await logout(); } },
-      ]
-    );
+  const handleLogout = () => setShowLogoutModal(true);
+
+  const confirmLogout = async () => {
+    setShowLogoutModal(false);
+    try {
+      await logout();
+    } catch (e) {
+      // ignore — clears locally regardless
+    }
+    router.replace('/login');
   };
 
   if (!user) {
@@ -107,6 +111,7 @@ export default function ProfileScreen() {
   }
 
   return (
+    <>
     <PermissionGuard
       permissions={[
         ['student_profile', 'read_own'],
@@ -228,6 +233,17 @@ export default function ProfileScreen() {
         <AppFooter />
       </ThemedView>
     </PermissionGuard>
+    <ConfirmModal
+      visible={showLogoutModal}
+      title="Logout"
+      message="Are you sure you want to logout?"
+      confirmText="Logout"
+      cancelText="Cancel"
+      destructive
+      onConfirm={confirmLogout}
+      onCancel={() => setShowLogoutModal(false)}
+    />
+    </>
   );
 }
 

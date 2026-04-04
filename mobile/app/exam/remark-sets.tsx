@@ -2,12 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator, Alert, Modal, ScrollView, StyleSheet,
+  ActivityIndicator, Modal, ScrollView, StyleSheet,
   Switch, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts';
 import {
   remarkGradesApi, RemarkGradeSet, RemarkGradeSetCreate, RemarkGradeItem,
@@ -23,6 +24,7 @@ export default function RemarkSetsScreen() {
   const { hasPermission } = useMobilePermission();
   const qc = useQueryClient();
 
+  const { confirm, modalProps } = useConfirmModal();
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const inputBg = theme === 'dark' ? '#0f0f23' : '#f8fafc';
@@ -69,16 +71,19 @@ export default function RemarkSetsScreen() {
   const closeModal = () => { setModalVisible(false); setEditingSet(null); };
 
   const handleDelete = (set: RemarkGradeSet) => {
-    Alert.alert('Delete', `Delete \"${set.name}\"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(set.id) },
-    ]);
+    confirm({
+      title: 'Delete',
+      message: `Delete "${set.name}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(set.id),
+    });
   };
 
   const handleSubmit = () => {
-    if (!form.name.trim()) { Alert.alert('Validation', 'Name is required'); return; }
+    if (!form.name.trim()) { showError('Validation', 'Name is required'); return; }
     const validItems = form.items.filter(i => i.remark.trim());
-    if (validItems.length === 0) { Alert.alert('Validation', 'At least one remark item is required'); return; }
+    if (validItems.length === 0) { showError('Validation', 'At least one remark item is required'); return; }
     const payload = { ...form, items: validItems };
     if (editingSet) updateMutation.mutate({ id: editingSet.id, data: payload });
     else createMutation.mutate(payload);
@@ -247,6 +252,7 @@ export default function RemarkSetsScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
     </AppLayout>
   );
 }

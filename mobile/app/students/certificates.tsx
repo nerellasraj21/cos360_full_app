@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import React, { useState } from 'react';
 import {
-  Alert,
   Linking,
   ScrollView,
   StyleSheet,
@@ -28,6 +27,7 @@ import {
 } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 // ─── Shared certificate card ───────────────────────────────────────────────
 
@@ -41,6 +41,7 @@ function CertificateCard({
   onDelete?: () => void;
 }) {
   const { showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
 
   const handleDownload = async () => {
     try {
@@ -56,14 +57,13 @@ function CertificateCard({
   };
 
   const confirmDelete = () => {
-    Alert.alert(
-      'Delete Certificate',
-      `Delete "${cert.type_name}"? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: onDelete },
-      ],
-    );
+    confirm({
+      title: 'Delete Certificate',
+      message: `Delete "${cert.type_name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => onDelete?.(),
+    });
   };
 
   const categoryColor =
@@ -122,6 +122,7 @@ function CertificateCard({
           </TouchableOpacity>
         ) : null}
       </View>
+      <ConfirmModal {...modalProps} />
     </View>
   );
 }
@@ -298,7 +299,7 @@ function AdminCertificatesView() {
 
   const handleIssueSubmit = () => {
     if (!selectedStudentId || !issuedTypeId || !issuedFile) {
-      Alert.alert('Required', 'Please select student, certificate type and a file');
+      showError('Required', 'Please select student, certificate type and a file');
       return;
     }
     issuedMutation.mutate({
@@ -312,7 +313,7 @@ function AdminCertificatesView() {
 
   const handleReceivedSubmit = () => {
     if (!selectedStudentId || !recvTypeId || !recvFile) {
-      Alert.alert('Required', 'Please select student, certificate type and a file');
+      showError('Required', 'Please select student, certificate type and a file');
       return;
     }
     receivedMutation.mutate({

@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   StyleSheet,
@@ -15,6 +14,8 @@ import {
 } from 'react-native';
 
 import { ScreenLayout } from '@/components';
+import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts';
 import { authApi, type AuthMenu, type AuthMenuCreate, type AuthMenuUpdate } from '@/src/api/auth';
 
@@ -22,6 +23,8 @@ const COLOR = '#6366F1';
 
 export default function AdminMenuScreen() {
   const { colors, theme } = useTheme();
+  const { showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
   const queryClient = useQueryClient();
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -41,7 +44,7 @@ export default function AdminMenuScreen() {
       queryClient.invalidateQueries({ queryKey: ['admin-menus'] });
       closeModal();
     },
-    onError: () => Alert.alert('Error', 'Failed to create menu item'),
+    onError: () => showError('Error', 'Failed to create menu item'),
   });
 
   const updateMutation = useMutation({
@@ -50,7 +53,7 @@ export default function AdminMenuScreen() {
       queryClient.invalidateQueries({ queryKey: ['admin-menus'] });
       closeModal();
     },
-    onError: () => Alert.alert('Error', 'Failed to update menu item'),
+    onError: () => showError('Error', 'Failed to update menu item'),
   });
 
   const deleteMutation = useMutation({
@@ -58,7 +61,7 @@ export default function AdminMenuScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-menus'] });
     },
-    onError: () => Alert.alert('Error', 'Failed to delete menu item'),
+    onError: () => showError('Error', 'Failed to delete menu item'),
   });
 
   const toggleMutation = useMutation({
@@ -67,7 +70,7 @@ export default function AdminMenuScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-menus'] });
     },
-    onError: () => Alert.alert('Error', 'Failed to update status'),
+    onError: () => showError('Error', 'Failed to update status'),
   });
 
   const openCreate = () => {
@@ -89,7 +92,7 @@ export default function AdminMenuScreen() {
   };
 
   const handleSubmit = () => {
-    if (!form.name.trim()) { Alert.alert('Validation', 'Menu name is required'); return; }
+    if (!form.name.trim()) { showError('Validation', 'Menu name is required'); return; }
     if (editingMenu) {
       updateMutation.mutate({ id: editingMenu.id, data: form });
     } else {
@@ -98,14 +101,13 @@ export default function AdminMenuScreen() {
   };
 
   const handleDelete = (menu: AuthMenu) => {
-    Alert.alert(
-      'Delete Menu Item',
-      `Delete "${menu.name}"? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(menu.id) },
-      ]
-    );
+    confirm({
+      title: 'Delete Menu Item',
+      message: `Delete "${menu.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(menu.id),
+    });
   };
 
   const handleToggleActive = (menu: AuthMenu) => {
@@ -285,6 +287,7 @@ export default function AdminMenuScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
     </ScreenLayout>
   );
 }

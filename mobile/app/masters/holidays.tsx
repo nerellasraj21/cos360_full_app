@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-    Alert,
     FlatList,
     Modal,
     RefreshControl,
@@ -19,13 +18,15 @@ function DatePickerModal({
   onClose,
   onSelect,
   initialDate,
-  title
+  title,
+  themeColors
 }: {
   visible: boolean;
   onClose: () => void;
   onSelect: (date: string) => void;
   initialDate?: Date;
   title: string;
+  themeColors: any;
 }) {
   const [selectedDate, setSelectedDate] = useState(initialDate || new Date());
 
@@ -56,11 +57,11 @@ function DatePickerModal({
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.datePickerOverlay}>
-        <View style={[styles.datePickerContainer, { backgroundColor: Colors.light.background }]}>
+        <View style={[styles.datePickerContainer, { backgroundColor: themeColors.background }]}>
           <View style={styles.datePickerHeader}>
             <ThemedText type="subtitle" style={styles.datePickerTitle}>{title}</ThemedText>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={Colors.light['card-foreground']} />
+              <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
             </TouchableOpacity>
           </View>
 
@@ -78,7 +79,7 @@ function DatePickerModal({
           <View style={styles.dateControls}>
             <View style={styles.controlRow}>
               <TouchableOpacity style={styles.controlButton} onPress={() => adjustYear(-1)}>
-                <Ionicons name="chevron-back" size={20} color={Colors.light.primary} />
+                <Ionicons name="chevron-back" size={20} color={themeColors.primary} />
                 <ThemedText style={styles.controlText}>Year</ThemedText>
               </TouchableOpacity>
 
@@ -88,13 +89,13 @@ function DatePickerModal({
 
               <TouchableOpacity style={styles.controlButton} onPress={() => adjustYear(1)}>
                 <ThemedText style={styles.controlText}>Year</ThemedText>
-                <Ionicons name="chevron-forward" size={20} color={Colors.light.primary} />
+                <Ionicons name="chevron-forward" size={20} color={themeColors.primary} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.controlRow}>
               <TouchableOpacity style={styles.controlButton} onPress={() => adjustMonth(-1)}>
-                <Ionicons name="chevron-back" size={20} color={Colors.light.primary} />
+                <Ionicons name="chevron-back" size={20} color={themeColors.primary} />
                 <ThemedText style={styles.controlText}>Month</ThemedText>
               </TouchableOpacity>
 
@@ -106,13 +107,13 @@ function DatePickerModal({
 
               <TouchableOpacity style={styles.controlButton} onPress={() => adjustMonth(1)}>
                 <ThemedText style={styles.controlText}>Month</ThemedText>
-                <Ionicons name="chevron-forward" size={20} color={Colors.light.primary} />
+                <Ionicons name="chevron-forward" size={20} color={themeColors.primary} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.controlRow}>
               <TouchableOpacity style={styles.controlButton} onPress={() => adjustDate(-1)}>
-                <Ionicons name="chevron-back" size={20} color={Colors.light.primary} />
+                <Ionicons name="chevron-back" size={20} color={themeColors.primary} />
                 <ThemedText style={styles.controlText}>Day</ThemedText>
               </TouchableOpacity>
 
@@ -122,7 +123,7 @@ function DatePickerModal({
 
               <TouchableOpacity style={styles.controlButton} onPress={() => adjustDate(1)}>
                 <ThemedText style={styles.controlText}>Day</ThemedText>
-                <Ionicons name="chevron-forward" size={20} color={Colors.light.primary} />
+                <Ionicons name="chevron-forward" size={20} color={themeColors.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -151,9 +152,10 @@ import { useTheme } from '@/contexts';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 // Calendar View Component
-function CalendarView({ holidays, themeColors }: { holidays: HolidayRead[], themeColors: any }) {
+function CalendarView({ holidays, themeColors, onHolidayPress }: { holidays: HolidayRead[], themeColors: any, onHolidayPress: (h: HolidayRead) => void }) {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
@@ -204,30 +206,33 @@ function CalendarView({ holidays, themeColors }: { holidays: HolidayRead[], them
       const holiday = getHolidayForDate(date);
       const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
+      const holidayBg = holiday?.color || '#FEF3C7';
       days.push(
-        <View
+        <TouchableOpacity
           key={day}
+          activeOpacity={holiday ? 0.7 : 1}
+          onPress={() => holiday && onHolidayPress(holiday)}
           style={[
             styles.calendarDay,
-            holiday && styles.holidayDay,
+            holiday && [styles.holidayDay, { backgroundColor: holidayBg + '40' }],
             isWeekend && !holiday && styles.weekendDay
           ]}
         >
           <ThemedText style={[
             styles.dayNumber,
-            holiday && styles.holidayDayNumber,
+            holiday && [styles.holidayDayNumber, { color: holidayBg === '#FEF3C7' ? '#D97706' : holiday.color }],
             isWeekend && !holiday && styles.weekendDayNumber
           ]}>
             {day}
           </ThemedText>
           {holiday && (
-            <View style={styles.holidayIndicator}>
+            <View style={[styles.holidayIndicator, { backgroundColor: holiday.color || '#D97706' }]}>
               <ThemedText style={styles.calendarHolidayName} numberOfLines={1}>
                 {holiday.name}
               </ThemedText>
             </View>
           )}
-        </View>
+        </TouchableOpacity>
       );
     }
 
@@ -295,6 +300,7 @@ export default function HolidaysScreen() {
     description: '',
     academic_year_id: '',
     is_active: true,
+    color: '#2563eb',
   });
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
@@ -305,6 +311,7 @@ export default function HolidaysScreen() {
   const { theme, colors } = useTheme();
   const themeColors = Colors[theme];
   const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
   const queryClient = useQueryClient();
   // Permission checking will be handled by PermissionGuard components
 
@@ -352,16 +359,6 @@ export default function HolidaysScreen() {
     },
   });
 
-  const activateMutation = useMutation({
-    mutationFn: holidaysApi.activateHoliday,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['holidays'] });
-      showSuccess('Holiday Activated', 'Holiday activated successfully.');
-    },
-    onError: (error: any) => {
-      showError('Activate Failed', error.message || 'Failed to activate holiday');
-    },
-  });
 
   // Fetch academic years for dropdown
   const { data: academicYearsData } = useQuery({
@@ -390,6 +387,7 @@ export default function HolidaysScreen() {
       description: '',
       academic_year_id: '',
       is_active: true,
+      color: '#2563eb',
     });
     setEditingHoliday(null);
   };
@@ -403,23 +401,19 @@ export default function HolidaysScreen() {
       description: holiday.description || '',
       academic_year_id: holiday.academic_year_id,
       is_active: holiday.is_active,
+      color: holiday.color || '#2563eb',
     });
     setIsModalVisible(true);
   };
 
   const handleDelete = (holiday: HolidayRead) => {
-    Alert.alert(
-      'Delete Holiday',
-      `Are you sure you want to delete "${holiday.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(holiday.id),
-        },
-      ]
-    );
+    confirm({
+      title: 'Delete Holiday',
+      message: `Are you sure you want to delete "${holiday.name}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(holiday.id),
+    });
   };
 
   const handleStartDateSelect = (dateString: string) => {
@@ -440,7 +434,7 @@ export default function HolidaysScreen() {
 
   const handleSubmit = () => {
     if (!formData.name || !formData.start_date || !formData.end_date || !formData.academic_year_id) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      showError('Error', 'Please fill in all required fields');
       return;
     }
 
@@ -450,7 +444,8 @@ export default function HolidaysScreen() {
       start_date: formData.start_date,
       end_date: formData.end_date,
       academic_year_id: formData.academic_year_id,
-      is_active: formData.is_active
+      is_active: formData.is_active,
+      color: formData.color || '#2563eb',
     };
 
     if (editingHoliday) {
@@ -473,9 +468,14 @@ export default function HolidaysScreen() {
     <View style={[styles.holidayCard, { backgroundColor: themeColors.card }]}>
       <View style={styles.holidayHeader}>
         <View style={styles.holidayInfo}>
-          <ThemedText type="subtitle" style={styles.holidayName}>
-            {item.name}
-          </ThemedText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {item.color && (
+              <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: item.color }} />
+            )}
+            <ThemedText type="subtitle" style={styles.holidayName}>
+              {item.name}
+            </ThemedText>
+          </View>
           <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#10B981' : '#EF4444' }]}>
             <ThemedText style={styles.statusText}>
               {item.is_active ? 'Active' : 'Inactive'}
@@ -489,22 +489,6 @@ export default function HolidaysScreen() {
               onPress={() => handleEdit(item)}
             >
               <Ionicons name="create" size={16} color="white" />
-            </TouchableOpacity>
-          </PermissionGuard>
-          <PermissionGuard resourceConstant={PERMISSION_RESOURCES.HOLIDAYS} actionConstant="update">
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: item.is_active ? '#F59E0B' : '#10B981' }]}
-              onPress={() => {
-                if (item.is_active) {
-                  // Deactivate - use update mutation to set is_active to false
-                  updateMutation.mutate({ id: item.id, data: { is_active: false } });
-                } else {
-                  // Activate
-                  activateMutation.mutate(item.id);
-                }
-              }}
-            >
-              <Ionicons name={item.is_active ? "eye-off" : "eye"} size={16} color="white" />
             </TouchableOpacity>
           </PermissionGuard>
           <PermissionGuard resourceConstant={PERMISSION_RESOURCES.HOLIDAYS} actionConstant="delete">
@@ -686,7 +670,7 @@ export default function HolidaysScreen() {
           }
         />
       ) : (
-        <CalendarView holidays={filteredHolidays} themeColors={themeColors} />
+        <CalendarView holidays={filteredHolidays} themeColors={themeColors} onHolidayPress={handleEdit} />
       )}
 
       {/* Add/Edit Modal */}
@@ -788,6 +772,24 @@ export default function HolidaysScreen() {
                 />
               </View>
 
+              <View style={styles.formGroup}>
+                <ThemedText style={styles.label}>Event Color</ThemedText>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 }}>
+                  {['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#0891b2', '#db2777', '#ea580c'].map(color => (
+                    <TouchableOpacity
+                      key={color}
+                      onPress={() => setFormData(prev => ({ ...prev, color }))}
+                      style={{
+                        width: 32, height: 32, borderRadius: 16,
+                        backgroundColor: color,
+                        borderWidth: formData.color === color ? 3 : 0,
+                        borderColor: themeColors['card-foreground'],
+                      }}
+                    />
+                  ))}
+                </View>
+              </View>
+
               <View style={styles.checkboxContainer}>
                 <TouchableOpacity
                   style={styles.checkbox}
@@ -831,6 +833,7 @@ export default function HolidaysScreen() {
         onSelect={handleStartDateSelect}
         initialDate={formData.start_date ? new Date(formData.start_date) : undefined}
         title="Select Start Date"
+        themeColors={themeColors}
       />
 
       <DatePickerModal
@@ -839,7 +842,9 @@ export default function HolidaysScreen() {
         onSelect={handleEndDateSelect}
         initialDate={formData.end_date ? new Date(formData.end_date) : (formData.start_date ? new Date(formData.start_date) : undefined)}
         title="Select End Date"
+        themeColors={themeColors}
       />
+      <ConfirmModal {...modalProps} />
       </ThemedView>
     </ReadOrListPermissionGuard>
   );

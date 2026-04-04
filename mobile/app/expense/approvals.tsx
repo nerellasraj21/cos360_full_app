@@ -7,9 +7,8 @@ import { ReadOrListPermissionGuard, ApprovePermissionGuard } from '@/components/
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Modal,
   StyleSheet,
@@ -17,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useToastContext } from '@/components/ToastProvider';
 
 export default function ExpenseApprovalsScreen() {
   const router = useRouter();
@@ -29,9 +29,26 @@ export default function ExpenseApprovalsScreen() {
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
   const [approvalComment, setApprovalComment] = useState('');
 
+  const { showError } = useToastContext();
+  const [searchQuery, setSearchQuery] = useState('');
+
   const transactions = Array.isArray(pendingApprovals)
     ? pendingApprovals
     : pendingApprovals?.items || [];
+
+  const filteredTransactions = useMemo(() => {
+    if (!searchQuery.trim()) return transactions;
+    const q = searchQuery.toLowerCase();
+    return transactions.filter((t: any) =>
+      (t.description ?? '').toLowerCase().includes(q) ||
+      (t.vendor_name ?? '').toLowerCase().includes(q) ||
+      (t.payment_method ?? '').toLowerCase().includes(q) ||
+      (t.status ?? '').toLowerCase().includes(q)
+    );
+  }, [transactions, searchQuery]);
+
+  const totalAmount = transactions.reduce((sum: number, t: any) => sum + (t.amount ?? 0), 0);
+  const requiresAttentionCount = transactions.filter((t: any) => t.requires_approval).length;
 
   const handleApprove = (id: string) => {
     setSelectedTransactionId(id);
@@ -49,14 +66,14 @@ export default function ExpenseApprovalsScreen() {
 
   const handleApprovalSubmit = () => {
     if (!approvalComment.trim()) {
-      Alert.alert('Error', 'Please enter an approval comment');
+      showError('Error', 'Please enter an approval comment');
       return;
     }
     approveMutation.mutate(
       { id: selectedTransactionId, data: { action: approvalAction, approval_comment: approvalComment.trim() } },
       {
         onSuccess: () => setApprovalModalVisible(false),
-        onError: () => Alert.alert('Error', `Failed to ${approvalAction} transaction`),
+        onError: () => showError('Error', `Failed to ${approvalAction} transaction`),
       }
     );
   };
@@ -133,8 +150,39 @@ export default function ExpenseApprovalsScreen() {
     <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_APPROVALS}>
       <AppLayout title="Expense Approvals">
         <View style={styles.container}>
+          {/* Summary cards */}
+          <View style={styles.statsRow}>
+            <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+              <Ionicons name="time-outline" size={18} color={colors['muted-foreground']} />
+              <ThemedText style={styles.statValue}>{transactions.length}</ThemedText>
+              <ThemedText style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Pending</ThemedText>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+              <Ionicons name="cash-outline" size={18} color={colors['muted-foreground']} />
+              <ThemedText style={styles.statValue}>₹{totalAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</ThemedText>
+              <ThemedText style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Total Amount</ThemedText>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+              <Ionicons name="alert-circle-outline" size={18} color="#F59E0B" />
+              <ThemedText style={[styles.statValue, { color: '#F59E0B' }]}>{requiresAttentionCount}</ThemedText>
+              <ThemedText style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Attention</ThemedText>
+            </View>
+          </View>
+
+          {/* Search bar */}
+          <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Ionicons name="search-outline" size={16} color={colors['muted-foreground']} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.foreground }]}
+              placeholder="Search by description, vendor or status..."
+              placeholderTextColor={colors['muted-foreground']}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+
         <FlatList
-          data={transactions}
+          data={filteredTransactions}
           keyExtractor={(item) => item.id}
           renderItem={renderTransactionItem}
           contentContainerStyle={styles.listContainer}
@@ -221,6 +269,41 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 10,
+    padding: 10,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  statLabel: {
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 8,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    padding: 0,
   },
   centerContainer: {
     flex: 1,
