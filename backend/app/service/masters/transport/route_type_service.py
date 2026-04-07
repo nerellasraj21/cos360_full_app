@@ -100,7 +100,8 @@ async def deactivate_route_type(route_type_id: UUID, db: AsyncSession):
     # Invalidate cache after deactivating
     invalidate_cache("dropdown", "route_types")
 
-    return {"message": "Route type soft deleted"}
+    await db.refresh(route_type)
+    return route_type
 
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes

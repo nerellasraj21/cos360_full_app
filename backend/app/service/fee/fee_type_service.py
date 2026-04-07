@@ -353,7 +353,15 @@ async def update_fee_type(db: AsyncSession, fee_type_id: UUID, fee_type_data: Fe
 async def delete_fee_type(db: AsyncSession, fee_type_id: UUID):
     """Delete a fee type"""
     try:
-        result = await db.execute(select(FeeTypeModel).where(FeeTypeModel.id == fee_type_id))
+        result = await db.execute(
+            select(FeeTypeModel)
+            .options(
+                selectinload(FeeTypeModel.fee_category),
+                selectinload(FeeTypeModel.fee_term).selectinload(FeeTerm.fee_term_dates),
+                selectinload(FeeTypeModel.academic_year),
+            )
+            .where(FeeTypeModel.id == fee_type_id)
+        )
         db_fee_type = result.scalar_one_or_none()
 
         if not db_fee_type:
@@ -394,13 +402,19 @@ async def delete_fee_type(db: AsyncSession, fee_type_id: UUID):
                 detail=f"Cannot delete fee type '{db_fee_type.type_name}' because it is being used by {total_dependencies} record(s): {', '.join(dependency_details)}. Please reassign or delete the dependent records first.",
             )
 
+        # Populate computed fields before deleting (needed for response serialization)
+        db_fee_type.fee_category_name = db_fee_type.fee_category.category_name if db_fee_type.fee_category else None
+        db_fee_type.fee_term_name = db_fee_type.fee_term.term_name if db_fee_type.fee_term else None
+        db_fee_type.academic_year_name = db_fee_type.academic_year.title if db_fee_type.academic_year else None
+        db_fee_type.fee_term_dates = db_fee_type.fee_term.fee_term_dates if db_fee_type.fee_term else []
+
         await db.delete(db_fee_type)
         await db.commit()
 
         # Invalidate cache after deleting fee type
         invalidate_cache("dropdown", "fee_types")
 
-        return {"message": "Fee type deleted successfully"}
+        return db_fee_type
 
     except HTTPException:
         await db.rollback()

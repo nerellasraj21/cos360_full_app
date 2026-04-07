@@ -384,6 +384,39 @@ async def update_section(db: AsyncSession, section_id: UUID, section_data: dict)
         raise HTTPException(status_code=500, detail=f"Error updating section: {str(e)}")
 
 
+async def add_sections_to_class(db: AsyncSession, class_id: UUID, sections: list[dict]):
+    try:
+        result = await db.execute(select(ClassModel).where(ClassModel.id == class_id))
+        existing_class = result.scalar_one_or_none()
+        if not existing_class:
+            raise HTTPException(status_code=404, detail="Class not found")
+
+        new_sections = []
+        for sec in sections:
+            new_sec = SectionModel(
+                name=sec["name"],
+                description=sec.get("description"),
+                is_active=sec.get("is_active", True),
+                class_id=class_id,
+            )
+            db.add(new_sec)
+            new_sections.append(new_sec)
+
+        await db.flush()
+        await db.commit()
+        for sec in new_sections:
+            await db.refresh(sec)
+
+        invalidate_cache("dropdown", "sections")
+        return new_sections
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error adding sections to class: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error adding sections: {str(e)}")
+
+
 async def delete_section(db: AsyncSession, section_id: UUID):
     try:
         result = await db.execute(select(SectionModel).where(SectionModel.id == section_id))
@@ -397,10 +430,18 @@ async def delete_section(db: AsyncSession, section_id: UUID):
 
         return {"message": "Section deleted successfully"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         log.error(f"Error deleting section: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error deleting section: {str(e)}")
+        error_msg = str(e)
+        if "foreign key" in error_msg.lower() or "violates" in error_msg.lower():
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete this section because it is referenced by other records (admissions, fee mappings, timetable, etc.). Deactivate it instead."
+            )
+        raise HTTPException(status_code=500, detail=f"Error deleting section: {error_msg}")
 
 
 async def get_section_by_id(db: AsyncSession, section_id: UUID):

@@ -26,10 +26,14 @@ class ExpenseCategoryService(BaseExpenseService):
     ) -> ExpenseCategoryRead:
         """Create a new expense category"""
 
-        # Validate unique name
-        is_unique = await self.validate_unique_constraint(ExpenseCategory, "name", category_data.name)
-
-        if not is_unique:
+        # Validate unique name among active categories only (soft-deleted names can be reused)
+        from sqlalchemy import func
+        dup_check = select(func.count(ExpenseCategory.id)).where(
+            ExpenseCategory.name == category_data.name,
+            ExpenseCategory.is_active == True,  # noqa: E712
+        )
+        dup_result = await self.db.execute(dup_check)
+        if dup_result.scalar() > 0:
             raise self.build_error_response(
                 "DUPLICATE_CATEGORY_NAME", f"Category with name '{category_data.name}' already exists"
             )
@@ -111,13 +115,16 @@ class ExpenseCategoryService(BaseExpenseService):
         # Store original state for audit
         self.prepare_record_snapshot(category)
 
-        # Check name uniqueness if name is being changed
+        # Check name uniqueness if name is being changed (active categories only)
         if category_data.name and category_data.name != category.name:
-            is_unique = await self.validate_unique_constraint(
-                ExpenseCategory, "name", category_data.name, exclude_id=category_id
+            from sqlalchemy import func
+            dup_check = select(func.count(ExpenseCategory.id)).where(
+                ExpenseCategory.name == category_data.name,
+                ExpenseCategory.is_active == True,  # noqa: E712
+                ExpenseCategory.id != category_id,
             )
-
-            if not is_unique:
+            dup_result = await self.db.execute(dup_check)
+            if dup_result.scalar() > 0:
                 raise self.build_error_response(
                     "DUPLICATE_CATEGORY_NAME", f"Category with name '{category_data.name}' already exists"
                 )
@@ -190,4 +197,5 @@ class ExpenseCategoryService(BaseExpenseService):
         #     action_reason="Expense category deleted"
         # )
 
-        return {"message": "Expense category deleted successfully", "category_id": category_id}
+        await self.db.refresh(category)
+        return category

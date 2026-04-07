@@ -190,7 +190,10 @@ async def deactivate_transport_pricing(pricing_id: UUID, db: AsyncSession):
         raise HTTPException(404, "Transport pricing not found")
     pricing.is_active = False
     await db.commit()
-    return {"message": "Transport pricing deactivated"}
+    result = await db.execute(
+        select(TransportPricing).where(TransportPricing.id == pricing_id).options(*_eager_options())
+    )
+    return _pricing_to_dict(result.scalar_one())
 
 
 async def get_pricing_by_vehicle(vehicle_id: UUID, db: AsyncSession, active_only: bool = True):

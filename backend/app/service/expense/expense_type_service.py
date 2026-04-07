@@ -214,18 +214,6 @@ class ExpenseTypeService(BaseExpenseService):
         expense_type.is_active = False
         await self.db.flush()
         await self.db.commit()
+        await self.db.refresh(expense_type)
 
-        # TODO: Temporarily disabled audit log creation for debugging
-        # await self.create_audit_log(
-        #     transaction_id=expense_type.id,
-        #     action="delete",
-        #     action_category="type",
-        #     actor_user_id=user_id,
-        #     actor_role=user_role,
-        #     actor_username=user_username,
-        #     org_id=expense_type.org_id,
-        #     full_record_before=self.prepare_record_snapshot(expense_type),
-        #     action_reason="Expense type deleted"
-        # )
-
-        return {"message": "Expense type deleted successfully", "type_id": type_id}
+        return expense_type

@@ -60,7 +60,8 @@ async def deactivate_vehicle(vehicle_id: UUID, db: AsyncSession):
         raise HTTPException(404, detail="Vehicle not found")
     vehicle.is_active = False
     await db.commit()
-    return {"message": "Vehicle soft deleted"}
+    await db.refresh(vehicle)
+    return vehicle
 
 
 async def get_vehicles_dropdown(db: AsyncSession, active_only: bool = True):

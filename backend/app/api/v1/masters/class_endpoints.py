@@ -6,8 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.tenant_session import get_tenant_db
 from app.middleware.rate_limit_middleware import rate_limit_create, rate_limit_dropdown
 from app.schemas.masters.class_schema import ClassCreate, ClassDropdown, ClassOut, ClassRead, ClassUpdate
-from app.schemas.masters.sections_schema import ClassSectionInfo, SectionDropdown, SectionOut, SectionUpdate
+from app.schemas.masters.sections_schema import ClassSectionInfo, SectionCreate, SectionDropdown, SectionOut, SectionUpdate
 from app.service.masters.class_service import (
+    add_sections_to_class,
     create_class_with_sections,
     delete_class_with_sections,
     delete_section,
@@ -199,6 +200,18 @@ async def list_students_by_class_section(
     await check_role_plan_permission_with_error(db, request, role, "classes", "list")
 
     return await get_students_by_class_section(class_name, section_name, db)
+
+
+# Add Sections to Existing Class
+@router.post("/{class_id}/sections", response_model=list[SectionOut], status_code=status.HTTP_201_CREATED)
+async def add_sections_endpoint(
+    request: Request, class_id: UUID, sections: list[SectionCreate], db: AsyncSession = Depends(get_tenant_db)
+):
+    """Add one or more sections to an existing class without affecting existing sections."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "sections", "create")
+    return await add_sections_to_class(db, class_id, [s.model_dump() for s in sections])
 
 
 # Get Individual Section

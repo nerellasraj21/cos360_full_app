@@ -181,5 +181,6 @@ class ExpenseAttachmentService(BaseExpenseService):
         attachment.is_archived = True
         await self.db.flush()
         await self.db.commit()
+        await self.db.refresh(attachment)
 
-        return {"message": "Expense attachment deleted successfully", "attachment_id": attachment_id}
+        return attachment

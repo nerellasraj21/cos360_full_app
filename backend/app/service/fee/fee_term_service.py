@@ -247,7 +247,7 @@ async def delete_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
         # Delete fee term (cascade will delete associated dates)
         await db.delete(db_fee_term)
         await db.commit()
-        return {"message": "Fee term and associated dates deleted successfully"}
+        return db_fee_term
 
     except HTTPException:
         await db.rollback()
