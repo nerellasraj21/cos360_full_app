@@ -119,4 +119,4 @@ class ExpenseAuditService(BaseExpenseService):
         await self.db.delete(audit_log)
         await self.db.commit()
 
-        return {"message": "Audit log deleted successfully", "audit_log_id": audit_log_id}
+        return audit_log

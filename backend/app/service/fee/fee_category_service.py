@@ -301,7 +301,7 @@ async def delete_fee_category(db: AsyncSession, fee_category_id: UUID):
         # Invalidate cache after deleting category
         invalidate_cache("dropdown", "fee_categories")
 
-        return {"message": "Fee category deleted successfully"}
+        return db_fee_category
 
     except HTTPException:
         await db.rollback()

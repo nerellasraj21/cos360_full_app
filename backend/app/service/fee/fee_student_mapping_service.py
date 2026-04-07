@@ -540,7 +540,7 @@ async def delete_fee_student_mapping(db: AsyncSession, mapping_id: UUID):
 
         await db.delete(db_mapping)
         await db.commit()
-        return {"message": "Fee student mapping deleted successfully"}
+        return db_mapping
 
     except HTTPException:
         await db.rollback()

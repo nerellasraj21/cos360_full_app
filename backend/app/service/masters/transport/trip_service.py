@@ -60,4 +60,4 @@ async def delete_a_trip(trip_id: UUID, db: AsyncSession):
         raise HTTPException(404, detail="Trip not found")
     await db.delete(trip)
     await db.commit()
-    return {"message": "Trip deleted"}
+    return trip

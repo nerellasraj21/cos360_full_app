@@ -136,4 +136,5 @@ async def deactivate_route_stop(stop_id: UUID, db: AsyncSession):
         raise HTTPException(404, detail="Route stop not found")
     stop.is_active = False
     await db.commit()
-    return {"message": "Route stop soft deleted"}
+    await db.refresh(stop)
+    return stop

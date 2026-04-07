@@ -142,5 +142,6 @@ class ExpenseSettingsService(BaseExpenseService):
 
         await self.db.flush()
         await self.db.commit()
+        await self.db.refresh(setting)
 
-        return {"message": "Expense setting deleted successfully", "setting_id": setting_id}
+        return setting
