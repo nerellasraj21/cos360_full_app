@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { useCreateStaffEnrollment, useUpdateStaffEnrollment, useDesignationsDropdown } from '@/hooks/staff';
 import { useRoles } from '@/api/auth';
 import { toast } from 'sonner';
@@ -59,7 +60,7 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
 
       if (initialData?.id) {
         await updateMutation.mutateAsync({
-          staffId: initialData.id,
+          id: initialData.id,
           data: submitData
         });
       } else {
@@ -150,21 +151,19 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
                 </Select>
               </div>
               <div>
-                <Label htmlFor="date_of_birth">Date of Birth</Label>
-                <Input
-                  id="date_of_birth"
-                  type="date"
+                <Label>Date of Birth</Label>
+                <DatePicker
                   value={formData.date_of_birth}
-                  onChange={(e) => handleInputChange('date_of_birth', e.target.value)}
+                  onChange={(v) => handleInputChange('date_of_birth', v)}
+                  placeholder="Select date of birth"
                 />
               </div>
               <div>
-                <Label htmlFor="joining_date">Joining Date *</Label>
-                <Input
-                  id="joining_date"
-                  type="date"
+                <Label>Joining Date *</Label>
+                <DatePicker
                   value={formData.joining_date}
-                  onChange={(e) => handleInputChange('joining_date', e.target.value)}
+                  onChange={(v) => handleInputChange('joining_date', v)}
+                  placeholder="Select joining date"
                   required
                 />
               </div>

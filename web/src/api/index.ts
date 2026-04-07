@@ -77,6 +77,18 @@ CAxios.interceptors.response.use(
       }
     }
 
+    // Extract backend detail message from FastAPI error responses
+    if (error.response?.data) {
+      const data = error.response.data;
+      const detail = data.detail;
+      if (detail) {
+        const message = Array.isArray(detail)
+          ? detail.map((d: any) => d.msg || JSON.stringify(d)).join('; ')
+          : String(detail);
+        error.message = message;
+      }
+    }
+
     return Promise.reject(error);
   }
 );

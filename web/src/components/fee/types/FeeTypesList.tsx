@@ -11,11 +11,13 @@ import { useFeeTypes, useDeleteFeeType } from '@/hooks/fee/useFeeTypes';
 import { usePermission } from '@/hooks/usePermission';
 import { FeeTypeForm } from './FeeTypeForm';
 import type { FeeType } from '@/types/fee';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 export function FeeTypesList() {
     const [selectedType, setSelectedType] = useState<FeeType | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<FeeType | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortKey, setSortKey] = useState<string | null>(null);
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -66,13 +68,14 @@ export function FeeTypesList() {
         setIsFormOpen(true);
     };
 
-    const handleDeleteType = async (type: FeeType) => {
-        if (window.confirm(`Are you sure you want to delete "${type.type_name}"? This action cannot be undone.`)) {
-            try {
-                await deleteTypeMutation.mutateAsync({ id: type.id, categoryId: type.fee_category_id });
-            } catch (error) {
-                console.error('Failed to delete fee type:', error);
-            }
+    const handleDeleteType = (type: FeeType) => {
+        setDeleteTarget(type);
+    };
+
+    const confirmDelete = () => {
+        if (deleteTarget) {
+            deleteTypeMutation.mutate({ id: deleteTarget.id, categoryId: deleteTarget.fee_category_id });
+            setDeleteTarget(null);
         }
     };
 
@@ -242,6 +245,16 @@ export function FeeTypesList() {
                     />
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDialog
+                open={!!deleteTarget}
+                onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+                title="Delete Fee Type"
+                description={`Are you sure you want to delete "${deleteTarget?.type_name}"? This action cannot be undone.`}
+                confirmLabel="Delete"
+                onConfirm={confirmDelete}
+                isPending={deleteTypeMutation.isPending}
+            />
         </div>
     );
 }

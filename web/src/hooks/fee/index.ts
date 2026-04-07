@@ -42,6 +42,12 @@ export {
     useUpdateClassMappingTermAmounts,
     useDeleteClassMappingTermAmounts,
     feeClassMappingKeys,
+    useFeeStudentMappings,
+    useFeeStudentMapping,
+    useCreateFeeStudentMapping,
+    useUpdateFeeStudentMapping,
+    useDeleteFeeStudentMapping,
+    feeStudentMappingKeys,
 } from './useFeeMappings';
 
 // Bulk Operations hooks

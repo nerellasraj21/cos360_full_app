@@ -16,11 +16,13 @@ import CreatableSelect from 'react-select/creatable';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ShieldX, Loader2 } from 'lucide-react';
+import { TimePicker } from '@/components/ui/TimePicker';
 import type { RouteTypeDropdown, TripTypeDropdown } from '@/types/masters/transportTypes';
 import { toast } from 'sonner';
+import { useSelectStyles } from '@/lib/useSelectStyles';
 
 // Helper function to create columns with dynamic options
-const createColumns = (routeTypeOptions: RouteTypeDropdown[], tripTypeOptions: TripTypeDropdown[]) => [
+const createColumns = (routeTypeOptions: RouteTypeDropdown[], tripTypeOptions: TripTypeDropdown[], selectStyles: Record<string, any>) => [
     { key: "route_name", label: "Route Name", editable: true },
     { key: "starting_stop", label: "Starting Stop", editable: true },
     { key: "ending_stop", label: "Ending Stop", editable: true },
@@ -42,11 +44,7 @@ const createColumns = (routeTypeOptions: RouteTypeDropdown[], tripTypeOptions: T
                 classNamePrefix="react-select"
                 menuPlacement="auto"
                 menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                styles={{
-                    menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
-                    control: (base) => ({ ...base, minHeight: '32px', fontSize: '12px' }),
-                    menu: (base) => ({ ...base, pointerEvents: 'auto' })
-                }}
+                styles={{ ...selectStyles, control: (base: any, state: any) => ({ ...selectStyles.control(base, state), minHeight: '32px', fontSize: '12px' }) }}
                 isClearable={false}
                 menuShouldBlockScroll={false}
                 closeMenuOnScroll={false}
@@ -73,11 +71,7 @@ const createColumns = (routeTypeOptions: RouteTypeDropdown[], tripTypeOptions: T
                 classNamePrefix="react-select"
                 menuPlacement="auto"
                 menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                styles={{
-                    menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
-                    control: (base) => ({ ...base, minHeight: '32px', fontSize: '12px' }),
-                    menu: (base) => ({ ...base, pointerEvents: 'auto' })
-                }}
+                styles={{ ...selectStyles, control: (base: any, state: any) => ({ ...selectStyles.control(base, state), minHeight: '32px', fontSize: '12px' }) }}
                 isClearable={false}
                 menuShouldBlockScroll={false}
                 closeMenuOnScroll={false}
@@ -93,13 +87,7 @@ const createColumns = (routeTypeOptions: RouteTypeDropdown[], tripTypeOptions: T
         editable: true,
         render: (value: string) => value ? value.substring(0, 5) : 'N/A',
         renderEdit: (value: any, _row: Route, onChange: (val: any) => void) => (
-            <input
-                type="time"
-                value={value || ''}
-                onChange={(e) => onChange(e.target.value)}
-                className="w-full px-2 py-1 border border-input rounded text-sm"
-                style={{ minHeight: '32px' }}
-            />
+            <TimePicker value={value ? value.substring(0, 5) : ''} onChange={onChange} />
         )
     },
     {
@@ -108,13 +96,7 @@ const createColumns = (routeTypeOptions: RouteTypeDropdown[], tripTypeOptions: T
         editable: true,
         render: (value: string) => value ? value.substring(0, 5) : 'N/A',
         renderEdit: (value: any, _row: Route, onChange: (val: any) => void) => (
-            <input
-                type="time"
-                value={value || ''}
-                onChange={(e) => onChange(e.target.value)}
-                className="w-full px-2 py-1 border border-input rounded text-sm"
-                style={{ minHeight: '32px' }}
-            />
+            <TimePicker value={value ? value.substring(0, 5) : ''} onChange={onChange} />
         )
     },
     {
@@ -144,8 +126,8 @@ const formFields: FormField[] = [
     { name: "number_of_stops", label: "Number of Stops", type: "number", required: true },
     { name: "route_type", label: "Route Type", required: true },
     { name: "trip_type", label: "Trip Type", required: true },
-    { name: "start_time", label: "Start Time", required: true },
-    { name: "end_time", label: "End Time", required: true },
+    { name: "start_time", label: "Start Time", type: "time" as const, required: true },
+    { name: "end_time", label: "End Time", type: "time" as const, required: true },
     { name: "is_active", label: "Active", type: "checkbox" },
 ];
 
@@ -173,6 +155,9 @@ export default function RoutesPage() {
     const createRoute = useCreateRoute();
     const updateRoute = useUpdateRoute();
     const deleteRoute = useDeleteRoute();
+
+    // Theme-aware react-select styles
+    const selectStyles = useSelectStyles();
 
     // Fetch dynamic options from backend
     const { data: routeTypeOptions = [], isLoading: isLoadingRouteTypes } = useRouteTypesDropdown();
@@ -209,7 +194,7 @@ export default function RoutesPage() {
     }
 
     // Create columns with dynamic options
-    const columns = createColumns(routeTypeOptions, tripTypeOptions);
+    const columns = createColumns(routeTypeOptions, tripTypeOptions, selectStyles);
 
     const config: MasterPageConfig<Route, RouteInput> = {
         title: "Routes",
@@ -277,10 +262,7 @@ export default function RoutesPage() {
                             classNamePrefix="react-select"
                             menuPlacement="auto"
                             menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                            styles={{
-                                menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
-                                menu: (base) => ({ ...base, pointerEvents: 'auto' })
-                            }}
+                            styles={selectStyles}
                             menuShouldBlockScroll={false}
                             closeMenuOnScroll={false}
                             tabSelectsValue={false}
@@ -338,10 +320,7 @@ export default function RoutesPage() {
                             classNamePrefix="react-select"
                             menuPlacement="auto"
                             menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                            styles={{
-                                menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
-                                menu: (base) => ({ ...base, pointerEvents: 'auto' })
-                            }}
+                            styles={selectStyles}
                             menuShouldBlockScroll={false}
                             closeMenuOnScroll={false}
                             tabSelectsValue={false}
@@ -360,17 +339,6 @@ export default function RoutesPage() {
                             Type a new trip type and press Enter to create it
                         </p>
                     </div>
-                );
-            }
-            if (field.name === 'start_time' || field.name === 'end_time') {
-                return (
-                    <input
-                        type="time"
-                        value={value || ''}
-                        onChange={(e) => onChange(e.target.value)}
-                        className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
-                        required={field.required}
-                    />
                 );
             }
             return null;

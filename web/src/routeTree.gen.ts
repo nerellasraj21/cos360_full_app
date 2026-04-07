@@ -77,8 +77,6 @@ import { Route as AppMastersAcademicyearsRouteImport } from './routes/_app/maste
 import { Route as AppFeeTypesRouteImport } from './routes/_app/fee/types'
 import { Route as AppFeeTransactionsRouteImport } from './routes/_app/fee/transactions'
 import { Route as AppFeeTermsRouteImport } from './routes/_app/fee/terms'
-import { Route as AppFeeTermamountsRouteImport } from './routes/_app/fee/termamounts'
-import { Route as AppFeeTerm_amountsRouteImport } from './routes/_app/fee/term_amounts'
 import { Route as AppFeeTermAmountsRouteImport } from './routes/_app/fee/term-amounts'
 import { Route as AppFeeReportsRouteImport } from './routes/_app/fee/reports'
 import { Route as AppFeeRefundsRouteImport } from './routes/_app/fee/refunds'
@@ -106,6 +104,7 @@ import { Route as AppExamAuditRouteImport } from './routes/_app/exam/audit'
 import { Route as AppCommunicationTemplatesRouteImport } from './routes/_app/communication/templates'
 import { Route as AppCommunicationLogsRouteImport } from './routes/_app/communication/logs'
 import { Route as AppCommunicationComposeRouteImport } from './routes/_app/communication/compose'
+import { Route as AppAdminUsersRouteImport } from './routes/_app/admin/users'
 import { Route as AppAdminProfileRouteImport } from './routes/_app/admin/profile'
 import { Route as AppExamResultsIndexRouteImport } from './routes/_app/exam/results/index'
 import { Route as AppExamMarksIndexRouteImport } from './routes/_app/exam/marks/index'
@@ -485,16 +484,6 @@ const AppFeeTermsRoute = AppFeeTermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => AppFeeRoute,
 } as any)
-const AppFeeTermamountsRoute = AppFeeTermamountsRouteImport.update({
-  id: '/termamounts',
-  path: '/termamounts',
-  getParentRoute: () => AppFeeRoute,
-} as any)
-const AppFeeTerm_amountsRoute = AppFeeTerm_amountsRouteImport.update({
-  id: '/term_amounts',
-  path: '/term_amounts',
-  getParentRoute: () => AppFeeRoute,
-} as any)
 const AppFeeTermAmountsRoute = AppFeeTermAmountsRouteImport.update({
   id: '/term-amounts',
   path: '/term-amounts',
@@ -630,6 +619,11 @@ const AppCommunicationComposeRoute = AppCommunicationComposeRouteImport.update({
   id: '/compose',
   path: '/compose',
   getParentRoute: () => AppCommunicationRoute,
+} as any)
+const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppAdminProfileRoute = AppAdminProfileRouteImport.update({
   id: '/admin/profile',
@@ -796,6 +790,7 @@ export interface FileRoutesByFullPath {
   '/set-password': typeof AuthSetPasswordRoute
   '/': typeof AppIndexRoute
   '/admin/profile': typeof AppAdminProfileRoute
+  '/admin/users': typeof AppAdminUsersRoute
   '/communication/compose': typeof AppCommunicationComposeRoute
   '/communication/logs': typeof AppCommunicationLogsRoute
   '/communication/templates': typeof AppCommunicationTemplatesRoute
@@ -823,8 +818,6 @@ export interface FileRoutesByFullPath {
   '/fee/refunds': typeof AppFeeRefundsRoute
   '/fee/reports': typeof AppFeeReportsRoute
   '/fee/term-amounts': typeof AppFeeTermAmountsRoute
-  '/fee/term_amounts': typeof AppFeeTerm_amountsRoute
-  '/fee/termamounts': typeof AppFeeTermamountsRoute
   '/fee/terms': typeof AppFeeTermsRoute
   '/fee/transactions': typeof AppFeeTransactionsRoute
   '/fee/types': typeof AppFeeTypesRoute
@@ -915,6 +908,7 @@ export interface FileRoutesByTo {
   '/set-password': typeof AuthSetPasswordRoute
   '/': typeof AppIndexRoute
   '/admin/profile': typeof AppAdminProfileRoute
+  '/admin/users': typeof AppAdminUsersRoute
   '/communication/compose': typeof AppCommunicationComposeRoute
   '/communication/logs': typeof AppCommunicationLogsRoute
   '/communication/templates': typeof AppCommunicationTemplatesRoute
@@ -937,8 +931,6 @@ export interface FileRoutesByTo {
   '/fee/refunds': typeof AppFeeRefundsRoute
   '/fee/reports': typeof AppFeeReportsRoute
   '/fee/term-amounts': typeof AppFeeTermAmountsRoute
-  '/fee/term_amounts': typeof AppFeeTerm_amountsRoute
-  '/fee/termamounts': typeof AppFeeTermamountsRoute
   '/fee/terms': typeof AppFeeTermsRoute
   '/fee/transactions': typeof AppFeeTransactionsRoute
   '/fee/types': typeof AppFeeTypesRoute
@@ -1036,6 +1028,7 @@ export interface FileRoutesById {
   '/_auth/set-password': typeof AuthSetPasswordRoute
   '/_app/': typeof AppIndexRoute
   '/_app/admin/profile': typeof AppAdminProfileRoute
+  '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/communication/compose': typeof AppCommunicationComposeRoute
   '/_app/communication/logs': typeof AppCommunicationLogsRoute
   '/_app/communication/templates': typeof AppCommunicationTemplatesRoute
@@ -1063,8 +1056,6 @@ export interface FileRoutesById {
   '/_app/fee/refunds': typeof AppFeeRefundsRoute
   '/_app/fee/reports': typeof AppFeeReportsRoute
   '/_app/fee/term-amounts': typeof AppFeeTermAmountsRoute
-  '/_app/fee/term_amounts': typeof AppFeeTerm_amountsRoute
-  '/_app/fee/termamounts': typeof AppFeeTermamountsRoute
   '/_app/fee/terms': typeof AppFeeTermsRoute
   '/_app/fee/transactions': typeof AppFeeTransactionsRoute
   '/_app/fee/types': typeof AppFeeTypesRoute
@@ -1162,6 +1153,7 @@ export interface FileRouteTypes {
     | '/set-password'
     | '/'
     | '/admin/profile'
+    | '/admin/users'
     | '/communication/compose'
     | '/communication/logs'
     | '/communication/templates'
@@ -1189,8 +1181,6 @@ export interface FileRouteTypes {
     | '/fee/refunds'
     | '/fee/reports'
     | '/fee/term-amounts'
-    | '/fee/term_amounts'
-    | '/fee/termamounts'
     | '/fee/terms'
     | '/fee/transactions'
     | '/fee/types'
@@ -1281,6 +1271,7 @@ export interface FileRouteTypes {
     | '/set-password'
     | '/'
     | '/admin/profile'
+    | '/admin/users'
     | '/communication/compose'
     | '/communication/logs'
     | '/communication/templates'
@@ -1303,8 +1294,6 @@ export interface FileRouteTypes {
     | '/fee/refunds'
     | '/fee/reports'
     | '/fee/term-amounts'
-    | '/fee/term_amounts'
-    | '/fee/termamounts'
     | '/fee/terms'
     | '/fee/transactions'
     | '/fee/types'
@@ -1401,6 +1390,7 @@ export interface FileRouteTypes {
     | '/_auth/set-password'
     | '/_app/'
     | '/_app/admin/profile'
+    | '/_app/admin/users'
     | '/_app/communication/compose'
     | '/_app/communication/logs'
     | '/_app/communication/templates'
@@ -1428,8 +1418,6 @@ export interface FileRouteTypes {
     | '/_app/fee/refunds'
     | '/_app/fee/reports'
     | '/_app/fee/term-amounts'
-    | '/_app/fee/term_amounts'
-    | '/_app/fee/termamounts'
     | '/_app/fee/terms'
     | '/_app/fee/transactions'
     | '/_app/fee/types'
@@ -1990,20 +1978,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFeeTermsRouteImport
       parentRoute: typeof AppFeeRoute
     }
-    '/_app/fee/termamounts': {
-      id: '/_app/fee/termamounts'
-      path: '/termamounts'
-      fullPath: '/fee/termamounts'
-      preLoaderRoute: typeof AppFeeTermamountsRouteImport
-      parentRoute: typeof AppFeeRoute
-    }
-    '/_app/fee/term_amounts': {
-      id: '/_app/fee/term_amounts'
-      path: '/term_amounts'
-      fullPath: '/fee/term_amounts'
-      preLoaderRoute: typeof AppFeeTerm_amountsRouteImport
-      parentRoute: typeof AppFeeRoute
-    }
     '/_app/fee/term-amounts': {
       id: '/_app/fee/term-amounts'
       path: '/term-amounts'
@@ -2192,6 +2166,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/communication/compose'
       preLoaderRoute: typeof AppCommunicationComposeRouteImport
       parentRoute: typeof AppCommunicationRoute
+    }
+    '/_app/admin/users': {
+      id: '/_app/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AppAdminUsersRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/admin/profile': {
       id: '/_app/admin/profile'
@@ -2624,8 +2605,6 @@ interface AppFeeRouteChildren {
   AppFeeRefundsRoute: typeof AppFeeRefundsRoute
   AppFeeReportsRoute: typeof AppFeeReportsRoute
   AppFeeTermAmountsRoute: typeof AppFeeTermAmountsRoute
-  AppFeeTerm_amountsRoute: typeof AppFeeTerm_amountsRoute
-  AppFeeTermamountsRoute: typeof AppFeeTermamountsRoute
   AppFeeTermsRoute: typeof AppFeeTermsRoute
   AppFeeTransactionsRoute: typeof AppFeeTransactionsRoute
   AppFeeTypesRoute: typeof AppFeeTypesRoute
@@ -2640,8 +2619,6 @@ const AppFeeRouteChildren: AppFeeRouteChildren = {
   AppFeeRefundsRoute: AppFeeRefundsRoute,
   AppFeeReportsRoute: AppFeeReportsRoute,
   AppFeeTermAmountsRoute: AppFeeTermAmountsRoute,
-  AppFeeTerm_amountsRoute: AppFeeTerm_amountsRoute,
-  AppFeeTermamountsRoute: AppFeeTermamountsRoute,
   AppFeeTermsRoute: AppFeeTermsRoute,
   AppFeeTransactionsRoute: AppFeeTransactionsRoute,
   AppFeeTypesRoute: AppFeeTypesRoute,
@@ -2713,6 +2690,7 @@ interface AppRouteChildren {
   AppSuperorgRoute: typeof AppSuperorgRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAdminProfileRoute: typeof AppAdminProfileRoute
+  AppAdminUsersRoute: typeof AppAdminUsersRoute
   AppMastersAcademicyearsRoute: typeof AppMastersAcademicyearsRoute
   AppMastersClassesandsectionsRoute: typeof AppMastersClassesandsectionsRoute
   AppMastersClasssubjectmappingsRoute: typeof AppMastersClasssubjectmappingsRoute
@@ -2759,6 +2737,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSuperorgRoute: AppSuperorgRoute,
   AppIndexRoute: AppIndexRoute,
   AppAdminProfileRoute: AppAdminProfileRoute,
+  AppAdminUsersRoute: AppAdminUsersRoute,
   AppMastersAcademicyearsRoute: AppMastersAcademicyearsRoute,
   AppMastersClassesandsectionsRoute: AppMastersClassesandsectionsRoute,
   AppMastersClasssubjectmappingsRoute: AppMastersClasssubjectmappingsRoute,

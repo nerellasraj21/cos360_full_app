@@ -65,7 +65,8 @@ export function useExpenseCategoryDropdown() {
   return useQuery<ExpenseCategoryDropdown[]>({
     queryKey: ['expense-categories-dropdown'],
     queryFn: () => expenseApi.getCategoryDropdown(),
-    staleTime: expenseCacheUtils.TTL.LONG,
+    staleTime: 0,          // always stale so invalidation + refetchOnMount work
+    refetchOnMount: true,  // override global false — dropdown must always be fresh
   });
 }
 

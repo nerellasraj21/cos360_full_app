@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ViewButton, EditButton, DeleteButton, DownloadButton, TableActionGroup } from '@/components/common/TableActions';
 import { Edit, Trash2, Plus, Users, Mail, Phone, Calendar, Award, MapPin, Filter, Download, FileText, FileSpreadsheet, Eye, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Search, GraduationCap, Briefcase, Landmark, Wallet } from 'lucide-react';
+import { DatePicker } from '@/components/ui/DatePicker';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -479,13 +480,42 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
         try {
             let staffId: string;
 
+            // Helper: convert empty strings to undefined so Pydantic
+            // doesn't validate '' against EmailStr / date / etc.
+            const orUndef = (v: string | undefined) => (v && v.trim() !== '' ? v : undefined);
+
             if (editingStaff) {
                 await updateMutation.mutateAsync({
                     id: editingStaff.id,
                     data: {
-                        ...formData,
+                        first_name: formData.first_name,
+                        last_name: orUndef(formData.last_name),
+                        email: orUndef(formData.email),
+                        phone: orUndef(formData.phone),
+                        gender: formData.gender,
+                        date_of_birth: orUndef(formData.date_of_birth),
+                        joining_date: formData.joining_date,
+                        qualification: orUndef(formData.qualification),
+                        experience_years: formData.experience_years || undefined,
+                        address: orUndef(formData.address),
+                        designation_id: orUndef(formData.designation_id),
+                        department: orUndef(formData.department),
+                        is_active: formData.is_active,
+                        work_org: orUndef(formData.work_org),
+                        work_from_date: orUndef(formData.work_from_date),
+                        work_to_date: orUndef(formData.work_to_date),
+                        subjects_dealt: orUndef(formData.subjects_dealt),
+                        work_remarks: orUndef(formData.work_remarks),
+                        bank_name: orUndef(formData.bank_name),
+                        bank_branch: orUndef(formData.bank_branch),
+                        account_number: orUndef(formData.account_number),
+                        ifsc_code: orUndef(formData.ifsc_code),
+                        account_holder_name: orUndef(formData.account_holder_name),
+                        account_type: formData.account_type,
                         current_salary: formData.current_salary ? Number(formData.current_salary) : undefined,
                         last_drawn_salary: formData.last_drawn_salary ? Number(formData.last_drawn_salary) : undefined,
+                        pf_account_number: orUndef(formData.pf_account_number),
+                        uan_number: orUndef(formData.uan_number),
                     },
                 });
                 staffId = editingStaff.id;
@@ -913,10 +943,10 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     <label className="block text-sm font-medium text-foreground mb-1">
                         Date of Birth
                     </label>
-                    <Input
-                        type="date"
+                    <DatePicker
                         value={formData.date_of_birth}
-                        onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                        onChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, date_of_birth: v }); }}
+                        placeholder="Select date of birth"
                     />
                 </div>
 
@@ -924,10 +954,10 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     <label className="block text-sm font-medium text-foreground mb-1">
                         Joining Date *
                     </label>
-                    <Input
-                        type="date"
+                    <DatePicker
                         value={formData.joining_date}
-                        onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })}
+                        onChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, joining_date: v }); }}
+                        placeholder="Select joining date"
                         required
                     />
                 </div>
@@ -1142,11 +1172,11 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-foreground mb-1">From Date</label>
-                    <Input type="date" value={formData.work_from_date || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, work_from_date: e.target.value }); }} />
+                    <DatePicker value={formData.work_from_date || ''} onChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, work_from_date: v }); }} placeholder="Select from date" />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-foreground mb-1">To Date</label>
-                    <Input type="date" value={formData.work_to_date || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, work_to_date: e.target.value }); }} />
+                    <DatePicker value={formData.work_to_date || ''} onChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, work_to_date: v }); }} placeholder="Select to date" />
                 </div>
                 <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-foreground mb-1">Remarks</label>

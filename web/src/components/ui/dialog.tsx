@@ -93,6 +93,25 @@ export function DialogContent({
   onEscapeKeyDown,
   ...props
 }: DialogContentProps) {
+  // Separate DialogFooter from body children so the footer is always rendered
+  // outside the scroll area and stays fixed at the bottom of the dialog.
+  let footer: React.ReactNode = null
+  let bodyChildren: React.ReactNode = children
+
+  if (!customLayout) {
+    const childrenArray = React.Children.toArray(children)
+    const footerIdx = childrenArray.findIndex(
+      (child) => React.isValidElement(child) && child.type === DialogFooter
+    )
+    if (footerIdx !== -1) {
+      footer = childrenArray[footerIdx]
+      bodyChildren = [
+        ...childrenArray.slice(0, footerIdx),
+        ...childrenArray.slice(footerIdx + 1),
+      ]
+    }
+  }
+
   return (
     <RadixDialog.Portal>
       <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
@@ -130,9 +149,16 @@ export function DialogContent({
             {children}
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto p-6">
-            {children}
-          </div>
+          <>
+            <div className="flex-1 overflow-y-auto p-6">
+              {bodyChildren}
+            </div>
+            {footer && (
+              <div className="flex-shrink-0 border-t px-6 py-4">
+                {footer}
+              </div>
+            )}
+          </>
         )}
       </RadixDialog.Content>
     </RadixDialog.Portal>
@@ -152,7 +178,7 @@ export function DialogDescription({ className, ...props }: React.ComponentProps<
 }
 
 export function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("mt-6 flex justify-end gap-2", className)} {...props} />
+  return <div className={cn("flex justify-end gap-2", className)} {...props} />
 }
 
 export function DialogClose({ children, ...props }: React.ComponentProps<typeof RadixDialog.Close>) {

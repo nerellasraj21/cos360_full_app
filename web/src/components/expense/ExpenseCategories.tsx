@@ -13,11 +13,13 @@ import { useExpenseCategories, useCreateExpenseCategory, useUpdateExpenseCategor
 import { validateCategoryForm } from '@/lib/expenseValidation';
 import { handleExpenseApiError } from '@/lib/expenseErrorHandler';
 import type { ExpenseCategory, ExpenseCategoryCreate } from '@/types/expense';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 export function ExpenseCategories() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [isFormDirty, setIsFormDirty] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ExpenseCategory | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
@@ -92,8 +94,13 @@ export function ExpenseCategories() {
   };
 
   const handleDelete = (category: ExpenseCategory) => {
-    if (confirm(`Are you sure you want to delete the category "${category.name}"? This may affect existing expense types.`)) {
-      deleteMutation.mutate(category.id);
+    setDeleteTarget(category);
+  };
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteMutation.mutate(deleteTarget.id);
+      setDeleteTarget(null);
     }
   };
 
@@ -291,6 +298,16 @@ export function ExpenseCategories() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete Category"
+        description={`Are you sure you want to delete "${deleteTarget?.name}"? This may affect existing expense types.`}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        isPending={deleteMutation.isPending}
+      />
     </Card>
   );
 }

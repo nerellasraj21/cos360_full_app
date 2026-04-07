@@ -15,11 +15,13 @@ import { validateTypeForm } from '@/lib/expenseValidation';
 import { handleExpenseApiError } from '@/lib/expenseErrorHandler';
 import type { ExpenseType, ExpenseTypeCreate } from '@/types/expense';
 import { PermissionGuard } from '@/components/PermissionGuard';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 export function ExpenseTypes() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [isFormDirty, setIsFormDirty] = useState(false);
   const [editingType, setEditingType] = useState<ExpenseType | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ExpenseType | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -106,8 +108,13 @@ export function ExpenseTypes() {
   };
 
   const handleDelete = (type: ExpenseType) => {
-    if (confirm(`Are you sure you want to delete the expense type "${type.name}"? This may affect existing transactions.`)) {
-      deleteMutation.mutate(type.id);
+    setDeleteTarget(type);
+  };
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteMutation.mutate(deleteTarget.id);
+      setDeleteTarget(null);
     }
   };
 
@@ -351,6 +358,16 @@ export function ExpenseTypes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete Expense Type"
+        description={`Are you sure you want to delete "${deleteTarget?.name}"? This may affect existing transactions.`}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        isPending={deleteMutation.isPending}
+      />
     </Card>
   );
 }

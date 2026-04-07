@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { EditButton, DeleteButton, TableActionGroup } from '@/components/common/TableActions';
 import { Edit, Trash2, Plus, Calculator, AlertCircle, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 
 interface ClassMappingTableProps {
     className?: string;
+    highlightKey?: number;
 }
 
 interface MappingFormData {
@@ -31,8 +32,10 @@ interface MappingFormData {
 type SortKey = 'class' | 'feeType' | 'totalFee' | 'termStatus' | 'assignmentType';
 type SortDir = 'asc' | 'desc';
 
-export function ClassMappingTable({ className }: ClassMappingTableProps) {
+export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingTableProps) {
     const { selectedAcademicYearId } = useAcademicYearStore();
+
+    const [isHighlighted, setIsHighlighted] = useState(false);
 
     // Component logic
     const [editingMapping, setEditingMapping] = useState<FeeClassMapping | null>(null);
@@ -55,6 +58,14 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
     const { data: mappingsResponse, isLoading, error } = useFeeClassMappings({
         academic_year_id: selectedAcademicYearId || undefined,
     });
+
+    // Fire when highlightKey increments (every sidebar click) and data is ready
+    useEffect(() => {
+        if (!highlightKey || isLoading) return;
+        setIsHighlighted(true);
+        const timer = setTimeout(() => setIsHighlighted(false), 3000);
+        return () => clearTimeout(timer);
+    }, [highlightKey, isLoading]);
 
     // Data handling
 
@@ -404,7 +415,14 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                                     const feeType = getFeeType(mapping.fee_type_id);
 
                                     return (
-                                        <tr key={mapping.id} className="hover:bg-accent/50" style={{ height: '48px' }}>
+                                        <tr
+                                            key={mapping.id}
+                                            className={cn(
+                                                "hover:bg-accent/50 transition-colors duration-300",
+                                                isHighlighted && index === 0 && "bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 animate-pulse"
+                                            )}
+                                            style={{ height: '48px' }}
+                                        >
                                             <td className="px-4 py-3 text-sm text-muted-foreground align-middle">
                                                 {index + 1}
                                             </td>
@@ -454,7 +472,10 @@ export function ClassMappingTable({ className }: ClassMappingTableProps) {
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() => handleManageTermAmounts(mapping)}
-                                                        className="h-8 w-8 p-0"
+                                                        className={cn(
+                                                            "h-8 w-8 p-0 transition-all duration-300",
+                                                            isHighlighted && index === 0 && "text-amber-600 dark:text-amber-400 scale-110"
+                                                        )}
                                                         title="Manage Term Amounts"
                                                     >
                                                         <Calculator className="h-4 w-4" />

@@ -3,7 +3,7 @@ import type {
     ExpenseAttachment,
     ExpenseAttachmentUploadRequest,
     ExpenseAttachmentUpdateRequest
-} from '@/types/expense/attachment';
+} from '@/types/expense';
 
 export const expenseAttachmentsApi = {
     // Upload attachment
@@ -11,16 +11,16 @@ export const expenseAttachmentsApi = {
         console.log('[DEBUG] expenseAttachmentsApi.uploadAttachment called for transaction:', data.transaction_id);
 
         const formData = new FormData();
-        formData.append('transaction_id', data.transaction_id);
-        if (data.attachment_type) formData.append('attachment_type', data.attachment_type);
-        if (data.description) formData.append('description', data.description);
         formData.append('file', data.file);
 
-        const response = await CAxios.post('/expense/attachments/', formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
+        const params = new URLSearchParams({ document_type: data.document_type ?? 'invoice' });
+        if (data.department_id) params.append('department_id', data.department_id);
+
+        const response = await CAxios.post(
+            `/expense/attachments/transactions/${data.transaction_id}/upload?${params.toString()}`,
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' } },
+        );
         console.log('[DEBUG] expenseAttachmentsApi.uploadAttachment success:', response.data);
         return response.data;
     },

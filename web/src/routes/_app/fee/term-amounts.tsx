@@ -4,6 +4,6 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 // Redirect users to the Fee Mappings page (Class Mappings tab)
 export const Route = createFileRoute('/_app/fee/term-amounts')({
   beforeLoad: () => {
-    throw redirect({ to: '/fee/mappings', hash: 'class-mappings', replace: true })
+    throw redirect({ to: '/fee/mappings', hash: 'class-mappings-term-amounts', replace: true })
   },
 })

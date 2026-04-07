@@ -381,34 +381,36 @@ export const expenseApi = {
     getTransactionAttachments: async (transactionId: string): Promise<ExpenseAttachmentListResponse> => {
       console.log('[DEBUG] expenseApi.attachments.getTransactionAttachments called with transactionId:', transactionId);
 
-      const response = await CAxios.get(`/expense/attachments?transaction_id=${transactionId}`);
+      const response = await CAxios.get(`/expense/attachments/transactions/${transactionId}/list`);
       console.log('[DEBUG] expenseApi.attachments.getTransactionAttachments returning:', response.data);
       return response.data;
     },
 
     // Upload attachment
-    uploadAttachment: async (transactionId: string, file: File): Promise<ExpenseAttachment> => {
+    uploadAttachment: async (transactionId: string, file: File, documentType: string = 'invoice', departmentId?: string): Promise<ExpenseAttachment> => {
       console.log('[DEBUG] expenseApi.attachments.uploadAttachment called with transactionId:', transactionId, 'file:', file.name);
 
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('transaction_id', transactionId);
 
-      const response = await CAxios.post('/expense/attachments', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const params = new URLSearchParams({ document_type: documentType });
+      if (departmentId) params.append('department_id', departmentId);
+
+      const response = await CAxios.post(
+        `/expense/attachments/transactions/${transactionId}/upload?${params.toString()}`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      );
 
       console.log('[DEBUG] expenseApi.attachments.uploadAttachment success:', response.data);
       return response.data;
     },
 
     // Download attachment
-    downloadAttachment: async (transactionId: string, attachmentId: string): Promise<Blob> => {
-      console.log('[DEBUG] expenseApi.attachments.downloadAttachment called with transactionId:', transactionId, 'attachmentId:', attachmentId);
+    downloadAttachment: async (_transactionId: string, attachmentId: string): Promise<Blob> => {
+      console.log('[DEBUG] expenseApi.attachments.downloadAttachment called with attachmentId:', attachmentId);
 
-      const response = await CAxios.get(`/expense/attachments/${attachmentId}/download?transaction_id=${transactionId}`, {
+      const response = await CAxios.get(`/expense/attachments/${attachmentId}/download`, {
         responseType: 'blob',
       });
 
@@ -417,10 +419,10 @@ export const expenseApi = {
     },
 
     // Delete attachment
-    deleteAttachment: async (transactionId: string, attachmentId: string): Promise<void> => {
-      console.log('[DEBUG] expenseApi.attachments.deleteAttachment called with transactionId:', transactionId, 'attachmentId:', attachmentId);
+    deleteAttachment: async (_transactionId: string, attachmentId: string): Promise<void> => {
+      console.log('[DEBUG] expenseApi.attachments.deleteAttachment called with attachmentId:', attachmentId);
 
-      await CAxios.delete(`/expense/attachments/${attachmentId}?transaction_id=${transactionId}`);
+      await CAxios.delete(`/expense/attachments/${attachmentId}`);
       console.log('[DEBUG] expenseApi.attachments.deleteAttachment deleted attachment with id:', attachmentId);
     },
   },
@@ -480,6 +482,65 @@ export const {
   attachments,
   reporting,
 } = expenseApi;
+
+// ============================================================================
+// FLAT ALIASES — required by hooks/expense/index.ts
+// ============================================================================
+Object.assign(expenseApi as any, {
+  // Categories
+  getCategories:       (p?: any) => expenseApi.categories.getAllCategories(p),
+  getCategoryDropdown: ()        => expenseApi.categories.getCategoriesDropdown(),
+  createCategory:      (d: any)  => expenseApi.categories.createCategory(d),
+  updateCategory:      (id: string, d: any) => expenseApi.categories.updateCategory(id, d),
+  deleteCategory:      (id: string)         => expenseApi.categories.deleteCategory(id),
+
+  // Types
+  getTypes:       (p?: any) => expenseApi.types.getAllTypes(p),
+  getTypeDropdown:(categoryId?: string) => expenseApi.types.getTypesDropdown(),
+  createType:     (d: any)  => expenseApi.types.createType(d),
+  updateType:     (id: string, d: any) => expenseApi.types.updateType(id, d),
+  deleteType:     (id: string)         => expenseApi.types.deleteType(id),
+
+  // Transactions
+  getTransactions:     (p?: any) => expenseApi.transactions.getAllTransactions(p),
+  getTransaction:      (id: string) => expenseApi.transactions.getTransactionById(id),
+  createTransaction:   (d: any)    => expenseApi.transactions.createTransaction(d),
+  updateTransaction:   (id: string, d: any) => expenseApi.transactions.updateTransaction(id, d),
+  deleteTransaction:   (id: string) => expenseApi.transactions.deleteTransaction(id),
+  approveTransaction:  (id: string, d: any) => expenseApi.transactions.approveTransaction(id, d),
+  getPendingApprovals: (p?: any) => expenseApi.transactions.getPendingApprovals(p),
+
+  // Attachments
+  getTransactionAttachments: (transactionId: string) =>
+    expenseApi.attachments.getTransactionAttachments(transactionId),
+  uploadAttachment: (transactionId: string, file: File, documentType?: string, deptId?: string) =>
+    expenseApi.attachments.uploadAttachment(transactionId, file, documentType ?? 'invoice', deptId),
+  downloadAttachment: (attachmentId: string) =>
+    expenseApi.attachments.downloadAttachment('', attachmentId),
+  deleteAttachment: (attachmentId: string) =>
+    expenseApi.attachments.deleteAttachment('', attachmentId),
+
+  // Audit
+  getAuditLogs:   (f?: any) => expenseApi.audit.getAuditLogs(f),
+  getAuditSummary:(_id: string) => Promise.resolve({}),
+
+  // Settings
+  getSettings:      (p?: any) => expenseApi.settings.getAllSettings(p),
+  getSettingValue:  (_key: string) => Promise.resolve({}),
+  getCommonSettings:() => Promise.resolve({}),
+  createSetting:    (d: any) => expenseApi.settings.createSetting(d),
+  updateSetting:    (id: string, d: any) => expenseApi.settings.updateSetting(id, d),
+  deleteSetting:    (id: string) => expenseApi.settings.deleteSetting(id),
+
+  // Reports (stubs for unimplemented endpoints)
+  getCategoryReport:  (_f: any) => Promise.resolve({}),
+  getTypeReport:      (_f: any) => Promise.resolve({}),
+  getTrendReport:     (_f: any) => Promise.resolve({}),
+  getExpenseSummary:  (_days: number) => Promise.resolve({}),
+  getSummaryReport:   (f?: any) => expenseApi.reporting.getSummaryReport(f),
+  exportReport:       (_d: any) => Promise.resolve({}),
+  getExportStatus:    (_id: string) => Promise.resolve({}),
+});
 
 export { expenseSummaryApi } from './summary';
 export type { ExpenseSummaryParams } from './summary';

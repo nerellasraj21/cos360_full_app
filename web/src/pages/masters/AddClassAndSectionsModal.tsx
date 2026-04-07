@@ -174,7 +174,7 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
           {step === 1 && (
             <div className="space-y-4">
               {/* Alphabetical Section Generation */}
-              <div className="border rounded-lg p-4 bg-gray-50">
+              <div className="border rounded-lg p-4 bg-muted/50">
                 <div className="mb-3 font-semibold text-sm">Quick Add Sections Alphabetically</div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="flex items-center gap-2">
@@ -209,7 +209,7 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
                     Generate Sections
                   </Button>
                 </div>
-                <div className="text-xs text-gray-600">
+                <div className="text-xs text-muted-foreground">
                   This will create sections from {startLetter} to {endLetter} (e.g., A, B, C, D)
                 </div>
               </div>
@@ -217,7 +217,7 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
               {/* Manual Section Management */}
               <div>
                 <div className="mb-2 font-semibold">Manual Sections</div>
-                <div className="max-h-60 overflow-y-auto border rounded-md p-3 bg-white">
+                <div className="max-h-60 overflow-y-auto border rounded-md p-3 bg-background">
                   {sections.map((section, idx) => (
                     <div key={idx} className="flex items-center gap-2 mb-2">
                       <Input
@@ -231,12 +231,12 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
                     </div>
                   ))}
                   {sections.length === 0 && (
-                    <div className="text-center py-4 text-gray-500 text-sm">
+                    <div className="text-center py-4 text-muted-foreground text-sm">
                       No sections added yet. Use the alphabetical generator above or add manually.
                     </div>
                   )}
                 </div>
-                <div className="mt-2 text-xs text-gray-600">
+                <div className="mt-2 text-xs text-muted-foreground">
                   Total sections: {sections.length}
                 </div>
               </div>
@@ -249,18 +249,18 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
               <div><b>Year:</b> {classData.academic_year_id}</div>
               <div><b>Active:</b> {classData.is_active ? 'Yes' : 'No'}</div>
               <div><b>Sections:</b>
-                <div className="max-h-40 overflow-y-auto border rounded-md p-3 bg-gray-50 mt-2">
+                <div className="max-h-40 overflow-y-auto border rounded-md p-3 bg-muted/50 mt-2">
                   {sections.length > 0 ? (
                     <ul className="list-disc ml-6 space-y-1">
                       {sections.map((s, i) => <li key={i} className="text-sm">{s.name}</li>)}
                     </ul>
                   ) : (
-                    <div className="text-center py-4 text-gray-500 text-sm">
+                    <div className="text-center py-4 text-muted-foreground text-sm">
                       No sections added
                     </div>
                   )}
                 </div>
-                <div className="mt-1 text-xs text-gray-600">
+                <div className="mt-1 text-xs text-muted-foreground">
                   Total sections: {sections.length}
                 </div>
               </div>

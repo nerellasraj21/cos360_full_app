@@ -32,6 +32,7 @@ import type {
 import { toast } from 'sonner';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { usePermission } from '@/hooks/usePermission';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 export function ExpenseTransactionsPage() {
   const { checkPermission } = usePermission();
@@ -45,6 +46,7 @@ export function ExpenseTransactionsPage() {
   const [attachments, setAttachments] = useState<File[]>([]);
   const [approvalComment, setApprovalComment] = useState('');
   const [isFormDirty, setIsFormDirty] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ExpenseTransaction | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<ExpenseTransactionCreate>({
@@ -160,13 +162,14 @@ export function ExpenseTransactionsPage() {
   };
 
   // Handle delete
-  const handleDelete = async (transaction: ExpenseTransaction) => {
-    if (window.confirm('Are you sure you want to delete this transaction?')) {
-      try {
-        await deleteMutation.mutateAsync(transaction.id);
-      } catch (error) {
-        // Error handling is done in the mutation hook
-      }
+  const handleDelete = (transaction: ExpenseTransaction) => {
+    setDeleteTarget(transaction);
+  };
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteMutation.mutate(deleteTarget.id);
+      setDeleteTarget(null);
     }
   };
 
@@ -852,6 +855,16 @@ export function ExpenseTransactionsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete Transaction"
+        description="Are you sure you want to delete this transaction?"
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        isPending={deleteMutation.isPending}
+      />
       </div>
     </PermissionGuard>
   );

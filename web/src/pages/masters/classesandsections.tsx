@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   useReadAllClassSections,
   useCreateClassSections,
   useUpdateClassSections,
   useDeleteClassSections,
-  useCreateSection,
-  useUpdateSection,
-  useDeleteSection,
   useUpdateSectionById,
   useDeleteSectionById,
+  useCreateSectionsBulk,
 } from "@/api/hooks/masters/classesandsections";
 import type {
   ClassRead,
@@ -63,11 +62,10 @@ export default function ClassesAndSectionsPage() {
   const createClassMutation = useCreateClassSections();
   const updateClassMutation = useUpdateClassSections();
   const deleteClassMutation = useDeleteClassSections();
-  const createSectionMutation = useCreateSection();
-  const updateSectionMutation = useUpdateSection();
-  const deleteSectionMutation = useDeleteSection();
   const updateSectionByIdMutation = useUpdateSectionById();
   const deleteSectionByIdMutation = useDeleteSectionById();
+  const createSectionsBulkMutation = useCreateSectionsBulk();
+
 
   // Modal states
   const [editClassModal, setEditClassModal] = useState<{
@@ -179,44 +177,38 @@ export default function ClassesAndSectionsPage() {
   };
 
   const handleUpdateSection = (sectionId: string, data: any) => {
-    if (editSectionModal.sectionData) {
-      // Update existing section using direct section operations
-      // Include the section ID in the request body as required by backend
-      updateSectionByIdMutation.mutate(
-        {
-          sectionId,
-          sectionData: { ...data, id: sectionId },
-        },
-        {
-          onSuccess: () => {
-            setEditSectionModal({
-              isOpen: false,
-              sectionData: null,
-              classId: "",
-              className: "",
-            });
-          },
-        }
-      );
-    } else {
-      // Create new section using class-based operations (since we need class context for creation)
-      createSectionMutation.mutate(
-        {
-          classId: editSectionModal.classId,
-          sectionData: data,
-        },
-        {
-          onSuccess: () => {
-            setEditSectionModal({
-              isOpen: false,
-              sectionData: null,
-              classId: "",
-              className: "",
-            });
-          },
-        }
-      );
+    updateSectionByIdMutation.mutate(
+      { sectionId, sectionData: { ...data, id: sectionId } },
+      {
+        onSuccess: () => setEditSectionModal({ isOpen: false, sectionData: null, classId: "", className: "" }),
+      }
+    );
+  };
+
+  const handleAddSections = (newSections: { name: string; is_active: boolean }[]) => {
+    const classData = classSectionsData?.find((c) => c.id === editSectionModal.classId);
+    const existingNames = new Set(
+      (classData?.sections ?? []).map((s) => s.name.trim().toLowerCase())
+    );
+
+    const duplicates = newSections.filter((s) => existingNames.has(s.name.trim().toLowerCase()));
+    const toAdd = newSections.filter((s) => !existingNames.has(s.name.trim().toLowerCase()));
+
+    if (duplicates.length > 0) {
+      const names = duplicates.map((s) => s.name).join(", ");
+      if (toAdd.length === 0) {
+        toast.error(`Section${duplicates.length > 1 ? "s" : ""} already exist: ${names}`);
+        return;
+      }
+      toast.warning(`Skipped duplicate section${duplicates.length > 1 ? "s" : ""}: ${names}`);
     }
+
+    createSectionsBulkMutation.mutate(
+      { classId: editSectionModal.classId, sections: toAdd },
+      {
+        onSuccess: () => setEditSectionModal({ isOpen: false, sectionData: null, classId: "", className: "" }),
+      }
+    );
   };
 
   return (
@@ -296,7 +288,7 @@ export default function ClassesAndSectionsPage() {
           isPending={updateClassMutation.status === "pending"}
         />
 
-        {/* Edit Section Modal */}
+        {/* Edit/Add Section Modal */}
         <EditSectionModal
           isOpen={editSectionModal.isOpen}
           onClose={() =>
@@ -310,9 +302,10 @@ export default function ClassesAndSectionsPage() {
           sectionData={editSectionModal.sectionData}
           className={editSectionModal.className}
           onSubmit={handleUpdateSection}
+          onAddSections={handleAddSections}
           isPending={
             updateSectionByIdMutation.status === "pending" ||
-            createSectionMutation.status === "pending"
+            createSectionsBulkMutation.status === "pending"
           }
         />
 
@@ -327,13 +320,25 @@ export default function ClassesAndSectionsPage() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete{" "}
-                {deleteConfirm.type === "class" ? "class" : "section"} "
-                {deleteConfirm.name}"?
-                {deleteConfirm.type === "class" &&
-                  " This will also delete all associated sections."}
-                This action cannot be undone.
+              <AlertDialogDescription asChild>
+                <div className="space-y-2">
+                  <p>
+                    Are you sure you want to delete {deleteConfirm.type === "class" ? "class" : "section"}{" "}
+                    <strong>"{deleteConfirm.name}"</strong>?
+                  </p>
+                  {deleteConfirm.type === "class" && (() => {
+                    const classData = classSectionsData?.find((c) => c.id === deleteConfirm.id);
+                    const sectionCount = classData?.sections?.length ?? 0;
+                    return sectionCount > 0 ? (
+                      <p className="text-amber-600 dark:text-amber-400 text-sm font-medium">
+                        ⚠ This class has {sectionCount} section{sectionCount !== 1 ? "s" : ""}.
+                        Deletion will fail if any section or class has linked student admissions,
+                        fee mappings, or subject mappings. Deactivate instead if records exist.
+                      </p>
+                    ) : null;
+                  })()}
+                  <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

@@ -8,6 +8,7 @@ import { PlanSelectionStep } from './steps/PlanSelectionStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { useCreateOrganization } from '@/api/organizations';
 import type { SuperOrgFormData, OrganizationRead } from '@/types/organization';
+import { toast } from 'sonner';
 
 interface SuperOrgFormProps {
     onComplete: (newOrg?: OrganizationRead) => void;
@@ -82,7 +83,7 @@ const SuperOrgForm: React.FC<SuperOrgFormProps> = ({ onComplete }) => {
     const onSubmit = async (data: SuperOrgFormData) => {
         // Validate terms acceptance before submission
         if (!data.terms_accepted) {
-            alert('Please accept the terms and conditions to continue.');
+            toast.error('Please accept the terms and conditions to continue.');
             return;
         }
 

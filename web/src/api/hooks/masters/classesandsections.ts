@@ -16,6 +16,7 @@ import {
   updateClassSections,
   deleteClassSections,
   createSection,
+  createSections,
   updateSection,
   deleteSection,
   getSectionById,
@@ -324,6 +325,28 @@ export function useDeleteSectionById() {
     },
     onError: (error) => {
       toast.error(`Failed to delete section: ${error.message}`);
+    },
+  });
+}
+
+export function useCreateSectionsBulk() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    void,
+    Error,
+    { classId: string; sections: { name: string; is_active?: boolean }[] }
+  >({
+    mutationFn: async ({ classId, sections }) => {
+      await createSections(classId, sections);
+    },
+    onSuccess: (_, { sections }) => {
+      toast.success(`${sections.length} section${sections.length > 1 ? "s" : ""} added successfully!`);
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === "class-sections",
+      });
+    },
+    onError: (error) => {
+      toast.error(`Failed to add sections: ${error.message}`);
     },
   });
 }

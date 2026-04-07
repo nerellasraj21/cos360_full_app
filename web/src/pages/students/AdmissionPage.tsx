@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { GraduationCap } from 'lucide-react';
-import MultiStepAdmissionForm from '@/components/students/MultiStepAdmissionForm';
+import MultiStepAdmissionForm, { type MultiStepAdmissionFormHandle } from '@/components/students/MultiStepAdmissionForm';
 import AdmissionTable from '@/components/students/AdmissionTable';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useStudentsSearch } from '@/api/hooks/students/admissions';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { usePermission } from '@/hooks/usePermission';
@@ -15,6 +15,8 @@ import { FilterBar } from '@/components/ui/FilterBar';
 const AdmissionPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentStep, setCurrentStep] = useState(0);
+  const formRef = useRef<MultiStepAdmissionFormHandle>(null);
 
   const { checkPermission } = usePermission();
 
@@ -81,12 +83,58 @@ const AdmissionPage = () => {
           </Card>
         )}
 
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <Dialog open={isFormOpen} onOpenChange={(open) => {
+          setIsFormOpen(open);
+          if (!open) {
+            setCurrentStep(0);
+          }
+        }} modal={false}>
           <DialogContent className="w-full max-w-4xl">
             <DialogHeader>
               <DialogTitle>New Student Admission</DialogTitle>
             </DialogHeader>
-            <MultiStepAdmissionForm onComplete={() => setIsFormOpen(false)} />
+            <MultiStepAdmissionForm ref={formRef} onComplete={() => setIsFormOpen(false)} />
+            <DialogFooter className="!justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  formRef.current?.prevStep();
+                  setCurrentStep(prev => Math.max(prev - 1, 0));
+                }}
+                disabled={currentStep === 0}
+              >
+                Previous
+              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsFormOpen(false)}
+                >
+                  Cancel
+                </Button>
+                {currentStep < 5 ? (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      formRef.current?.nextStep();
+                      setCurrentStep(prev => prev + 1);
+                    }}
+                  >
+                    Next
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={() => formRef.current?.submit()}
+                    disabled={formRef.current?.isLoading ?? false}
+                  >
+                    {formRef.current?.isLoading ? 'Creating...' : 'Create Admission'}
+                  </Button>
+                )}
+              </div>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

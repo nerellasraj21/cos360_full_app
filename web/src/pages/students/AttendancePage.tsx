@@ -522,106 +522,138 @@ function StaffView() {
     };
   }, [studentAttendances]);
 
+  const totalStudents = students.length;
+  const attendancePct = totalStudents > 0
+    ? Math.round((attendanceSummary.present / totalStudents) * 100)
+    : 0;
+
   return (
     <div className="container mx-auto p-4 space-y-6">
       <PageHeader title="Student Attendance" icon={<UserCheck className="h-5 w-5" />} />
 
+      {/* Single unified card */}
       <Card>
-        <CardHeader><CardTitle>Select Class, Section & Date</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Class</Label>
-              <Select value={selectedClass} onValueChange={handleClassChange} disabled={classesLoading}>
-                <SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger>
-                <SelectContent>
-                  {classesData?.map((cls: ClassRead) => (
-                    <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Section</Label>
-              <Select
-                value={selectedSection}
-                onValueChange={handleSectionChange}
-                disabled={!selectedClass || availableSections.length === 0}
-              >
-                <SelectTrigger><SelectValue placeholder="Select Section" /></SelectTrigger>
-                <SelectContent>
-                  {availableSections.map((section) => (
-                    <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Input type="date" value={selectedDate} onChange={(e) => handleDateChange(e.target.value)} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {selectedClass && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex justify-between items-center">
-              <span>Student Attendance</span>
+        <CardHeader>
+          <CardTitle className="flex justify-between items-center">
+            <span>Attendance Overview</span>
+            {selectedClass && selectedSection && (
               <div className="flex items-center gap-2">
                 {hasUnsavedChanges && <Badge variant="secondary">Unsaved Changes</Badge>}
-                <Button variant="outline" onClick={() => loadExistingAttendance()} disabled={isLoadingAttendance}>
-                  {isLoadingAttendance ? <Loader2 className="h-4 w-4 animate-spin" /> : '🔄'}
+                <Button variant="outline" size="sm" onClick={() => loadExistingAttendance()} disabled={isLoadingAttendance}>
+                  {isLoadingAttendance ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🔄</span>}
                   Refresh
                 </Button>
-                <Button onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
+                <Button size="sm" onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {isSaving ? 'Saving...' : 'Save Attendance'}
                 </Button>
               </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoadingAttendance || studentsLoading ? (
-              <div className="flex justify-center items-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin" />
-                <span className="ml-2">Loading students...</span>
+            )}
+          </CardTitle>
+        </CardHeader>
+
+        {/* ── Filters ── */}
+        <div className="px-6 pb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-1.5">
+            <Label>Class</Label>
+            <Select value={selectedClass} onValueChange={handleClassChange} disabled={classesLoading}>
+              <SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger>
+              <SelectContent>
+                {classesData?.map((cls: ClassRead) => (
+                  <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Section</Label>
+            <Select
+              value={selectedSection}
+              onValueChange={handleSectionChange}
+              disabled={!selectedClass || availableSections.length === 0}
+            >
+              <SelectTrigger><SelectValue placeholder="Select Section" /></SelectTrigger>
+              <SelectContent>
+                {availableSections.map((section) => (
+                  <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Date</Label>
+            <Input type="date" value={selectedDate} onChange={(e) => handleDateChange(e.target.value)} />
+          </div>
+        </div>
+
+        {selectedClass && selectedSection && (
+          <>
+            {/* ── Analysis ── */}
+            <div className="border-t px-6 py-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">Attendance Analysis</p>
+                {totalStudents > 0 && (
+                  <span className="text-sm font-semibold">{attendancePct}% Present</span>
+                )}
               </div>
-            ) : students.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No students found for the selected class and section.
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col items-center justify-center gap-1 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                  <span className="text-3xl font-bold text-green-700 dark:text-green-400">{attendanceSummary.present}</span>
+                  <span className="text-xs font-medium text-green-600 dark:text-green-500 uppercase tracking-wide">Present</span>
+                </div>
+                <div className="flex flex-col items-center justify-center gap-1 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg">
+                  <span className="text-3xl font-bold text-red-700 dark:text-red-400">{attendanceSummary.absent}</span>
+                  <span className="text-xs font-medium text-red-600 dark:text-red-500 uppercase tracking-wide">Absent</span>
+                </div>
+                <div className="flex flex-col items-center justify-center gap-1 p-4 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <span className="text-3xl font-bold text-yellow-700 dark:text-yellow-400">{attendanceSummary.late}</span>
+                  <span className="text-xs font-medium text-yellow-600 dark:text-yellow-500 uppercase tracking-wide">Late</span>
+                </div>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {saveMessage && (
-                  <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-green-800">{saveMessage}</span>
+              {totalStudents > 0 && (
+                <>
+                  <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+                    <div className="bg-green-500 transition-all duration-300" style={{ width: `${(attendanceSummary.present / totalStudents) * 100}%` }} />
+                    <div className="bg-yellow-400 transition-all duration-300" style={{ width: `${(attendanceSummary.late / totalStudents) * 100}%` }} />
+                    <div className="bg-red-400 transition-all duration-300" style={{ width: `${(attendanceSummary.absent / totalStudents) * 100}%` }} />
                   </div>
-                )}
-                {saveError && (
-                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md">
-                    <XCircle className="h-5 w-5 text-red-600" />
-                    <span className="text-red-800">{saveError}</span>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{totalStudents} students total</span>
+                    <span className="flex items-center gap-3">
+                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" />Present</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />Late</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" />Absent</span>
+                    </span>
                   </div>
-                )}
-                {students.length > 0 && (
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="flex items-center justify-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <span className="text-2xl font-bold text-green-700">{attendanceSummary.present}</span>
-                      <span className="text-sm text-green-600 font-medium">Present</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <span className="text-2xl font-bold text-red-700">{attendanceSummary.absent}</span>
-                      <span className="text-sm text-red-600 font-medium">Absent</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <span className="text-2xl font-bold text-yellow-700">{attendanceSummary.late}</span>
-                      <span className="text-sm text-yellow-600 font-medium">Late</span>
-                    </div>
-                  </div>
-                )}
+                </>
+              )}
+              {saveMessage && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <span className="text-green-800 text-sm">{saveMessage}</span>
+                </div>
+              )}
+              {saveError && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <XCircle className="h-5 w-5 text-red-600" />
+                  <span className="text-red-800 text-sm">{saveError}</span>
+                </div>
+              )}
+            </div>
+
+            {/* ── Student list ── */}
+            <div className="border-t px-6 pb-6 pt-4">
+              <p className="text-sm font-medium text-muted-foreground mb-3">Students</p>
+              {isLoadingAttendance || studentsLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                  <span className="ml-2">Loading students...</span>
+                </div>
+              ) : students.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No students found for the selected class and section.
+                </div>
+              ) : (
                 <div className="grid gap-2">
                   {students
                     .filter(student => student.student?.id)
@@ -634,12 +666,12 @@ function StaffView() {
                         late: 'bg-yellow-100 text-yellow-700 border-yellow-300',
                       }[status];
                       const rowStyles = attendance?.isModified
-                        ? 'border-blue-300 bg-blue-50'
+                        ? 'border-blue-300 bg-blue-50 dark:bg-blue-950/20'
                         : status === 'absent'
                         ? 'border-red-200'
                         : status === 'late'
                         ? 'border-yellow-200'
-                        : 'border-gray-200';
+                        : 'border-border';
                       return (
                         <div
                           key={student.id}
@@ -652,34 +684,32 @@ function StaffView() {
                             </span>
                             <div>
                               <div className="font-medium">{getStudentName(student.student)}</div>
-                              <div className="text-sm text-gray-500">Roll No: {student.admission_number || 'N/A'}</div>
+                              <div className="text-sm text-muted-foreground">Roll No: {student.admission_number || 'N/A'}</div>
                             </div>
                             {attendance?.isModified && <Badge variant="secondary" className="text-xs">Modified</Badge>}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Select
-                              value={status}
-                              onValueChange={(value) =>
-                                handleAttendanceChange(student.student.id, value as 'present' | 'absent' | 'late')
-                              }
-                            >
-                              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="present">Present</SelectItem>
-                                <SelectItem value="absent">Absent</SelectItem>
-                                <SelectItem value="late">Late</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          <Select
+                            value={status}
+                            onValueChange={(value) =>
+                              handleAttendanceChange(student.student.id, value as 'present' | 'absent' | 'late')
+                            }
+                          >
+                            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="present">Present</SelectItem>
+                              <SelectItem value="absent">Absent</SelectItem>
+                              <SelectItem value="late">Late</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       );
                     })}
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+              )}
+            </div>
+          </>
+        )}
+      </Card>
     </div>
   );
 }

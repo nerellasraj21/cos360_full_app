@@ -19,6 +19,7 @@ import { MandalDropdown } from '@/components/dropdown/MandalDropdown';
 import { CasteDropdown } from '@/components/dropdown/CasteDropdown';
 import { SubCasteDropdown } from '@/components/dropdown/SubCasteDropdown';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import type { StudentAdmissionResponse, StudentOut } from '@/types/admission';
 import type { ClassRead } from '@/types/masters/classesandsections';
 import { useState } from 'react';
@@ -46,6 +47,7 @@ interface AdmissionTableProps {
 const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true }: AdmissionTableProps = {}) => {
   const navigate = useNavigate();
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [toggleTarget, setToggleTarget] = useState<AdmissionTableData | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [isEditDirty, setIsEditDirty] = useState(false);
   const [selectedAdmission, setSelectedAdmission] = useState<StudentAdmissionResponse | null>(null);
@@ -438,18 +440,21 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
     }
   };
 
-  const handleToggleStatus = async (row: AdmissionTableData) => {
+  const handleToggleStatus = (row: AdmissionTableData) => {
+    setToggleTarget(row);
+  };
+
+  const confirmToggleStatus = async () => {
+    if (!toggleTarget) return;
     try {
-      const action = row.is_active ? 'disable' : 'enable';
-      if (confirm(`Are you sure you want to ${action} ${row.student_name}?`)) {
-        await toggleStatusMutation.mutateAsync({
-          studentId: row.student_id,
-          isActive: !row.is_active
-        });
-      }
+      await toggleStatusMutation.mutateAsync({
+        studentId: toggleTarget.student_id,
+        isActive: !toggleTarget.is_active
+      });
     } catch (error) {
       console.error('Error toggling student status:', error);
     }
+    setToggleTarget(null);
   };
 
   // Helper function to prepare details for modal
@@ -1107,6 +1112,16 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!toggleTarget}
+        onOpenChange={(open) => { if (!open) setToggleTarget(null); }}
+        title={toggleTarget?.is_active ? 'Disable Student' : 'Enable Student'}
+        description={`Are you sure you want to ${toggleTarget?.is_active ? 'disable' : 'enable'} ${toggleTarget?.student_name}?`}
+        confirmLabel={toggleTarget?.is_active ? 'Disable' : 'Enable'}
+        onConfirm={confirmToggleStatus}
+        isPending={toggleStatusMutation.isPending}
+      />
     </div>
   );
 };

@@ -78,7 +78,12 @@ export const deleteClassSections = async (classId: string): Promise<void> => {
 
 // Section-specific operations (through class)
 export const createSection = async (classId: string, sectionData: { name: string; description?: string; is_active?: boolean }): Promise<any> => {
-  const { data } = await CAxios.post(`${CLASSES_AND_SECTIONS_BASE}${classId}/sections`, sectionData);
+  const { data } = await CAxios.post(`${CLASSES_AND_SECTIONS_BASE}${classId}/sections`, [sectionData]);
+  return data;
+};
+
+export const createSections = async (classId: string, sections: { name: string; description?: string; is_active?: boolean }[]): Promise<any> => {
+  const { data } = await CAxios.post(`${CLASSES_AND_SECTIONS_BASE}${classId}/sections`, sections);
   return data;
 };
 

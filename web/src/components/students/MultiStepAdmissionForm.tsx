@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,9 +11,18 @@ import { AddressStepForm } from './admission-steps/AddressStepForm';
 import { PreviousSchoolStepForm } from './admission-steps/PreviousSchoolStepForm';
 import { SummaryStepForm } from './admission-steps/SummaryStepForm';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
+import { toast } from 'sonner';
 
 interface MultiStepAdmissionFormProps {
   onComplete: () => void;
+}
+
+export interface MultiStepAdmissionFormHandle {
+  submit: () => Promise<void>;
+  nextStep: () => void;
+  prevStep: () => void;
+  currentStep: number;
+  isLoading: boolean;
 }
 
 const steps = [
@@ -25,11 +34,12 @@ const steps = [
   { id: 'summary', title: 'Review & Submit', component: SummaryStepForm },
 ];
 
-const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onComplete }) => {
+const MultiStepAdmissionFormComponent: React.FC<MultiStepAdmissionFormProps> = ({ onComplete }, ref) => {
   const [currentStep, setCurrentStep] = useState(0);
 
   const createAdmission = useCreateAdmission();
   const selectedAcademicYearId = useAcademicYearStore((state) => state.selectedAcademicYearId);
+  const submitRef = useRef<() => Promise<void>>();
 
   const methods = useForm<StudentAdmissionCreate>({
     defaultValues: {
@@ -110,7 +120,7 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
 
   const { handleSubmit, trigger } = methods;
 
-  const nextStep = async () => {
+  const nextStepFn = async () => {
     // Define ONLY required fields for each step
     const stepFields = {
       0: ['admission_date'], // Academic Details
@@ -130,9 +140,21 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
     }
   };
 
-  const prevStep = () => {
+  const prevStepFn = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 0));
   };
+
+  // Expose submit and navigation methods via ref
+  useImperativeHandle(ref, () => ({
+    submit: async () => {
+      console.log('📤 Ref submit called');
+      await handleSubmit(onSubmit)();
+    },
+    nextStep: nextStepFn,
+    prevStep: prevStepFn,
+    currentStep,
+    isLoading: createAdmission.status === 'pending'
+  }), [handleSubmit, onSubmit, currentStep, createAdmission.status, nextStepFn, prevStepFn]);
 
   const onSubmit = async (data: StudentAdmissionCreate) => {
     try {
@@ -147,7 +169,7 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
 
       // Validate academic year is selected
       if (!currentAcademicYearId || currentAcademicYearId.trim() === '') {
-        alert('Academic Year is required. Please select an academic year from the header dropdown.');
+        toast.error('Academic Year is required. Please select an academic year from the header dropdown.');
         return;
       }
 
@@ -178,13 +200,13 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
 
       if (missingFields.length > 0) {
         console.error('Missing required fields:', missingFields);
-        alert(`Please fill in all required fields:\n${missingFields.join('\n')}`);
+        toast.error(`Please fill in all required fields: ${missingFields.join(', ')}`);
         return;
       }
 
       // Validate parent emails are different
       if (data.father_email && data.mother_email && data.father_email === data.mother_email) {
-        alert("Father's and Mother's email addresses must be different");
+        toast.error("Father's and Mother's email addresses must be different");
         return;
       }
 
@@ -266,25 +288,25 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
       console.error('Error data:', error?.response?.data);
 
       // Show detailed error message
-      let errorMessage = 'Failed to create admission:\n\n';
+      let errorMessage = 'Failed to create admission: ';
 
       if (error?.response?.data?.detail) {
         const detail = error.response.data.detail;
         if (Array.isArray(detail)) {
           errorMessage += detail.map((err: any) => {
             const loc = err.loc?.join('.') || 'unknown';
-            return `• ${loc}: ${err.msg}`;
-          }).join('\n');
+            return `${loc}: ${err.msg}`;
+          }).join(' | ');
         } else if (typeof detail === 'string') {
           errorMessage += detail;
         } else {
-          errorMessage += JSON.stringify(detail, null, 2);
+          errorMessage += JSON.stringify(detail);
         }
       } else {
         errorMessage += error.message || 'Unknown error';
       }
 
-      alert(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -319,44 +341,9 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
             ))}
           </CardContent>
         </Card>
-
-        <div className="flex justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={prevStep}
-            disabled={currentStep === 0}
-          >
-            Previous
-          </Button>
-
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onComplete}
-            >
-              Cancel
-            </Button>
-
-            {currentStep < steps.length - 1 ? (
-              <Button type="button" onClick={nextStep}>
-                Next
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={() => handleSubmit(onSubmit)()}
-                disabled={createAdmission.status === 'pending'}
-              >
-                {createAdmission.status === 'pending' ? 'Creating...' : 'Create Admission'}
-              </Button>
-            )}
-          </div>
-        </div>
       </form>
     </FormProvider>
   );
 };
 
-export default MultiStepAdmissionForm;
+export default forwardRef(MultiStepAdmissionFormComponent);

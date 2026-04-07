@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation } from '@tanstack/react-router';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClassMappingTable } from '@/components/fee/mappings/ClassMappingTable';
 import { StudentMappingTable } from '@/components/fee/mappings/StudentMappingTable';
@@ -40,9 +41,27 @@ export function FeeMappings() {
 
 function FeeMappingsContent() {
     const { academicYears, fetchAndSetAcademicYears, selectedAcademicYearId } = useAcademicYearStore();
-    const [activeTab, setActiveTab] = useState(
-        window.location.hash === '#class-mappings' ? 'class-mappings' : 'student-mappings'
+    const location = useLocation();
+
+    const [activeTab, setActiveTab] = useState(() =>
+        location.hash === 'class-mappings' || location.hash === 'class-mappings-term-amounts'
+            ? 'class-mappings'
+            : 'student-mappings'
     );
+    // Numeric key — increments on every sidebar click so highlight always re-triggers
+    const [highlightKey, setHighlightKey] = useState(() =>
+        location.hash === 'class-mappings-term-amounts' ? 1 : 0
+    );
+
+    // React to every navigation (including repeated clicks on the same sidebar item)
+    useEffect(() => {
+        if (location.hash === 'class-mappings-term-amounts') {
+            setActiveTab('class-mappings');
+            setHighlightKey(k => k + 1);
+        } else if (location.hash === 'class-mappings') {
+            setActiveTab('class-mappings');
+        }
+    }, [location]);
 
     // Initialize academic years if not loaded
     useEffect(() => {
@@ -77,7 +96,7 @@ function FeeMappingsContent() {
                 </TabsContent>
 
                 <TabsContent value="class-mappings" className="space-y-6">
-                    <ClassMappingTable />
+                    <ClassMappingTable highlightKey={highlightKey} />
                 </TabsContent>
             </Tabs>
         </div>

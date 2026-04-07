@@ -48,14 +48,6 @@ if (!rootElement.innerHTML) {
         position="top-right"
         richColors
         closeButton
-        toastOptions={{
-          style: {
-            background: 'var(--color-background)',
-            color: 'var(--color-foreground)',
-            border: '1px solid var(--color-border)',
-          },
-          className: 'custom-toast',
-        }}
       />
       <QueryClientProvider client={queryClient}>
         <AuthProvider>

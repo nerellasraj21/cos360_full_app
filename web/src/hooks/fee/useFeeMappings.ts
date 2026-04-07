@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { feeClassMappingsApi } from '@/api/fee';
+import { feeStudentMappingsApi } from '@/api/fee/studentMappings';
 import { createClassMappingTermAmounts, updateClassMappingTermAmounts, deleteClassMappingTermAmounts } from '@/api/fee/mappings';
 import type {
     FeeClassMapping,
@@ -8,7 +9,11 @@ import type {
     FeeClassMappingUpdateRequest,
     FeeClassMappingBulkCreateRequest,
     FeeClassMappingBulkResponse,
-    FeeClassMappingListResponse
+    FeeClassMappingListResponse,
+    FeeStudentMapping,
+    FeeStudentMappingCreateRequest,
+    FeeStudentMappingUpdateRequest,
+    FeeStudentMappingListResponse,
 } from '@/types/fee/mapping';
 
 // Query keys for fee class mappings
@@ -186,6 +191,84 @@ export function useDeleteClassMappingTermAmounts() {
         },
         onError: (error) => {
             toast.error(`Failed to delete term amounts: ${error.message}`);
+        },
+    });
+}
+
+// ─── Student Mapping Hooks ────────────────────────────────────────────────────
+
+export const feeStudentMappingKeys = {
+    all: ['fee-student-mappings'] as const,
+    lists: () => [...feeStudentMappingKeys.all, 'list'] as const,
+    list: (params?: object) => [...feeStudentMappingKeys.lists(), params] as const,
+    details: () => [...feeStudentMappingKeys.all, 'detail'] as const,
+    detail: (id: string) => [...feeStudentMappingKeys.details(), id] as const,
+};
+
+export function useFeeStudentMappings(params?: {
+    student_id?: string;
+    class_id?: string;
+    section_id?: string;
+    fee_type_id?: string;
+    academic_year_id?: string;
+}) {
+    return useQuery<FeeStudentMapping[] | FeeStudentMappingListResponse>({
+        queryKey: feeStudentMappingKeys.list(params),
+        queryFn: () => feeStudentMappingsApi.getAllMappings(params),
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
+export function useFeeStudentMapping(id: string) {
+    return useQuery<FeeStudentMapping>({
+        queryKey: feeStudentMappingKeys.detail(id),
+        queryFn: () => feeStudentMappingsApi.getMappingById(id),
+        enabled: !!id,
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
+export function useCreateFeeStudentMapping() {
+    const queryClient = useQueryClient();
+    return useMutation<FeeStudentMapping, Error, FeeStudentMappingCreateRequest>({
+        mutationFn: feeStudentMappingsApi.createMapping,
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: feeStudentMappingKeys.lists() });
+            queryClient.setQueryData(feeStudentMappingKeys.detail(data.id), data);
+            toast.success('Fee student mapping created successfully');
+        },
+        onError: (error) => {
+            toast.error(`Failed to create fee student mapping: ${error.message}`);
+        },
+    });
+}
+
+export function useUpdateFeeStudentMapping() {
+    const queryClient = useQueryClient();
+    return useMutation<FeeStudentMapping, Error, { id: string; data: FeeStudentMappingUpdateRequest }>({
+        mutationFn: ({ id, data }) => feeStudentMappingsApi.updateMapping(id, data),
+        onSuccess: (data) => {
+            queryClient.setQueryData(feeStudentMappingKeys.detail(data.id), data);
+            queryClient.invalidateQueries({ queryKey: feeStudentMappingKeys.lists() });
+            toast.success('Fee student mapping updated successfully');
+        },
+        onError: (error) => {
+            toast.error(`Failed to update fee student mapping: ${error.message}`);
+        },
+    });
+}
+
+export function useDeleteFeeStudentMapping() {
+    const queryClient = useQueryClient();
+    return useMutation<{ message: string }, Error, string>({
+        mutationFn: feeStudentMappingsApi.deleteMapping,
+        onSuccess: (_, id) => {
+            queryClient.removeQueries({ queryKey: feeStudentMappingKeys.detail(id) });
+            queryClient.invalidateQueries({ queryKey: feeStudentMappingKeys.lists() });
+            toast.success('Fee student mapping deleted successfully');
+        },
+        onError: (error) => {
+            toast.error(`Failed to delete fee student mapping: ${error.message}`);
         },
     });
 }

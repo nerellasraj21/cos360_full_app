@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -114,6 +115,7 @@ const RolesPermissionsPage: React.FC = () => {
   const [isClassDialogOpen, setIsClassDialogOpen] = useState(false);
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [deleteRoleTarget, setDeleteRoleTarget] = useState<string | null>(null);
   const [academicYearForm, setAcademicYearForm] = useState({
     title: '',
     start_date: '',
@@ -442,8 +444,13 @@ const RolesPermissionsPage: React.FC = () => {
   };
 
   const handleDeleteRole = (id: string) => {
-    if (confirm('Are you sure you want to delete this role? This action cannot be undone.')) {
-      deleteRoleMutation.mutate(id);
+    setDeleteRoleTarget(id);
+  };
+
+  const confirmDeleteRole = () => {
+    if (deleteRoleTarget) {
+      deleteRoleMutation.mutate(deleteRoleTarget);
+      setDeleteRoleTarget(null);
     }
   };
 
@@ -1565,6 +1572,16 @@ const RolesPermissionsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!deleteRoleTarget}
+        onOpenChange={(open) => { if (!open) setDeleteRoleTarget(null); }}
+        title="Delete Role"
+        description="Are you sure you want to delete this role? This action cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={confirmDeleteRole}
+        isPending={deleteRoleMutation.isPending}
+      />
     </div>
   );
 };

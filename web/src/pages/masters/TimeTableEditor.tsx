@@ -533,7 +533,7 @@ export default function TimeTableEditor() {
             link.href = dataUrl;
             link.click();
         } catch (err) {
-            alert('Failed to export PNG');
+            toast.error('Failed to export PNG');
         }
     };
 
@@ -551,7 +551,7 @@ export default function TimeTableEditor() {
             link.click();
             URL.revokeObjectURL(link.href);
         } catch (err) {
-            alert('Failed to export CSV');
+            toast.error('Failed to export CSV');
         }
     };
 
@@ -577,7 +577,7 @@ export default function TimeTableEditor() {
             link.click();
             URL.revokeObjectURL(link.href);
         } catch (err) {
-            alert('Failed to export Excel');
+            toast.error('Failed to export Excel');
         }
     };
 

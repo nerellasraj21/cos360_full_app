@@ -8,15 +8,17 @@ import type { RouteStop, RouteStopInput } from '@/types/masters/routeStop';
 import Select from 'react-select';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { TimePicker } from '@/components/ui/TimePicker';
 import { ShieldX } from 'lucide-react';
+import { useSelectStyles } from '@/lib/useSelectStyles';
 
 const formFields: FormField[] = [
   { name: 'route_id', label: 'Route', required: true },
   { name: 'name', label: 'Stop Name', required: true },
   { name: 'number', label: 'Stop Number', type: 'number', required: true },
-  { name: 'reaching_time', label: 'Reaching Time', required: true },
-  { name: 'pickup_time', label: 'Pickup Time' },
-  { name: 'drop_time', label: 'Drop Time' },
+  { name: 'reaching_time', label: 'Reaching Time', type: 'time' as const, required: true },
+  { name: 'pickup_time', label: 'Pickup Time', type: 'time' as const },
+  { name: 'drop_time', label: 'Drop Time', type: 'time' as const },
   { name: 'fees', label: 'Fees', type: 'number', required: true },
   { name: 'is_active', label: 'Active', type: 'checkbox' },
 ];
@@ -38,7 +40,8 @@ export default function RouteStopsPage() {
   const createMutation = useCreateRouteStop();
   const updateMutation = useUpdateRouteStop();
   const deleteMutation = useDeleteRouteStop();
-
+  const selectStyles = useSelectStyles();
+  const inlineSelectStyles = { ...selectStyles, control: (base: any, state: any) => ({ ...selectStyles.control(base, state), minHeight: '32px', fontSize: '12px' }) };
 
   const columns = useMemo(() => [
     { key: 'id', label: 'ID' },
@@ -63,18 +66,7 @@ export default function RouteStopsPage() {
             classNamePrefix="react-select"
             menuPlacement="auto"
             menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-            styles={{
-              menuPortal: base => ({
-                ...base,
-                zIndex: 9999,
-                pointerEvents: 'auto' // Essential for clickability
-              }),
-              menu: base => ({
-                ...base,
-                pointerEvents: 'auto' // Essential for clickability
-              }),
-              control: (base) => ({ ...base, minHeight: '32px', fontSize: '12px' })
-            }}
+            styles={inlineSelectStyles}
             isClearable={false}
             // Keyboard accessibility props
             menuShouldBlockScroll={false}
@@ -94,13 +86,7 @@ export default function RouteStopsPage() {
       editable: true,
       render: (value: string) => value ? value.substring(0, 5) : 'N/A',
       renderEdit: (value: any, _row: RouteStop, onChange: (val: any) => void) => (
-        <input
-          type="time"
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full px-2 py-1 border border-input rounded text-sm"
-          style={{ minHeight: '32px' }}
-        />
+        <TimePicker value={value ? value.substring(0, 5) : ''} onChange={onChange} />
       )
     },
     {
@@ -109,13 +95,7 @@ export default function RouteStopsPage() {
       editable: true,
       render: (value: string | null) => value ? value.substring(0, 5) : '—',
       renderEdit: (value: any, _row: RouteStop, onChange: (val: any) => void) => (
-        <input
-          type="time"
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full px-2 py-1 border border-input rounded text-sm"
-          style={{ minHeight: '32px' }}
-        />
+        <TimePicker value={value ? value.substring(0, 5) : ''} onChange={onChange} />
       )
     },
     {
@@ -124,13 +104,7 @@ export default function RouteStopsPage() {
       editable: true,
       render: (value: string | null) => value ? value.substring(0, 5) : '—',
       renderEdit: (value: any, _row: RouteStop, onChange: (val: any) => void) => (
-        <input
-          type="time"
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full px-2 py-1 border border-input rounded text-sm"
-          style={{ minHeight: '32px' }}
-        />
+        <TimePicker value={value ? value.substring(0, 5) : ''} onChange={onChange} />
       )
     },
     {
@@ -157,7 +131,7 @@ export default function RouteStopsPage() {
         </div>
       ),
     },
-  ], [routes]);
+  ], [routes, inlineSelectStyles]);
 
   const renderCustomField = (field: FormField, value: any, onChange: (val: any) => void) => {
     if (field.name === 'route_id') {
@@ -175,34 +149,13 @@ export default function RouteStopsPage() {
           classNamePrefix="react-select"
           menuPlacement="auto"
           menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-          styles={{
-            menuPortal: base => ({
-              ...base,
-              zIndex: 9999,
-              pointerEvents: 'auto' // Essential for clickability
-            }),
-            menu: base => ({
-              ...base,
-              pointerEvents: 'auto' // Essential for clickability
-            })
-          }}
+          styles={selectStyles}
           // Keyboard accessibility props
           menuShouldBlockScroll={false}
           closeMenuOnScroll={false}
           tabSelectsValue={false}
           openMenuOnFocus={true}
           blurInputOnSelect={true}
-        />
-      );
-    }
-    if (field.name === 'reaching_time' || field.name === 'pickup_time' || field.name === 'drop_time') {
-      return (
-        <input
-          type="time"
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
-          required={field.required}
         />
       );
     }

@@ -76,13 +76,21 @@ export const showNotification = (
   message: string,
   type: NotificationType = 'info',
   title?: string,
-  duration?: number
+  _duration?: number
 ) => {
+  // Also fire sonner toast so it appears in the top-right Toaster
+  switch (type) {
+    case 'success': toast.success(title || message, title ? { description: message } : undefined); break;
+    case 'error':   toast.error(title || message, title ? { description: message } : undefined); break;
+    case 'warning': toast.warning(title || message, title ? { description: message } : undefined); break;
+    default:        toast.info(title || message, title ? { description: message } : undefined); break;
+  }
+
   notificationManager.notify({
     type,
     title: title || type.charAt(0).toUpperCase() + type.slice(1),
     message,
-    duration
+    duration: _duration,
   });
 };
 

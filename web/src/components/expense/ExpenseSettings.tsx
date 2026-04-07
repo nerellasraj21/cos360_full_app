@@ -16,11 +16,13 @@ import { useExpenseSettings, useExpenseCommonSettings, useCreateExpenseSetting, 
 import { handleExpenseApiError } from '@/lib/expenseErrorHandler';
 import type { ExpenseSettings, ExpenseSettingsCreate, ExpenseSettingsUpdate } from '@/types/expense';
 import { PermissionGuard } from '@/components/PermissionGuard';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 export function ExpenseSettings() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingSetting, setEditingSetting] = useState<ExpenseSettings | null>(null);
   const [isFormDirty, setIsFormDirty] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ExpenseSettings | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [formData, setFormData] = useState<ExpenseSettingsCreate>({
     setting_key: '',
@@ -140,8 +142,13 @@ export function ExpenseSettings() {
   };
 
   const handleDelete = (setting: ExpenseSettings) => {
-    if (confirm(`Are you sure you want to delete the setting "${setting.setting_name}"?`)) {
-      deleteMutation.mutate(setting.id);
+    setDeleteTarget(setting);
+  };
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteMutation.mutate(deleteTarget.id);
+      setDeleteTarget(null);
     }
   };
 
@@ -523,6 +530,16 @@ export function ExpenseSettings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete Setting"
+        description={`Are you sure you want to delete "${deleteTarget?.setting_name}"?`}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

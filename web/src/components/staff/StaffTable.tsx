@@ -20,9 +20,11 @@ import {
   Search,
   Filter
 } from 'lucide-react';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { useStaffEnrollments, useUpdateStaffEnrollment, useDeleteStaffEnrollment, useDesignationsDropdown } from '@/hooks/masters/useStaff';
 import { useRoles } from '@/api/auth';
 import { StaffEnrollmentForm } from './StaffEnrollmentForm';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 interface StaffTableProps {
   searchQuery?: string;
@@ -36,6 +38,7 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
   const [localSearch, setLocalSearch] = useState('');
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const [editForm, setEditForm] = useState({
     first_name: '',
@@ -99,8 +102,13 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
   };
 
   const handleDelete = (staffId: string) => {
-    if (confirm('Are you sure you want to delete this staff member? This action cannot be undone.')) {
-      deleteMutation.mutate(staffId);
+    setDeleteTargetId(staffId);
+  };
+
+  const confirmDelete = () => {
+    if (deleteTargetId) {
+      deleteMutation.mutate(deleteTargetId);
+      setDeleteTargetId(null);
     }
   };
 
@@ -394,21 +402,20 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="edit-dob">Date of Birth</Label>
-                <Input
-                  id="edit-dob"
-                  type="date"
+                <Label>Date of Birth</Label>
+                <DatePicker
                   value={editForm.date_of_birth}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, date_of_birth: e.target.value }))}
+                  onChange={(v) => { setIsEditDirty(true); setEditForm(prev => ({ ...prev, date_of_birth: v })); }}
+                  placeholder="Select date of birth"
                 />
               </div>
               <div>
-                <Label htmlFor="edit-joining">Joining Date *</Label>
-                <Input
-                  id="edit-joining"
-                  type="date"
+                <Label>Joining Date *</Label>
+                <DatePicker
                   value={editForm.joining_date}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, joining_date: e.target.value }))}
+                  onChange={(v) => { setIsEditDirty(true); setEditForm(prev => ({ ...prev, joining_date: v })); }}
+                  placeholder="Select joining date"
+                  required
                 />
               </div>
             </div>
@@ -487,6 +494,16 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTargetId}
+        onOpenChange={(open) => { if (!open) setDeleteTargetId(null); }}
+        title="Delete Staff Member"
+        description="Are you sure you want to delete this staff member? This action cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

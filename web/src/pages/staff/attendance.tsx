@@ -378,117 +378,128 @@ const StaffAttendancePage: React.FC = () => {
         // Changing status to "present" removes the record via save logic
     };
 
+    const attendanceSummary = useMemo(() => {
+        const all = Array.from(staffAttendances.values());
+        return {
+            present: all.filter(a => a.status === 'present').length,
+            absent: all.filter(a => a.status === 'absent').length,
+            late: all.filter(a => a.status === 'late').length,
+        };
+    }, [staffAttendances]);
+
+    const totalStaff = staff.length;
+    const attendancePct = totalStaff > 0
+        ? Math.round((attendanceSummary.present / totalStaff) * 100)
+        : 0;
+
     return (
         <div className="container mx-auto p-4 space-y-6">
             <PageHeader title="Staff Attendance" icon={<ClipboardCheck className="h-5 w-5" />} />
 
-            {/* Date Selection */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Select Date</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Date Selection */}
-                        <div className="space-y-2">
-                            <Label htmlFor="date-select">Date</Label>
-                            <Input
-                                id="date-select"
-                                type="date"
-                                value={selectedDate}
-                                onChange={(e) => handleDateChange(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Staff Attendance Table */}
+            {/* Single unified card */}
             <Card>
                 <CardHeader>
                     <CardTitle className="flex justify-between items-center">
-                        <span>Staff Attendance</span>
+                        <span>Attendance Overview</span>
                         <div className="flex items-center gap-2">
-                            {hasUnsavedChanges && (
-                                <Badge variant="secondary">Unsaved Changes</Badge>
-                            )}
-                            <Button
-                                variant="outline"
-                                onClick={() => refetchAttendance()}
-                                disabled={attendanceLoading}
-                                className="flex items-center gap-2"
-                            >
-                                {attendanceLoading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    '🔄'
-                                )}
+                            {hasUnsavedChanges && <Badge variant="secondary">Unsaved Changes</Badge>}
+                            <Button variant="outline" size="sm" onClick={() => refetchAttendance()} disabled={attendanceLoading}>
+                                {attendanceLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🔄</span>}
                                 Refresh
                             </Button>
-                            <Button
-                                onClick={handleSave}
-                                disabled={isSaving || !hasUnsavedChanges}
-                                className="flex items-center gap-2"
-                            >
-                                {isSaving ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Save className="h-4 w-4" />
-                                )}
+                            <Button size="sm" onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
+                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                                 {isSaving ? 'Saving...' : 'Save Attendance'}
                             </Button>
                         </div>
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    {/* Success/Error Messages */}
-                    {saveMessage && (
-                        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md dark:bg-green-950 dark:border-green-800">
-                            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                            <span className="text-green-800 dark:text-green-200">{saveMessage}</span>
-                        </div>
-                    )}
-                    {saveError && (
-                        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md dark:bg-red-950 dark:border-red-800">
-                            <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-                            <span className="text-red-800 dark:text-red-200">{saveError}</span>
-                        </div>
-                    )}
 
-                    {/* Table Controls */}
+                {/* ── Date selector ── */}
+                <div className="px-6 pb-4">
+                    <div className="max-w-xs space-y-1.5">
+                        <Label htmlFor="date-select">Date</Label>
+                        <Input
+                            id="date-select"
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => handleDateChange(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                {/* ── Analysis ── */}
+                {totalStaff > 0 && (
+                    <div className="border-t px-6 py-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium text-muted-foreground">Attendance Analysis</p>
+                            <span className="text-sm font-semibold">{attendancePct}% Present</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div className="flex flex-col items-center justify-center gap-1 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                                <span className="text-3xl font-bold text-green-700 dark:text-green-400">{attendanceSummary.present}</span>
+                                <span className="text-xs font-medium text-green-600 dark:text-green-500 uppercase tracking-wide">Present</span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center gap-1 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg">
+                                <span className="text-3xl font-bold text-red-700 dark:text-red-400">{attendanceSummary.absent}</span>
+                                <span className="text-xs font-medium text-red-600 dark:text-red-500 uppercase tracking-wide">Absent</span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center gap-1 p-4 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                                <span className="text-3xl font-bold text-yellow-700 dark:text-yellow-400">{attendanceSummary.late}</span>
+                                <span className="text-xs font-medium text-yellow-600 dark:text-yellow-500 uppercase tracking-wide">Late</span>
+                            </div>
+                        </div>
+                        <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+                            <div className="bg-green-500 transition-all duration-300" style={{ width: `${(attendanceSummary.present / totalStaff) * 100}%` }} />
+                            <div className="bg-yellow-400 transition-all duration-300" style={{ width: `${(attendanceSummary.late / totalStaff) * 100}%` }} />
+                            <div className="bg-red-400 transition-all duration-300" style={{ width: `${(attendanceSummary.absent / totalStaff) * 100}%` }} />
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>{totalStaff} staff total</span>
+                            <span className="flex items-center gap-3">
+                                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" />Present</span>
+                                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />Late</span>
+                                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" />Absent</span>
+                            </span>
+                        </div>
+                        {saveMessage && (
+                            <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md dark:bg-green-950 dark:border-green-800">
+                                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                <span className="text-green-800 dark:text-green-200 text-sm">{saveMessage}</span>
+                            </div>
+                        )}
+                        {saveError && (
+                            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md dark:bg-red-950 dark:border-red-800">
+                                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                                <span className="text-red-800 dark:text-red-200 text-sm">{saveError}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ── Staff list ── */}
+                <div className="border-t px-6 pb-6 pt-4 space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-4">
-                        {/* Search Input */}
                         <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
                             <Search className="h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search by name, email, or department..."
                                 value={searchQuery}
-                                onChange={(e) => {
-                                    setSearchQuery(e.target.value);
-                                    setCurrentPage(0); // Reset to first page on search
-                                }}
+                                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(0); }}
                                 className="h-9"
                             />
                         </div>
-
-                        {/* Column Visibility Toggle */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="sm" className="gap-2">
-                                    {visibleColumns.size === columns.length ? (
-                                        <Eye className="h-4 w-4" />
-                                    ) : (
-                                        <EyeOff className="h-4 w-4" />
-                                    )}
+                                    {visibleColumns.size === columns.length ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                                     Columns ({visibleColumns.size}/{columns.length})
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuCheckboxItem
                                     checked={visibleColumns.size === columns.length}
-                                    onCheckedChange={(checked) =>
-                                        checked ? handleSelectAllColumns() : handleDeselectAllColumns()
-                                    }
+                                    onCheckedChange={(checked) => checked ? handleSelectAllColumns() : handleDeselectAllColumns()}
                                     className="font-semibold"
                                 >
                                     Select All
@@ -506,14 +517,12 @@ const StaffAttendancePage: React.FC = () => {
                         </DropdownMenu>
                     </div>
 
-                    {/* Loading State */}
                     {attendanceLoading || staffLoading ? (
                         <div className="flex justify-center items-center py-12">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                             <span className="ml-2 text-muted-foreground">Loading staff...</span>
                         </div>
                     ) : filteredData.length === 0 ? (
-                        // Empty State
                         <div className="text-center py-12 text-muted-foreground">
                             {searchQuery ? (
                                 <>
@@ -521,35 +530,27 @@ const StaffAttendancePage: React.FC = () => {
                                     <p className="text-sm mt-1">Try adjusting your search query</p>
                                 </>
                             ) : (
-                                <p className="text-lg">No staff members found for this date.</p>
+                                <p className="text-lg">No staff members found.</p>
                             )}
                         </div>
                     ) : (
-                        // Table
                         <Table
                             columns={filteredColumns}
                             data={paginatedData}
                             onEdit={handleEdit}
                             onDelete={handleDelete}
-                            isEditing={false} // Disable edit buttons - direct editing via status dropdown
+                            isEditing={false}
                             pagination={{
                                 page: currentPage,
                                 pageSize: pageSize,
                                 total: filteredData.length,
                                 onPageChange: setCurrentPage,
-                                onPageSizeChange: (size) => {
-                                    setPageSize(size);
-                                    setCurrentPage(0); // Reset to first page
-                                },
+                                onPageSizeChange: (size) => { setPageSize(size); setCurrentPage(0); },
                             }}
-                            permissions={{
-                                resource: 'staff',
-                                canEdit: false,
-                                canDelete: false,
-                            }}
+                            permissions={{ resource: 'staff', canEdit: false, canDelete: false }}
                         />
                     )}
-                </CardContent>
+                </div>
             </Card>
         </div>
     );

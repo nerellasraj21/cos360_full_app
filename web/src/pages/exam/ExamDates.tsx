@@ -3,6 +3,7 @@ import { useParams, useNavigate } from '@tanstack/react-router'
 import { Plus, Edit, Trash2, Loader2, Calendar, ArrowLeft, Save, X, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/TimePicker'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
@@ -221,11 +222,11 @@ export default function ExamDates() {
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium">Start Time</label>
-                <Input type="time" value={formData.start_time ?? ''} onChange={(e) => setFormData(p => ({ ...p, start_time: e.target.value || null }))} />
+                <TimePicker value={formData.start_time ?? ''} onChange={(val) => setFormData(p => ({ ...p, start_time: val || null }))} />
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium">End Time</label>
-                <Input type="time" value={formData.end_time ?? ''} onChange={(e) => setFormData(p => ({ ...p, end_time: e.target.value || null }))} />
+                <TimePicker value={formData.end_time ?? ''} onChange={(val) => setFormData(p => ({ ...p, end_time: val || null }))} />
               </div>
               <div className="col-span-2 space-y-1">
                 <label className="text-sm font-medium">Venue</label>

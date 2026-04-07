@@ -3,6 +3,7 @@ import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TimePicker } from "@/components/ui/TimePicker";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
@@ -90,7 +91,7 @@ export interface MasterPageConfig<T, TInput> {
 export interface FormField {
   name: string;
   label: string;
-  type?: "text" | "number" | "date" | "checkbox" | "academic_year_select";
+  type?: "text" | "number" | "date" | "time" | "checkbox" | "academic_year_select";
   required?: boolean;
   pattern?: string;
   patternMessage?: string;
@@ -293,6 +294,20 @@ export function MasterPage<
           </div>
         );
       }
+    }
+
+    if (type === "time") {
+      const rawValue = formData[name as keyof TInput] as string;
+      return (
+        <div key={name} className="mb-4">
+          <Label htmlFor={name}>{label}</Label>
+          <TimePicker
+            value={rawValue ? rawValue.substring(0, 5) : ''}
+            onChange={(val) => setFormData((prev) => ({ ...prev, [name]: val }))}
+            required={required}
+          />
+        </div>
+      );
     }
 
     if (type === "checkbox") {
