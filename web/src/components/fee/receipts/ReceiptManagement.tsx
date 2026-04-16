@@ -60,7 +60,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
     try {
       setLoading(true);
       const response = await feeReceiptsApi.searchReceipts(searchParams);
-      setReceipts(response.items || []);
+      setReceipts(Array.isArray(response) ? response as unknown as FeeReceipt[] : response.items || []);
     } catch (error) {
       console.error('Error loading receipts:', error);
       toast.error('Failed to load receipts');
@@ -276,15 +276,16 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
         </Dialog>
       </div>
 
-      {/* Search and Filters */}
+      {/* Merged Card: All Sections */}
       <Card>
+        {/* Search and Filters Section */}
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Search className="w-4 h-4" />
-            Search Receipts
+            Search & Management
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pb-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <Label htmlFor="receiptNumber">Receipt Number</Label>
@@ -324,17 +325,20 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
             </div>
           </div>
         </CardContent>
-      </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Receipt Selection */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Select Receipt</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <Select onValueChange={handleReceiptSelect}>
+        {/* Separator */}
+        <div className="px-6">
+          <Separator />
+        </div>
+
+        {/* Receipt Selection & Details Section */}
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Receipt Selection */}
+            <div>
+              <h3 className="font-semibold mb-4">Select Receipt</h3>
+              <div className="space-y-4">
+                <Select onValueChange={handleReceiptSelect}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a receipt..." />
                 </SelectTrigger>
@@ -367,16 +371,12 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                   </Button>
                 </div>
               )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Receipt Details */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Receipt Details</CardTitle>
-          </CardHeader>
-          <CardContent>
+            {/* Receipt Details */}
+            <div className="lg:col-span-2">
+              <h3 className="font-semibold mb-4">Receipt Details</h3>
             {selectedReceipt ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -390,7 +390,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                       <Badge variant={selectedReceipt.is_reprinted ? "secondary" : "default"}>
                         {selectedReceipt.is_reprinted ? "Reprinted" : "Original"}
                       </Badge>
-                      {selectedReceipt.reprint_count !== "0" && (
+                      {selectedReceipt.reprint_count !== 0 && (
                         <Badge variant="outline">
                           Prints: {selectedReceipt.reprint_count}
                         </Badge>
@@ -431,17 +431,18 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                 <p>Select a receipt to view details</p>
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          </div>
+        </CardContent>
 
-      {/* Receipt Content */}
-      {receiptContent && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Receipt Content</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {/* Receipt Content Section */}
+        {receiptContent && (
+          <>
+            <div className="px-6">
+              <Separator />
+            </div>
+            <CardContent className="pt-6">
+              <h3 className="font-semibold mb-4">Receipt Content</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -491,20 +492,21 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                 </Table>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </>
+        )}
 
-      {/* Verification Results */}
-      {verification && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="w-4 h-4" />
-              Receipt Integrity Verification
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        {/* Verification Results Section */}
+        {verification && (
+          <>
+            <div className="px-6">
+              <Separator />
+            </div>
+            <CardContent className="pt-6">
+              <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Receipt Integrity Verification
+              </h3>
             <Alert className={verification.is_integrity_valid ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
               <AlertDescription>
                 <div className="space-y-2">
@@ -530,17 +532,17 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                   </div>
                 </div>
               </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
-      )}
+              </Alert>
+            </CardContent>
+          </>
+        )}
 
-      {/* Receipts List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Receipts</CardTitle>
-        </CardHeader>
-        <CardContent>
+        {/* Recent Receipts Section */}
+        <div className="px-6">
+          <Separator />
+        </div>
+        <CardContent className="pt-6">
+          <h3 className="font-semibold mb-4">Recent Receipts</h3>
           <Table>
             <TableHeader>
               <TableRow>
@@ -587,7 +589,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                         <Badge variant={receipt.is_reprinted ? "secondary" : "default"}>
                           {receipt.is_reprinted ? "Reprinted" : "Original"}
                         </Badge>
-                        {receipt.reprint_count !== "0" && (
+                        {receipt.reprint_count !== 0 && (
                           <Badge variant="outline" className="text-xs">
                             {receipt.reprint_count}
                           </Badge>

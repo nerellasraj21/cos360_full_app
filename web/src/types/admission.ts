@@ -7,12 +7,13 @@ export interface AdmissionTypeOption {
 export interface Parent {
   id?: string;
   name: string;
-  email: string;
-  phone: string;
+  email?: string;
+  phone?: string;
   occupation?: string;
   aadhar_number?: string;
   gender?: string;
   relation_to_student?: string;
+  salary_range?: string;
   students?: any[];
 }
 
@@ -72,6 +73,7 @@ export interface StudentOut {
   }>;
   father?: Parent;
   mother?: Parent;
+  guardian?: Parent;
 }
 
 export interface StudentAdmissionBase {
@@ -139,6 +141,16 @@ export interface StudentAdmissionCreate extends StudentAdmissionBase {
   mother_aadhar_number?: string;
   mother_gender?: string;
   mother_relation_to_student?: string;
+
+  // Guardian details (optional)
+  guardian_name?: string;
+  guardian_email?: string;
+  guardian_phone?: string;
+  guardian_occupation?: string;
+  guardian_salary_range?: string;
+  guardian_aadhar_number?: string;
+  guardian_gender?: string;
+  guardian_relation_to_student?: string;
 }
 
 export interface StudentAdmissionResponse extends StudentAdmissionBase {
@@ -146,6 +158,9 @@ export interface StudentAdmissionResponse extends StudentAdmissionBase {
   student_id?: string;
   admission_number?: string;
   admitted_academic_year_id?: string;
+  state_id?: string;
+  district_id?: string;
+  mandal_id?: string;
   student: StudentOut;
 }
 
@@ -201,6 +216,13 @@ export interface StudentAdmissionUpdate {
   mother_aadhar_number?: string;
   mother_gender?: string;
   mother_salary_range?: string;
+  guardian_name?: string;
+  guardian_email?: string;
+  guardian_phone?: string;
+  guardian_occupation?: string;
+  guardian_aadhar_number?: string;
+  guardian_gender?: string;
+  guardian_salary_range?: string;
 }
 
 export interface StudentDropdownItem {

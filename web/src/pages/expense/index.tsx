@@ -4,9 +4,7 @@ import {
   Tag,
   Tags,
   ArrowLeftRight,
-  CheckCircle2,
   LayoutList,
-  History,
   ChevronRight,
   ShieldX,
 } from 'lucide-react';
@@ -18,7 +16,6 @@ import {
   useExpenseCategories,
   useExpenseTypes,
   useExpenseTransactions,
-  usePendingExpenseApprovals,
 } from '@/hooks/expense';
 
 interface NavItem {
@@ -52,25 +49,11 @@ const navItems: NavItem[] = [
     color: 'bg-chart-3/10 border-chart-3/20 hover:bg-chart-3/20',
   },
   {
-    title: 'Pending Approvals',
-    description: 'Review and approve or reject expense transactions awaiting authorization',
-    path: '/expense/approvals',
-    icon: <CheckCircle2 className="h-5 w-5" />,
-    color: 'bg-chart-4/10 border-chart-4/20 hover:bg-chart-4/20',
-  },
-  {
     title: 'Summary',
     description: 'Category-wise breakdown with type totals and grand total — filterable by academic year',
     path: '/expense/summary',
     icon: <LayoutList className="h-5 w-5" />,
     color: 'bg-chart-5/10 border-chart-5/20 hover:bg-chart-5/20',
-  },
-  {
-    title: 'Audit Trail',
-    description: 'Complete audit log of all expense actions including status changes and approvals',
-    path: '/expense/audit',
-    icon: <History className="h-5 w-5" />,
-    color: 'bg-chart-2/10 border-chart-2/20 hover:bg-chart-2/20',
   },
 ];
 
@@ -99,12 +82,10 @@ function ExpenseDashboardContent() {
   const { data: categories, isLoading: loadingCategories } = useExpenseCategories();
   const { data: types, isLoading: loadingTypes } = useExpenseTypes();
   const { data: transactions, isLoading: loadingTransactions } = useExpenseTransactions();
-  const { data: pendingApprovals, isLoading: loadingPending } = usePendingExpenseApprovals();
 
   const categoryCount = Array.isArray(categories) ? categories.length : 0;
   const typeCount = Array.isArray(types) ? types.length : 0;
   const transactionCount = Array.isArray(transactions) ? transactions.length : 0;
-  const pendingCount = pendingApprovals?.items?.length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -115,11 +96,10 @@ function ExpenseDashboardContent() {
       />
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard label="Expense Categories" value={categoryCount} loading={loadingCategories} />
         <StatCard label="Expense Types" value={typeCount} loading={loadingTypes} />
         <StatCard label="Total Transactions" value={transactionCount} loading={loadingTransactions} />
-        <StatCard label="Pending Approvals" value={pendingCount} loading={loadingPending} />
       </div>
 
       {/* Navigation Cards */}

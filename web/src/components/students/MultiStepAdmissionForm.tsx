@@ -1,7 +1,8 @@
-import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useState } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DialogFooter } from '@/components/ui/dialog';
 import { useCreateAdmission } from '@/api/hooks/students/admissions';
 import type { StudentAdmissionCreate } from '@/types/admission';
 import { AcademicStepForm } from './admission-steps/AcademicStepForm';
@@ -17,14 +18,6 @@ interface MultiStepAdmissionFormProps {
   onComplete: () => void;
 }
 
-export interface MultiStepAdmissionFormHandle {
-  submit: () => Promise<void>;
-  nextStep: () => void;
-  prevStep: () => void;
-  currentStep: number;
-  isLoading: boolean;
-}
-
 const steps = [
   { id: 'academic', title: 'Academic Details', component: AcademicStepForm },
   { id: 'student', title: 'Student Details', component: StudentStepForm },
@@ -34,12 +27,11 @@ const steps = [
   { id: 'summary', title: 'Review & Submit', component: SummaryStepForm },
 ];
 
-const MultiStepAdmissionFormComponent: React.FC<MultiStepAdmissionFormProps> = ({ onComplete }, ref) => {
+const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
 
   const createAdmission = useCreateAdmission();
   const selectedAcademicYearId = useAcademicYearStore((state) => state.selectedAcademicYearId);
-  const submitRef = useRef<() => Promise<void>>();
 
   const methods = useForm<StudentAdmissionCreate>({
     defaultValues: {
@@ -92,6 +84,15 @@ const MultiStepAdmissionFormComponent: React.FC<MultiStepAdmissionFormProps> = (
       mother_aadhar_number: '',
       mother_gender: '',
       mother_relation_to_student: 'Mother',
+      // Guardian details (optional)
+      guardian_name: '',
+      guardian_email: '',
+      guardian_phone: '',
+      guardian_occupation: '',
+      guardian_salary_range: '',
+      guardian_aadhar_number: '',
+      guardian_gender: '',
+      guardian_relation_to_student: 'Guardian',
       // Keep nested structure for backward compatibility
       student: {
         first_name: '',
@@ -118,9 +119,9 @@ const MultiStepAdmissionFormComponent: React.FC<MultiStepAdmissionFormProps> = (
     },
   });
 
-  const { handleSubmit, trigger } = methods;
+  const { trigger } = methods;
 
-  const nextStepFn = async () => {
+  const nextStep = async () => {
     // Define ONLY required fields for each step
     const stepFields = {
       0: ['admission_date'], // Academic Details
@@ -140,21 +141,9 @@ const MultiStepAdmissionFormComponent: React.FC<MultiStepAdmissionFormProps> = (
     }
   };
 
-  const prevStepFn = () => {
+  const prevStep = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 0));
   };
-
-  // Expose submit and navigation methods via ref
-  useImperativeHandle(ref, () => ({
-    submit: async () => {
-      console.log('📤 Ref submit called');
-      await handleSubmit(onSubmit)();
-    },
-    nextStep: nextStepFn,
-    prevStep: prevStepFn,
-    currentStep,
-    isLoading: createAdmission.status === 'pending'
-  }), [handleSubmit, onSubmit, currentStep, createAdmission.status, nextStepFn, prevStepFn]);
 
   const onSubmit = async (data: StudentAdmissionCreate) => {
     try {
@@ -225,6 +214,7 @@ const MultiStepAdmissionFormComponent: React.FC<MultiStepAdmissionFormProps> = (
         address_line2: data.address_line2 || '',
         city: data.city,
         state: data.state_id,
+        state_id: data.state_id || undefined,
         district_id: data.district_id || undefined,
         mandal_id: data.mandal_id || undefined,
         pincode: data.pincode || undefined,
@@ -248,24 +238,36 @@ const MultiStepAdmissionFormComponent: React.FC<MultiStepAdmissionFormProps> = (
           identification_marks: data.student_identification_marks || '',  // Required - send empty string if not provided
           father: {
             name: data.father_name || '',
-            email: data.father_email || '',
-            phone: data.father_phone || '',                  // Required - send empty string if not provided
-            occupation: data.father_occupation || '',        // Required - send empty string if not provided
-            salary_range: data.father_salary_range || '',
-            aadhar_number: data.father_aadhar_number || '',  // Required - send empty string if not provided
-            gender: data.father_gender || '',
-            relation_to_student: data.father_relation_to_student || 'Father',
+            email: data.father_email || undefined,
+            phone: data.father_phone || undefined,
+            occupation: data.father_occupation || undefined,
+            salary_range: data.father_salary_range || undefined,
+            aadhar_number: data.father_aadhar_number || undefined,
+            gender: data.father_gender || undefined,
+            relation_to_student: 'Father' as const,
           },
           mother: {
             name: data.mother_name || '',
-            email: data.mother_email || '',
-            phone: data.mother_phone || '',                  // Required - send empty string if not provided
-            occupation: data.mother_occupation || '',        // Required - send empty string if not provided
-            salary_range: data.mother_salary_range || '',
-            aadhar_number: data.mother_aadhar_number || '',  // Required - send empty string if not provided
-            gender: data.mother_gender || '',
-            relation_to_student: data.mother_relation_to_student || 'Mother',
+            email: data.mother_email || undefined,
+            phone: data.mother_phone || undefined,
+            occupation: data.mother_occupation || undefined,
+            salary_range: data.mother_salary_range || undefined,
+            aadhar_number: data.mother_aadhar_number || undefined,
+            gender: data.mother_gender || undefined,
+            relation_to_student: 'Mother' as const,
           },
+          ...(data.guardian_name ? {
+            guardian: {
+              name: data.guardian_name,
+              email: data.guardian_email || undefined,
+              phone: data.guardian_phone || undefined,
+              occupation: data.guardian_occupation || undefined,
+              salary_range: data.guardian_salary_range || undefined,
+              aadhar_number: data.guardian_aadhar_number || undefined,
+              gender: data.guardian_gender || undefined,
+              relation_to_student: 'Guardian' as const,
+            }
+          } : {}),
         },
       };
 
@@ -310,40 +312,83 @@ const MultiStepAdmissionFormComponent: React.FC<MultiStepAdmissionFormProps> = (
     }
   };
 
-  // Debug: Log current step and mutation status
-  console.log('Current Step:', currentStep, '/', steps.length - 1);
-  console.log('Mutation Status:', createAdmission.status);
-  console.log('On Final Step (Summary):', currentStep === steps.length - 1);
-
   return (
     <FormProvider {...methods}>
-      <form className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>{steps[currentStep].title}</span>
-              <span className="text-sm text-gray-500">
-                Step {currentStep + 1} of {steps.length}
-              </span>
-            </CardTitle>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-              ></div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {steps.map((step, index) => (
-              <div key={step.id} style={{ display: index === currentStep ? 'block' : 'none' }}>
-                <step.component />
+      <form className="flex flex-col flex-1 min-h-0" onSubmit={(e) => {
+        e.preventDefault();
+        if (currentStep === steps.length - 1) {
+          // Bypass react-hook-form's global validation (which incorrectly blocks
+          // optional fields with pattern rules). Each step already validated its
+          // required fields via nextStep(). onSubmit() has its own required-field
+          // checks and will show toast errors for anything missing.
+          const values = methods.getValues();
+          onSubmit(values as StudentAdmissionCreate);
+        }
+      }}>
+        <div className="flex-1 overflow-y-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>{steps[currentStep].title}</span>
+                <span className="text-sm text-gray-500">
+                  Step {currentStep + 1} of {steps.length}
+                </span>
+              </CardTitle>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+                ></div>
               </div>
-            ))}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              {steps.map((step, index) => (
+                <div key={step.id} style={{ display: index === currentStep ? 'block' : 'none' }}>
+                  <step.component />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex-shrink-0 border-t pt-4 mt-2">
+        <DialogFooter className="!justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={prevStep}
+            disabled={currentStep === 0}
+          >
+            Previous
+          </Button>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onComplete}
+            >
+              Cancel
+            </Button>
+
+            {currentStep < steps.length - 1 ? (
+              <Button type="button" onClick={nextStep}>
+                Next
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                disabled={createAdmission.isPending}
+              >
+                {createAdmission.isPending ? 'Creating...' : 'Create Admission'}
+              </Button>
+            )}
+          </div>
+        </DialogFooter>
+        </div>
       </form>
     </FormProvider>
   );
 };
 
-export default forwardRef(MultiStepAdmissionFormComponent);
+export default MultiStepAdmissionForm;

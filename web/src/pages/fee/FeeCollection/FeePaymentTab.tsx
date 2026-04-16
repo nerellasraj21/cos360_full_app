@@ -46,7 +46,7 @@ import {
 } from '@/components/ui/table';
 import { usePayFee, useFeeSummary } from '@/hooks/fee';
 import { formatCurrency } from './FeeSummaryTab';
-import type { FeePaymentResponse, CollectionPaymentMethod } from '@/types/fee';
+import type { FeePaymentResponse, CollectionPaymentMethod, FeePaymentRequest } from '@/types/fee';
 
 const PAYMENT_METHODS: { value: CollectionPaymentMethod; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -97,6 +97,7 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [paymentResult, setPaymentResult] = useState<FeePaymentResponse | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const {
     register,
@@ -125,20 +126,32 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
   function handleConfirmPayment() {
     setShowConfirm(false);
     const formData = watch();
-    payFeeMutation.mutate(
-      {
-        student_id: studentId,
-        academic_year_id: selectedAcademicYearId,
-        ...formData,
+
+    // Clean up optional fields - remove undefined/empty values
+    const cleanedData: Record<string, any> = {
+      student_id: studentId,
+      academic_year_id: selectedAcademicYearId,
+      amount_to_pay: formData.amount_to_pay,
+      payment_method: formData.payment_method,
+      send_sms: formData.send_sms,
+      print_duplicate: formData.print_duplicate,
+    };
+
+    // Add optional fields only if they have values
+    if (formData.upi_reference) cleanedData.upi_reference = formData.upi_reference;
+    if (formData.bank_reference) cleanedData.bank_reference = formData.bank_reference;
+    if (formData.cheque_number) cleanedData.cheque_number = formData.cheque_number;
+    if (formData.cheque_bank) cleanedData.cheque_bank = formData.cheque_bank;
+    if (formData.cheque_date) cleanedData.cheque_date = formData.cheque_date;
+    if (formData.remarks) cleanedData.remarks = formData.remarks;
+
+    payFeeMutation.mutate(cleanedData as FeePaymentRequest, {
+      onSuccess: (result) => {
+        setPaymentResult(result);
+        setShowSuccess(true);
+        reset();
       },
-      {
-        onSuccess: (result) => {
-          setPaymentResult(result);
-          setShowSuccess(true);
-          reset();
-        },
-      }
-    );
+    });
   }
 
   function handleCloseSuccess() {
@@ -169,6 +182,11 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
           <CardTitle className="text-base">Collect Payment</CardTitle>
         </CardHeader>
         <CardContent>
+          {payFeeMutation.isError && (
+            <div className="mb-4 p-3 bg-destructive/10 border border-destructive text-destructive rounded-md text-sm">
+              {payFeeMutation.error?.message || 'Failed to process payment. Please try again.'}
+            </div>
+          )}
           <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Amount */}
@@ -283,7 +301,11 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
             </div>
 
             {/* Submit */}
-            <Button type="submit" disabled={payFeeMutation.isPending} className="w-full md:w-auto">
+            <Button
+              type="submit"
+              disabled={payFeeMutation.isPending || !amountToPay || amountToPay <= 0 || Object.keys(errors).length > 0}
+              className="w-full md:w-auto"
+            >
               {payFeeMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...
@@ -362,16 +384,22 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
               <div className="flex justify-end gap-2">
                 <Button
                   variant="outline"
+                  disabled={isDownloading}
                   onClick={async () => {
+                    if (isDownloading) return;
+                    setIsDownloading(true);
                     try {
                       await feeReceiptsApi.downloadReceiptPdf(paymentResult.receipt_id, paymentResult.receipt_number);
                       toast.success('Receipt downloaded');
                     } catch {
                       toast.error('Failed to download receipt');
+                    } finally {
+                      setIsDownloading(false);
                     }
                   }}
                 >
-                  <Download className="h-4 w-4 mr-2" /> Download Receipt
+                  {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                  Download Receipt
                 </Button>
                 <Button onClick={handleCloseSuccess}>Close</Button>
               </div>

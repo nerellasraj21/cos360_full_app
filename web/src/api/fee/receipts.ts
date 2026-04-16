@@ -94,6 +94,15 @@ export const feeReceiptsApi = {
     return response.data;
   },
 
+  // Returns a blob URL for in-app PDF preview — caller must call URL.revokeObjectURL when done
+  getReceiptPdfBlobUrl: async (receiptId: string): Promise<string> => {
+    const response = await CAxios.get(`/fee/collection/receipts/${receiptId}/pdf`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    return window.URL.createObjectURL(blob);
+  },
+
   // Download receipt as PDF
   downloadReceiptPdf: async (receiptId: string, receiptNumber?: string): Promise<void> => {
     const response = await CAxios.get(`/fee/collection/receipts/${receiptId}/pdf`, {

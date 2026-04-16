@@ -94,7 +94,7 @@ export function TimePicker({ value, onChange, required, disabled, className }: T
           type="button"
           disabled={disabled}
           className={cn(
-            "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors",
+            "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-xs transition-colors overflow-hidden",
             "hover:bg-accent hover:text-accent-foreground",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
             "disabled:pointer-events-none disabled:opacity-50",
@@ -102,8 +102,8 @@ export function TimePicker({ value, onChange, required, disabled, className }: T
             className
           )}
         >
-          <span>{formatDisplay(value)}</span>
-          <Clock className="h-4 w-4 opacity-50 shrink-0" />
+          <span className="whitespace-nowrap overflow-hidden text-ellipsis">{formatDisplay(value)}</span>
+          <Clock className="h-4 w-4 shrink-0 ml-1 dark:text-white text-gray-400" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-3" align="start">

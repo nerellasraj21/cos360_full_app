@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Loader2, ChevronLeft, ChevronsLeft, ChevronRightIcon, ChevronsRight } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Loader2, ChevronLeft, ChevronsLeft, ChevronRightIcon, ChevronsRight, Search, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -40,11 +40,11 @@ function CategoryNode({ category, serialNumber, onEdit, onDelete, onManageTypes,
     };
 
     return (
-        <div className="border border-gray-200 rounded-lg mb-2">
+        <div className="border border-border rounded-lg mb-2">
             {/* Category Header */}
             <div
                 className={cn(
-                    "flex items-center justify-between p-3 hover:bg-gray-50",
+                    "flex items-center justify-between p-3 hover:bg-muted",
                     canViewTypes ? "cursor-pointer" : "cursor-default"
                 )}
                 onMouseEnter={() => setShowActions(true)}
@@ -52,7 +52,7 @@ function CategoryNode({ category, serialNumber, onEdit, onDelete, onManageTypes,
             >
                 <div className="flex items-center flex-1" onClick={canViewTypes ? toggleExpanded : undefined}>
                     <span className="w-8 text-xs text-muted-foreground font-medium shrink-0 text-center">{serialNumber}</span>
-                    <button className="mr-2 p-1 hover:bg-gray-200 rounded">
+                    <button className="mr-2 p-1 hover:bg-muted rounded">
                         {isExpanded ? (
                             <ChevronDown className="h-4 w-4" />
                         ) : (
@@ -60,11 +60,11 @@ function CategoryNode({ category, serialNumber, onEdit, onDelete, onManageTypes,
                         )}
                     </button>
                     <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">{category.category_name}</h3>
+                        <h3 className="font-medium text-foreground">{category.category_name}</h3>
                         <div className="flex items-center gap-2 mt-1">
                             <StatusBadge status={category.category_status} />
                             {canViewTypes && (
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-muted-foreground">
                                     {feeTypes.length} fee type{feeTypes.length !== 1 ? 's' : ''}
                                 </span>
                             )}
@@ -124,21 +124,21 @@ function CategoryNode({ category, serialNumber, onEdit, onDelete, onManageTypes,
 
             {/* Fee Types List */}
             {isExpanded && canViewTypes && (
-                <div className="border-t border-gray-200 bg-gray-50">
+                <div className="border-t border-border bg-muted/30">
                     {typesLoading ? (
                         <div className="p-4 flex justify-center items-center">
                             <Loader2 className="h-6 w-6 animate-spin" />
-                            <span className="ml-2 text-gray-500">Loading fee types...</span>
+                            <span className="ml-2 text-muted-foreground">Loading fee types...</span>
                         </div>
                     ) : feeTypes.length > 0 ? (
                         <div className="p-3 space-y-2">
                             {feeTypes.map((feeType: FeeType) => (
-                                <div key={feeType.id} className="flex items-center justify-between p-2 bg-white rounded border">
+                                <div key={feeType.id} className="flex items-center justify-between p-2 bg-card rounded border border-border">
                                     <div>
-                                        <span className="font-medium text-sm">{feeType.type_name}</span>
+                                        <span className="font-medium text-sm text-foreground">{feeType.type_name}</span>
                                         <div className="flex items-center gap-2 mt-1">
                                             <StatusBadge status={feeType.fee_status} />
-                                            <span className="text-xs text-gray-500">
+                                            <span className="text-xs text-muted-foreground">
                                                 Term: {(() => {
                                                     if (!feeType.fee_term_name) return 'Unknown';
                                                     if (feeType.fee_term_name === feeType.fee_term_id) {
@@ -153,7 +153,7 @@ function CategoryNode({ category, serialNumber, onEdit, onDelete, onManageTypes,
                             ))}
                         </div>
                     ) : (
-                        <div className="p-4 text-center text-gray-500">
+                        <div className="p-4 text-center text-muted-foreground">
                             No fee types found. Click the + button to add fee types.
                         </div>
                     )}
@@ -171,6 +171,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(50);
     const [statusFilter, setStatusFilter] = useState<CategoryStatus | 'all'>('all');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Dialog states
     const [editingCategory, setEditingCategory] = useState<FeeCategory | null>(null);
@@ -208,9 +209,16 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
     const deleteMutation = useDeleteFeeCategory();
 
     // Extract data from paginated response
-    const categories = categoriesResponse?.items || [];
+    const allCategories = categoriesResponse?.items || [];
     const totalCategories = categoriesResponse?.total || 0;
     const totalPages = Math.ceil(totalCategories / pageSize);
+
+    // Client-side search filter
+    const categories = useMemo(() => {
+        if (!searchQuery.trim()) return allCategories;
+        const q = searchQuery.toLowerCase();
+        return allCategories.filter(c => c.category_name.toLowerCase().includes(q));
+    }, [allCategories, searchQuery]);
 
     // Debug logging
     console.log('[FeeCategoryTree] Component state:', {
@@ -337,34 +345,46 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
 
     return (
         <div className={cn("space-y-4", className)}>
-            {/* Header with Filters */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <h2 className="text-lg font-semibold text-gray-900">Fee Categories</h2>
-
-                    {/* Status Filter */}
-                    <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-                        <SelectTrigger className="w-[150px]">
-                            <SelectValue placeholder="Filter by status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="inactive">Inactive</SelectItem>
-                        </SelectContent>
-                    </Select>
+            {/* Filter Bar */}
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                    <Filter className="h-3.5 w-3.5" />
+                    <span>Filters</span>
                 </div>
-
-                {canCreate && (
-                    <Button onClick={handleCreate} className="flex items-center gap-2">
-                        <Plus className="h-4 w-4" />
-                        Add Category
-                    </Button>
-                )}
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="relative max-w-sm">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                            <Input
+                                placeholder="Search categories..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="pl-8 h-8 text-sm w-64"
+                            />
+                        </div>
+                        {/* Status Filter */}
+                        <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+                            <SelectTrigger className="w-[150px] h-8 text-sm">
+                                <SelectValue placeholder="Filter by status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    {canCreate && (
+                        <Button onClick={handleCreate} className="flex items-center gap-2">
+                            <Plus className="h-4 w-4" />
+                            Add Category
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Summary */}
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-muted-foreground">
                 Showing {categories.length > 0 ? skip + 1 : 0}-{Math.min(skip + pageSize, totalCategories)} of {totalCategories} categories
             </div>
 
@@ -386,7 +406,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
                     ))}
                 </div>
             ) : (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-muted-foreground">
                     <p>No fee categories found for the selected filters.</p>
                     {canCreate && (
                         <Button onClick={handleCreate} className="mt-4">
@@ -398,10 +418,10 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t pt-4">
+                <div className="flex items-center justify-between border-t border-border pt-4">
                     {/* Page Size Selector */}
                     <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">Items per page:</span>
+                        <span className="text-sm text-muted-foreground">Items per page:</span>
                         <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
                             <SelectTrigger className="w-[80px]">
                                 <SelectValue />
@@ -434,7 +454,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
                             <ChevronLeft className="h-4 w-4" />
                         </Button>
 
-                        <span className="text-sm text-gray-600 px-4">
+                        <span className="text-sm text-muted-foreground px-4">
                             Page {currentPage} of {totalPages}
                         </span>
 
@@ -469,7 +489,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
 
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-foreground mb-1">
                                 Category Name *
                             </label>
                             <Input
@@ -485,9 +505,9 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
                                 id="category_status"
                                 checked={formData.category_status === 'active'}
                                 onChange={(e) => { setFormData({ ...formData, category_status: e.target.checked ? 'active' : 'inactive' }); setIsFormDirty(true); }}
-                                className="rounded border-gray-300"
+                                className="rounded border-border"
                             />
-                            <label htmlFor="category_status" className="text-sm font-medium text-gray-700">
+                            <label htmlFor="category_status" className="text-sm font-medium text-foreground">
                                 Active
                             </label>
                         </div>
@@ -521,7 +541,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
                         <DialogTitle>Delete Fee Category</DialogTitle>
                     </DialogHeader>
 
-                    <p className="text-gray-600">
+                    <p className="text-muted-foreground">
                         Are you sure you want to delete the category "{showDeleteDialog?.category_name}"?
                         This action cannot be undone.
                     </p>

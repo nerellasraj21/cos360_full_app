@@ -59,7 +59,7 @@ export function DatePicker({
       >
         {display || placeholder}
       </span>
-      <CalendarIcon className="h-4 w-4 opacity-50 shrink-0 mr-3 pointer-events-none" />
+      <CalendarIcon className="h-4 w-4 shrink-0 mr-3 pointer-events-none dark:text-white text-gray-400" />
 
       {/* Native date input — transparent overlay so the full button area is clickable */}
       <input

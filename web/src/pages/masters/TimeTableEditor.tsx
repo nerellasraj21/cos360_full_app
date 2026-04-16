@@ -9,6 +9,7 @@ import { useClassesDropdown, useSectionsByClassId } from '@/hooks/masters/useCla
 import { useMappingsByClass } from '@/api/hooks/masters/classsubjectmappings';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { TimePicker } from '@/components/ui/TimePicker';
 import Select, { type SingleValue } from 'react-select';
 import CreatableSelect from 'react-select/creatable';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,9 @@ function transformRowsToFrontendTimetableCreate(rows: any[], sectionId: string, 
   const timetable_data: any[] = [];
 
   for (const row of rows) {
+    // Skip rows with missing times
+    if (!row.time.from || !row.time.to) continue;
+
     const item: any = {
       time: {
         from: row.time.from,
@@ -67,7 +71,16 @@ function transformRowsToFrontendTimetableCreate(rows: any[], sectionId: string, 
     };
 
     if (row.type === 'subject') {
-      item.subjects = row.subjects;
+      // Filter out empty/null day values — backend expects dict[str, UUID] with no empty strings
+      const filteredSubjects: Record<string, string> = {};
+      for (const [day, val] of Object.entries(row.subjects || {})) {
+        if (val && typeof val === 'string' && val.trim() !== '') {
+          filteredSubjects[day] = val;
+        }
+      }
+      // Skip subject rows where no day has a subject assigned
+      if (Object.keys(filteredSubjects).length === 0) continue;
+      item.subjects = filteredSubjects;
     } else {
       item.label = row.label;
     }
@@ -91,22 +104,20 @@ function TimeRangeInput({
     wide?: boolean;
 }) {
     return (
-        <div className={wide ? "flex items-center justify-center gap-1 w-44" : "flex items-center justify-center gap-1 w-full"}>
-            <Input
-                type="time"
-                value={value.from}
-                onChange={(e) => onChange('from', e.target.value)}
-                className="w-full p-1 h-8 text-xs border-input bg-card text-foreground"
-                aria-label="From time"
-            />
-            <span className="text-muted-foreground text-lg">-</span>
-            <Input
-                type="time"
-                value={value.to}
-                onChange={(e) => onChange('to', e.target.value)}
-                className="w-full p-1 h-8 text-xs border-input bg-card text-foreground"
-                aria-label="To time"
-            />
+        <div className="flex items-center gap-1 w-full">
+            <div className="flex-1 min-w-0">
+                <TimePicker
+                    value={value.from}
+                    onChange={(time) => onChange('from', time)}
+                />
+            </div>
+            <span className="text-muted-foreground font-semibold shrink-0">-</span>
+            <div className="flex-1 min-w-0">
+                <TimePicker
+                    value={value.to}
+                    onChange={(time) => onChange('to', time)}
+                />
+            </div>
         </div>
     );
 }
@@ -203,20 +214,6 @@ export default function TimeTableEditor() {
     const createFrontendTimetableMutation = useCreateFrontendTimetableMutation();
     const updateFrontendTimetableMutation = useUpdateFrontendTimetableMutation();
 
-    // Invalidate query on success
-    useEffect(() => {
-        if (createFrontendTimetableMutation.isSuccess) {
-            queryClient.invalidateQueries({ queryKey: ['timetable', 'frontend', selectedSection?.value] });
-            setIsEditing(false);
-        }
-    }, [createFrontendTimetableMutation.isSuccess, queryClient, selectedSection]);
-
-    useEffect(() => {
-        if (updateFrontendTimetableMutation.isSuccess) {
-            queryClient.invalidateQueries({ queryKey: ['timetable', 'frontend', selectedSection?.value] });
-            setIsEditing(false);
-        }
-    }, [updateFrontendTimetableMutation.isSuccess, queryClient, selectedSection]);
 
 
     const getTimetableKey = (classId: string, sectionId: string) => {
@@ -236,7 +233,7 @@ export default function TimeTableEditor() {
     // Use hooks for data fetching
     const { data: classesData, isLoading: classesLoading } = useClassesDropdown();
     const { data: sectionsData, isLoading: sectionsLoading } = useSectionsByClassId(selectedClass?.value || '');
-    const { data: frontendTimetableData, isLoading: frontendLoading, error: frontendError, isError: isFrontendError } = useFrontendTimetable(selectedSection?.value || '');
+    const { data: frontendTimetableData, isLoading: frontendLoading, isFetching: frontendFetching, error: frontendError, isError: isFrontendError } = useFrontendTimetable(selectedSection?.value || '');
     const { data: classMappings } = useMappingsByClass(selectedClass?.value || '', { active_only: true });
 
 
@@ -254,6 +251,8 @@ export default function TimeTableEditor() {
 
     // Load timetable data when section changes
     useEffect(() => {
+        // Don't reset state during a background refetch (e.g. after save invalidation)
+        if (frontendFetching && frontendTimetableData) return;
         console.log('useEffect triggered: frontendTimetableData:', !!frontendTimetableData, 'isFrontendError:', isFrontendError, 'frontendError:', frontendError?.message, 'selectedSection:', selectedSection?.value);
         if (frontendTimetableData) {
             setTimetableData(frontendTimetableData);
@@ -304,7 +303,7 @@ export default function TimeTableEditor() {
             setIsEditing(true);
             console.log('Set isEditing to true (no data, no error)');
         }
-    }, [frontendTimetableData, selectedSection, isFrontendError, frontendError]);
+    }, [frontendTimetableData, frontendFetching, selectedSection, isFrontendError, frontendError]);
 
     const classOptions = useMemo(() => {
         if (!classesData) return [];
@@ -593,23 +592,38 @@ export default function TimeTableEditor() {
                         <Button
                             variant={isEditing ? 'secondary' : 'default'}
                             size="sm"
+                            disabled={createFrontendTimetableMutation.isPending || updateFrontendTimetableMutation.isPending}
                             onClick={() => {
                                 if (isEditing) {
                                     const data = transformRowsToFrontendTimetableCreate(rows, selectedSection!.value, includeSaturday);
+                                    const sectionId = selectedSection!.value;
+                                    const callbacks = {
+                                        onSuccess: () => {
+                                            toast.success('Timetable saved successfully');
+                                            queryClient.invalidateQueries({ queryKey: ['timetable', 'frontend', sectionId] });
+                                            setIsEditing(false);
+                                        },
+                                        onError: (err: any) => {
+                                            toast.error(err?.message || 'Failed to save timetable');
+                                        },
+                                    };
                                     if (timetableData) {
-                                        // Update
-                                        updateFrontendTimetableMutation.mutate({ sectionId: selectedSection!.value, data });
+                                        updateFrontendTimetableMutation.mutate({ sectionId, data }, callbacks);
                                     } else {
-                                        // Create
-                                        createFrontendTimetableMutation.mutate(data);
+                                        createFrontendTimetableMutation.mutate(data, callbacks);
                                     }
+                                } else {
+                                    setIsEditing(true);
                                 }
-                                setIsEditing((v) => !v);
                             }}
                             className="min-w-[80px]"
                         >
-                            {isEditing ? <Save className="w-4 h-4 mr-1" /> : <Edit className="w-4 h-4 mr-1" />}
-                            {isEditing ? 'Save' : 'Edit'}
+                            {(createFrontendTimetableMutation.isPending || updateFrontendTimetableMutation.isPending)
+                                ? <><Save className="w-4 h-4 mr-1 animate-spin" />Saving...</>
+                                : isEditing
+                                    ? <><Save className="w-4 h-4 mr-1" />Save</>
+                                    : <><Edit className="w-4 h-4 mr-1" />Edit</>
+                            }
                         </Button>
                     )}
                     {!isEditing && isClassAndSectionSelected && rows.length > 0 && (
@@ -656,7 +670,6 @@ export default function TimeTableEditor() {
                         </div>
                     )}
                 </div>
-                <h2 className="text-2xl font-bold text-center flex-1">TIMETABLE</h2>
                 <div className="flex gap-4">
                     <Select
                         options={classOptions}
@@ -711,7 +724,7 @@ export default function TimeTableEditor() {
                 <div className="border rounded-lg bg-muted/30 overflow-x-auto">
                     <table ref={!isEditing ? tableRef : undefined} className="w-full text-sm table-fixed align-middle timetable-table">
                         <colgroup>
-                            <col style={{ width: '12rem' }} />
+                            <col style={{ width: '18rem' }} />
                             {activeDays.map((_, i) => (
                                 <col key={i} style={{ width: '10.5rem' }} />
                             ))}

@@ -62,7 +62,6 @@ export default function ExamDetail() {
     attendance_from_date: '',
     attendance_to_date: '',
     publish_rank: false,
-    term: '',
   })
   const [activeTab, setActiveTab] = useState<'overview' | 'dates' | 'marks' | 'permissions' | 'audit'>('overview')
 
@@ -130,7 +129,6 @@ export default function ExamDetail() {
       attendance_from_date: exam.attendance_from_date ?? '',
       attendance_to_date: exam.attendance_to_date ?? '',
       publish_rank: !!exam.publish_rank,
-      term: exam.term ?? '',
     })
     setIsEditDirty(false)
     setShowEdit(true)
@@ -145,7 +143,6 @@ export default function ExamDetail() {
         attendance_from_date: editForm.attendance_from_date || undefined,
         attendance_to_date: editForm.attendance_to_date || undefined,
         publish_rank: editForm.publish_rank,
-        term: editForm.term || undefined,
       },
       { onSuccess: () => { setIsEditDirty(false); setShowEdit(false) } }
     )
@@ -614,15 +611,6 @@ export default function ExamDetail() {
                 type="date"
                 value={editForm.attendance_to_date}
                 onChange={(e) => setEditForm(p => ({ ...p, attendance_to_date: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Term</label>
-              <Input
-                value={editForm.term}
-                onChange={(e) => setEditForm(p => ({ ...p, term: e.target.value }))}
-                placeholder="e.g. Term 1"
-                maxLength={20}
               />
             </div>
             <div className="flex items-center gap-2 pt-5">

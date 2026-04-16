@@ -39,7 +39,6 @@ export const examDetailsSchema = z.object({
       (v) => (v === '' ? null : v),
       z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable()
     ),
-  term: z.string().max(20).optional().nullable(),
 }).refine(
   (data) => data.board !== 'Custom' || !!data.custom_board_name,
   { message: 'Custom board name is required when board is Custom', path: ['custom_board_name'] }

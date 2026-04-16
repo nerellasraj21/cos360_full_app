@@ -19,9 +19,11 @@ import {
   useSelectorStudents,
   useSearchCertificateTypes,
 } from "@/api/hooks/students/certificates";
+import { IssuableCertificateGenerator } from "@/components/students/IssuableCertificateGenerator";
 import type { CertificateRead, SelectorStudent } from "@/types/certificates/types";
 
 type UploadTab = "received" | "issued";
+type IssueSubTab = "upload" | "generate";
 
 export const CertificateUploadPage: React.FC = () => {
   // Cascade selector state
@@ -32,6 +34,7 @@ export const CertificateUploadPage: React.FC = () => {
 
   // Upload tabs
   const [uploadTab, setUploadTab] = useState<UploadTab>("received");
+  const [issueSubTab, setIssueSubTab] = useState<IssueSubTab>("upload");
 
   // Delete dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
@@ -373,92 +376,135 @@ export const CertificateUploadPage: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                /* ── Issue Certificate Form ── */
+                /* ── Issue Certificate with Sub-tabs ── */
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Certificate Type *</Label>
-                      <Select value={issuedTypeId} onValueChange={setIssuedTypeId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {certTypes.map((t) => (
-                            <SelectItem key={t.id} value={t.id}>
-                              {t.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  {/* Sub-tabs for Issue/Generate */}
+                  <div className="flex gap-1 border-b">
+                    <Button
+                      size="sm"
+                      variant={issueSubTab === "upload" ? "default" : "outline"}
+                      onClick={() => setIssueSubTab("upload")}
+                      className="rounded-none"
+                    >
+                      Upload Certificate File
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={issueSubTab === "generate" ? "default" : "outline"}
+                      onClick={() => setIssueSubTab("generate")}
+                      className="rounded-none"
+                    >
+                      Generate Issuable
+                    </Button>
+                  </div>
 
-                    <div className="space-y-2">
-                      <Label>Issue Date *</Label>
-                      <input
-                        type="date"
-                        value={issuedDate}
-                        onChange={(e) => setIssuedDate(e.target.value)}
-                        className={inputClass}
-                      />
-                    </div>
+                  {issueSubTab === "upload" ? (
+                    /* ── Upload Certificate File ── */
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Certificate Type *</Label>
+                          <Select value={issuedTypeId} onValueChange={setIssuedTypeId}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {certTypes.map((t) => (
+                                <SelectItem key={t.id} value={t.id}>
+                                  {t.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label>
-                        Certificate File *{" "}
-                        <span className="text-xs text-muted-foreground font-normal">
-                          PDF/JPG/PNG/DOCX, max 10 MB
-                        </span>
-                      </Label>
-                      <input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png,.docx"
-                        onChange={(e) => setIssuedFile(e.target.files?.[0] ?? null)}
-                        className={inputClass}
-                      />
-                      {issuedFile && (
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Upload className="h-3 w-3" />
-                          {issuedFile.name}
+                        <div className="space-y-2">
+                          <Label>Issue Date *</Label>
+                          <input
+                            type="date"
+                            value={issuedDate}
+                            onChange={(e) => setIssuedDate(e.target.value)}
+                            className={inputClass}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>
+                            Certificate File *{" "}
+                            <span className="text-xs text-muted-foreground font-normal">
+                              PDF/JPG/PNG/DOCX, max 10 MB
+                            </span>
+                          </Label>
+                          <input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png,.docx"
+                            onChange={(e) => setIssuedFile(e.target.files?.[0] ?? null)}
+                            className={inputClass}
+                          />
+                          {issuedFile && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Upload className="h-3 w-3" />
+                              {issuedFile.name}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Remarks</Label>
+                          <textarea
+                            value={issuedRemarks}
+                            onChange={(e) => setIssuedRemarks(e.target.value)}
+                            className={inputClass}
+                            placeholder="Optional remarks (max 500 characters)"
+                            rows={2}
+                            maxLength={500}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleSubmitIssued}
+                          disabled={uploadIssued.isPending}
+                        >
+                          {uploadIssued.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Issuing...
+                            </>
+                          ) : (
+                            "Issue Certificate"
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleResetIssued}
+                          disabled={uploadIssued.isPending}
+                        >
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Reset
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* ── Generate Issuable Certificate ── */
+                    <div>
+                      {selectedStudent ? (
+                        <IssuableCertificateGenerator
+                          selectedStudent={{
+                            id: selectedStudent.student_id,
+                            name: selectedStudent.full_name,
+                            admission_number: selectedStudent.admission_no,
+                          }}
+                          selectedStudentId={selectedStudentId}
+                        />
+                      ) : (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <p>Select a student above to generate certificates</p>
                         </div>
                       )}
                     </div>
-
-                    <div className="space-y-2">
-                      <Label>Remarks</Label>
-                      <textarea
-                        value={issuedRemarks}
-                        onChange={(e) => setIssuedRemarks(e.target.value)}
-                        className={inputClass}
-                        placeholder="Optional remarks (max 500 characters)"
-                        rows={2}
-                        maxLength={500}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleSubmitIssued}
-                      disabled={uploadIssued.isPending}
-                    >
-                      {uploadIssued.isPending ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Issuing...
-                        </>
-                      ) : (
-                        "Issue Certificate"
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleResetIssued}
-                      disabled={uploadIssued.isPending}
-                    >
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Reset
-                    </Button>
-                  </div>
+                  )}
                 </div>
               )}
             </CardContent>

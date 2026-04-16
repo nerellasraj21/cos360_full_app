@@ -70,8 +70,8 @@ export const ParentsStepForm = () => {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Parent Details</h2>
-      
+      <h2 className="text-xl font-semibold">Parent & Guardian Details</h2>
+
       <div className="grid grid-cols-2 gap-4">
         {/* Father's Details */}
         <div className="space-y-4">
@@ -336,6 +336,117 @@ export const ParentsStepForm = () => {
               readOnly
               className="bg-gray-100"
             />
+          </div>
+        </div>
+
+        {/* Guardian's Details (Optional) */}
+        <div className="space-y-4 col-span-2">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-medium">Guardian's Information (Optional)</h3>
+            <span className="text-xs text-gray-500">Optional</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="guardian_name">Name (Optional)</Label>
+              <Input
+                id="guardian_name"
+                {...register('guardian_name')}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="guardian_email">Email (Optional)</Label>
+              <Input
+                id="guardian_email"
+                type="email"
+                {...register('guardian_email', {
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: 'Invalid email address'
+                  }
+                })}
+              />
+              {errors.guardian_email && (
+                <span className="text-red-500">{errors.guardian_email.message as string}</span>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="guardian_phone">Phone (Optional)</Label>
+              <div className="flex gap-2 items-start">
+                <div className="flex-1">
+                  <Input
+                    id="guardian_phone"
+                    {...register('guardian_phone', {
+                      pattern: {
+                        value: /^[\+]?[1-9][\d]{0,15}$/,
+                        message: 'Invalid phone number format'
+                      }
+                    })}
+                  />
+                  {errors.guardian_phone && (
+                    <span className="text-red-500 text-sm">{errors.guardian_phone.message as string}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="guardian_occupation">Occupation (Optional)</Label>
+              <Input
+                id="guardian_occupation"
+                {...register('guardian_occupation')}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="guardian_salary_range">Salary Range (Optional)</Label>
+              <SalaryRangeDropdown
+                id="guardian_salary_range"
+                label=""
+                register={register('guardian_salary_range')}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="guardian_aadhar_number">Aadhar Number (Optional)</Label>
+              <Input
+                id="guardian_aadhar_number"
+                {...register('guardian_aadhar_number', {
+                  pattern: {
+                    value: /^\d{12}$/,
+                    message: 'Aadhar number must be 12 digits'
+                  }
+                })}
+              />
+              {errors.guardian_aadhar_number && (
+                <span className="text-red-500">{errors.guardian_aadhar_number.message as string}</span>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="guardian_gender">Gender (Optional)</Label>
+              <select
+                id="guardian_gender"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                {...register('guardian_gender')}
+              >
+                <option value="">Select Gender</option>
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+                <option value="O">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="guardian_relation_to_student">Relation to Student (Optional)</Label>
+              <Input
+                id="guardian_relation_to_student"
+                placeholder="e.g., Grandfather, Grandmother, Uncle, Aunt"
+                {...register('guardian_relation_to_student')}
+              />
+            </div>
           </div>
         </div>
       </div>

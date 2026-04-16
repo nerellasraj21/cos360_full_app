@@ -98,7 +98,7 @@ export function useDeactivateHoliday() {
     action: 'delete',
     mutationFn: deactivateHoliday,
     onSuccess: () => {
-      toast.success('Holiday deactivated!');
+      toast.success('Holiday deleted!');
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
       queryClient.invalidateQueries({ queryKey: ['holidays-dropdown'] });
     },

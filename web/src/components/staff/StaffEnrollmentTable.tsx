@@ -862,13 +862,14 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 onDirtyDiscard={() => setIsFormDirty(false)}
                 modal={false}
             >
-        <DialogContent className="max-w-2xl">
-            <DialogHeader>
+        <DialogContent className="max-w-2xl flex flex-col max-h-[90vh] p-0">
+            <DialogHeader className="flex-shrink-0 px-6 py-4 border-b">
                 <DialogTitle>
                     {editingStaff ? 'Edit Staff Enrollment' : 'Create Staff Enrollment'}
                 </DialogTitle>
             </DialogHeader>
 
+            <div className="overflow-y-auto flex-1 px-6 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4" onChange={() => setIsFormDirty(true)}>
                 {/* Basic Information */}
                 <div className="md:col-span-2">
@@ -1067,7 +1068,24 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                             valueContainer: (base) => ({ ...base, padding: '0 8px' }),
                                             input: (base) => ({ ...base, fontSize: '12px', margin: 0, padding: 0 }),
                                             menuPortal: (base) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
-                                            menu: (base) => ({ ...base, pointerEvents: 'auto', fontSize: '12px' }),
+                                            menu: (base) => ({
+                                                ...base,
+                                                pointerEvents: 'auto',
+                                                fontSize: '12px',
+                                                backgroundColor: '#ffffff',
+                                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                            }),
+                                            option: (base, state) => ({
+                                                ...base,
+                                                backgroundColor: state.isSelected
+                                                    ? '#3b82f6'
+                                                    : state.isFocused
+                                                    ? '#f3f4f6'
+                                                    : '#ffffff',
+                                                color: state.isSelected ? '#ffffff' : '#1f2937',
+                                                cursor: 'pointer',
+                                                padding: '8px 12px',
+                                            }),
                                         }}
                                         menuShouldBlockScroll={false}
                                         closeMenuOnScroll={false}
@@ -1247,8 +1265,9 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     <Input value={formData.uan_number || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, uan_number: e.target.value }); }} placeholder="12-digit UAN" />
                 </div>
             </div>
+            </div>
 
-            <DialogFooter>
+            <div className="flex-shrink-0 border-t px-6 py-4 flex justify-end gap-3 bg-card">
                 <DialogClose asChild>
                     <Button variant="outline">Cancel</Button>
                 </DialogClose>
@@ -1258,7 +1277,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 >
                     {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save'}
                 </Button>
-            </DialogFooter>
+            </div>
             </DialogContent>
         </Dialog>
 
@@ -1417,128 +1436,94 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                         )}
 
                         {/* Work Experience */}
-                        {(displayStaff.work_org || displayStaff.work_from_date || displayStaff.subjects_dealt || displayStaff.work_remarks) && (
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-semibold text-foreground border-b pb-2 flex items-center gap-2">
-                                    <Briefcase className="h-5 w-5" />
-                                    Work Experience
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {displayStaff.work_org && (
-                                        <div className="flex justify-between">
-                                            <span className="font-medium text-muted-foreground">Organization:</span>
-                                            <span className="text-foreground">{displayStaff.work_org}</span>
-                                        </div>
-                                    )}
-                                    {(displayStaff.work_from_date || displayStaff.work_to_date) && (
-                                        <div className="flex justify-between">
-                                            <span className="font-medium text-muted-foreground">Period:</span>
-                                            <span className="text-foreground">
-                                                {displayStaff.work_from_date ? new Date(displayStaff.work_from_date).toLocaleDateString() : '—'}
-                                                {' → '}
-                                                {displayStaff.work_to_date ? new Date(displayStaff.work_to_date).toLocaleDateString() : 'Present'}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {displayStaff.subjects_dealt && (
-                                        <div className="flex justify-between md:col-span-2">
-                                            <span className="font-medium text-muted-foreground">Subjects:</span>
-                                            <span className="text-foreground">{displayStaff.subjects_dealt}</span>
-                                        </div>
-                                    )}
-                                    {displayStaff.work_remarks && (
-                                        <div className="flex justify-between md:col-span-2">
-                                            <span className="font-medium text-muted-foreground">Remarks:</span>
-                                            <span className="text-foreground">{displayStaff.work_remarks}</span>
-                                        </div>
-                                    )}
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold text-foreground border-b pb-2 flex items-center gap-2">
+                                <Briefcase className="h-5 w-5" />
+                                Work Experience
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-muted-foreground">Organization:</span>
+                                    <span className="text-foreground">{displayStaff.work_org || '—'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-muted-foreground">Period:</span>
+                                    <span className="text-foreground">
+                                        {displayStaff.work_from_date ? new Date(displayStaff.work_from_date).toLocaleDateString() : '—'}
+                                        {' → '}
+                                        {displayStaff.work_to_date ? new Date(displayStaff.work_to_date).toLocaleDateString() : 'Present'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between md:col-span-2">
+                                    <span className="font-medium text-muted-foreground">Subjects:</span>
+                                    <span className="text-foreground">{displayStaff.subjects_dealt || '—'}</span>
+                                </div>
+                                <div className="flex justify-between md:col-span-2">
+                                    <span className="font-medium text-muted-foreground">Remarks:</span>
+                                    <span className="text-foreground">{displayStaff.work_remarks || '—'}</span>
                                 </div>
                             </div>
-                        )}
+                        </div>
 
                         {/* Bank Details */}
-                        {(displayStaff.bank_name || displayStaff.account_number || displayStaff.ifsc_code) && (
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-semibold text-foreground border-b pb-2 flex items-center gap-2">
-                                    <Landmark className="h-5 w-5" />
-                                    Bank Details
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {displayStaff.bank_name && (
-                                        <div className="flex justify-between">
-                                            <span className="font-medium text-muted-foreground">Bank:</span>
-                                            <span className="text-foreground">{displayStaff.bank_name}</span>
-                                        </div>
-                                    )}
-                                    {displayStaff.bank_branch && (
-                                        <div className="flex justify-between">
-                                            <span className="font-medium text-muted-foreground">Branch:</span>
-                                            <span className="text-foreground">{displayStaff.bank_branch}</span>
-                                        </div>
-                                    )}
-                                    {displayStaff.account_holder_name && (
-                                        <div className="flex justify-between">
-                                            <span className="font-medium text-muted-foreground">Account Holder:</span>
-                                            <span className="text-foreground">{displayStaff.account_holder_name}</span>
-                                        </div>
-                                    )}
-                                    {displayStaff.account_type && (
-                                        <div className="flex justify-between">
-                                            <span className="font-medium text-muted-foreground">Account Type:</span>
-                                            <Badge variant="outline">{displayStaff.account_type}</Badge>
-                                        </div>
-                                    )}
-                                    {displayStaff.account_number && (
-                                        <div className="flex justify-between">
-                                            <span className="font-medium text-muted-foreground">Account No.:</span>
-                                            <span className="text-foreground font-mono text-sm">{displayStaff.account_number}</span>
-                                        </div>
-                                    )}
-                                    {displayStaff.ifsc_code && (
-                                        <div className="flex justify-between">
-                                            <span className="font-medium text-muted-foreground">IFSC Code:</span>
-                                            <span className="text-foreground font-mono text-sm">{displayStaff.ifsc_code}</span>
-                                        </div>
-                                    )}
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold text-foreground border-b pb-2 flex items-center gap-2">
+                                <Landmark className="h-5 w-5" />
+                                Bank Details
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-muted-foreground">Bank:</span>
+                                    <span className="text-foreground">{displayStaff.bank_name || '—'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-muted-foreground">Branch:</span>
+                                    <span className="text-foreground">{displayStaff.bank_branch || '—'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-muted-foreground">Account Holder:</span>
+                                    <span className="text-foreground">{displayStaff.account_holder_name || '—'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-muted-foreground">Account Type:</span>
+                                    {displayStaff.account_type ? <Badge variant="outline">{displayStaff.account_type}</Badge> : <span className="text-foreground">—</span>}
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-muted-foreground">Account No.:</span>
+                                    <span className="text-foreground font-mono text-sm">{displayStaff.account_number || '—'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-muted-foreground">IFSC Code:</span>
+                                    <span className="text-foreground font-mono text-sm">{displayStaff.ifsc_code || '—'}</span>
                                 </div>
                             </div>
-                        )}
+                        </div>
 
                         {/* Salary & PF */}
-                        {(displayStaff.last_drawn_salary || displayStaff.current_salary || displayStaff.pf_account_number || displayStaff.uan_number) && (
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-semibold text-foreground border-b pb-2 flex items-center gap-2">
-                                    <Wallet className="h-5 w-5" />
-                                    Salary & PF
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {displayStaff.last_drawn_salary && (
-                                        <div className="flex justify-between">
-                                            <span className="font-medium text-muted-foreground">Last Drawn Salary:</span>
-                                            <span className="text-foreground">₹{Number(displayStaff.last_drawn_salary).toLocaleString('en-IN')}</span>
-                                        </div>
-                                    )}
-                                    {displayStaff.current_salary && (
-                                        <div className="flex justify-between">
-                                            <span className="font-medium text-muted-foreground">Current Salary:</span>
-                                            <span className="text-foreground">₹{Number(displayStaff.current_salary).toLocaleString('en-IN')}</span>
-                                        </div>
-                                    )}
-                                    {displayStaff.pf_account_number && (
-                                        <div className="flex justify-between">
-                                            <span className="font-medium text-muted-foreground">PF Account No.:</span>
-                                            <span className="text-foreground font-mono text-sm">{displayStaff.pf_account_number}</span>
-                                        </div>
-                                    )}
-                                    {displayStaff.uan_number && (
-                                        <div className="flex justify-between">
-                                            <span className="font-medium text-muted-foreground">UAN:</span>
-                                            <span className="text-foreground font-mono text-sm">{displayStaff.uan_number}</span>
-                                        </div>
-                                    )}
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold text-foreground border-b pb-2 flex items-center gap-2">
+                                <Wallet className="h-5 w-5" />
+                                Salary & PF
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-muted-foreground">Last Drawn Salary:</span>
+                                    <span className="text-foreground">{displayStaff.last_drawn_salary ? `₹${Number(displayStaff.last_drawn_salary).toLocaleString('en-IN')}` : '—'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-muted-foreground">Current Salary:</span>
+                                    <span className="text-foreground">{displayStaff.current_salary ? `₹${Number(displayStaff.current_salary).toLocaleString('en-IN')}` : '—'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-muted-foreground">PF Account No.:</span>
+                                    <span className="text-foreground font-mono text-sm">{displayStaff.pf_account_number || '—'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-muted-foreground">UAN:</span>
+                                    <span className="text-foreground font-mono text-sm">{displayStaff.uan_number || '—'}</span>
                                 </div>
                             </div>
-                        )}
+                        </div>
 
                         {/* Attendance Summary (if available) */}
                         {displayStaff.attendances && displayStaff.attendances.length > 0 && (

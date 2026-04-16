@@ -18,7 +18,7 @@ import { useClassesDropdown, useSectionsByClassId } from "@/hooks/masters/useCla
 import { useAcademicYearStore } from "@/lib/academicYearStore";
 import type { Subject } from "@/types/masters";
 import type { SubjectMappingItem } from "@/types/masters/subject";
-import { Trash2, AlertTriangle } from "lucide-react";
+import { Trash2, AlertTriangle, Info } from "lucide-react";
 
 type SelectOption = { value: string; label: string };
 
@@ -44,7 +44,7 @@ export function AddBulkClassSubjectMappingsModal({
   const [isOpen, setIsOpen] = useState(false);
   const [isFormDirty, setIsFormDirty] = useState(false);
   const [selectedClass, setSelectedClass] = useState<SelectOption | null>(null);
-  const [selectedSection, setSelectedSection] = useState<SelectOption | null>(null);
+  const [selectedSections, setSelectedSections] = useState<SelectOption[]>([]);
   const [selectedSubjects, setSelectedSubjects] = useState<SubjectWithSettings[]>([]);
 
   const { selectedAcademicYearId } = useAcademicYearStore();
@@ -66,7 +66,7 @@ export function AddBulkClassSubjectMappingsModal({
   }, [sectionsData]);
 
   // Check if "All Sections" is selected
-  const isAllSectionsSelected = selectedSection?.value === "ALL_SECTIONS";
+  const isAllSectionsSelected = selectedSections.some(s => s.value === "ALL_SECTIONS");
   const sectionsCount = sectionsData?.length || 0;
 
   const subjectOptions = useMemo(() => {
@@ -84,18 +84,21 @@ export function AddBulkClassSubjectMappingsModal({
 
   const handleClassChange = (option: SingleValue<SelectOption>) => {
     setSelectedClass(option || null);
-    // Reset section when class changes
-    setSelectedSection(null);
+    // Reset sections when class changes
+    setSelectedSections([]);
     setIsFormDirty(true);
   };
 
-  const handleSectionChange = (option: SingleValue<SelectOption>) => {
-    setSelectedSection(option || null);
+  const handleSectionChange = (options: MultiValue<SelectOption>) => {
+    // If "All Sections" is selected, only use that option
+    const hasAllSections = options?.some(opt => opt.value === "ALL_SECTIONS");
+    const newSelection = hasAllSections ? [ALL_SECTIONS_OPTION] : (options || []);
+    setSelectedSections(newSelection);
     setIsFormDirty(true);
   };
 
   const handleSubjectsChange = (options: MultiValue<SelectOption>) => {
-    const newSubjects = options.map((opt, index) => {
+    const newSubjects = (options || []).map((opt, index) => {
       // Check if subject already exists in selectedSubjects to preserve settings
       const existing = selectedSubjects.find((s) => s.value === opt.value);
       if (existing) {
@@ -138,7 +141,7 @@ export function AddBulkClassSubjectMappingsModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedClass || !selectedAcademicYearId || selectedSubjects.length === 0) {
+    if (!selectedClass || !selectedAcademicYearId || selectedSubjects.length === 0 || selectedSections.length === 0) {
       return;
     }
 
@@ -149,28 +152,37 @@ export function AddBulkClassSubjectMappingsModal({
       is_active: s.is_active,
     }));
 
-    // Send undefined for section_id when "All Sections" is selected
-    const sectionId = selectedSection?.value === "ALL_SECTIONS" ? undefined : selectedSection?.value;
+    // Handle "All Sections" selection - pass undefined for section_id
+    const isAllSectionsSelected = selectedSections.some(s => s.value === "ALL_SECTIONS");
+    const sectionsToCreate = isAllSectionsSelected
+      ? [undefined]  // undefined means all sections
+      : selectedSections.map(s => s.value);
 
-    bulkCreateMutation.mutate(
-      {
-        class_id: selectedClass.value,
-        section_id: sectionId,
-        academic_year_id: selectedAcademicYearId,
-        subjects: subjectMappings,
-      },
-      {
-        onSuccess: () => {
-          setIsOpen(false);
-          resetForm();
+    // Create mappings for each selected section
+    sectionsToCreate.forEach(sectionId => {
+      bulkCreateMutation.mutate(
+        {
+          class_id: selectedClass.value,
+          section_id: sectionId,
+          academic_year_id: selectedAcademicYearId,
+          subjects: subjectMappings,
         },
-      }
-    );
+        {
+          onSuccess: () => {
+            // Only close form and reset after the last request
+            if (sectionId === sectionsToCreate[sectionsToCreate.length - 1]) {
+              setIsOpen(false);
+              resetForm();
+            }
+          },
+        }
+      );
+    });
   };
 
   const resetForm = () => {
     setSelectedClass(null);
-    setSelectedSection(null);
+    setSelectedSections([]);
     setSelectedSubjects([]);
     setIsFormDirty(false);
   };
@@ -182,7 +194,7 @@ export function AddBulkClassSubjectMappingsModal({
     }
   };
 
-  const isFormValid = selectedClass && selectedSubjects.length > 0 && selectedAcademicYearId;
+  const isFormValid = selectedClass && selectedSubjects.length > 0 && selectedSections.length > 0 && selectedAcademicYearId;
 
   return (
     <Dialog
@@ -217,15 +229,16 @@ export function AddBulkClassSubjectMappingsModal({
               />
             </div>
 
-            {/* Section Selection (cascading from class) */}
+            {/* Section Selection (cascading from class) - Multi-select */}
             {selectedClass && (
               <div>
-                <Label htmlFor="section_id">Section</Label>
+                <Label htmlFor="section_id">Sections</Label>
                 <Select
+                  isMulti
                   options={sectionOptions}
-                  value={selectedSection}
+                  value={selectedSections}
                   onChange={handleSectionChange}
-                  placeholder="Select Section"
+                  placeholder="Select one or more sections"
                   classNamePrefix="react-select"
                   menuPlacement="auto"
                   menuPortalTarget={typeof window !== "undefined" ? document.body : undefined}
@@ -233,7 +246,17 @@ export function AddBulkClassSubjectMappingsModal({
                   styles={selectStyles}
                   isClearable
                   isDisabled={!selectedClass}
+                  closeMenuOnSelect={false}
                 />
+                {/* Info when multiple sections are selected */}
+                {selectedSections.length > 0 && !isAllSectionsSelected && (
+                  <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+                    <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      Mappings will be created for {selectedSections.length} selected section{selectedSections.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                )}
                 {/* Warning when All Sections is selected */}
                 {isAllSectionsSelected && sectionsCount > 0 && (
                   <div className="flex items-center gap-2 mt-2 p-2 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">

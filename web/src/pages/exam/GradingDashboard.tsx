@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { Layers, Table2, ListChecks, PenLine, Ticket, ChevronRight } from 'lucide-react';
+import { Layers, Table2, ListChecks, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -37,20 +37,6 @@ const navItems: NavItem[] = [
     icon: <ListChecks className="h-5 w-5" />,
     color: 'bg-chart-3/10 border-chart-3/20 hover:bg-chart-3/20',
   },
-  {
-    title: 'Mark Entry',
-    description: 'Enter and manage student marks for each exam, subject, class, and section',
-    path: '/exam/marks',
-    icon: <PenLine className="h-5 w-5" />,
-    color: 'bg-chart-4/10 border-chart-4/20 hover:bg-chart-4/20',
-  },
-  {
-    title: 'Hall Tickets',
-    description: 'Generate and download hall tickets for students appearing in exams',
-    path: '/exam/hall-tickets',
-    icon: <Ticket className="h-5 w-5" />,
-    color: 'bg-chart-5/10 border-chart-5/20 hover:bg-chart-5/20',
-  },
 ];
 
 function StatCard({ label, value, loading }: { label: string; value: number; loading: boolean }) {
@@ -79,7 +65,7 @@ export default function GradingDashboard() {
     <div className="space-y-6">
       <PageHeader
         title="Grading"
-        subtitle="Manage grade schemes, remark sets, mark entry, and hall tickets"
+        subtitle="Manage exam grade schemes, subject grade schemes, and remark grade sets"
         icon={<Layers className="h-5 w-5" />}
       />
 

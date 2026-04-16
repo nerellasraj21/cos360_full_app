@@ -251,11 +251,13 @@ export interface ExamListItem {
   nature: ExamNature
   status: ExamStatus
   academic_year_id: string
-  academic_year_title: string
+  academic_year_title?: string | null
   mark_entry_deadline: string | null
   hall_ticket_min_attendance?: number | null
   attendance_from_date?: string | null
   attendance_to_date?: string | null
+  publish_rank?: boolean
+  term?: string | null
   created_at: string
   subject_config_count?: number
   class_section_count?: number

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -564,6 +565,18 @@ function FeeRefundsContent() {
 
   return (
     <div className="space-y-6">
+      {/* Page Title */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Fee Refunds</h1>
+          <p className="text-muted-foreground mt-1">Manage fee refund requests and track their status</p>
+        </div>
+        <Button onClick={() => setShowCreateDialog(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Create Refund Request
+        </Button>
+      </div>
+
       {/* Create Refund Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogContent className="max-w-4xl max-h-[80vh]">
@@ -798,13 +811,16 @@ function FeeRefundsContent() {
         </div>
       )}
 
-      {/* Search and Filters */}
+      {/* Merged Card: Filters and Table */}
       <Card>
-        <CardContent className="pt-4">
-          <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground mb-3">
-            <Search className="h-3.5 w-3.5" />
-            <span>Filters</span>
+        {/* Filters Section */}
+        <CardHeader>
+          <div className="flex items-center gap-1.5">
+            <Search className="h-4 w-4" />
+            <CardTitle>Filters</CardTitle>
           </div>
+        </CardHeader>
+        <CardContent className="pb-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Student</label>
@@ -886,26 +902,22 @@ function FeeRefundsContent() {
             </Button>
           </div>
         </CardContent>
-      </Card>
 
-      {/* Refunds Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-2xl font-bold">Fee Refunds</CardTitle>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => refetch()}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Refund
-              </Button>
-            </div>
+        {/* Separator */}
+        <div className="px-6">
+          <Separator />
+        </div>
+
+        {/* Refunds Table Section */}
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-end">
+            <Button variant="outline" onClick={() => refetch()} size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

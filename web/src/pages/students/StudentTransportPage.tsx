@@ -87,8 +87,7 @@ function AdminView() {
     <div className="container mx-auto p-4 space-y-4">
       <PageHeader title="Student Transport" icon={<Bus className="h-5 w-5" />} />
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Student Transport Assignments</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-end">
           <Button size="sm" onClick={() => setIsAddOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Assign Transport

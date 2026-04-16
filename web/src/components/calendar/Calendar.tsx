@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { Edit, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Edit, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useDrop, useDrag } from "react-dnd";
 import { addDays, startOfWeek, startOfMonth, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, addMonths, subMonths, isWithinInterval, parseISO } from "date-fns";
@@ -564,9 +564,14 @@ export function Calendar() {
                       <span className="inline-block w-4 h-4 rounded" style={{ backgroundColor: ev.color || "#2563eb" }}></span>
                     </td>
                     <td className="px-4 py-2">
-                      {hasUpdatePermission && (
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Event" onClick={() => { setSelectedEvent(ev); setIsEditDirty(false); setShowEditDialog(true); }}><Edit className="h-4 w-4" /></Button>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {hasUpdatePermission && (
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Event" onClick={() => { setSelectedEvent(ev); setIsEditDirty(false); setShowEditDialog(true); }}><Edit className="h-4 w-4" /></Button>
+                        )}
+                        {hasDeletePermission && (
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive/80" title="Delete Event" onClick={() => { if (ev.id) deleteHoliday.mutate(ev.id); }}><Trash2 className="h-4 w-4" /></Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -650,16 +655,18 @@ export function Calendar() {
 
   return (
     <Card className="w-full max-w-5xl mx-auto mt-8">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div className="flex gap-2">
-          <Button variant={view === "month" ? "default" : "outline"} onClick={() => setView("month")}>Month</Button>
-          {/* <Button variant={view === "week" ? "default" : "outline"} onClick={() => setView("week")}>Week</Button> */}
-          {/* <Button variant={view === "day" ? "default" : "outline"} onClick={() => setView("day")}>Day</Button> */}
-          {/* <Button variant={view === "year" ? "default" : "outline"} onClick={() => setView("year")}>Year</Button> */}
-          {/* <Button variant={view === "vertical" ? "default" : "outline"} onClick={() => setView("vertical")}>Day</Button> */}
-          <Button variant={view === "all" ? "default" : "outline"} onClick={() => setView("all")}>All Events</Button>
-        </div>
-        <div className="flex gap-2 items-center">
+      <CardHeader>
+        <CardTitle className="text-2xl font-bold">Holidays</CardTitle>
+        <div className="flex items-center justify-between mt-2">
+          <div className="flex gap-2">
+            <Button variant={view === "month" ? "default" : "outline"} onClick={() => setView("month")}>Month</Button>
+            {/* <Button variant={view === "week" ? "default" : "outline"} onClick={() => setView("week")}>Week</Button> */}
+            {/* <Button variant={view === "day" ? "default" : "outline"} onClick={() => setView("day")}>Day</Button> */}
+            {/* <Button variant={view === "year" ? "default" : "outline"} onClick={() => setView("year")}>Year</Button> */}
+            {/* <Button variant={view === "vertical" ? "default" : "outline"} onClick={() => setView("vertical")}>Day</Button> */}
+            <Button variant={view === "all" ? "default" : "outline"} onClick={() => setView("all")}>All Events</Button>
+          </div>
+          <div className="flex gap-2 items-center">
           {view !== "all" && (
             <>
               <Button variant="ghost" onClick={() => {
@@ -670,7 +677,7 @@ export function Calendar() {
                   setSelectedDate(null);
                 }
               }}>{"<"}</Button>
-              <CardTitle>{
+              <span className="font-semibold text-base">{
                 view === "year"
                   ? format(current, "yyyy")
                   : view === "month"
@@ -678,7 +685,7 @@ export function Calendar() {
                     : view === "week"
                       ? `${format(startOfWeek(current, { weekStartsOn: 0 }), "MMM d")} - ${format(addDays(startOfWeek(current, { weekStartsOn: 0 }), 6), "MMM d, yyyy")}`
                       : format(current, "MMMM d, yyyy")
-              }</CardTitle>
+              }</span>
               <Button variant="ghost" onClick={() => {
                 if (view === "month") setCurrent(addMonths(current, 1));
                 else if (view === "week") setCurrent(addDays(current, 7));
@@ -701,6 +708,7 @@ export function Calendar() {
               + Add Event
             </Button>
           )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>

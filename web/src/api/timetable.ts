@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import CAxios from './index';
 import type {
   FullTimetableCreate,
@@ -223,6 +223,7 @@ export function useFrontendTimetable(sectionId: string) {
       return timetableApi.getFrontendTimetable(sectionId);
     },
     enabled: !!sectionId,
+    placeholderData: keepPreviousData,
     retry: (failureCount, error: any) => {
       // Do not retry on 404 errors
       if (error?.message === 'Timetable not found for this section') {

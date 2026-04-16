@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Loader2, Save, Upload, Download, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,7 @@ export default function MarkEntryGrid() {
     examId: string; classId: string; sectionId: string; subjectConfigId: string
   }
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [localValues, setLocalValues] = useState<Record<string, Record<string, string | number | null>>>({})
   const [localAbsent, setLocalAbsent] = useState<Record<string, boolean>>({})
@@ -85,6 +87,11 @@ export default function MarkEntryGrid() {
       : Object.values(rows.find((r) => r.student_id === studentId)?.marks ?? {}).some((m) => m.is_absent)
 
   const handleCellChange = (studentId: string, compId: string, value: string) => {
+    const max = componentMap[compId]?.maxMarks
+    if (max !== undefined && value !== '' && parseFloat(value) > max) {
+      toast.warning(`Cannot exceed max marks (${max}) for ${componentMap[compId]?.name}`)
+      return
+    }
     setLocalValues((prev) => ({
       ...prev,
       [studentId]: { ...(prev[studentId] ?? {}), [compId]: value },
@@ -184,6 +191,7 @@ export default function MarkEntryGrid() {
       formData.append('section_id', resolvedSectionId)
       formData.append('subject_config_id', subjectConfigId)
       await uploadMarks(examId, formData)
+      queryClient.invalidateQueries({ queryKey: ['marks', examId] })
       toast.success('Marks uploaded successfully')
       setUploadDialogOpen(false)
       setUploadFile(null)
@@ -319,7 +327,7 @@ export default function MarkEntryGrid() {
                     <td className="sticky left-0 z-10 bg-card px-4 py-2.5 font-medium">
                       {row.student_name}
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                    <td className="px-3 py-2.5 text-xs whitespace-nowrap">
                       {row.admission_number}
                     </td>
                     {componentIds.map((compId) => {

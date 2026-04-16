@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Plus, Edit, Trash2, AlertTriangle, Loader2, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -116,17 +116,16 @@ export function FeeTypesList() {
     return (
         <div className="space-y-6">
             <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <CardTitle>Fee Types</CardTitle>
-                        {canCreate && (
+                {canCreate && (
+                    <CardHeader className="pb-0">
+                        <div className="flex justify-end">
                             <Button onClick={handleCreateNew}>
                                 <Plus className="h-4 w-4 mr-2" />
                                 Add New Type
                             </Button>
-                        )}
-                    </div>
-                </CardHeader>
+                        </div>
+                    </CardHeader>
+                )}
                 <CardContent>
                     {types.length === 0 ? (
                         <div className="text-center py-8">

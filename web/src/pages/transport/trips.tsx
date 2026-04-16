@@ -39,13 +39,21 @@ export default function TripsPage() {
             label: "Vehicle",
             editable: true,
             render: (value: any) => vehicleMap.get(value) || value,
-            renderEdit: (value: any, _row: any, onChange: (val: any) => void) => (
-                <VehiclesDropdown
-                    value={value}
-                    onChange={(newValue) => onChange(newValue)}
-                    placeholder="Select Vehicle"
-                />
-            ),
+            renderEdit: (value: any, _row: any, onChange: (val: any) => void) => {
+                const vehicleOptions = vehicles?.map(v => ({
+                    id: v.id,
+                    value: v.id,
+                    label: `${v.name} - ${v.registration_number}`
+                })) || [];
+                return (
+                    <VehiclesDropdown
+                        value={value}
+                        onChange={(newValue) => onChange(newValue)}
+                        placeholder="Select Vehicle"
+                        data={vehicleOptions}
+                    />
+                );
+            },
         },
         {
             key: "route_id",
@@ -106,11 +114,17 @@ export default function TripsPage() {
 
     const renderCustomField = (field: FormField, value: any, onChange: (val: any) => void) => {
         if (field.name === 'vehicle_id') {
+            const vehicleOptions = vehicles?.map(v => ({
+                id: v.id,
+                value: v.id,
+                label: `${v.name} - ${v.registration_number}`
+            })) || [];
             return (
                 <VehiclesDropdown
                     value={value}
                     onChange={(newValue) => onChange(newValue)}
                     placeholder="Select Vehicle"
+                    data={vehicleOptions}
                 />
             );
         }

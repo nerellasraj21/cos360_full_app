@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table } from "@/components/common/table";
@@ -66,10 +66,7 @@ export const StudentDocumentsPage: React.FC = () => {
             <PageHeader title="Student Documents" icon={<FolderOpen className="h-5 w-5" />} />
 
             <Card>
-                <CardHeader>
-                    <CardTitle>Select Student</CardTitle>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-6 pt-6">
                     <div className="flex gap-4 items-end">
                         <div className="flex-1">
                             <label className="block text-sm font-medium mb-2">Student</label>
@@ -94,26 +91,25 @@ export const StudentDocumentsPage: React.FC = () => {
                             Clear
                         </Button>
                     </div>
-                </CardContent>
-            </Card>
 
-            {selectedStudent && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>
-                            Documents for {students.find(s => s.id === selectedStudent)?.display_name || 'Selected Student'}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {isLoading ? (
-                            <div className="text-center py-4">Loading documents...</div>
-                        ) : documents.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground">
-                                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                <p>No documents found for this student.</p>
-                                <p className="text-sm">Documents uploaded for the selected student will appear here.</p>
+                    {!selectedStudent ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                            <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <p>Please select a student to view their documents.</p>
+                        </div>
+                    ) : isLoading ? (
+                        <div className="text-center py-4">Loading documents...</div>
+                    ) : documents.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <p>No documents found for this student.</p>
+                            <p className="text-sm">Documents uploaded for the selected student will appear here.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="text-sm font-medium text-muted-foreground border-t pt-6">
+                                Documents for {students.find(s => s.id === selectedStudent)?.display_name || 'Selected Student'}
                             </div>
-                        ) : (
                             <Table
                                 columns={columns}
                                 data={documents}
@@ -122,21 +118,10 @@ export const StudentDocumentsPage: React.FC = () => {
                                 isEditing={false}
                                 className="w-full"
                             />
-                        )}
-                    </CardContent>
-                </Card>
-            )}
-
-            {!selectedStudent && (
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="text-center text-muted-foreground">
-                            <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p>Please select a student to view their documents.</p>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
+                        </>
+                    )}
+                </CardContent>
+            </Card>
         </div>
     );
 };

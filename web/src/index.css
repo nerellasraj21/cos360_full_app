@@ -123,6 +123,11 @@
   }
 }
 
+/* Dark mode: make native date input calendar picker icon white */
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
 .custom-toast [data-close-button] {
   color: var(--color-foreground);
   background: transparent;

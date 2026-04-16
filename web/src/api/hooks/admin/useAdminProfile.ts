@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { User } from '@/types/auth';
-import { getUserDetails, updateUser, changePassword } from '@/api/admin/users';
+import { adminUsersApi } from '@/api/admin/users';
 
 type AdminUserUpdate = {
   username?: string;
@@ -19,7 +19,7 @@ type ChangePasswordData = {
 export function useAdminProfile(user_id: string) {
   return useQuery<User>({
     queryKey: ['admin', 'users', user_id],
-    queryFn: () => getUserDetails(user_id),
+    queryFn: () => adminUsersApi.getUserDetails(user_id),
   });
 }
 
@@ -27,7 +27,7 @@ export function useAdminProfile(user_id: string) {
 export function useUpdateAdminProfile(user_id: string) {
   const queryClient = useQueryClient();
   return useMutation<User, Error, AdminUserUpdate>({
-    mutationFn: (data) => updateUser(user_id, data),
+    mutationFn: (data) => adminUsersApi.updateUser(user_id, data),
     onSuccess: () => {
       toast.success('Admin profile updated successfully!');
       queryClient.invalidateQueries({ queryKey: ['admin', 'users', user_id] });
@@ -41,7 +41,7 @@ export function useUpdateAdminProfile(user_id: string) {
 // Mutation hook for changing admin password
 export function useChangeAdminPassword() {
   return useMutation<void, Error, ChangePasswordData>({
-    mutationFn: changePassword,
+    mutationFn: adminUsersApi.changePassword,
     onSuccess: () => {
       toast.success('Password changed successfully!');
     },

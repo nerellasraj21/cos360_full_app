@@ -315,6 +315,27 @@ import { Edit, Trash2, Eye, Plus } from 'lucide-react';
 </Button>
 ```
 
+#### Dark Mode Icon Visibility
+
+When using icons with reduced opacity, ensure dark mode visibility:
+
+```typescript
+// ❌ WRONG - opacity-50 is too faint in dark mode
+<CalendarIcon className="h-4 w-4 opacity-50" />
+
+// ✅ CORRECT - Use opacity-75 for better dark mode visibility
+<CalendarIcon className="h-4 w-4 opacity-75" />
+
+// ✅ ALSO CORRECT - Use semantic color classes (handles both modes automatically)
+<CalendarIcon className="h-4 w-4 text-muted-foreground" />
+```
+
+**Why:** In dark mode, foreground color is white. `opacity-50` on white = 50% gray = barely visible on dark background. Use `opacity-75` or `text-muted-foreground` for better contrast.
+
+**Applied To:**
+- `DatePicker.tsx` - Calendar icon (opacity-75)
+- `TimePicker.tsx` - Clock icon (opacity-75)
+
 #### Tailwind Utility Classes
 
 ```typescript

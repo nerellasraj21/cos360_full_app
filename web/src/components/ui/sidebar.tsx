@@ -188,9 +188,7 @@ export const getIconForMenuItem = (name: string) => {
         Types: Tags,
         Departments: Building2,
         Approvals: CheckCircle2,
-        "Pending Approvals": CheckCircle2,
         Summary: LayoutList,
-        "Audit Trail": History,
         Settings: Settings2,
         "Expense Settings": Settings2,
         "Audit Log": History,
@@ -351,8 +349,8 @@ function RecursiveMenuItem({
             
             {hasChildren && open && isExpanded && item.children && (
                 <ul className="space-y-1 text-sm text-muted-foreground pl-2 mt-1 animate-in slide-in-from-top-2 duration-200">
-                    {item.children.map((child) => (
-                        <li key={child.id}>
+                    {item.children.map((child, index) => (
+                        <li key={`${child.id}-${index}`}>
                             <RecursiveMenuItem
                                 item={child}
                                 open={open}
@@ -582,8 +580,8 @@ export function Sidebar({
                     Menu
                 </div>
                 <ul className="space-y-1">
-                    {menuData.map((item) => (
-                        <li key={item.id}>
+                    {menuData.map((item, index) => (
+                        <li key={`${item.id}-${index}`}>
                             <RecursiveMenuItem
                                 item={item}
                                 open={sidebarOpen || isMobile}
@@ -617,7 +615,7 @@ export function Sidebar({
                         if (!hasChildren && thisItem.url) {
                             return isLevel0 ? (
                                 <div
-                                    key={id}
+                                    key={`submenu-${id}-${level}`}
                                     className="fixed bg-sidebar border border-border rounded-lg shadow-xl py-2 px-4 z-[100] min-w-[200px] animate-in fade-in-0 zoom-in-95 duration-200"
                                     style={{
                                         top: pos.top,
@@ -650,7 +648,7 @@ export function Sidebar({
                         if (hasChildren) {
                             return (
                                 <div
-                                    key={id}
+                                    key={`submenu-children-${id}-${level}`}
                                     className="fixed bg-sidebar border border-border rounded-lg shadow-xl py-3 px-4 z-[100] min-w-[200px] animate-in fade-in-0 zoom-in-95 duration-200"
                                     style={{
                                         top: pos.top,
@@ -663,8 +661,8 @@ export function Sidebar({
                                         {thisItem.name}
                                     </div>
                                     <ul className="space-y-1 text-sm text-muted-foreground">
-                                        {itemsToShow.map((child) => (
-                                            <li key={child.id}>
+                                        {itemsToShow.map((child, childIndex) => (
+                                            <li key={`submenu-${id}-${child.id}-${childIndex}`}>
                                                 <button
                                                     className="w-full text-left px-3 py-2 rounded-lg hover:bg-sidebar-accent transition-colors font-medium"
                                                     onMouseEnter={(e) => handleMouseEnter(child, level + 1, e)}
@@ -686,7 +684,7 @@ export function Sidebar({
                             );
                         }
                         return null;
-                    }),
+                    }).filter(Boolean),
                     document.body
                 )
             )}

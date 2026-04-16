@@ -658,8 +658,9 @@ export function useBatchSaveMarks(examId: string, subjectConfigId: string) {
       queryClient.invalidateQueries({ queryKey: ['marks', examId] })
       toast.success('Marks saved successfully')
     },
-    onError: () => {
-      toast.error('Failed to save marks')
+    onError: (error: any) => {
+      const msg = error?.response?.data?.detail ?? 'Failed to save marks'
+      toast.error(msg)
     },
   })
 }

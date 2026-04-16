@@ -17,7 +17,7 @@ export interface FeeReceiptCreate extends FeeReceiptBase {
 export interface FeeReceiptUpdate {
   pdf_file_path?: string;
   is_reprinted?: boolean;
-  reprint_count?: string;
+  reprint_count?: number;
   remarks?: string;
 }
 
@@ -25,7 +25,7 @@ export interface FeeReceipt extends FeeReceiptBase {
   id: string;
   pdf_file_path?: string;
   is_reprinted: boolean;
-  reprint_count: string;
+  reprint_count: number;
   generated_by_user_id: string;
   remarks?: string;
   generated_at: string;
@@ -40,7 +40,7 @@ export interface FeeReceiptSummary {
   student_admission_num: string;
   generated_at: string;
   is_reprinted: boolean;
-  reprint_count: string;
+  reprint_count: number;
 }
 
 export interface ReceiptItemDetail {

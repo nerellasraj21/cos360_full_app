@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Eye, Copy, Trash2, Loader2, ClipboardList, MoreHorizontal, Edit, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { Plus, Eye, Trash2, Loader2, ClipboardList, Edit, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
@@ -18,15 +18,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { useExamList, useDeleteExam, useCloneExam, useExamGradeSchemes, useUpdateExam } from '@/api/hooks/exam/useExam'
+import { useExamList, useDeleteExam, useExamGradeSchemes, useUpdateExam, useExamDetail } from '@/api/hooks/exam/useExam'
 import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
 import { useAcademicYearStore } from '@/lib/academicYearStore'
 import { useAuthStore } from '@/lib/authStore'
@@ -36,21 +29,36 @@ import type { ExamListItem, ExamStatus, ExamNature, ExamBoard, ExamLevel } from 
 // Edit Exam Dialog (subcomponent)
 // ---------------------------------------------------------------------------
 interface EditExamDialogProps {
-  exam: ExamListItem
+  examId: string
   onClose: () => void
 }
 
-function EditExamDialog({ exam, onClose }: EditExamDialogProps) {
-  const updateMutation = useUpdateExam(exam.id)
+function EditExamDialog({ examId, onClose }: EditExamDialogProps) {
+  const { data: exam, isLoading } = useExamDetail(examId)
+  const updateMutation = useUpdateExam(examId)
   const [form, setForm] = useState({
-    exam_name: exam.exam_name,
-    mark_entry_deadline: exam.mark_entry_deadline ?? '',
-    hall_ticket_min_attendance: exam.hall_ticket_min_attendance != null ? String(exam.hall_ticket_min_attendance) : '',
-    attendance_from_date: exam.attendance_from_date ?? '',
-    attendance_to_date: exam.attendance_to_date ?? '',
-    publish_rank: !!(exam as any).publish_rank,
-    term: (exam as any).term ?? '',
+    exam_name: '',
+    mark_entry_deadline: '',
+    hall_ticket_min_attendance: '',
+    attendance_from_date: '',
+    attendance_to_date: '',
+    publish_rank: false,
+    term: '',
   })
+
+  useEffect(() => {
+    if (exam) {
+      setForm({
+        exam_name: exam.exam_name ?? '',
+        mark_entry_deadline: exam.mark_entry_deadline ?? '',
+        hall_ticket_min_attendance: exam.hall_ticket_min_attendance != null ? String(exam.hall_ticket_min_attendance) : '',
+        attendance_from_date: exam.attendance_from_date ?? '',
+        attendance_to_date: exam.attendance_to_date ?? '',
+        publish_rank: !!exam.publish_rank,
+        term: exam.term ?? '',
+      })
+    }
+  }, [exam])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,6 +73,14 @@ function EditExamDialog({ exam, onClose }: EditExamDialogProps) {
         term: form.term || undefined,
       },
       { onSuccess: () => onClose() }
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
     )
   }
 
@@ -180,8 +196,6 @@ export default function ExamList() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [natureFilter, setNatureFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [cloneTarget, setCloneTarget] = useState<ExamListItem | null>(null)
-  const [cloneName, setCloneName] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<ExamListItem | null>(null)
   const [editTarget, setEditTarget] = useState<ExamListItem | null>(null)
   const [isEditDirty, setIsEditDirty] = useState(false)
@@ -208,7 +222,6 @@ export default function ExamList() {
   )
 
   const deleteMutation = useDeleteExam()
-  const cloneMutation = useCloneExam()
   const { data: gradeSchemes = [] } = useExamGradeSchemes()
   const { data: subjectsList = [] } = useSubjectsDropdown()
   const subjectNameMap = Object.fromEntries(subjectsList.map(s => [s.id, s.name]))
@@ -228,19 +241,6 @@ export default function ExamList() {
   }, [exams, searchQuery, sortKey, sortDir])
 
   const hasGradingSetup = gradeSchemes.length > 0
-
-  const handleClone = () => {
-    if (!cloneTarget) return
-    cloneMutation.mutate(
-      { examId: cloneTarget.id, data: { new_name: cloneName } },
-      {
-        onSuccess: (data) => {
-          setCloneTarget(null)
-          navigate({ to: `/exam/exams/${data.id}` as any })
-        },
-      }
-    )
-  }
 
   const handleDelete = () => {
     if (!deleteTarget) return
@@ -345,7 +345,7 @@ export default function ExamList() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">
@@ -358,7 +358,7 @@ export default function ExamList() {
                 <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('nature')}>Nature <SortIcon col="nature" /></th>
                 <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('status')}>Status <SortIcon col="status" /></th>
                 <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('mark_entry_deadline')}>Deadline <SortIcon col="mark_entry_deadline" /></th>
-                <th className="px-4 py-3 text-right font-medium">Actions</th>
+                <th className="px-4 py-3 text-right font-medium sticky right-0 bg-muted/40">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -405,49 +405,27 @@ export default function ExamList() {
                   <td className="px-4 py-3 text-muted-foreground">
                     {exam.mark_entry_deadline ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => navigate({ to: `/exam/exams/${exam.id}` as any })}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Details
-                        </DropdownMenuItem>
-                        {isAdmin && (
-                          <>
-                            <DropdownMenuItem onClick={() => { setIsEditDirty(false); setEditTarget(exam); }}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit Exam
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setCloneTarget(exam)
-                                setCloneName(`${exam.exam_name} (Copy)`)
-                              }}
-                            >
-                              <Copy className="mr-2 h-4 w-4" />
-                              Clone Exam
-                            </DropdownMenuItem>
-                            {exam.status === 'draft' && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive"
-                                  onClick={() => setDeleteTarget(exam)}
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                  <td className="px-4 py-3 text-right sticky right-0 bg-background" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        title="Edit Exam"
+                        onClick={() => { setIsEditDirty(false); setEditTarget(exam); }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
+                        title="Delete Exam"
+                        onClick={() => setDeleteTarget(exam)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -463,31 +441,8 @@ export default function ExamList() {
             <DialogTitle>Edit Exam</DialogTitle>
           </DialogHeader>
           {editTarget && (
-            <EditExamDialog exam={editTarget} onClose={() => { setIsEditDirty(false); setEditTarget(null); }} />
+            <EditExamDialog examId={editTarget.id} onClose={() => { setIsEditDirty(false); setEditTarget(null); }} />
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Clone Dialog */}
-      <Dialog open={!!cloneTarget} onOpenChange={() => setCloneTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Clone Exam</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            A copy of <strong>{cloneTarget?.exam_name}</strong> will be created without marks. Continue?
-          </p>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">New Exam Name</label>
-            <Input value={cloneName} onChange={(e) => setCloneName(e.target.value)} />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setCloneTarget(null)}>Cancel</Button>
-            <Button disabled={cloneMutation.isPending} onClick={handleClone}>
-              {cloneMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Clone
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
 

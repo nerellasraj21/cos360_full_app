@@ -154,15 +154,16 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Merged Card: Filters + Table */}
       <Card>
+        {/* Filters Section */}
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="w-4 h-4" />
             Filters
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pb-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -198,10 +199,8 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
             </Select>
           </div>
         </CardContent>
-      </Card>
 
-      {/* Table */}
-      <Card>
+        {/* Table Section - No gap */}
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -252,7 +251,7 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
                         <EditButton onClick={() => { setIsEditDirty(false); setEditingMapping(mapping); }} title="Edit Mapping" />
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <DeleteButton title="Delete Mapping" />
+                            <DeleteButton onClick={() => {}} title="Delete Mapping" />
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>

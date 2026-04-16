@@ -106,12 +106,14 @@ import { Route as AppCommunicationLogsRouteImport } from './routes/_app/communic
 import { Route as AppCommunicationComposeRouteImport } from './routes/_app/communication/compose'
 import { Route as AppAdminUsersRouteImport } from './routes/_app/admin/users'
 import { Route as AppAdminProfileRouteImport } from './routes/_app/admin/profile'
+import { Route as AppFeeCollectionIndexRouteImport } from './routes/_app/fee/collection/index'
 import { Route as AppExamResultsIndexRouteImport } from './routes/_app/exam/results/index'
 import { Route as AppExamMarksIndexRouteImport } from './routes/_app/exam/marks/index'
 import { Route as AppExamHallTicketsIndexRouteImport } from './routes/_app/exam/hall-tickets/index'
 import { Route as AppExamGradingIndexRouteImport } from './routes/_app/exam/grading/index'
 import { Route as AppExamExamsIndexRouteImport } from './routes/_app/exam/exams/index'
 import { Route as AppStudentsAdmissionAdmissionIdRouteImport } from './routes/_app/students/admission/$admissionId'
+import { Route as AppFeeCollectionStudentIdRouteImport } from './routes/_app/fee/collection/$studentId'
 import { Route as AppExamResultsIdRouteImport } from './routes/_app/exam/results/$id'
 import { Route as AppExamMyMarksExamIdRouteImport } from './routes/_app/exam/my-marks/$examId'
 import { Route as AppExamMarksExamIdRouteImport } from './routes/_app/exam/marks/$examId'
@@ -630,6 +632,11 @@ const AppAdminProfileRoute = AppAdminProfileRouteImport.update({
   path: '/admin/profile',
   getParentRoute: () => AppRoute,
 } as any)
+const AppFeeCollectionIndexRoute = AppFeeCollectionIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppFeeCollectionRoute,
+} as any)
 const AppExamResultsIndexRoute = AppExamResultsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -660,6 +667,12 @@ const AppStudentsAdmissionAdmissionIdRoute =
     id: '/$admissionId',
     path: '/$admissionId',
     getParentRoute: () => AppStudentsAdmissionRoute,
+  } as any)
+const AppFeeCollectionStudentIdRoute =
+  AppFeeCollectionStudentIdRouteImport.update({
+    id: '/$studentId',
+    path: '/$studentId',
+    getParentRoute: () => AppFeeCollectionRoute,
   } as any)
 const AppExamResultsIdRoute = AppExamResultsIdRouteImport.update({
   id: '/$id',
@@ -812,7 +825,7 @@ export interface FileRoutesByFullPath {
   '/expense/transactions': typeof AppExpenseTransactionsRoute
   '/expense/types': typeof AppExpenseTypesRoute
   '/fee/categories': typeof AppFeeCategoriesRoute
-  '/fee/collection': typeof AppFeeCollectionRoute
+  '/fee/collection': typeof AppFeeCollectionRouteWithChildren
   '/fee/mappings': typeof AppFeeMappingsRoute
   '/fee/receipts': typeof AppFeeReceiptsRoute
   '/fee/refunds': typeof AppFeeRefundsRoute
@@ -876,12 +889,14 @@ export interface FileRoutesByFullPath {
   '/exam/marks/$examId': typeof AppExamMarksExamIdRouteWithChildren
   '/exam/my-marks/$examId': typeof AppExamMyMarksExamIdRoute
   '/exam/results/$id': typeof AppExamResultsIdRoute
+  '/fee/collection/$studentId': typeof AppFeeCollectionStudentIdRoute
   '/students/admission/$admissionId': typeof AppStudentsAdmissionAdmissionIdRoute
   '/exam/exams/': typeof AppExamExamsIndexRoute
   '/exam/grading/': typeof AppExamGradingIndexRoute
   '/exam/hall-tickets/': typeof AppExamHallTicketsIndexRoute
   '/exam/marks/': typeof AppExamMarksIndexRoute
   '/exam/results/': typeof AppExamResultsIndexRoute
+  '/fee/collection/': typeof AppFeeCollectionIndexRoute
   '/exam/exams/$id/audit': typeof AppExamExamsIdAuditRoute
   '/exam/exams/$id/dates': typeof AppExamExamsIdDatesRoute
   '/exam/exams/$id/notify': typeof AppExamExamsIdNotifyRoute
@@ -925,7 +940,6 @@ export interface FileRoutesByTo {
   '/expense/transactions': typeof AppExpenseTransactionsRoute
   '/expense/types': typeof AppExpenseTypesRoute
   '/fee/categories': typeof AppFeeCategoriesRoute
-  '/fee/collection': typeof AppFeeCollectionRoute
   '/fee/mappings': typeof AppFeeMappingsRoute
   '/fee/receipts': typeof AppFeeReceiptsRoute
   '/fee/refunds': typeof AppFeeRefundsRoute
@@ -988,12 +1002,14 @@ export interface FileRoutesByTo {
   '/exam/marks/$examId': typeof AppExamMarksExamIdRouteWithChildren
   '/exam/my-marks/$examId': typeof AppExamMyMarksExamIdRoute
   '/exam/results/$id': typeof AppExamResultsIdRoute
+  '/fee/collection/$studentId': typeof AppFeeCollectionStudentIdRoute
   '/students/admission/$admissionId': typeof AppStudentsAdmissionAdmissionIdRoute
   '/exam/exams': typeof AppExamExamsIndexRoute
   '/exam/grading': typeof AppExamGradingIndexRoute
   '/exam/hall-tickets': typeof AppExamHallTicketsIndexRoute
   '/exam/marks': typeof AppExamMarksIndexRoute
   '/exam/results': typeof AppExamResultsIndexRoute
+  '/fee/collection': typeof AppFeeCollectionIndexRoute
   '/exam/exams/$id/audit': typeof AppExamExamsIdAuditRoute
   '/exam/exams/$id/dates': typeof AppExamExamsIdDatesRoute
   '/exam/exams/$id/notify': typeof AppExamExamsIdNotifyRoute
@@ -1050,7 +1066,7 @@ export interface FileRoutesById {
   '/_app/expense/transactions': typeof AppExpenseTransactionsRoute
   '/_app/expense/types': typeof AppExpenseTypesRoute
   '/_app/fee/categories': typeof AppFeeCategoriesRoute
-  '/_app/fee/collection': typeof AppFeeCollectionRoute
+  '/_app/fee/collection': typeof AppFeeCollectionRouteWithChildren
   '/_app/fee/mappings': typeof AppFeeMappingsRoute
   '/_app/fee/receipts': typeof AppFeeReceiptsRoute
   '/_app/fee/refunds': typeof AppFeeRefundsRoute
@@ -1114,12 +1130,14 @@ export interface FileRoutesById {
   '/_app/exam/marks/$examId': typeof AppExamMarksExamIdRouteWithChildren
   '/_app/exam/my-marks/$examId': typeof AppExamMyMarksExamIdRoute
   '/_app/exam/results/$id': typeof AppExamResultsIdRoute
+  '/_app/fee/collection/$studentId': typeof AppFeeCollectionStudentIdRoute
   '/_app/students/admission/$admissionId': typeof AppStudentsAdmissionAdmissionIdRoute
   '/_app/exam/exams/': typeof AppExamExamsIndexRoute
   '/_app/exam/grading/': typeof AppExamGradingIndexRoute
   '/_app/exam/hall-tickets/': typeof AppExamHallTicketsIndexRoute
   '/_app/exam/marks/': typeof AppExamMarksIndexRoute
   '/_app/exam/results/': typeof AppExamResultsIndexRoute
+  '/_app/fee/collection/': typeof AppFeeCollectionIndexRoute
   '/_app/exam/exams/$id/audit': typeof AppExamExamsIdAuditRoute
   '/_app/exam/exams/$id/dates': typeof AppExamExamsIdDatesRoute
   '/_app/exam/exams/$id/notify': typeof AppExamExamsIdNotifyRoute
@@ -1239,12 +1257,14 @@ export interface FileRouteTypes {
     | '/exam/marks/$examId'
     | '/exam/my-marks/$examId'
     | '/exam/results/$id'
+    | '/fee/collection/$studentId'
     | '/students/admission/$admissionId'
     | '/exam/exams/'
     | '/exam/grading/'
     | '/exam/hall-tickets/'
     | '/exam/marks/'
     | '/exam/results/'
+    | '/fee/collection/'
     | '/exam/exams/$id/audit'
     | '/exam/exams/$id/dates'
     | '/exam/exams/$id/notify'
@@ -1288,7 +1308,6 @@ export interface FileRouteTypes {
     | '/expense/transactions'
     | '/expense/types'
     | '/fee/categories'
-    | '/fee/collection'
     | '/fee/mappings'
     | '/fee/receipts'
     | '/fee/refunds'
@@ -1351,12 +1370,14 @@ export interface FileRouteTypes {
     | '/exam/marks/$examId'
     | '/exam/my-marks/$examId'
     | '/exam/results/$id'
+    | '/fee/collection/$studentId'
     | '/students/admission/$admissionId'
     | '/exam/exams'
     | '/exam/grading'
     | '/exam/hall-tickets'
     | '/exam/marks'
     | '/exam/results'
+    | '/fee/collection'
     | '/exam/exams/$id/audit'
     | '/exam/exams/$id/dates'
     | '/exam/exams/$id/notify'
@@ -1476,12 +1497,14 @@ export interface FileRouteTypes {
     | '/_app/exam/marks/$examId'
     | '/_app/exam/my-marks/$examId'
     | '/_app/exam/results/$id'
+    | '/_app/fee/collection/$studentId'
     | '/_app/students/admission/$admissionId'
     | '/_app/exam/exams/'
     | '/_app/exam/grading/'
     | '/_app/exam/hall-tickets/'
     | '/_app/exam/marks/'
     | '/_app/exam/results/'
+    | '/_app/fee/collection/'
     | '/_app/exam/exams/$id/audit'
     | '/_app/exam/exams/$id/dates'
     | '/_app/exam/exams/$id/notify'
@@ -2181,6 +2204,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminProfileRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/fee/collection/': {
+      id: '/_app/fee/collection/'
+      path: '/'
+      fullPath: '/fee/collection/'
+      preLoaderRoute: typeof AppFeeCollectionIndexRouteImport
+      parentRoute: typeof AppFeeCollectionRoute
+    }
     '/_app/exam/results/': {
       id: '/_app/exam/results/'
       path: '/'
@@ -2222,6 +2252,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/students/admission/$admissionId'
       preLoaderRoute: typeof AppStudentsAdmissionAdmissionIdRouteImport
       parentRoute: typeof AppStudentsAdmissionRoute
+    }
+    '/_app/fee/collection/$studentId': {
+      id: '/_app/fee/collection/$studentId'
+      path: '/$studentId'
+      fullPath: '/fee/collection/$studentId'
+      preLoaderRoute: typeof AppFeeCollectionStudentIdRouteImport
+      parentRoute: typeof AppFeeCollectionRoute
     }
     '/_app/exam/results/$id': {
       id: '/_app/exam/results/$id'
@@ -2597,9 +2634,22 @@ const AppExpenseRouteWithChildren = AppExpenseRoute._addFileChildren(
   AppExpenseRouteChildren,
 )
 
+interface AppFeeCollectionRouteChildren {
+  AppFeeCollectionStudentIdRoute: typeof AppFeeCollectionStudentIdRoute
+  AppFeeCollectionIndexRoute: typeof AppFeeCollectionIndexRoute
+}
+
+const AppFeeCollectionRouteChildren: AppFeeCollectionRouteChildren = {
+  AppFeeCollectionStudentIdRoute: AppFeeCollectionStudentIdRoute,
+  AppFeeCollectionIndexRoute: AppFeeCollectionIndexRoute,
+}
+
+const AppFeeCollectionRouteWithChildren =
+  AppFeeCollectionRoute._addFileChildren(AppFeeCollectionRouteChildren)
+
 interface AppFeeRouteChildren {
   AppFeeCategoriesRoute: typeof AppFeeCategoriesRoute
-  AppFeeCollectionRoute: typeof AppFeeCollectionRoute
+  AppFeeCollectionRoute: typeof AppFeeCollectionRouteWithChildren
   AppFeeMappingsRoute: typeof AppFeeMappingsRoute
   AppFeeReceiptsRoute: typeof AppFeeReceiptsRoute
   AppFeeRefundsRoute: typeof AppFeeRefundsRoute
@@ -2613,7 +2663,7 @@ interface AppFeeRouteChildren {
 
 const AppFeeRouteChildren: AppFeeRouteChildren = {
   AppFeeCategoriesRoute: AppFeeCategoriesRoute,
-  AppFeeCollectionRoute: AppFeeCollectionRoute,
+  AppFeeCollectionRoute: AppFeeCollectionRouteWithChildren,
   AppFeeMappingsRoute: AppFeeMappingsRoute,
   AppFeeReceiptsRoute: AppFeeReceiptsRoute,
   AppFeeRefundsRoute: AppFeeRefundsRoute,

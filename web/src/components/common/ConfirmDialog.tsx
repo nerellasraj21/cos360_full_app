@@ -9,6 +9,7 @@ interface ConfirmDialogProps {
   description: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  pendingLabel?: string;
   onConfirm: () => void;
   onCancel?: () => void;
   isPending?: boolean;
@@ -22,6 +23,7 @@ export function ConfirmDialog({
   description,
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
+  pendingLabel,
   onConfirm,
   onCancel,
   isPending = false,
@@ -58,7 +60,7 @@ export function ConfirmDialog({
             disabled={isPending}
           >
             {isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            {isPending ? 'Deleting...' : confirmLabel}
+            {isPending ? (pendingLabel ?? `${confirmLabel}ing...`) : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

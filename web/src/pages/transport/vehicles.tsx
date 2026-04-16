@@ -39,9 +39,25 @@ export default function VehiclePage() {
           classNamePrefix="react-select"
           menuPlacement="auto"
           styles={{
-            menu: (base) => ({ ...base, zIndex: 9999 }),
+            menu: (base) => ({ ...base, zIndex: 9999, backgroundColor: '#fff', borderRadius: '4px' }),
             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-            control: (base) => ({ ...base, minHeight: '32px', fontSize: '12px' })
+            control: (base) => ({ ...base, minHeight: '32px', fontSize: '12px', backgroundColor: '#fff', borderColor: '#d1d5db', color: '#000' }),
+            option: (base, state) => ({
+              ...base,
+              backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#e5e7eb' : '#fff',
+              color: state.isSelected ? '#fff' : '#000',
+              cursor: 'pointer',
+              padding: '6px 10px',
+              fontSize: '12px'
+            }),
+            singleValue: (base) => ({
+              ...base,
+              color: '#000'
+            }),
+            input: (base) => ({
+              ...base,
+              color: '#000'
+            })
           }}
           isClearable={false}
           openMenuOnClick={true}
@@ -153,8 +169,29 @@ export default function VehiclePage() {
             classNamePrefix="react-select"
             menuPlacement="auto"
             styles={{
-              menu: (base) => ({ ...base, zIndex: 9999 }),
+              menu: (base) => ({ ...base, zIndex: 9999, backgroundColor: '#fff', borderRadius: '4px' }),
               menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+              option: (base, state) => ({
+                ...base,
+                backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#e5e7eb' : '#fff',
+                color: state.isSelected ? '#fff' : '#000',
+                cursor: 'pointer',
+                padding: '8px 12px'
+              }),
+              control: (base) => ({
+                ...base,
+                backgroundColor: '#fff',
+                borderColor: '#d1d5db',
+                color: '#000'
+              }),
+              singleValue: (base) => ({
+                ...base,
+                color: '#000'
+              }),
+              input: (base) => ({
+                ...base,
+                color: '#000'
+              })
             }}
             openMenuOnClick={true}
             closeMenuOnSelect={true}

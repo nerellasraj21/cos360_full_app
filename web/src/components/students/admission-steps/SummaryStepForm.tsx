@@ -7,11 +7,28 @@ import { useClassesDropdown, useSectionsByClassId } from '@/hooks/masters/useCla
 import { useStatesDropdown } from '@/api/hooks/masters/locations';
 import { useCastesDropdown, useSubCastesDropdown } from '@/api/hooks/masters/castes';
 
+/**
+ * SummaryStepForm - Review and Verify Admission Form Data
+ *
+ * Displays a comprehensive review of all admission form data organized by sections:
+ * - Academic Details (admission date, year, class, section)
+ * - Student Details (name, DOB, gender, Aadhar, APAAR, caste, community, etc.)
+ * - Parent Details (Father, Mother, and optionally Guardian)
+ * - Address Details (address line, city, state)
+ * - Previous School (conditionally displayed if applicable)
+ *
+ * Guardian Details:
+ * - Guardian section is conditionally displayed only if guardian_name is provided
+ * - If user filled in guardian information during the admission form, it will appear here
+ * - Guardian fields: Name, Email, Phone, Occupation, Aadhar, Gender, Relation
+ *
+ * This is the final step before form submission where users can verify all information is correct.
+ */
 export function SummaryStepForm() {
   const { watch } = useFormContext<StudentAdmissionCreate>();
   const formData = watch();
 
-  // Fetch data to display names instead of IDs
+  // Fetch reference data to display names instead of IDs
   const { data: academicYears = [] } = useAcademicYearsDropdown();
   const { data: classes = [] } = useClassesDropdown(true);
   const { data: admittedSections = [] } = useSectionsByClassId(formData.admitted_class_id ?? '');
@@ -113,6 +130,18 @@ export function SummaryStepForm() {
             <p><strong>Gender:</strong> {formData.mother_gender}</p>
             <p><strong>Relation:</strong> {formData.mother_relation_to_student}</p>
           </div>
+          {formData.guardian_name && (
+            <div>
+              <h4 className="font-semibold">Guardian</h4>
+              <p><strong>Name:</strong> {formData.guardian_name}</p>
+              <p><strong>Email:</strong> {formData.guardian_email}</p>
+              <p><strong>Phone:</strong> {formData.guardian_phone}</p>
+              <p><strong>Occupation:</strong> {formData.guardian_occupation}</p>
+              <p><strong>Aadhar:</strong> {formData.guardian_aadhar_number}</p>
+              <p><strong>Gender:</strong> {formData.guardian_gender}</p>
+              <p><strong>Relation:</strong> {formData.guardian_relation_to_student}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

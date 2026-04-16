@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, IndianRupee, FolderOpen, Tag, TrendingUp, Loader2, Info } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ChevronDown, ChevronRight, IndianRupee, FolderOpen, Tag, TrendingUp, Loader2, Info, Search, Filter } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { useExpenseHierarchicalSummary } from '@/hooks/expense';
@@ -167,6 +168,7 @@ function CategoryCard({ category, index }: { category: ExpenseCategorySummaryIte
 // ─── Main page ────────────────────────────────────────────────────────────────
 export function ExpenseSummaryPage() {
   const [selectedYearId, setSelectedYearId] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: academicYears, isLoading: yearsLoading } = useAcademicYearsDropdown();
 
@@ -175,6 +177,33 @@ export function ExpenseSummaryPage() {
     : {};
 
   const { data: summary, isLoading, isError } = useExpenseHierarchicalSummary(summaryParams);
+
+  const filteredCategories = useMemo(() => {
+    if (!summary?.categories) return [];
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return summary.categories;
+    return summary.categories
+      .map((cat) => {
+        if (cat.category_name.toLowerCase().includes(q) || (cat.category_description ?? '').toLowerCase().includes(q)) {
+          return cat;
+        }
+        const matchedTypes = cat.types
+          .map((type) => {
+            if (type.type_name.toLowerCase().includes(q) || (type.type_description ?? '').toLowerCase().includes(q)) {
+              return type;
+            }
+            const matchedEntries = type.entries.filter(
+              (e) =>
+                e.description.toLowerCase().includes(q) ||
+                (e.vendor_name ?? '').toLowerCase().includes(q)
+            );
+            return matchedEntries.length > 0 ? { ...type, entries: matchedEntries } : null;
+          })
+          .filter(Boolean) as ExpenseTypeSummaryItem[];
+        return matchedTypes.length > 0 ? { ...cat, types: matchedTypes } : null;
+      })
+      .filter(Boolean) as ExpenseCategorySummaryItem[];
+  }, [summary, searchQuery]);
 
   return (
     <PermissionGuard
@@ -216,6 +245,25 @@ export function ExpenseSummaryPage() {
             </Select>
           </div>
         </div>
+
+        {/* Search filter */}
+        {summary && summary.categories.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+              <Filter className="h-3.5 w-3.5" />
+              <span>Filters</span>
+            </div>
+            <div className="relative max-w-sm">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search by category, type, description or vendor..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-8 text-sm"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Grand total banner */}
         {summary && (
@@ -273,21 +321,24 @@ export function ExpenseSummaryPage() {
         {/* Categories */}
         {!isLoading && !isError && summary && (
           <>
-            {summary.categories.length === 0 ? (
+            {filteredCategories.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                   <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Expense Data</h3>
+                  <h3 className="text-lg font-medium mb-2">
+                    {searchQuery ? 'No Results Found' : 'No Expense Data'}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
-                    No categories or expenses found{selectedYearId !== 'all' ? ' for the selected academic year' : ''}.
-                    <br />
-                    Start by creating categories and adding expense entries.
+                    {searchQuery
+                      ? `No categories, types, or entries match "${searchQuery}".`
+                      : <>No categories or expenses found{selectedYearId !== 'all' ? ' for the selected academic year' : ''}.<br />Start by creating categories and adding expense entries.</>
+                    }
                   </p>
                 </CardContent>
               </Card>
             ) : (
               <>
-                {summary.categories.map((cat, idx) => (
+                {filteredCategories.map((cat, idx) => (
                   <CategoryCard key={cat.category_id} category={cat} index={idx} />
                 ))}
 

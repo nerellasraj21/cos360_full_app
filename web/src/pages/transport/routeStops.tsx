@@ -81,15 +81,6 @@ export default function RouteStopsPage() {
     { key: 'name', label: 'Stop Name', editable: true },
     { key: 'number', label: 'Stop Number', editable: true },
     {
-      key: 'reaching_time',
-      label: 'Reaching Time',
-      editable: true,
-      render: (value: string) => value ? value.substring(0, 5) : 'N/A',
-      renderEdit: (value: any, _row: RouteStop, onChange: (val: any) => void) => (
-        <TimePicker value={value ? value.substring(0, 5) : ''} onChange={onChange} />
-      )
-    },
-    {
       key: 'pickup_time',
       label: 'Pickup Time',
       editable: true,

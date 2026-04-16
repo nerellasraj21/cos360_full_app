@@ -11,8 +11,10 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useAdmissions, useUpdateAdmission, useToggleStudentStatus, useAdmissionTypesDropdown } from '@/api/hooks/students/admissions';
+import { getAdmissionByStudentId } from '@/api/students/admissions';
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections';
 import { useAcademicYearsDropdown } from '@/api/hooks/masters/academicyears';
+import { useStatesDropdown, useDistrictsDropdown, useMandalsDropdown } from '@/api/hooks/masters/locations';
 import { StateDropdown } from '@/components/dropdown/StateDropdown';
 import { DistrictDropdown } from '@/components/dropdown/DistrictDropdown';
 import { MandalDropdown } from '@/components/dropdown/MandalDropdown';
@@ -47,8 +49,10 @@ interface AdmissionTableProps {
 const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true }: AdmissionTableProps = {}) => {
   const navigate = useNavigate();
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewLoading, setViewLoading] = useState(false);
   const [toggleTarget, setToggleTarget] = useState<AdmissionTableData | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
   const [isEditDirty, setIsEditDirty] = useState(false);
   const [selectedAdmission, setSelectedAdmission] = useState<StudentAdmissionResponse | null>(null);
   const [page, setPage] = useState(0);
@@ -105,6 +109,14 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
     mother_aadhar_number: '',
     mother_gender: '',
     mother_salary_range: '',
+    // Guardian fields
+    guardian_name: '',
+    guardian_email: '',
+    guardian_phone: '',
+    guardian_occupation: '',
+    guardian_aadhar_number: '',
+    guardian_gender: '',
+    guardian_salary_range: '',
   });
 
   const { data: admissionsResponse, isLoading } = useAdmissions({ skip: page * pageSize, limit: pageSize });
@@ -114,10 +126,12 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
   const updateMutation = useUpdateAdmission();
   const toggleStatusMutation = useToggleStudentStatus();
 
-  // Debug: Log admissions data when it changes
-  console.log('📊 Admissions Response:', admissionsResponse);
-  console.log('📊 Total Count:', admissionsResponse?.total_count);
-  console.log('📊 Items Count:', admissionsResponse?.items?.length);
+  // Location hooks for view modal display (keyed on selectedAdmission's state/district)
+  const selectedStateId = (selectedAdmission as any)?.state_id || selectedAdmission?.state;
+  const selectedDistrictId = (selectedAdmission as any)?.district_id;
+  const { data: states = [] } = useStatesDropdown();
+  const { data: districts = [], isLoading: districtsLoading } = useDistrictsDropdown(selectedStateId);
+  const { data: mandals = [], isLoading: mandalsLoading } = useMandalsDropdown(selectedDistrictId);
 
   // Helper functions to get display names
   const getAcademicYearName = (yearId: string) => {
@@ -137,6 +151,25 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       return section ? section.name : `Section ${sectionId}`;
     }
     return `Section ${sectionId}`;
+  };
+
+  const getStateName = (stateId: string) =>
+    states.find(s => s.id === stateId)?.name || stateId;
+
+  const getDistrictName = (districtId: string) => {
+    if (districtsLoading) return 'Loading...';
+    return districts.find(d => d.id === districtId)?.name || 'N/A';
+  };
+
+  const getMandalName = (mandalId: string) => {
+    if (mandalsLoading) return 'Loading...';
+    return mandals.find(m => m.id === mandalId)?.name || 'N/A';
+  };
+
+  const formatGender = (g?: string) => {
+    if (!g) return 'N/A';
+    const map: Record<string, string> = { M: 'Male', F: 'Female', O: 'Other', male: 'Male', female: 'Female', other: 'Other' };
+    return map[g] ?? (g.charAt(0).toUpperCase() + g.slice(1));
   };
 
   const handlePageChange = (newPage: number) => {
@@ -271,23 +304,37 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       render: (_, row) => (
         <TableActionGroup>
           <ViewButton
-            onClick={() => {
-              const admission = admissionsResponse?.items?.find(item => item.id === row.id);
-              if (admission) {
+            onClick={async () => {
+              const listItem = admissionsResponse?.items?.find(item => item.id === row.id);
+              const studentId = listItem?.student?.id || listItem?.student_id;
+              if (!studentId) return;
+              setViewLoading(true);
+              try {
+                const admission = await getAdmissionByStudentId(studentId);
                 setSelectedAdmission(admission);
                 setViewModalOpen(true);
+              } catch {
+                toast.error('Failed to load admission details');
+              } finally {
+                setViewLoading(false);
               }
             }}
             title="View Admission"
+            disabled={viewLoading}
           />
           {hasUpdatePermission && (
             <>
               <EditButton
-                onClick={() => {
-                  const admission = admissionsResponse?.items?.find(item => item.id === row.id);
-                  if (admission) {
-                    setSelectedAdmission(admission);
+                onClick={async () => {
+                  const listItem = admissionsResponse?.items?.find(item => item.id === row.id);
+                  const studentId = listItem?.student?.id || listItem?.student_id;
+                  if (!studentId) return;
+                  setEditLoading(true);
+                  try {
+                    const admission = await getAdmissionByStudentId(studentId);
                     const s = admission.student as any;
+                    const a = admission as any;
+                    setSelectedAdmission(admission);
                     setEditForm({
                       // Admission fields
                       admission_date: admission.admission_date || '',
@@ -301,9 +348,9 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       address_line2: admission.address_line2 || '',
                       city: admission.city || '',
                       state: admission.state || '',
-                      state_id: admission.state || '',  // state column stores UUID (same as state_id)
-                      district_id: (admission as any).district_id || '',
-                      mandal_id: (admission as any).mandal_id || '',
+                      state_id: admission.state || '',
+                      district_id: a.district_id || '',
+                      mandal_id: a.mandal_id || '',
                       is_previous_school: admission.is_previous_school || false,
                       previous_school_name: admission.previous_school_name || '',
                       previous_class: admission.previous_class || '',
@@ -319,9 +366,9 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       nationality: s?.nationality || '',
                       mother_tongue: s?.mother_tongue || '',
                       caste: s?.caste || '',
-                      caste_id: s?.caste || '',       // caste column stores UUID (same as caste_id)
+                      caste_id: s?.caste || '',
                       sub_caste: s?.sub_caste || '',
-                      sub_caste_id: s?.sub_caste || '', // sub_caste column stores UUID
+                      sub_caste_id: s?.sub_caste || '',
                       community: s?.community || '',
                       identification_marks: s?.identification_marks || '',
                       // Father fields
@@ -340,12 +387,25 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       mother_aadhar_number: s?.mother?.aadhar_number || '',
                       mother_gender: s?.mother?.gender || '',
                       mother_salary_range: s?.mother?.salary_range || '',
+                      // Guardian fields (nested under student, same as father/mother)
+                      guardian_name: s?.guardian?.name || '',
+                      guardian_email: s?.guardian?.email || '',
+                      guardian_phone: s?.guardian?.phone || '',
+                      guardian_occupation: s?.guardian?.occupation || '',
+                      guardian_aadhar_number: s?.guardian?.aadhar_number || '',
+                      guardian_gender: s?.guardian?.gender || '',
+                      guardian_salary_range: s?.guardian?.salary_range || '',
                     });
                     setIsEditDirty(false);
                     setEditModalOpen(true);
+                  } catch {
+                    toast.error('Failed to load admission details');
+                  } finally {
+                    setEditLoading(false);
                   }
                 }}
                 title="Edit Admission"
+                disabled={editLoading}
               />
               {row.is_active ? (
                 <DeactivateButton
@@ -471,10 +531,12 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       { label: 'Address Line 1', value: admission.address_line1 },
       { label: 'Address Line 2', value: admission.address_line2 || 'N/A' },
       { label: 'City', value: admission.city },
-      { label: 'State', value: admission.state },
+      { label: 'State', value: admission.state ? getStateName(admission.state) : 'N/A' },
+      { label: 'District', value: admission.district_id ? getDistrictName(admission.district_id) : 'N/A' },
+      { label: 'Mandal', value: admission.mandal_id ? getMandalName(admission.mandal_id) : 'N/A' },
       { label: 'Student Name', value: `${studentData.first_name} ${studentData.last_name}` },
       { label: 'Date of Birth', value: new Date(studentData.date_of_birth).toLocaleDateString() },
-      { label: 'Gender', value: studentData.gender },
+      { label: 'Gender', value: formatGender(studentData.gender) },
       { label: 'Aadhar Number', value: studentData.aadhar_number || 'N/A' },
       { label: 'APAAR Number', value: studentData.apaar_number || 'N/A' },
       { label: 'Caste', value: studentData.caste || 'N/A' },
@@ -488,13 +550,19 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       { label: 'Father Phone', value: studentData.father?.phone || 'N/A' },
       { label: 'Father Occupation', value: studentData.father?.occupation || 'N/A' },
       { label: 'Father Aadhar', value: studentData.father?.aadhar_number || 'N/A' },
-      { label: 'Father Gender', value: studentData.father?.gender || 'N/A' },
+      { label: 'Father Gender', value: formatGender(studentData.father?.gender) },
       { label: 'Mother Name', value: studentData.mother?.name || 'N/A' },
       { label: 'Mother Email', value: studentData.mother?.email || 'N/A' },
       { label: 'Mother Phone', value: studentData.mother?.phone || 'N/A' },
       { label: 'Mother Occupation', value: studentData.mother?.occupation || 'N/A' },
       { label: 'Mother Aadhar', value: studentData.mother?.aadhar_number || 'N/A' },
-      { label: 'Mother Gender', value: studentData.mother?.gender || 'N/A' },
+      { label: 'Mother Gender', value: formatGender(studentData.mother?.gender) },
+      { label: 'Guardian Name', value: studentData.guardian?.name || 'N/A' },
+      { label: 'Guardian Email', value: studentData.guardian?.email || 'N/A' },
+      { label: 'Guardian Phone', value: studentData.guardian?.phone || 'N/A' },
+      { label: 'Guardian Occupation', value: studentData.guardian?.occupation || 'N/A' },
+      { label: 'Guardian Aadhar', value: studentData.guardian?.aadhar_number || 'N/A' },
+      { label: 'Guardian Gender', value: formatGender(studentData.guardian?.gender) },
       ...(admission.is_previous_school ? [
         { label: 'Previous School Name', value: admission.previous_school_name },
         { label: 'Previous Class', value: admission.previous_class },
@@ -555,12 +623,13 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
       {/* Edit Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
-        <DialogContent className="max-w-2xl max-h-[85vh]">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle>Edit Admission - {selectedAdmission?.admission_number}</DialogTitle>
           </DialogHeader>
+          <div className="overflow-y-auto px-6">
           {selectedAdmission && (
-            <div className="space-y-4 overflow-y-auto pr-1" onChange={() => setIsEditDirty(true)}>
+            <div className="space-y-4 pr-1 pb-2" onChange={() => setIsEditDirty(true)}>
 
               {/* Admission Info */}
               <div className="grid grid-cols-2 gap-4">
@@ -852,9 +921,9 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                   <Select value={editForm.gender} onValueChange={(v) => setEditForm(prev => ({ ...prev, gender: v }))}>
                     <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="M">Male</SelectItem>
+                      <SelectItem value="F">Female</SelectItem>
+                      <SelectItem value="O">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -952,9 +1021,9 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                   <Select value={editForm.father_gender} onValueChange={(v) => setEditForm(prev => ({ ...prev, father_gender: v }))}>
                     <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="M">Male</SelectItem>
+                      <SelectItem value="F">Female</SelectItem>
+                      <SelectItem value="O">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1007,9 +1076,9 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                   <Select value={editForm.mother_gender} onValueChange={(v) => setEditForm(prev => ({ ...prev, mother_gender: v }))}>
                     <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="M">Male</SelectItem>
+                      <SelectItem value="F">Female</SelectItem>
+                      <SelectItem value="O">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1029,9 +1098,64 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                   </Select>
                 </div>
               </div>
+
+              {/* Guardian Details */}
+              <p className="text-sm font-semibold text-muted-foreground pt-2">Guardian's Details (Optional)</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-guardian-name">Name</Label>
+                  <Input id="edit-guardian-name" value={editForm.guardian_name} onChange={(e) => setEditForm(prev => ({ ...prev, guardian_name: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-guardian-email">Email</Label>
+                  <Input id="edit-guardian-email" type="email" value={editForm.guardian_email} onChange={(e) => setEditForm(prev => ({ ...prev, guardian_email: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-guardian-phone">Phone</Label>
+                  <Input id="edit-guardian-phone" value={editForm.guardian_phone} onChange={(e) => setEditForm(prev => ({ ...prev, guardian_phone: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-guardian-occupation">Occupation</Label>
+                  <Input id="edit-guardian-occupation" value={editForm.guardian_occupation} onChange={(e) => setEditForm(prev => ({ ...prev, guardian_occupation: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-guardian-aadhar">Aadhar Number</Label>
+                  <Input id="edit-guardian-aadhar" value={editForm.guardian_aadhar_number} onChange={(e) => setEditForm(prev => ({ ...prev, guardian_aadhar_number: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-guardian-gender">Gender (Optional)</Label>
+                  <Select value={editForm.guardian_gender} onValueChange={(v) => setEditForm(prev => ({ ...prev, guardian_gender: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="M">Male</SelectItem>
+                      <SelectItem value="F">Female</SelectItem>
+                      <SelectItem value="O">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-guardian-salary">Salary Range (Optional)</Label>
+                  <Select value={editForm.guardian_salary_range} onValueChange={(v) => setEditForm(prev => ({ ...prev, guardian_salary_range: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select salary range" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="below_1l">Below 1L</SelectItem>
+                      <SelectItem value="1l_3l">1L - 3L</SelectItem>
+                      <SelectItem value="3l_5l">3L - 5L</SelectItem>
+                      <SelectItem value="5l_10l">5L - 10L</SelectItem>
+                      <SelectItem value="above_10l">Above 10L</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           )}
-          <DialogFooter>
+          <div className="flex justify-end gap-2 pt-4 pb-4">
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
@@ -1092,12 +1216,22 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       mother_aadhar_number: editForm.mother_aadhar_number || undefined,
                       mother_gender: editForm.mother_gender || undefined,
                       mother_salary_range: editForm.mother_salary_range || undefined,
+                      // Guardian fields
+                      guardian_name: editForm.guardian_name || undefined,
+                      guardian_email: editForm.guardian_email || undefined,
+                      guardian_phone: editForm.guardian_phone || undefined,
+                      guardian_occupation: editForm.guardian_occupation || undefined,
+                      guardian_aadhar_number: editForm.guardian_aadhar_number || undefined,
+                      guardian_gender: editForm.guardian_gender || undefined,
+                      guardian_salary_range: editForm.guardian_salary_range || undefined,
                     };
 
                     await updateMutation.mutateAsync({
                       studentId: selectedAdmission.student.id,
                       data: updateData
                     });
+                    const refreshed = await getAdmissionByStudentId(selectedAdmission.student.id);
+                    setSelectedAdmission(refreshed);
                     setIsEditDirty(false);
                     setEditModalOpen(false);
                   } catch (error) {
@@ -1109,7 +1243,8 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
             >
               {updateMutation.isPending ? 'Updating...' : 'Update Admission'}
             </Button>
-          </DialogFooter>
+          </div>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1119,6 +1254,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
         title={toggleTarget?.is_active ? 'Disable Student' : 'Enable Student'}
         description={`Are you sure you want to ${toggleTarget?.is_active ? 'disable' : 'enable'} ${toggleTarget?.student_name}?`}
         confirmLabel={toggleTarget?.is_active ? 'Disable' : 'Enable'}
+        isDestructive={!!toggleTarget?.is_active}
         onConfirm={confirmToggleStatus}
         isPending={toggleStatusMutation.isPending}
       />

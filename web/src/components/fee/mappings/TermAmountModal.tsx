@@ -237,12 +237,11 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                         throw new Error(`Missing ID for term ${index + 1}. Cannot update without existing ID.`);
                     }
 
-                    // Backend expects term_id (not term_date_id)
-                    const termId = ta.term_date_id || ta.term_id || ta.term_number.toString();
+                    const termDateId = ta.term_date_id || ta.term_id || ta.term_number.toString();
 
                     return {
                         id: existing.id, // Must be valid UUID
-                        term_id: termId, // Backend expects this field
+                        term_date_id: termDateId, // Backend schema field name
                         term_amount: ta.term_amount || 0
                     };
                 });

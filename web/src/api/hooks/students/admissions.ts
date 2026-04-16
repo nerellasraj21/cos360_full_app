@@ -61,6 +61,25 @@ export function useStudentByAdmissionId(admissionId: string) {
   });
 }
 
+export function useStudentById(studentId: string) {
+  return useQuery<StudentOut>({
+    queryKey: ['student', 'detail', studentId],
+    queryFn: async () => {
+      const admission = await getAdmissionByStudentId(studentId);
+      return admission.student;
+    },
+    enabled: !!studentId,
+  });
+}
+
+export function useStudentAdmissionDetail(studentId: string) {
+  return useQuery<StudentAdmissionResponse>({
+    queryKey: ['student', 'admission', 'detail', studentId],
+    queryFn: () => getAdmissionByStudentId(studentId),
+    enabled: !!studentId,
+  });
+}
+
 export function useStudentsSearch(query: string) {
   return usePermissionProtectedQuery<StudentOut[]>({
     queryKey: ['students', 'search', query],
