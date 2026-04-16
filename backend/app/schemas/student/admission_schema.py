@@ -28,6 +28,9 @@ class StudentAdmissionBase(BaseModel):
 
 class StudentAdmissionCreate(StudentAdmissionBase):
     student: StudentCreate
+    state_id: UUID | None = None
+    district_id: UUID | None = None
+    mandal_id: UUID | None = None
 
 
 class StudentAdmissionResponse(StudentAdmissionBase):
@@ -41,6 +44,9 @@ class StudentAdmissionResponse(StudentAdmissionBase):
     address_line1: str | None = None
     city: str | None = None
     state: str | None = None
+    state_id: UUID | None = None
+    district_id: UUID | None = None
+    mandal_id: UUID | None = None
     student: StudentOut
 
     model_config = ConfigDict(from_attributes=True)
@@ -102,5 +108,15 @@ class StudentAdmissionUpdate(BaseModel):
     mother_aadhar_number: str | None = None
     mother_gender: str | None = None
     mother_salary_range: str | None = None
+
+    # Guardian fields (optional)
+    guardian_name: str | None = None
+    guardian_email: str | None = None
+    guardian_phone: str | None = None
+    guardian_occupation: str | None = None
+    guardian_aadhar_number: str | None = None
+    guardian_gender: str | None = None
+    guardian_salary_range: str | None = None
+    guardian_relation_to_student: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

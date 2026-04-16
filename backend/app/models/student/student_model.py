@@ -49,22 +49,42 @@ class Student(BaseOrg):
     documents = relationship("StudentDocument", back_populates="student", cascade="all, delete-orphan")
     fee_student_mappings = relationship("FeeStudentMapping", back_populates="student", cascade="all, delete-orphan")
 
+    # Parent relationship properties (dynamically extracted from parent_links)
+    # These are populated by admission service to provide convenient access to father, mother, and guardian
+    # See: app/service/student/admission_service.py (get_admission_by_id_with_context, etc.)
+
     @property
     def father(self):
+        """Get father from parent_links relationship. Populated by admission service."""
         if hasattr(self, "_father"):
             return self._father
         return None
 
     @father.setter
     def father(self, value):
+        """Set father - used by admission service to assign extracted parent."""
         self._father = value
 
     @property
     def mother(self):
+        """Get mother from parent_links relationship. Populated by admission service."""
         if hasattr(self, "_mother"):
             return self._mother
         return None
 
     @mother.setter
     def mother(self, value):
+        """Set mother - used by admission service to assign extracted parent."""
         self._mother = value
+
+    @property
+    def guardian(self):
+        """Get guardian from parent_links relationship. Populated by admission service."""
+        if hasattr(self, "_guardian"):
+            return self._guardian
+        return None
+
+    @guardian.setter
+    def guardian(self, value):
+        """Set guardian - used by admission service to assign extracted parent."""
+        self._guardian = value

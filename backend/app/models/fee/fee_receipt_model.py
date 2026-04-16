@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import TIMESTAMP, Boolean, Column, ForeignKey, String, Text, func
+from sqlalchemy import TIMESTAMP, Boolean, Column, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -34,7 +34,7 @@ class FeeReceipt(BaseOrg):
 
     # Status tracking
     is_reprinted = Column(Boolean, default=False, nullable=False)
-    reprint_count = Column("reprint_count", String, server_default="0", nullable=False)  # Track reprints
+    reprint_count = Column("reprint_count", Integer, server_default="0", nullable=False)  # Track reprints
 
     # Operational fields
     generated_by_user_id = Column(UUID(as_uuid=True), nullable=False)  # Staff who generated receipt

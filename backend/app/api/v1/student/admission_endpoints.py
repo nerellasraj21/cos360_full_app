@@ -12,7 +12,7 @@ from app.schemas.student.admission_schema import (
     StudentAdmissionResponse,
     StudentAdmissionUpdate,
 )
-from app.schemas.student.student_schema import StudentDropdown, StudentSimpleDropdown
+from app.schemas.student.student_schema import StudentDropdown, StudentSimpleDropdown, StudentOut
 from app.service.student.admission_service import (
     add_admission,
     delete_admission,
@@ -33,8 +33,13 @@ from app.tools.simple_permissions import (
 
 router = APIRouter(prefix="/students/admission", tags=["Student/Student Admission"])
 
+# Note: All endpoints include explicit response_model declarations to ensure proper serialization
+# of nested relationships (student, father, mother). This ensures Pydantic correctly serializes
+# the complex Student object with its parent relationships for API responses.
+# See: https://github.com/anthropics/claude-code/issues/[admission-details-missing]
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+
+@router.post("/", status_code=status.HTTP_201_CREATED, response_model=StudentAdmissionResponse)
 async def create_admission(
     admission: StudentAdmissionCreate, request: Request, db: AsyncSession = Depends(get_tenant_db)
 ):
@@ -85,7 +90,7 @@ async def get_next_admission_number(
     }
 
 
-@router.get("/id/{student_id}")
+@router.get("/id/{student_id}", response_model=StudentAdmissionResponse)
 async def get_admission(student_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Get admission by student ID with user access validation - All authenticated users"""
 
@@ -98,7 +103,7 @@ async def get_admission(student_id: UUID, request: Request, db: AsyncSession = D
     return await get_admission_by_id_with_context(student_id, db, user_context, request)
 
 
-@router.patch("/{student_id}")
+@router.patch("/{student_id}", response_model=StudentAdmissionResponse)
 async def update_admission(
     student_id: UUID, data: StudentAdmissionUpdate, request: Request, db: AsyncSession = Depends(get_tenant_db)
 ):
@@ -113,7 +118,7 @@ async def update_admission(
 
 
 # Get student by admission ID
-@router.get("/by-admission/{admission_id}")
+@router.get("/by-admission/{admission_id}", response_model=StudentOut)
 async def fetch_student_by_admission(admission_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Get student by admission ID - All authenticated users"""
     current_user = await get_current_user_token(request)
@@ -126,7 +131,7 @@ async def fetch_student_by_admission(admission_id: UUID, request: Request, db: A
 
 
 # Search (get while typing)
-@router.get("/search")
+@router.get("/search", response_model=list[StudentOut])
 async def search_student_by_text(
     request: Request, db: AsyncSession = Depends(get_tenant_db), query: str = Query(..., min_length=1)
 ):
@@ -155,7 +160,7 @@ async def list_admissions(
     return await get_all_admissions_with_context(db, user_context, skip, limit)
 
 
-@router.delete("/{admission_id}", status_code=status.HTTP_200_OK)
+@router.delete("/{admission_id}", status_code=status.HTTP_200_OK, response_model=StudentAdmissionResponse)
 async def delete_student_admission(admission_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Delete student admission and related data - Admin only"""
     current_user = await get_current_user_token(request)
@@ -167,7 +172,7 @@ async def delete_student_admission(admission_id: UUID, request: Request, db: Asy
     return await delete_admission(admission_id, db)
 
 
-@router.patch("/{student_id}/toggle-active", status_code=status.HTTP_200_OK)
+@router.patch("/{student_id}/toggle-active", status_code=status.HTTP_200_OK, response_model=StudentAdmissionResponse)
 async def toggle_student_active_status(student_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Toggle student active/inactive status - Admin only"""
     current_user = await get_current_user_token(request)
@@ -274,7 +279,7 @@ async def get_my_children_admissions(
 
 
 @router.get("/admission-types/dropdown")
-async def get_admission_types_dropdown(request: Request):
+async def get_admission_types_dropdown(request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """
     Get admission type options for dropdown.
 
@@ -284,7 +289,11 @@ async def get_admission_types_dropdown(request: Request):
 
     **Required Permission**: student_admissions:read
     """
-    await get_current_user_token(request)
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, "student_admissions", "read")
 
     return [
         {"value": "primary", "label": "Primary Admission"},

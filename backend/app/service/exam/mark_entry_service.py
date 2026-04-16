@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.exam.exam_subject_config_model import ExamSubjectConfig
+from app.models.exam.exam_subject_config_model import ExamSubjectComponent, ExamSubjectConfig
 from app.models.exam.mark_permission_model import ExamMarkEntryPermission
 from app.models.exam.student_marks_model import StudentMark
 from app.schemas.exam.mark_entry_schema import MarkEntryCreate
@@ -168,18 +168,22 @@ async def get_marks_grid(
     components = comp_result.scalars().all()
     component_ids = [str(c.id) for c in components]
 
-    # 2. Get all enrolled students for this class/section
-    section_filter = "AND (sa.current_section_id = :section_id)" if section_id else ""
+    # 2. Get all enrolled students for this class/section (deduplicated per student)
+    section_filter = "AND sa.current_section_id = :section_id" if section_id else ""
     student_sql = text(f"""
-        SELECT
-            sa.student_id,
-            TRIM(COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '')) AS student_name,
-            sa.admission_number
-        FROM student_admissions sa
-        JOIN students s ON s.id = sa.student_id
-        WHERE sa.current_class_id = :class_id
-          {section_filter}
-        ORDER BY sa.admission_number
+        SELECT student_id, student_name, admission_number
+        FROM (
+            SELECT DISTINCT ON (sa.student_id)
+                sa.student_id,
+                TRIM(COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '')) AS student_name,
+                sa.admission_number
+            FROM student_admissions sa
+            JOIN students s ON s.id = sa.student_id
+            WHERE sa.current_class_id = :class_id
+              {section_filter}
+            ORDER BY sa.student_id, sa.admission_number
+        ) sub
+        ORDER BY admission_number
         LIMIT :limit OFFSET :offset
     """)
     params: dict = {
@@ -280,6 +284,28 @@ async def upsert_marks(
     written = 0
 
     try:
+        # Build component max_marks lookup to validate before saving
+        component_ids = list({item.component_id for item in payload.marks})
+        comp_result = await db.execute(
+            select(ExamSubjectComponent).where(ExamSubjectComponent.id.in_(component_ids))
+        )
+        comp_max: dict[UUID, float | None] = {
+            c.id: (float(c.max_marks) if c.max_marks is not None else None)
+            for c in comp_result.scalars().all()
+        }
+
+        for item in payload.marks:
+            if item.marks_obtained is not None:
+                max_allowed = comp_max.get(item.component_id)
+                if max_allowed is not None and float(item.marks_obtained) > max_allowed:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=(
+                            f"marks_obtained ({item.marks_obtained}) exceeds the component "
+                            f"maximum ({max_allowed}) for component {item.component_id}."
+                        ),
+                    )
+
         for item in payload.marks:
             # Look up existing row for this student/component/attempt
             existing_result = await db.execute(

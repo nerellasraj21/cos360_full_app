@@ -102,7 +102,6 @@ class FeeReceiptService:
                     and_(
                         Admission.student_id == transaction.student_id,
                         Admission.admission_number == transaction.student_admission_num,
-                        Admission.academic_year_id == transaction.academic_year_id,
                     )
                 )
             )
@@ -331,8 +330,8 @@ class FeeReceiptService:
 
             # Update reprint information
             receipt.is_reprinted = True
-            current_count = int(receipt.reprint_count) if receipt.reprint_count.isdigit() else 0
-            receipt.reprint_count = str(current_count + 1)
+            current_count = receipt.reprint_count if isinstance(receipt.reprint_count, int) else 0
+            receipt.reprint_count = current_count + 1
 
             await db.commit()
             await db.refresh(receipt)

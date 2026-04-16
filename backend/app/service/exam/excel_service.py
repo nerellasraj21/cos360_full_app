@@ -17,6 +17,7 @@ async def generate_excel_template(
     db: AsyncSession,
     class_id: UUID = None,
     section_id: UUID = None,
+    attempt_number: int = 1,
 ) -> bytes:
     """
     Generate an Excel template for offline mark entry.
@@ -63,28 +64,72 @@ async def generate_excel_template(
     if class_id:
         section_filter = "AND sa.current_section_id = :section_id" if section_id else ""
         student_sql = text(f"""
-            SELECT
-                sa.student_id,
-                sa.admission_number,
-                TRIM(COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '')) AS student_name
-            FROM student_admissions sa
-            JOIN students s ON s.id = sa.student_id
-            WHERE sa.current_class_id = :class_id
-              {section_filter}
-            ORDER BY sa.admission_number
+            SELECT student_id, admission_number, student_name
+            FROM (
+                SELECT DISTINCT ON (sa.student_id)
+                    sa.student_id,
+                    sa.admission_number,
+                    TRIM(COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '')) AS student_name
+                FROM student_admissions sa
+                JOIN students s ON s.id = sa.student_id
+                WHERE sa.current_class_id = :class_id
+                  {section_filter}
+                ORDER BY sa.student_id, sa.admission_number
+            ) sub
+            ORDER BY admission_number
         """)
         params: dict = {"class_id": str(class_id)}
         if section_id:
             params["section_id"] = str(section_id)
         student_rows = (await db.execute(student_sql, params)).fetchall()
 
+        # Fetch already-entered marks for this exam + subject config
+        from sqlalchemy import and_
+
+        from app.models.exam.student_marks_model import StudentMark
+
+        student_ids = [r[0] for r in student_rows]
+        mark_rows_result = await db.execute(
+            StudentMark.__table__.select().where(
+                and_(
+                    StudentMark.exam_id == exam_id,
+                    StudentMark.subject_config_id == subject_config_id,
+                    StudentMark.attempt_number == attempt_number,
+                    StudentMark.student_id.in_(student_ids),
+                )
+            )
+        )
+        # Build lookup: student_id → component_id → {"marks": value, "is_absent": bool}
+        mark_lookup: dict = {}
+        for mr in mark_rows_result.fetchall():
+            sid_key = str(mr.student_id)
+            cid_key = str(mr.component_id)
+            if sid_key not in mark_lookup:
+                mark_lookup[sid_key] = {}
+            mark_lookup[sid_key][cid_key] = {
+                "marks": mr.marks_obtained,
+                "is_absent": bool(mr.is_absent),
+            }
+
         data_font = Font(name="Calibri", size=11)
-        id_font = Font(name="Calibri", size=11, color="C0C0C0")  # grey — soft hint to not edit
+        id_font = Font(name="Calibri", size=11, color="000000")
 
         for row_idx, (sid, adm_no, name) in enumerate(student_rows, start=2):
             ws.cell(row=row_idx, column=1, value=str(sid)).font = id_font
             ws.cell(row=row_idx, column=2, value=adm_no or "").font = data_font
             ws.cell(row=row_idx, column=3, value=name or "").font = data_font
+            # Fill in any marks already entered for this student
+            student_marks = mark_lookup.get(str(sid), {})
+            for comp_col_offset, comp in enumerate(config.components):
+                entry = student_marks.get(str(comp.id))
+                col_idx = 4 + comp_col_offset
+                if entry is not None:
+                    if entry["is_absent"]:
+                        cell = ws.cell(row=row_idx, column=col_idx, value="ABS")
+                        cell.font = data_font
+                        cell.alignment = Alignment(horizontal="right")
+                    elif entry["marks"] is not None:
+                        ws.cell(row=row_idx, column=col_idx, value=float(entry["marks"])).font = data_font
 
     # Auto-size columns (approximate — openpyxl has no auto-fit)
     for col_idx, header in enumerate(headers, 1):
