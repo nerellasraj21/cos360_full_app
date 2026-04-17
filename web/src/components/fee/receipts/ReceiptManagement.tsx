@@ -41,6 +41,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
     offset: 0
   });
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+  const [showReprintDialog, setShowReprintDialog] = useState(false);
   const [isFormDirty, setIsFormDirty] = useState(false);
   const [selectedTransactionId, setSelectedTransactionId] = useState('');
 
@@ -128,10 +129,38 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
     try {
       const reprintedReceipt = await feeReceiptsApi.reprintReceipt(selectedReceipt.id);
       setSelectedReceipt(reprintedReceipt);
-      toast.success('Receipt reprinted successfully');
+      setShowReprintDialog(true);
     } catch (error) {
       console.error('Error reprinting receipt:', error);
       toast.error('Failed to reprint receipt');
+    }
+  };
+
+  const handleReprintPrint = async () => {
+    if (!selectedReceipt) return;
+    try {
+      const blobUrl = await feeReceiptsApi.getReceiptPdfBlobUrl(selectedReceipt.id);
+      const win = window.open(blobUrl);
+      win?.addEventListener('load', () => {
+        win.print();
+        window.URL.revokeObjectURL(blobUrl);
+      });
+      setShowReprintDialog(false);
+    } catch (error) {
+      console.error('Error printing receipt:', error);
+      toast.error('Failed to print receipt');
+    }
+  };
+
+  const handleReprintDownload = async () => {
+    if (!selectedReceipt) return;
+    try {
+      await feeReceiptsApi.downloadReceiptPdf(selectedReceipt.id, selectedReceipt.receipt_number);
+      toast.success('Receipt PDF downloaded');
+      setShowReprintDialog(false);
+    } catch (error) {
+      console.error('Error downloading receipt:', error);
+      toast.error('Failed to download receipt PDF');
     }
   };
 
@@ -275,6 +304,28 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Reprint Options Dialog */}
+      <Dialog open={showReprintDialog} onOpenChange={setShowReprintDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reprint Receipt</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Choose how you'd like to receive the reprinted copy
+            </p>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-2">
+            <Button onClick={handleReprintPrint} className="w-full" variant="outline">
+              <Printer className="w-4 h-4 mr-2" />
+              Print
+            </Button>
+            <Button onClick={handleReprintDownload} className="w-full">
+              <Download className="w-4 h-4 mr-2" />
+              Download PDF
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Merged Card: All Sections */}
       <Card>
@@ -457,6 +508,12 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                   <Label className="text-sm font-medium">Total Amount</Label>
                   <p className="text-lg font-semibold">₹{receiptContent.total_amount.toLocaleString()}</p>
                 </div>
+                {receiptContent.payment_reference && (
+                  <div>
+                    <Label className="text-sm font-medium">Payment Reference</Label>
+                    <p>{receiptContent.payment_reference}</p>
+                  </div>
+                )}
                 <div>
                   <Label className="text-sm font-medium">Collected By</Label>
                   <p>
@@ -507,26 +564,26 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                 <Shield className="w-4 h-4" />
                 Receipt Integrity Verification
               </h3>
-            <Alert className={verification.is_integrity_valid ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
+            <Alert className={verification.is_valid ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
               <AlertDescription>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    {verification.is_integrity_valid ? (
+                    {verification.is_valid ? (
                       <Shield className="w-4 h-4 text-green-600" />
                     ) : (
                       <Shield className="w-4 h-4 text-red-600" />
                     )}
-                    <span className={`font-medium ${verification.is_integrity_valid ? 'text-green-800' : 'text-red-800'}`}>
-                      {verification.is_integrity_valid ? 'Receipt is valid and untampered' : 'Receipt integrity compromised'}
+                    <span className={`font-medium ${verification.is_valid ? 'text-green-800' : 'text-red-800'}`}>
+                      {verification.is_valid ? 'Receipt is valid and untampered' : 'Receipt integrity compromised'}
                     </span>
                   </div>
                   <div className="text-sm space-y-1">
                     <p><strong>Receipt:</strong> {verification.receipt_number}</p>
-                    <p><strong>Verification Date:</strong> {new Date(verification.verified_at).toLocaleString()}</p>
-                    {!verification.is_integrity_valid && (
+                    <p><strong>Verification Date:</strong> {new Date(verification.verification_date).toLocaleString()}</p>
+                    {!verification.is_valid && (
                       <div className="mt-2 p-2 bg-red-100 rounded text-red-800 text-xs">
-                        <p><strong>Stored Hash:</strong> {verification.verification_details.stored_hash}</p>
-                        <p><strong>Current Hash:</strong> {verification.verification_details.current_hash}</p>
+                        <p><strong>Stored Hash:</strong> {verification.stored_hash}</p>
+                        <p><strong>Current Hash:</strong> {verification.current_hash}</p>
                       </div>
                     )}
                   </div>

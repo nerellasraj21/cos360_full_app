@@ -71,14 +71,10 @@ export interface ReceiptContent {
 export interface ReceiptVerification {
   receipt_id: string;
   receipt_number: string;
-  is_integrity_valid: boolean;
-  verification_hash: string;
-  verified_at: string;
-  verification_details: {
-    stored_hash: string;
-    current_hash: string;
-    match: boolean;
-  };
+  is_valid: boolean;
+  stored_hash: string;
+  current_hash: string;
+  verification_date: string;
 }
 
 export interface FeeReceiptSearchParams {
