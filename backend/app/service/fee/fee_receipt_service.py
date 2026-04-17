@@ -273,6 +273,72 @@ class FeeReceiptService:
             )
 
     @staticmethod
+    async def _enrich_receipt_fields(db: AsyncSession, receipt: FeeReceipt) -> FeeReceiptRead:
+        """
+        Convert ORM receipt to FeeReceiptRead, back-filling class_section / academic_year
+        for legacy receipts that were stored with empty strings.
+        Never mutates the ORM object (avoids SQLAlchemy autoflush side-effects).
+        """
+        academic_year = receipt.academic_year or ""
+        class_section = receipt.class_section or ""
+
+        if not academic_year or not class_section:
+            try:
+                tx_result = await db.execute(
+                    select(FeeTransaction).where(FeeTransaction.id == receipt.fee_transaction_id)
+                )
+                transaction = tx_result.scalar_one_or_none()
+
+                if transaction:
+                    if not academic_year and transaction.academic_year_id:
+                        ay_result = await db.execute(
+                            select(AcademicYear.title).where(AcademicYear.id == transaction.academic_year_id)
+                        )
+                        academic_year = ay_result.scalar_one_or_none() or ""
+
+                    if not class_section:
+                        adm_result = await db.execute(
+                            select(Admission).where(
+                                and_(
+                                    Admission.student_id == transaction.student_id,
+                                    Admission.admission_number == transaction.student_admission_num,
+                                )
+                            )
+                        )
+                        admission = adm_result.scalar_one_or_none()
+                        if admission:
+                            cls_result = await db.execute(
+                                select(Class.name).where(Class.id == admission.current_class_id)
+                            )
+                            class_name = cls_result.scalar_one_or_none() or ""
+                            sec_result = await db.execute(
+                                select(Section.name).where(Section.id == admission.current_section_id)
+                            )
+                            section_name = sec_result.scalar_one_or_none() or ""
+                            class_section = f"{class_name} - {section_name}" if section_name else class_name
+            except Exception:
+                pass  # Best-effort enrichment; fall through with whatever we have
+
+        return FeeReceiptRead(
+            id=receipt.id,
+            receipt_number=receipt.receipt_number,
+            fee_transaction_id=receipt.fee_transaction_id,
+            student_name=receipt.student_name,
+            student_admission_num=receipt.student_admission_num,
+            class_section=class_section,
+            academic_year=academic_year,
+            content_hash=receipt.content_hash,
+            pdf_file_path=receipt.pdf_file_path,
+            is_reprinted=receipt.is_reprinted,
+            reprint_count=receipt.reprint_count,
+            generated_by_user_id=receipt.generated_by_user_id,
+            remarks=receipt.remarks,
+            generated_at=receipt.generated_at,
+            created_at=receipt.created_at,
+            updated_at=receipt.updated_at,
+        )
+
+    @staticmethod
     async def get_receipt_by_id(db: AsyncSession, receipt_id: UUID) -> FeeReceiptRead:
         """Get receipt by ID"""
         try:
@@ -284,6 +350,7 @@ class FeeReceiptService:
                     status_code=status.HTTP_404_NOT_FOUND, detail=f"Receipt with ID {receipt_id} not found"
                 )
 
+            receipt = await FeeReceiptService._enrich_receipt_fields(db, receipt)
             return receipt
 
         except HTTPException:
@@ -306,6 +373,7 @@ class FeeReceiptService:
                     status_code=status.HTTP_404_NOT_FOUND, detail=f"Receipt with number {receipt_number} not found"
                 )
 
+            receipt = await FeeReceiptService._enrich_receipt_fields(db, receipt)
             return receipt
 
         except HTTPException:
@@ -419,7 +487,11 @@ class FeeReceiptService:
             result = await db.execute(query)
             receipts = result.scalars().all()
 
-            return receipts
+            enriched = []
+            for receipt in receipts:
+                enriched.append(await FeeReceiptService._enrich_receipt_fields(db, receipt))
+
+            return enriched
 
         except Exception as e:
             log.error(f"Error searching receipts: {str(e)}")
