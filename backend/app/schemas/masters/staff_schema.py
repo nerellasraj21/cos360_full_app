@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Literal, Optional
 from uuid import UUID
@@ -122,6 +122,9 @@ class StaffEnrollmentUpdate(BaseModel):
 
 class StaffEnrollmentOut(StaffEnrollmentBase):
     id: UUID
+    user_id: UUID
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     qualifications: List[StaffQualificationOut] = []
 
     model_config = {"from_attributes": True}

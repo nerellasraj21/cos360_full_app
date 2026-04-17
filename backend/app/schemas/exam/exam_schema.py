@@ -66,5 +66,10 @@ class ExamListItem(BaseModel):
     status: ExamStatus
     academic_year_id: UUID
     mark_entry_deadline: date | None = None
+    hall_ticket_min_attendance: Decimal | None = None
+    attendance_from_date: date | None = None
+    attendance_to_date: date | None = None
+    publish_rank: bool = False
+    term: str | None = None
     created_at: datetime
     subject_config_count: int | None = None

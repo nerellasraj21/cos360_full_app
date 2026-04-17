@@ -223,7 +223,7 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
                 )
 
         # Convert student fields, excluding the nested ones
-        student_data = admission.student.dict(exclude={"father", "mother"})
+        student_data = admission.student.dict(exclude={"father", "mother", "guardian"})
 
         # Validate student data before creating objects
         try:
@@ -402,6 +402,90 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
                 request=request,
             )
 
+        # Handle guardian (optional) - reuse existing user if email exists, create new if not
+        guardian_dict = None
+        if admission.student.guardian:
+            guardian_email = admission.student.guardian.email
+            try:
+                if guardian_email and guardian_email.strip():
+                    # Check if guardian email already exists
+                    existing_guardian_result = await db.execute(
+                        select(User)
+                        .options(selectinload(User.role))
+                        .join(Role)
+                        .where(and_(User.email == guardian_email, Role.name == "Parent"))
+                    )
+                    existing_guardian_user = existing_guardian_result.scalar_one_or_none()
+
+                    if existing_guardian_user:
+                        # Reuse existing guardian user
+                        guardian_user_data = existing_guardian_user
+                        logger.info(f"Reusing existing guardian with user_id: {guardian_user_data.id}, email: {guardian_email}")
+                        existing_guardian_parent_result = await db.execute(
+                            select(Parent).where(Parent.user_id == guardian_user_data.id)
+                        )
+                        guardian_dict = existing_guardian_parent_result.scalar_one_or_none()
+
+                        if not guardian_dict:
+                            logger.error(f"No parent record found for existing guardian user_id: {guardian_user_data.id}")
+                            raise create_not_found_error(
+                                message=f"Parent record not found for existing guardian user {guardian_email}",
+                                resource_type="parent",
+                                resource_id=str(guardian_user_data.id),
+                                request=request,
+                            )
+
+                        # Update existing guardian data
+                        logger.info(f"Updating existing guardian data for parent_id: {guardian_dict.id}")
+                        guardian_data = admission.student.guardian.dict()
+                        for field, value in guardian_data.items():
+                            if field not in ["email"] and hasattr(guardian_dict, field):
+                                old_value = getattr(guardian_dict, field)
+                                if old_value != value:
+                                    logger.info(f"Updating guardian.{field}: '{old_value}' -> '{value}'")
+                                    setattr(guardian_dict, field, value)
+                        await db.flush()
+                    else:
+                        # Create new guardian user and parent
+                        try:
+                            guardian_dict = Parent(**admission.student.guardian.dict())
+                        except Exception as e:
+                            raise create_validation_error(
+                                message=f"Invalid guardian data: {str(e)}", field="student.guardian", request=request
+                            )
+
+                        guardian_user_data = User(
+                            username=guardian_dict.email,
+                            email=guardian_dict.email,
+                            password_hash=hash_password("parent@123"),
+                            is_active=True,
+                            role_id=parent_role_id,
+                        )
+                        db.add(guardian_user_data)
+                        await db.flush()
+
+                        # Mark as first login
+                        try:
+                            from sqlalchemy import text as _text
+
+                            await db.execute(_text("UPDATE users SET is_first_login = TRUE WHERE id = :id"), {"id": str(guardian_user_data.id)})
+                        except Exception:
+                            pass
+
+                        guardian_dict.user_id = guardian_user_data.id
+                        db.add(guardian_dict)
+                        await db.flush()
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error handling guardian data: {str(e)}")
+                raise create_error_response(
+                    error_code=ErrorCategory.SYSTEM_ERROR,
+                    message="Failed to process guardian information",
+                    status_code=500,
+                    request=request,
+                )
+
         # Check if father-student link already exists
         try:
             existing_father_link_result = await db.execute(
@@ -443,6 +527,28 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
                 status_code=500,
                 request=request,
             )
+
+        # Check if guardian-student link already exists (if guardian provided)
+        if guardian_dict:
+            try:
+                existing_guardian_link_result = await db.execute(
+                    select(StudentParentLink).where(
+                        and_(StudentParentLink.student_id == student_dict.id, StudentParentLink.parent_id == guardian_dict.id)
+                    )
+                )
+                existing_guardian_links = existing_guardian_link_result.scalars().all()
+                if len(existing_guardian_links) == 0:
+                    student_parent_link_guardian = StudentParentLink(student_id=student_dict.id, parent_id=guardian_dict.id)
+                    db.add(student_parent_link_guardian)
+                    await db.flush()
+            except Exception as e:
+                logger.error(f"Error creating guardian-student link: {str(e)}")
+                raise create_error_response(
+                    error_code=ErrorCategory.SYSTEM_ERROR,
+                    message="Failed to create guardian-student relationship",
+                    status_code=500,
+                    request=request,
+                )
 
         # Create admission record
         try:
@@ -560,25 +666,33 @@ async def get_admission_by_id(student_id: UUID, db: AsyncSession, request: Reque
 
             for link in admission.student.parent_links:
                 if link.parent and link.parent.relation_to_student:
-                    if link.parent.relation_to_student.lower() == "father":
+                    relation = link.parent.relation_to_student.lower()
+                    if relation == "father":
                         father = link.parent
                         # Remove student_links attribute to prevent circular reference
                         if hasattr(father, "student_links"):
                             delattr(father, "student_links")
-                    elif link.parent.relation_to_student.lower() == "mother":
+                    elif relation == "mother":
                         mother = link.parent
                         # Remove student_links attribute to prevent circular reference
                         if hasattr(mother, "student_links"):
                             delattr(mother, "student_links")
+                    elif relation == "guardian":
+                        guardian = link.parent
+                        # Remove student_links attribute to prevent circular reference
+                        if hasattr(guardian, "student_links"):
+                            delattr(guardian, "student_links")
 
-            # Set father and mother attributes on student
+            # Set father, mother, and guardian attributes on student
             admission.student.father = father
             admission.student.mother = mother
+            admission.student.guardian = guardian
         else:
             # Set default None values if no parents
             if admission.student:
                 admission.student.father = None
                 admission.student.mother = None
+                admission.student.guardian = None
 
         return admission
 
@@ -654,24 +768,39 @@ async def get_admission_by_id_with_context(
                 request=request,
             )
 
-        # Process father/mother relationships (existing logic)
+        # Process father/mother/guardian relationships from parent_links
+        # This extracts parents from the StudentParentLink junction table based on relation_to_student
+        # and assigns them to student properties for easy access in API responses.
+        #
+        # Parents are stored in a single 'parents' table with a relation_to_student field that
+        # identifies whether each record is a Father, Mother, or Guardian.
+        #
+        # Implementation Note: These properties are set on the SQLAlchemy model instance
+        # for convenient serialization via StudentOut schema. The StudentOut.extract_father_mother_guardian
+        # model_validator ensures these properties are properly extracted when converting ORM to Pydantic.
         if admission.student and admission.student.parent_links:
             father = None
             mother = None
+            guardian = None
 
             for link in admission.student.parent_links:
                 if link.parent and link.parent.relation_to_student:
-                    if link.parent.relation_to_student.lower() == "father":
+                    relation = link.parent.relation_to_student.lower()
+                    if relation == "father":
                         father = link.parent
-                    elif link.parent.relation_to_student.lower() == "mother":
+                    elif relation == "mother":
                         mother = link.parent
+                    elif relation == "guardian":
+                        guardian = link.parent
 
             admission.student.father = father
             admission.student.mother = mother
+            admission.student.guardian = guardian
         else:
             if admission.student:
                 admission.student.father = None
                 admission.student.mother = None
+                admission.student.guardian = None
 
         logger.info(
             f"User {user_context.username} accessed admission for student {student_id} (scope: {user_context.access_scope})"
@@ -770,6 +899,7 @@ async def update_partial_details_admission(
     STUDENT_FIELDS = {"first_name", "last_name", "date_of_birth", "gender", "is_primary", "aadhar_number", "apaar_number", "nationality", "mother_tongue", "caste", "caste_id", "sub_caste", "sub_caste_id", "community", "identification_marks"}
     FATHER_FIELDS = {"father_name", "father_email", "father_phone", "father_occupation", "father_aadhar_number", "father_gender", "father_salary_range"}
     MOTHER_FIELDS = {"mother_name", "mother_email", "mother_phone", "mother_occupation", "mother_aadhar_number", "mother_gender", "mother_salary_range"}
+    GUARDIAN_FIELDS = {"guardian_name", "guardian_email", "guardian_phone", "guardian_occupation", "guardian_aadhar_number", "guardian_gender", "guardian_salary_range", "guardian_relation_to_student"}
 
     try:
         # Fetch with eager loading so we can update student + parent in same transaction
@@ -826,6 +956,11 @@ async def update_partial_details_admission(
                 for key in MOTHER_FIELDS:
                     if key in update_data:
                         parent_field = key[len("mother_"):]  # strip "mother_" prefix
+                        setattr(parent, parent_field, update_data[key])
+            elif relation == "guardian":
+                for key in GUARDIAN_FIELDS:
+                    if key in update_data:
+                        parent_field = key[len("guardian_"):]  # strip "guardian_" prefix
                         setattr(parent, parent_field, update_data[key])
 
         await db.flush()
@@ -986,25 +1121,33 @@ async def get_all_admissions(db: AsyncSession, skip: int = 0, limit: int = 10):
 
             for link in admission.student.parent_links:
                 if link.parent and link.parent.relation_to_student:
-                    if link.parent.relation_to_student.lower() == "father":
+                    relation = link.parent.relation_to_student.lower()
+                    if relation == "father":
                         father = link.parent
                         # Remove student_links attribute to prevent circular reference
                         if hasattr(father, "student_links"):
                             delattr(father, "student_links")
-                    elif link.parent.relation_to_student.lower() == "mother":
+                    elif relation == "mother":
                         mother = link.parent
                         # Remove student_links attribute to prevent circular reference
                         if hasattr(mother, "student_links"):
                             delattr(mother, "student_links")
+                    elif relation == "guardian":
+                        guardian = link.parent
+                        # Remove student_links attribute to prevent circular reference
+                        if hasattr(guardian, "student_links"):
+                            delattr(guardian, "student_links")
 
-            # Set father and mother attributes on student
+            # Set father, mother, and guardian attributes on student
             admission.student.father = father
             admission.student.mother = mother
+            admission.student.guardian = guardian
         else:
             # Set default None values if no parents
             if admission.student:
                 admission.student.father = None
                 admission.student.mother = None
+                admission.student.guardian = None
 
     has_next = (skip + limit) < total_count
 
@@ -1159,9 +1302,51 @@ async def toggle_student_active(student_id: UUID, db: AsyncSession):
         raise HTTPException(status_code=400, detail="Student has no associated user")
 
     student.user.is_active = not student.user.is_active
+    new_is_active = student.user.is_active
     await db.commit()
 
-    return {
-        "message": f"Student {'activated' if student.user.is_active else 'deactivated'} successfully",
-        "is_active": student.user.is_active,
-    }
+    # Load the full admission with relationships to return StudentAdmissionResponse
+    # Must include Student.user so is_active is readable from the committed value
+    admission_result = await db.execute(
+        select(Admission)
+        .options(
+            selectinload(Admission.student).selectinload(Student.parent_links).selectinload(StudentParentLink.parent),
+            selectinload(Admission.student).selectinload(Student.user),
+        )
+        .where(Admission.student_id == student_id)
+    )
+    admission = admission_result.scalar_one_or_none()
+
+    if not admission:
+        raise HTTPException(status_code=404, detail="Admission not found for student")
+
+    # Set is_active from the freshly loaded user (mirrors get_all_admissions_with_context pattern)
+    if admission.student:
+        if admission.student.user:
+            admission.student.is_active = admission.student.user.is_active
+        else:
+            admission.student.is_active = None
+
+    # Process father/mother/guardian relationships
+    if admission.student and admission.student.parent_links:
+        father = None
+        mother = None
+        guardian = None
+        for link in admission.student.parent_links:
+            if link.parent and link.parent.relation_to_student:
+                relation = link.parent.relation_to_student.lower()
+                if relation == "father":
+                    father = link.parent
+                elif relation == "mother":
+                    mother = link.parent
+                elif relation == "guardian":
+                    guardian = link.parent
+        admission.student.father = father
+        admission.student.mother = mother
+        admission.student.guardian = guardian
+    elif admission.student:
+        admission.student.father = None
+        admission.student.mother = None
+        admission.student.guardian = None
+
+    return admission

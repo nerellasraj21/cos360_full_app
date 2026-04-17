@@ -400,6 +400,27 @@ async def process_fee_payment(
     5. Dispatch SMS if requested
     """
     import secrets
+    import traceback as _traceback
+
+    try:
+        return await _process_fee_payment_inner(db, data, current_user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        _traceback.print_exc()
+        log.error(f"Fee payment failed: {type(e).__name__}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Payment failed: {type(e).__name__}: {str(e)}",
+        )
+
+
+async def _process_fee_payment_inner(
+    db: AsyncSession,
+    data: FeePaymentRequest,
+    current_user: dict,
+) -> FeePaymentResponse:
+    import secrets
 
     collected_by_user_id = UUID(current_user.get("sub"))
 
@@ -425,9 +446,9 @@ async def process_fee_payment(
 
     # ── Admission ────────────────────────────────────────────────────────
     adm_result = await db.execute(
-        select(Admission).where(Admission.student_id == data.student_id)
+        select(Admission).where(Admission.student_id == data.student_id).limit(1)
     )
-    admission = adm_result.scalar_one_or_none()
+    admission = adm_result.scalars().first()
     if not admission:
         raise HTTPException(status_code=404, detail="Student admission not found")
 
@@ -626,9 +647,7 @@ async def process_fee_payment(
         receipt_content.receipt_number = receipt_number
         content_hash = FeeReceiptService.generate_content_hash(receipt_content.dict())
 
-        student_name = ""
-        if hasattr(admission, "student") and admission.student:
-            student_name = f"{admission.student.first_name} {admission.student.last_name}"
+        student_name = receipt_content.student_name
 
         db_receipt = FeeReceipt(
             receipt_number=receipt_number,
@@ -640,7 +659,7 @@ async def process_fee_payment(
             content_hash=content_hash,
             generated_by_user_id=collected_by_user_id,
             is_reprinted=data.print_duplicate,
-            reprint_count="1" if data.print_duplicate else "0",
+            reprint_count=1 if data.print_duplicate else 0,
         )
         db.add(db_receipt)
         txn.receipt_generated = True

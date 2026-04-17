@@ -2,7 +2,7 @@ import logging as log
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -94,6 +94,8 @@ async def get_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Fee term with id {fee_term_id} not found"
             )
         return fee_term
+    except HTTPException:
+        raise
     except Exception as e:
         log.error(f"Error getting fee term with dates: {str(e)}")
         raise HTTPException(
@@ -165,13 +167,29 @@ async def update_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID, fee_te
                     status_code=status.HTTP_400_BAD_REQUEST, detail="Duplicate fee term dates are not allowed"
                 )
 
-            # Delete existing fee term dates (cascade will handle this, but being explicit)
-            await db.execute(delete(FeeTermDatesModel).where(FeeTermDatesModel.term_id == fee_term_id))
+            # Fetch existing dates sorted by date (stable order for in-place update)
+            existing_result = await db.execute(
+                select(FeeTermDatesModel)
+                .where(FeeTermDatesModel.term_id == fee_term_id)
+                .order_by(FeeTermDatesModel.fee_term_date)
+            )
+            existing_dates = list(existing_result.scalars().all())
+            new_dates = sorted(fee_term_data.fee_term_dates, key=lambda d: d.fee_term_date)
 
-            # Create new fee term dates
-            for fee_date in fee_term_data.fee_term_dates:
-                db_fee_term_date = FeeTermDatesModel(term_id=db_fee_term.id, fee_term_date=fee_date.fee_term_date)
-                db.add(db_fee_term_date)
+            if len(existing_dates) == len(new_dates):
+                # Same count — update existing records in-place so term_date_id FKs stay valid
+                for existing, new in zip(existing_dates, new_dates):
+                    existing.fee_term_date = new.fee_term_date
+            else:
+                # Count changed — only safe if no FK references exist yet
+                # Delete extras or add new ones
+                if len(existing_dates) > len(new_dates):
+                    for extra in existing_dates[len(new_dates):]:
+                        await db.delete(extra)
+                for existing, new in zip(existing_dates[:len(new_dates)], new_dates):
+                    existing.fee_term_date = new.fee_term_date
+                for new in new_dates[len(existing_dates):]:
+                    db.add(FeeTermDatesModel(term_id=db_fee_term.id, fee_term_date=new.fee_term_date))
 
         await db.commit()
 

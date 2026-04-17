@@ -24,7 +24,7 @@ class FeeReceiptCreate(FeeReceiptBase):
 class FeeReceiptUpdate(BaseModel):
     pdf_file_path: str | None = None
     is_reprinted: bool | None = None
-    reprint_count: str | None = None
+    reprint_count: int | None = None
     remarks: str | None = None
 
 
@@ -32,7 +32,7 @@ class FeeReceiptRead(FeeReceiptBase):
     id: UUID
     pdf_file_path: str | None = None
     is_reprinted: bool
-    reprint_count: str
+    reprint_count: int
     generated_by_user_id: UUID
     remarks: str | None = None
     generated_at: datetime
@@ -51,7 +51,7 @@ class FeeReceiptSummary(BaseModel):
     student_admission_num: str
     generated_at: datetime
     is_reprinted: bool
-    reprint_count: str
+    reprint_count: int
 
     model_config = {"from_attributes": True}
 
