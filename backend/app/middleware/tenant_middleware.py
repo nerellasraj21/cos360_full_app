@@ -84,9 +84,8 @@ class TenantMiddleware(BaseHTTPMiddleware):
         # Method 1: Check cschema header (PRIMARY)
         client_name = request.headers.get("cschema")
         if client_name:
-            # Header is present (value doesn't matter), use default tenant
             request.state.tenant_detection_method = "cschema_header"
-            return self.default_client_name  # Always returns 'test_tenant_schema'
+            return client_name
 
         # If strict mode is enabled, cschema header is required
         if self.strict_mode:

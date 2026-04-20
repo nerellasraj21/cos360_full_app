@@ -40,6 +40,7 @@ from app.models.exam.student_marks_model import StudentMark
 from app.models.exam.mark_permission_model import ExamMarkEntryPermission
 from app.models.exam.audit_log_model import ExamAuditLog
 from app.models.exam.student_result_model import StudentExamResult, StudentSubjectResult
+from app.models.student.issuable_certificate_model import IssuableCertificateTemplate, GeneratedCertificate
 
 
 
@@ -110,6 +111,7 @@ def run_migrations_online() -> None:
     """
     # Override database URL from environment if available
     config_section = config.get_section(config.config_ini_section, {})
+    schema_name = os.getenv('SCHEMA_NAME', 'cos360_masters')
     database_url = os.getenv("DATABASE_URL")
     if database_url:
         # Convert asyncpg to psycopg2 for alembic compatibility
@@ -117,8 +119,10 @@ def run_migrations_online() -> None:
             database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
         # psycopg2 uses sslmode instead of ssl
         database_url = database_url.replace("?ssl=", "?sslmode=").replace("&ssl=", "&sslmode=")
+        # Neon pooler rejects SET search_path — use the unpooled endpoint for migrations
+        database_url = database_url.replace("-pooler.", ".")
         config_section["sqlalchemy.url"] = database_url
-    
+
     connectable = engine_from_config(
         config_section,
         prefix="sqlalchemy.",
@@ -126,14 +130,17 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        # Set the search_path for Alembic migrations
-        schema_name = os.getenv('SCHEMA_NAME', 'cos360_masters')
+        # Set the search_path for Alembic migrations.
+        # commit() after SET so autobegin transaction closes cleanly before
+        # alembic starts its own transaction — otherwise the outer autobegin
+        # rolls back all DDL when the with-block exits.
         connection.execute(
             __import__('sqlalchemy').text(f'SET search_path TO {schema_name}, public')
         )
+        connection.commit()
 
         context.configure(
-            connection=connection, target_metadata=target_metadata, compare_type=True,  # Enable type comparison
+            connection=connection, target_metadata=target_metadata, compare_type=True,
         )
 
         with context.begin_transaction():

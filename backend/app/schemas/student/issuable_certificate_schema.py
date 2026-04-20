@@ -38,7 +38,7 @@ class IssuableCertificateTemplateRead(BaseModel):
     html_template: str
     color_theme: str
     variables_used: str | None
-    is_active: bool
+    is_active: str
     created_at: datetime
     updated_at: datetime
 
@@ -68,7 +68,7 @@ class GeneratedCertificateRead(BaseModel):
     issued_date: datetime
     issued_by: UUID
     remarks: str | None
-    is_active: bool
+    is_active: str
     created_at: datetime
     updated_at: datetime
 

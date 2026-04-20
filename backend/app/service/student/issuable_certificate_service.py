@@ -7,7 +7,7 @@ import uuid
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.student.issuable_certificate_model import (
@@ -30,7 +30,7 @@ from app.schemas.student.issuable_certificate_schema import (
 
 async def get_all_templates(db: AsyncSession) -> list[IssuableCertificateTemplateRead]:
     """Get all active certificate templates"""
-    query = select(IssuableCertificateTemplate).where(IssuableCertificateTemplate.is_active == True)
+    query = select(IssuableCertificateTemplate).where(func.lower(IssuableCertificateTemplate.is_active) == "true")
     result = await db.execute(query)
     templates = result.scalars().all()
     return [IssuableCertificateTemplateRead.from_orm(t) for t in templates]
@@ -68,7 +68,7 @@ async def create_template(
         html_template=data.html_template,
         color_theme=data.color_theme,
         variables_used=variables_json,
-        is_active=True,
+        is_active="True",
     )
 
     db.add(template)
@@ -131,7 +131,7 @@ async def delete_template(db: AsyncSession, template_id: UUID) -> None:
         )
 
     # Soft delete
-    template.is_active = False
+    template.is_active = "False"
     await db.commit()
 
 
@@ -167,7 +167,7 @@ async def generate_certificate(
         html_content=request_data.edited_html,
         issued_by=issued_by_id,
         remarks=request_data.remarks,
-        is_active=True,
+        is_active="True",
     )
 
     db.add(certificate)
@@ -184,7 +184,7 @@ async def get_issued_certificates_by_student(
     """Get all issued certificates for a student"""
     query = select(GeneratedCertificate).where(
         GeneratedCertificate.student_id == student_id,
-        GeneratedCertificate.is_active == True,
+        func.lower(GeneratedCertificate.is_active) == "true",
     )
     result = await db.execute(query)
     certificates = result.scalars().all()
@@ -227,7 +227,7 @@ async def delete_issued_certificate(db: AsyncSession, certificate_id: UUID) -> N
         )
 
     # Soft delete
-    certificate.is_active = False
+    certificate.is_active = "False"
     await db.commit()
 
 
