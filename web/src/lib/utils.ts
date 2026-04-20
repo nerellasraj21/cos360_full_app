@@ -7,9 +7,13 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatDate(date: string | Date): string {
   if (!date) return '';
-  return new Date(date).toLocaleDateString('en-US', {
+  return new Date(date).toLocaleDateString('en-IN', {
     year: 'numeric',
     month: 'short',
     day: 'numeric'
   });
+}
+
+export function formatCurrency(amount: number | string): string {
+  return `₹${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
