@@ -1,5 +1,188 @@
 # COS360 Frontend - Updates Changelog
 
+## Recent Updates (Latest Session - Apr 18, 2026)
+
+### 3. ✅ Expense Module - Data Not Loading Fix
+
+**Files Changed:**
+- `src/hooks/expense/index.ts`
+
+**Issue:** All expense pages (Categories, Types, Transactions, Approvals) showed empty state ("No categories found", "No transactions found") even though data existed in the backend and permissions were passing.
+
+**Root Cause:**
+
+Two compounding factors:
+
+1. **`refetchOnMount: false` globally in `main.tsx`** — React Query skips fetching on mount if it has previously run (even if that prior run was disabled).
+
+2. **Zustand `persist` middleware rehydrates asynchronously** — on the very first render, `permissionsMap` is empty, so `hasPermission = false` → `enabled = false` in `usePermissionProtectedQuery`. React Query registers the query as disabled. When Zustand finishes rehydrating (next render), `hasPermission = true` → `enabled = true`, but with `refetchOnMount: false` globally, React Query does not trigger a fresh fetch for that mount cycle. The query stays in a "never ran" state and returns `undefined` → components show empty.
+
+**Confirmed from backend:** All expense list endpoints (`GET /expense/categories`, `GET /expense/types`, `GET /expense/transactions`) return plain arrays (`list[...]`), not paginated objects.
+
+**Solution:**
+
+Added `refetchOnMount: true` to the three expense list hooks and pending approvals hook, overriding the global `false` default:
+
+```typescript
+// src/hooks/expense/index.ts
+
+export function useExpenseCategories(params?) {
+  return usePermissionProtectedQuery<ExpenseCategory[]>({
+    queryKey: ['expense-categories', params],
+    queryFn: () => expenseApi.getCategories(params),
+    resource: 'expense_categories',
+    action: 'list',
+    staleTime: expenseCacheUtils.TTL.MEDIUM,
+    refetchOnMount: true,  // ← fix: override global refetchOnMount: false
+  });
+}
+// Same pattern applied to useExpenseTypes, useExpenseTransactions, usePendingExpenseApprovals
+```
+
+This ensures the query always fetches on mount regardless of the global QueryClient default, resolving the auth-rehydration timing race.
+
+---
+
+### 2. ✅ Edit Student Admission - Footer Buttons Now Stick to Bottom (Don't Scroll)
+
+**File:**
+
+- `src/components/students/AdmissionTable.tsx`
+
+**Issue:** In the Edit Admission dialog, the **Cancel** and **Update Admission** buttons were scrolling along with the form content. Users had to scroll to the bottom of a long form to reach them, and on short viewports they could be clipped.
+
+**Root Cause:**
+
+The footer `<div>` containing Cancel + Update Admission was nested **inside** the scrollable container:
+
+```tsx
+<DialogContent className="max-w-2xl">
+  <DialogHeader ... />
+  <div className="overflow-y-auto px-6">   ← scrollable
+    {selectedAdmission && (<div>...form fields...</div>)}
+    <div className="flex justify-end gap-2 pt-4 pb-4">  ← footer (INSIDE scroll area)
+      Cancel + Update Admission
+    </div>
+  </div>
+</DialogContent>
+```
+
+No flex layout was defined on `DialogContent`, so the scrollable div expanded to include the footer, making the whole thing scroll as one block.
+
+**Solution:**
+
+Converted `DialogContent` into a flex column with a height cap and lifted the footer out of the scroll area:
+
+```tsx
+<DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+  <DialogHeader className="... flex-shrink-0" />
+  <div className="flex-1 overflow-y-auto px-6">     ← only form fields scroll
+    {selectedAdmission && (<div>...form fields...</div>)}
+  </div>
+  <div className="flex-shrink-0 border-t px-6 py-4 flex justify-end gap-2">  ← sticky footer
+    Cancel + Update Admission
+  </div>
+</DialogContent>
+```
+
+- `max-h-[90vh] flex flex-col` on DialogContent → creates a bounded flex column
+- `flex-shrink-0` on header and footer → fixed top and bottom
+- `flex-1 overflow-y-auto` on the middle div → only the form content scrolls
+- `border-t` on the footer → visual separation from the scrolling form
+
+Same layout pattern as `StaffEnrollmentForm.tsx` and `MultiStepAdmissionForm.tsx`.
+
+---
+
+### 1. ✅ Student Admission - Prevent Accidental Auto-Save on Multi-Step Form
+
+**File:**
+
+- `src/components/students/MultiStepAdmissionForm.tsx`
+
+**Issue:** While filling in the student admission form, the record was sometimes being saved without the user clicking the "Create Admission" button — i.e. the `useCreateAdmission` mutation fired unexpectedly.
+
+**Root Cause:**
+
+- The wrapper was a `<form>` with a `type="submit"` Create Admission button and an `onSubmit` handler that called `onSubmit(methods.getValues())`.
+- HTML fires `onSubmit` on many paths that are **not** a click on the submit button:
+  - Pressing Enter inside any text input (implicit form submission)
+  - Browser/password-manager autofill completing with a synthesized Enter
+  - Mobile on-screen keyboard "Go" / "Done" / "Send" key
+  - Lingering keypress during the Next → Create Admission button swap on Step 5 (Summary)
+- A first-pass attempt tried gating on `e.nativeEvent.submitter.id`, but that property is set by the browser to the **default submit button** for implicit submissions too — so Enter / autofill / mobile Go all passed the check. Submitter-identity cannot distinguish a real click from implicit submission.
+
+**Solution:**
+
+Remove form submission from the flow entirely. If there is no submit button and no form submission path, the browser has no way to implicitly submit anything — the only way to save is to click the button.
+
+1. **Wrapper changed from `<form>` to `<div>`** — the layout/flex structure is identical, but the element no longer participates in HTML form submission semantics.
+2. **Create Admission button is now `type="button"` with an `onClick` handler** (`handleCreateAdmissionClick`) that invokes the existing validation + mutation flow directly. A genuine click is the only activation path.
+3. **Defense-in-depth `onKeyDown` blocker** on the wrapper: if Enter is pressed inside an `<INPUT>`, `e.preventDefault()` is called. Kept so that any future re-introduction of a form element, or stray submit buttons, doesn't resurrect the bug.
+
+**Rules that remain unchanged (still run only after the click passes the gates above):**
+
+- Summary-step guard
+- Academic year presence check
+- 13 required-field check (academic year, admission date, student first/last/DOB/gender, father name+email, mother name+email, address line 1, city, state)
+- Father vs mother email uniqueness
+- Flat → nested payload reshape (empty strings → `undefined`)
+- `createAdmission.mutateAsync(cleanedData)`
+- 500 ms wait → `onComplete()` on success
+- Detailed toast on failure from `error.response.data.detail`
+
+---
+
+## Recent Updates (Previous Session - Apr 17, 2026)
+
+### 1. ✅ Holidays Calendar - Date Pickers Now Work in Add/Edit Dialogs
+
+**File:**
+
+- `src/components/calendar/Calendar.tsx`
+
+**Issue:** Clicking the date inputs in the Add Event / Edit Event dialogs did nothing — the native date picker did not open, especially in dark mode where the calendar icon was invisible.
+
+**Root Cause:**
+
+- Raw `<input type="date">` used with minimal styling (`border rounded px-2 py-1`)
+- No `color-scheme` CSS → the browser's calendar-icon indicator rendered white-on-white in dark mode
+- Inconsistent with the rest of the app, which uses shadcn `<Input type="date">` (as in Student Admission)
+
+**Solution:**
+
+- Replaced all 4 raw `<input type="date">` elements (2 in Add dialog, 2 in Edit dialog) with the shadcn `<Input type="date">` component
+- Matches the proven pattern used in `src/components/students/admission-steps/AcademicStepForm.tsx`
+- Calendar icon is now visible and clickable in both light and dark themes
+
+---
+
+### 2. ✅ Holidays Calendar - Month/Year Quick Select in Header
+
+**File:**
+
+- `src/components/calendar/Calendar.tsx`
+
+**Issue:** The month view header only had `<` and `>` buttons that stepped one month at a time. Users could not jump directly to a different year (e.g. jumping from April 2026 to April 2023 required 36 clicks).
+
+**Solution:**
+
+- Turned the "April 2026" header text into two click-to-change controls (month + year)
+- Implementation uses an **invisible `<select>` overlaid on the visible text**:
+  - Visible text keeps the original `font-semibold text-base` styling (no visual change from before)
+  - A transparent `<select>` is absolutely positioned over each label (`absolute inset-0 opacity-0 cursor-pointer`)
+  - Clicking opens the native OS dropdown; hover tints the text with `hover:text-primary` as an affordance
+- Year range: current year ±10 (21 options)
+- Month options: January – December
+- `<` / `>` buttons remain for month-by-month stepping
+
+**Why the overlay pattern:**
+
+- Native `<select>` (even with `appearance: none`) reserves internal width for its dropdown-arrow area, sized to the widest option (e.g. "September"), producing a visible gap between month and year
+- Overlaying an invisible select on plain text gives pixel-perfect sizing identical to the original `<span>` layout while remaining clickable
+
+---
+
 ## Recent Updates (Latest Session - Apr 7, 2026 - Part 3)
 
 ### 1. ✅ Dark Mode Icon Visibility - DatePicker & TimePicker Icons

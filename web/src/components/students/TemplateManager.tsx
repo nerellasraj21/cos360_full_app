@@ -249,10 +249,15 @@ export function TemplateManager() {
                     Created:{" "}
                     {new Date(template.created_at).toLocaleDateString()}
                   </p>
+                  {template.variables_used && (
+                    <p className="mt-1 text-muted-foreground truncate" title={template.variables_used}>
+                      Variables: {template.variables_used.split(",").length} fields
+                    </p>
+                  )}
                   <p className="mt-1">
                     Status:{" "}
-                    <Badge variant={template.is_active ? "default" : "secondary"}>
-                      {template.is_active ? "Active" : "Inactive"}
+                    <Badge variant={template.is_active === "True" ? "default" : "secondary"}>
+                      {template.is_active === "True" ? "Active" : "Inactive"}
                     </Badge>
                   </p>
                 </div>

@@ -83,9 +83,9 @@ function ExpenseDashboardContent() {
   const { data: types, isLoading: loadingTypes } = useExpenseTypes();
   const { data: transactions, isLoading: loadingTransactions } = useExpenseTransactions();
 
-  const categoryCount = Array.isArray(categories) ? categories.length : 0;
-  const typeCount = Array.isArray(types) ? types.length : 0;
-  const transactionCount = Array.isArray(transactions) ? transactions.length : 0;
+  const categoryCount = categories?.length ?? 0;
+  const typeCount = types?.length ?? 0;
+  const transactionCount = transactions?.length ?? 0;
 
   return (
     <div className="space-y-6">

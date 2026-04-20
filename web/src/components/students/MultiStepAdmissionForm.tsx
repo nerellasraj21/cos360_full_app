@@ -312,19 +312,29 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
     }
   };
 
+  const handleCreateAdmissionClick = () => {
+    if (currentStep !== steps.length - 1) return;
+    // Bypass react-hook-form's global validation (which incorrectly blocks
+    // optional fields with pattern rules). Each step already validated its
+    // required fields via nextStep(). onSubmit() has its own required-field
+    // checks and will show toast errors for anything missing.
+    const values = methods.getValues();
+    onSubmit(values as StudentAdmissionCreate);
+  };
+
   return (
     <FormProvider {...methods}>
-      <form className="flex flex-col flex-1 min-h-0" onSubmit={(e) => {
-        e.preventDefault();
-        if (currentStep === steps.length - 1) {
-          // Bypass react-hook-form's global validation (which incorrectly blocks
-          // optional fields with pattern rules). Each step already validated its
-          // required fields via nextStep(). onSubmit() has its own required-field
-          // checks and will show toast errors for anything missing.
-          const values = methods.getValues();
-          onSubmit(values as StudentAdmissionCreate);
-        }
-      }}>
+      <div
+        className="flex flex-col flex-1 min-h-0"
+        onKeyDown={(e) => {
+          // Defense in depth: swallow Enter inside inputs so nothing can
+          // accidentally trigger an implicit form submission.
+          const target = e.target as HTMLElement;
+          if (e.key === 'Enter' && target.tagName === 'INPUT') {
+            e.preventDefault();
+          }
+        }}
+      >
         <div className="flex-1 overflow-y-auto">
           <Card>
             <CardHeader>
@@ -377,7 +387,9 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
               </Button>
             ) : (
               <Button
-                type="submit"
+                id="create-admission-submit"
+                type="button"
+                onClick={handleCreateAdmissionClick}
                 disabled={createAdmission.isPending}
               >
                 {createAdmission.isPending ? 'Creating...' : 'Create Admission'}
@@ -386,7 +398,7 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
           </div>
         </DialogFooter>
         </div>
-      </form>
+      </div>
     </FormProvider>
   );
 };

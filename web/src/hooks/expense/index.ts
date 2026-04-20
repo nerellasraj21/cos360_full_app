@@ -58,6 +58,7 @@ export function useExpenseCategories(params?: {
     resource: 'expense_categories',
     action: 'list',
     staleTime: expenseCacheUtils.TTL.MEDIUM,
+    refetchOnMount: true,
   });
 }
 
@@ -134,6 +135,7 @@ export function useExpenseTypes(params?: {
     resource: 'expense_types',
     action: 'list',
     staleTime: expenseCacheUtils.TTL.MEDIUM,
+    refetchOnMount: true,
   });
 }
 
@@ -208,6 +210,7 @@ export function useExpenseTransactions(params?: {
     queryKey: ['expense-transactions', params],
     queryFn: () => expenseApi.getTransactions(params),
     staleTime: expenseCacheUtils.TTL.MEDIUM,
+    refetchOnMount: true,
   });
 }
 
@@ -294,6 +297,7 @@ export function usePendingExpenseApprovals(params?: {
     resource: 'expense_transactions',
     action: 'approve',
     staleTime: expenseCacheUtils.TTL.SHORT,
+    refetchOnMount: true,
   });
 }
 

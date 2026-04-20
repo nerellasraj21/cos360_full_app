@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
-  ChevronDown, ChevronRight, Check, Loader2, Save, ArrowLeft,
+  ChevronDown, ChevronRight, Check, Loader2, Save,
   Plus, Trash2, AlertCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -284,14 +284,7 @@ export default function CreateExam() {
 
   return (
     <div className="space-y-4">
-      {/* Top bar */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/exam/exams' as any })} className="gap-1">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Exams
-        </Button>
-        <h1 className="text-xl font-bold">Create Exam</h1>
-      </div>
+      <h1 className="text-xl font-bold">Create Exam</h1>
 
       <div className="rounded-lg border bg-card">
         {/* Section 1: Exam Details */}

@@ -53,6 +53,7 @@ import { Route as AppStudentsMydocumentsRouteImport } from './routes/_app/studen
 import { Route as AppStudentsMycertificatesRouteImport } from './routes/_app/students/mycertificates'
 import { Route as AppStudentsDocumentsuploadRouteImport } from './routes/_app/students/documentsupload'
 import { Route as AppStudentsCertificatetypesRouteImport } from './routes/_app/students/certificatetypes'
+import { Route as AppStudentsCertificatetemplatesRouteImport } from './routes/_app/students/certificatetemplates'
 import { Route as AppStudentsCertificatesuploadRouteImport } from './routes/_app/students/certificatesupload'
 import { Route as AppStudentsCertificatesRouteImport } from './routes/_app/students/certificates'
 import { Route as AppStudentsAttendanceRouteImport } from './routes/_app/students/attendance'
@@ -359,6 +360,12 @@ const AppStudentsCertificatetypesRoute =
   AppStudentsCertificatetypesRouteImport.update({
     id: '/certificatetypes',
     path: '/certificatetypes',
+    getParentRoute: () => AppStudentsRoute,
+  } as any)
+const AppStudentsCertificatetemplatesRoute =
+  AppStudentsCertificatetemplatesRouteImport.update({
+    id: '/certificatetemplates',
+    path: '/certificatetemplates',
     getParentRoute: () => AppStudentsRoute,
   } as any)
 const AppStudentsCertificatesuploadRoute =
@@ -855,6 +862,7 @@ export interface FileRoutesByFullPath {
   '/students/attendance': typeof AppStudentsAttendanceRoute
   '/students/certificates': typeof AppStudentsCertificatesRoute
   '/students/certificatesupload': typeof AppStudentsCertificatesuploadRoute
+  '/students/certificatetemplates': typeof AppStudentsCertificatetemplatesRoute
   '/students/certificatetypes': typeof AppStudentsCertificatetypesRoute
   '/students/documentsupload': typeof AppStudentsDocumentsuploadRoute
   '/students/mycertificates': typeof AppStudentsMycertificatesRoute
@@ -969,6 +977,7 @@ export interface FileRoutesByTo {
   '/students/attendance': typeof AppStudentsAttendanceRoute
   '/students/certificates': typeof AppStudentsCertificatesRoute
   '/students/certificatesupload': typeof AppStudentsCertificatesuploadRoute
+  '/students/certificatetemplates': typeof AppStudentsCertificatetemplatesRoute
   '/students/certificatetypes': typeof AppStudentsCertificatetypesRoute
   '/students/documentsupload': typeof AppStudentsDocumentsuploadRoute
   '/students/mycertificates': typeof AppStudentsMycertificatesRoute
@@ -1096,6 +1105,7 @@ export interface FileRoutesById {
   '/_app/students/attendance': typeof AppStudentsAttendanceRoute
   '/_app/students/certificates': typeof AppStudentsCertificatesRoute
   '/_app/students/certificatesupload': typeof AppStudentsCertificatesuploadRoute
+  '/_app/students/certificatetemplates': typeof AppStudentsCertificatetemplatesRoute
   '/_app/students/certificatetypes': typeof AppStudentsCertificatetypesRoute
   '/_app/students/documentsupload': typeof AppStudentsDocumentsuploadRoute
   '/_app/students/mycertificates': typeof AppStudentsMycertificatesRoute
@@ -1223,6 +1233,7 @@ export interface FileRouteTypes {
     | '/students/attendance'
     | '/students/certificates'
     | '/students/certificatesupload'
+    | '/students/certificatetemplates'
     | '/students/certificatetypes'
     | '/students/documentsupload'
     | '/students/mycertificates'
@@ -1337,6 +1348,7 @@ export interface FileRouteTypes {
     | '/students/attendance'
     | '/students/certificates'
     | '/students/certificatesupload'
+    | '/students/certificatetemplates'
     | '/students/certificatetypes'
     | '/students/documentsupload'
     | '/students/mycertificates'
@@ -1463,6 +1475,7 @@ export interface FileRouteTypes {
     | '/_app/students/attendance'
     | '/_app/students/certificates'
     | '/_app/students/certificatesupload'
+    | '/_app/students/certificatetemplates'
     | '/_app/students/certificatetypes'
     | '/_app/students/documentsupload'
     | '/_app/students/mycertificates'
@@ -1831,6 +1844,13 @@ declare module '@tanstack/react-router' {
       path: '/certificatetypes'
       fullPath: '/students/certificatetypes'
       preLoaderRoute: typeof AppStudentsCertificatetypesRouteImport
+      parentRoute: typeof AppStudentsRoute
+    }
+    '/_app/students/certificatetemplates': {
+      id: '/_app/students/certificatetemplates'
+      path: '/certificatetemplates'
+      fullPath: '/students/certificatetemplates'
+      preLoaderRoute: typeof AppStudentsCertificatetemplatesRouteImport
       parentRoute: typeof AppStudentsRoute
     }
     '/_app/students/certificatesupload': {
@@ -2694,6 +2714,7 @@ interface AppStudentsRouteChildren {
   AppStudentsAttendanceRoute: typeof AppStudentsAttendanceRoute
   AppStudentsCertificatesRoute: typeof AppStudentsCertificatesRoute
   AppStudentsCertificatesuploadRoute: typeof AppStudentsCertificatesuploadRoute
+  AppStudentsCertificatetemplatesRoute: typeof AppStudentsCertificatetemplatesRoute
   AppStudentsCertificatetypesRoute: typeof AppStudentsCertificatetypesRoute
   AppStudentsDocumentsuploadRoute: typeof AppStudentsDocumentsuploadRoute
   AppStudentsMycertificatesRoute: typeof AppStudentsMycertificatesRoute
@@ -2710,6 +2731,7 @@ const AppStudentsRouteChildren: AppStudentsRouteChildren = {
   AppStudentsAttendanceRoute: AppStudentsAttendanceRoute,
   AppStudentsCertificatesRoute: AppStudentsCertificatesRoute,
   AppStudentsCertificatesuploadRoute: AppStudentsCertificatesuploadRoute,
+  AppStudentsCertificatetemplatesRoute: AppStudentsCertificatetemplatesRoute,
   AppStudentsCertificatetypesRoute: AppStudentsCertificatetypesRoute,
   AppStudentsDocumentsuploadRoute: AppStudentsDocumentsuploadRoute,
   AppStudentsMycertificatesRoute: AppStudentsMycertificatesRoute,

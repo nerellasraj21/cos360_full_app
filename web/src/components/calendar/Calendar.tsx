@@ -677,15 +677,43 @@ export function Calendar() {
                   setSelectedDate(null);
                 }
               }}>{"<"}</Button>
-              <span className="font-semibold text-base">{
-                view === "year"
-                  ? format(current, "yyyy")
-                  : view === "month"
-                    ? format(current, "MMMM yyyy")
+              {view === "month" ? (
+                <span className="font-semibold text-base">
+                  <span className="relative inline-block cursor-pointer hover:text-primary">
+                    {format(current, "MMMM")}
+                    <select
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      value={current.getMonth()}
+                      onChange={e => setCurrent(new Date(current.getFullYear(), Number(e.target.value), 1))}
+                    >
+                      {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (
+                        <option key={i} value={i}>{m}</option>
+                      ))}
+                    </select>
+                  </span>
+                  {" "}
+                  <span className="relative inline-block cursor-pointer hover:text-primary">
+                    {current.getFullYear()}
+                    <select
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      value={current.getFullYear()}
+                      onChange={e => setCurrent(new Date(Number(e.target.value), current.getMonth(), 1))}
+                    >
+                      {Array.from({ length: 21 }, (_, i) => new Date().getFullYear() - 10 + i).map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </span>
+                </span>
+              ) : (
+                <span className="font-semibold text-base">{
+                  view === "year"
+                    ? format(current, "yyyy")
                     : view === "week"
                       ? `${format(startOfWeek(current, { weekStartsOn: 0 }), "MMM d")} - ${format(addDays(startOfWeek(current, { weekStartsOn: 0 }), 6), "MMM d, yyyy")}`
                       : format(current, "MMMM d, yyyy")
-              }</span>
+                }</span>
+              )}
               <Button variant="ghost" onClick={() => {
                 if (view === "month") setCurrent(addMonths(current, 1));
                 else if (view === "week") setCurrent(addDays(current, 7));
@@ -746,17 +774,15 @@ export function Calendar() {
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium">Date Range<span className="text-destructive">*</span></label>
               <div className="flex gap-2">
-                <input
+                <Input
                   type="date"
-                  className="border rounded px-2 py-1 w-full"
                   value={newEventStart}
                   onChange={e => setNewEventStart(e.target.value)}
                   required
                 />
                 <span className="self-center">to</span>
-                <input
+                <Input
                   type="date"
-                  className="border rounded px-2 py-1 w-full"
                   value={newEventEnd}
                   onChange={e => setNewEventEnd(e.target.value)}
                   required
@@ -830,17 +856,15 @@ export function Calendar() {
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium">Date Range<span className="text-destructive">*</span></label>
                 <div className="flex gap-2">
-                  <input
+                  <Input
                     type="date"
-                    className="border rounded px-2 py-1 w-full"
                     value={selectedEvent.start_date}
                     onChange={e => setSelectedEvent({ ...selectedEvent, start_date: e.target.value })}
                     required
                   />
                   <span className="self-center">to</span>
-                  <input
+                  <Input
                     type="date"
-                    className="border rounded px-2 py-1 w-full"
                     value={selectedEvent.end_date}
                     onChange={e => setSelectedEvent({ ...selectedEvent, end_date: e.target.value })}
                     required

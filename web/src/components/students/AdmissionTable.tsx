@@ -623,11 +623,11 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
       {/* Edit Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle>Edit Admission - {selectedAdmission?.admission_number}</DialogTitle>
           </DialogHeader>
-          <div className="overflow-y-auto px-6">
+          <div className="flex-1 overflow-y-auto px-6">
           {selectedAdmission && (
             <div className="space-y-4 pr-1 pb-2" onChange={() => setIsEditDirty(true)}>
 
@@ -1155,7 +1155,8 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
               </div>
             </div>
           )}
-          <div className="flex justify-end gap-2 pt-4 pb-4">
+          </div>
+          <div className="flex-shrink-0 border-t px-6 py-4 flex justify-end gap-2">
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
@@ -1243,7 +1244,6 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
             >
               {updateMutation.isPending ? 'Updating...' : 'Update Admission'}
             </Button>
-          </div>
           </div>
         </DialogContent>
       </Dialog>

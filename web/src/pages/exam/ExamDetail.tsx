@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import {
-  ArrowLeft, Edit, Copy, Trash2, Loader2, Calendar, Lock,
+  Edit, Copy, Trash2, Loader2, Calendar, Lock,
   CheckCircle, BarChart3, Users, FileText, Clock, ClipboardList, Plus, Save,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -160,18 +160,9 @@ export default function ExamDetail() {
 
   return (
     <div className="space-y-6">
-      {/* Back + Header */}
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate({ to: '/exam/exams' as any })}
-            className="mb-2 gap-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Exams
-          </Button>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight">{exam.exam_name}</h1>
             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_BADGE[exam.status ?? 'draft']}`}>

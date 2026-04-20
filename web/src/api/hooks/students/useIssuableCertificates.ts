@@ -34,9 +34,6 @@ const issuableCertificateKeys = {
 // TEMPLATE HOOKS
 // ============================================================================
 
-/**
- * Get all certificate templates
- */
 export const useIssuableCertificateTemplates = () => {
   return useQuery({
     queryKey: issuableCertificateKeys.templatesList(),
@@ -49,9 +46,6 @@ export const useIssuableCertificateTemplates = () => {
   });
 };
 
-/**
- * Get single certificate template
- */
 export const useIssuableCertificateTemplate = (templateId: string) => {
   return useQuery({
     queryKey: issuableCertificateKeys.template(templateId),
@@ -65,9 +59,6 @@ export const useIssuableCertificateTemplate = (templateId: string) => {
   });
 };
 
-/**
- * Create a new certificate template
- */
 export const useCreateIssuableCertificateTemplate = () => {
   const queryClient = useQueryClient();
 
@@ -80,22 +71,15 @@ export const useCreateIssuableCertificateTemplate = () => {
       return response.data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({
-        queryKey: issuableCertificateKeys.templatesList(),
-      });
+      queryClient.invalidateQueries({ queryKey: issuableCertificateKeys.templatesList() });
       toast.success(`Template "${data.name}" created successfully`);
     },
     onError: (error: any) => {
-      const message =
-        error?.response?.data?.detail || "Failed to create template";
-      toast.error(message);
+      toast.error(error?.response?.data?.detail || "Failed to create template");
     },
   });
 };
 
-/**
- * Update a certificate template
- */
 export const useUpdateIssuableCertificateTemplate = () => {
   const queryClient = useQueryClient();
 
@@ -114,25 +98,16 @@ export const useUpdateIssuableCertificateTemplate = () => {
       return response.data;
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: issuableCertificateKeys.templatesList(),
-      });
-      queryClient.invalidateQueries({
-        queryKey: issuableCertificateKeys.template(variables.templateId),
-      });
+      queryClient.invalidateQueries({ queryKey: issuableCertificateKeys.templatesList() });
+      queryClient.invalidateQueries({ queryKey: issuableCertificateKeys.template(variables.templateId) });
       toast.success(`Template "${data.name}" updated successfully`);
     },
     onError: (error: any) => {
-      const message =
-        error?.response?.data?.detail || "Failed to update template";
-      toast.error(message);
+      toast.error(error?.response?.data?.detail || "Failed to update template");
     },
   });
 };
 
-/**
- * Delete a certificate template
- */
 export const useDeleteIssuableCertificateTemplate = () => {
   const queryClient = useQueryClient();
 
@@ -141,15 +116,11 @@ export const useDeleteIssuableCertificateTemplate = () => {
       await CAxios.delete(`/issuable-certificates/templates/${templateId}/`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: issuableCertificateKeys.templatesList(),
-      });
+      queryClient.invalidateQueries({ queryKey: issuableCertificateKeys.templatesList() });
       toast.success("Template deleted successfully");
     },
     onError: (error: any) => {
-      const message =
-        error?.response?.data?.detail || "Failed to delete template";
-      toast.error(message);
+      toast.error(error?.response?.data?.detail || "Failed to delete template");
     },
   });
 };
@@ -158,9 +129,6 @@ export const useDeleteIssuableCertificateTemplate = () => {
 // ISSUED CERTIFICATE HOOKS
 // ============================================================================
 
-/**
- * Get all issued certificates for a student
- */
 export const useIssuedCertificatesByStudent = (studentId: string) => {
   return useQuery({
     queryKey: issuableCertificateKeys.issuedByStudent(studentId),
@@ -174,9 +142,6 @@ export const useIssuedCertificatesByStudent = (studentId: string) => {
   });
 };
 
-/**
- * Get single issued certificate details
- */
 export const useIssuedCertificateDetail = (certificateId: string) => {
   return useQuery({
     queryKey: issuableCertificateKeys.issuedDetail(certificateId),
@@ -191,7 +156,9 @@ export const useIssuedCertificateDetail = (certificateId: string) => {
 };
 
 /**
- * Generate and issue a certificate
+ * Generate and save a certificate.
+ * Backend returns GenerateCertificateResponse: { id, status, message, download_url }.
+ * No PDF download endpoint exists — use browser print after saving.
  */
 export const useGenerateIssuableCertificate = () => {
   const queryClient = useQueryClient();
@@ -204,56 +171,18 @@ export const useGenerateIssuableCertificate = () => {
       );
       return response.data;
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
         queryKey: issuableCertificateKeys.issuedByStudent(variables.student_id),
       });
-      toast.success("Certificate generated and saved successfully");
+      toast.success("Certificate saved successfully");
     },
     onError: (error: any) => {
-      const message =
-        error?.response?.data?.detail || "Failed to generate certificate";
-      toast.error(message);
+      toast.error(error?.response?.data?.detail || "Failed to generate certificate");
     },
   });
 };
 
-/**
- * Download issued certificate as PDF
- */
-export const useDownloadIssuedCertificatePdf = () => {
-  return useMutation({
-    mutationFn: async (certificateId: string) => {
-      const response = await CAxios.get(
-        `/issuable-certificates/issued/${certificateId}/download/`,
-        {
-          responseType: "blob",
-        }
-      );
-      return response.data;
-    },
-    onSuccess: (blob: Blob, certificateId: string) => {
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `certificate-${certificateId}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(link);
-      toast.success("Certificate downloaded");
-    },
-    onError: (error: any) => {
-      const message =
-        error?.response?.data?.detail || "Failed to download certificate";
-      toast.error(message);
-    },
-  });
-};
-
-/**
- * Delete an issued certificate
- */
 export const useDeleteIssuedCertificate = () => {
   const queryClient = useQueryClient();
 
@@ -261,16 +190,12 @@ export const useDeleteIssuedCertificate = () => {
     mutationFn: async (certificateId: string) => {
       await CAxios.delete(`/issuable-certificates/issued/${certificateId}/`);
     },
-    onSuccess: (_, certificateId) => {
-      queryClient.invalidateQueries({
-        queryKey: issuableCertificateKeys.issued(),
-      });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: issuableCertificateKeys.issued() });
       toast.success("Certificate deleted successfully");
     },
     onError: (error: any) => {
-      const message =
-        error?.response?.data?.detail || "Failed to delete certificate";
-      toast.error(message);
+      toast.error(error?.response?.data?.detail || "Failed to delete certificate");
     },
   });
 };
