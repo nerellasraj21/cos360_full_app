@@ -145,7 +145,7 @@ async def get_tenant_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     if not schema_name:
         # Check if it's the default client for backward compatibility
         if client_name == "default":
-            schema_name = "cos360_masters"
+            schema_name = "cos360_master"
             logger.warning(f"Using default tenant fallback: {client_name} -> {schema_name}")
         else:
             logger.warning(f"Tenant not found or inactive: {client_name}")
@@ -190,7 +190,7 @@ async def get_tenant_db_by_client_name(client_name: str) -> AsyncGenerator[Async
     if not schema_name:
         # Check if it's the default client for backward compatibility
         if client_name == "default":
-            schema_name = "cos360_masters"
+            schema_name = "cos360_master"
             logger.warning(f"Using default tenant fallback: {client_name} -> {schema_name}")
         else:
             logger.warning(f"Tenant not found or inactive: {client_name}")

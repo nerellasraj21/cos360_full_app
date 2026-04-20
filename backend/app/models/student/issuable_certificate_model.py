@@ -9,7 +9,7 @@ Two tables:
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, LargeBinary, String, Text
+from sqlalchemy import Column, DateTime, ForeignKey, LargeBinary, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -39,7 +39,7 @@ class GeneratedCertificate(BaseOrg):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     student_id = Column(UUID(as_uuid=True), nullable=False, index=True)  # UUID reference to student
-    template_id = Column(UUID(as_uuid=True), nullable=False, index=True)  # Foreign key to IssuableCertificateTemplate
+    template_id = Column(UUID(as_uuid=True), ForeignKey("issuable_certificate_templates.id"), nullable=False, index=True)
     html_content = Column(Text, nullable=False)  # Filled + edited HTML content
     pdf_content = Column(LargeBinary, nullable=True)  # PDF as binary blob (optional, cached)
     issued_date = Column(DateTime, default=datetime.utcnow, nullable=False)

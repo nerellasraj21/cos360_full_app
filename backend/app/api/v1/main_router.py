@@ -78,7 +78,7 @@ from app.api.v1.student.admission_endpoints import router as admission_router
 from app.api.v1.student.attendance_endpoints import router as attendance_router
 from app.api.v1.student.certificate_endpoints import router as certificate_router
 from app.api.v1.student.certificate_type_endpoints import router as certificate_type_router
-# from app.api.v1.student.issuable_certificate_endpoints import router as issuable_certificate_router
+from app.api.v1.student.issuable_certificate_endpoints import router as issuable_certificate_router
 from app.api.v1.student.student_document_endpoints import router as student_document_router
 from app.api.v1.student.student_parent_endpoints import router as student_parent_link_router
 
@@ -118,7 +118,7 @@ router.include_router(timetable_router)
 router.include_router(admission_router)
 router.include_router(certificate_router)
 router.include_router(certificate_type_router)
-# router.include_router(issuable_certificate_router)
+router.include_router(issuable_certificate_router)
 router.include_router(parent_router)
 router.include_router(staff_router)
 router.include_router(caste_router)
