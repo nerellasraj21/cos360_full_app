@@ -61,6 +61,7 @@ class FeeTransactionApi {
     if (params?.academic_year_id) queryParams.append('academic_year_id', params.academic_year_id);
     if (params?.payment_method) queryParams.append('payment_method', params.payment_method);
     if (params?.status) queryParams.append('status', params.status);
+    if (params?.has_receipt !== undefined) queryParams.append('has_receipt', String(params.has_receipt));
     if (params?.date_from) queryParams.append('date_from', params.date_from);
     if (params?.date_to) queryParams.append('date_to', params.date_to);
     if (params?.limit !== undefined) queryParams.append('limit', params.limit.toString());

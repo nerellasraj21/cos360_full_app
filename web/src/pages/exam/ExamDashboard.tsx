@@ -1,10 +1,11 @@
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect } from 'react'
-import { Loader2, BookOpen, ClipboardList, Award, Ticket, Settings, Plus } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import { Loader2, BookOpen, ClipboardList, Award, Ticket, Settings, Plus, Filter, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { useExamList } from '@/api/hooks/exam/useExam'
 import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
 import { useAcademicYearStore } from '@/lib/academicYearStore'
@@ -75,12 +76,21 @@ export default function ExamDashboard() {
     if (academicYears.length === 0) fetchAndSetAcademicYears()
   }, [academicYears.length, fetchAndSetAcademicYears])
 
+  const [searchQuery, setSearchQuery] = useState('')
+
   const selectedYear = academicYears.find(y => String(y.id) === String(selectedAcademicYearId))
   const { data: exams = [], isLoading } = useExamList({ academic_year_id: selectedAcademicYearId || undefined })
   const { data: subjectsList = [] } = useSubjectsDropdown()
   const subjectNameMap = Object.fromEntries(subjectsList.map(s => [s.id, s.name]))
 
-  const byStatus = (status: string) => exams.filter(e => e.status === status)
+  const filteredExams = useMemo(() =>
+    searchQuery.trim() === ''
+      ? exams
+      : exams.filter(e => e.exam_name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [exams, searchQuery]
+  )
+
+  const byStatus = (status: string) => filteredExams.filter(e => e.status === status)
 
   const quickLinks = [
     { label: 'All Exams', icon: BookOpen, to: '/exam/exams' },
@@ -116,6 +126,23 @@ export default function ExamDashboard() {
             <span className="text-xs text-center">{link.label}</span>
           </button>
         ))}
+      </div>
+
+      {/* Filter Bar */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+          <Filter className="h-3.5 w-3.5" />
+          <span>Filters</span>
+        </div>
+        <div className="relative max-w-60">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search exams..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
       </div>
 
       {/* Summary Stats */}
@@ -157,16 +184,22 @@ export default function ExamDashboard() {
             </section>
           )}
 
-          {exams.length === 0 && (
+          {filteredExams.length === 0 && (
             <div className="rounded-lg border bg-muted/20 p-8 text-center">
               <BookOpen className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No exams found for this academic year.</p>
-              <Button
-                className="mt-4"
-                onClick={() => navigate({ to: '/exam/exams/create' as any })}
-              >
-                Create First Exam
-              </Button>
+              <p className="text-muted-foreground">
+                {exams.length === 0
+                  ? 'No exams found for this academic year.'
+                  : 'No exams match your search.'}
+              </p>
+              {exams.length === 0 && (
+                <Button
+                  className="mt-4"
+                  onClick={() => navigate({ to: '/exam/exams/create' as any })}
+                >
+                  Create First Exam
+                </Button>
+              )}
             </div>
           )}
         </>

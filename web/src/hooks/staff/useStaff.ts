@@ -379,3 +379,36 @@ export function useDeleteQualification() {
     },
   });
 }
+
+// Staff Photo Hooks
+export function useUploadStaffPhoto() {
+  const queryClient = useQueryClient();
+
+  return useMutation<Staff, Error, { staffId: string; file: File }>({
+    mutationFn: ({ staffId, file }) => staffApi.uploadStaffPhoto(staffId, file),
+    onSuccess: (data) => {
+      queryClient.setQueryData(staffKeys.detail(data.id), data);
+      queryClient.invalidateQueries({ queryKey: staffKeys.lists() });
+      toast.success('Photo uploaded successfully');
+    },
+    onError: (error) => {
+      toast.error(`Failed to upload photo: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteStaffPhoto() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: (staffId) => staffApi.deleteStaffPhoto(staffId),
+    onSuccess: (_, staffId) => {
+      queryClient.invalidateQueries({ queryKey: staffKeys.detail(staffId) });
+      queryClient.invalidateQueries({ queryKey: staffKeys.lists() });
+      toast.success('Photo removed successfully');
+    },
+    onError: (error) => {
+      toast.error(`Failed to remove photo: ${error.message}`);
+    },
+  });
+}

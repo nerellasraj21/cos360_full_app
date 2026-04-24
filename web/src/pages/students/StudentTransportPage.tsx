@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   Loader2, Bus, MapPin, Clock, IndianRupee, Navigation2, Truck,
-  Plus, Filter, Search, Edit, Trash2, Tag,
+  Plus, Filter, Search, X, Edit, Trash2, Tag,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/authStore';
 import { useParentChildren } from '@/api/auth';
@@ -87,25 +87,38 @@ function AdminView() {
     <div className="container mx-auto p-4 space-y-4">
       <PageHeader title="Student Transport" icon={<Bus className="h-5 w-5" />} />
       <Card>
-        <CardHeader className="flex flex-row items-center justify-end">
-          <Button size="sm" onClick={() => setIsAddOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Assign Transport
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {/* Filter bar */}
-          <div className="flex items-center gap-2 mb-4">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Filters</span>
-            <div className="relative ml-2">
-              <Search className="h-4 w-4 absolute left-2 top-2 text-muted-foreground" />
+        <CardContent className="pt-6">
+          {/* Filter + action row */}
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm font-medium text-muted-foreground">Filters</span>
+              {search && (
+                <span className="text-xs text-muted-foreground">
+                  {filtered.length} of {transports.length}
+                </span>
+              )}
+              <Button size="sm" onClick={() => setIsAddOpen(true)} className="ml-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                Assign Transport
+              </Button>
+            </div>
+            <div className="relative max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <Input
                 placeholder="Search student, route, stop..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 h-8 w-64"
+                className="pl-8 pr-8 h-9"
               />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           </div>
 

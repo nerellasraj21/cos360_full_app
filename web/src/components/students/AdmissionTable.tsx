@@ -3,24 +3,26 @@ import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ViewButton, EditButton, ActivateButton, DeactivateButton, TableActionGroup } from '@/components/common/TableActions';
-import { Loader2, Eye, Edit, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, Eye, Edit, CheckCircle, XCircle, UserCircle, X, Plus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { useAdmissions, useUpdateAdmission, useToggleStudentStatus, useAdmissionTypesDropdown } from '@/api/hooks/students/admissions';
+import { useAdmissions, useUpdateAdmission, useToggleStudentStatus, useAdmissionTypesDropdown, useUploadStudentPhoto, useDeleteStudentPhoto } from '@/api/hooks/students/admissions';
 import { getAdmissionByStudentId } from '@/api/students/admissions';
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections';
-import { useAcademicYearsDropdown } from '@/api/hooks/masters/academicyears';
+import { useAcademicYears } from '@/api/hooks/masters/academicyears';
 import { useStatesDropdown, useDistrictsDropdown, useMandalsDropdown } from '@/api/hooks/masters/locations';
 import { StateDropdown } from '@/components/dropdown/StateDropdown';
 import { DistrictDropdown } from '@/components/dropdown/DistrictDropdown';
 import { MandalDropdown } from '@/components/dropdown/MandalDropdown';
 import { CasteDropdown } from '@/components/dropdown/CasteDropdown';
 import { SubCasteDropdown } from '@/components/dropdown/SubCasteDropdown';
+import { useCastesDropdown, useSubCastesDropdown } from '@/api/hooks/masters/castes';
 import { toast } from 'sonner';
+import { config } from '@/lib/config';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import type { StudentAdmissionResponse, StudentOut } from '@/types/admission';
 import type { ClassRead } from '@/types/masters/classesandsections';
@@ -119,12 +121,16 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
     guardian_salary_range: '',
   });
 
+  const mediaBase = config.api.baseURL.replace(/\/api\/v\d+$/, '');
+
   const { data: admissionsResponse, isLoading } = useAdmissions({ skip: page * pageSize, limit: pageSize });
   const { data: classesData = [] } = useClassSectionsDropdown();
-  const { data: academicYears = [] } = useAcademicYearsDropdown();
+  const { data: academicYears = [] } = useAcademicYears();
   const { data: admissionTypes = [] } = useAdmissionTypesDropdown();
   const updateMutation = useUpdateAdmission();
   const toggleStatusMutation = useToggleStudentStatus();
+  const uploadPhotoMutation = useUploadStudentPhoto();
+  const deletePhotoMutation = useDeleteStudentPhoto();
 
   // Location hooks for view modal display (keyed on selectedAdmission's state/district)
   const selectedStateId = (selectedAdmission as any)?.state_id || selectedAdmission?.state;
@@ -132,6 +138,11 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
   const { data: states = [] } = useStatesDropdown();
   const { data: districts = [], isLoading: districtsLoading } = useDistrictsDropdown(selectedStateId);
   const { data: mandals = [], isLoading: mandalsLoading } = useMandalsDropdown(selectedDistrictId);
+
+  // Caste hooks for view modal display (fetch all so inactive castes still resolve)
+  const selectedCasteId = (selectedAdmission?.student as any)?.caste || '';
+  const { data: allCastes = [] } = useCastesDropdown(false);
+  const { data: allSubCastes = [] } = useSubCastesDropdown(selectedCasteId || undefined, false);
 
   // Helper functions to get display names
   const getAcademicYearName = (yearId: string) => {
@@ -165,6 +176,12 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
     if (mandalsLoading) return 'Loading...';
     return mandals.find(m => m.id === mandalId)?.name || 'N/A';
   };
+
+  const getCasteName = (casteId: string) =>
+    allCastes.find(c => c.id === casteId)?.name || casteId;
+
+  const getSubCasteName = (subCasteId: string) =>
+    allSubCastes.find(s => s.id === subCasteId)?.name || subCasteId;
 
   const formatGender = (g?: string) => {
     if (!g) return 'N/A';
@@ -523,7 +540,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
     return [
       { label: 'Admission Number', value: admission.admission_number },
       { label: 'Admission Date', value: new Date(admission.admission_date).toLocaleDateString() },
-      { label: 'Academic Year', value: getAcademicYearName(admission.academic_year_id || '') || 'N/A' },
+      { label: 'Academic Year', value: getAcademicYearName(admission.admitted_academic_year_id || admission.academic_year_id || '') || 'N/A' },
       { label: 'Admitted Class', value: getClassName(admission.admitted_class_id || '') || 'N/A' },
       { label: 'Admitted Section', value: getSectionName(admission.admitted_class_id || '', admission.admitted_section_id || '') || 'N/A' },
       { label: 'Current Class', value: getClassName(admission.current_class_id || '') || 'N/A' },
@@ -539,8 +556,8 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       { label: 'Gender', value: formatGender(studentData.gender) },
       { label: 'Aadhar Number', value: studentData.aadhar_number || 'N/A' },
       { label: 'APAAR Number', value: studentData.apaar_number || 'N/A' },
-      { label: 'Caste', value: studentData.caste || 'N/A' },
-      { label: 'Sub Caste', value: studentData.sub_caste || 'N/A' },
+      { label: 'Caste', value: studentData.caste ? getCasteName(studentData.caste) : 'N/A' },
+      { label: 'Sub Caste', value: studentData.sub_caste ? getSubCasteName(studentData.sub_caste) : 'N/A' },
       { label: 'Community', value: studentData.community || 'N/A' },
       { label: 'Nationality', value: studentData.nationality },
       { label: 'Mother Tongue', value: studentData.mother_tongue },
@@ -589,30 +606,46 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
       {/* View Modal */}
       <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl flex flex-col max-h-[90vh] p-0">
+          <DialogHeader className="flex-shrink-0 px-6 py-4 border-b">
             <DialogTitle>Admission Details - {selectedAdmission?.admission_number}</DialogTitle>
           </DialogHeader>
-          {selectedAdmission && (
-            <div className="space-y-4">
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse">
-                  <tbody>
-                    {getAdmissionDetails(selectedAdmission).map((detail, index) => (
-                      <tr key={index} className="border-b last:border-0">
-                        <td className="px-4 py-2 font-medium bg-muted/50 w-1/3">
-                          {detail.label}
-                        </td>
-                        <td className="px-4 py-2">
-                          {detail.value}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div className="overflow-y-auto flex-1 px-6 py-4">
+            {selectedAdmission && (
+              <div className="space-y-4">
+                {/* Student photo — centered at top */}
+                <div className="flex justify-center">
+                  {selectedAdmission.student?.photo_url ? (
+                    <img
+                      src={`${mediaBase}${selectedAdmission.student.photo_url}`}
+                      alt={`${selectedAdmission.student.first_name} ${selectedAdmission.student.last_name}`}
+                      className="h-24 w-24 rounded-full object-cover border-2 border-border"
+                    />
+                  ) : (
+                    <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center border-2 border-border">
+                      <UserCircle className="h-12 w-12 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-collapse">
+                    <tbody>
+                      {getAdmissionDetails(selectedAdmission).map((detail, index) => (
+                        <tr key={index} className="border-b last:border-0">
+                          <td className="px-4 py-2 font-medium bg-muted/50 w-1/3">
+                            {detail.label}
+                          </td>
+                          <td className="px-4 py-2">
+                            {detail.value}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setViewModalOpen(false)}>
               Close
@@ -901,6 +934,81 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
               {/* Student Details */}
               <p className="text-sm font-semibold text-muted-foreground pt-2">Student Details</p>
+
+              {/* Student photo */}
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  {selectedAdmission.student?.photo_url ? (
+                    <img
+                      src={`${mediaBase}${selectedAdmission.student.photo_url}`}
+                      alt="Student photo"
+                      className="h-20 w-20 rounded-full object-cover border-2 border-border"
+                    />
+                  ) : (
+                    <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center border-2 border-border">
+                      <UserCircle className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                  )}
+                  {selectedAdmission.student?.photo_url && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const studentId = selectedAdmission.student.id;
+                        deletePhotoMutation.mutate(studentId, {
+                          onSuccess: async () => {
+                            const refreshed = await getAdmissionByStudentId(studentId);
+                            setSelectedAdmission(refreshed);
+                          },
+                        });
+                      }}
+                      disabled={deletePhotoMutation.isPending}
+                      className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/80"
+                      title="Remove photo"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="block text-sm font-medium text-foreground">Student Photo</label>
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      disabled={uploadPhotoMutation.isPending || deletePhotoMutation.isPending}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 2 * 1024 * 1024) {
+                          toast.error('Photo must be under 2 MB');
+                          e.target.value = '';
+                          return;
+                        }
+                        const studentId = selectedAdmission?.student.id;
+                        if (!studentId) return;
+                        uploadPhotoMutation.mutate({ studentId, file }, {
+                          onSuccess: async () => {
+                            const refreshed = await getAdmissionByStudentId(studentId);
+                            setSelectedAdmission(refreshed);
+                          },
+                        });
+                        e.target.value = '';
+                      }}
+                    />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-background text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                      {uploadPhotoMutation.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Plus className="h-3.5 w-3.5" />
+                      )}
+                      {uploadPhotoMutation.isPending ? 'Uploading…' : 'Choose photo'}
+                    </span>
+                  </label>
+                  <span className="text-xs text-muted-foreground">JPG, PNG or WebP · max 2 MB</span>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-first-name">First Name</Label>

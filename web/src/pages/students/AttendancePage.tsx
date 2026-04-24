@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Loader2, Save, CheckCircle, XCircle, UserCheck, Users } from 'lucide-react';
+import { Loader2, Save, CheckCircle, XCircle, UserCheck, Users, Filter, Search, X } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from 'sonner';
 import { useClassSectionsDropdown, useStudentsByClassSection } from '@/api/hooks/masters/classesandsections';
@@ -45,6 +45,7 @@ interface StudentAttendanceState {
   existingRecord?: StudentAttendanceOut;
   isModified: boolean;
 }
+
 
 // ─── Role router ─────────────────────────────────────────────────────────────
 
@@ -284,17 +285,20 @@ function AttendanceRecordList({
           <div className="space-y-2">
             {[...records]
               .sort((a, b) => b.date.localeCompare(a.date))
-              .map((record) => (
+              .map((record, index) => (
                 <div
                   key={record.id}
                   className="flex items-center justify-between p-3 border rounded-lg"
                   style={{ height: '48px' }}
                 >
-                  <span className="font-medium">
-                    {new Date(record.date).toLocaleDateString('en-GB', {
-                      day: '2-digit', month: 'short', year: 'numeric',
-                    })}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground w-6 text-right shrink-0">{index + 1}</span>
+                    <span className="font-medium">
+                      {new Date(record.date).toLocaleDateString('en-GB', {
+                        day: '2-digit', month: 'short', year: 'numeric',
+                      })}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-3">
                     {record.remarks && (
                       <span className="text-sm text-muted-foreground hidden md:block">{record.remarks}</span>
@@ -327,6 +331,8 @@ function StaffView() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
 
   const { data: classesData, isLoading: classesLoading } = useClassSectionsDropdown();
 
@@ -397,12 +403,14 @@ function StaffView() {
     setSelectedSection('');
     setStudentAttendances(new Map());
     setExistingAttendances([]);
+    setSearchQuery('');
   };
 
   const handleSectionChange = (sectionId: string) => {
     setSelectedSection(sectionId);
     setStudentAttendances(new Map());
     setExistingAttendances([]);
+    setSearchQuery('');
   };
 
   const handleDateChange = (date: string) => {
@@ -527,6 +535,17 @@ function StaffView() {
     ? Math.round((attendanceSummary.present / totalStudents) * 100)
     : 0;
 
+  const filteredStudents = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return students;
+    return students.filter(s => {
+      const name = getStudentName(s.student).toLowerCase();
+      const roll = (s.admission_number || '').toLowerCase();
+      return name.includes(q) || roll.includes(q);
+    });
+  }, [students, searchQuery]);
+
+
   return (
     <div className="container mx-auto p-4 space-y-6">
       <PageHeader title="Student Attendance" icon={<UserCheck className="h-5 w-5" />} />
@@ -643,7 +662,35 @@ function StaffView() {
 
             {/* ── Student list ── */}
             <div className="border-t px-6 pb-6 pt-4">
-              <p className="text-sm font-medium text-muted-foreground mb-3">Students</p>
+              {/* Filter row */}
+              <div className="space-y-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <p className="text-sm font-medium text-muted-foreground">Filter Students</p>
+                  {searchQuery && (
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {filteredStudents.length} of {totalStudents}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="Search by name or roll no..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8 pr-8 h-9 text-sm"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
               {isLoadingAttendance || studentsLoading ? (
                 <div className="flex justify-center items-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin" />
@@ -653,11 +700,15 @@ function StaffView() {
                 <div className="text-center py-8 text-muted-foreground">
                   No students found for the selected class and section.
                 </div>
+              ) : filteredStudents.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No students match "{searchQuery}".
+                </div>
               ) : (
                 <div className="grid gap-2">
-                  {students
+                  {filteredStudents
                     .filter(student => student.student?.id)
-                    .map((student) => {
+                    .map((student, index) => {
                       const attendance = studentAttendances.get(student.student.id);
                       const status = attendance?.status || 'present';
                       const statusStyles = {
@@ -665,9 +716,7 @@ function StaffView() {
                         absent: 'bg-red-100 text-red-700 border-red-300',
                         late: 'bg-yellow-100 text-yellow-700 border-yellow-300',
                       }[status];
-                      const rowStyles = attendance?.isModified
-                        ? 'border-blue-300 bg-blue-50 dark:bg-blue-950/20'
-                        : status === 'absent'
+                      const rowStyles = status === 'absent'
                         ? 'border-red-200'
                         : status === 'late'
                         ? 'border-yellow-200'
@@ -679,6 +728,7 @@ function StaffView() {
                           style={{ height: '64px' }}
                         >
                           <div className="flex items-center gap-3">
+                            <span className="text-xs text-muted-foreground w-6 text-right shrink-0">{index + 1}</span>
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${statusStyles} capitalize min-w-[60px] justify-center`}>
                               {status}
                             </span>
@@ -686,7 +736,6 @@ function StaffView() {
                               <div className="font-medium">{getStudentName(student.student)}</div>
                               <div className="text-sm text-muted-foreground">Roll No: {student.admission_number || 'N/A'}</div>
                             </div>
-                            {attendance?.isModified && <Badge variant="secondary" className="text-xs">Modified</Badge>}
                           </div>
                           <Select
                             value={status}

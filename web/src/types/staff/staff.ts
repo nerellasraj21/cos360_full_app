@@ -63,6 +63,8 @@ export interface Staff {
   current_salary?: string;    // Decimal serialized as string by backend
   pf_account_number?: string;
   uan_number?: string;
+  // Photo
+  photo_url?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import type { Subject, SubjectInput, ClassSubjectMappingBulkCreate, ClassSubjectMappingBulkResponse } from '@/types/masters';
 import type { SubjectDropdown } from '@/api/masters/subjects';
 import { fetchSubjects, fetchSubjectById, createSubject, updateSubject, deleteSubject, createBulkClassSubjectMappings, fetchSubjectsDropdown } from '@/api/masters/subjects';
@@ -90,13 +90,20 @@ export function useSubjectsPaginated(page: number, pageSize: number, academicYea
         academic_year_id: academicYearId
       });
 
+      const total = response.total || response.items.length;
+      const start = page * pageSize;
+      const pageItems = response.items.length > pageSize
+        ? response.items.slice(start, start + pageSize)
+        : response.items;
+
       return {
-        data: response.items,
-        total: response.total || response.items.length,
-        hasMore: response.total ? (page + 1) * pageSize < response.total : false,
+        data: pageItems,
+        total,
+        hasMore: (page + 1) * pageSize < total,
       };
     },
     enabled,
+    placeholderData: keepPreviousData,
   });
 }
 

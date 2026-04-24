@@ -213,12 +213,18 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
     const totalCategories = categoriesResponse?.total || 0;
     const totalPages = Math.ceil(totalCategories / pageSize);
 
-    // Client-side search filter
+    // Client-side filters (status + search)
     const categories = useMemo(() => {
-        if (!searchQuery.trim()) return allCategories;
-        const q = searchQuery.toLowerCase();
-        return allCategories.filter(c => c.category_name.toLowerCase().includes(q));
-    }, [allCategories, searchQuery]);
+        let filtered = allCategories;
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(c => c.category_status === statusFilter);
+        }
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            filtered = filtered.filter(c => c.category_name.toLowerCase().includes(q));
+        }
+        return filtered;
+    }, [allCategories, searchQuery, statusFilter]);
 
     // Debug logging
     console.log('[FeeCategoryTree] Component state:', {

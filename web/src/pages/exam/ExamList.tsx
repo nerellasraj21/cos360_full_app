@@ -416,15 +416,6 @@ export default function ExamList() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
-                        title="Delete Exam"
-                        onClick={() => setDeleteTarget(exam)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </td>
                 </tr>

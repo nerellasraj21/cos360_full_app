@@ -294,4 +294,5 @@ export const feeCollectionApi = {
       handleApiError(error);
     }
   },
+
 };

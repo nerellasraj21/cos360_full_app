@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, CheckCircle, XCircle, Search, Eye, EyeOff, ClipboardCheck } from 'lucide-react';
+import { Loader2, Save, CheckCircle, XCircle, Search, Eye, EyeOff, ClipboardCheck, Filter, X } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from 'sonner';
 import { Table } from '@/components/common/table';
@@ -77,7 +77,7 @@ const StaffAttendancePage: React.FC = () => {
 
     // Data fetching
     const { data: staffData, isLoading: staffLoading } = useStaff({ is_active: true });
-    const { data: attendanceData, isLoading: attendanceLoading, refetch: refetchAttendance } = useStaffAttendanceByDate(selectedDate);
+    const { data: attendanceData, isLoading: attendanceLoading, isFetching: attendanceFetching, refetch: refetchAttendance } = useStaffAttendanceByDate(selectedDate);
 
     // Mutations
     const createMutation = useCreateStaffAttendance();
@@ -112,11 +112,11 @@ const StaffAttendancePage: React.FC = () => {
             const newAttendances = new Map<string, StaffAttendanceState>();
 
             staff.forEach(staffMember => {
-                const existing = existingAttendances.find(att => att.staff_id === staffMember.id.toString());
+                const existing = existingAttendances.find(att => att.staff_id === staffMember.id);
                 // Always default to 'present' unless there's an existing record for this specific date
                 const status = existing ? existing.status : 'present';
-                newAttendances.set(staffMember.id.toString(), {
-                    staff_id: staffMember.id.toString(),
+                newAttendances.set(staffMember.id, {
+                    staff_id: staffMember.id,
                     status: status,
                     existingRecord: existing,
                     isModified: false
@@ -315,10 +315,10 @@ const StaffAttendancePage: React.FC = () => {
     // Transform staff data into table rows
     const tableData: StaffAttendanceRow[] = useMemo(() => {
         return staff.map((staffMember) => {
-            const attendance = staffAttendances.get(staffMember.id.toString());
+            const attendance = staffAttendances.get(staffMember.id);
             return {
-                id: staffMember.id.toString(),
-                staff_id: staffMember.id.toString(),
+                id: staffMember.id,
+                staff_id: staffMember.id,
                 staff_name: `${staffMember.first_name || ''} ${staffMember.last_name || ''}`.trim() || 'Unknown Staff',
                 email: staffMember.email || 'N/A',
                 department: staffMember.department || 'N/A',
@@ -403,8 +403,8 @@ const StaffAttendancePage: React.FC = () => {
                         <span>Attendance Overview</span>
                         <div className="flex items-center gap-2">
                             {hasUnsavedChanges && <Badge variant="secondary">Unsaved Changes</Badge>}
-                            <Button variant="outline" size="sm" onClick={() => refetchAttendance()} disabled={attendanceLoading}>
-                                {attendanceLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🔄</span>}
+                            <Button variant="outline" size="sm" onClick={() => refetchAttendance()} disabled={attendanceFetching}>
+                                {attendanceFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🔄</span>}
                                 Refresh
                             </Button>
                             <Button size="sm" onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
@@ -479,16 +479,35 @@ const StaffAttendancePage: React.FC = () => {
 
                 {/* ── Staff list ── */}
                 <div className="border-t px-6 pb-6 pt-4 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
-                            <Search className="h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search by name, email, or department..."
-                                value={searchQuery}
-                                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(0); }}
-                                className="h-9"
-                            />
+                    {/* Filter title row */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <p className="text-sm font-medium text-muted-foreground">Filter Staff</p>
+                            {searchQuery && (
+                                <span className="text-xs text-muted-foreground ml-auto">
+                                    {filteredData.length} of {totalStaff}
+                                </span>
+                            )}
                         </div>
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="relative flex-1 min-w-[200px] max-w-sm">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                                <Input
+                                    placeholder="Search by name, email, or department..."
+                                    value={searchQuery}
+                                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(0); }}
+                                    className="pl-8 pr-8 h-9"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        onClick={() => { setSearchQuery(''); setCurrentPage(0); }}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                )}
+                            </div>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="sm" className="gap-2">
@@ -515,6 +534,7 @@ const StaffAttendancePage: React.FC = () => {
                                 ))}
                             </DropdownMenuContent>
                         </DropdownMenu>
+                        </div>
                     </div>
 
                     {attendanceLoading || staffLoading ? (
@@ -540,6 +560,7 @@ const StaffAttendancePage: React.FC = () => {
                             onEdit={handleEdit}
                             onDelete={handleDelete}
                             isEditing={false}
+                            searchable={false}
                             pagination={{
                                 page: currentPage,
                                 pageSize: pageSize,

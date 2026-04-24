@@ -31,10 +31,19 @@ export const createStaffAttendance = async (
     }
 };
 
-// Get all attendances
-export const getAllStaffAttendances = async (): Promise<StaffAttendanceOut[]> => {
+// Get all attendances with optional filters
+export const getAllStaffAttendances = async (params?: {
+    start_date?: string;
+    end_date?: string;
+    name?: string;
+}): Promise<StaffAttendanceOut[]> => {
     try {
-        const { data } = await CAxios.get('/staff/attendance');
+        const queryParams = new URLSearchParams();
+        if (params?.start_date) queryParams.append('start_date', params.start_date);
+        if (params?.end_date) queryParams.append('end_date', params.end_date);
+        if (params?.name) queryParams.append('name', params.name);
+        const query = queryParams.toString();
+        const { data } = await CAxios.get(`/staff/attendance${query ? `?${query}` : ''}`);
         return data;
     } catch (error) {
         throw handleApiError(error);
@@ -88,7 +97,7 @@ export const getStaffAttendanceByDateFilter = async (
         if (params?.start_date) queryParams.append('start_date', params.start_date);
         if (params?.end_date) queryParams.append('end_date', params.end_date);
 
-        const { data } = await CAxios.get(`/masters/staff/${staffId}/attendance/filter?${queryParams.toString()}`);
+        const { data } = await CAxios.get(`/staff/${staffId}/attendance/filter?${queryParams.toString()}`);
         return data;
     } catch (error) {
         throw handleApiError(error);
@@ -100,10 +109,8 @@ export const getStaffAttendanceByDate = async (
     attendanceDate: string
 ): Promise<StaffAttendanceOut[]> => {
     try {
-        // Try to get attendance for specific date
-        const allAttendances = await getAllStaffAttendances();
-        const filteredData = allAttendances.filter(att => att.date === attendanceDate);
-        return filteredData;
+        const { data } = await CAxios.get(`/staff/attendance/by-date/${attendanceDate}`);
+        return data;
     } catch (error) {
         throw handleApiError(error);
     }

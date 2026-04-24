@@ -94,15 +94,21 @@ export function Table<T extends { [key: string]: any }>({
     }
   };
 
-  // Filter data by search query across all text columns
+  // Filter data by search query across all columns (raw value + rendered text)
   const filteredData = useMemo(() => {
     if (!searchQuery.trim()) return data;
     const q = searchQuery.toLowerCase();
     return data.filter((row) =>
       columns.some((col) => {
         const val = row[col.key as string];
-        if (val === null || val === undefined) return false;
-        return String(val).toLowerCase().includes(q);
+        // Check raw value
+        if (val !== null && val !== undefined && String(val).toLowerCase().includes(q)) return true;
+        // Check rendered value if render returns a primitive (e.g. formatted date, route name, fees with ₹)
+        if (col.render) {
+          const rendered = col.render(val, row);
+          if ((typeof rendered === 'string' || typeof rendered === 'number') && String(rendered).toLowerCase().includes(q)) return true;
+        }
+        return false;
       })
     );
   }, [data, searchQuery, columns]);

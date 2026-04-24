@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Edit, Trash2, Plus, FileText, Loader2, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Edit, Trash2, Plus, FileText, Loader2, Filter, Search, X, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -142,26 +142,37 @@ export const CertificateTypeManager: React.FC<CertificateTypeManagerProps> = ({ 
 
   return (
     <div className={cn('space-y-4', className)}>
-      {/* Header */}
-      <div className="flex justify-end">
-        <Button onClick={handleCreate} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Add Certificate Type
-        </Button>
-      </div>
-
       {/* Filter Bar */}
-      <div className="flex items-center gap-3">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium text-muted-foreground">Filters</span>
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm font-medium text-muted-foreground">Filters</span>
+          {searchQuery && (
+            <span className="text-xs text-muted-foreground">
+              {filteredTypes.length} of {certificateTypes.length}
+            </span>
+          )}
+          <Button onClick={handleCreate} className="ml-auto flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Add Certificate Type
+          </Button>
+        </div>
+        <div className="relative max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search name or description..."
-            className="pl-8 h-8 text-sm"
+            className="pl-8 pr-8 h-9 text-sm"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 

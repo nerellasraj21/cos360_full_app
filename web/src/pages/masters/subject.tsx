@@ -32,7 +32,6 @@ export default function SubjectPage() {
 
   const subjects = data?.data || [];
   const total = data?.total || subjects.length;
-  const hasMore = data?.hasMore || false;
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { data: _categories } = useSubjectCategories();
@@ -96,8 +95,7 @@ export default function SubjectPage() {
   ];
 
   const handlePageChange = (newPage: number) => {
-    if (newPage > page && hasMore) setPage(newPage);
-    if (newPage < page && page > 0) setPage(newPage);
+    setPage(newPage);
   };
 
   const handlePageSizeChange = (newSize: number) => {

@@ -73,12 +73,23 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
   const loadTransactions = async () => {
     try {
       setTransactionsLoading(true);
-      const response = await searchTransactions({
+      const body = await searchTransactions({
         academic_year_id: selectedAcademicYearId,
-        status: 'completed', // Only show completed transactions for receipt generation
-        limit: 100
+        status: 'completed',
+        has_receipt: false, // backend filter (small addition per backend dev)
+        limit: 100,
       });
-      setTransactions(response.data || []);
+      // body is already the parsed response — handle array, { data: [] }, or { items: [] }
+      const raw: FeeTransaction[] = Array.isArray(body)
+        ? body
+        : Array.isArray(body?.data)
+        ? body.data
+        : Array.isArray(body?.items)
+        ? body.items
+        : [];
+      // Client-side fallback: if backend ignores has_receipt, filter ourselves
+      const list = raw.filter((tx) => !tx.receipt_generated);
+      setTransactions(list);
     } catch (error) {
       console.error('Error loading transactions:', error);
       toast.error('Failed to load transactions');
@@ -257,7 +268,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                     </Select>
                     {transactions.length === 0 && (
                       <p className="text-sm text-muted-foreground mt-1">
-                        No completed transactions found for the current academic year.
+                        No pending transactions found. Receipts are auto-generated for cash/UPI payments. Only cleared cheque/DD payments without a receipt will appear here.
                       </p>
                     )}
                   </>

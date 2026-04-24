@@ -22,7 +22,9 @@ import {
   toggleStudentActiveStatus,
   fetchStudentsDropdown,
   fetchStudentsDropdownSimple,
-  fetchAdmissionTypesDropdown
+  fetchAdmissionTypesDropdown,
+  uploadStudentPhoto,
+  deleteStudentPhoto
 } from '@/api/students/admissions';
 
 // Types
@@ -163,6 +165,38 @@ export function useUpdateAdmission() {
     },
     resource: 'student_admissions',
     action: 'update',
+  });
+}
+
+export function useUploadStudentPhoto() {
+  const queryClient = useQueryClient();
+  return useMutation<StudentAdmissionResponse, Error, { studentId: string; file: File }>({
+    mutationFn: ({ studentId, file }) => uploadStudentPhoto(studentId, file),
+    onSuccess: (_, { studentId }) => {
+      queryClient.invalidateQueries({ queryKey: ['student', 'detail', studentId] });
+      queryClient.invalidateQueries({ queryKey: ['admission', 'student', studentId] });
+      queryClient.invalidateQueries({ queryKey: ['admissions'] });
+      toast.success('Photo uploaded successfully');
+    },
+    onError: (error) => {
+      toast.error(`Failed to upload photo: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteStudentPhoto() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (studentId) => deleteStudentPhoto(studentId),
+    onSuccess: (_, studentId) => {
+      queryClient.invalidateQueries({ queryKey: ['student', 'detail', studentId] });
+      queryClient.invalidateQueries({ queryKey: ['admission', 'student', studentId] });
+      queryClient.invalidateQueries({ queryKey: ['admissions'] });
+      toast.success('Photo removed successfully');
+    },
+    onError: (error) => {
+      toast.error(`Failed to remove photo: ${error.message}`);
+    },
   });
 }
 

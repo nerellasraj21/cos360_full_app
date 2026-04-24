@@ -3,8 +3,10 @@ import { useForm, FormProvider } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DialogFooter } from '@/components/ui/dialog';
-import { useCreateAdmission } from '@/api/hooks/students/admissions';
+import { useCreateAdmission, useUploadStudentPhoto } from '@/api/hooks/students/admissions';
 import type { StudentAdmissionCreate } from '@/types/admission';
+import { UserCircle, X, Plus, Loader2 } from 'lucide-react';
+import { config } from '@/lib/config';
 import { AcademicStepForm } from './admission-steps/AcademicStepForm';
 import { StudentStepForm } from './admission-steps/StudentStepForm';
 import { ParentsStepForm } from './admission-steps/ParentsStepForm';
@@ -29,8 +31,12 @@ const steps = [
 
 const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
 
+  const mediaBase = config.api.baseURL.replace(/\/api\/v\d+$/, '');
   const createAdmission = useCreateAdmission();
+  const uploadPhotoMutation = useUploadStudentPhoto();
   const selectedAcademicYearId = useAcademicYearStore((state) => state.selectedAcademicYearId);
 
   const methods = useForm<StudentAdmissionCreate>({
@@ -280,6 +286,18 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
       console.log('===== SUCCESS =====');
       console.log('API Response:', result);
 
+      // Upload pending photo if one was selected before creation
+      if (pendingPhotoFile) {
+        const studentId = result.student?.id;
+        if (studentId) {
+          try {
+            await uploadPhotoMutation.mutateAsync({ studentId, file: pendingPhotoFile });
+          } catch {
+            // Photo upload failed non-fatally — admission was already created
+          }
+        }
+      }
+
       // Wait a moment for the table to refetch before closing the dialog
       await new Promise(resolve => setTimeout(resolve, 500));
       onComplete();
@@ -354,6 +372,66 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
             <CardContent>
               {steps.map((step, index) => (
                 <div key={step.id} style={{ display: index === currentStep ? 'block' : 'none' }}>
+                  {/* Photo picker shown on Student Details step */}
+                  {index === 1 && (
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="relative">
+                        {photoPreviewUrl ? (
+                          <img
+                            src={photoPreviewUrl}
+                            alt="Student photo preview"
+                            className="h-20 w-20 rounded-full object-cover border-2 border-border"
+                          />
+                        ) : (
+                          <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center border-2 border-border">
+                            <UserCircle className="h-10 w-10 text-muted-foreground" />
+                          </div>
+                        )}
+                        {pendingPhotoFile && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPendingPhotoFile(null);
+                              setPhotoPreviewUrl(null);
+                            }}
+                            className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/80"
+                            title="Remove photo"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="block text-sm font-medium text-foreground">
+                          Student Photo <span className="text-muted-foreground font-normal">(Optional)</span>
+                        </label>
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 2 * 1024 * 1024) {
+                                toast.error('Photo must be under 2 MB');
+                                e.target.value = '';
+                                return;
+                              }
+                              setPendingPhotoFile(file);
+                              setPhotoPreviewUrl(URL.createObjectURL(file));
+                              e.target.value = '';
+                            }}
+                          />
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-background text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                            <Plus className="h-3.5 w-3.5" />
+                            {pendingPhotoFile ? 'Change photo' : 'Choose photo'}
+                          </span>
+                        </label>
+                        <span className="text-xs text-muted-foreground">JPG, PNG or WebP · max 2 MB</span>
+                      </div>
+                    </div>
+                  )}
                   <step.component />
                 </div>
               ))}

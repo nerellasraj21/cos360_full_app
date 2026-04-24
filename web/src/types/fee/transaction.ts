@@ -115,6 +115,7 @@ export interface FeeTransactionSearchParams {
   academic_year_id?: string;
   payment_method?: PaymentMethod;
   status?: TransactionStatus;
+  has_receipt?: boolean;
   date_from?: string;
   date_to?: string;
   transaction_number?: string;

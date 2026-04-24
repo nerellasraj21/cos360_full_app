@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Plus, Edit, Trash2, AlertTriangle, Loader2, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Edit, Trash2, AlertTriangle, Loader2, Filter, Search, X, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -116,17 +116,7 @@ export function FeeTypesList() {
     return (
         <div className="space-y-6">
             <Card>
-                {canCreate && (
-                    <CardHeader className="pb-0">
-                        <div className="flex justify-end">
-                            <Button onClick={handleCreateNew}>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add New Type
-                            </Button>
-                        </div>
-                    </CardHeader>
-                )}
-                <CardContent>
+                <CardContent className="pt-3">
                     {types.length === 0 ? (
                         <div className="text-center py-8">
                             <div className="text-muted-foreground mb-4">
@@ -141,14 +131,39 @@ export function FeeTypesList() {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                        <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-                                <Filter className="h-3.5 w-3.5" />
-                                <span>Filters</span>
+                        {/* Filter + action row */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                <span className="text-sm font-medium text-muted-foreground">Filters</span>
+                                {searchQuery && (
+                                    <span className="text-xs text-muted-foreground">
+                                        {filteredTypes.length} of {types.length}
+                                    </span>
+                                )}
+                                {canCreate && (
+                                    <Button onClick={handleCreateNew} className="ml-auto">
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add New Type
+                                    </Button>
+                                )}
                             </div>
                             <div className="relative max-w-sm">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                                <Input placeholder="Search by name, category or term..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                                <Input
+                                    placeholder="Search by name, category or term..."
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    className="pl-8 pr-8 h-9 text-sm"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                         <Table>

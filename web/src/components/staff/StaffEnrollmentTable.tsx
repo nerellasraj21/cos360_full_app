@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ViewButton, EditButton, DeleteButton, DownloadButton, TableActionGroup } from '@/components/common/TableActions';
-import { Edit, Trash2, Plus, Users, Mail, Phone, Calendar, Award, MapPin, Filter, Download, FileText, FileSpreadsheet, Eye, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Search, GraduationCap, Briefcase, Landmark, Wallet } from 'lucide-react';
+import { Edit, Trash2, Plus, Users, Mail, Phone, Calendar, Award, MapPin, Filter, Download, FileText, FileSpreadsheet, Eye, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Search, GraduationCap, Briefcase, Landmark, Wallet, UserCircle, X } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
 import {
   DropdownMenu,
@@ -20,7 +20,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useStaffEnrollments, useStaffEnrollment, useCreateStaffEnrollment, useUpdateStaffEnrollment, useDeleteStaffEnrollment, staffKeys } from '@/hooks/staff/useStaff';
+import { useStaffEnrollments, useStaffEnrollment, useCreateStaffEnrollment, useUpdateStaffEnrollment, useDeleteStaffEnrollment, useUploadStaffPhoto, useDeleteStaffPhoto, staffKeys } from '@/hooks/staff/useStaff';
+import { config } from '@/lib/config';
 import { useRoles } from '@/api/auth';
 import { getAllDesignations, staffApi } from '@/api/staff/staff';
 import { InfiniteScrollDropdown } from '@/components/dropdown';
@@ -137,13 +138,14 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const [removedQualIds, setRemovedQualIds] = useState<string[]>([]);
     const [customDegreeOptions, setCustomDegreeOptions] = useState<DegreeOption[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(5);
     const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
         new Set(['name', 'contact', 'designation', 'department', 'status'])
     );
     const [sortKey, setSortKey] = useState<string | null>(null);
     const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
     const [localSearch, setLocalSearch] = useState('');
+    const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
 
     const [formData, setFormData] = useState<StaffFormData>({
         first_name: '',
@@ -194,7 +196,12 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const createMutation = useCreateStaffEnrollment();
     const updateMutation = useUpdateStaffEnrollment();
     const deleteMutation = useDeleteStaffEnrollment();
+    const uploadPhotoMutation = useUploadStaffPhoto();
+    const deletePhotoMutation = useDeleteStaffPhoto();
     const queryClient = useQueryClient();
+
+    // Derive the media root from the API base URL (strip /api/v1 suffix)
+    const mediaBase = config.api.baseURL.replace(/\/api\/v\d+$/, '');
 
     // Permission checks for UI elements
     const { checkPermission } = usePermission();
@@ -267,8 +274,8 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const paginatedData = useMemo(() => {
         const startIndex = (currentPage - 1) * pageSize;
         const endIndex = startIndex + pageSize;
-        return filteredData.slice(startIndex, endIndex);
-    }, [filteredData, currentPage, pageSize]);
+        return sortedData.slice(startIndex, endIndex);
+    }, [sortedData, currentPage, pageSize]);
 
     const totalPages = Math.ceil(filteredData.length / pageSize);
 
@@ -399,6 +406,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
         setLocalQuals([]);
         setRemovedQualIds([]);
         setIsFormDirty(false);
+        setPendingPhotoFile(null);
         setEditingStaff(null);
         setShowCreateDialog(true);
     };
@@ -445,6 +453,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
         })));
         setRemovedQualIds([]);
         setIsFormDirty(false);
+        setPendingPhotoFile(null);
         setEditingStaff(staff);
         setShowCreateDialog(true);
     };
@@ -541,7 +550,37 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     }
                 }
             } else {
-                const created = await createMutation.mutateAsync(formData);
+                const created = await createMutation.mutateAsync({
+                    first_name: formData.first_name,
+                    last_name: orUndef(formData.last_name),
+                    email: orUndef(formData.email),
+                    phone: orUndef(formData.phone),
+                    gender: formData.gender,
+                    date_of_birth: orUndef(formData.date_of_birth),
+                    joining_date: formData.joining_date,
+                    qualification: orUndef(formData.qualification),
+                    experience_years: formData.experience_years || undefined,
+                    address: orUndef(formData.address),
+                    designation_id: orUndef(formData.designation_id),
+                    department: orUndef(formData.department),
+                    is_active: formData.is_active,
+                    role_id: orUndef(formData.role_id),
+                    work_org: orUndef(formData.work_org),
+                    work_from_date: orUndef(formData.work_from_date),
+                    work_to_date: orUndef(formData.work_to_date),
+                    subjects_dealt: orUndef(formData.subjects_dealt),
+                    work_remarks: orUndef(formData.work_remarks),
+                    bank_name: orUndef(formData.bank_name),
+                    bank_branch: orUndef(formData.bank_branch),
+                    account_number: orUndef(formData.account_number),
+                    ifsc_code: orUndef(formData.ifsc_code),
+                    account_holder_name: orUndef(formData.account_holder_name),
+                    account_type: formData.account_type,
+                    current_salary: formData.current_salary ? Number(formData.current_salary) : undefined,
+                    last_drawn_salary: formData.last_drawn_salary ? Number(formData.last_drawn_salary) : undefined,
+                    pf_account_number: orUndef(formData.pf_account_number),
+                    uan_number: orUndef(formData.uan_number),
+                });
                 staffId = created.id;
 
                 // Add all qualifications after staff is created
@@ -556,6 +595,11 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                         });
                     }
                 }
+
+                // Upload photo if one was selected before staff existed
+                if (pendingPhotoFile) {
+                    await uploadPhotoMutation.mutateAsync({ staffId, file: pendingPhotoFile });
+                }
             }
 
             // Refresh list so qualifications appear immediately
@@ -566,6 +610,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
             setEditingStaff(null);
             setLocalQuals([]);
             setRemovedQualIds([]);
+            setPendingPhotoFile(null);
         } catch (error) {
             // Error handling is done in the mutation hooks
         }
@@ -685,6 +730,10 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     </div>
                 </CardHeader>
                 <CardContent>
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <Filter className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-sm font-medium text-muted-foreground">Filters</p>
+                        </div>
                         <div className="flex items-center gap-2 mb-3">
                             <Search className="h-4 w-4 text-muted-foreground" />
                             <Input
@@ -720,10 +769,10 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                 </TableHeader>
                                 <TableBody>
                                     {paginatedData.map((staffMember, index) => (
-                                        <TableRow key={staffMember.id} className="hover:bg-gray-50" style={{ height: '48px' }}>
-                                            <TableCell className="px-3 align-middle text-xs text-muted-foreground">{index + 1}</TableCell>
+                                        <TableRow key={staffMember.id} className="hover:bg-gray-50">
+                                            <TableCell className="px-3 py-2 align-middle text-xs text-muted-foreground">{(currentPage - 1) * pageSize + index + 1}</TableCell>
                                             {filteredColumns.map(col => (
-                                                <TableCell key={col.key} className="align-middle">
+                                                <TableCell key={col.key} className="py-2 align-middle">
                                                     {col.key === 'name' && (
                                                         <div>
                                                             <div className="font-medium">
@@ -773,7 +822,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                                     )}
                                                 </TableCell>
                                             ))}
-                                            <TableCell className="text-right">
+                                            <TableCell className="py-2 text-right">
                                                 <TableActionGroup>
                                                     {hasReadPermission && (
                                                         <ViewButton
@@ -808,47 +857,43 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                             </Table>
 
                             {/* Pagination Controls */}
-                            {filteredData.length > pageSize && (
-                                <div className="flex items-center justify-between mt-4">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm text-gray-600">Rows per page:</span>
-                                        <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
-                                            <SelectTrigger className="w-20">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="5">5</SelectItem>
-                                                <SelectItem value="10">10</SelectItem>
-                                                <SelectItem value="20">20</SelectItem>
-                                                <SelectItem value="50">50</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm text-gray-600">
-                                            {Math.min((currentPage - 1) * pageSize + 1, filteredData.length)}-{Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length}
-                                        </span>
-                                        <div className="flex gap-1">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                                                disabled={currentPage === 1}
-                                            >
-                                                Previous
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                                                disabled={currentPage === totalPages}
-                                            >
-                                                Next
-                                            </Button>
-                                        </div>
-                                    </div>
+                            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        disabled={currentPage === 1}
+                                    >
+                                        Previous
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                        disabled={currentPage >= totalPages}
+                                    >
+                                        Next
+                                    </Button>
                                 </div>
-                            )}
+                                <div className="flex items-center gap-2 text-sm">
+                                    <span className="text-muted-foreground">Rows per page:</span>
+                                    <Select value={pageSize.toString()} onValueChange={(value) => { setPageSize(Number(value)); setCurrentPage(1); }}>
+                                        <SelectTrigger className="w-16 h-8">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="5">5</SelectItem>
+                                            <SelectItem value="10">10</SelectItem>
+                                            <SelectItem value="20">20</SelectItem>
+                                            <SelectItem value="50">50</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <span className="text-muted-foreground">
+                                        {filteredData.length === 0 ? '0' : `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, filteredData.length)}`} of {filteredData.length}
+                                    </span>
+                                </div>
+                            </div>
                         </>
                     )}
                 </CardContent>
@@ -874,6 +919,82 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 {/* Basic Information */}
                 <div className="md:col-span-2">
                     <h3 className="text-sm font-medium text-foreground mb-3">Basic Information</h3>
+                </div>
+
+                {/* Photo upload */}
+                <div className="md:col-span-2 flex items-center gap-4 mb-2">
+                    <div className="relative">
+                        {(editingStaff?.photo_url || pendingPhotoFile) ? (
+                            <img
+                                src={pendingPhotoFile
+                                    ? URL.createObjectURL(pendingPhotoFile)
+                                    : `${mediaBase}${editingStaff!.photo_url}`}
+                                alt="Staff photo"
+                                className="h-20 w-20 rounded-full object-cover border-2 border-border"
+                            />
+                        ) : (
+                            <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center border-2 border-border">
+                                <UserCircle className="h-10 w-10 text-muted-foreground" />
+                            </div>
+                        )}
+                        {/* Remove button — only for edit mode with a saved photo, or pending photo on create */}
+                        {(pendingPhotoFile || (editingStaff && editingStaff.photo_url)) && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (pendingPhotoFile) {
+                                        setPendingPhotoFile(null);
+                                    } else if (editingStaff) {
+                                        deletePhotoMutation.mutate(editingStaff.id);
+                                    }
+                                }}
+                                className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/80"
+                                title="Remove photo"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="block text-sm font-medium text-foreground">
+                            {editingStaff ? 'Change Photo' : 'Staff Photo'}
+                        </label>
+                        <label className="cursor-pointer">
+                            <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                className="hidden"
+                                disabled={uploadPhotoMutation.isPending || deletePhotoMutation.isPending}
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    if (file.size > 2 * 1024 * 1024) {
+                                        toast.error('Photo must be under 2 MB');
+                                        e.target.value = '';
+                                        return;
+                                    }
+                                    if (editingStaff) {
+                                        // Existing staff — upload immediately
+                                        uploadPhotoMutation.mutate({ staffId: editingStaff.id, file });
+                                    } else {
+                                        // New staff — hold the file until save
+                                        setPendingPhotoFile(file);
+                                        setIsFormDirty(true);
+                                    }
+                                    e.target.value = '';
+                                }}
+                            />
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-background text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                                {uploadPhotoMutation.isPending ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <Plus className="h-3.5 w-3.5" />
+                                )}
+                                {uploadPhotoMutation.isPending ? 'Uploading…' : 'Choose photo'}
+                            </span>
+                        </label>
+                        <span className="text-xs text-muted-foreground">JPG, PNG or WebP · max 2 MB</span>
+                    </div>
                 </div>
 
                 <div>
@@ -1283,14 +1404,15 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
 
         {/* View Staff Details Dialog */}
         <Dialog open={showViewDialog} onOpenChange={() => setShowViewDialog(false)}>
-            <DialogContent className="max-w-4xl">
-                <DialogHeader>
+            <DialogContent className="max-w-4xl flex flex-col max-h-[90vh] p-0">
+                <DialogHeader className="flex-shrink-0 px-6 py-4 border-b">
                     <DialogTitle className="flex items-center gap-2">
                         <Users className="h-5 w-5" />
                         Staff Details: {viewingStaff?.first_name} {viewingStaff?.last_name}
                     </DialogTitle>
                 </DialogHeader>
 
+                <div className="overflow-y-auto flex-1 px-6 py-4">
                 {viewDetailLoading ? (
                     <div className="flex justify-center items-center py-12">
                         <Loader2 className="h-8 w-8 animate-spin" />
@@ -1298,6 +1420,21 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     </div>
                 ) : displayStaff && (
                     <div className="space-y-6">
+                        {/* Staff photo (view) */}
+                        <div className="flex justify-center">
+                            {displayStaff.photo_url ? (
+                                <img
+                                    src={`${mediaBase}${displayStaff.photo_url}`}
+                                    alt={`${displayStaff.first_name} ${displayStaff.last_name || ''}`}
+                                    className="h-24 w-24 rounded-full object-cover border-2 border-border"
+                                />
+                            ) : (
+                                <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center border-2 border-border">
+                                    <UserCircle className="h-12 w-12 text-muted-foreground" />
+                                </div>
+                            )}
+                        </div>
+
                         {/* Basic Information */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-4">
@@ -1553,6 +1690,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                         )}
                     </div>
                 )}
+                </div>
 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setShowViewDialog(false)}>

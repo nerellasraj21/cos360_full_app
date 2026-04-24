@@ -59,8 +59,8 @@ const PAYMENT_METHODS: { value: CollectionPaymentMethod; label: string }[] = [
 const paymentSchema = z.object({
   amount_to_pay: z.number({ required_error: 'Amount is required' }).positive('Amount must be greater than 0'),
   payment_method: z.enum(['cash', 'upi', 'cheque', 'bank_transfer', 'dd'] as const),
-  upi_reference: z.string().optional(),
-  bank_reference: z.string().optional(),
+  upi_reference: z.string().max(30, 'Max 30 characters').optional(),
+  bank_reference: z.string().max(30, 'Max 30 characters').optional(),
   cheque_number: z.string().optional(),
   cheque_bank: z.string().optional(),
   cheque_date: z.string().optional(),
@@ -74,7 +74,17 @@ const paymentSchema = z.object({
   if (data.payment_method === 'cheque' || data.payment_method === 'dd') {
     if (!data.cheque_number) ctx.addIssue({ code: 'custom', message: 'Cheque/DD number is required', path: ['cheque_number'] });
     if (!data.cheque_bank) ctx.addIssue({ code: 'custom', message: 'Bank name is required', path: ['cheque_bank'] });
-    if (!data.cheque_date) ctx.addIssue({ code: 'custom', message: 'Cheque/DD date is required', path: ['cheque_date'] });
+    if (!data.cheque_date) {
+      ctx.addIssue({ code: 'custom', message: 'Cheque/DD date is required', path: ['cheque_date'] });
+    } else {
+      const chequeDate = new Date(data.cheque_date);
+      const maxDate = new Date();
+      maxDate.setDate(maxDate.getDate() + 90);
+      maxDate.setHours(23, 59, 59, 999);
+      if (chequeDate > maxDate) {
+        ctx.addIssue({ code: 'custom', message: 'Cheque/DD date cannot be more than 90 days in the future', path: ['cheque_date'] });
+      }
+    }
   }
   if (data.payment_method === 'bank_transfer' && !data.bank_reference) {
     ctx.addIssue({ code: 'custom', message: 'Bank reference is required', path: ['bank_reference'] });
@@ -199,7 +209,15 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
                   min="0.01"
                   max={totalDue || undefined}
                   placeholder="0.00"
-                  {...register('amount_to_pay', { valueAsNumber: true })}
+                  {...register('amount_to_pay', {
+                    valueAsNumber: true,
+                    onBlur: (e) => {
+                      const val = parseFloat(e.target.value);
+                      if (totalDue > 0 && val > totalDue) {
+                        setValue('amount_to_pay', totalDue, { shouldValidate: true });
+                      }
+                    },
+                  })}
                 />
                 {errors.amount_to_pay && (
                   <p className="text-sm text-destructive">{errors.amount_to_pay.message}</p>
@@ -254,7 +272,12 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="cheque_date">{paymentMethod === 'dd' ? 'DD Date' : 'Cheque Date'} *</Label>
-                    <Input id="cheque_date" type="date" {...register('cheque_date')} />
+                    <Input
+                      id="cheque_date"
+                      type="date"
+                      max={(() => { const d = new Date(); d.setDate(d.getDate() + 90); return d.toISOString().split('T')[0]; })()}
+                      {...register('cheque_date')}
+                    />
                     {errors.cheque_date && (
                       <p className="text-sm text-destructive">{errors.cheque_date.message}</p>
                     )}
@@ -341,70 +364,86 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600" /> Payment Successful
+              <CheckCircle className="h-5 w-5 text-green-600" /> Payment Recorded
             </DialogTitle>
           </DialogHeader>
-          {paymentResult && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <span className="text-muted-foreground">Transaction #:</span>
-                <span className="font-medium">{paymentResult.transaction_number}</span>
-                <span className="text-muted-foreground">Receipt #:</span>
-                <span className="font-medium">{paymentResult.receipt_number}</span>
-                <span className="text-muted-foreground">Amount Paid:</span>
-                <span className="font-medium">{formatCurrency(paymentResult.amount_paid)}</span>
-                <span className="text-muted-foreground">Payment Method:</span>
-                <span className="font-medium capitalize">{paymentResult.payment_method.replace('_', ' ')}</span>
-                <span className="text-muted-foreground">SMS Status:</span>
-                <StatusBadge status={paymentResult.sms_status} />
-              </div>
-
-              {paymentResult.items_paid.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Items Paid</h4>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fee Type</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paymentResult.items_paid.map((item) => (
-                        <TableRow key={item.fee_type_id}>
-                          <TableCell>{item.fee_type_name}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(item.amount_paid)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+          {paymentResult && (() => {
+            const isChequePending = paymentResult.payment_method === 'cheque' || paymentResult.payment_method === 'dd';
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <span className="text-muted-foreground">Transaction #:</span>
+                  <span className="font-medium">{paymentResult.transaction_number}</span>
+                  {!isChequePending && (
+                    <>
+                      <span className="text-muted-foreground">Receipt #:</span>
+                      <span className="font-medium">{paymentResult.receipt_number}</span>
+                    </>
+                  )}
+                  <span className="text-muted-foreground">Amount Paid:</span>
+                  <span className="font-medium">{formatCurrency(paymentResult.amount_paid)}</span>
+                  <span className="text-muted-foreground">Payment Method:</span>
+                  <span className="font-medium capitalize">{paymentResult.payment_method.replace('_', ' ')}</span>
+                  <span className="text-muted-foreground">SMS Status:</span>
+                  <StatusBadge status={paymentResult.sms_status} />
                 </div>
-              )}
 
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  disabled={isDownloading}
-                  onClick={async () => {
-                    if (isDownloading) return;
-                    setIsDownloading(true);
-                    try {
-                      await feeReceiptsApi.downloadReceiptPdf(paymentResult.receipt_id, paymentResult.receipt_number);
-                      toast.success('Receipt downloaded');
-                    } catch {
-                      toast.error('Failed to download receipt');
-                    } finally {
-                      setIsDownloading(false);
-                    }
-                  }}
-                >
-                  {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                  Download Receipt
-                </Button>
-                <Button onClick={handleCloseSuccess}>Close</Button>
+                {paymentResult.items_paid.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Items Paid</h4>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fee Type</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paymentResult.items_paid.map((item) => (
+                          <TableRow key={item.fee_type_id}>
+                            <TableCell>{item.fee_type_name}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.amount_paid)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                {isChequePending ? (
+                  <div className="p-3 bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 rounded-md text-sm text-amber-800 dark:text-amber-300">
+                    Cheque/DD pending clearance — receipt will be generated once the instrument clears.
+                  </div>
+                ) : (
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      disabled={isDownloading}
+                      onClick={async () => {
+                        if (isDownloading) return;
+                        setIsDownloading(true);
+                        try {
+                          await feeReceiptsApi.downloadReceiptPdf(paymentResult.receipt_id, paymentResult.receipt_number);
+                          toast.success('Receipt downloaded');
+                        } catch {
+                          toast.error('Failed to download receipt');
+                        } finally {
+                          setIsDownloading(false);
+                        }
+                      }}
+                    >
+                      {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                      Download Receipt
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button onClick={handleCloseSuccess}>Close</Button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

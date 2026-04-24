@@ -62,6 +62,7 @@ export interface StudentOut {
   mother_tongue?: string;
   identification_marks?: string;
   is_active: boolean;
+  photo_url?: string | null;
   user_id?: string;
   parent_links?: Array<{
     parent: {

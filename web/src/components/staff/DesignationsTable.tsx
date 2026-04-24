@@ -149,27 +149,24 @@ export function DesignationsTable({ className }: DesignationsTableProps) {
 
     return (
         <div className={cn("space-y-4", className)}>
-            {/* Header */}
-            <div className="flex items-center justify-end">
+            {/* Header + Search */}
+            <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                        <Filter className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium text-muted-foreground">Filters</span>
+                    </div>
+                    <div className="relative w-64">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input placeholder="Search designations..." value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} className="pl-8 h-9" />
+                    </div>
+                </div>
                 {hasCreatePermission && (
-                    <Button onClick={handleCreate} className="flex items-center gap-2">
+                    <Button onClick={handleCreate} className="flex items-center gap-2 shrink-0">
                         <Plus className="h-4 w-4" />
                         Add Designation
                     </Button>
                 )}
-            </div>
-
-            {/* Designations Table */}
-            {/* Filter bar */}
-            <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-                    <Filter className="h-3.5 w-3.5" />
-                    <span>Filters</span>
-                </div>
-                <div className="relative max-w-sm">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    <Input placeholder="Search designations..." value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} className="pl-8 h-8 text-sm" />
-                </div>
             </div>
 
             {filteredData.length > 0 ? (

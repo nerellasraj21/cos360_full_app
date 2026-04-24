@@ -20,10 +20,14 @@ import type {
 } from '@/types/attendance';
 
 // Query hooks
-export const useStaffAttendances = () => {
+export const useStaffAttendances = (params?: {
+    start_date?: string;
+    end_date?: string;
+    name?: string;
+}) => {
     return useQuery({
-        queryKey: ['staff-attendances'],
-        queryFn: getAllStaffAttendances,
+        queryKey: ['staff-attendances', params],
+        queryFn: () => getAllStaffAttendances(params),
     });
 };
 

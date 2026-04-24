@@ -180,6 +180,34 @@ export const fetchAdmissionTypesDropdown = async (): Promise<AdmissionTypeOption
   }
 };
 
+// Upload student photo
+export const uploadStudentPhoto = async (
+  studentId: string,
+  file: File
+): Promise<StudentAdmissionResponse> => {
+  try {
+    const formData = new FormData();
+    formData.append('photo', file);
+    const { data } = await CAxios.post(
+      `${STUDENT_ADMISSIONS}id/${studentId}/photo`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Delete student photo
+export const deleteStudentPhoto = async (studentId: string): Promise<void> => {
+  try {
+    await CAxios.delete(`${STUDENT_ADMISSIONS}id/${studentId}/photo`);
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
 // Legacy functions for backward compatibility
 export const fetchStudentAdmissions = listAdmissions;
 export const fetchStudentById = getAdmissionByStudentId;

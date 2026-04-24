@@ -34,7 +34,8 @@ export const staffApi = {
     if (params?.limit !== undefined) queryParams.append('limit', params.limit.toString());
     if (params?.gender) queryParams.append('gender', params.gender);
 
-    const response = await CAxios.get(`/staff/enrollments?${queryParams.toString()}`);
+    const query = queryParams.toString();
+    const response = await CAxios.get(`/staff/enrollments${query ? `?${query}` : ''}`);
     console.log('[DEBUG] staffApi.getAllStaffEnrollments returning:', response.data);
     return response.data;
   },
@@ -268,6 +269,19 @@ export const staffApi = {
 
   deleteQualification: async (staffId: string, qualificationId: string): Promise<void> => {
     await CAxios.delete(`/staff/${staffId}/qualifications/${qualificationId}`);
+  },
+
+  uploadStaffPhoto: async (staffId: string, file: File): Promise<Staff> => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    const response = await CAxios.post(`/staff/enrollment/${staffId}/photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  deleteStaffPhoto: async (staffId: string): Promise<void> => {
+    await CAxios.delete(`/staff/enrollment/${staffId}/photo`);
   },
 };
 
