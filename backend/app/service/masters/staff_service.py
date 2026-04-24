@@ -1,7 +1,9 @@
+import os
+import uuid as _uuid
 from datetime import date
 from uuid import UUID
 
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from sqlalchemy import and_
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -386,6 +388,65 @@ async def get_all_designations_list(db: AsyncSession):
         return result.scalars().all()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving designations: {str(e)}")
+
+
+async def upload_staff_photo(staff_id: UUID, file: UploadFile, db: AsyncSession):
+    result = await db.execute(select(Staff).where(Staff.id == staff_id))
+    staff = result.scalar_one_or_none()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff not found")
+
+    ext = os.path.splitext(file.filename or "")[-1].lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+        raise HTTPException(status_code=400, detail="Only jpg, png, webp files are allowed")
+
+    save_dir = os.path.join("media", "staff", "photos")
+    os.makedirs(save_dir, exist_ok=True)
+
+    filename = f"{staff_id}{ext}"
+    filepath = os.path.join(save_dir, filename)
+
+    contents = await file.read()
+    if len(contents) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must not exceed 2 MB")
+
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    # Delete old photo file if different
+    if staff.photo and staff.photo != f"/media/staff/photos/{filename}":
+        old_path = staff.photo.lstrip("/")
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+    staff.photo = f"/media/staff/photos/{filename}"
+    await db.flush()
+
+    result = await db.execute(
+        select(Staff)
+        .options(selectinload(Staff.designation_obj), selectinload(Staff.user), selectinload(Staff.qualifications))
+        .where(Staff.id == staff.id)
+    )
+    staff_out = result.scalar_one()
+    await db.commit()
+    return staff_out
+
+
+async def delete_staff_photo(staff_id: UUID, db: AsyncSession):
+    result = await db.execute(select(Staff).where(Staff.id == staff_id))
+    staff = result.scalar_one_or_none()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff not found")
+    if not staff.photo:
+        raise HTTPException(status_code=404, detail="No photo to delete")
+
+    filepath = staff.photo.lstrip("/")
+    if os.path.exists(filepath):
+        os.remove(filepath)
+
+    staff.photo = None
+    await db.commit()
+    return {"detail": "Staff photo deleted successfully"}
 
 
 async def get_all_drivers_list(db: AsyncSession):

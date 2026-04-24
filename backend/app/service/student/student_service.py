@@ -1,5 +1,7 @@
+import os
 from uuid import UUID
 
+from fastapi import HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -80,3 +82,57 @@ async def get_students_simple_dropdown(
     ]
 
     return sorted(dropdown_data, key=lambda x: x["name"])
+
+
+async def upload_student_photo(student_id: UUID, file: UploadFile, db: AsyncSession):
+    result = await db.execute(select(Student).where(Student.id == student_id))
+    student = result.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    ext = os.path.splitext(file.filename or "")[-1].lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+        raise HTTPException(status_code=400, detail="Only jpg, png, webp files are allowed")
+
+    save_dir = os.path.join("media", "student", "photos")
+    os.makedirs(save_dir, exist_ok=True)
+
+    filename = f"{student_id}{ext}"
+    filepath = os.path.join(save_dir, filename)
+
+    contents = await file.read()
+    if len(contents) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must not exceed 2 MB")
+
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    if student.photo and student.photo != f"/media/student/photos/{filename}":
+        old_path = student.photo.lstrip("/")
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+    student.photo = f"/media/student/photos/{filename}"
+    await db.flush()
+
+    result = await db.execute(select(Student).where(Student.id == student.id))
+    student_out = result.scalar_one()
+    await db.commit()
+    return student_out
+
+
+async def delete_student_photo(student_id: UUID, db: AsyncSession):
+    result = await db.execute(select(Student).where(Student.id == student_id))
+    student = result.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    if not student.photo:
+        raise HTTPException(status_code=404, detail="No photo to delete")
+
+    filepath = student.photo.lstrip("/")
+    if os.path.exists(filepath):
+        os.remove(filepath)
+
+    student.photo = None
+    await db.commit()
+    return {"detail": "Student photo deleted successfully"}

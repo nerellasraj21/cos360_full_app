@@ -808,6 +808,7 @@ class FeeTransactionService:
         academic_year_id: UUID | None = None,
         payment_method: str | None = None,
         transaction_status: str | None = None,
+        has_receipt: bool | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         limit: int = 100,
@@ -828,6 +829,8 @@ class FeeTransactionService:
                 conditions.append(FeeTransaction.payment_method == payment_method)
             if transaction_status:
                 conditions.append(FeeTransaction.status == transaction_status)
+            if has_receipt is not None:
+                conditions.append(FeeTransaction.receipt_generated == has_receipt)
             if date_from:
                 conditions.append(FeeTransaction.transaction_date >= date_from)
             if date_to:

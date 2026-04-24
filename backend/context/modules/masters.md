@@ -347,7 +347,15 @@ POST   /api/v1/masters/staff/
 GET    /api/v1/masters/staff/{id}
 PUT    /api/v1/masters/staff/{id}
 DELETE /api/v1/masters/staff/{id}
+
+POST   /api/v1/masters/staff/enrollment/{staff_id}/photo   (Added 2026-04-22)
+  - Upload staff profile photo (multipart/form-data, field "photo", max 2 MB, jpg/png/webp)
+DELETE /api/v1/masters/staff/enrollment/{staff_id}/photo   (Added 2026-04-22)
+  - Delete staff profile photo
 ```
+
+**Staff photo field:** `photo_url` in `StaffEnrollmentOut` / `StaffOut` (validation_alias of DB column `photo`).
+File stored at `media/staff/photos/{staff_id}.{ext}`. Frontend builds full URL same as student photos.
 
 ### Parent Endpoints
 

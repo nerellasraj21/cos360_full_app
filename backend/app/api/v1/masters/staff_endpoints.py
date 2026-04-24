@@ -2,7 +2,7 @@ from datetime import date
 import enum
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -40,6 +40,7 @@ from app.service.masters.staff_service import (
     create_staff_enrollment,
     delete_staff_attendance,
     delete_staff_enrollment,
+    delete_staff_photo,
     delete_staff_qualification,
     get_all_designations_list,
     get_all_drivers_list,
@@ -55,6 +56,7 @@ from app.service.masters.staff_service import (
     update_staff_attendance,
     update_staff_enrollment,
     update_staff_qualification,
+    upload_staff_photo,
 )
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
@@ -125,6 +127,30 @@ async def remove_enrollment(request: Request, staff_id: UUID, db: AsyncSession =
     await check_role_plan_permission_with_error(db, request, role, "staff", "delete")
 
     return await delete_staff_enrollment(staff_id, db)
+
+
+# -------------------- Staff Photo Endpoints --------------------
+
+
+@router.post("/enrollment/{staff_id}/photo", response_model=StaffEnrollmentOut)
+async def upload_photo(
+    request: Request,
+    staff_id: UUID,
+    photo: UploadFile = File(...),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "staff", "update")
+    return await upload_staff_photo(staff_id, photo, db)
+
+
+@router.delete("/enrollment/{staff_id}/photo")
+async def remove_photo(request: Request, staff_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "staff", "update")
+    return await delete_staff_photo(staff_id, db)
 
 
 # -------------------- Staff Attendance Endpoints --------------------

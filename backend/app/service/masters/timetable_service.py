@@ -569,12 +569,17 @@ async def update_frontend_timetable(
             time_key = f"{slot_data.time.from_time}-{slot_data.time.to}"
 
             if time_key not in slot_time_cache:
+                from datetime import datetime
+
+                from_time = datetime.strptime(slot_data.time.from_time, "%H:%M").time()
+                to_time = datetime.strptime(slot_data.time.to, "%H:%M").time()
+
                 # Create new slot time
                 slot_time = SlotTime(
                     section_id=section_id,
                     label=f"{slot_data.time.from_time}-{slot_data.time.to}",
-                    start_time=slot_data.time.from_time,
-                    end_time=slot_data.time.to,
+                    start_time=from_time,
+                    end_time=to_time,
                 )
                 db.add(slot_time)
                 await db.flush()

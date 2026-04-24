@@ -4,7 +4,7 @@ from datetime import date
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class AdmissionTypeEnum(StrEnum):
@@ -70,11 +70,12 @@ class StudentOut(StudentBase):
     first_name: str
     last_name: str
     is_active: bool | None = None
+    photo_url: str | None = Field(None, validation_alias="photo")
     father: ParentOut | None = None
     mother: ParentOut | None = None
     guardian: ParentOut | None = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     @model_validator(mode='before')
     @classmethod

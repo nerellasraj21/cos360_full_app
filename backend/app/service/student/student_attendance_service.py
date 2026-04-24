@@ -571,6 +571,15 @@ async def update_attendance_by_date(
                 if new_remarks:
                     attendance.remarks = new_remarks
                 updated_records.append(attendance)
+            else:
+                new_record = StudentAttendance(
+                    student_id=student_id,
+                    date=attendance_date,
+                    status=new_status,
+                    remarks=new_remarks,
+                )
+                db.add(new_record)
+                updated_records.append(new_record)
 
         await db.flush()
 

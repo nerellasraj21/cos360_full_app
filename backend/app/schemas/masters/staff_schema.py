@@ -126,8 +126,9 @@ class StaffEnrollmentOut(StaffEnrollmentBase):
     created_at: datetime | None = None
     updated_at: datetime | None = None
     qualifications: List[StaffQualificationOut] = []
+    photo_url: str | None = Field(None, validation_alias="photo")
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 class DesignationCreate(BaseModel):
@@ -181,8 +182,11 @@ class StaffOut(BaseModel):
     pf_account_number: str | None = None
     uan_number: str | None = None
 
+    photo_url: str | None = Field(None, validation_alias="photo")
+
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 class DriverOut(BaseModel):

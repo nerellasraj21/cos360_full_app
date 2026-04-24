@@ -83,6 +83,7 @@ Evidence: `app/api/v1/student/`, `app/service/student/`, `context_guide.json:498
 - `academic_year_id` (UUID FK): Enrollment year
 - `user_id` (UUID FK): Associated user account
 - `is_active`: Enrollment status
+- `photo` (VARCHAR 500, nullable): Relative URL path to student profile photo (e.g. `/media/student/photos/{id}.jpg`) — **Added 2026-04-22**
 
 ### StudentDocument
 
@@ -164,6 +165,27 @@ PATCH  /api/v1/students/admissions/{id}
 DELETE /api/v1/students/admissions/{id}
   - Soft delete student
 ```
+
+### Student Photo Endpoints (Added 2026-04-22)
+
+```
+POST   /api/v1/students/admission/id/{student_id}/photo
+  - Upload student profile photo
+  - Body: multipart/form-data, field name must be "photo"
+  - Constraints: jpg/png/webp only, max 2 MB
+  - Replaces existing photo (old file deleted from disk)
+  - Returns: StudentOut with photo_url field
+
+DELETE /api/v1/students/admission/id/{student_id}/photo
+  - Delete student profile photo
+  - Removes file from disk, sets photo column to null
+  - Returns: { "detail": "Student photo deleted successfully" }
+```
+
+**Response field:** `photo_url` (e.g. `/media/student/photos/{student_id}.jpg`)
+**File storage:** `media/student/photos/{student_id}.{ext}` on the server filesystem
+**Frontend rendering:** Prepend API base URL minus `/api/v1` to `photo_url` to build the full image URL
+**Required permission:** `student_admissions:update`
 
 ### Attendance Endpoints
 
@@ -259,7 +281,7 @@ Evidence: `context_guide.json:498-514`
 1. **Bulk Operations**: Bulk admission import capability not observed
 2. **Archive Policy**: Student data retention/archival policy not documented
 3. **Transfer Workflow**: Student transfer between classes/schools not visible
-4. **Photo Management**: Student photo upload/storage not explicitly documented
+4. **Photo Management**: ~~Student photo upload/storage not explicitly documented~~ — **RESOLVED 2026-04-22**: `POST/DELETE /students/admission/id/{id}/photo` implemented; stored in `media/student/photos/`
 
 ---
 

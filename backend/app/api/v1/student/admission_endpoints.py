@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -24,7 +24,12 @@ from app.service.student.admission_service import (
     toggle_student_active,
     update_partial_details_admission,
 )
-from app.service.student.student_service import get_students_dropdown, get_students_simple_dropdown
+from app.service.student.student_service import (
+    delete_student_photo,
+    get_students_dropdown,
+    get_students_simple_dropdown,
+    upload_student_photo,
+)
 from app.tools.enhanced_permissions import check_user_resource_access
 from app.tools.simple_permissions import (
     check_role_plan_permission_with_error,
@@ -181,6 +186,30 @@ async def toggle_student_active_status(student_id: UUID, request: Request, db: A
     await check_role_plan_permission_with_error(db, request, role, "student_admissions", "update")
 
     return await toggle_student_active(student_id, db)
+
+
+# Student Photo Endpoints
+
+
+@router.post("/id/{student_id}/photo", response_model=StudentOut)
+async def upload_photo(
+    request: Request,
+    student_id: UUID,
+    photo: UploadFile = File(...),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "student_admissions", "update")
+    return await upload_student_photo(student_id, photo, db)
+
+
+@router.delete("/id/{student_id}/photo")
+async def remove_photo(request: Request, student_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "student_admissions", "update")
+    return await delete_student_photo(student_id, db)
 
 
 # Student Dropdown Endpoints

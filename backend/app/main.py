@@ -1,8 +1,11 @@
+import os
+
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.main_router import router as api_v1_router
 from app.config import settings
@@ -52,6 +55,10 @@ async def startup():
     # No need to create tables on startup in production
     pass
 
+
+# Serve uploaded media files
+os.makedirs("media", exist_ok=True)
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 # Register Routers
 app.include_router(api_v1_router, prefix="/api/v1")

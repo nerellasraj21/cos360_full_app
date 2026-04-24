@@ -61,6 +61,9 @@ class Staff(BaseOrg):
     pf_account_number = Column(String(50), nullable=True)
     uan_number = Column(String(20), nullable=True)
 
+    # Photo
+    photo = Column(String(500), nullable=True)
+
     # Relationships
     attendances = relationship("StaffAttendance", back_populates="staff", cascade="all, delete-orphan")
     qualifications = relationship("StaffQualification", back_populates="staff", cascade="all, delete-orphan")

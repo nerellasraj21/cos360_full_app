@@ -37,6 +37,7 @@ class Student(BaseOrg):
     # Caste master foreign keys (new structure)
     caste_id = Column(UUID(as_uuid=True), ForeignKey("castes.id"), nullable=True)
     sub_caste_id = Column(UUID(as_uuid=True), ForeignKey("sub_castes.id"), nullable=True)
+    photo = Column(String(500), nullable=True)
 
     user = relationship("User", back_populates="student")
     caste_obj = relationship("Caste", back_populates="students", foreign_keys=[caste_id])

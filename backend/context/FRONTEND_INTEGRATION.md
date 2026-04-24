@@ -430,3 +430,61 @@ const gpa = Number(response.gpa);  // "4.50" → 4.5
 | **Children URL** | `GET /students/parents/{id}/students` was wrong — correct URL is `/student-parent-links/parent/{id}/students` | Update the parent children fetch URL |
 | **Student username** | Now generated as `firstname.lastname` (e.g. `ravi.sharma`), collision-safe | Login with this format for new students |
 | **Parent username** | Now set to parent's email address | Login with email for parents created via admission API |
+
+---
+
+## 12. Student Photo (Added 2026-04-22)
+
+Students now have a profile photo field. Photo management follows the same pattern as staff photos.
+
+### 12.1 Upload photo
+
+```http
+POST /api/v1/students/admission/id/{student_id}/photo
+Headers: Authorization: Bearer <token>
+         cschema: <tenant-name>
+         Content-Type: multipart/form-data
+Body: form field name = "photo", value = <file>
+```
+
+Constraints: jpg/png/webp only, max 2 MB. Replaces any existing photo.
+
+Response: full `StudentOut` object including `photo_url`.
+
+### 12.2 Delete photo
+
+```http
+DELETE /api/v1/students/admission/id/{student_id}/photo
+Headers: Authorization: Bearer <token>
+         cschema: <tenant-name>
+```
+
+Response: `{ "detail": "Student photo deleted successfully" }`
+
+### 12.3 Displaying the photo
+
+The `photo_url` field in `StudentOut` (and all admission responses) is a relative path:
+
+```json
+{ "photo_url": "/media/student/photos/<student_id>.jpg" }
+```
+
+Build the full image URL by prepending the API base URL **without** `/api/v1`:
+
+```js
+const mediaBase = API_BASE_URL.replace(/\/api\/v1$/, "");
+const imgSrc = student.photo_url ? mediaBase + student.photo_url : null;
+```
+
+### 12.4 Frontend implementation checklist
+
+- [ ] Add `photo_url?: string | null` to the Student TypeScript interface
+- [ ] Add `uploadStudentPhoto(studentId, file)` — `POST` multipart/form-data, field name `"photo"`
+- [ ] Add `deleteStudentPhoto(studentId)` — `DELETE`
+- [ ] Add `useUploadStudentPhoto()` hook — invalidates student detail + admissions list on success
+- [ ] Add `useDeleteStudentPhoto()` hook — same invalidation
+- [ ] In Create/Edit admission dialog:
+  - Hold file in `pendingPhotoFile` state (upload after record is created, once `student_id` is available)
+  - Show avatar if `photo_url` exists, placeholder icon otherwise
+  - Client-side guard: reject files > 2 MB before uploading
+- [ ] In admission detail/view: show avatar at top of details panel
