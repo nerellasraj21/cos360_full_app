@@ -27,12 +27,19 @@ from app.models.masters.sections_model import Section
 from app.models.masters.student_parent_association_model import StudentParentLink
 from app.models.student.student_model import Student
 from app.schemas.fee.fee_collection_schema import (
+    FeeHistoryItem,
+    FeeHistoryResponse,
+    FeeHistoryTransactionItem,
     FeePaymentItemPaid,
     FeePaymentRequest,
     FeePaymentResponse,
     FeeSummaryItem,
     FeeSummaryResponse,
+    FeeSummarySmsPreview,
+    FeeSummarySmsResponse,
     StudentSearchResult,
+    TermDueItem,
+    TermsDueResponse,
 )
 from app.service.fee.fee_receipt_service import FeeReceiptService
 
@@ -338,6 +345,380 @@ async def get_fee_summary(
         grand_total_due=grand_due,
         old_fee_pending_amount=old_fee_pending,
     )
+
+
+# ─── Fee History ─────────────────────────────────────────────────────────────
+
+
+async def get_fee_history(
+    db: AsyncSession,
+    student_id: UUID,
+    academic_year_id: UUID,
+) -> FeeHistoryResponse:
+    # Student info
+    student_result = await db.execute(select(Student).where(Student.id == student_id))
+    student = student_result.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    admission_result = await db.execute(select(Admission).where(Admission.student_id == student_id))
+    admission = admission_result.scalar_one_or_none()
+    if not admission:
+        raise HTTPException(status_code=404, detail="Admission not found for student")
+
+    from app.models.masters.academic_year_model import AcademicYear
+    ay_result = await db.execute(select(AcademicYear.title).where(AcademicYear.id == academic_year_id))
+    ay_title = ay_result.scalar_one_or_none() or ""
+
+    # All completed transactions for this student + academic year, newest first
+    txn_result = await db.execute(
+        select(FeeTransaction)
+        .where(
+            and_(
+                FeeTransaction.student_id == student_id,
+                FeeTransaction.academic_year_id == academic_year_id,
+                FeeTransaction.status == "completed",
+            )
+        )
+        .order_by(FeeTransaction.transaction_date.desc())
+    )
+    transactions = txn_result.scalars().all()
+
+    items: list[FeeHistoryItem] = []
+    grand_total_paid = Decimal("0.00")
+
+    for idx, txn in enumerate(transactions, start=1):
+        # Receipt for this transaction
+        receipt_result = await db.execute(
+            select(FeeReceipt.id, FeeReceipt.receipt_number).where(
+                FeeReceipt.fee_transaction_id == txn.id
+            )
+        )
+        receipt_row = receipt_result.first()
+        receipt_id = receipt_row.id if receipt_row else None
+        receipt_number = receipt_row.receipt_number if receipt_row else None
+
+        # Fee type breakdown for this transaction
+        items_result = await db.execute(
+            select(
+                FeeTransactionItem.fee_type_id,
+                func.sum(FeeTransactionItem.amount_paid).label("amount_paid"),
+            )
+            .join(FeeType, FeeType.id == FeeTransactionItem.fee_type_id)
+            .where(FeeTransactionItem.fee_transaction_id == txn.id)
+            .group_by(FeeTransactionItem.fee_type_id)
+        )
+        txn_fee_items_rows = items_result.all()
+
+        # Resolve fee type names
+        fee_types_paid: list[FeeHistoryTransactionItem] = []
+        for row in txn_fee_items_rows:
+            ft_result = await db.execute(select(FeeType.type_name).where(FeeType.id == row.fee_type_id))
+            ft_name = ft_result.scalar_one_or_none() or "Unknown"
+            fee_types_paid.append(FeeHistoryTransactionItem(
+                fee_type_id=row.fee_type_id,
+                fee_type_name=ft_name,
+                amount_paid=Decimal(str(row.amount_paid or 0)),
+            ))
+
+        items.append(FeeHistoryItem(
+            s_no=idx,
+            transaction_id=txn.id,
+            transaction_number=txn.transaction_number,
+            receipt_id=receipt_id,
+            receipt_number=receipt_number,
+            transaction_date=txn.transaction_date,
+            amount_paid=txn.total_amount,
+            payment_method=txn.payment_method,
+            status=txn.status,
+            fee_types_paid=fee_types_paid,
+        ))
+        grand_total_paid += txn.total_amount
+
+    return FeeHistoryResponse(
+        student_id=student_id,
+        student_name=f"{student.first_name} {student.last_name}",
+        admission_number=admission.admission_number or "",
+        academic_year=ay_title,
+        total_paid=grand_total_paid,
+        items=items,
+    )
+
+
+# ─── Terms Due ───────────────────────────────────────────────────────────────
+
+
+async def get_terms_due(
+    db: AsyncSession,
+    student_id: UUID,
+    academic_year_id: UUID,
+    as_of_date: date,
+) -> TermsDueResponse:
+    from app.models.fee.fee_student_map_term_amount_model import FeeStudentMapTermAmount
+    from app.models.fee.fee_term_dates_model import FeeTermDates
+    from app.models.fee.fee_term_model import FeeTerm
+
+    # Student + admission
+    student_result = await db.execute(select(Student).where(Student.id == student_id))
+    student = student_result.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    admission_result = await db.execute(select(Admission).where(Admission.student_id == student_id))
+    admission = admission_result.scalar_one_or_none()
+    admission_no = admission.admission_number if admission else ""
+
+    # All fee mappings for student + academic year
+    mappings_result = await db.execute(
+        select(FeeStudentMapping)
+        .options(selectinload(FeeStudentMapping.fee_type))
+        .where(
+            and_(
+                FeeStudentMapping.student_id == student_id,
+                FeeStudentMapping.academic_year_id == academic_year_id,
+            )
+        )
+    )
+    mappings = mappings_result.scalars().all()
+
+    # Selected month boundaries
+    month_start = as_of_date.replace(day=1)
+
+    current_month_terms: list[TermDueItem] = []
+    overdue_terms: list[TermDueItem] = []
+
+    for mapping in mappings:
+        fee_type_name = mapping.fee_type.type_name if mapping.fee_type else "Unknown"
+
+        # All term amounts for this mapping with due date <= as_of_date
+        term_rows_result = await db.execute(
+            select(
+                FeeStudentMapTermAmount.id,
+                FeeStudentMapTermAmount.term_id,
+                FeeStudentMapTermAmount.term_date_id,
+                FeeStudentMapTermAmount.term_amount,
+                FeeTermDates.fee_term_date,
+                FeeTerm.term_name,
+            )
+            .join(FeeTermDates, FeeTermDates.id == FeeStudentMapTermAmount.term_date_id)
+            .join(FeeTerm, FeeTerm.id == FeeStudentMapTermAmount.term_id)
+            .where(
+                and_(
+                    FeeStudentMapTermAmount.fee_student_map_id == mapping.id,
+                    FeeTermDates.fee_term_date <= as_of_date,
+                )
+            )
+            .order_by(FeeTermDates.fee_term_date)
+        )
+        term_rows = term_rows_result.all()
+
+        for row in term_rows:
+            # Paid amount for this specific term_date_id
+            paid_result = await db.execute(
+                select(func.coalesce(func.sum(FeeTransactionItem.amount_paid), 0))
+                .select_from(FeeTransactionItem)
+                .join(FeeTransaction, FeeTransactionItem.fee_transaction_id == FeeTransaction.id)
+                .where(
+                    and_(
+                        FeeTransaction.student_id == student_id,
+                        FeeTransaction.academic_year_id == academic_year_id,
+                        FeeTransaction.status == "completed",
+                        FeeTransactionItem.fee_type_id == mapping.fee_type_id,
+                        FeeTransactionItem.term_date_id == row.term_date_id,
+                    )
+                )
+            )
+            paid_amount = Decimal(str(paid_result.scalar_one() or 0))
+            pending_amount = max(Decimal(str(row.term_amount)) - paid_amount, Decimal("0.00"))
+
+            # Skip fully paid terms
+            if pending_amount == Decimal("0.00"):
+                continue
+
+            item = TermDueItem(
+                fee_type_id=mapping.fee_type_id,
+                fee_type_name=fee_type_name,
+                term_id=row.term_id,
+                term_name=row.term_name,
+                term_date_id=row.term_date_id,
+                due_date=row.fee_term_date,
+                term_amount=Decimal(str(row.term_amount)),
+                paid_amount=paid_amount,
+                pending_amount=pending_amount,
+            )
+
+            # Current month vs overdue
+            if row.fee_term_date >= month_start:
+                current_month_terms.append(item)
+            else:
+                overdue_terms.append(item)
+
+    total_current = sum(i.pending_amount for i in current_month_terms)
+    total_overdue = sum(i.pending_amount for i in overdue_terms)
+    selected_month = as_of_date.strftime("%B %Y")
+
+    return TermsDueResponse(
+        student_id=student_id,
+        student_name=f"{student.first_name} {student.last_name}",
+        admission_number=admission_no,
+        as_of_date=as_of_date,
+        selected_month=selected_month,
+        current_month_terms=current_month_terms,
+        overdue_terms=overdue_terms,
+        total_current_month_pending=Decimal(str(total_current)),
+        total_overdue_pending=Decimal(str(total_overdue)),
+        grand_total_pending=Decimal(str(total_current + total_overdue)),
+    )
+
+
+# ─── Fee Summary SMS ─────────────────────────────────────────────────────────
+
+
+async def get_fee_summary_sms_preview(
+    db: AsyncSession,
+    student_id: UUID,
+    academic_year_id: UUID,
+) -> FeeSummarySmsPreview:
+    student_result = await db.execute(select(Student).where(Student.id == student_id))
+    student = student_result.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    admission_result = await db.execute(select(Admission).where(Admission.student_id == student_id))
+    admission = admission_result.scalar_one_or_none()
+
+    parent_result = await db.execute(
+        select(Parent.name, Parent.phone)
+        .select_from(StudentParentLink)
+        .join(Parent, Parent.id == StudentParentLink.parent_id)
+        .where(StudentParentLink.student_id == student_id)
+        .limit(1)
+    )
+    parent_row = parent_result.first()
+    parent_name = parent_row.name if parent_row else "Parent"
+    parent_phone = parent_row.phone if parent_row else None
+
+    summary = await get_fee_summary(db, student_id, academic_year_id)
+    due_amount = summary.grand_total_due + summary.old_fee_pending_amount
+    student_name = f"{student.first_name} {student.last_name}"
+    admission_no = admission.admission_number if admission else ""
+
+    can_send = bool(parent_phone)
+    message = (
+        f"Dear {parent_name}, fee due for {student_name} "
+        f"(Adm: {admission_no}) is Rs.{due_amount:,.2f} for {summary.academic_year}. "
+        f"Please pay at the earliest."
+    ) if can_send else "No parent phone number found — SMS cannot be sent."
+
+    return FeeSummarySmsPreview(
+        parent_name=parent_name,
+        parent_phone=parent_phone,
+        student_name=student_name,
+        admission_number=admission_no,
+        academic_year=summary.academic_year,
+        due_amount=due_amount,
+        message=message,
+        can_send=can_send,
+    )
+
+
+async def send_fee_summary_sms(
+    db: AsyncSession,
+    student_id: UUID,
+    academic_year_id: UUID,
+    triggered_by_user_id: UUID,
+) -> FeeSummarySmsResponse:
+    import asyncio
+    import uuid as _uuid
+
+    # Get student + admission
+    student_result = await db.execute(select(Student).where(Student.id == student_id))
+    student = student_result.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    admission_result = await db.execute(select(Admission).where(Admission.student_id == student_id))
+    admission = admission_result.scalar_one_or_none()
+
+    # Get parent phone
+    parent_result = await db.execute(
+        select(Parent.name, Parent.phone)
+        .select_from(StudentParentLink)
+        .join(Parent, Parent.id == StudentParentLink.parent_id)
+        .where(StudentParentLink.student_id == student_id)
+        .limit(1)
+    )
+    parent_row = parent_result.first()
+    if not parent_row or not parent_row.phone:
+        return FeeSummarySmsResponse(status="skipped", detail="No parent phone number found for this student")
+
+    parent_name = parent_row.name or "Parent"
+    parent_phone = parent_row.phone
+
+    # Get fee summary for due amount
+    summary = await get_fee_summary(db, student_id, academic_year_id)
+    due_amount = summary.grand_total_due + summary.old_fee_pending_amount
+    student_name = f"{student.first_name} {student.last_name}"
+    admission_no = admission.admission_number if admission else ""
+
+    message = (
+        f"Dear {parent_name}, fee due for {student_name} "
+        f"(Adm: {admission_no}) is Rs.{due_amount:,.2f} for {summary.academic_year}. "
+        f"Please pay at the earliest."
+    )
+
+    row_data = {
+        "recipient_name": parent_name,
+        "recipient_phone": parent_phone,
+        "recipient_email": None,
+        "rendered_message": message,
+        "template_id": None,
+        "triggered_by": str(triggered_by_user_id),
+        "target_type": "fee_summary_reminder",
+        "target_ref": {"student_id": str(student_id), "academic_year_id": str(academic_year_id)},
+    }
+
+    # Send SMS and log result
+    from app.models.communication.communication_model import NotificationLog
+
+    status = "sent"
+    detail = f"SMS sent to {parent_name} ({parent_phone})"
+    provider_msg_id = None
+    error_msg = None
+
+    try:
+        from app.tasks.communication.send_tasks import _call_provider
+        loop = asyncio.get_event_loop()
+        provider_msg_id = await loop.run_in_executor(None, _call_provider, "sms", row_data)
+    except Exception as e:
+        log.warning(f"Fee summary SMS failed for student {student_id}: {e}")
+        status = "failed"
+        detail = f"SMS failed: {str(e)}"
+        error_msg = str(e)
+
+    # Audit log to NotificationLog (template_id is nullable there)
+    try:
+        notification_log = NotificationLog(
+            id=_uuid.uuid4(),
+            template_id=None,
+            recipient_name=parent_name,
+            recipient_phone=parent_phone,
+            recipient_email=None,
+            channel="sms",
+            message=message,
+            status="sent" if status == "sent" else "failed",
+            provider_message_id=provider_msg_id,
+            error_message=error_msg,
+            triggered_by=triggered_by_user_id,
+            target_type="fee_summary_reminder",
+            target_ref={"student_id": str(student_id), "academic_year_id": str(academic_year_id)},
+        )
+        db.add(notification_log)
+        await db.commit()
+    except Exception as e:
+        log.debug(f"Notification log write failed: {e}")
+
+    return FeeSummarySmsResponse(status=status, detail=detail)
 
 
 # ─── Fee Payment Convenience Wrapper ─────────────────────────────────────────

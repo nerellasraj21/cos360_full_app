@@ -65,6 +65,95 @@ class FeeSummaryResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ─── Terms Due ───────────────────────────────────────────────────────────────
+
+class TermDueItem(BaseModel):
+    fee_type_id: UUID
+    fee_type_name: str
+    term_id: UUID
+    term_name: str
+    term_date_id: UUID
+    due_date: date
+    term_amount: Decimal
+    paid_amount: Decimal
+    pending_amount: Decimal
+
+    model_config = {"from_attributes": True}
+
+
+class TermsDueResponse(BaseModel):
+    student_id: UUID
+    student_name: str
+    admission_number: str
+    as_of_date: date
+    selected_month: str
+    current_month_terms: list[TermDueItem]
+    overdue_terms: list[TermDueItem]
+    total_current_month_pending: Decimal
+    total_overdue_pending: Decimal
+    grand_total_pending: Decimal
+
+    model_config = {"from_attributes": True}
+
+
+# ─── Fee Summary SMS ─────────────────────────────────────────────────────────
+
+class FeeSummarySmsPreview(BaseModel):
+    parent_name: str
+    parent_phone: Optional[str]
+    student_name: str
+    admission_number: str
+    academic_year: str
+    due_amount: Decimal
+    message: str
+    can_send: bool  # False if no parent phone found
+
+    model_config = {"from_attributes": True}
+
+
+class FeeSummarySmsResponse(BaseModel):
+    status: str  # "sent" | "skipped" | "failed"
+    detail: str
+
+    model_config = {"from_attributes": True}
+
+
+# ─── Fee History ─────────────────────────────────────────────────────────────
+
+class FeeHistoryTransactionItem(BaseModel):
+    fee_type_id: UUID
+    fee_type_name: str
+    amount_paid: Decimal
+
+    model_config = {"from_attributes": True}
+
+
+class FeeHistoryItem(BaseModel):
+    s_no: int
+    transaction_id: UUID
+    transaction_number: str
+    receipt_id: Optional[UUID] = None
+    receipt_number: Optional[str] = None
+    transaction_date: datetime
+    amount_paid: Decimal
+    payment_method: str
+    status: str
+    fee_types_paid: list[FeeHistoryTransactionItem]
+
+    model_config = {"from_attributes": True}
+
+
+class FeeHistoryResponse(BaseModel):
+    student_id: UUID
+    student_name: str
+    admission_number: str
+    academic_year: str
+    total_paid: Decimal
+    items: list[FeeHistoryItem]
+
+    model_config = {"from_attributes": True}
+
+
 # ─── Fee Payment ─────────────────────────────────────────────────────────────
 
 class FeePaymentRequest(BaseModel):

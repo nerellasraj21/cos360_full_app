@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, Date, DateTime, ForeignKey, String
+from sqlalchemy import Column, Date, DateTime, Enum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -14,9 +14,15 @@ class CertificateIssue(BaseOrg):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True)
     certificate_type_id = Column(UUID(as_uuid=True), ForeignKey("certificate_types.id"), nullable=True)
+    certificate_category = Column(
+        Enum("received", "issued", name="certificate_category_enum", create_type=False),
+        nullable=False,
+    )
     issue_date = Column(Date)
     file_path = Column(String, nullable=True)
     remarks = Column(String(255), nullable=True)
+    issued_by_name = Column(String(150), nullable=True)
+    issuer_signature_path = Column(String(500), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 

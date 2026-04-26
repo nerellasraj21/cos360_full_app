@@ -85,7 +85,7 @@ class TenantMiddleware(BaseHTTPMiddleware):
         client_name = request.headers.get("cschema")
         if client_name:
             request.state.tenant_detection_method = "cschema_header"
-            return self.default_client_name
+            return client_name
 
         # If strict mode is enabled, cschema header is required
         if self.strict_mode:

@@ -2,7 +2,7 @@
 Schemas for Fee Concession module.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
@@ -57,8 +57,10 @@ class ConcessionSummaryItem(BaseModel):
     fee_type_id: UUID
     fee_type_name: str
     assigned_fee: Decimal
-    current_due: Decimal
     concession_amount: Decimal
+    due_amount: Decimal
+    due_date: Optional[date] = None
+    is_settled: bool
     reason: Optional[str] = None
     approved_by: Optional[str] = None
 

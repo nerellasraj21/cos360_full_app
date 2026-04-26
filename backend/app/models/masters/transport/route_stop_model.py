@@ -17,7 +17,7 @@ class RouteStop(BaseOrg):
     reaching_time = Column(Time)  # Deprecated: use pickup_time / drop_time instead
     pickup_time = Column(Time, nullable=True)
     drop_time = Column(Time, nullable=True)
-    fees = Column(Integer)
+    fees = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True)
 
     route = relationship("Route", back_populates="stops")

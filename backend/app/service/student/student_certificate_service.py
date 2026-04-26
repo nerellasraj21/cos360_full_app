@@ -7,7 +7,6 @@ Integrates with FileManager for S3 operations and logs all actions to FileAuditL
 
 import logging
 import os
-import uuid as uuid_module
 from datetime import datetime, date
 from uuid import UUID
 
@@ -136,6 +135,7 @@ async def create_certificate(
         cert = CertificateIssue(
             student_id=student_id,
             certificate_type_id=certificate_type_id,
+            certificate_category="received",
             issue_date=issue_date,
             remarks=remarks,
             file_path=s3_key,
@@ -177,6 +177,7 @@ async def create_certificate(
             file_path=cert_with_type.file_path,
             issue_date=cert_with_type.issue_date,
             remarks=cert_with_type.remarks,
+            certificate_category=cert_with_type.certificate_category,
             created_at=cert_with_type.created_at,
             updated_at=cert_with_type.updated_at,
         )
@@ -703,19 +704,17 @@ async def _upload_signature(
             detail="Signature file must not exceed 2 MB",
         )
 
-    file_uuid = str(uuid_module.uuid4())
-    s3_key = f"{tenant_schema}/signatures/{student_id}/{file_uuid}{ext_lower}"
+    file_key = await file_manager.upload_bytes(
+        tenant_schema,
+        "signatures",
+        str(student_id),
+        data,
+        ext_lower,
+        signature_file.content_type or "image/png",
+    )
 
-    async with await file_manager._get_s3_client() as client:
-        await client.put_object(
-            Bucket=file_manager.bucket,
-            Key=s3_key,
-            Body=data,
-            ContentType=signature_file.content_type or "image/png",
-        )
-
-    log.info(f"Signature uploaded to S3: {s3_key}")
-    return s3_key
+    log.info(f"Signature saved locally: {file_key}")
+    return file_key
 
 
 async def create_received_document(
@@ -763,6 +762,7 @@ async def create_received_document(
         cert = CertificateIssue(
             student_id=student_id,
             certificate_type_id=certificate_type_id,
+            certificate_category="received",
             remarks=remarks,
             file_path=s3_key,
             created_at=datetime.utcnow(),
@@ -792,6 +792,7 @@ async def create_received_document(
             file_path=cert_with_type.file_path,
             issue_date=cert_with_type.issue_date,
             remarks=cert_with_type.remarks,
+            certificate_category=cert_with_type.certificate_category,
             created_at=cert_with_type.created_at,
             updated_at=cert_with_type.updated_at,
         )
@@ -856,6 +857,7 @@ async def create_issued_certificate(
         cert = CertificateIssue(
             student_id=student_id,
             certificate_type_id=certificate_type_id,
+            certificate_category="issued",
             issue_date=issue_date,
             remarks=remarks,
             file_path=s3_key,
@@ -886,6 +888,7 @@ async def create_issued_certificate(
             file_path=cert_with_type.file_path,
             issue_date=cert_with_type.issue_date,
             remarks=cert_with_type.remarks,
+            certificate_category=cert_with_type.certificate_category,
             created_at=cert_with_type.created_at,
             updated_at=cert_with_type.updated_at,
         )

@@ -12,15 +12,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.tenant_session import get_tenant_db
 from app.middleware.rate_limit_middleware import rate_limit_api
 from app.schemas.fee.fee_collection_schema import (
+    FeeHistoryResponse,
     FeePaymentRequest,
     FeePaymentResponse,
     FeeSummaryResponse,
+    FeeSummarySmsPreview,
+    FeeSummarySmsResponse,
     StudentSearchResult,
+    TermsDueResponse,
 )
 from app.service.fee.fee_collection_service import (
+    get_fee_history,
     get_fee_summary,
+    get_fee_summary_sms_preview,
+    get_terms_due,
     process_fee_payment,
     search_students_for_fee,
+    send_fee_summary_sms,
 )
 from app.service.fee.fee_receipt_service import FeeReceiptService
 from app.tools.enhanced_permissions import check_user_resource_access
@@ -127,6 +135,138 @@ async def child_fee_summary(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot access fee data for unrelated student")
 
     return await get_fee_summary(db, student_id, academic_year_id, as_of_date)
+
+
+# ─── Terms Due ───────────────────────────────────────────────────────────────
+
+
+@router.get("/terms-due/{student_id}", response_model=TermsDueResponse)
+@rate_limit_api()
+async def terms_due(
+    student_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    academic_year_id: UUID = Query(..., description="Academic year ID"),
+    as_of_date: date = Query(..., description="Date selected by admin — shows all unpaid terms up to this date"),
+):
+    """
+    Returns all unpaid/partially paid fee terms up to the selected date.
+    Split into current month terms and overdue terms from previous months.
+    Fully paid terms are excluded.
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "fee_collection", "read")
+
+    return await get_terms_due(db, student_id, academic_year_id, as_of_date)
+
+
+# ─── Fee Summary SMS ─────────────────────────────────────────────────────────
+
+
+@router.get("/summary/{student_id}/sms-preview", response_model=FeeSummarySmsPreview)
+@rate_limit_api()
+async def fee_summary_sms_preview(
+    student_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    academic_year_id: UUID = Query(..., description="Academic year ID"),
+):
+    """
+    Preview the SMS that will be sent to the parent — shows parent name, phone,
+    due amount, and exact message text. Does NOT send anything.
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "fee_collection", "read")
+
+    return await get_fee_summary_sms_preview(db, student_id, academic_year_id)
+
+
+@router.post("/summary/{student_id}/send-sms", response_model=FeeSummarySmsResponse)
+@rate_limit_api()
+async def send_fee_summary_sms_endpoint(
+    student_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    academic_year_id: UUID = Query(..., description="Academic year ID"),
+):
+    """
+    Send fee due reminder SMS to the student's parent.
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "fee_collection", "read")
+
+    triggered_by = UUID(current_user.get("sub"))
+    return await send_fee_summary_sms(db, student_id, academic_year_id, triggered_by)
+
+
+# ─── Fee History ─────────────────────────────────────────────────────────────
+
+
+@router.get("/history/{student_id}", response_model=FeeHistoryResponse)
+@rate_limit_api()
+async def fee_history(
+    student_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    academic_year_id: UUID = Query(..., description="Academic year ID"),
+):
+    """
+    Full payment history for a student in a given academic year.
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "fee_collection", "read")
+
+    return await get_fee_history(db, student_id, academic_year_id)
+
+
+@router.get("/my-history", response_model=FeeHistoryResponse)
+@rate_limit_api()
+async def my_fee_history(
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    academic_year_id: UUID = Query(..., description="Academic year ID"),
+):
+    """
+    Student views own payment history.
+    """
+    user_context = await check_user_resource_access(db, request, "fee_collection", "read")
+    if not user_context.student_id:
+        from fastapi import HTTPException, status
+
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only students can access this endpoint")
+
+    return await get_fee_history(db, user_context.student_id, academic_year_id)
+
+
+@router.get("/child-history/{student_id}", response_model=FeeHistoryResponse)
+@rate_limit_api()
+async def child_fee_history(
+    student_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    academic_year_id: UUID = Query(..., description="Academic year ID"),
+):
+    """
+    Parent views child's payment history. Validates parent-child link.
+    """
+    user_context = await check_user_resource_access(
+        db, request, "fee_collection", "read", target_entity_id=student_id
+    )
+    if not user_context.parent_id:
+        from fastapi import HTTPException, status
+
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only parents can access this endpoint")
+
+    if student_id not in (user_context.allowed_entity_ids or []):
+        from fastapi import HTTPException, status
+
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot access fee data for unrelated student")
+
+    return await get_fee_history(db, student_id, academic_year_id)
 
 
 # ─── Fee Payment ─────────────────────────────────────────────────────────────

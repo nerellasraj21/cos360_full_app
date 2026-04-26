@@ -10,6 +10,7 @@ class VehicleBase(BaseModel):
     vehicle_type: str
     last_inspected_date: date
     pollution_renewal_date: date
+    fees: float | None = None
     is_active: bool = True
 
 
@@ -23,6 +24,7 @@ class VehicleUpdate(BaseModel):
     vehicle_type: str | None = None
     last_inspected_date: date | None = None
     pollution_renewal_date: date | None = None
+    fees: float | None = None
     is_active: bool | None = None
 
     model_config = {"from_attributes": True}

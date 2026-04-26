@@ -12,7 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.fee.fee_concession_model import FeeConcession
+from app.models.fee.fee_student_map_term_amount_model import FeeStudentMapTermAmount
 from app.models.fee.fee_student_mapping_model import FeeStudentMapping
+from app.models.fee.fee_term_dates_model import FeeTermDates
+from app.models.fee.fee_transaction_item_model import FeeTransactionItem
+from app.models.fee.fee_transaction_model import FeeTransaction
 from app.models.fee.fee_type_model import FeeType
 from app.models.masters.admission_model import Admission
 from app.models.student.student_model import Student
@@ -197,7 +201,7 @@ async def get_concession_summary(
     for mapping in mappings:
         assigned = mapping.total_fee or Decimal("0.00")
 
-        # Get active concession for this fee type
+        # Active concession for this fee type
         conc_result = await db.execute(
             select(FeeConcession).where(
                 and_(
@@ -209,23 +213,50 @@ async def get_concession_summary(
             )
         )
         conc = conc_result.scalar_one_or_none()
-
         conc_amount = conc.concession_amount if conc else Decimal("0.00")
         reason = conc.reason if conc else None
         approver = None
         if conc:
             approver = conc.approved_by.value if hasattr(conc.approved_by, "value") else str(conc.approved_by)
 
-        current_due = assigned - conc_amount
-        if current_due < 0:
-            current_due = Decimal("0.00")
+        fee_after_concession = max(assigned - conc_amount, Decimal("0.00"))
+
+        # Paid amount for this fee type
+        paid_result = await db.execute(
+            select(func.coalesce(func.sum(FeeTransactionItem.amount_paid), 0))
+            .select_from(FeeTransactionItem)
+            .join(FeeTransaction, FeeTransactionItem.fee_transaction_id == FeeTransaction.id)
+            .where(
+                and_(
+                    FeeTransaction.student_id == student_id,
+                    FeeTransaction.academic_year_id == academic_year_id,
+                    FeeTransaction.status == "completed",
+                    FeeTransactionItem.fee_type_id == mapping.fee_type_id,
+                )
+            )
+        )
+        paid_amount = Decimal(str(paid_result.scalar_one() or 0))
+
+        due_amount = max(fee_after_concession - paid_amount, Decimal("0.00"))
+        is_settled = due_amount == Decimal("0.00")
+
+        # Latest term due date for this fee type
+        due_date_result = await db.execute(
+            select(func.max(FeeTermDates.fee_term_date))
+            .select_from(FeeStudentMapTermAmount)
+            .join(FeeTermDates, FeeTermDates.id == FeeStudentMapTermAmount.term_date_id)
+            .where(FeeStudentMapTermAmount.fee_student_map_id == mapping.id)
+        )
+        due_date = due_date_result.scalar_one_or_none()
 
         items.append(ConcessionSummaryItem(
             fee_type_id=mapping.fee_type_id,
             fee_type_name=mapping.fee_type.type_name if mapping.fee_type else "Unknown",
             assigned_fee=assigned,
-            current_due=current_due,
             concession_amount=conc_amount,
+            due_amount=due_amount,
+            due_date=due_date,
+            is_settled=is_settled,
             reason=reason,
             approved_by=approver,
         ))

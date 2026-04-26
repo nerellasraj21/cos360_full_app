@@ -11,7 +11,7 @@ class RouteStopBase(BaseModel):
     reaching_time: time
     pickup_time: time | None = None
     drop_time: time | None = None
-    fees: float
+    fees: float | None = None
     is_active: bool = True
 
 
