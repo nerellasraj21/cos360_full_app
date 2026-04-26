@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,7 +59,9 @@ interface ConcessionRow {
   fee_type_id: string;
   fee_type_name: string;
   assigned_fee: number;
-  current_due: number;
+  due_amount: number;
+  due_date: string | null;
+  is_settled: boolean;
   concession_amount: number;
   reason: string;
   approved_by: string;
@@ -97,7 +100,9 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
           fee_type_id: item.fee_type_id,
           fee_type_name: item.fee_type_name,
           assigned_fee: item.assigned_fee,
-          current_due: item.current_due,
+          due_amount: item.due_amount,
+          due_date: item.due_date,
+          is_settled: item.is_settled,
           concession_amount: item.concession_amount || 0,
           reason: item.reason || '',
           approved_by: item.approved_by || '',
@@ -196,7 +201,9 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
                   <TableHead className="w-12">S.No.</TableHead>
                   <TableHead>Fee Type</TableHead>
                   <TableHead className="text-right">Assigned</TableHead>
-                  <TableHead className="text-right">Current Due</TableHead>
+                  <TableHead className="text-right">Due Amount</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead>Settled</TableHead>
                   <TableHead className="w-32">Concession Amt</TableHead>
                   <TableHead className="w-48">Reason (min 5 chars)</TableHead>
                   <TableHead className="w-40">Approved By</TableHead>
@@ -208,7 +215,15 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
                     <TableCell>{idx + 1}</TableCell>
                     <TableCell className="font-medium">{row.fee_type_name}</TableCell>
                     <TableCell className="text-right">{formatCurrency(row.assigned_fee)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(row.current_due)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(row.due_amount)}</TableCell>
+                    <TableCell className="text-sm">
+                      {row.due_date ? new Date(row.due_date).toLocaleDateString('en-IN') : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={row.is_settled ? 'default' : 'destructive'}>
+                        {row.is_settled ? 'Settled' : 'Pending'}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <Input
                         type="number"
@@ -251,7 +266,7 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
                   <TableRow className="bg-muted/50 font-semibold h-12">
                     <TableCell colSpan={2}>Grand Total</TableCell>
                     <TableCell className="text-right">{formatCurrency(summaryData.grand_total_assigned)}</TableCell>
-                    <TableCell className="text-right" />
+                    <TableCell colSpan={3} />
                     <TableCell>{formatCurrency(summaryData.grand_total_concession)}</TableCell>
                     <TableCell colSpan={2}>
                       After Concession: {formatCurrency(summaryData.grand_total_fee_after_concession)}

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, CheckCircle, Download } from 'lucide-react';
+import { Loader2, CheckCircle, Download, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { feeReceiptsApi } from '@/api/fee/receipts';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
@@ -44,9 +44,66 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { usePayFee, useFeeSummary } from '@/hooks/fee';
+import { usePayFee, useFeeSummary, useTermsDue } from '@/hooks/fee';
 import { formatCurrency } from './FeeSummaryTab';
-import type { FeePaymentResponse, CollectionPaymentMethod, FeePaymentRequest } from '@/types/fee';
+import type { FeePaymentResponse, CollectionPaymentMethod, FeePaymentRequest, TermsDueItem } from '@/types/fee';
+
+function TermsDueSection({ title, items, total }: { title: string; items: TermsDueItem[]; total: number }) {
+  if (items.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        </CardHeader>
+        <CardContent className="py-3 text-sm text-muted-foreground">No pending terms.</CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fee Type</TableHead>
+                <TableHead>Term</TableHead>
+                <TableHead>Due Date</TableHead>
+                <TableHead className="text-right">Term Amount</TableHead>
+                <TableHead className="text-right">Paid</TableHead>
+                <TableHead className="text-right">Pending</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.term_date_id} className="h-10">
+                  <TableCell className="text-sm">{item.fee_type_name}</TableCell>
+                  <TableCell className="text-sm">{item.term_name}</TableCell>
+                  <TableCell className="text-sm">
+                    {new Date(item.due_date).toLocaleDateString('en-IN')}
+                  </TableCell>
+                  <TableCell className="text-right text-sm">{formatCurrency(item.term_amount)}</TableCell>
+                  <TableCell className="text-right text-sm">{formatCurrency(item.paid_amount)}</TableCell>
+                  <TableCell className="text-right text-sm font-medium text-red-600">
+                    {formatCurrency(item.pending_amount)}
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow className="bg-muted/50 font-semibold h-10">
+                <TableCell colSpan={5} className="text-right text-sm">Total Pending</TableCell>
+                <TableCell className="text-right text-sm text-red-600">{formatCurrency(total)}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 const PAYMENT_METHODS: { value: CollectionPaymentMethod; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -103,6 +160,9 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
   const { selectedAcademicYearId } = useAcademicYearStore();
   const { data: summaryData } = useFeeSummary(studentId, selectedAcademicYearId);
   const payFeeMutation = usePayFee();
+
+  const [asOfDate, setAsOfDate] = useState('');
+  const { data: termsDue, isFetching: termsFetching } = useTermsDue(studentId, selectedAcademicYearId, asOfDate);
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -184,6 +244,57 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Date Picker */}
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex items-center gap-3">
+            <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Label htmlFor="terms-date" className="shrink-0">View dues as of</Label>
+            <Input
+              id="terms-date"
+              type="date"
+              className="w-44"
+              value={asOfDate}
+              onChange={(e) => setAsOfDate(e.target.value)}
+            />
+            {termsFetching && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Terms Due Sections */}
+      {termsDue && (
+        <>
+          <TermsDueSection
+            title={`${termsDue.selected_month} Terms`}
+            items={termsDue.current_month_terms}
+            total={termsDue.total_current_month_pending}
+          />
+          <TermsDueSection
+            title="Overdue Terms"
+            items={termsDue.overdue_terms}
+            total={termsDue.total_overdue_pending}
+          />
+          {termsDue.grand_total_pending > 0 && (
+            <Card>
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Grand Total Pending</p>
+                    <p className="text-2xl font-bold text-red-600">{formatCurrency(termsDue.grand_total_pending)}</p>
+                  </div>
+                  <Button
+                    onClick={() => setValue('amount_to_pay', termsDue.grand_total_pending, { shouldValidate: true })}
+                  >
+                    Pay {formatCurrency(termsDue.grand_total_pending)}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {/* Payment Form */}

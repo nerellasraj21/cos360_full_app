@@ -5,6 +5,7 @@ import type {
   StudentAdmissionResponse,
   StudentDropdownItem
 } from '@/types/admission';
+import { getAdmissionByStudentId } from '@/api/students/admissions';
 
 export const useAdmission = () => {
   const createAdmission = useMutation<
@@ -21,6 +22,14 @@ export const useAdmission = () => {
   return {
     createAdmission,
   };
+};
+
+export const useStudentAdmissionDetail = (studentId: string) => {
+  return useQuery<StudentAdmissionResponse>({
+    queryKey: ['students', 'admission-detail', studentId],
+    queryFn: () => getAdmissionByStudentId(studentId),
+    enabled: !!studentId,
+  });
 };
 
 export const useStudentsDropdown = (activeOnly: boolean = true) => {

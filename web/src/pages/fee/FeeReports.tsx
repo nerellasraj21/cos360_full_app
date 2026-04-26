@@ -348,78 +348,74 @@ function FeeReportsContent() {
   );
 }
 
-// --- Stats Cards ---
+// --- Stats Tables ---
 
-function CollectionStatsCards({ stats, isLoading }: { stats?: FeeCollectionStats; isLoading: boolean }) {
-  if (isLoading) return <StatsCardsSkeleton />;
-  if (!stats) return null;
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard icon={<DollarSign className="h-4 w-4" />} label="Total Collected" value={formatCurrency(stats.total_collected)} />
-      <StatCard icon={<DollarSign className="h-4 w-4" />} label="Total Due" value={formatCurrency(stats.total_due)} />
-      <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Collection %" value={`${stats.collection_percentage.toFixed(1)}%`} />
-      <StatCard icon={<Layers className="h-4 w-4" />} label="Payment Methods" value={Object.keys(stats.payment_methods).length.toString()} />
-    </div>
-  );
-}
-
-function PendingStatsCards({ stats, isLoading }: { stats?: PendingFeesStats; isLoading: boolean }) {
-  if (isLoading) return <StatsCardsSkeleton />;
-  if (!stats) return null;
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard icon={<DollarSign className="h-4 w-4" />} label="Total Pending" value={formatCurrency(stats.total_pending_amount)} />
-      <StatCard icon={<DollarSign className="h-4 w-4" />} label="Total Overdue" value={formatCurrency(stats.total_overdue_amount)} />
-      <StatCard icon={<Users className="h-4 w-4" />} label="Students Pending" value={stats.total_students_with_pending.toString()} />
-      <StatCard icon={<Clock className="h-4 w-4" />} label="Avg Overdue Days" value={stats.average_overdue_days.toFixed(0)} />
-    </div>
-  );
-}
-
-function StructureStatsCards({ stats, isLoading }: { stats?: FeeStructureStats; isLoading: boolean }) {
-  if (isLoading) return <StatsCardsSkeleton />;
-  if (!stats) return null;
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard icon={<Layers className="h-4 w-4" />} label="Fee Types" value={stats.total_fee_types.toString()} />
-      <StatCard icon={<Layers className="h-4 w-4" />} label="Categories" value={stats.total_categories.toString()} />
-      <StatCard icon={<Layers className="h-4 w-4" />} label="Terms" value={stats.total_terms.toString()} />
-      <StatCard icon={<DollarSign className="h-4 w-4" />} label="Avg Fee" value={formatCurrency(stats.average_fee_amount)} />
-    </div>
-  );
-}
-
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function StatsTable({ rows, isLoading }: { rows: { icon: React.ReactNode; label: string; value: string }[]; isLoading: boolean }) {
   return (
     <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2">
-          <div className="text-muted-foreground">{icon}</div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">{label}</p>
-            <p className="text-2xl font-bold">{value}</p>
-          </div>
-        </div>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="h-10">
+              <TableHead className="w-8 pl-4"></TableHead>
+              <TableHead>Metric</TableHead>
+              <TableHead className="text-right pr-4">Value</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading
+              ? [1, 2, 3, 4].map((i) => (
+                  <TableRow key={i} className="h-10">
+                    <TableCell className="pl-4"><div className="h-4 w-4 bg-muted rounded animate-pulse" /></TableCell>
+                    <TableCell><div className="h-4 bg-muted rounded w-32 animate-pulse" /></TableCell>
+                    <TableCell className="text-right pr-4"><div className="h-4 bg-muted rounded w-24 ml-auto animate-pulse" /></TableCell>
+                  </TableRow>
+                ))
+              : rows.map((row, i) => (
+                  <TableRow key={i} className="h-10">
+                    <TableCell className="pl-4 text-muted-foreground">{row.icon}</TableCell>
+                    <TableCell className="font-medium">{row.label}</TableCell>
+                    <TableCell className="text-right pr-4 font-semibold">{row.value}</TableCell>
+                  </TableRow>
+                ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
 }
 
-function StatsCardsSkeleton() {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {[1, 2, 3, 4].map((i) => (
-        <Card key={i}>
-          <CardContent className="p-4">
-            <div className="animate-pulse space-y-2">
-              <div className="h-4 bg-muted rounded w-20" />
-              <div className="h-8 bg-muted rounded w-28" />
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
+function CollectionStatsCards({ stats, isLoading }: { stats?: FeeCollectionStats; isLoading: boolean }) {
+  const rows = stats ? [
+    { icon: <DollarSign className="h-4 w-4" />, label: 'Total Collected', value: formatCurrency(stats.total_collected) },
+    { icon: <DollarSign className="h-4 w-4" />, label: 'Total Due', value: formatCurrency(stats.total_due) },
+    { icon: <BarChart3 className="h-4 w-4" />, label: 'Collection %', value: `${stats.collection_percentage.toFixed(1)}%` },
+    { icon: <Layers className="h-4 w-4" />, label: 'Payment Methods', value: Object.keys(stats.payment_methods).length.toString() },
+  ] : [];
+  if (!isLoading && !stats) return null;
+  return <StatsTable rows={rows} isLoading={isLoading} />;
+}
+
+function PendingStatsCards({ stats, isLoading }: { stats?: PendingFeesStats; isLoading: boolean }) {
+  const rows = stats ? [
+    { icon: <DollarSign className="h-4 w-4" />, label: 'Total Pending', value: formatCurrency(stats.total_pending_amount) },
+    { icon: <DollarSign className="h-4 w-4" />, label: 'Total Overdue', value: formatCurrency(stats.total_overdue_amount) },
+    { icon: <Users className="h-4 w-4" />, label: 'Students Pending', value: stats.total_students_with_pending.toString() },
+    { icon: <Clock className="h-4 w-4" />, label: 'Avg Overdue Days', value: stats.average_overdue_days.toFixed(0) },
+  ] : [];
+  if (!isLoading && !stats) return null;
+  return <StatsTable rows={rows} isLoading={isLoading} />;
+}
+
+function StructureStatsCards({ stats, isLoading }: { stats?: FeeStructureStats; isLoading: boolean }) {
+  const rows = stats ? [
+    { icon: <Layers className="h-4 w-4" />, label: 'Fee Types', value: stats.total_fee_types.toString() },
+    { icon: <Layers className="h-4 w-4" />, label: 'Categories', value: stats.total_categories.toString() },
+    { icon: <Layers className="h-4 w-4" />, label: 'Terms', value: stats.total_terms.toString() },
+    { icon: <DollarSign className="h-4 w-4" />, label: 'Avg Fee', value: formatCurrency(stats.average_fee_amount) },
+  ] : [];
+  if (!isLoading && !stats) return null;
+  return <StatsTable rows={rows} isLoading={isLoading} />;
 }
 
 // --- Tables ---

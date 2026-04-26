@@ -11,14 +11,16 @@ import FeeSummaryTab from './FeeSummaryTab';
 import FeePaymentTab from './FeePaymentTab';
 import ConcessionTab from './ConcessionTab';
 import OldFeeTab from './OldFeeTab';
+import FeeHistoryTab from './FeeHistoryTab';
 
-type Tab = 'summary' | 'payment' | 'concessions' | 'old-fees';
+type Tab = 'summary' | 'payment' | 'concessions' | 'old-fees' | 'history';
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'summary', label: 'Fee Summary' },
   { value: 'payment', label: 'Fee Payment' },
   { value: 'concessions', label: 'Concessions' },
   { value: 'old-fees', label: 'Old Fees' },
+  { value: 'history', label: 'Fee History' },
 ];
 
 interface StudentFeeDetailPageProps {
@@ -154,6 +156,9 @@ export default function StudentFeeDetailPage({ studentId }: StudentFeeDetailPage
         )}
         {activeTab === 'old-fees' && (
           <OldFeeTab studentId={student.id} />
+        )}
+        {activeTab === 'history' && (
+          <FeeHistoryTab studentId={student.id} isActive={activeTab === 'history'} />
         )}
       </div>
 

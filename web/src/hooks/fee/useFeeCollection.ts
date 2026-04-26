@@ -16,6 +16,9 @@ import type {
   OldFeeManualCreate,
   OldFeeCarryForwardRequest,
   OldFeeUpdate,
+  FeeHistoryResponse,
+  SmsSummaryPreview,
+  TermsDueResponse,
 } from '@/types/fee';
 
 // ===== QUERY KEYS =====
@@ -30,6 +33,10 @@ export const feeCollectionKeys = {
     [...feeCollectionKeys.all, 'my-summary', yearId] as const,
   childSummary: (studentId: string, yearId: string) =>
     [...feeCollectionKeys.all, 'child-summary', studentId, yearId] as const,
+  history: (studentId: string, yearId: string) =>
+    [...feeCollectionKeys.all, 'history', studentId, yearId] as const,
+  termsDue: (studentId: string, yearId: string, date: string) =>
+    [...feeCollectionKeys.all, 'terms-due', studentId, yearId, date] as const,
 };
 
 export const feeConcessionKeys = {
@@ -63,7 +70,6 @@ export function useFeeSummary(studentId: string, academicYearId: string) {
     queryKey: feeCollectionKeys.summary(studentId, academicYearId),
     queryFn: () => feeCollectionApi.getFeeSummary(studentId, academicYearId),
     enabled: !!studentId && !!academicYearId,
-    staleTime: 30_000,
   });
 }
 
@@ -72,7 +78,6 @@ export function useMyFeeSummary(academicYearId: string) {
     queryKey: feeCollectionKeys.mySummary(academicYearId),
     queryFn: () => feeCollectionApi.getMyFeeSummary(academicYearId),
     enabled: !!academicYearId,
-    staleTime: 30_000,
   });
 }
 
@@ -81,7 +86,6 @@ export function useChildFeeSummary(studentId: string, academicYearId: string) {
     queryKey: feeCollectionKeys.childSummary(studentId, academicYearId),
     queryFn: () => feeCollectionApi.getChildFeeSummary(studentId, academicYearId),
     enabled: !!studentId && !!academicYearId,
-    staleTime: 30_000,
   });
 }
 
@@ -161,6 +165,57 @@ export function useDeleteConcession() {
     onError: (error) => {
       toast.error(error.message || 'Failed to revoke concession');
     },
+  });
+}
+
+// ===== TERMS DUE =====
+
+export function useTermsDue(studentId: string, academicYearId: string, asOfDate: string) {
+  return useQuery<TermsDueResponse>({
+    queryKey: feeCollectionKeys.termsDue(studentId, academicYearId, asOfDate),
+    queryFn: () => feeCollectionApi.getTermsDue(studentId, academicYearId, asOfDate),
+    enabled: !!studentId && !!academicYearId && !!asOfDate,
+  });
+}
+
+// ===== FEE SUMMARY SMS =====
+
+export function useFeeSummarySmsPreview() {
+  return useMutation<SmsSummaryPreview, Error, { studentId: string; academicYearId: string }>({
+    mutationFn: ({ studentId, academicYearId }) =>
+      feeCollectionApi.getFeeSummarySmsPreview(studentId, academicYearId),
+    onError: (error) => {
+      toast.error(error.message || 'Failed to load SMS preview');
+    },
+  });
+}
+
+export function useSendFeeSummarySms() {
+  return useMutation<{ status: string; detail: string }, Error, { studentId: string; academicYearId: string }>({
+    mutationFn: ({ studentId, academicYearId }) =>
+      feeCollectionApi.sendFeeSummarySms(studentId, academicYearId),
+    onSuccess: (result) => {
+      if (result.status === 'sent') {
+        toast.success('SMS sent successfully');
+      } else if (result.status === 'skipped') {
+        toast.info(result.detail || 'SMS skipped — no phone number on record');
+      } else {
+        toast.error(result.detail || 'SMS failed to send');
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to send SMS');
+    },
+  });
+}
+
+// ===== FEE HISTORY =====
+
+export function useFeeHistory(studentId: string, academicYearId: string, enabled: boolean) {
+  return useQuery<FeeHistoryResponse>({
+    queryKey: feeCollectionKeys.history(studentId, academicYearId),
+    queryFn: () => feeCollectionApi.getFeeHistory(studentId, academicYearId),
+    enabled: enabled && !!studentId && !!academicYearId,
   });
 }
 

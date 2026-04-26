@@ -13,6 +13,9 @@ import {
   FEE_OLD,
   FEE_OLD_CARRY_FORWARD,
   FEE_OLD_STUDENT,
+  FEE_COLLECTION_HISTORY,
+  FEE_COLLECTION_SUMMARY_SMS_BASE,
+  FEE_COLLECTION_TERMS_DUE,
 } from '@/constants/api/fee';
 import type {
   StudentSearchParams,
@@ -29,6 +32,9 @@ import type {
   OldFeeManualCreate,
   OldFeeCarryForwardRequest,
   OldFeeUpdate,
+  FeeHistoryResponse,
+  SmsSummaryPreview,
+  TermsDueResponse,
 } from '@/types/fee/collection';
 
 // ===== HELPER FUNCTIONS =====
@@ -290,6 +296,88 @@ export const feeCollectionApi = {
   deleteOldFee: async (id: string): Promise<void> => {
     try {
       await CAxios.delete(`${FEE_OLD}/${id}`);
+    } catch (error) {
+      handleApiError(error);
+    }
+  },
+
+  // ---- Fee Summary SMS ----
+
+  getFeeSummarySmsPreview: async (
+    studentId: string,
+    academicYearId: string
+  ): Promise<SmsSummaryPreview> => {
+    try {
+      const response = await CAxios.get<SmsSummaryPreview>(
+        `${FEE_COLLECTION_SUMMARY_SMS_BASE}/${studentId}/sms-preview?academic_year_id=${academicYearId}`
+      );
+      return response.data;
+    } catch (error) {
+      handleApiError(error);
+    }
+  },
+
+  sendFeeSummarySms: async (
+    studentId: string,
+    academicYearId: string
+  ): Promise<{ status: string; detail: string }> => {
+    try {
+      const response = await CAxios.post<{ status: string; detail: string }>(
+        `${FEE_COLLECTION_SUMMARY_SMS_BASE}/${studentId}/send-sms?academic_year_id=${academicYearId}`
+      );
+      return response.data;
+    } catch (error) {
+      handleApiError(error);
+    }
+  },
+
+  // ---- Terms Due ----
+
+  getTermsDue: async (
+    studentId: string,
+    academicYearId: string,
+    asOfDate: string
+  ): Promise<TermsDueResponse> => {
+    try {
+      const params = new URLSearchParams({
+        academic_year_id: academicYearId,
+        as_of_date: asOfDate,
+      });
+      const response = await CAxios.get<Record<string, unknown>>(
+        `${FEE_COLLECTION_TERMS_DUE}/${studentId}?${params.toString()}`
+      );
+      const raw = response.data;
+      const parseItem = (item: Record<string, unknown>) => ({
+        ...item,
+        term_amount: Number(item.term_amount),
+        paid_amount: Number(item.paid_amount),
+        pending_amount: Number(item.pending_amount),
+      });
+      return {
+        ...raw,
+        current_month_terms: ((raw.current_month_terms as Record<string, unknown>[]) ?? []).map(parseItem),
+        overdue_terms: ((raw.overdue_terms as Record<string, unknown>[]) ?? []).map(parseItem),
+        total_current_month_pending: Number(raw.total_current_month_pending),
+        total_overdue_pending: Number(raw.total_overdue_pending),
+        grand_total_pending: Number(raw.grand_total_pending),
+      } as TermsDueResponse;
+    } catch (error) {
+      handleApiError(error);
+    }
+  },
+
+  // ---- Fee History ----
+
+  getFeeHistory: async (
+    studentId: string,
+    academicYearId: string
+  ): Promise<FeeHistoryResponse> => {
+    try {
+      const params = new URLSearchParams({ academic_year_id: academicYearId });
+      const response = await CAxios.get<FeeHistoryResponse>(
+        `${FEE_COLLECTION_HISTORY}/${studentId}?${params.toString()}`
+      );
+      return response.data;
     } catch (error) {
       handleApiError(error);
     }

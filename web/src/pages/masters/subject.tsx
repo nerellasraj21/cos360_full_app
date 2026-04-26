@@ -28,7 +28,7 @@ export default function SubjectPage() {
   const {
     data,
     isLoading,
-  } = useSubjectsPaginated(page, pageSize, selectedAcademicYearId, hasListPermission);
+  } = useSubjectsPaginated(page, pageSize, hasListPermission);
 
   const subjects = data?.data || [];
   const total = data?.total || subjects.length;

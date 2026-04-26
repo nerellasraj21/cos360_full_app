@@ -79,15 +79,14 @@ export function useCreateBulkClassSubjectMappings() {
   });
 }
 
-export function useSubjectsPaginated(page: number, pageSize: number, academicYearId?: string, enabled: boolean = true) {
+export function useSubjectsPaginated(page: number, pageSize: number, enabled: boolean = true) {
   return useQuery({
-    queryKey: ['subjects', 'paginated', page, pageSize, academicYearId],
+    queryKey: ['subjects', 'paginated', page, pageSize],
     queryFn: async () => {
       const response = await fetchSubjects({
         skip: page * pageSize,
         limit: pageSize,
         active_only: false,
-        academic_year_id: academicYearId
       });
 
       const total = response.total || response.items.length;

@@ -608,17 +608,24 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
         <DialogContent className="max-w-4xl flex flex-col max-h-[90vh] p-0">
           <DialogHeader className="flex-shrink-0 px-6 py-4 border-b">
-            <DialogTitle>Admission Details - {selectedAdmission?.admission_number}</DialogTitle>
+            <DialogTitle>
+              Admission Details - {selectedAdmission?.admission_number}
+              {selectedAdmission?.student && (
+                <span className="block text-base font-normal text-muted-foreground mt-0.5">
+                  {[selectedAdmission.student.first_name, selectedAdmission.student.last_name].filter(Boolean).join(' ')}
+                </span>
+              )}
+            </DialogTitle>
           </DialogHeader>
           <div className="overflow-y-auto flex-1 px-6 py-4">
             {selectedAdmission && (
               <div className="space-y-4">
                 {/* Student photo — centered at top */}
-                <div className="flex justify-center">
+                <div className="flex flex-col items-center gap-2">
                   {selectedAdmission.student?.photo_url ? (
                     <img
                       src={`${mediaBase}${selectedAdmission.student.photo_url}`}
-                      alt={`${selectedAdmission.student.first_name} ${selectedAdmission.student.last_name}`}
+                      alt={`${selectedAdmission.student.first_name} ${selectedAdmission.student.last_name || ''}`.trim()}
                       className="h-24 w-24 rounded-full object-cover border-2 border-border"
                     />
                   ) : (
@@ -626,6 +633,9 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       <UserCircle className="h-12 w-12 text-muted-foreground" />
                     </div>
                   )}
+                  <p className="text-base font-semibold">
+                    {[selectedAdmission.student?.first_name, selectedAdmission.student?.last_name].filter(Boolean).join(' ') || 'N/A'}
+                  </p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full border-collapse">

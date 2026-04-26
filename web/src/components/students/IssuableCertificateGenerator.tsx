@@ -1,10 +1,10 @@
 // src/components/students/IssuableCertificateGenerator.tsx
 // Issuable certificate generator — select template, fill student data, save & print
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Printer, RotateCcw, Save } from "lucide-react";
+import { Loader2, Printer, RotateCcw, Save, Settings } from "lucide-react";
 import { toast } from "sonner";
 import {
   Select,
@@ -19,18 +19,18 @@ import {
   useGenerateIssuableCertificate,
 } from "@/api/hooks/students/useIssuableCertificates";
 import { useAuthStore } from "@/lib/authStore";
+import { useNavigate } from "@tanstack/react-router";
 import type { IssuableCertificateTemplate } from "@/types/certificates/issuable";
+import { CertificateEditor } from "./CertificateEditor";
+import { useStudentAdmissionDetail } from "@/api/hooks/students/useAdmission";
+import { useSelectorClasses, useSelectorSections } from "@/api/hooks/students/certificates";
 
 interface StudentData {
   id: string;
   name: string;
   admission_number: string;
-  father_name?: string;
-  mother_name?: string;
-  dob?: string;
-  class?: string;
-  section?: string;
-  gender?: string;
+  class_name?: string;
+  section_name?: string;
 }
 
 interface IssuableCertificateGeneratorProps {
@@ -45,34 +45,87 @@ export function IssuableCertificateGenerator({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [editableHtml, setEditableHtml] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem("cert_logo_url") || "");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const { data: templates, isLoading: isLoadingTemplates } =
     useIssuableCertificateTemplates();
   const { data: templateData } = useIssuableCertificateTemplate(selectedTemplateId);
-  const generateMutation = useGenerateIssuableCertificate();
-  const { academicYearId } = useAuthStore();
+  const { data: admissionDetail, isLoading: isLoadingDetail } =
+    useStudentAdmissionDetail(selectedStudentId);
 
-  // Auto-fill placeholders with student data
+  // Resolve class & section names from the admission's current_class_id / current_section_id
+  const currentClassId = admissionDetail?.current_class_id || "";
+  const currentSectionId = admissionDetail?.current_section_id || "";
+  const { data: allClasses = [] } = useSelectorClasses();
+  const { data: classSections = [] } = useSelectorSections(currentClassId);
+
+  const resolvedClassName =
+    allClasses.find((c) => c.id === currentClassId)?.name ||
+    selectedStudent?.class_name || "";
+  const resolvedSectionName =
+    classSections.find((s) => s.id === currentSectionId)?.name ||
+    selectedStudent?.section_name || "";
+
+  const generateMutation = useGenerateIssuableCertificate();
+  const { academicYearTitle } = useAuthStore();
+  const navigate = useNavigate();
+
+  // Auto-fill placeholders — combines cascade-selected names with full API data
   const filledHtml = useMemo(() => {
     if (!templateData || !selectedStudent) return "";
+
+    const s = admissionDetail?.student;
+    const fmt = (d?: string) =>
+      d ? new Date(d).toLocaleDateString("en-IN") : "";
+    const normalizeGender = (g?: string) => {
+      const l = g?.toLowerCase();
+      if (l === "m" || l === "male") return "Male";
+      if (l === "f" || l === "female") return "Female";
+      return g || "";
+    };
+    const gender = normalizeGender(s?.gender);
 
     let html = templateData.html_template;
 
     const replacements: Record<string, string> = {
-      student_name: selectedStudent.name || "",
-      father_name: selectedStudent.father_name || "",
-      mother_name: selectedStudent.mother_name || "",
-      dob: selectedStudent.dob || "",
-      admission_number: selectedStudent.admission_number || "",
-      class_name: selectedStudent.class || "",
-      section: selectedStudent.section || "",
-      academic_year: academicYearId || new Date().getFullYear().toString(),
-      issue_date: new Date().toLocaleDateString(),
+      // School
+      school_logo: logoUrl || "",
       school_name: "Your School Name",
-      // gender helpers
-      gender_he_she: selectedStudent.gender === "Female" ? "She" : "He",
-      gender_his_her: selectedStudent.gender === "Female" ? "Her" : "His",
+      // Student identity
+      student_name: s ? `${s.first_name} ${s.last_name}`.trim() : selectedStudent.name,
+      admission_number: admissionDetail?.admission_number || selectedStudent.admission_number || "",
+      dob: fmt(s?.date_of_birth),
+      gender,
+      aadhar_number: s?.aadhar_number || "",
+      apaar_number: s?.apaar_number || "",
+      // Class
+      class_name: resolvedClassName,
+      section: resolvedSectionName,
+      academic_year: academicYearTitle || new Date().getFullYear().toString(),
+      // Parents
+      father_name: s?.father?.name || "",
+      mother_name: s?.mother?.name || "",
+      // Guardian
+      guardian_name: s?.guardian?.name || "",
+      guardian_phone: s?.guardian?.phone || "",
+      guardian_relation: s?.guardian?.relation_to_student || "",
+      guardian_details: s?.guardian?.name
+        ? [
+            s.guardian.name,
+            s.guardian.relation_to_student && `(${s.guardian.relation_to_student})`,
+            s.guardian.phone && `Ph: ${s.guardian.phone}`,
+          ].filter(Boolean).join(" | ")
+        : "",
+      // Dates
+      date_of_joining: fmt(admissionDetail?.admission_date),
+      date_of_leaving: "",          // not stored in current model — blank for manual fill
+      date_of_joining_class: "",    // not stored in current model — blank for manual fill
+      date_of_leaving_class: "",    // not stored in current model — blank for manual fill
+      issue_date: new Date().toLocaleDateString("en-IN"),
+      // Gender pronouns
+      gender_he_she: gender === "Female" ? "She" : "He",
+      gender_his_her: gender === "Female" ? "Her" : "His",
     };
 
     Object.entries(replacements).forEach(([key, value]) => {
@@ -80,7 +133,7 @@ export function IssuableCertificateGenerator({
     });
 
     return html;
-  }, [templateData, selectedStudent, academicYearId]);
+  }, [templateData, selectedStudent, admissionDetail, resolvedClassName, resolvedSectionName, academicYearTitle, logoUrl]);
 
   const displayHtml = editableHtml || filledHtml;
 
@@ -95,6 +148,10 @@ export function IssuableCertificateGenerator({
     else setEditableHtml("");
     setIsEditing(!isEditing);
   };
+
+  const handleEditorChange = useCallback((html: string) => {
+    setEditableHtml(html);
+  }, []);
 
   // Save certificate to backend then trigger browser print on the iframe
   const handleSaveAndPrint = async () => {
@@ -132,8 +189,17 @@ export function IssuableCertificateGenerator({
     <div className="space-y-4">
       {/* Template Selection */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Select Certificate Template</CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => navigate({ to: "/students/certificatetemplates" })}
+          >
+            <Settings className="h-3.5 w-3.5" />
+            Manage Templates
+          </Button>
         </CardHeader>
         <CardContent>
           {isLoadingTemplates ? (
@@ -164,57 +230,63 @@ export function IssuableCertificateGenerator({
         </CardContent>
       </Card>
 
+      {/* School Logo URL — persisted in localStorage */}
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium whitespace-nowrap">School Logo URL</label>
+            <input
+              type="url"
+              value={logoUrl}
+              onChange={(e) => {
+                setLogoUrl(e.target.value);
+                localStorage.setItem("cert_logo_url", e.target.value);
+              }}
+              placeholder="https://yourschool.com/logo.png"
+              className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            {logoUrl && (
+              <img
+                src={logoUrl}
+                alt="Logo preview"
+                className="h-10 w-10 object-contain rounded border"
+                onError={(e) => (e.currentTarget.style.display = "none")}
+              />
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Paste your school logo image URL — it will appear in all certificates and is saved for next time.
+          </p>
+        </CardContent>
+      </Card>
+
       {selectedTemplateId && (
         <>
-          {/* Student Info Summary */}
-          <Card className="bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800">
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground font-medium">Student Name</p>
-                  <p className="font-semibold">{selectedStudent?.name}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground font-medium">Admission No</p>
-                  <p className="font-semibold">{selectedStudent?.admission_number}</p>
-                </div>
-                {selectedStudent?.class && (
-                  <div>
-                    <p className="text-muted-foreground font-medium">Class</p>
-                    <p className="font-semibold">{selectedStudent.class}</p>
-                  </div>
-                )}
-                {selectedStudent?.section && (
-                  <div>
-                    <p className="text-muted-foreground font-medium">Section</p>
-                    <p className="font-semibold">{selectedStudent.section}</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Preview / Edit */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">Certificate Preview</CardTitle>
               <Button size="sm" variant="outline" onClick={handleEditToggle}>
-                {isEditing ? "View Only" : "Edit HTML"}
+                {isEditing ? "View Preview" : "Edit Content"}
               </Button>
             </CardHeader>
             <CardContent>
               {isEditing ? (
-                <div className="space-y-4">
-                  <textarea
-                    value={editableHtml}
-                    onChange={(e) => setEditableHtml(e.target.value)}
-                    className="w-full h-96 font-mono text-xs p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Edit certificate HTML..."
+                <div className="space-y-3">
+                  <CertificateEditor
+                    key={selectedTemplateId}
+                    initialContent={filledHtml}
+                    onChange={handleEditorChange}
+                    minHeight="420px"
                   />
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setEditableHtml(filledHtml)}
+                    onClick={() => {
+                      setEditableHtml("");
+                      setIsEditing(false);
+                      setTimeout(() => setIsEditing(true), 0);
+                    }}
                   >
                     <RotateCcw className="h-4 w-4 mr-1" />
                     Reset to Original

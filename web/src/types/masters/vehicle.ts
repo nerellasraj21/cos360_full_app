@@ -3,6 +3,7 @@ export interface Vehicle {
   name: string;
   registration_number: string;
   vehicle_type: 'Bus' | 'Van' | 'Auto';
+  fees?: number;
   last_inspected_date: string; // Date in YYYY-MM-DD format
   pollution_renewal_date: string; // Date in YYYY-MM-DD format
   is_active: boolean;
@@ -14,6 +15,7 @@ export interface VehicleInput {
   name: string;
   registration_number: string;
   vehicle_type: 'Bus' | 'Van' | 'Auto';
+  fees?: number;
   last_inspected_date: string; // Date in YYYY-MM-DD format
   pollution_renewal_date: string; // Date in YYYY-MM-DD format
   is_active?: boolean;
@@ -23,6 +25,7 @@ export interface VehicleUpdate {
   name?: string;
   registration_number?: string;
   vehicle_type?: 'Bus' | 'Van' | 'Auto';
+  fees?: number;
   last_inspected_date?: string;
   pollution_renewal_date?: string;
   is_active?: boolean;

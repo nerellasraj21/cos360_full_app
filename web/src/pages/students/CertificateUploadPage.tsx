@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Trash2, RotateCcw, Upload, Download, Loader2, ChevronRight, User, ScrollText } from "lucide-react";
+import { FileText, Trash2, RotateCcw, Upload, Download, Loader2, ChevronRight, User, ScrollText, Filter, Search } from "lucide-react";
 import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from "sonner";
 import {
@@ -20,17 +20,29 @@ import {
   useSearchCertificateTypes,
 } from "@/api/hooks/students/certificates";
 import { IssuableCertificateGenerator } from "@/components/students/IssuableCertificateGenerator";
+import { useStudentsDropdown } from "@/api/hooks/students/useAdmission";
+import { Input } from "@/components/ui/input";
 import type { CertificateRead, SelectorStudent } from "@/types/certificates/types";
+import { config } from "@/lib/config";
 
 type UploadTab = "received" | "issued";
 type IssueSubTab = "upload" | "generate";
 
+const CERT_SESSION_KEY = "cert_page_selection";
+
 export const CertificateUploadPage: React.FC = () => {
-  // Cascade selector state
-  const [classId, setClassId] = useState("");
-  const [sectionId, setSectionId] = useState("");
-  const [selectedStudentId, setSelectedStudentId] = useState("");
+  // Restore cascade selection from sessionStorage
+  const saved = (() => { try { return JSON.parse(sessionStorage.getItem(CERT_SESSION_KEY) || "{}"); } catch { return {}; } })();
+
+  const [classId, setClassId] = useState<string>(saved.classId || "");
+  const [sectionId, setSectionId] = useState<string>(saved.sectionId || "");
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(saved.selectedStudentId || "");
   const [selectedStudent, setSelectedStudent] = useState<SelectorStudent | null>(null);
+
+  // Search state
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   // Upload tabs
   const [uploadTab, setUploadTab] = useState<UploadTab>("received");
@@ -63,6 +75,27 @@ export const CertificateUploadPage: React.FC = () => {
     selectedStudentId
   );
 
+  const handleClear = () => {
+    setClassId("");
+    setSectionId("");
+    setSelectedStudentId("");
+    setSelectedStudent(null);
+    setSearchInput("");
+    setSearchQuery("");
+    setShowSearchResults(false);
+    sessionStorage.removeItem(CERT_SESSION_KEY);
+  };
+
+  const handleSelectFromSearch = (student: typeof allStudents[0]) => {
+    const fullName = student.display_name || student.name || "";
+    setSelectedStudentId(student.id);
+    setSelectedStudent({ student_id: student.id, full_name: fullName, admission_no: student.admission_number || "" } as SelectorStudent);
+    setSearchInput(fullName);
+    setShowSearchResults(false);
+    setClassId("");
+    setSectionId("");
+  };
+
   // Mutations
   const uploadReceived = useUploadReceived();
   const uploadIssued = useUploadIssued();
@@ -70,6 +103,37 @@ export const CertificateUploadPage: React.FC = () => {
   const downloadCertificate = useDownloadCertificateDocument();
 
   const certificates = certificatesData?.items ?? [];
+
+  const { data: allStudents = [], isLoading: searchLoading } = useStudentsDropdown();
+
+  // Filter students client-side by name or admission number
+  const searchResults = searchInput.trim()
+    ? allStudents.filter((s) => {
+        const q = searchInput.toLowerCase();
+        return (
+          (s.display_name || s.name || "").toLowerCase().includes(q) ||
+          (s.admission_number || "").toLowerCase().includes(q)
+        );
+      })
+    : [];
+
+  // Debounce no longer needed (client-side), but keep searchQuery in sync
+  useEffect(() => {
+    setSearchQuery(searchInput.trim());
+  }, [searchInput]);
+
+  // Restore selectedStudent object once students list loads
+  useEffect(() => {
+    if (selectedStudentId && students.length > 0 && !selectedStudent) {
+      const found = students.find((s) => s.student_id === selectedStudentId);
+      if (found) setSelectedStudent(found);
+    }
+  }, [students, selectedStudentId]);
+
+  // Persist selection to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem(CERT_SESSION_KEY, JSON.stringify({ classId, sectionId, selectedStudentId }));
+  }, [classId, sectionId, selectedStudentId]);
 
   // Cascade handlers
   const handleClassChange = (val: string) => {
@@ -90,11 +154,16 @@ export const CertificateUploadPage: React.FC = () => {
     setSelectedStudent(students.find((s) => s.student_id === val) ?? null);
   };
 
+  const mediaBase = config.api.baseURL.replace(/\/api\/v\d+$/, '');
+
   // Download
   const handleDownload = async (id: string) => {
     try {
       const result = await downloadCertificate.mutateAsync(id);
-      window.location.href = result.presigned_url;
+      const url = result.presigned_url?.startsWith('http')
+        ? result.presigned_url
+        : `${mediaBase}${result.presigned_url}`;
+      window.open(url, '_blank');
     } catch {
       // handled by mutation
     }
@@ -175,23 +244,70 @@ export const CertificateUploadPage: React.FC = () => {
       <PageHeader title="Student Certificates" icon={<ScrollText className="h-5 w-5" />} />
       {/* ── Cascade Selector ── */}
       <Card>
-        <CardHeader>
-          <CardTitle>Select Student</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="pt-4 space-y-3">
+          {/* Filters header row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Filters</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleClear} disabled={!classId && !searchInput && !selectedStudentId}>
+              Clear
+            </Button>
+          </div>
+
+          {/* Search box */}
+          <div className="relative">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, admission no..."
+                value={searchInput}
+                className="pl-9"
+                onChange={(e) => {
+                  setSearchInput(e.target.value);
+                  setShowSearchResults(true);
+                }}
+                onFocus={() => searchInput && setShowSearchResults(true)}
+                onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
+              />
+              {searchLoading && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            {showSearchResults && searchResults.length > 0 && (
+              <div className="absolute left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg max-h-52 overflow-y-auto">
+                {searchResults.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-accent transition-colors"
+                    onMouseDown={() => handleSelectFromSearch(s)}
+                  >
+                    <span className="font-medium">{s.display_name || s.name}</span>
+                    {s.admission_number && <span className="ml-2 text-xs text-muted-foreground">{s.admission_number}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+            {showSearchResults && searchQuery && !searchLoading && searchResults.length === 0 && (
+              <div className="absolute left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg px-4 py-3 text-sm text-muted-foreground">
+                No students found
+              </div>
+            )}
+          </div>
+
+          {/* Cascade selectors */}
           <div className="flex flex-wrap items-end gap-3">
-            {/* Class */}
             <div className="space-y-1.5 flex-1 min-w-[160px]">
-              <Label>Class *</Label>
+              <Label>Class</Label>
               <Select value={classId} onValueChange={handleClassChange} disabled={classesLoading}>
                 <SelectTrigger>
                   <SelectValue placeholder={classesLoading ? "Loading..." : "Select class"} />
                 </SelectTrigger>
                 <SelectContent>
                   {classes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -200,48 +316,27 @@ export const CertificateUploadPage: React.FC = () => {
             {classId && (
               <>
                 <ChevronRight className="h-4 w-4 text-muted-foreground mb-1 shrink-0" />
-
-                {/* Section */}
                 <div className="space-y-1.5 flex-1 min-w-[160px]">
                   <Label>Section</Label>
-                  <Select
-                    value={sectionId || "__all__"}
-                    onValueChange={handleSectionChange}
-                  >
+                  <Select value={sectionId || "__all__"} onValueChange={handleSectionChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="All sections" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">All sections</SelectItem>
                       {sections.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name}
-                        </SelectItem>
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <ChevronRight className="h-4 w-4 text-muted-foreground mb-1 shrink-0" />
-
-                {/* Student */}
                 <div className="space-y-1.5 flex-1 min-w-[200px]">
-                  <Label>Student *</Label>
-                  <Select
-                    value={selectedStudentId}
-                    onValueChange={handleStudentChange}
-                    disabled={studentsLoading || students.length === 0}
-                  >
+                  <Label>Student</Label>
+                  <Select value={selectedStudentId} onValueChange={handleStudentChange} disabled={studentsLoading || students.length === 0}>
                     <SelectTrigger>
-                      <SelectValue
-                        placeholder={
-                          studentsLoading
-                            ? "Loading..."
-                            : students.length === 0
-                            ? "No students found"
-                            : "Select student"
-                        }
-                      />
+                      <SelectValue placeholder={studentsLoading ? "Loading..." : students.length === 0 ? "No students found" : "Select student"} />
                     </SelectTrigger>
                     <SelectContent>
                       {students.map((s) => (
@@ -379,23 +474,25 @@ export const CertificateUploadPage: React.FC = () => {
                 /* ── Issue Certificate with Sub-tabs ── */
                 <div className="space-y-4">
                   {/* Sub-tabs for Issue/Generate */}
-                  <div className="flex gap-1 border-b">
-                    <Button
-                      size="sm"
-                      variant={issueSubTab === "upload" ? "default" : "outline"}
-                      onClick={() => setIssueSubTab("upload")}
-                      className="rounded-none"
-                    >
-                      Upload Certificate File
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={issueSubTab === "generate" ? "default" : "outline"}
-                      onClick={() => setIssueSubTab("generate")}
-                      className="rounded-none"
-                    >
-                      Generate Issuable
-                    </Button>
+                  <div className="flex items-center justify-between gap-2 border-b flex-wrap">
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant={issueSubTab === "upload" ? "default" : "outline"}
+                        onClick={() => setIssueSubTab("upload")}
+                        className="rounded-none"
+                      >
+                        Upload Certificate File
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={issueSubTab === "generate" ? "default" : "outline"}
+                        onClick={() => setIssueSubTab("generate")}
+                        className="rounded-none"
+                      >
+                        Generate Issuable
+                      </Button>
+                    </div>
                   </div>
 
                   {issueSubTab === "upload" ? (
@@ -495,6 +592,8 @@ export const CertificateUploadPage: React.FC = () => {
                             id: selectedStudent.student_id,
                             name: selectedStudent.full_name,
                             admission_number: selectedStudent.admission_no,
+                            class_name: classes.find(c => c.id === classId)?.name || "",
+                            section_name: sections.find(s => s.id === sectionId)?.name || "",
                           }}
                           selectedStudentId={selectedStudentId}
                         />

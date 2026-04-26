@@ -57,3 +57,12 @@ export const FEE_CONCESSIONS_HISTORY = `${FEE_CONCESSIONS}/history`;
 export const FEE_OLD = `${FEE_BASE}/old-fees`;
 export const FEE_OLD_CARRY_FORWARD = `${FEE_OLD}/carry-forward`;
 export const FEE_OLD_STUDENT = `${FEE_OLD}/student`;
+
+// Fee History
+export const FEE_COLLECTION_HISTORY = `${FEE_COLLECTION}/history`;
+
+// Fee Summary SMS (base — append /{id}/send-sms or /{id}/sms-preview)
+export const FEE_COLLECTION_SUMMARY_SMS_BASE = `${FEE_COLLECTION}/summary`;
+
+// Terms Due
+export const FEE_COLLECTION_TERMS_DUE = `${FEE_COLLECTION}/terms-due`;

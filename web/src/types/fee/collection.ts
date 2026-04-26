@@ -95,7 +95,9 @@ export interface ConcessionSummaryItem {
   fee_type_id: string;
   fee_type_name: string;
   assigned_fee: number;
-  current_due: number;
+  due_amount: number;
+  due_date: string | null;
+  is_settled: boolean;
   concession_amount: number;
   reason: string | null;
   approved_by: string | null;
@@ -187,4 +189,69 @@ export interface OldFeeUpdate {
   paid_date?: string;
   receipt_manual?: string;
   remarks?: string;
+}
+
+// ---- Terms Due ----
+
+export interface TermsDueItem {
+  fee_type_id: string;
+  fee_type_name: string;
+  term_id: string;
+  term_name: string;
+  term_date_id: string;
+  due_date: string;
+  term_amount: number;
+  paid_amount: number;
+  pending_amount: number;
+}
+
+export interface TermsDueResponse {
+  student_id: string;
+  student_name: string;
+  admission_number: string;
+  as_of_date: string;
+  selected_month: string;
+  current_month_terms: TermsDueItem[];
+  overdue_terms: TermsDueItem[];
+  total_current_month_pending: number;
+  total_overdue_pending: number;
+  grand_total_pending: number;
+}
+
+// ---- SMS Preview ----
+
+export interface SmsSummaryPreview {
+  parent_name: string;
+  parent_phone: string;
+  student_name: string;
+  admission_number: string;
+  academic_year: string;
+  due_amount: number;
+  message: string;
+  can_send: boolean;
+}
+
+// ---- Fee History ----
+
+export interface FeeHistoryFeeType {
+  fee_type_id: string;
+  fee_type_name: string;
+  amount_paid: number;
+}
+
+export interface FeeHistoryItem {
+  s_no: number;
+  receipt_id: string;
+  transaction_date: string;
+  receipt_number: string;
+  amount_paid: number;
+  payment_method: string;
+  fee_types_paid: FeeHistoryFeeType[];
+}
+
+export interface FeeHistoryResponse {
+  student_id: string;
+  academic_year_id: string;
+  items: FeeHistoryItem[];
+  total_paid: number;
 }

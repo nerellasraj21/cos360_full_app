@@ -2,23 +2,40 @@
 // Manage certificate templates (Create/Edit/Delete)
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, Eye, X, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Edit, Trash2, Plus, Eye, X, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 import {
   useIssuableCertificateTemplates,
+  useIssuableCertificateTemplate,
   useCreateIssuableCertificateTemplate,
   useUpdateIssuableCertificateTemplate,
   useDeleteIssuableCertificateTemplate,
 } from "@/api/hooks/students/useIssuableCertificates";
 import type { IssuableCertificateTemplate } from "@/types/certificates/issuable";
+import { CertificateEditor } from "./CertificateEditor";
+import { DEFAULT_TEMPLATES } from "@/lib/defaultCertificateTemplates";
 
-// Validation schema
 const templateSchema = z.object({
   name: z.string().min(1, "Template name is required"),
   html_template: z.string().min(1, "HTML template is required"),
@@ -27,178 +44,160 @@ const templateSchema = z.object({
 
 type TemplateFormData = z.infer<typeof templateSchema>;
 
-export function TemplateManager() {
-  // State
-  const [isCreating, setIsCreating] = useState(false);
-  const [editingTemplate, setEditingTemplate] =
-    useState<IssuableCertificateTemplate | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewTemplate, setPreviewTemplate] =
-    useState<IssuableCertificateTemplate | null>(null);
+// ── Isolated preview component ───────────────────────────────────────────────
+function TemplatePreviewDialog({
+  template,
+  onClose,
+}: {
+  template: IssuableCertificateTemplate | null;
+  onClose: () => void;
+}) {
+  const { data: freshTemplate, isLoading } = useIssuableCertificateTemplate(template?.id ?? "");
+  const html = freshTemplate?.html_template ?? template?.html_template ?? "";
+  const iframeSrcDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:0;padding:16px;background:#fff;color:#222;font-family:Arial,sans-serif;}</style></head><body>${html}</body></html>`;
 
-  // Hooks
+  return (
+    <Dialog open={!!template} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col gap-3">
+        <DialogHeader>
+          <DialogTitle>{freshTemplate?.name ?? template?.name} — Preview</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 overflow-auto min-h-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-40 gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading…
+            </div>
+          ) : (
+            <iframe
+              key={freshTemplate?.id ?? template?.id}
+              srcDoc={iframeSrcDoc}
+              className="w-full border-0"
+              style={{ height: "65vh" }}
+              title="Certificate Preview"
+            />
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Main TemplateManager ─────────────────────────────────────────────────────
+export function TemplateManager() {
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<IssuableCertificateTemplate | null>(null);
+  const [previewTemplate, setPreviewTemplate] = useState<IssuableCertificateTemplate | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<IssuableCertificateTemplate | null>(null);
+
   const { data: templates, isLoading } = useIssuableCertificateTemplates();
   const createMutation = useCreateIssuableCertificateTemplate();
   const updateMutation = useUpdateIssuableCertificateTemplate();
   const deleteMutation = useDeleteIssuableCertificateTemplate();
 
-  // Form setup
   const form = useForm<TemplateFormData>({
     resolver: zodResolver(templateSchema),
-    defaultValues: {
-      name: editingTemplate?.name || "",
-      html_template: editingTemplate?.html_template || "",
-      color_theme: editingTemplate?.color_theme || "blue",
-    },
+    defaultValues: { name: "", html_template: "", color_theme: "blue" },
   });
 
-  // Handle form submit
   const handleSubmit = async (data: TemplateFormData) => {
     if (editingTemplate) {
-      await updateMutation.mutateAsync({
-        templateId: editingTemplate.id,
-        data,
-      });
+      await updateMutation.mutateAsync({ templateId: editingTemplate.id, data });
     } else {
       await createMutation.mutateAsync(data);
     }
-
     form.reset();
     setIsCreating(false);
     setEditingTemplate(null);
   };
 
-  // Handle delete
-  const handleDelete = async (templateId: string) => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete this template? This cannot be undone."
-      )
-    ) {
-      await deleteMutation.mutateAsync(templateId);
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteMutation.mutateAsync(deleteTarget.id);
+    setDeleteTarget(null);
+  };
+
+  const [isSeeding, setIsSeeding] = useState(false);
+  const handleLoadDefaultTemplates = async () => {
+    setIsSeeding(true);
+    try {
+      for (const tpl of DEFAULT_TEMPLATES) {
+        await createMutation.mutateAsync(tpl);
+      }
+      toast.success("Default templates added successfully");
+    } catch {
+      toast.error("Failed to add one or more default templates");
+    } finally {
+      setIsSeeding(false);
     }
   };
 
-  // ============================================================================
-  // CREATE/EDIT MODE
-  // ============================================================================
+  // ── Create / Edit form ────────────────────────────────────────────────────
   if (isCreating || editingTemplate) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>
-            {editingTemplate ? "Edit Template" : "Create New Template"}
-          </CardTitle>
+          <CardTitle>{editingTemplate ? "Edit Template" : "Create New Template"}</CardTitle>
           <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setIsCreating(false);
-              setEditingTemplate(null);
-              form.reset();
-            }}
+            variant="ghost" size="sm"
+            onClick={() => { setIsCreating(false); setEditingTemplate(null); form.reset(); }}
           >
             <X className="h-4 w-4" />
           </Button>
         </CardHeader>
         <CardContent>
-          <form
-            onSubmit={form.handleSubmit(handleSubmit)}
-            className="space-y-6"
-          >
-            {/* Template Name */}
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Template Name *
-              </label>
+              <label className="block text-sm font-medium mb-2">Template Name *</label>
               <input
                 type="text"
                 placeholder="e.g., Bonafide Certificate"
                 {...form.register("name")}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
               />
               {form.formState.errors.name && (
-                <p className="text-red-500 text-sm mt-1">
-                  {form.formState.errors.name.message}
-                </p>
+                <p className="text-destructive text-sm mt-1">{form.formState.errors.name.message}</p>
               )}
             </div>
 
-            {/* Color Theme */}
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Color Theme
-              </label>
-              <div className="flex gap-2">
+              <label className="block text-sm font-medium mb-2">Color Theme</label>
+              <div className="flex gap-4">
                 {(["blue", "green", "red", "orange"] as const).map((theme) => (
-                  <label
-                    key={theme}
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <input
-                      type="radio"
-                      value={theme}
-                      {...form.register("color_theme")}
-                      className="h-4 w-4"
-                    />
+                  <label key={theme} className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" value={theme} {...form.register("color_theme")} className="h-4 w-4" />
                     <span className="text-sm capitalize">{theme}</span>
                   </label>
                 ))}
               </div>
             </div>
 
-            {/* HTML Template */}
             <div>
-              <label className="block text-sm font-medium mb-2">
-                HTML Template *
-              </label>
-              <p className="text-xs text-gray-600 mb-2">
-                Use placeholders like{" "}
-                <code className="bg-gray-200 px-2 py-1 rounded text-xs">
-                  {"{"}
-                  {"{"}student_name{"}"}{"}"}
-                </code>{" "}
-                for dynamic fields
+              <label className="block text-sm font-medium mb-2">Certificate Content *</label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Type your certificate text. Use <strong>Insert Variable</strong> to add dynamic fields.
               </p>
-              <textarea
-                placeholder="<h1>CERTIFICATE</h1>..."
-                {...form.register("html_template")}
-                rows={15}
-                className="w-full px-3 py-2 border rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <Controller
+                key={editingTemplate?.id ?? "new"}
+                name="html_template"
+                control={form.control}
+                render={({ field }) => (
+                  <CertificateEditor initialContent={field.value} onChange={field.onChange} minHeight="360px" />
+                )}
               />
               {form.formState.errors.html_template && (
-                <p className="text-red-500 text-sm mt-1">
-                  {form.formState.errors.html_template.message}
-                </p>
+                <p className="text-destructive text-sm mt-1">{form.formState.errors.html_template.message}</p>
               )}
             </div>
 
-            {/* Action Buttons */}
             <div className="flex gap-2">
-              <Button
-                type="submit"
-                disabled={
-                  createMutation.isPending || updateMutation.isPending
-                }
-              >
-                {createMutation.isPending || updateMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  `${editingTemplate ? "Update" : "Create"} Template`
-                )}
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                {createMutation.isPending || updateMutation.isPending
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
+                  : `${editingTemplate ? "Update" : "Create"} Template`}
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsCreating(false);
-                  setEditingTemplate(null);
-                  form.reset();
-                }}
-              >
+              <Button type="button" variant="outline"
+                onClick={() => { setIsCreating(false); setEditingTemplate(null); form.reset(); }}>
                 Cancel
               </Button>
             </div>
@@ -208,24 +207,27 @@ export function TemplateManager() {
     );
   }
 
-  // ============================================================================
-  // LIST MODE
-  // ============================================================================
+  // ── List ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-semibold">Certificate Templates</h2>
-        <Button onClick={() => setIsCreating(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Create Template
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleLoadDefaultTemplates} disabled={isSeeding} className="gap-2">
+            {isSeeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Load Default Templates
+          </Button>
+          <Button onClick={() => setIsCreating(true)} className="gap-2">
+            <Plus className="h-4 w-4" />Create Template
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
         <Card>
           <CardContent className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin" />
-            <span className="ml-2">Loading templates...</span>
+            <span className="ml-2">Loading templates…</span>
           </CardContent>
         </Card>
       ) : templates && templates.length > 0 ? (
@@ -234,70 +236,38 @@ export function TemplateManager() {
             <Card key={template.id} className="flex flex-col">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <CardTitle className="text-base">{template.name}</CardTitle>
-                  </div>
-                  <Badge variant="outline" className="capitalize">
-                    {template.color_theme}
-                  </Badge>
+                  <CardTitle className="text-base flex-1">{template.name}</CardTitle>
+                  <Badge variant="outline" className="capitalize">{template.color_theme}</Badge>
                 </div>
               </CardHeader>
-
               <CardContent className="flex-1 flex flex-col gap-3">
-                <div className="text-xs text-gray-600">
-                  <p>
-                    Created:{" "}
-                    {new Date(template.created_at).toLocaleDateString()}
-                  </p>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>Created: {new Date(template.created_at).toLocaleDateString()}</p>
                   {template.variables_used && (
-                    <p className="mt-1 text-muted-foreground truncate" title={template.variables_used}>
-                      Variables: {template.variables_used.split(",").length} fields
-                    </p>
+                    <p>Variables: {template.variables_used.split(",").length} fields</p>
                   )}
-                  <p className="mt-1">
-                    Status:{" "}
+                  <p>Status:{" "}
                     <Badge variant={template.is_active === "True" ? "default" : "secondary"}>
                       {template.is_active === "True" ? "Active" : "Inactive"}
                     </Badge>
                   </p>
                 </div>
-
                 <div className="flex gap-2 mt-auto pt-3 border-t">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setPreviewTemplate(template);
-                      setShowPreview(true);
-                    }}
-                    className="gap-2 flex-1"
-                  >
-                    <Eye className="h-4 w-4" />
-                    Preview
+                  <Button size="sm" variant="outline" className="gap-1.5 flex-1"
+                    onClick={() => setPreviewTemplate(template)}>
+                    <Eye className="h-4 w-4" />Preview
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
+                  <Button size="sm" variant="outline" className="gap-1.5 flex-1"
                     onClick={() => {
                       setEditingTemplate(template);
-                      form.reset({
-                        name: template.name,
-                        html_template: template.html_template,
-                        color_theme: template.color_theme,
-                      });
-                    }}
-                    className="gap-2 flex-1"
-                  >
-                    <Edit className="h-4 w-4" />
-                    Edit
+                      form.reset({ name: template.name, html_template: template.html_template, color_theme: template.color_theme });
+                    }}>
+                    <Edit className="h-4 w-4" />Edit
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleDelete(template.id)}
+                  <Button size="sm" variant="ghost"
+                    onClick={() => setDeleteTarget(template)}
                     disabled={deleteMutation.isPending}
-                    className="text-destructive hover:text-destructive/80 p-0 w-10"
-                  >
+                    className="text-destructive hover:text-destructive/80 p-0 w-10">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -308,35 +278,37 @@ export function TemplateManager() {
       ) : (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-gray-600 mb-4">No templates created yet</p>
-            <Button onClick={() => setIsCreating(true)}>
-              Create Your First Template
-            </Button>
+            <p className="text-muted-foreground mb-4">No templates created yet</p>
+            <Button onClick={() => setIsCreating(true)}>Create Your First Template</Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Preview Modal */}
-      {showPreview && previewTemplate && (
-        <Card className="fixed inset-4 z-50 max-w-4xl mx-auto flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>{previewTemplate.name} - Preview</CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowPreview(false)}
-            >
-              <X className="h-4 w-4" />
+      {/* ── Preview Dialog (with student selector) ── */}
+      <TemplatePreviewDialog
+        template={previewTemplate}
+        onClose={() => setPreviewTemplate(null)}
+      />
+
+      {/* ── Delete Confirm Dialog ── */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Template?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Deleting...</>
+                : "Delete"}
             </Button>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-auto">
-            <div
-              className="border rounded-lg p-4 bg-white"
-              dangerouslySetInnerHTML={{ __html: previewTemplate.html_template }}
-            />
-          </CardContent>
-        </Card>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

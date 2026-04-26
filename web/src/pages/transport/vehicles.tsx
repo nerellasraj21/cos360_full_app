@@ -27,6 +27,12 @@ export default function VehiclePage() {
     { key: 'name', label: 'Vehicle Name', editable: true },
     { key: 'registration_number', label: 'Registration Number', editable: true },
     {
+      key: 'fees',
+      label: 'Fees (₹)',
+      editable: true,
+      render: (value) => value != null ? `₹${Number(value).toLocaleString('en-IN')}` : '—',
+    },
+    {
       key: 'vehicle_type',
       label: 'Vehicle Type',
       editable: true,
@@ -102,6 +108,7 @@ export default function VehiclePage() {
     { name: 'name', label: 'Vehicle Name', required: true },
     { name: 'registration_number', label: 'Registration Number', required: true },
     { name: 'vehicle_type', label: 'Vehicle Type', required: true },
+    { name: 'fees', label: 'Fees', type: 'number' as const },
     { name: 'last_inspected_date', label: 'Last Inspected Date', type: 'date', required: true },
     { name: 'pollution_renewal_date', label: 'Pollution Renewal Date', type: 'date', required: true },
     { name: 'is_active', label: 'Active', type: 'checkbox' },
@@ -130,8 +137,9 @@ export default function VehiclePage() {
       name: '',
       registration_number: '',
       vehicle_type: 'Bus' as const,
-      last_inspected_date: new Date().toISOString().split('T')[0], // Today's date
-      pollution_renewal_date: new Date().toISOString().split('T')[0], // Today's date
+      fees: undefined,
+      last_inspected_date: new Date().toISOString().split('T')[0],
+      pollution_renewal_date: new Date().toISOString().split('T')[0],
       is_active: true,
     },
     formFields,

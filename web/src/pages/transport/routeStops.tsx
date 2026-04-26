@@ -19,7 +19,6 @@ const formFields: FormField[] = [
   { name: 'reaching_time', label: 'Reaching Time', type: 'time' as const, required: true },
   { name: 'pickup_time', label: 'Pickup Time', type: 'time' as const },
   { name: 'drop_time', label: 'Drop Time', type: 'time' as const },
-  { name: 'fees', label: 'Fees', type: 'number', required: true },
   { name: 'is_active', label: 'Active', type: 'checkbox' },
 ];
 
@@ -30,7 +29,6 @@ const defaultValues: RouteStopInput = {
   reaching_time: '08:30:00',
   pickup_time: '',
   drop_time: '',
-  fees: 25, // Integer as per backend
   is_active: true,
 };
 
@@ -97,12 +95,6 @@ export default function RouteStopsPage() {
       renderEdit: (value: any, _row: RouteStop, onChange: (val: any) => void) => (
         <TimePicker value={value ? value.substring(0, 5) : ''} onChange={onChange} />
       )
-    },
-    {
-      key: 'fees',
-      label: 'Fees',
-      editable: true,
-      render: (value: number) => value ? `₹${value}` : 'N/A'
     },
     {
       key: 'is_active',

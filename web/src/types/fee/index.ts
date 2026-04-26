@@ -38,6 +38,12 @@ export type {
     OldFeeManualCreate,
     OldFeeCarryForwardRequest,
     OldFeeUpdate,
+    TermsDueItem,
+    TermsDueResponse,
+    FeeHistoryFeeType,
+    FeeHistoryItem,
+    FeeHistoryResponse,
+    SmsSummaryPreview,
 } from './collection';
 export type {
     FeeCollectionFilter,
