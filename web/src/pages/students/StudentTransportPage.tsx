@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import {
 import {
   Loader2, Bus, MapPin, Clock, IndianRupee, Navigation2, Truck,
   Plus, Filter, Search, X, Edit, Trash2, Tag,
+  ChevronUp, ChevronDown, ChevronsUpDown,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/authStore';
 import { useParentChildren } from '@/api/auth';
@@ -60,6 +61,8 @@ function AdminView() {
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingTransport, setEditingTransport] = useState<StudentTransportOut | null>(null);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
 
   const { data: transports = [], isLoading } = useStudentTransports();
   const deleteMutation = useDeleteStudentTransport();
@@ -73,6 +76,43 @@ function AdminView() {
     const q = search.toLowerCase();
     return !q || studentName.includes(q) || route.includes(q) || stop.includes(q);
   });
+
+  const sortedData = useMemo(() => {
+    if (!sortKey || !sortDir) return filtered;
+    return [...filtered].sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === 'student') {
+        const aName = a.student ? `${a.student.first_name} ${a.student.last_name}` : '';
+        const bName = b.student ? `${b.student.first_name} ${b.student.last_name}` : '';
+        cmp = aName.localeCompare(bName);
+      } else if (sortKey === 'trip') {
+        cmp = (a.trip?.trip_number ?? 0) - (b.trip?.trip_number ?? 0);
+      } else if (sortKey === 'route') {
+        cmp = (a.trip?.route?.route_name ?? '').localeCompare(b.trip?.route?.route_name ?? '');
+      } else if (sortKey === 'stop') {
+        cmp = (a.stop?.name ?? '').localeCompare(b.stop?.name ?? '');
+      } else if (sortKey === 'fee') {
+        cmp = Number(a.fee_per_term) - Number(b.fee_per_term);
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [filtered, sortKey, sortDir]);
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      if (sortDir === 'asc') { setSortDir('desc'); }
+      else if (sortDir === 'desc') { setSortKey(null); setSortDir(null); }
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-50" />;
+    if (sortDir === 'asc') return <ChevronUp className="h-3 w-3 ml-1 inline" />;
+    return <ChevronDown className="h-3 w-3 ml-1 inline" />;
+  };
 
   if (isLoading) {
     return (
@@ -95,7 +135,7 @@ function AdminView() {
               <span className="text-sm font-medium text-muted-foreground">Filters</span>
               {search && (
                 <span className="text-xs text-muted-foreground">
-                  {filtered.length} of {transports.length}
+                  {sortedData.length} of {transports.length}
                 </span>
               )}
               <Button size="sm" onClick={() => setIsAddOpen(true)} className="ml-auto">
@@ -126,24 +166,34 @@ function AdminView() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12">S.No.</TableHead>
-                <TableHead>Student</TableHead>
-                <TableHead>Trip</TableHead>
-                <TableHead>Route</TableHead>
-                <TableHead>Stop</TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('student')}>
+                  Student<SortIcon col="student" />
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('trip')}>
+                  Trip<SortIcon col="trip" />
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('route')}>
+                  Route<SortIcon col="route" />
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('stop')}>
+                  Stop<SortIcon col="stop" />
+                </TableHead>
                 <TableHead>Pricing</TableHead>
-                <TableHead>Fee / Term</TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('fee')}>
+                  Fee / Term<SortIcon col="fee" />
+                </TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 ? (
+              {sortedData.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     No transport assignments found.
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((t, idx) => (
+                sortedData.map((t, idx) => (
                   <TableRow key={t.id} style={{ height: '48px' }}>
                     <TableCell className="text-muted-foreground text-sm">{idx + 1}</TableCell>
                     <TableCell className="font-medium">

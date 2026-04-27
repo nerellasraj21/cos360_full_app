@@ -47,6 +47,11 @@ export function DesignationsTable({ className }: DesignationsTableProps) {
     const sortedData = useMemo(() => {
         if (!sortKey || !sortDir) return filteredData;
         return [...filteredData].sort((a, b) => {
+            if (sortKey === 'staff_count') {
+                const aVal = a.staff_count || 0;
+                const bVal = b.staff_count || 0;
+                return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
+            }
             let aVal: string = '';
             let bVal: string = '';
             if (sortKey === 'title') { aVal = a.title; bVal = b.title; }
@@ -182,8 +187,11 @@ export function DesignationsTable({ className }: DesignationsTableProps) {
                                     >
                                         Title<SortIcon col="title" />
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        Staff Count
+                                    <th
+                                        className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer select-none"
+                                        onClick={() => handleSort('staff_count')}
+                                    >
+                                        Staff Count<SortIcon col="staff_count" />
                                     </th>
                                     <th
                                         className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer select-none"

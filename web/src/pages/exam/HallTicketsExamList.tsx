@@ -23,7 +23,7 @@ export default function HallTicketsExamList() {
   const navigate = useNavigate()
   const { selectedAcademicYearId, academicYears, fetchAndSetAcademicYears } = useAcademicYearStore()
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortKey, setSortKey] = useState<'exam_name' | 'board' | 'status' | null>(null)
+  const [sortKey, setSortKey] = useState<'exam_name' | 'board' | 'exam_type' | 'nature' | 'status' | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
@@ -123,8 +123,12 @@ export default function HallTicketsExamList() {
                 <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('board')}>
                   Board <SortIcon col="board" />
                 </th>
-                <th className="px-4 py-3 text-left font-medium">Type</th>
-                <th className="px-4 py-3 text-left font-medium">Nature</th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('exam_type')}>
+                  Type <SortIcon col="exam_type" />
+                </th>
+                <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('nature')}>
+                  Nature <SortIcon col="nature" />
+                </th>
                 <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('status')}>
                   Status <SortIcon col="status" />
                 </th>
