@@ -32,15 +32,28 @@ router = APIRouter(prefix="/auth", tags=["Auth/Login"])
 
 
 @router.get("/academic-years", response_model=list[AcademicYearOption])
-async def list_academic_years(db: AsyncSession = Depends(get_tenant_db)):
+async def list_academic_years(request: Request, client_name: str | None = None):
     """Return available academic years for the login screen (public, no auth required)."""
-    from sqlalchemy import select
+    from sqlalchemy import select, text
 
+    from app.db.tenant_session import AsyncSessionLocal, TenantService
+    from app.middleware.tenant_middleware import get_client_name_from_request
     from app.models.masters.academic_year_model import AcademicYear
 
-    result = await db.execute(select(AcademicYear).order_by(AcademicYear.start_date.desc()))
-    years = result.scalars().all()
-    return [{"id": y.id, "title": y.title, "is_active": y.is_active} for y in years]
+    # Resolve tenant schema: query param → middleware header/subdomain → default fallback
+    resolved_name = client_name or get_client_name_from_request(request)
+    schema_name = await TenantService.get_tenant_schema(resolved_name)
+    if not schema_name:
+        if resolved_name == "default":
+            schema_name = "cos360_master"
+        else:
+            return []
+
+    async with AsyncSessionLocal() as session:
+        await session.execute(text(f'SET search_path TO "{schema_name}"'))
+        result = await session.execute(select(AcademicYear).order_by(AcademicYear.start_date.desc()))
+        years = result.scalars().all()
+        return [{"id": y.id, "title": y.title, "is_active": y.is_active} for y in years]
 
 
 @router.post(
