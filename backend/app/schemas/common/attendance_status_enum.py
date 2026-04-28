@@ -11,6 +11,7 @@ class AttendanceStatusEnum(StrEnum):
     PRESENT = "present"
     ABSENT = "absent"
     LATE = "late"
+    HALF_DAY = "half_day"
 
     @classmethod
     def get_all_values(cls):
