@@ -50,6 +50,10 @@ interface TableProps<T> {
   pagination?: PaginationProps;
   searchable?: boolean;
   showSerialNumber?: boolean;
+  /** Controlled search query — when provided, Table uses this instead of its own state */
+  searchQuery?: string;
+  /** Called when the search input changes (required when searchQuery is controlled) */
+  onSearchChange?: (q: string) => void;
 }
 
 type SortDir = "asc" | "desc" | null;
@@ -65,6 +69,8 @@ export function Table<T extends { [key: string]: any }>({
   permissions,
   searchable = true,
   showSerialNumber = true,
+  searchQuery: controlledSearchQuery,
+  onSearchChange,
 }: TableProps<T>) {
   const [editingRow, setEditingRow] = useState<{
     rowIdx: number;
@@ -74,7 +80,12 @@ export function Table<T extends { [key: string]: any }>({
   const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [internalSearchQuery, setInternalSearchQuery] = useState("");
+  const isControlled = controlledSearchQuery !== undefined;
+  const searchQuery = isControlled ? controlledSearchQuery : internalSearchQuery;
+  const setSearchQuery = isControlled
+    ? (q: string) => onSearchChange?.(q)
+    : setInternalSearchQuery;
 
   const isAnyRowEditing = editingRow !== null;
 

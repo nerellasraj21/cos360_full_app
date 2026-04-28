@@ -95,14 +95,14 @@ export interface BulkAttendanceUpdate {
 export interface StaffAttendanceBase {
   staff_id: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'half_day';
   remarks?: string;
 }
 
 export interface StaffAttendanceCreate extends StaffAttendanceBase { }
 
 export interface StaffAttendanceUpdate {
-  status?: 'present' | 'absent' | 'late';
+  status?: 'present' | 'absent' | 'late' | 'half_day';
   remarks?: string;
 }
 
@@ -138,9 +138,11 @@ export interface StaffAttendanceSummary {
   present_count: number;
   absent_count: number;
   late_count: number;
+  half_day_count: number;
   present_percentage: number;
   absent_percentage: number;
   late_percentage: number;
+  half_day_percentage: number;
   date_range: {
     from_date: string;
     to_date: string;

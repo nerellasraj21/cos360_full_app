@@ -146,6 +146,13 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
     const [localSearch, setLocalSearch] = useState('');
     const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+    const [phoneError, setPhoneError] = useState('');
+    const [emailError, setEmailError] = useState('');
+    const [experienceError, setExperienceError] = useState('');
+    const [lastSalaryError, setLastSalaryError] = useState('');
+    const [currentSalaryError, setCurrentSalaryError] = useState('');
+    const [pfError, setPfError] = useState('');
+    const [uanError, setUanError] = useState('');
 
     const [formData, setFormData] = useState<StaffFormData>({
         first_name: '',
@@ -284,6 +291,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
         setVisibleColumns(prev => {
             const newSet = new Set(prev);
             if (newSet.has(columnKey)) {
+                if (newSet.size === 1) return prev; // keep at least one column
                 newSet.delete(columnKey);
             } else {
                 newSet.add(columnKey);
@@ -297,13 +305,13 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     };
 
     const handleDeselectAllColumns = () => {
-        setVisibleColumns(new Set());
+        setVisibleColumns(new Set([allColumns[0].key])); // keep first column
     };
 
     // Export functions
     const handleExportCSV = () => {
         const headers = filteredColumns.map(col => col.label).join(',');
-        const rows = staff.map(staffMember =>
+        const rows = sortedData.map(staffMember =>
             filteredColumns.map(col => {
                 let value: any = '';
                 switch (col.key) {
@@ -341,7 +349,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     };
 
     const handleExportExcel = () => {
-        const exportData = staff.map(staffMember => {
+        const exportData = sortedData.map(staffMember => {
             const row: any = {};
             filteredColumns.forEach(col => {
                 switch (col.key) {
@@ -1026,9 +1034,15 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     <Input
                         type="email"
                         value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+                            setEmailError(val && !valid ? 'Please enter a valid email address' : '');
+                            setFormData({ ...formData, email: val });
+                        }}
                         placeholder="Enter email address"
                     />
+                    {emailError && <span className="text-red-500">{emailError}</span>}
                 </div>
 
                 <div>
@@ -1037,9 +1051,17 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     </label>
                     <Input
                         value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        onChange={(e) => {
+                            if (e.target.value.length > 10) {
+                                setPhoneError('Phone number cannot exceed 10 digits');
+                            } else {
+                                setPhoneError('');
+                            }
+                            setFormData({ ...formData, phone: e.target.value });
+                        }}
                         placeholder="Enter phone number"
                     />
+                    {phoneError && <span className="text-red-500">{phoneError}</span>}
                 </div>
 
                 <div>
@@ -1103,9 +1125,14 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                         type="number"
                         min="0"
                         value={formData.experience_years}
-                        onChange={(e) => setFormData({ ...formData, experience_years: parseInt(e.target.value) || 0 })}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setExperienceError(val && Number(val) > 50 ? 'Experience cannot exceed 50 years' : '');
+                            setFormData({ ...formData, experience_years: parseInt(val) || 0 });
+                        }}
                         placeholder="Enter years of experience"
                     />
+                    {experienceError && <span className="text-red-500">{experienceError}</span>}
                 </div>
 
                 <div className="md:col-span-2">
@@ -1371,19 +1398,23 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-foreground mb-1">Last Drawn Salary (₹)</label>
-                    <Input type="number" step="0.01" min="0" value={formData.last_drawn_salary || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, last_drawn_salary: e.target.value }); }} placeholder="e.g. 45000.00" />
+                    <Input type="number" step="0.01" min="0" value={formData.last_drawn_salary || ''} onChange={(e) => { const val = e.target.value; setLastSalaryError(val && Number(val) > 10000000 ? 'Salary cannot exceed ₹1,00,00,000' : ''); setIsFormDirty(true); setFormData({ ...formData, last_drawn_salary: val }); }} placeholder="e.g. 45000.00" />
+                    {lastSalaryError && <span className="text-red-500">{lastSalaryError}</span>}
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-foreground mb-1">Current Salary (₹)</label>
-                    <Input type="number" step="0.01" min="0" value={formData.current_salary || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, current_salary: e.target.value }); }} placeholder="e.g. 50000.00" />
+                    <Input type="number" step="0.01" min="0" value={formData.current_salary || ''} onChange={(e) => { const val = e.target.value; setCurrentSalaryError(val && Number(val) > 10000000 ? 'Salary cannot exceed ₹1,00,00,000' : ''); setIsFormDirty(true); setFormData({ ...formData, current_salary: val }); }} placeholder="e.g. 50000.00" />
+                    {currentSalaryError && <span className="text-red-500">{currentSalaryError}</span>}
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-foreground mb-1">PF Account Number</label>
-                    <Input value={formData.pf_account_number || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, pf_account_number: e.target.value }); }} placeholder="e.g. AP/HYD/12345" />
+                    <Input value={formData.pf_account_number || ''} onChange={(e) => { const val = e.target.value; setPfError(val && !/^[A-Za-z0-9]+\/[A-Za-z0-9/]+$/.test(val) ? 'Invalid PF Account Number format (e.g. AP/HYD/12345)' : ''); setIsFormDirty(true); setFormData({ ...formData, pf_account_number: val }); }} placeholder="e.g. AP/HYD/12345" />
+                    {pfError && <span className="text-red-500">{pfError}</span>}
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-foreground mb-1">UAN Number</label>
-                    <Input value={formData.uan_number || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, uan_number: e.target.value }); }} placeholder="12-digit UAN" />
+                    <Input value={formData.uan_number || ''} onChange={(e) => { const val = e.target.value; setUanError(val && !/^\d{12}$/.test(val) ? 'UAN Number must be exactly 12 digits' : ''); setIsFormDirty(true); setFormData({ ...formData, uan_number: val }); }} placeholder="12-digit UAN" />
+                    {uanError && <span className="text-red-500">{uanError}</span>}
                 </div>
             </div>
             </div>

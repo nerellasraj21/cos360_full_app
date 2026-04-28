@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
 import { Button } from "@/components/ui/button";
@@ -106,6 +106,7 @@ export function MasterPage<
   TInput extends Record<string, any>,
 >({ config }: MasterPageProps<T, TInput>) {
   const [formData, setFormData] = useState<TInput>(config.defaultValues);
+  const [searchQuery, setSearchQuery] = useState("");
   const [localModalOpen, setLocalModalOpen] = useState(false);
   const pendingCloseRef = useRef(false);
   const prevIsPendingRef = useRef(false);
@@ -122,10 +123,27 @@ export function MasterPage<
     visibleColumns.has(col.key as string)
   );
 
+  const filteredData = useMemo(() => {
+    if (!searchQuery.trim()) return config.data;
+    const q = searchQuery.toLowerCase();
+    return config.data.filter((row) =>
+      filteredColumns.some((col) => {
+        const val = (row as any)[col.key as string];
+        if (val !== null && val !== undefined && String(val).toLowerCase().includes(q)) return true;
+        if (col.render) {
+          const rendered = col.render(val, row);
+          if ((typeof rendered === "string" || typeof rendered === "number") && String(rendered).toLowerCase().includes(q)) return true;
+        }
+        return false;
+      })
+    );
+  }, [config.data, searchQuery, filteredColumns]);
+
   const handleColumnToggle = (columnKey: string) => {
     setVisibleColumns((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(columnKey)) {
+        if (newSet.size === 1) return prev; // keep at least one column
         newSet.delete(columnKey);
       } else {
         newSet.add(columnKey);
@@ -139,18 +157,26 @@ export function MasterPage<
   };
 
   const handleDeselectAllColumns = () => {
-    setVisibleColumns(new Set());
+    const firstKey = config.columns[0]?.key as string;
+    setVisibleColumns(firstKey ? new Set([firstKey]) : new Set(config.columns.map((col) => col.key as string)));
+  };
+
+  const getExportValue = (col: TableColumn<T>, row: T): string => {
+    const raw = row[col.key as keyof T];
+    if (col.render) {
+      const rendered = col.render(raw, row);
+      if (typeof rendered === "string" || typeof rendered === "number") return String(rendered);
+    }
+    return raw !== null && raw !== undefined ? String(raw) : "";
   };
 
   const handleExportCSV = () => {
     const headers = filteredColumns.map((col) => col.label).join(",");
-    const rows = config.data
+    const rows = filteredData
       .map((row) =>
         filteredColumns
           .map((col) => {
-            const value = row[col.key as keyof T];
-
-            const escapedValue = String(value).replace(/"/g, '""');
+            const escapedValue = getExportValue(col, row).replace(/"/g, '""');
             return `"${escapedValue}"`;
           })
           .join(",")
@@ -173,10 +199,10 @@ export function MasterPage<
   };
 
   const handleExportExcel = () => {
-    const data = config.data.map((row) =>
+    const data = filteredData.map((row) =>
       filteredColumns.reduce(
         (acc, col) => {
-          acc[col.label] = row[col.key as keyof T];
+          acc[col.label] = getExportValue(col, row);
           return acc;
         },
         {} as Record<string, any>
@@ -200,10 +226,10 @@ export function MasterPage<
         key: col.key,
         label: col.label,
       })),
-      data: config.data.map((row) => {
+      data: filteredData.map((row) => {
         const filteredRow: any = {};
         filteredColumns.forEach((col) => {
-          filteredRow[col.key as string] = row[col.key as keyof T];
+          filteredRow[col.key as string] = getExportValue(col, row);
         });
         return filteredRow;
       }),
@@ -516,6 +542,8 @@ export function MasterPage<
               onDelete={handleDelete}
               isEditing={config.isEditing}
               pagination={config.pagination}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
               permissions={{
                 resource: config.permissions?.resource
                   ? getResourceName(config.permissions.resource)

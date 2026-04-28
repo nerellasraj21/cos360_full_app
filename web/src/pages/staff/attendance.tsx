@@ -32,7 +32,7 @@ import type { Staff } from '@/types/staff';
 
 interface StaffAttendanceState {
     staff_id: string;
-    status: 'present' | 'absent' | 'late';
+    status: 'present' | 'absent' | 'late' | 'half_day';
     existingRecord?: StaffAttendanceOut;
     isModified: boolean;
 }
@@ -44,7 +44,7 @@ interface StaffAttendanceRow {
     staff_name: string;
     email: string;
     department: string;
-    status: 'present' | 'absent' | 'late';
+    status: 'present' | 'absent' | 'late' | 'half_day';
     isModified: boolean;
     existingRecord?: StaffAttendanceOut;
 }
@@ -72,7 +72,7 @@ const StaffAttendancePage: React.FC = () => {
     const [currentPage, setCurrentPage] = useState<number>(0);
     const [pageSize, setPageSize] = useState<number>(10);
     const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
-        new Set(['staff_name', 'email', 'department', 'status', 'isModified', 'actions'])
+        new Set(['staff_name', 'email', 'department', 'status', 'isModified'])
     );
 
     // Data fetching
@@ -136,7 +136,7 @@ const StaffAttendancePage: React.FC = () => {
         setSaveError(null);
     };
 
-    const handleAttendanceChange = (staffId: string, status: 'present' | 'absent' | 'late') => {
+    const handleAttendanceChange = (staffId: string, status: 'present' | 'absent' | 'late' | 'half_day') => {
         setStaffAttendances(prev => {
             const newMap = new Map(prev);
             const current = newMap.get(staffId);
@@ -270,22 +270,23 @@ const StaffAttendancePage: React.FC = () => {
             key: 'status',
             label: 'Status',
             editable: false, // Make non-editable since we're using custom render
-            render: (value: 'present' | 'absent' | 'late', row: StaffAttendanceRow) => {
+            render: (value: 'present' | 'absent' | 'late' | 'half_day', row: StaffAttendanceRow) => {
                 // Direct dropdown - no edit mode needed
                 return (
                     <Select
                         value={value}
                         onValueChange={(newValue) => {
-                            handleAttendanceChange(row.staff_id, newValue as 'present' | 'absent' | 'late');
+                            handleAttendanceChange(row.staff_id, newValue as 'present' | 'absent' | 'late' | 'half_day');
                         }}
                     >
-                        <SelectTrigger className="w-32">
+                        <SelectTrigger className="w-36">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="present">Present</SelectItem>
                             <SelectItem value="absent">Absent</SelectItem>
                             <SelectItem value="late">Late</SelectItem>
+                            <SelectItem value="half_day">Half Day</SelectItem>
                         </SelectContent>
                     </Select>
                 );
@@ -297,13 +298,6 @@ const StaffAttendancePage: React.FC = () => {
             editable: false,
             render: (value: boolean) =>
                 value ? <Badge variant="secondary">Modified</Badge> : null,
-        },
-        {
-            key: 'actions',
-            label: '', // Empty label to hide Actions column header
-            editable: false,
-            render: () => null, // Return null to hide content
-            className: 'w-0 p-0', // Hide the column entirely
         },
     ];
 
@@ -348,7 +342,10 @@ const StaffAttendancePage: React.FC = () => {
     }, [filteredData, currentPage, pageSize]);
 
     // Column visibility handlers
+    const FIXED_COLUMNS = new Set(['staff_name']);
+
     const handleColumnToggle = (columnKey: string) => {
+        if (FIXED_COLUMNS.has(columnKey)) return;
         setVisibleColumns((prev) => {
             const newSet = new Set(prev);
             if (newSet.has(columnKey)) {
@@ -365,7 +362,7 @@ const StaffAttendancePage: React.FC = () => {
     };
 
     const handleDeselectAllColumns = () => {
-        setVisibleColumns(new Set());
+        setVisibleColumns(new Set(FIXED_COLUMNS));
     };
 
     // Dummy handlers for Table component (not used, but required by Table props)
@@ -384,6 +381,7 @@ const StaffAttendancePage: React.FC = () => {
             present: all.filter(a => a.status === 'present').length,
             absent: all.filter(a => a.status === 'absent').length,
             late: all.filter(a => a.status === 'late').length,
+            half_day: all.filter(a => a.status === 'half_day').length,
         };
     }, [staffAttendances]);
 
@@ -435,7 +433,7 @@ const StaffAttendancePage: React.FC = () => {
                             <p className="text-sm font-medium text-muted-foreground">Attendance Analysis</p>
                             <span className="text-sm font-semibold">{attendancePct}% Present</span>
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-4 gap-3">
                             <div className="flex flex-col items-center justify-center gap-1 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
                                 <span className="text-3xl font-bold text-green-700 dark:text-green-400">{attendanceSummary.present}</span>
                                 <span className="text-xs font-medium text-green-600 dark:text-green-500 uppercase tracking-wide">Present</span>
@@ -448,10 +446,15 @@ const StaffAttendancePage: React.FC = () => {
                                 <span className="text-3xl font-bold text-yellow-700 dark:text-yellow-400">{attendanceSummary.late}</span>
                                 <span className="text-xs font-medium text-yellow-600 dark:text-yellow-500 uppercase tracking-wide">Late</span>
                             </div>
+                            <div className="flex flex-col items-center justify-center gap-1 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                <span className="text-3xl font-bold text-blue-700 dark:text-blue-400">{attendanceSummary.half_day}</span>
+                                <span className="text-xs font-medium text-blue-600 dark:text-blue-500 uppercase tracking-wide">Half Day</span>
+                            </div>
                         </div>
                         <div className="flex h-2 rounded-full overflow-hidden bg-muted">
                             <div className="bg-green-500 transition-all duration-300" style={{ width: `${(attendanceSummary.present / totalStaff) * 100}%` }} />
                             <div className="bg-yellow-400 transition-all duration-300" style={{ width: `${(attendanceSummary.late / totalStaff) * 100}%` }} />
+                            <div className="bg-blue-400 transition-all duration-300" style={{ width: `${(attendanceSummary.half_day / totalStaff) * 100}%` }} />
                             <div className="bg-red-400 transition-all duration-300" style={{ width: `${(attendanceSummary.absent / totalStaff) * 100}%` }} />
                         </div>
                         <div className="flex justify-between text-xs text-muted-foreground">
@@ -459,6 +462,7 @@ const StaffAttendancePage: React.FC = () => {
                             <span className="flex items-center gap-3">
                                 <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" />Present</span>
                                 <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />Late</span>
+                                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-400" />Half Day</span>
                                 <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" />Absent</span>
                             </span>
                         </div>
@@ -523,15 +527,21 @@ const StaffAttendancePage: React.FC = () => {
                                 >
                                     Select All
                                 </DropdownMenuCheckboxItem>
-                                {columns.map((col) => (
-                                    <DropdownMenuCheckboxItem
-                                        key={col.key as string}
-                                        checked={visibleColumns.has(col.key as string)}
-                                        onCheckedChange={() => handleColumnToggle(col.key as string)}
-                                    >
-                                        {col.label}
-                                    </DropdownMenuCheckboxItem>
-                                ))}
+                                {columns.map((col) => {
+                                    const isFixed = FIXED_COLUMNS.has(col.key as string);
+                                    return (
+                                        <DropdownMenuCheckboxItem
+                                            key={col.key as string}
+                                            checked={visibleColumns.has(col.key as string)}
+                                            onCheckedChange={() => handleColumnToggle(col.key as string)}
+                                            disabled={isFixed}
+                                            className={isFixed ? 'opacity-60 cursor-not-allowed' : ''}
+                                        >
+                                            {col.label}
+                                            {isFixed && <span className="ml-1 text-xs text-muted-foreground">(fixed)</span>}
+                                        </DropdownMenuCheckboxItem>
+                                    );
+                                })}
                             </DropdownMenuContent>
                         </DropdownMenu>
                         </div>

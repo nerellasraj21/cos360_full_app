@@ -119,6 +119,7 @@ export function ClassSectionsTable({
     setVisibleColumns(prev => {
       const newSet = new Set(prev);
       if (newSet.has(columnKey)) {
+        if (newSet.size === 1) return prev; // keep at least one column
         newSet.delete(columnKey);
       } else {
         newSet.add(columnKey);
@@ -132,7 +133,7 @@ export function ClassSectionsTable({
   };
 
   const handleDeselectAllColumns = () => {
-    setVisibleColumns(new Set());
+    setVisibleColumns(new Set([allColumns[0].key])); // keep first column
   };
 
   // Export functions
@@ -413,11 +414,29 @@ export function ClassSectionsTable({
 
         {/* Pagination Controls */}
         {sortedData.length > pageSize && (
-          <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center justify-between mt-4 pt-4 border-t">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Rows per page:</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Rows per page:</span>
               <Select value={pageSize.toString()} onValueChange={(value) => { setPageSize(Number(value)); setCurrentPage(1); }}>
-                <SelectTrigger className="w-20">
+                <SelectTrigger className="w-16">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -427,29 +446,9 @@ export function ClassSectionsTable({
                   <SelectItem value="50">50</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
+              <span className="text-muted-foreground">
                 {Math.min((currentPage - 1) * pageSize + 1, sortedData.length)}-{Math.min(currentPage * pageSize, sortedData.length)} of {sortedData.length}
               </span>
-              <div className="flex gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </Button>
-              </div>
             </div>
           </div>
         )}

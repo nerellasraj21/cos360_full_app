@@ -39,6 +39,8 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
   const [localSearch, setLocalSearch] = useState('');
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
 
   const [editForm, setEditForm] = useState({
     first_name: '',
@@ -374,16 +376,30 @@ export function StaffTable({ searchQuery }: StaffTableProps) {
                   id="edit-email"
                   type="email"
                   value={editForm.email}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+                    setEmailError(val && !valid ? 'Please enter a valid email address' : '');
+                    setEditForm(prev => ({ ...prev, email: val }));
+                  }}
                 />
+                {emailError && <span className="text-red-500">{emailError}</span>}
               </div>
               <div>
                 <Label htmlFor="edit-phone">Phone</Label>
                 <Input
                   id="edit-phone"
                   value={editForm.phone}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) => {
+                    if (e.target.value.length > 10) {
+                      setPhoneError('Phone number cannot exceed 10 digits');
+                    } else {
+                      setPhoneError('');
+                    }
+                    setEditForm(prev => ({ ...prev, phone: e.target.value }));
+                  }}
                 />
+                {phoneError && <span className="text-red-500">{phoneError}</span>}
               </div>
             </div>
 

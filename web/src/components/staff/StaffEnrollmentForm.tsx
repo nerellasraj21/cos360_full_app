@@ -17,6 +17,9 @@ interface StaffEnrollmentFormProps {
 }
 
 export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffEnrollmentFormProps) {
+  const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [experienceError, setExperienceError] = useState('');
   const [formData, setFormData] = useState({
     first_name: initialData?.first_name || '',
     last_name: initialData?.last_name || '',
@@ -122,18 +125,32 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
                     id="email"
                     type="email"
                     value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+                      setEmailError(val && !valid ? 'Please enter a valid email address' : '');
+                      handleInputChange('email', val);
+                    }}
                     placeholder="Enter email address"
                   />
+                  {emailError && <span className="text-red-500">{emailError}</span>}
                 </div>
                 <div>
                   <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
                     value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    onChange={(e) => {
+                      if (e.target.value.length > 10) {
+                        setPhoneError('Phone number cannot exceed 10 digits');
+                      } else {
+                        setPhoneError('');
+                      }
+                      handleInputChange('phone', e.target.value);
+                    }}
                     placeholder="Enter phone number"
                   />
+                  {phoneError && <span className="text-red-500">{phoneError}</span>}
                 </div>
               </div>
 
@@ -191,9 +208,14 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
                     type="number"
                     min="0"
                     value={formData.experience_years}
-                    onChange={(e) => handleInputChange('experience_years', e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setExperienceError(val && Number(val) > 50 ? 'Experience cannot exceed 50 years' : '');
+                      handleInputChange('experience_years', val);
+                    }}
                     placeholder="Years of experience"
                   />
+                  {experienceError && <span className="text-red-500">{experienceError}</span>}
                 </div>
               </div>
 
