@@ -58,8 +58,9 @@ class TenantService:
             # Query database
             schema_name = await TenantService._fetch_tenant_schema(client_name)
 
-            # Cache the result (including None for non-existent tenants)
-            _tenant_cache[client_name] = schema_name
+            # Only cache successful lookups — never cache None so DB additions take effect immediately
+            if schema_name:
+                _tenant_cache[client_name] = schema_name
 
             return schema_name
 
