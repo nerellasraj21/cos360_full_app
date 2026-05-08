@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ReactSelect from 'react-select';
+import { useSelectStyles } from '@/lib/useSelectStyles';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useCreateFeeType, useUpdateFeeType } from '@/hooks/fee/useFeeTypes';
 import { useFeeCategories } from '@/hooks/fee/useFeeCategories';
@@ -32,6 +33,7 @@ interface FeeTypeFormProps {
 export function FeeTypeForm({ type, onSuccess, onCancel }: FeeTypeFormProps) {
     const { selectedAcademicYearId } = useAcademicYearStore();
     const [error, setError] = useState<string | null>(null);
+    const selectStyles = useSelectStyles();
 
     const createMutation = useCreateFeeType();
     const updateMutation = useUpdateFeeType();
@@ -140,22 +142,16 @@ export function FeeTypeForm({ type, onSuccess, onCancel }: FeeTypeFormProps) {
 
             <div className="space-y-2">
                 <Label htmlFor="fee_category_id">Fee Category</Label>
-                <Select
-                    value={watch('fee_category_id')}
-                    onValueChange={(value) => setValue('fee_category_id', value)}
-                    disabled={isPending}
-                >
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select fee category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {categories.map((category) => (
-                            <SelectItem key={category.id} value={category.id}>
-                                {category.category_name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <ReactSelect
+                    options={categories.map(c => ({ value: c.id, label: c.category_name }))}
+                    value={watch('fee_category_id') ? { value: watch('fee_category_id'), label: categories.find(c => c.id === watch('fee_category_id'))?.category_name ?? '' } : null}
+                    onChange={opt => setValue('fee_category_id', opt?.value ?? '')}
+                    placeholder="Select fee category"
+                    isClearable
+                    isDisabled={isPending}
+                    menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                    styles={selectStyles}
+                />
                 {errors.fee_category_id && (
                     <p className="text-sm text-destructive">{errors.fee_category_id.message}</p>
                 )}
@@ -163,34 +159,34 @@ export function FeeTypeForm({ type, onSuccess, onCancel }: FeeTypeFormProps) {
 
             <div className="space-y-2">
                 <Label htmlFor="fee_term_id">Fee Term</Label>
-                <Select
-                    value={watch('fee_term_id')}
-                    onValueChange={(value) => setValue('fee_term_id', value)}
-                    disabled={isPending}
-                >
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select fee term" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {terms.length === 0 ? (
-                            <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                                No fee terms available
-                            </div>
-                        ) : (
-                            terms.map((term, idx) => {
-                                const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                                const isUUID = UUID_REGEX.test(term.term_name ?? '');
-                                const suffix = term.number_of_terms ? ` (${term.number_of_terms} installment${term.number_of_terms !== 1 ? 's' : ''})` : '';
-                                const label = (!term.term_name || isUUID)
-                                    ? `Term ${idx + 1}${suffix}`
-                                    : `${term.term_name}${suffix}`;
-                                return (
-                                    <SelectItem key={term.id} value={term.id}>{label}</SelectItem>
-                                );
-                            })
-                        )}
-                    </SelectContent>
-                </Select>
+                <ReactSelect
+                    options={terms.map((term, idx) => {
+                        const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                        const isUUID = UUID_REGEX.test(term.term_name ?? '');
+                        const suffix = term.number_of_terms ? ` (${term.number_of_terms} installment${term.number_of_terms !== 1 ? 's' : ''})` : '';
+                        const label = (!term.term_name || isUUID) ? `Term ${idx + 1}${suffix}` : `${term.term_name}${suffix}`;
+                        return { value: term.id, label };
+                    })}
+                    value={(() => {
+                        const id = watch('fee_term_id');
+                        if (!id) return null;
+                        const idx = terms.findIndex(t => t.id === id);
+                        if (idx === -1) return null;
+                        const term = terms[idx];
+                        const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                        const isUUID = UUID_REGEX.test(term.term_name ?? '');
+                        const suffix = term.number_of_terms ? ` (${term.number_of_terms} installment${term.number_of_terms !== 1 ? 's' : ''})` : '';
+                        const label = (!term.term_name || isUUID) ? `Term ${idx + 1}${suffix}` : `${term.term_name}${suffix}`;
+                        return { value: id, label };
+                    })()}
+                    onChange={opt => setValue('fee_term_id', opt?.value ?? '')}
+                    placeholder="Select fee term"
+                    isClearable
+                    isDisabled={isPending || termsLoading}
+                    noOptionsMessage={() => termsLoading ? 'Loading...' : 'No fee terms available'}
+                    menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                    styles={selectStyles}
+                />
                 {errors.fee_term_id && (
                     <p className="text-sm text-destructive">{errors.fee_term_id.message}</p>
                 )}

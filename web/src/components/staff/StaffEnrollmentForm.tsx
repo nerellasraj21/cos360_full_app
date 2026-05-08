@@ -58,6 +58,9 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
     try {
       const submitData = {
         ...formData,
+        qualification: formData.qualification
+          ? [...new Set(formData.qualification.split(',').map((s: string) => s.trim()).filter(Boolean))].join(', ')
+          : formData.qualification,
         experience_years: formData.experience_years ? parseInt(formData.experience_years.toString()) : undefined
       };
 

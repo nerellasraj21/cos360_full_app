@@ -310,29 +310,26 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
 
     // Export functions
     const handleExportCSV = () => {
-        const headers = filteredColumns.map(col => col.label).join(',');
+        const headers = filteredColumns.flatMap(col => col.key === 'contact' ? ['Email', 'Phone'] : [col.label]).join(',');
         const rows = sortedData.map(staffMember =>
-            filteredColumns.map(col => {
-                let value: any = '';
+            filteredColumns.flatMap(col => {
                 switch (col.key) {
                     case 'name':
-                        value = `${staffMember.first_name} ${staffMember.last_name || ''}`.trim();
-                        break;
+                        return [`"${`${staffMember.first_name} ${staffMember.last_name || ''}`.trim().replace(/"/g, '""')}"`];
                     case 'contact':
-                        value = `${staffMember.email || ''} ${staffMember.phone || ''}`.trim();
-                        break;
+                        return [
+                            `"${(staffMember.email || '').replace(/"/g, '""')}"`,
+                            `"${(staffMember.phone || '').replace(/"/g, '""')}"`,
+                        ];
                     case 'designation':
-                        value = getDesignationTitle(staffMember.designation_id);
-                        break;
+                        return [`"${getDesignationTitle(staffMember.designation_id).replace(/"/g, '""')}"`];
                     case 'department':
-                        value = staffMember.department || '';
-                        break;
+                        return [`"${(staffMember.department || '').replace(/"/g, '""')}"`];
                     case 'status':
-                        value = staffMember.is_active ? 'Active' : 'Inactive';
-                        break;
+                        return [`"${staffMember.is_active ? 'Active' : 'Inactive'}"`];
+                    default:
+                        return ['""'];
                 }
-                const escapedValue = String(value).replace(/"/g, '""');
-                return `"${escapedValue}"`;
             }).join(',')
         ).join('\n');
 
@@ -357,7 +354,8 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                         row[col.label] = `${staffMember.first_name} ${staffMember.last_name || ''}`.trim();
                         break;
                     case 'contact':
-                        row[col.label] = `${staffMember.email || ''} ${staffMember.phone || ''}`.trim();
+                        row['Email'] = staffMember.email || '';
+                        row['Phone'] = staffMember.phone || '';
                         break;
                     case 'designation':
                         row[col.label] = getDesignationTitle(staffMember.designation_id);
@@ -512,7 +510,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                         gender: formData.gender,
                         date_of_birth: orUndef(formData.date_of_birth),
                         joining_date: formData.joining_date,
-                        qualification: orUndef(formData.qualification),
+                        qualification: orUndef(formData.qualification ? [...new Set(formData.qualification.split(',').map(s => s.trim()).filter(Boolean))].join(', ') : formData.qualification),
                         experience_years: formData.experience_years || undefined,
                         address: orUndef(formData.address),
                         designation_id: orUndef(formData.designation_id),
@@ -566,7 +564,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     gender: formData.gender,
                     date_of_birth: orUndef(formData.date_of_birth),
                     joining_date: formData.joining_date,
-                    qualification: orUndef(formData.qualification),
+                    qualification: orUndef(formData.qualification ? [...new Set(formData.qualification.split(',').map(s => s.trim()).filter(Boolean))].join(', ') : formData.qualification),
                     experience_years: formData.experience_years || undefined,
                     address: orUndef(formData.address),
                     designation_id: orUndef(formData.designation_id),

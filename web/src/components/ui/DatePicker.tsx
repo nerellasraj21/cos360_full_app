@@ -49,6 +49,7 @@ export function DatePicker({
         disabled && "pointer-events-none opacity-50",
         className
       )}
+      onClick={() => inputRef.current?.showPicker()}
     >
       {/* Visible label layer */}
       <span

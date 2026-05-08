@@ -4,6 +4,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ReactSelect from 'react-select';
+import { useSelectStyles } from '@/lib/useSelectStyles';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -270,6 +272,7 @@ interface AssignTransportDialogProps {
 
 function AssignTransportDialog({ open, onOpenChange, transport }: AssignTransportDialogProps) {
   const isEdit = !!transport;
+  const selectStyles = useSelectStyles();
   const createMutation = useCreateStudentTransport();
   const updateMutation = useUpdateStudentTransport();
 
@@ -331,7 +334,7 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Assignment' : 'Assign Transport'}</DialogTitle>
@@ -340,45 +343,42 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
           {!isEdit && (
             <div className="space-y-2">
               <Label>Student</Label>
-              <Select value={studentId} onValueChange={setStudentId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select student..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {students.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ReactSelect
+                options={students.map(s => ({ value: s.id, label: s.name }))}
+                value={studentId ? { value: studentId, label: students.find(s => s.id === studentId)?.name ?? '' } : null}
+                onChange={opt => setStudentId(opt?.value ?? '')}
+                placeholder="Select student..."
+                isClearable
+                menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                styles={selectStyles}
+              />
             </div>
           )}
 
           <div className="space-y-2">
             <Label>Trip</Label>
-            <Select value={tripId} onValueChange={setTripId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select trip..." />
-              </SelectTrigger>
-              <SelectContent>
-                {trips.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>Trip #{t.trip_number}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ReactSelect
+              options={trips.map(t => ({ value: t.id, label: `Trip #${t.trip_number}` }))}
+              value={tripId ? { value: tripId, label: `Trip #${trips.find(t => t.id === tripId)?.trip_number ?? ''}` } : null}
+              onChange={opt => setTripId(opt?.value ?? '')}
+              placeholder="Select trip..."
+              isClearable
+              menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+              styles={selectStyles}
+            />
           </div>
 
           <div className="space-y-2">
             <Label>Stop</Label>
-            <Select value={stopId} onValueChange={setStopId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select stop..." />
-              </SelectTrigger>
-              <SelectContent>
-                {stops.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>#{s.number} – {s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ReactSelect
+              options={stops.map(s => ({ value: s.id, label: `#${s.number} – ${s.name}` }))}
+              value={stopId ? { value: stopId, label: (() => { const s = stops.find(s => s.id === stopId); return s ? `#${s.number} – ${s.name}` : ''; })() } : null}
+              onChange={opt => setStopId(opt?.value ?? '')}
+              placeholder="Select stop..."
+              isClearable
+              menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+              styles={selectStyles}
+            />
           </div>
 
           {pricingOptions.length > 0 && (

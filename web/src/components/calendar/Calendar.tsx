@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Edit, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { useDrop, useDrag } from "react-dnd";
 import { addDays, startOfWeek, startOfMonth, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, addMonths, subMonths, isWithinInterval, parseISO } from "date-fns";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -774,17 +775,15 @@ export function Calendar() {
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium">Date Range<span className="text-destructive">*</span></label>
               <div className="flex gap-2">
-                <Input
-                  type="date"
+                <DatePicker
                   value={newEventStart}
-                  onChange={e => setNewEventStart(e.target.value)}
+                  onChange={setNewEventStart}
                   required
                 />
                 <span className="self-center">to</span>
-                <Input
-                  type="date"
+                <DatePicker
                   value={newEventEnd}
-                  onChange={e => setNewEventEnd(e.target.value)}
+                  onChange={setNewEventEnd}
                   required
                 />
               </div>
@@ -856,17 +855,15 @@ export function Calendar() {
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium">Date Range<span className="text-destructive">*</span></label>
                 <div className="flex gap-2">
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={selectedEvent.start_date}
-                    onChange={e => setSelectedEvent({ ...selectedEvent, start_date: e.target.value })}
+                    onChange={v => setSelectedEvent({ ...selectedEvent, start_date: v })}
                     required
                   />
                   <span className="self-center">to</span>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={selectedEvent.end_date}
-                    onChange={e => setSelectedEvent({ ...selectedEvent, end_date: e.target.value })}
+                    onChange={v => setSelectedEvent({ ...selectedEvent, end_date: v })}
                     required
                   />
                 </div>

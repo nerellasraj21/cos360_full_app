@@ -3,7 +3,8 @@ import { EditButton, DeleteButton, TableActionGroup } from '@/components/common/
 import { Edit, Trash2, Plus, Calculator, AlertCircle, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ReactSelect from 'react-select';
+import { useSelectStyles } from '@/lib/useSelectStyles';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ type SortDir = 'asc' | 'desc';
 
 export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingTableProps) {
     const { selectedAcademicYearId } = useAcademicYearStore();
+    const selectStyles = useSelectStyles();
 
     const [isHighlighted, setIsHighlighted] = useState(false);
 
@@ -507,7 +509,7 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
             )}
 
             {/* Create/Edit Dialog */}
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} guardDirty={isFormDirty} onDirtyDiscard={() => setIsFormDirty(false)}>
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} guardDirty={isFormDirty} onDirtyDiscard={() => setIsFormDirty(false)} modal={false}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle>
@@ -520,50 +522,30 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                             <label className="block text-sm font-medium text-foreground mb-1">
                                 Fee Type *
                             </label>
-                            <Select
-                                value={formData.fee_type_id || ''}
-                                onValueChange={(value) => { setFormData({ ...formData, fee_type_id: value }); setIsFormDirty(true); }}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select fee type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {feeTypes.map((feeType) => (
-                                        <SelectItem key={feeType.id} value={feeType.id.toString()}>
-                                            {/* <div>
-                                                <div className="font-medium">{feeType.type_name}</div>
-                                                {feeType.fee_category_name && (
-                                                    <div className="text-xs text-muted-foreground">
-                                                     
-                                                    </div>
-                                                )}
-                                            </div> */}
-                                            {feeType?feeType.type_name:'Unknown Fee Type'} 
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <ReactSelect
+                                options={feeTypes.map(ft => ({ value: ft.id.toString(), label: ft ? ft.type_name : 'Unknown Fee Type' }))}
+                                value={formData.fee_type_id ? { value: formData.fee_type_id, label: feeTypes.find(ft => ft.id.toString() === formData.fee_type_id)?.type_name ?? 'Unknown Fee Type' } : null}
+                                onChange={opt => { setFormData({ ...formData, fee_type_id: opt?.value ?? '' }); setIsFormDirty(true); }}
+                                placeholder="Select fee type"
+                                isClearable
+                                menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                                styles={selectStyles}
+                            />
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-foreground mb-1">
                                 Class *
                             </label>
-                            <Select
-                                value={formData.class_id || ''}
-                                onValueChange={(value) => { setFormData({ ...formData, class_id: value }); setIsFormDirty(true); }}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select class" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {classes.map((classItem) => (
-                                        <SelectItem key={classItem.id} value={classItem.id}>
-                                            {classItem.name} 
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <ReactSelect
+                                options={classes.map(c => ({ value: c.id, label: c.name }))}
+                                value={formData.class_id ? { value: formData.class_id, label: classes.find(c => c.id === formData.class_id)?.name ?? '' } : null}
+                                onChange={opt => { setFormData({ ...formData, class_id: opt?.value ?? '' }); setIsFormDirty(true); }}
+                                placeholder="Select class"
+                                isClearable
+                                menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                                styles={selectStyles}
+                            />
                         </div>
 
                         <div>

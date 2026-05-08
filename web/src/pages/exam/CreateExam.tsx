@@ -9,13 +9,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/DatePicker'
+import ReactSelect from 'react-select'
+import { useSelectStyles } from '@/lib/useSelectStyles'
 import { ClassSectionSelector } from '@/components/exam/ClassSectionSelector'
 import { SubjectConfigAccordion } from '@/components/exam/SubjectConfigAccordion'
 import {
@@ -54,6 +50,7 @@ type Section = 1 | 2 | 3 | 4 | 5
 
 export default function CreateExam() {
   const navigate = useNavigate()
+  const selectStyles = useSelectStyles()
   const { selectedAcademicYearId, academicYears, fetchAndSetAcademicYears } = useAcademicYearStore()
   const { wizardData, updateWizardData, resetWizard } = useExamStore()
 
@@ -307,10 +304,13 @@ export default function CreateExam() {
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Board *</label>
-                <Select value={form.watch('board')} onValueChange={(v) => form.setValue('board', v as any)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{BOARDS.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
-                </Select>
+                <ReactSelect
+                  options={BOARDS.map(b => ({ value: b, label: b }))}
+                  value={form.watch('board') ? { value: form.watch('board'), label: form.watch('board') } : null}
+                  onChange={opt => form.setValue('board', opt?.value as any)}
+                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                  styles={selectStyles}
+                />
               </div>
 
               {form.watch('board') === 'Custom' && (
@@ -325,10 +325,13 @@ export default function CreateExam() {
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Level *</label>
-                <Select value={form.watch('level')} onValueChange={(v) => form.setValue('level', v as any)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{LEVELS.map(l => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}</SelectContent>
-                </Select>
+                <ReactSelect
+                  options={LEVELS.map(l => ({ value: l.value, label: l.label }))}
+                  value={LEVELS.find(l => l.value === form.watch('level')) ? { value: form.watch('level'), label: LEVELS.find(l => l.value === form.watch('level'))!.label } : null}
+                  onChange={opt => form.setValue('level', opt?.value as any)}
+                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                  styles={selectStyles}
+                />
               </div>
 
               <div className="space-y-1">
@@ -341,22 +344,25 @@ export default function CreateExam() {
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Nature *</label>
-                <Select value={form.watch('nature')} onValueChange={(v) => form.setValue('nature', v as any)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{NATURES.map(n => <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>)}</SelectContent>
-                </Select>
+                <ReactSelect
+                  options={NATURES.map(n => ({ value: n.value, label: n.label }))}
+                  value={NATURES.find(n => n.value === form.watch('nature')) ? { value: form.watch('nature'), label: NATURES.find(n => n.value === form.watch('nature'))!.label } : null}
+                  onChange={opt => form.setValue('nature', opt?.value as any)}
+                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                  styles={selectStyles}
+                />
               </div>
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Academic Year *</label>
-                <Select value={form.watch('academic_year_id')} onValueChange={(v) => form.setValue('academic_year_id', v)}>
-                  <SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger>
-                  <SelectContent>
-                    {academicYears.map(ay => (
-                      <SelectItem key={ay.id} value={String(ay.id)}>{ay.title ?? ay.id}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <ReactSelect
+                  options={academicYears.map(ay => ({ value: String(ay.id), label: ay.title ?? String(ay.id) }))}
+                  value={form.watch('academic_year_id') ? { value: form.watch('academic_year_id'), label: academicYears.find(ay => String(ay.id) === form.watch('academic_year_id'))?.title ?? form.watch('academic_year_id') } : null}
+                  onChange={opt => form.setValue('academic_year_id', opt?.value ?? '')}
+                  placeholder="Select year"
+                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                  styles={selectStyles}
+                />
                 {form.formState.errors.academic_year_id && (
                   <p className="text-xs text-destructive">{form.formState.errors.academic_year_id.message}</p>
                 )}
@@ -364,21 +370,19 @@ export default function CreateExam() {
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Grade Scheme</label>
-                <Select
-                  value={form.watch('exam_grade_scheme_id') ?? '__none__'}
-                  onValueChange={(v) => form.setValue('exam_grade_scheme_id', v === '__none__' ? null : v)}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select scheme" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— None —</SelectItem>
-                    {(examSchemes.data ?? []).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <ReactSelect
+                  options={[{ value: '__none__', label: '— None —' }, ...(examSchemes.data ?? []).map(s => ({ value: s.id, label: s.name }))]}
+                  value={(() => { const v = form.watch('exam_grade_scheme_id'); if (!v) return { value: '__none__', label: '— None —' }; const s = (examSchemes.data ?? []).find(s => s.id === v); return s ? { value: s.id, label: s.name } : { value: '__none__', label: '— None —' }; })()}
+                  onChange={opt => form.setValue('exam_grade_scheme_id', (!opt || opt.value === '__none__') ? null : opt.value)}
+                  placeholder="Select scheme"
+                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                  styles={selectStyles}
+                />
               </div>
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Mark Entry Deadline</label>
-                <Input type="date" {...form.register('mark_entry_deadline')} />
+                <DatePicker value={form.watch('mark_entry_deadline') ?? ''} onChange={v => form.setValue('mark_entry_deadline', v)} />
               </div>
 
               <div className="space-y-1">
@@ -388,12 +392,12 @@ export default function CreateExam() {
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Attendance From</label>
-                <Input type="date" {...form.register('attendance_from_date')} />
+                <DatePicker value={form.watch('attendance_from_date') ?? ''} onChange={v => form.setValue('attendance_from_date', v)} />
               </div>
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Attendance To</label>
-                <Input type="date" {...form.register('attendance_to_date')} />
+                <DatePicker value={form.watch('attendance_to_date') ?? ''} onChange={v => form.setValue('attendance_to_date', v)} />
               </div>
 
               <div className="flex items-center gap-2">

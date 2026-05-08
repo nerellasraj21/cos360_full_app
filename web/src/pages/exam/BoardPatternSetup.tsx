@@ -10,13 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import ReactSelect from 'react-select'
+import { useSelectStyles } from '@/lib/useSelectStyles'
 // Note: nature dropdown uses native <select> to avoid Dialog overflow clipping
 import {
   Dialog,
@@ -64,6 +59,7 @@ const patternSchema = z.object({
 type PatternForm = z.infer<typeof patternSchema>
 
 export default function BoardPatternSetup() {
+  const selectStyles = useSelectStyles()
   const [editTarget, setEditTarget] = useState<BoardExamPattern | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -324,7 +320,7 @@ export default function BoardPatternSetup() {
       )}
 
       {/* Create / Edit Dialog */}
-      <Dialog open={showForm} onOpenChange={setShowForm} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)}>
+      <Dialog open={showForm} onOpenChange={setShowForm} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)} modal={false}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editTarget ? 'Edit Board Pattern' : 'Create Board Pattern'}</DialogTitle>
@@ -333,34 +329,26 @@ export default function BoardPatternSetup() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-sm font-medium">Board</label>
-                <Select
-                  value={form.watch('board')}
-                  onValueChange={(v) => { form.setValue('board', v as any); setIsDirty(true) }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BOARDS.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <ReactSelect
+                  options={BOARDS.map(b => ({ value: b, label: b }))}
+                  value={form.watch('board') ? { value: form.watch('board'), label: form.watch('board') } : null}
+                  onChange={opt => { form.setValue('board', opt?.value as any); setIsDirty(true) }}
+                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                  styles={selectStyles}
+                />
                 {form.formState.errors.board && (
                   <p className="text-xs text-destructive">{form.formState.errors.board.message}</p>
                 )}
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium">Level</label>
-                <Select
-                  value={form.watch('level')}
-                  onValueChange={(v) => { form.setValue('level', v as any); setIsDirty(true) }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LEVELS.map(l => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <ReactSelect
+                  options={LEVELS.map(l => ({ value: l.value, label: l.label }))}
+                  value={LEVELS.find(l => l.value === form.watch('level')) ? { value: form.watch('level'), label: LEVELS.find(l => l.value === form.watch('level'))!.label } : null}
+                  onChange={opt => { form.setValue('level', opt?.value as any); setIsDirty(true) }}
+                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                  styles={selectStyles}
+                />
               </div>
             </div>
 

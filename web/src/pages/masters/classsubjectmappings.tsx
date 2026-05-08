@@ -101,7 +101,7 @@ export default function ClassSubjectMappingsPage() {
   const [pageSize, setPageSize] = useState(5);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [subjectsLoading, setSubjectsLoading] = useState(true);
-  const { selectedAcademicYearId, fetchAndSetAcademicYears } =
+  const { selectedAcademicYearId, fetchAndSetAcademicYears, academicYears } =
     useAcademicYearStore();
   const { checkPermission } = usePermission();
 
@@ -110,8 +110,8 @@ export default function ClassSubjectMappingsPage() {
 
   // Initialize academic years if not loaded
   useEffect(() => {
-    fetchAndSetAcademicYears();
-  }, [fetchAndSetAcademicYears]);
+    if (academicYears.length === 0) fetchAndSetAcademicYears();
+  }, [academicYears.length, fetchAndSetAcademicYears]);
 
   // Fetch subjects for bulk modal
   useEffect(() => {

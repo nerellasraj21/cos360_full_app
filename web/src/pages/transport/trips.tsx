@@ -78,6 +78,7 @@ export default function TripsPage() {
                     value={value}
                     onChange={(newValue) => onChange(newValue)}
                     placeholder="Select Driver"
+                    data={(drivers || []).map(d => ({ id: d.user_id, value: d.user_id, label: `${d.first_name}${d.last_name ? ' ' + d.last_name : ''}` }))}
                 />
             ),
         },
@@ -143,6 +144,7 @@ export default function TripsPage() {
                     value={value}
                     onChange={(newValue) => onChange(newValue)}
                     placeholder="Select Driver"
+                    data={(drivers || []).map(d => ({ id: d.user_id, value: d.user_id, label: `${d.first_name}${d.last_name ? ' ' + d.last_name : ''}` }))}
                 />
             );
         }

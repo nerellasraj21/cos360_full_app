@@ -238,7 +238,7 @@ export function FeeTypesList() {
             </Card>
 
             {/* Fee Type Form Dialog */}
-            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)}>
+            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)} modal={false}>
                 <DialogContent className="max-w-md" onChange={() => setIsDirty(true)}>
                     <DialogHeader>
                         <DialogTitle>
