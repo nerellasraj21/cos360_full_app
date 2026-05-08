@@ -1,3 +1,4 @@
+from typing import Optional, List, Dict, Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -67,6 +68,8 @@ class RefreshTokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    academic_year_id: Optional[UUID] = None
+    academic_year_title: Optional[str] = None
 
 
 # Logout schemas
@@ -118,8 +121,8 @@ class SetPasswordResponse(BaseModel):
     menu: list[MenuItemResponse]
     permissions: dict[str, list[str]] = Field(default_factory=dict)
     entity_id: str | None = None
-    academic_year_id: UUID | None = None
-    academic_year_title: str | None = None
+    academic_year_id: Optional[UUID] = None
+    academic_year_title: Optional[str] = None
     access_token: str
     refresh_token: str
     token_type: str = "bearer"

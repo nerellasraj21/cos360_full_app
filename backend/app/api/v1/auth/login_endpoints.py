@@ -208,7 +208,13 @@ async def refresh_token(request: RefreshTokenRequest, fastapi_request: Request):
 
         logger.info(f"Token refreshed successfully for user: {payload.get('username')}")
 
-        return RefreshTokenResponse(access_token=new_access_token, refresh_token=new_refresh_token, token_type="bearer")
+        return RefreshTokenResponse(
+            access_token=new_access_token,
+            refresh_token=new_refresh_token,
+            token_type="bearer",
+            academic_year_id=payload.get("academic_year_id"),
+            academic_year_title=payload.get("academic_year_title"),
+        )
 
     except HTTPException:
         raise
