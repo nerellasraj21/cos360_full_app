@@ -266,6 +266,8 @@ _READ_ONLY_ACADEMIC = [
     ("academic_years", "list"),
     ("classes", "read"),
     ("classes", "list"),
+    ("sections", "read"),
+    ("sections", "list"),
     ("subjects", "read"),
     ("subjects", "list"),
     ("subject_categories", "read"),
@@ -344,6 +346,8 @@ _ROLE_PERMISSIONS = {
         ("exams", "list"),
         ("exam_marks", "read_own"),
         ("exam_marks", "list_own"),
+        ("exam_results", "read_own"),
+        ("exam_results", "list_own"),
         ("exam_hall_tickets", "read_own"),
         ("exam_hall_tickets", "list_own"),
         # Own student data only
@@ -581,6 +585,9 @@ async def seed_all_role_permissions(db: AsyncSession = Depends(get_tenant_db)):
             "/students/studenttransport",  # student-facing transport page
             "/students/studentdocuments",
             "/students/studentcertificates",
+            "/fee",           # L0 parent — before Exam Management
+            "/fee/my-fees",
+            "/fee/my-receipts",
             "/exam",  # L0 parent
             "/exam/exams",
             "/exam/marks",  # view own marks

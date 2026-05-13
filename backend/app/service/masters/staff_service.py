@@ -301,6 +301,80 @@ async def get_staff_attendance_by_date(attendance_date: date, db: AsyncSession):
         raise HTTPException(status_code=500, detail=f"Error retrieving staff attendance by date: {str(e)}")
 
 
+async def update_staff_attendance_by_date(
+    attendance_date: date, attendance_updates: list[dict], db: AsyncSession
+):
+    try:
+        if attendance_date > date.today():
+            raise HTTPException(status_code=400, detail="Cannot update attendance for future dates")
+
+        if not attendance_updates:
+            raise HTTPException(status_code=400, detail="No attendance updates provided")
+
+        updated_records = []
+        valid_statuses = ["present", "absent", "late", "half_day"]
+
+        for update_data in attendance_updates:
+            staff_id = update_data.get("staff_id")
+            new_status = update_data.get("status")
+            new_remarks = update_data.get("remarks")
+
+            if not staff_id or not new_status:
+                continue
+
+            if new_status not in valid_statuses:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid attendance status '{new_status}'. Must be one of: {', '.join(valid_statuses)}",
+                )
+
+            result = await db.execute(
+                select(StaffAttendance).where(
+                    and_(StaffAttendance.staff_id == staff_id, StaffAttendance.date == attendance_date)
+                )
+            )
+            attendance = result.scalar_one_or_none()
+
+            if attendance:
+                attendance.status = new_status
+                if new_remarks:
+                    attendance.remarks = new_remarks
+                updated_records.append(attendance)
+            else:
+                new_record = StaffAttendance(
+                    staff_id=staff_id,
+                    date=attendance_date,
+                    status=new_status,
+                    remarks=new_remarks,
+                )
+                db.add(new_record)
+                updated_records.append(new_record)
+
+        await db.flush()
+
+        result = await db.execute(
+            select(StaffAttendance)
+            .options(selectinload(StaffAttendance.staff))
+            .where(
+                and_(
+                    StaffAttendance.date == attendance_date,
+                    StaffAttendance.id.in_([r.id for r in updated_records]),
+                )
+            )
+        )
+        refreshed_records = result.scalars().all()
+
+        await db.commit()
+        return refreshed_records
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating staff attendance by date: {str(e)}")
+
+
 async def get_staff_list_by_gender(gender: GenderEnum | None, db: AsyncSession):
     stmt = select(Staff).options(
         selectinload(Staff.designation_obj), selectinload(Staff.user), selectinload(Staff.qualifications)

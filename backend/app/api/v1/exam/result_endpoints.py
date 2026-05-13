@@ -22,6 +22,7 @@ from app.schemas.exam.result_schema import (
 from app.service.exam.aggregate_service import compute_exam_aggregate
 from app.service.exam.audit_service import log_action
 from app.service.exam.result_service import (
+    get_all_results_for_student,
     get_exam_results,
     get_published_result_or_403,
     get_student_raw_marks,
@@ -125,6 +126,21 @@ async def get_single_result(
     return await get_student_result_or_404(db, exam_id, student_id)
 
 
+@router.get("/my-results", response_model=list[StudentExamResultRead])
+async def list_my_results(
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Student lists all their own results across all published/finalized exams."""
+    from fastapi import HTTPException, status
+
+    user_context = await check_user_resource_access(db, request, "exam_results", "list_own")
+    if not user_context.student_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only students can access this endpoint")
+
+    return await get_all_results_for_student(db, user_context.student_id)
+
+
 @router.get("/{exam_id}/my-result", response_model=StudentExamResultRead)
 async def get_my_result(
     exam_id: uuid.UUID,
@@ -134,7 +150,7 @@ async def get_my_result(
     """Student views their own result (only after exam is published)."""
     from fastapi import HTTPException, status
 
-    user_context = await check_user_resource_access(db, request, "exams", "read")
+    user_context = await check_user_resource_access(db, request, "exam_results", "read_own")
     if not user_context.student_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only students can access this endpoint")
 

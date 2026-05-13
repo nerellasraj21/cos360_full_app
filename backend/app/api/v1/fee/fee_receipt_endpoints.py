@@ -1,12 +1,13 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
 from app.schemas.fee import FeeReceiptRead, ReceiptContent
 from app.service.fee.fee_receipt_service import FeeReceiptService
+from app.tools.enhanced_permissions import check_user_resource_access
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 from app.utils.validation_helpers import validate_date_range
 
@@ -42,6 +43,33 @@ async def generate_fee_receipt(transaction_id: UUID, request: Request, db: Async
     generated_by_user_id = UUID(current_user.get("sub"))
 
     return await FeeReceiptService.create_receipt(db, transaction_id, generated_by_user_id)
+
+
+@router.get("/my-receipts", response_model=list[FeeReceiptRead])
+async def get_my_receipts(
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
+    offset: int = Query(0, ge=0, description="Number of records to skip"),
+):
+    """
+    Get current student's own receipts
+
+    - **Returns receipts belonging to the logged-in student only**
+
+    **Required permissions**: fee_receipts:list_own
+    """
+    user_context = await check_user_resource_access(db, request, "fee_receipts", "list_own")
+
+    if not user_context.student_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only students can access this endpoint")
+
+    return await FeeReceiptService.search_receipts(
+        db=db,
+        student_id=user_context.student_id,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/{receipt_id}", response_model=FeeReceiptRead)

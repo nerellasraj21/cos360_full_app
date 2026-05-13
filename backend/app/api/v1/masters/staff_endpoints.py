@@ -54,6 +54,7 @@ from app.service.masters.staff_service import (
     get_staff_list_by_gender,
     get_staff_qualifications,
     update_staff_attendance,
+    update_staff_attendance_by_date,
     update_staff_enrollment,
     update_staff_qualification,
     upload_staff_photo,
@@ -250,6 +251,19 @@ async def get_attendance_by_date(request: Request, attendance_date: date, db: As
     return await get_staff_attendance_by_date(attendance_date, db)
 
 
+@router.patch("/attendance/by-date/{attendance_date}", response_model=list[StaffAttendanceOut])
+async def bulk_update_attendance_by_date(
+    request: Request, attendance_date: date, attendance_updates: list[dict], db: AsyncSession = Depends(get_tenant_db)
+):
+    """Bulk update staff attendance records for a specific date"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    await check_role_plan_permission_with_error(db, request, role, "staff_attendance", "update")
+
+    return await update_staff_attendance_by_date(attendance_date, attendance_updates, db)
+
+
 @router.get("/", response_model=list[StaffOut])
 async def get_staff_list(
     request: Request,
@@ -441,6 +455,6 @@ async def get_all_drivers(request: Request, db: AsyncSession = Depends(get_tenan
     role = current_user.get("role")
 
     # Multi-layer permission check: Role + Plan validation
-    await check_role_plan_permission_with_error(db, request, role, "staff", "list")
+    await check_role_plan_permission_with_error(db, request, role, "transport_trips", "read")
 
     return await get_all_drivers_list(db)

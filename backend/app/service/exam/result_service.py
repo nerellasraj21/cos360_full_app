@@ -227,6 +227,84 @@ async def get_published_result_or_403(
     return await get_student_result_or_404(db, exam_id, student_id)
 
 
+async def get_all_results_for_student(
+    db: AsyncSession,
+    student_id: UUID,
+) -> list[dict]:
+    """Return all published/finalized exam results for a student across all exams."""
+    sql = text("""
+        SELECT
+            ser.id,
+            ser.exam_id,
+            ser.student_id,
+            TRIM(COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '')) AS student_name,
+            (
+                SELECT sa2.admission_number
+                FROM student_admissions sa2
+                WHERE sa2.student_id = ser.student_id
+                LIMIT 1
+            ) AS admission_number,
+            ser.total_marks_obtained,
+            ser.total_max_marks,
+            ser.percentage,
+            ser.grade_label,
+            ser.gpa,
+            ser.rank,
+            ser.is_passed,
+            ser.computed_at
+        FROM student_exam_results ser
+        LEFT JOIN students s ON s.id = ser.student_id
+        JOIN exams e ON e.id = ser.exam_id
+        WHERE ser.student_id = :student_id
+          AND e.status IN ('published', 'finalized')
+        ORDER BY ser.computed_at DESC NULLS LAST
+    """)
+    rows = (await db.execute(sql, {"student_id": str(student_id)})).mappings().all()
+    if not rows:
+        return []
+
+    sub_sql = text("""
+        SELECT
+            ssr.id,
+            ssr.student_id,
+            ssr.subject_config_id,
+            sub.name AS subject_name,
+            ssr.marks_obtained,
+            ssr.max_marks,
+            ssr.percentage,
+            ssr.grade_label,
+            ssr.gpa,
+            ssr.remark_grade,
+            ssr.is_absent,
+            ssr.is_passed,
+            ssr.exam_id
+        FROM student_subject_results ssr
+        LEFT JOIN exam_subject_config esc ON esc.id = ssr.subject_config_id
+        LEFT JOIN subjects sub ON sub.id = esc.subject_id
+        WHERE ssr.student_id = :student_id
+          AND EXISTS (
+              SELECT 1 FROM exams e
+              WHERE e.id = ssr.exam_id
+                AND e.status IN ('published', 'finalized')
+          )
+        ORDER BY COALESCE(esc.sort_order, 999)
+    """)
+    sub_rows = (await db.execute(sub_sql, {"student_id": str(student_id)})).mappings().all()
+
+    sub_by_exam: dict = {}
+    for sr in sub_rows:
+        key = str(sr["exam_id"])
+        sub_by_exam.setdefault(key, []).append(dict(sr))
+
+    results = []
+    for row in rows:
+        r = dict(row)
+        r["subject_results"] = sub_by_exam.get(str(r["exam_id"]), [])
+        results.append(r)
+
+    return results
+
+
 async def unlock_exam(db: AsyncSession, exam_id: UUID, reason: str) -> Exam:
     exam = await get_exam_or_404(db, exam_id)
     if exam.status not in ("locked", "published", "finalized"):

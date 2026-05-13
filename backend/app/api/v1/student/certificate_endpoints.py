@@ -36,6 +36,7 @@ from app.service.student.student_certificate_service import (
     list_certificates,
     update_certificate,
 )
+from app.tools.enhanced_permissions import check_user_resource_access
 from app.tools.simple_permissions import (
     check_role_plan_permission_with_error,
     get_current_user_token,
@@ -152,7 +153,7 @@ async def list_my_certificates(
 
     # Permission check
     await check_role_plan_permission_with_error(
-        db, request, role, "student_certificates", "list"
+        db, request, role, "student_certificates", "list_own"
     )
 
     # Resolve student ID from user ID
@@ -190,38 +191,34 @@ async def list_child_certificates(
 
     Parent must be linked to student via StudentParentLink.
 
-    **Permission Required:** `student_certificates:list`
+    **Permission Required:** `student_certificates:list_related` (Parent) or `student_certificates:list`
     """
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
 
-    # Permission check
-    await check_role_plan_permission_with_error(
-        db, request, role, "student_certificates", "list"
-    )
+    # Permission check — resolves list_related for Parent, plain list for others
+    await check_user_resource_access(db, request, "student_certificates", "list")
 
     # Verify parent relationship
     if role == "Parent":
-        from app.models.masters.student_parent_association_model import (
-            StudentParentLink,
-        )
+        from app.models.masters.student_parent_association_model import StudentParentLink
+        from sqlalchemy import text as _text
+
+        pr = await db.execute(_text("SELECT id FROM parents WHERE user_id = :uid"), {"uid": str(user_id)})
+        parent_id = pr.scalar_one_or_none()
+
+        if not parent_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Parent profile not found")
 
         result = await db.execute(
             select(StudentParentLink).where(
                 StudentParentLink.student_id == student_id,
-                StudentParentLink.parent_id == user_id,
+                StudentParentLink.parent_id == parent_id,
             )
         )
-        parent_link = result.scalar_one_or_none()
-
-        if not parent_link:
-            from fastapi import HTTPException
-
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not the parent of this student",
-            )
+        if not result.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not the parent of this student")
 
     return await list_certificates(
         db=db,
@@ -472,30 +469,32 @@ async def list_child_received_documents(
     """
     Parent views a child's received documents (no upload).
 
-    **Permission Required:** `student_certificates:list`
+    **Permission Required:** `student_certificates:list_related` (Parent) or `student_certificates:list`
     """
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
 
-    await check_role_plan_permission_with_error(
-        db, request, role, "student_certificates", "list"
-    )
+    await check_user_resource_access(db, request, "student_certificates", "list")
 
     if role == "Parent":
         from app.models.masters.student_parent_association_model import StudentParentLink
+        from sqlalchemy import text as _text
+
+        pr = await db.execute(_text("SELECT id FROM parents WHERE user_id = :uid"), {"uid": str(user_id)})
+        parent_id = pr.scalar_one_or_none()
+
+        if not parent_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Parent profile not found")
 
         result = await db.execute(
             select(StudentParentLink).where(
                 StudentParentLink.student_id == student_id,
-                StudentParentLink.parent_id == user_id,
+                StudentParentLink.parent_id == parent_id,
             )
         )
         if not result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not the parent of this student",
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not the parent of this student")
 
     return await list_certificates(
         db=db,
@@ -521,30 +520,32 @@ async def list_child_issued_certificates(
     """
     Parent or Student views issued certificates (no upload).
 
-    **Permission Required:** `student_certificates:list`
+    **Permission Required:** `student_certificates:list_related` (Parent) or `student_certificates:list`
     """
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
 
-    await check_role_plan_permission_with_error(
-        db, request, role, "student_certificates", "list"
-    )
+    await check_user_resource_access(db, request, "student_certificates", "list")
 
     if role == "Parent":
         from app.models.masters.student_parent_association_model import StudentParentLink
+        from sqlalchemy import text as _text
+
+        pr = await db.execute(_text("SELECT id FROM parents WHERE user_id = :uid"), {"uid": str(user_id)})
+        parent_id = pr.scalar_one_or_none()
+
+        if not parent_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Parent profile not found")
 
         result = await db.execute(
             select(StudentParentLink).where(
                 StudentParentLink.student_id == student_id,
-                StudentParentLink.parent_id == user_id,
+                StudentParentLink.parent_id == parent_id,
             )
         )
         if not result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not the parent of this student",
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not the parent of this student")
     elif role == "Student":
         result = await db.execute(select(Student).where(Student.id == student_id))
         student = result.scalar_one_or_none()
@@ -708,8 +709,9 @@ async def get_certificate_details(
     role = current_user.get("role")
 
     # Permission check
+    read_action = "read_own" if role == "Student" else "read"
     await check_role_plan_permission_with_error(
-        db, request, role, "student_certificates", "read"
+        db, request, role, "student_certificates", read_action
     )
 
     return await get_certificate_by_id(db=db, certificate_id=certificate_id)
@@ -827,8 +829,9 @@ async def download_certificate_endpoint(
     tenant_schema = request.headers.get("cschema", "test_tenant_schema")
 
     # Permission check
+    read_action = "read_own" if role == "Student" else "read"
     await check_role_plan_permission_with_error(
-        db, request, role, "student_certificates", "read"
+        db, request, role, "student_certificates", read_action
     )
 
     result = await download_certificate(
