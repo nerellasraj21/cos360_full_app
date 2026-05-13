@@ -3,6 +3,9 @@ import { ArrowLeft, Loader2, BarChart3, ChevronRight, AlertCircle, ServerCrash }
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useExamDetail, useExamClassSections, useExamSubjectConfigs } from '@/api/hooks/exam/useExam'
+import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
+import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections'
+import { useAuthStore } from '@/lib/authStore'
 import type { ExamClassSection, ExamSubjectConfig } from '@/types/exam'
 
 export default function MarkEntrySummary() {
@@ -20,6 +23,16 @@ export default function MarkEntrySummary() {
     isLoading: configsLoading,
     isError: configsError,
   } = useExamSubjectConfigs(examId)
+
+  const { data: subjectsList = [] } = useSubjectsDropdown({ active_only: false })
+  const subjectNameMap = Object.fromEntries(subjectsList.map(s => [s.id, s.name]))
+  const { data: classesList = [] } = useClassSectionsDropdown()
+  const classNameMap = Object.fromEntries(classesList.map(c => [c.id, c.name]))
+  const sectionNameMap = Object.fromEntries(classesList.flatMap(c => c.sections.map(s => [s.id, s.name])))
+
+  const canEnterMarks = useAuthStore(s =>
+    s.hasPermission('exams', 'update') || s.hasPermission('exam_marks', 'create')
+  )
 
   const isLoading = examLoading || sectionsLoading || configsLoading
   const isBackendError = sectionsError || configsError
@@ -96,7 +109,10 @@ export default function MarkEntrySummary() {
 
       {/* Class-section groups */}
       {!isBackendError && classSections.map((cs) => {
-        const csLabel = [cs.class_name, cs.section_name].filter(Boolean).join(' – ') || cs.class_id
+        const csLabel = [
+          cs.class_name ?? classNameMap[cs.class_id],
+          cs.section_name ?? (cs.section_id ? sectionNameMap[cs.section_id] : null),
+        ].filter(Boolean).join(' – ') || cs.class_id
         const configs = subjectConfigs.filter(
           (cfg) => cfg.class_id === cs.class_id && cfg.section_id === cs.section_id,
         )
@@ -122,7 +138,7 @@ export default function MarkEntrySummary() {
                     <th className="px-4 py-2 text-left">Subject</th>
                     <th className="px-4 py-2 text-left">Components</th>
                     <th className="px-4 py-2 text-left">Max Marks</th>
-                    <th className="px-4 py-2 text-right" />
+                    {canEnterMarks && <th className="px-4 py-2 text-right" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -134,11 +150,11 @@ export default function MarkEntrySummary() {
                     return (
                       <tr
                         key={cfg.id}
-                        className="cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/20"
-                        onClick={() => goToGrid(cs, cfg)}
+                        className={`border-b transition-colors last:border-0 ${canEnterMarks ? 'cursor-pointer hover:bg-muted/20' : ''}`}
+                        onClick={canEnterMarks ? () => goToGrid(cs, cfg) : undefined}
                       >
                         <td className="px-4 py-3 font-medium">
-                          {cfg.subject_name ?? cfg.subject_id}
+                          {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? cfg.subject_id}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1">
@@ -159,12 +175,14 @@ export default function MarkEntrySummary() {
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <Button variant="ghost" size="sm" className="gap-1 text-xs">
-                            Enter Marks
-                            <ChevronRight className="h-3 w-3" />
-                          </Button>
-                        </td>
+                        {canEnterMarks && (
+                          <td className="px-4 py-3 text-right">
+                            <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                              Enter Marks
+                              <ChevronRight className="h-3 w-3" />
+                            </Button>
+                          </td>
+                        )}
                       </tr>
                     )
                   })}

@@ -14,7 +14,7 @@ import { usePermission } from '@/hooks/usePermission';
 export default function SubjectPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
-  const { selectedAcademicYearId, fetchAndSetAcademicYears } = useAcademicYearStore();
+  const { academicYears, selectedAcademicYearId, fetchAndSetAcademicYears } = useAcademicYearStore();
   const { checkPermission } = usePermission();
 
   // Check permissions
@@ -22,8 +22,10 @@ export default function SubjectPage() {
 
   // Initialize academic years if not loaded
   useEffect(() => {
-    fetchAndSetAcademicYears();
-  }, [fetchAndSetAcademicYears]);
+    if (academicYears.length === 0) {
+      fetchAndSetAcademicYears();
+    }
+  }, [academicYears.length, fetchAndSetAcademicYears]);
 
   const {
     data,

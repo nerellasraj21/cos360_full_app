@@ -41,6 +41,7 @@ export interface Staff {
   designation_id?: string;
   department?: string;
   is_active: boolean;
+  role_id?: string;
   user_id: string;
   designation?: Designation;
   attendances?: StaffAttendance[];
@@ -100,6 +101,7 @@ export interface StaffUpdateRequest {
   designation_id?: string;
   department?: string;
   is_active?: boolean;
+  role_id?: string;
   // Work experience
   work_org?: string;
   work_from_date?: string;

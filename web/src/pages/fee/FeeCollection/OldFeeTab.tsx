@@ -50,6 +50,7 @@ import {
   useSettleOldFee,
   useDeleteOldFee,
 } from '@/hooks/fee';
+import { usePermission } from '@/hooks/usePermission';
 import { formatCurrency } from './FeeSummaryTab';
 import type { OldFeeRead, OldFeeUpdate } from '@/types/fee';
 
@@ -74,6 +75,11 @@ interface OldFeeTabProps {
 
 export default function OldFeeTab({ studentId }: OldFeeTabProps) {
   const { selectedAcademicYearId, academicYears } = useAcademicYearStore();
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('fee_old', 'create');
+  const canUpdate = checkPermission('fee_old', 'update');
+  const canDelete = checkPermission('fee_old', 'delete');
+  const hasAnyAction = canUpdate || canDelete;
   const { data, isLoading, isError, error } = useOldFeesForStudent(studentId, selectedAcademicYearId);
 
   const createMutation = useCreateOldFee();
@@ -166,14 +172,16 @@ export default function OldFeeTab({ studentId }: OldFeeTabProps) {
   return (
     <div className="space-y-4">
       {/* Action Buttons */}
-      <div className="flex items-center gap-2">
-        <Button size="sm" onClick={() => setShowAddDialog(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Manual Entry
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => setShowCarryForwardDialog(true)}>
-          Carry Forward
-        </Button>
-      </div>
+      {canCreate && (
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => setShowAddDialog(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add Manual Entry
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowCarryForwardDialog(true)}>
+            Carry Forward
+          </Button>
+        </div>
+      )}
 
       {/* Old Fees Table */}
       <Card>
@@ -199,7 +207,7 @@ export default function OldFeeTab({ studentId }: OldFeeTabProps) {
                     <TableHead className="text-right">Outstanding</TableHead>
                     <TableHead>Settled</TableHead>
                     <TableHead>Receipt</TableHead>
-                    <TableHead className="w-28">Actions</TableHead>
+                    {hasAnyAction && <TableHead className="w-28">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -223,25 +231,27 @@ export default function OldFeeTab({ studentId }: OldFeeTabProps) {
                         <StatusBadge status={item.is_settled} />
                       </TableCell>
                       <TableCell className="text-sm">{item.receipt_manual || item.receipt_system || '-'}</TableCell>
-                      <TableCell>
-                        <TableActionGroup>
-                          <EditButton onClick={() => handleEditOpen(item)} />
-                          {!item.is_settled && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
-                              title="Mark as Settled"
-                              onClick={() => setSettleId(item.id)}
-                            >
-                              <span className="text-xs font-bold">S</span>
-                            </Button>
-                          )}
-                          {item.source === 'manual_entry' && !item.is_settled && (
-                            <DeleteButton onClick={() => setDeleteId(item.id)} />
-                          )}
-                        </TableActionGroup>
-                      </TableCell>
+                      {hasAnyAction && (
+                        <TableCell>
+                          <TableActionGroup>
+                            {canUpdate && <EditButton onClick={() => handleEditOpen(item)} />}
+                            {canUpdate && !item.is_settled && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                                title="Mark as Settled"
+                                onClick={() => setSettleId(item.id)}
+                              >
+                                <span className="text-xs font-bold">S</span>
+                              </Button>
+                            )}
+                            {canDelete && item.source === 'manual_entry' && !item.is_settled && (
+                              <DeleteButton onClick={() => setDeleteId(item.id)} />
+                            )}
+                          </TableActionGroup>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
 

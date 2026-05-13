@@ -21,7 +21,6 @@ export const fetchParentStudents = async (parentId?: string): Promise<Student[]>
       throw new Error('Parent ID is required');
     }
 
-    // const { data } = await CAxios.get(`/student-parent-links/parent/${parentId}/students`);
     const { data } = await CAxios.get(`/student-parent-links/my-children`);
     return data;
   } catch (error) {

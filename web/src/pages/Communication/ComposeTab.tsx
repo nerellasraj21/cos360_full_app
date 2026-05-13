@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { usePermission } from '@/hooks/usePermission';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -98,6 +99,9 @@ interface ComposeTabProps {
 }
 
 export default function ComposeTab({ onSendSuccess }: ComposeTabProps) {
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('communications', 'create');
+
   // Step 1 — Channel
   const [channel, setChannel] = useState<Channel | null>(null);
 
@@ -518,11 +522,13 @@ export default function ComposeTab({ onSendSuccess }: ComposeTabProps) {
       )}
 
       {/* ── Send Button ──────────────────────────────────────────────────── */}
-      <div className={`flex justify-end pt-2 ${mobileStep !== 4 && userVars.length > 0 ? 'hidden md:flex' : ''}`}>
-        <Button onClick={handleSend} disabled={!isAllFilled}>
-          Send Now
-        </Button>
-      </div>
+      {canCreate && (
+        <div className={`flex justify-end pt-2 ${mobileStep !== 4 && userVars.length > 0 ? 'hidden md:flex' : ''}`}>
+          <Button onClick={handleSend} disabled={!isAllFilled}>
+            Send Now
+          </Button>
+        </div>
+      )}
 
       {/* ── Confirmation Modal ───────────────────────────────────────────── */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -584,7 +590,7 @@ export default function ComposeTab({ onSendSuccess }: ComposeTabProps) {
               </Button>
               <Button
                 onClick={handleConfirmSend}
-                disabled={sendMutation.isPending}
+                disabled={sendMutation.isPending || !canCreate}
               >
                 {sendMutation.isPending && (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />

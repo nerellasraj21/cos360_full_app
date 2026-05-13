@@ -10,6 +10,7 @@ import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTr
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useFeeTerms, useDeleteFeeTerm } from '@/hooks/fee/useFeeTerms';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
+import { usePermission } from '@/hooks/usePermission';
 import { PaymentDateManager } from './PaymentDateManager';
 import { FeeTermForm } from './FeeTermForm';
 import type { FeeTerm } from '@/types/fee';
@@ -17,6 +18,12 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 export function FeeTermsList() {
     const { selectedAcademicYearId } = useAcademicYearStore();
+    const { checkPermission } = usePermission();
+    const canCreate = checkPermission('fee_terms', 'create');
+    const canUpdate = checkPermission('fee_terms', 'update');
+    const canDelete = checkPermission('fee_terms', 'delete');
+    const hasAnyAction = canCreate || canUpdate || canDelete;
+
     const [selectedTerm, setSelectedTerm] = useState<FeeTerm | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isPaymentManagerOpen, setIsPaymentManagerOpen] = useState(false);
@@ -151,10 +158,12 @@ export function FeeTermsList() {
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <CardTitle>Fee Terms & Payment Schedules</CardTitle>
-                        <Button onClick={handleCreateNew}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New Term
-                        </Button>
+                        {canCreate && (
+                            <Button onClick={handleCreateNew}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add New Term
+                            </Button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -163,10 +172,12 @@ export function FeeTermsList() {
                             <div className="text-muted-foreground mb-4">
                                 No fee terms found for the selected academic year.
                             </div>
-                            <Button onClick={handleCreateNew}>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Create First Term
-                            </Button>
+                            {canCreate && (
+                                <Button onClick={handleCreateNew}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Create First Term
+                                </Button>
+                            )}
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -188,7 +199,7 @@ export function FeeTermsList() {
                                     <TableHead className="cursor-pointer select-none" onClick={() => handleSort('number_of_terms')}>Number of Terms <SortIcon col="number_of_terms" /></TableHead>
                                     <TableHead>Payment Schedule</TableHead>
                                     <TableHead className="cursor-pointer select-none" onClick={() => handleSort('term_status')}>Status <SortIcon col="term_status" /></TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    {hasAnyAction && <TableHead className="text-right">Actions</TableHead>}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -226,38 +237,46 @@ export function FeeTermsList() {
                                                     {term.term_status === 'active' ? 'Active' : 'Inactive'}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleManagePaymentDates(term)}
-                                                        title="Manage Payment Dates"
-                                                    >
-                                                        <Calendar className="h-4 w-4 mr-1" />
-                                                        Payment Dates
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleEditTerm(term)}
-                                                        className="h-8 w-8 p-0"
-                                                        title="Edit Fee Term"
-                                                    >
-                                                        <Edit className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleDeleteTerm(term)}
-                                                        disabled={deleteTermMutation.isPending}
-                                                        className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
-                                                        title="Delete Fee Term"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
+                                            {hasAnyAction && (
+                                                <TableCell className="text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {canUpdate && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleManagePaymentDates(term)}
+                                                                title="Manage Payment Dates"
+                                                            >
+                                                                <Calendar className="h-4 w-4 mr-1" />
+                                                                Payment Dates
+                                                            </Button>
+                                                        )}
+                                                        {canUpdate && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleEditTerm(term)}
+                                                                className="h-8 w-8 p-0"
+                                                                title="Edit Fee Term"
+                                                            >
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                        {canDelete && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleDeleteTerm(term)}
+                                                                disabled={deleteTermMutation.isPending}
+                                                                className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
+                                                                title="Delete Fee Term"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                            )}
                                         </TableRow>
                                     );
                                 })}

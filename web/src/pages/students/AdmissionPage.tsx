@@ -15,12 +15,11 @@ const AdmissionPage = () => {
   const { checkPermission } = usePermission();
 
   // Check permissions
-  const hasReadPermission = checkPermission('student_admissions', 'read');
+  const hasReadPermission = checkPermission('student_admissions', 'read') || checkPermission('student_admissions', 'read_own') || checkPermission('student_admissions', 'read_related');
 
   return (
     <PermissionGuard
-      resource="student_admissions"
-      action="list"
+      permissions={[['student_admissions', 'list'], ['student_admissions', 'list_own'], ['student_admissions', 'list_related']]}
       fallback={
         <div className="flex items-center justify-center h-64">
           <div className="text-center">

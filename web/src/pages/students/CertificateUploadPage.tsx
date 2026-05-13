@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { usePermission } from "@/hooks/usePermission";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,6 +32,9 @@ type IssueSubTab = "upload" | "generate";
 const CERT_SESSION_KEY = "cert_page_selection";
 
 export const CertificateUploadPage: React.FC = () => {
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('issuable_certificates', 'create');
+
   // Restore cascade selection from sessionStorage
   const saved = (() => { try { return JSON.parse(sessionStorage.getItem(CERT_SESSION_KEY) || "{}"); } catch { return {}; } })();
 
@@ -368,8 +372,8 @@ export const CertificateUploadPage: React.FC = () => {
       {/* ── Upload + Datatable (shown after student selected) ── */}
       {selectedStudentId && (
         <>
-          {/* Upload Section */}
-          <Card>
+          {/* Upload Section — only visible when user has create permission */}
+          {canCreate && <Card>
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <CardTitle>Upload for {selectedStudent?.full_name}</CardTitle>
@@ -607,7 +611,7 @@ export const CertificateUploadPage: React.FC = () => {
                 </div>
               )}
             </CardContent>
-          </Card>
+          </Card>}
 
           {/* ── Datatable ── */}
           <Card>
@@ -708,49 +712,7 @@ export const CertificateUploadPage: React.FC = () => {
                                   )}
                                 </Button>
                               )}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => setDeleteDialogOpen(cert.id)}
-                                title="Delete"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
                             </div>
-
-                            <Dialog
-                              open={deleteDialogOpen === cert.id}
-                              onOpenChange={(open) =>
-                                setDeleteDialogOpen(open ? cert.id : null)
-                              }
-                            >
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Delete Certificate?</DialogTitle>
-                                  <DialogDescription>
-                                    Are you sure you want to delete{" "}
-                                    <strong>{cert.type_name}</strong>? This action cannot be
-                                    undone.
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <DialogFooter>
-                                  <DialogClose asChild>
-                                    <Button variant="outline">Cancel</Button>
-                                  </DialogClose>
-                                  <Button
-                                    variant="destructive"
-                                    onClick={() => handleDelete(cert)}
-                                    disabled={deleteCertificate.isPending}
-                                  >
-                                    {deleteCertificate.isPending && (
-                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    )}
-                                    Delete
-                                  </Button>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
                           </td>
                         </tr>
                       ))}

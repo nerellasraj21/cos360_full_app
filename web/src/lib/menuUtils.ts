@@ -10,11 +10,28 @@ export interface MenuItem {
     children?: MenuItem[];
 }
 
+const isFeeItem = (item: MenuItem): boolean => {
+    const url = item.url ?? '';
+    const name = item.name.toLowerCase();
+    return url.startsWith('/fee') || name === 'fee management' || name === 'fees';
+};
+
+const filterMenuForRole = (items: MenuItem[], roleName: string): MenuItem[] => {
+    if (roleName !== 'teacher') return items;
+    return items
+        .filter(item => !isFeeItem(item))
+        .map(item => ({
+            ...item,
+            children: item.children ? filterMenuForRole(item.children, roleName) : [],
+        }));
+};
+
+
 export const useMenuData = () => {
-    const { menuItems, user, isAuthenticated } = useAuthStore();
+    const { menuItems, user, isAuthenticated, role } = useAuthStore();
 
     return useQuery({
-        queryKey: ['menu'],
+        queryKey: ['menu', role?.name],
         queryFn: () => {
             console.log('Loading menu data from authStore - User:', user, 'Authenticated:', isAuthenticated);
 
@@ -37,8 +54,10 @@ export const useMenuData = () => {
             };
 
             const transformedMenu = menuItems.map((item: any) => transformMenuItem(item, 0));
-            console.log('Transformed menu data:', transformedMenu);
-            return transformedMenu;
+            const roleName = role?.name?.toLowerCase() ?? '';
+            const filteredMenu = filterMenuForRole(transformedMenu, roleName);
+            console.log('Transformed menu data:', filteredMenu);
+            return filteredMenu;
         },
         enabled: !!user && !!menuItems && menuItems.length > 0
     });

@@ -71,19 +71,20 @@ export interface SetPasswordRequest {
 }
 
 export interface ParentChildItem {
-  id?: string;        // actual backend field
-  student_id?: string; // fallback alias
-  first_name: string;
-  last_name: string;
+  id?: string;
+  student_id?: string;
+  name?: string;         // combined field returned by /my-children
+  first_name?: string;
+  last_name?: string;
   admission_number?: string;
   class_name?: string;
+  section_name?: string;
 }
 
 export async function fetchParentChildren(parentEntityId: string): Promise<Student[]> {
   const { data } = await CAxios.get<ParentChildItem[] | { data: ParentChildItem[] }>(
     `/student-parent-links/parent/${parentEntityId}/students`
   );
-  // Handle both raw array and wrapped { data: [...] } responses
   const items: ParentChildItem[] = Array.isArray(data) ? data : (Array.isArray((data as any)?.data) ? (data as any).data : []);
   return items.map(item => ({
     id: item.id || item.student_id || '',
@@ -105,7 +106,41 @@ export function useParentChildren(parentEntityId: string | null) {
     queryKey: ['parent-children', parentEntityId],
     queryFn: () => fetchParentChildren(parentEntityId!),
     enabled: !!parentEntityId,
-    staleTime: 5 * 60 * 1000, // 5 min
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// Correct endpoint: token-scoped, no entity ID required in URL
+async function fetchMyChildren(): Promise<Student[]> {
+  const { data } = await CAxios.get<ParentChildItem[] | { data: ParentChildItem[] }>(
+    '/student-parent-links/my-children'
+  );
+  const items: ParentChildItem[] = Array.isArray(data) ? data : (Array.isArray((data as any)?.data) ? (data as any).data : []);
+  return items.map(item => {
+    const fullName = item.name || `${item.first_name || ''} ${item.last_name || ''}`.trim();
+    const firstName = item.first_name || fullName.split(' ')[0] || '';
+    const lastName = item.last_name || fullName.split(' ').slice(1).join(' ') || '';
+    return {
+      id: item.id || item.student_id || '',
+      name: fullName,
+      first_name: firstName,
+      last_name: lastName,
+      admission_number: item.admission_number || '',
+      class_id: '',
+      class_name: item.class_name || '',
+      section_name: item.section_name || '',
+      academic_year: '',
+      academic_year_id: '',
+      is_active: true,
+    };
+  });
+}
+
+export function useMyChildren() {
+  return useQuery<Student[]>({
+    queryKey: ['my-children'],
+    queryFn: fetchMyChildren,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { feeReceiptsApi } from '@/api/fee/receipts';
 import { searchTransactions } from '@/api/fee/transactions';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
+import { usePermission } from '@/hooks/usePermission';
 import type {
   FeeReceipt,
   ReceiptContent,
@@ -29,6 +30,9 @@ interface ReceiptManagementProps {
 
 export function ReceiptManagement({ className }: ReceiptManagementProps) {
   const { selectedAcademicYearId } = useAcademicYearStore();
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('fee_receipts', 'create');
+  const canUpdate = checkPermission('fee_receipts', 'update');
   const [receipts, setReceipts] = useState<FeeReceipt[]>([]);
   const [transactions, setTransactions] = useState<FeeTransaction[]>([]);
   const [selectedReceipt, setSelectedReceipt] = useState<FeeReceipt | null>(null);
@@ -216,6 +220,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
             Generate, view, and manage fee receipts with integrity verification
           </p>
         </div>
+        {canCreate && (
         <Dialog
           open={showGenerateDialog}
           onOpenChange={setShowGenerateDialog}
@@ -314,6 +319,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
             </div>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {/* Reprint Options Dialog */}
@@ -423,10 +429,12 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                     <Shield className="w-4 h-4 mr-2" />
                     Verify Integrity
                   </Button>
-                  <Button onClick={handleReprintReceipt} className="w-full" variant="outline">
-                    <Printer className="w-4 h-4 mr-2" />
-                    Reprint Receipt
-                  </Button>
+                  {canUpdate && (
+                    <Button onClick={handleReprintReceipt} className="w-full" variant="outline">
+                      <Printer className="w-4 h-4 mr-2" />
+                      Reprint Receipt
+                    </Button>
+                  )}
                   <Button onClick={handleDownloadReceipt} className="w-full">
                     <Download className="w-4 h-4 mr-2" />
                     Download PDF

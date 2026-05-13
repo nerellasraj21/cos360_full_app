@@ -8,6 +8,7 @@ import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFo
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useStaffAttendance, useCreateStaffAttendance, useUpdateStaffAttendance, useDeleteStaffAttendance, useStaffEnrollments } from '@/hooks/staff/useStaff';
+import { usePermission } from '@/hooks/usePermission';
 import type { StaffAttendance, StaffAttendanceInput, Staff } from '@/types/staff/staff';
 import { toast } from 'sonner';
 
@@ -18,6 +19,12 @@ interface StaffAttendanceTableProps {
 interface AttendanceFormData extends StaffAttendanceInput {}
 
 export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
+    const { checkPermission } = usePermission();
+    const canCreate = checkPermission('staff_attendance', 'create');
+    const canUpdate = checkPermission('staff_attendance', 'update');
+    const canDelete = checkPermission('staff_attendance', 'delete');
+    const hasAnyAction = canCreate || canUpdate || canDelete;
+
     const [editingAttendance, setEditingAttendance] = useState<StaffAttendance | null>(null);
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState<StaffAttendance | null>(null);
@@ -258,10 +265,12 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                         />
                     </div>
                 </div>
-                <Button onClick={handleCreate} className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Record Attendance
-                </Button>
+                {canCreate && (
+                    <Button onClick={handleCreate} className="flex items-center gap-2">
+                        <Plus className="h-4 w-4" />
+                        Record Attendance
+                    </Button>
+                )}
             </div>
 
             {/* Attendance Table */}
@@ -293,9 +302,11 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                                     <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                         Attendance Status
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        Actions
-                                    </th>
+                                    {hasAnyAction && (
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                            Actions
+                                        </th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="bg-card divide-y divide-border">
@@ -324,20 +335,25 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                                                 <span className="text-muted-foreground">Not marked</span>
                                             )}
                                         </td>
+                                        {hasAnyAction && (
                                         <td className="px-4 py-3 text-sm align-middle">
                                             <TableActionGroup>
                                                 {staffMember.attendance ? (
                                                     <>
-                                                        <EditButton
-                                                            onClick={() => handleEdit(staffMember.attendance!)}
-                                                            title="Edit Attendance"
-                                                        />
-                                                        <DeleteButton
-                                                            onClick={() => handleDelete(staffMember.attendance!)}
-                                                            title="Delete Attendance"
-                                                        />
+                                                        {canUpdate && (
+                                                            <EditButton
+                                                                onClick={() => handleEdit(staffMember.attendance!)}
+                                                                title="Edit Attendance"
+                                                            />
+                                                        )}
+                                                        {canDelete && (
+                                                            <DeleteButton
+                                                                onClick={() => handleDelete(staffMember.attendance!)}
+                                                                title="Delete Attendance"
+                                                            />
+                                                        )}
                                                     </>
-                                                ) : (
+                                                ) : canCreate ? (
                                                     <div className="flex gap-1">
                                                         <Button
                                                             variant="ghost"
@@ -360,9 +376,10 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                                                             Absent
                                                         </Button>
                                                     </div>
-                                                )}
+                                                ) : null}
                                             </TableActionGroup>
                                         </td>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>

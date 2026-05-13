@@ -28,9 +28,10 @@ interface CategoryNodeProps {
     canUpdate: boolean;
     canDelete: boolean;
     canViewTypes: boolean;
+    canManageTypes: boolean;
 }
 
-function CategoryNode({ category, serialNumber, onEdit, onDelete, onManageTypes, canUpdate, canDelete, canViewTypes }: CategoryNodeProps) {
+function CategoryNode({ category, serialNumber, onEdit, onDelete, onManageTypes, canUpdate, canDelete, canViewTypes, canManageTypes }: CategoryNodeProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [showActions, setShowActions] = useState(false);
     const { data: feeTypes = [], isLoading: typesLoading } = useFeeCategoryTypes(category.id, canViewTypes);
@@ -77,7 +78,7 @@ function CategoryNode({ category, serialNumber, onEdit, onDelete, onManageTypes,
                     "flex items-center gap-1 transition-opacity",
                     showActions ? "opacity-100" : "opacity-0"
                 )}>
-                    {canViewTypes && (
+                    {canManageTypes && (
                         <Button
                             variant="ghost"
                             size="sm"
@@ -192,6 +193,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
     const canUpdate = checkPermission('fee_categories', 'update');
     const canDelete = checkPermission('fee_categories', 'delete');
     const canViewTypes = checkPermission('fee_types', 'list');
+    const canManageTypes = checkPermission('fee_types', 'create') || checkPermission('fee_types', 'update') || checkPermission('fee_types', 'delete');
 
     // Calculate pagination params
     const skip = (currentPage - 1) * pageSize;
@@ -225,20 +227,6 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
         }
         return filtered;
     }, [allCategories, searchQuery, statusFilter]);
-
-    // Debug logging
-    console.log('[FeeCategoryTree] Component state:', {
-        isLoading,
-        isFetching,
-        error,
-        categoriesResponse,
-        categories,
-        totalCategories,
-        selectedAcademicYearId,
-        skip,
-        limit: pageSize,
-        statusFilter
-    });
 
     const handleCreate = () => {
         setFormData({
@@ -408,6 +396,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
                             canUpdate={canUpdate}
                             canDelete={canDelete}
                             canViewTypes={canViewTypes}
+                            canManageTypes={canManageTypes}
                         />
                     ))}
                 </div>

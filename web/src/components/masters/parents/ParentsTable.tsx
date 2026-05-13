@@ -8,6 +8,7 @@ import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFo
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useParents, useCreateParent, useUpdateParent, useDeleteParent } from '@/hooks/masters/useParents';
+import { usePermission } from '@/hooks/usePermission';
 import type { Parent, ParentInput } from '@/types/masters/parent';
 import { toast } from 'sonner';
 
@@ -18,6 +19,12 @@ interface ParentsTableProps {
 interface ParentFormData extends ParentInput {}
 
 export function ParentsTable({ className }: ParentsTableProps) {
+    const { checkPermission } = usePermission();
+    const canCreate = checkPermission('parent_management', 'create');
+    const canUpdate = checkPermission('parent_management', 'update');
+    const canDelete = checkPermission('parent_management', 'delete');
+    const hasAnyAction = canUpdate || canDelete;
+
     const [editingParent, setEditingParent] = useState<Parent | null>(null);
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [isFormDirty, setIsFormDirty] = useState(false);
@@ -188,10 +195,12 @@ export function ParentsTable({ className }: ParentsTableProps) {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-foreground">Parent Profiles</h2>
-                <Button onClick={handleCreate} className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Parent
-                </Button>
+                {canCreate && (
+                    <Button onClick={handleCreate} className="flex items-center gap-2">
+                        <Plus className="h-4 w-4" />
+                        Add Parent
+                    </Button>
+                )}
             </div>
 
             {/* Filter bar */}
@@ -252,9 +261,11 @@ export function ParentsTable({ className }: ParentsTableProps) {
                                     <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                         Students
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        Actions
-                                    </th>
+                                    {hasAnyAction && (
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                            Actions
+                                        </th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="bg-card divide-y divide-border">
@@ -299,18 +310,24 @@ export function ParentsTable({ className }: ParentsTableProps) {
                                                 <span>{parent.students?.length || 0} student{parent.students?.length !== 1 ? 's' : ''}</span>
                                             </div>
                                         </td>
+                                        {hasAnyAction && (
                                         <td className="px-4 align-middle text-sm">
                                             <TableActionGroup>
-                                                <EditButton
-                                                    onClick={() => handleEdit(parent)}
-                                                    title="Edit Parent"
-                                                />
-                                                <DeleteButton
-                                                    onClick={() => handleDelete(parent)}
-                                                    title="Delete Parent"
-                                                />
+                                                {canUpdate && (
+                                                    <EditButton
+                                                        onClick={() => handleEdit(parent)}
+                                                        title="Edit Parent"
+                                                    />
+                                                )}
+                                                {canDelete && (
+                                                    <DeleteButton
+                                                        onClick={() => handleDelete(parent)}
+                                                        title="Delete Parent"
+                                                    />
+                                                )}
                                             </TableActionGroup>
                                         </td>
+                                        )}
                                     </tr>
                                 ))}
                                 {sortedParents.length === 0 && (
@@ -327,9 +344,11 @@ export function ParentsTable({ className }: ParentsTableProps) {
             ) : (
                 <div className="text-center py-8 text-muted-foreground bg-card border border-border rounded-lg">
                     <p>No parent profiles found.</p>
-                    <Button onClick={handleCreate} className="mt-4">
-                        Create First Parent Profile
-                    </Button>
+                    {canCreate && (
+                        <Button onClick={handleCreate} className="mt-4">
+                            Create First Parent Profile
+                        </Button>
+                    )}
                 </div>
             )}
 

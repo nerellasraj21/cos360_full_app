@@ -57,16 +57,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [parentStudentsData, setAvailableStudents]);
 
-  // Auto-select first student if none selected and students are available
+  // Sync selectedStudent whenever fresh student data arrives from API
   React.useEffect(() => {
-    if (!selectedStudent && availableStudents.length > 0) {
-      logger.debug('Auto-selecting first student', { 
-        studentId: availableStudents[0].id,
-        studentName: availableStudents[0].name
-      });
-      selectStudent(availableStudents[0]);
+    if (availableStudents.length > 0) {
+      const currentId = selectedStudent?.id;
+      const freshMatch = availableStudents.find((s) => s.id === currentId);
+      // Re-select with fresh data (updates stale persisted ID), or select first if none
+      selectStudent(freshMatch ?? availableStudents[0]);
     }
-  }, [selectedStudent, availableStudents, selectStudent]);
+  }, [availableStudents]);
 
   // Log authentication state changes
   React.useEffect(() => {

@@ -192,7 +192,6 @@ export default function ExamList() {
     const roleName = s.user?.role?.name?.toLowerCase() ?? ''
     return roleName === 'admin' || roleName === 'superadmin' || roleName === 'principal'
   })
-
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [natureFilter, setNatureFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -358,7 +357,7 @@ export default function ExamList() {
                 <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('nature')}>Nature <SortIcon col="nature" /></th>
                 <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('status')}>Status <SortIcon col="status" /></th>
                 <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('mark_entry_deadline')}>Deadline <SortIcon col="mark_entry_deadline" /></th>
-                <th className="px-4 py-3 text-right font-medium sticky right-0 bg-muted/40">Actions</th>
+                {isAdmin && <th className="px-4 py-3 text-right font-medium sticky right-0 bg-muted/40">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -405,19 +404,21 @@ export default function ExamList() {
                   <td className="px-4 py-3 text-muted-foreground">
                     {exam.mark_entry_deadline ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-right sticky right-0 bg-background" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        title="Edit Exam"
-                        onClick={() => { setIsEditDirty(false); setEditTarget(exam); }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
+                  {isAdmin && (
+                    <td className="px-4 py-3 text-right sticky right-0 bg-background" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          title="Edit Exam"
+                          onClick={() => { setIsEditDirty(false); setEditTarget(exam); }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

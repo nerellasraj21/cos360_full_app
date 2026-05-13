@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { usePermission } from '@/hooks/usePermission';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -273,6 +274,10 @@ function TemplateFormModal({ open, onOpenChange, editing }: TemplateFormModalPro
 
 // ─── Main Templates Tab ───────────────────────────────────────────────────────
 export default function TemplatesTab() {
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('communications', 'create');
+  const canUpdate = checkPermission('communications', 'update');
+
   const [channelFilter, setChannelFilter] = useState<Channel | ''>('');
   const [statusFilter, setStatusFilter] = useState<'' | 'active' | 'inactive'>('');
   const [search, setSearch] = useState('');
@@ -351,9 +356,11 @@ export default function TemplatesTab() {
           aria-label="Search templates"
         />
 
-        <Button onClick={openCreate} className="ml-auto whitespace-nowrap">
-          + New Template
-        </Button>
+        {canCreate && (
+          <Button onClick={openCreate} className="ml-auto whitespace-nowrap">
+            + New Template
+          </Button>
+        )}
       </div>
 
       {/* Table — desktop */}
@@ -400,17 +407,19 @@ export default function TemplatesTab() {
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEdit(t)}
-                          aria-label={`Edit ${t.name}`}
-                          className="h-8 w-8 p-0"
-                          title="Edit Template"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {t.is_active && (
+                        {canUpdate && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEdit(t)}
+                            aria-label={`Edit ${t.name}`}
+                            className="h-8 w-8 p-0"
+                            title="Edit Template"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canUpdate && t.is_active && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -452,10 +461,12 @@ export default function TemplatesTab() {
                   </p>
                 )}
                 <div className="flex gap-2 pt-1">
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Template" onClick={() => openEdit(t)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  {t.is_active && (
+                  {canUpdate && (
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Template" onClick={() => openEdit(t)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {canUpdate && t.is_active && (
                     <Button
                       variant="ghost"
                       size="sm"

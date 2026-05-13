@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { useExamList } from '@/api/hooks/exam/useExam'
 import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
 import { useAcademicYearStore } from '@/lib/academicYearStore'
+import { useAuthStore } from '@/lib/authStore'
 import type { ExamListItem } from '@/types/exam'
 
 const statusColor: Record<string, string> = {
@@ -76,6 +77,11 @@ export default function ExamDashboard() {
     if (academicYears.length === 0) fetchAndSetAcademicYears()
   }, [academicYears.length, fetchAndSetAcademicYears])
 
+  const isAdmin = useAuthStore(s => {
+    const roleName = s.user?.role?.name?.toLowerCase() ?? ''
+    return roleName === 'admin' || roleName === 'superadmin' || roleName === 'principal'
+  })
+
   const [searchQuery, setSearchQuery] = useState('')
 
   const selectedYear = academicYears.find(y => String(y.id) === String(selectedAcademicYearId))
@@ -106,12 +112,12 @@ export default function ExamDashboard() {
         title="Exam Management"
         subtitle={selectedYear ? `Academic Year: ${selectedYear.title}` : 'All academic years'}
         icon={<ClipboardList className="h-5 w-5" />}
-        actions={
+        actions={isAdmin ? (
           <Button onClick={() => navigate({ to: '/exam/exams/create' as any })} className="gap-2">
             <Plus className="h-4 w-4" />
             New Exam
           </Button>
-        }
+        ) : null}
       />
 
       {/* Quick Links */}
@@ -192,7 +198,7 @@ export default function ExamDashboard() {
                   ? 'No exams found for this academic year.'
                   : 'No exams match your search.'}
               </p>
-              {exams.length === 0 && (
+              {isAdmin && exams.length === 0 && (
                 <Button
                   className="mt-4"
                   onClick={() => navigate({ to: '/exam/exams/create' as any })}

@@ -13,6 +13,7 @@ import { useFeeTypes } from '@/hooks/fee/useFeeTypes';
 import { useFeeCategories } from '@/hooks/fee/useFeeCategories';
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
+import { usePermission } from '@/hooks/usePermission';
 import { TermAmountModal } from './TermAmountModal';
 import type { FeeClassMapping, FeeType } from '@/types/fee';
 import { toast } from 'sonner';
@@ -36,6 +37,11 @@ type SortDir = 'asc' | 'desc';
 export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingTableProps) {
     const { selectedAcademicYearId } = useAcademicYearStore();
     const selectStyles = useSelectStyles();
+    const { checkPermission } = usePermission();
+    const canCreate = checkPermission('fee_class_mappings', 'create');
+    const canUpdate = checkPermission('fee_class_mappings', 'update');
+    const canDelete = checkPermission('fee_class_mappings', 'delete');
+    const hasAnyAction = canCreate || canUpdate || canDelete;
 
     const [isHighlighted, setIsHighlighted] = useState(false);
 
@@ -343,10 +349,12 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
             {/* Header */}
             <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-foreground">Fee Class Mappings</h2>
-                <Button onClick={handleCreate} className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Mapping
-                </Button>
+                {canCreate && (
+                    <Button onClick={handleCreate} className="flex items-center gap-2">
+                        <Plus className="h-4 w-4" />
+                        Add Mapping
+                    </Button>
+                )}
             </div>
 
             {/* Search */}
@@ -406,9 +414,11 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                                     >
                                         Assignment Type {<SortIcon colKey='assignmentType' />}
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        Actions
-                                    </th>
+                                    {hasAnyAction && (
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                            Actions
+                                        </th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="bg-card divide-y divide-border">
@@ -468,30 +478,38 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                                                     {mapping.all_by_default ? 'Default' : 'Custom'}
                                                 </Badge>
                                             </td>
-                                            <td className="px-4 py-3 text-sm align-middle">
-                                                <TableActionGroup>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleManageTermAmounts(mapping)}
-                                                        className={cn(
-                                                            "h-8 w-8 p-0 transition-all duration-300",
-                                                            isHighlighted && index === 0 && "text-amber-600 dark:text-amber-400 scale-110"
+                                            {hasAnyAction && (
+                                                <td className="px-4 py-3 text-sm align-middle">
+                                                    <TableActionGroup>
+                                                        {canUpdate && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleManageTermAmounts(mapping)}
+                                                                className={cn(
+                                                                    "h-8 w-8 p-0 transition-all duration-300",
+                                                                    isHighlighted && index === 0 && "text-amber-600 dark:text-amber-400 scale-110"
+                                                                )}
+                                                                title="Manage Term Amounts"
+                                                            >
+                                                                <Calculator className="h-4 w-4" />
+                                                            </Button>
                                                         )}
-                                                        title="Manage Term Amounts"
-                                                    >
-                                                        <Calculator className="h-4 w-4" />
-                                                    </Button>
-                                                    <EditButton
-                                                        onClick={() => handleEdit(mapping)}
-                                                        title="Edit Mapping"
-                                                    />
-                                                    <DeleteButton
-                                                        onClick={() => handleDelete(mapping)}
-                                                        title="Delete Mapping"
-                                                    />
-                                                </TableActionGroup>
-                                            </td>
+                                                        {canUpdate && (
+                                                            <EditButton
+                                                                onClick={() => handleEdit(mapping)}
+                                                                title="Edit Mapping"
+                                                            />
+                                                        )}
+                                                        {canDelete && (
+                                                            <DeleteButton
+                                                                onClick={() => handleDelete(mapping)}
+                                                                title="Delete Mapping"
+                                                            />
+                                                        )}
+                                                    </TableActionGroup>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })}
@@ -502,9 +520,11 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
             ) : (
                 <div className="text-center py-8 text-muted-foreground bg-card border border-border rounded-lg">
                     <p>No fee mappings found for the selected academic year.</p>
-                    <Button onClick={handleCreate} className="mt-4">
-                        Create First Mapping
-                    </Button>
+                    {canCreate && (
+                        <Button onClick={handleCreate} className="mt-4">
+                            Create First Mapping
+                        </Button>
+                    )}
                 </div>
             )}
 

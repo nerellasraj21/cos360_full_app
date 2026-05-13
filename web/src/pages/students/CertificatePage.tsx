@@ -1,38 +1,39 @@
 import React from "react";
 import { useAuthStore } from "@/lib/authStore";
+import { PermissionGuard } from "@/components/PermissionGuard";
 import { CertificateUploadPage } from "./CertificateUploadPage";
 import { StudentCertificatesPage } from "./StudentCertificatesPage";
 import { MyCertificatesPage } from "./MyCertificatesPage";
 import { ParentCertificatePage } from "./ParentCertificatePage";
 
-/**
- * Role-aware certificate page router.
- *
- * Admin / Staff  → CertificateUploadPage  (issue + manage all certs)
- * Teacher        → StudentCertificatesPage (read-only, per-student view)
- * Student        → MyCertificatesPage      (own certs via /certificates/my)
- * Parent         → ParentCertificatePage   (child certs via /certificates/my-child/{id})
- */
 const CertificatePage: React.FC = () => {
   const role = useAuthStore((s) => s.role);
-  const entityId = useAuthStore((s) => s.entityId);
-
   const roleName = role?.name.toLowerCase() ?? "";
 
-  if (roleName === "student") {
-    return <MyCertificatesPage />;
-  }
-
-  if (roleName === "parent") {
-    return <ParentCertificatePage parentEntityId={entityId} />;
-  }
-
-  if (roleName === "teacher") {
-    return <StudentCertificatesPage />;
-  }
-
-  // Admin / Staff — full management
-  return <CertificateUploadPage />;
+  return (
+    <PermissionGuard
+      permissions={[
+        ["student_certificates", "list"],
+        ["student_certificates", "list_own"],
+        ["student_certificates", "list_related"],
+      ]}
+      fallback={
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Access Denied</h2>
+            <p className="text-gray-600">You don't have permission to view Certificates.</p>
+          </div>
+        </div>
+      }
+    >
+      {roleName === "student" && <MyCertificatesPage />}
+      {roleName === "parent" && <ParentCertificatePage />}
+      {roleName === "teacher" && <StudentCertificatesPage />}
+      {roleName !== "student" && roleName !== "parent" && roleName !== "teacher" && (
+        <CertificateUploadPage />
+      )}
+    </PermissionGuard>
+  );
 };
 
 export default CertificatePage;

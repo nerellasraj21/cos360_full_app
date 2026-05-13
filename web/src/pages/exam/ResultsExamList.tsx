@@ -151,7 +151,7 @@ export default function ResultsExamList() {
                     key={exam.id}
                     className="cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/20"
                     style={{ height: '48px' }}
-                    onClick={() => navigate({ to: (isStudentOrParent ? `/exam/my-marks/${exam.id}` : `/exam/results/${exam.id}`) as any })}
+                    onClick={() => navigate({ to: `/exam/results/${exam.id}` as any })}
                   >
                     <td className="px-4 py-3 text-muted-foreground text-sm">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium">{exam.exam_name}</td>
@@ -168,7 +168,7 @@ export default function ResultsExamList() {
                     <td className="px-4 py-3 text-right">
                       <Button variant="ghost" size="sm" className="gap-1 text-xs">
                         <Award className="h-3 w-3" />
-                        {isStudentOrParent ? 'View Marks' : 'View Results'}
+                        View Results
                         <ChevronRight className="h-3 w-3" />
                       </Button>
                     </td>

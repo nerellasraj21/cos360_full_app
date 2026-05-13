@@ -9,12 +9,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Plus, Search, Filter, Eye, Edit, Trash2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useExpenseTransactions, useExpenseTypeDropdown, useExpenseCategoryDropdown } from '@/hooks/expense';
+import { usePermission } from '@/hooks/usePermission';
 import { ExpenseTransactionForm } from './ExpenseTransactionForm';
 import { ExpenseTransactionView } from './ExpenseTransactionView';
 import { formatCurrency } from '@/lib/expenseValidation';
 import type { ExpenseTransaction } from '@/types/expense';
 
 export function ExpenseTransactions() {
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('expense_transactions', 'create');
+  const canUpdate = checkPermission('expense_transactions', 'update');
+  const canDelete = checkPermission('expense_transactions', 'delete');
+
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [isCreateDirty, setIsCreateDirty] = useState(false);
   const [viewTransaction, setViewTransaction] = useState<ExpenseTransaction | null>(null);
@@ -100,10 +106,12 @@ export function ExpenseTransactions() {
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle className="text-2xl font-bold">Expense Transactions</CardTitle>
-          <Button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            New Transaction
-          </Button>
+          {canCreate && (
+            <Button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              New Transaction
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -224,22 +232,26 @@ export function ExpenseTransactions() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditTransaction(transaction)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {/* handle delete */}}
-                        className="h-8 w-8 p-0 text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canUpdate && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditTransaction(transaction)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {/* handle delete */}}
+                          className="h-8 w-8 p-0 text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

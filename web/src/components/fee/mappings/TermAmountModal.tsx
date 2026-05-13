@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { useCreateClassMappingTermAmounts, useUpdateClassMappingTermAmounts } from '@/hooks/fee/useFeeMappings';
 import { useFeeType } from '@/hooks/fee/useFeeTypes';
 import { useFeeTerm, useFeeTermDates } from '@/hooks/fee/useFeeTerms';
+import { usePermission } from '@/hooks/usePermission';
 import type { FeeClassMapping, FeeTermAmount, FeeTermAmountCreateRequest } from '@/types/fee';
 import { toast } from 'sonner';
 
@@ -43,6 +44,11 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
     const [termAmounts, setTermAmounts] = useState<TermAmountFormData[]>([]);
     const [distributionMode, setDistributionMode] = useState<'equal' | 'manual'>('equal');
     const [isFormDirty, setIsFormDirty] = useState(false);
+
+    const { checkPermission } = usePermission();
+    const canCreate = checkPermission('fee_class_mapping_term_amounts', 'create');
+    const canUpdate = checkPermission('fee_class_mapping_term_amounts', 'update');
+    const canWrite = canCreate || canUpdate;
 
     // Use hooks for API integration
     const createTermAmountsMutation = useCreateClassMappingTermAmounts();
@@ -394,27 +400,29 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                     </div>
 
                     {/* Distribution Options */}
-                    <div className="space-y-3">
-                        <h3 className="font-medium text-gray-900">Distribution Options</h3>
-                        <div className="flex gap-3">
-                            <Button
-                                variant={distributionMode === 'equal' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={handleEqualDistribution}
-                                className="flex items-center gap-2"
-                            >
-                                <DivideSquare className="h-4 w-4" />
-                                Equal Distribution
-                            </Button>
-                            <Button
-                                variant={distributionMode === 'manual' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setDistributionMode('manual')}
-                            >
-                                Manual Entry
-                            </Button>
+                    {canWrite && (
+                        <div className="space-y-3">
+                            <h3 className="font-medium text-gray-900">Distribution Options</h3>
+                            <div className="flex gap-3">
+                                <Button
+                                    variant={distributionMode === 'equal' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={handleEqualDistribution}
+                                    className="flex items-center gap-2"
+                                >
+                                    <DivideSquare className="h-4 w-4" />
+                                    Equal Distribution
+                                </Button>
+                                <Button
+                                    variant={distributionMode === 'manual' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setDistributionMode('manual')}
+                                >
+                                    Manual Entry
+                                </Button>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Term Amounts */}
                     <div className="space-y-3">
@@ -440,10 +448,11 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                                                 min="0"
                                                 step="0.01"
                                                 value={termAmount.term_amount || 0}
-                                                onChange={(e) => handleManualAmountChange(
+                                                onChange={(e) => canWrite && handleManualAmountChange(
                                                     termAmount.term_number,
                                                     parseFloat(e.target.value) || 0
                                                 )}
+                                                readOnly={!canWrite}
                                                 placeholder="Amount"
                                                 className="text-right"
                                             />
@@ -502,23 +511,25 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                 <DialogFooter>
                     <DialogClose asChild>
                         <Button variant="outline">
-                            Cancel
+                            {canWrite ? 'Cancel' : 'Close'}
                         </Button>
                     </DialogClose>
-                    <Button
-                        onClick={handleSave}
-                        disabled={!isValidDistribution() || createTermAmountsMutation.isPending || updateTermAmountsMutation.isPending}
-                        className="flex items-center gap-2"
-                    >
-                        {createTermAmountsMutation.isPending || updateTermAmountsMutation.isPending ? (
-                            'Saving...'
-                        ) : (
-                            <>
-                                <CheckCircle className="h-4 w-4" />
-                                Save Term Amounts
-                            </>
-                        )}
-                    </Button>
+                    {canWrite && (
+                        <Button
+                            onClick={handleSave}
+                            disabled={!isValidDistribution() || createTermAmountsMutation.isPending || updateTermAmountsMutation.isPending}
+                            className="flex items-center gap-2"
+                        >
+                            {createTermAmountsMutation.isPending || updateTermAmountsMutation.isPending ? (
+                                'Saving...'
+                            ) : (
+                                <>
+                                    <CheckCircle className="h-4 w-4" />
+                                    Save Term Amounts
+                                </>
+                            )}
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

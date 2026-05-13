@@ -33,8 +33,8 @@ export const ROUTE_SEGMENT_LABELS: Record<string, string> = {
   enrollment: 'Enrollment',
 
   // Fee
-  fee: 'Fee Management',
-  fees: 'Fee Management',
+  fee: 'Fee',
+  fees: 'Fee',
   categories: 'Categories',
   types: 'Types',
   terms: 'Terms',

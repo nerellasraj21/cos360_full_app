@@ -45,6 +45,7 @@ import {
   useUpdateConcession,
   useDeleteConcession,
 } from '@/hooks/fee';
+import { usePermission } from '@/hooks/usePermission';
 import { formatCurrency } from './FeeSummaryTab';
 import type { ConcessionHistoryItem, ConcessionUpdate } from '@/types/fee';
 
@@ -73,6 +74,11 @@ interface ConcessionTabProps {
 
 export default function ConcessionTab({ studentId }: ConcessionTabProps) {
   const { selectedAcademicYearId } = useAcademicYearStore();
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('fee_concessions', 'create');
+  const canUpdate = checkPermission('fee_concessions', 'update');
+  const canDelete = checkPermission('fee_concessions', 'delete');
+  const hasAnyHistoryAction = canUpdate || canDelete;
   const { data: summaryData, isLoading } = useConcessionSummary(studentId, selectedAcademicYearId);
   const bulkCreateMutation = useBulkCreateConcessions();
 
@@ -178,19 +184,21 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Apply Concessions</CardTitle>
-            <Button
-              size="sm"
-              onClick={handleSaveAll}
-              disabled={!hasValidConcessions || bulkCreateMutation.isPending}
-            >
-              {bulkCreateMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Saving...
-                </>
-              ) : (
-                'Save All Concessions'
-              )}
-            </Button>
+            {canCreate && (
+              <Button
+                size="sm"
+                onClick={handleSaveAll}
+                disabled={!hasValidConcessions || bulkCreateMutation.isPending}
+              >
+                {bulkCreateMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Saving...
+                  </>
+                ) : (
+                  'Save All Concessions'
+                )}
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -231,14 +239,16 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
                         max={row.assigned_fee}
                         step="0.01"
                         value={row.concession_amount || ''}
-                        onChange={(e) => updateRow(idx, 'concession_amount', Number(e.target.value))}
+                        onChange={(e) => canCreate && updateRow(idx, 'concession_amount', Number(e.target.value))}
+                        readOnly={!canCreate}
                         className="h-8 w-28"
                       />
                     </TableCell>
                     <TableCell>
                       <Input
                         value={row.reason}
-                        onChange={(e) => updateRow(idx, 'reason', e.target.value)}
+                        onChange={(e) => canCreate && updateRow(idx, 'reason', e.target.value)}
+                        readOnly={!canCreate}
                         placeholder="Reason..."
                         className="h-8"
                       />
@@ -246,7 +256,8 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
                     <TableCell>
                       <Select
                         value={row.approved_by}
-                        onValueChange={(v) => updateRow(idx, 'approved_by', v)}
+                        onValueChange={(v) => canCreate && updateRow(idx, 'approved_by', v)}
+                        disabled={!canCreate}
                       >
                         <SelectTrigger className="h-8">
                           <SelectValue placeholder="Select" />
@@ -315,7 +326,7 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
                       <TableHead>Reason</TableHead>
                       <TableHead>Approver</TableHead>
                       <TableHead>Recorded By</TableHead>
-                      <TableHead className="w-20">Actions</TableHead>
+                      {hasAnyHistoryAction && <TableHead className="w-20">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -329,12 +340,14 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
                         <TableCell className="text-sm">{item.reason}</TableCell>
                         <TableCell className="text-sm capitalize">{item.approver}</TableCell>
                         <TableCell className="text-sm">{item.recorded_by_staff_name || '-'}</TableCell>
-                        <TableCell>
-                          <TableActionGroup>
-                            <EditButton onClick={() => handleEditOpen(item)} />
-                            <DeleteButton onClick={() => setDeleteId(item.id)} />
-                          </TableActionGroup>
-                        </TableCell>
+                        {hasAnyHistoryAction && (
+                          <TableCell>
+                            <TableActionGroup>
+                              {canUpdate && <EditButton onClick={() => handleEditOpen(item)} />}
+                              {canDelete && <DeleteButton onClick={() => setDeleteId(item.id)} />}
+                            </TableActionGroup>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>

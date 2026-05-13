@@ -77,6 +77,10 @@ export const PERMISSIONS = {
     UPDATE: 'student_certificates:update',
     DELETE: 'student_certificates:delete',
     LIST: 'student_certificates:list',
+    LIST_OWN: 'student_certificates:list_own',
+    LIST_RELATED: 'student_certificates:list_related',
+    READ_OWN: 'student_certificates:read_own',
+    READ_RELATED: 'student_certificates:read_related',
   },
   CERTIFICATE_TYPES: {
     CREATE: 'certificate_types:create',
@@ -186,16 +190,20 @@ export const PERMISSIONS = {
   FEE_TRANSACTIONS: {
     CREATE: 'fee_transactions:create',
     READ: 'fee_transactions:read',
+    READ_OWN: 'fee_transactions:read_own',
     UPDATE: 'fee_transactions:update',
     DELETE: 'fee_transactions:delete',
     LIST: 'fee_transactions:list',
+    LIST_OWN: 'fee_transactions:list_own',
   },
   FEE_RECEIPTS: {
     CREATE: 'fee_receipts:create',
     READ: 'fee_receipts:read',
+    READ_OWN: 'fee_receipts:read_own',
     UPDATE: 'fee_receipts:update',
     DELETE: 'fee_receipts:delete',
     LIST: 'fee_receipts:list',
+    LIST_OWN: 'fee_receipts:list_own',
   },
   FEE_REFUNDS: {
     CREATE: 'fee_refunds:create',

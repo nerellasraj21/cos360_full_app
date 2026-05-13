@@ -810,6 +810,35 @@ export function useStudentResults(examId: string, params?: { student_id?: string
 }
 
 // ---------------------------------------------------------------------------
+// Student/Parent Results (exam_results: read_own / list_own)
+// ---------------------------------------------------------------------------
+export function useMyResults() {
+  return useQuery<StudentExamResult[]>({
+    queryKey: ['myResults'],
+    queryFn: () => examApi.getMyResults(),
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
+export function useMyResult(examId: string) {
+  return useQuery<StudentExamResult>({
+    queryKey: ['myResult', examId],
+    queryFn: () => examApi.getMyResult(examId),
+    enabled: !!examId,
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
+export function useChildResult(examId: string, studentId: string | null | undefined) {
+  return useQuery<StudentExamResult>({
+    queryKey: ['childResult', examId, studentId],
+    queryFn: () => examApi.getChildResult(examId, studentId!),
+    enabled: !!examId && !!studentId,
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Raw Marks View (student/parent)
 // ---------------------------------------------------------------------------
 export function useMyMarks(examId: string) {

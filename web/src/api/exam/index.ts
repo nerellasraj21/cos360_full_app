@@ -420,6 +420,7 @@ export const overrideHallTicketEligibility = async (examId: string, studentId: s
   return response.data
 }
 
+
 export const downloadHallTicket = async (examId: string, studentId: string): Promise<Blob> => {
   const response = await CAxios.get(`/exams/${examId}/hall-tickets/download`, {
     params: { student_id: studentId },
@@ -444,6 +445,24 @@ export const getStudentResults = async (examId: string, params?: { student_id?: 
 
 export const getStudentResult = async (examId: string, studentId: string): Promise<StudentExamResult> => {
   const response = await CAxios.get(`/exams/${examId}/results/${studentId}`)
+  return response.data
+}
+
+// Student: list all own results across all exams (exam_results: list_own)
+export const getMyResults = async (): Promise<StudentExamResult[]> => {
+  const response = await CAxios.get('/exams/my-results')
+  return response.data
+}
+
+// Student: own result for a specific exam (exam_results: read_own)
+export const getMyResult = async (examId: string): Promise<StudentExamResult> => {
+  const response = await CAxios.get(`/exams/${examId}/my-result`)
+  return response.data
+}
+
+// Parent: child's result for a specific exam
+export const getChildResult = async (examId: string, studentId: string): Promise<StudentExamResult> => {
+  const response = await CAxios.get(`/exams/${examId}/child-result/${studentId}`)
   return response.data
 }
 

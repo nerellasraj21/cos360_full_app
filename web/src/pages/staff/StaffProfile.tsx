@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useStaffProfile, useUpdateStaffProfile } from '@/api/hooks/staff/useStaffProfile';
+import { usePermission } from '@/hooks/usePermission';
 import {
   Card,
   CardContent,
@@ -35,6 +36,9 @@ interface ProfileFormData {
 }
 
 const StaffProfile: React.FC = () => {
+  const { checkPermission } = usePermission();
+  const canUpdateOwn = checkPermission('profile', 'update_own');
+
   const { data: profile, isLoading, error } = useStaffProfile();
   const updateMutation = useUpdateStaffProfile();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -119,6 +123,7 @@ const StaffProfile: React.FC = () => {
             <span className="font-medium">Phone:</span>
             <span className="text-muted-foreground">{profile.phone || 'N/A'}</span>
           </div>
+          {canUpdateOwn && (
           <div className="mt-2">
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} guardDirty={form.formState.isDirty} onDirtyDiscard={() => form.reset()}>
               <DialogTrigger asChild>
@@ -187,6 +192,7 @@ const StaffProfile: React.FC = () => {
               </DialogContent>
             </Dialog>
           </div>
+          )}
         </CardContent>
       </Card>
 

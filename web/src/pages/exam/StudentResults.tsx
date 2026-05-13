@@ -1,21 +1,216 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Loader2, Download, Search, RefreshCw, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Loader2, Download, Search, RefreshCw, ChevronDown, Award, CheckCircle, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useExamDetail, useStudentResults, useComputeAggregate } from '@/api/hooks/exam/useExam'
+import { Badge } from '@/components/ui/badge'
+import {
+  useExamDetail,
+  useStudentResults,
+  useComputeAggregate,
+  useMyResult,
+  useChildResult,
+} from '@/api/hooks/exam/useExam'
 import { ResultsTable } from '@/components/exam/ResultsTable'
+import { useAuthStore } from '@/lib/authStore'
 import * as XLSX from 'xlsx'
+import type { StudentExamResult } from '@/types/exam'
 
-export default function StudentResults() {
-  const { id } = useParams({ strict: false }) as { id: string }
+// ---------------------------------------------------------------------------
+// Shared result card — used by both StudentResultView and ParentResultView
+// ---------------------------------------------------------------------------
+function ResultSummaryCard({ result }: { result: StudentExamResult }) {
+  return (
+    <div className="space-y-4">
+      {/* Overall result */}
+      <div className={`rounded-lg border p-6 ${
+        result.is_passed
+          ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
+          : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
+      }`}>
+        <div className="flex items-center gap-4">
+          {result.is_passed
+            ? <CheckCircle className="h-10 w-10 text-green-500 shrink-0" />
+            : <XCircle className="h-10 w-10 text-destructive shrink-0" />}
+          <div>
+            <p className={`text-lg font-semibold ${result.is_passed ? 'text-green-700 dark:text-green-400' : 'text-destructive'}`}>
+              {result.is_passed ? 'Pass' : 'Fail'}
+            </p>
+            {result.grade_label && (
+              <p className="text-sm text-muted-foreground">Grade: <strong>{result.grade_label}</strong></p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-lg border bg-card p-4">
+          <p className="text-xs text-muted-foreground mb-1">Total Marks</p>
+          <p className="text-xl font-bold">
+            {result.total_marks_obtained != null ? Number(result.total_marks_obtained).toFixed(1) : '—'}
+            <span className="text-sm text-muted-foreground font-normal"> / {result.total_max_marks ?? '—'}</span>
+          </p>
+        </div>
+        <div className="rounded-lg border bg-card p-4">
+          <p className="text-xs text-muted-foreground mb-1">Percentage</p>
+          <p className="text-xl font-bold">
+            {result.percentage != null ? `${Number(result.percentage).toFixed(1)}%` : '—'}
+          </p>
+        </div>
+        <div className="rounded-lg border bg-card p-4">
+          <p className="text-xs text-muted-foreground mb-1">GPA</p>
+          <p className="text-xl font-bold">
+            {result.gpa != null ? Number(result.gpa).toFixed(2) : '—'}
+          </p>
+        </div>
+        <div className="rounded-lg border bg-card p-4">
+          <p className="text-xs text-muted-foreground mb-1">Rank</p>
+          <p className="text-xl font-bold">
+            {result.rank != null ? `#${result.rank}` : '—'}
+          </p>
+        </div>
+      </div>
+
+      {/* Subject breakdown */}
+      {result.subject_results && result.subject_results.length > 0 && (
+        <div className="rounded-lg border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/40">
+                <th className="px-4 py-3 text-left font-medium">Subject</th>
+                <th className="px-4 py-3 text-left font-medium">Marks</th>
+                <th className="px-4 py-3 text-left font-medium">%</th>
+                <th className="px-4 py-3 text-left font-medium">Grade</th>
+                <th className="px-4 py-3 text-left font-medium">Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.subject_results.map((sr) => (
+                <tr key={sr.subject_config_id} className="border-b last:border-0">
+                  <td className="px-4 py-2 font-medium">{sr.subject_name ?? '—'}</td>
+                  <td className="px-4 py-2">
+                    {sr.is_absent ? (
+                      <Badge variant="destructive" className="text-xs">Absent</Badge>
+                    ) : (
+                      `${sr.marks_obtained != null ? Number(sr.marks_obtained).toFixed(1) : '—'} / ${sr.max_marks ?? '—'}`
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground">
+                    {sr.percentage != null ? `${Number(sr.percentage).toFixed(1)}%` : '—'}
+                  </td>
+                  <td className="px-4 py-2">{sr.grade_label ?? '—'}</td>
+                  <td className="px-4 py-2">
+                    {sr.is_passed != null ? (
+                      <span className={sr.is_passed ? 'text-green-600' : 'text-destructive'}>
+                        {sr.is_passed ? 'Pass' : 'Fail'}
+                      </span>
+                    ) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Student view — own result (exam_results: read_own)
+// ---------------------------------------------------------------------------
+function StudentResultView({ examId }: { examId: string }) {
+  const navigate = useNavigate()
+  const { data: exam } = useExamDetail(examId)
+  const { data: result, isLoading, error } = useMyResult(examId)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/exam/results' as any })} className="gap-1">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div>
+          <h1 className="text-lg font-bold">Results — {exam?.exam_name ?? '...'}</h1>
+          <p className="text-xs text-muted-foreground">Your exam result</p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <div className="rounded-lg border border-dashed p-10 text-center">
+          <Award className="h-10 w-10 mx-auto mb-3 text-muted-foreground/40" />
+          <p className="text-muted-foreground">Results have not been published yet. Check back later.</p>
+        </div>
+      ) : !result ? (
+        <div className="rounded-lg border border-dashed p-10 text-center">
+          <Award className="h-10 w-10 mx-auto mb-3 text-muted-foreground/40" />
+          <p className="text-muted-foreground">No result found for this exam.</p>
+        </div>
+      ) : (
+        <ResultSummaryCard result={result} />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Parent view — child's result
+// ---------------------------------------------------------------------------
+function ParentResultView({ examId }: { examId: string }) {
+  const navigate = useNavigate()
+  const { data: exam } = useExamDetail(examId)
+  const selectedStudent = useAuthStore(s => s.selectedStudent)
+  const { data: result, isLoading, error } = useChildResult(examId, selectedStudent?.id ?? null)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/exam/results' as any })} className="gap-1">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div>
+          <h1 className="text-lg font-bold">Results — {exam?.exam_name ?? '...'}</h1>
+          {selectedStudent && <p className="text-xs text-muted-foreground">{selectedStudent.name}</p>}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <div className="rounded-lg border border-dashed p-10 text-center">
+          <Award className="h-10 w-10 mx-auto mb-3 text-muted-foreground/40" />
+          <p className="text-muted-foreground">Results have not been published yet. Check back later.</p>
+        </div>
+      ) : !result ? (
+        <div className="rounded-lg border border-dashed p-10 text-center">
+          <Award className="h-10 w-10 mx-auto mb-3 text-muted-foreground/40" />
+          <p className="text-muted-foreground">No result found for this exam.</p>
+        </div>
+      ) : (
+        <ResultSummaryCard result={result} />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Admin view — all students (existing behaviour, unchanged)
+// ---------------------------------------------------------------------------
+function AdminResultView({ examId }: { examId: string }) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
 
-  const { data: exam } = useExamDetail(id)
-  const { data: results = [], isLoading } = useStudentResults(id)
-  const computeMutation = useComputeAggregate(id)
+  const { data: exam } = useExamDetail(examId)
+  const { data: results = [], isLoading } = useStudentResults(examId)
+  const computeMutation = useComputeAggregate(examId)
 
   const canCompute = exam?.status === 'active' || exam?.status === 'locked'
 
@@ -164,4 +359,16 @@ export default function StudentResults() {
       </p>
     </div>
   )
+}
+
+// ---------------------------------------------------------------------------
+// Router — picks view based on role
+// ---------------------------------------------------------------------------
+export default function StudentResults() {
+  const { id } = useParams({ strict: false }) as { id: string }
+  const role = useAuthStore(s => s.role?.name?.toLowerCase() ?? '')
+
+  if (role === 'student') return <StudentResultView examId={id} />
+  if (role === 'parent') return <ParentResultView examId={id} />
+  return <AdminResultView examId={id} />
 }

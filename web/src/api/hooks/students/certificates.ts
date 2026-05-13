@@ -319,31 +319,43 @@ export function useMyChildReceived(studentId: string) {
     queryKey: ['my-child-received', studentId],
     queryFn: async () => {
       const response = await CAxios.get(`${CERTIFICATES_BASE}/my-child/${studentId}/received`);
-      return response.data;
+      const data = response.data;
+      if (Array.isArray(data)) {
+        return { items: data, total: data.length, has_next: false };
+      }
+      return data;
     },
     enabled: !!studentId,
   });
 }
 
-// Parent + Student — child's issued certificates
+// Parent — child's issued certificates
 export function useMyChildIssued(studentId: string) {
   return useQuery<PaginatedResponse<CertificateRead>>({
     queryKey: ['my-child-issued', studentId],
     queryFn: async () => {
       const response = await CAxios.get(`${CERTIFICATES_BASE}/my-child/${studentId}/issued`);
-      return response.data;
+      const data = response.data;
+      if (Array.isArray(data)) {
+        return { items: data, total: data.length, has_next: false };
+      }
+      return data;
     },
     enabled: !!studentId,
   });
 }
 
-// Parent — child's certificates (combined, legacy)
+// Parent — child's certificates (combined)
 export function useMyChildCertificates(studentId: string) {
   return useQuery<PaginatedResponse<CertificateRead>>({
     queryKey: ['my-child-certificates', studentId],
     queryFn: async () => {
       const response = await CAxios.get(`${CERTIFICATES_BASE}/my-child/${studentId}`);
-      return response.data;
+      const data = response.data;
+      if (Array.isArray(data)) {
+        return { items: data, total: data.length, has_next: false };
+      }
+      return data;
     },
     enabled: !!studentId,
   });

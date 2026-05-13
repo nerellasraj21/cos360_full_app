@@ -5,6 +5,7 @@ import ComposeTab from './ComposeTab';
 import TemplatesTab from './TemplatesTab';
 import LogsTab from './LogsTab';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { usePermission } from '@/hooks/usePermission';
 
 type Tab = 'compose' | 'templates' | 'logs';
 
@@ -15,6 +16,9 @@ const TABS: { value: Tab; label: string }[] = [
 ];
 
 export default function CommunicationPage() {
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('communications', 'create');
+
   const [activeTab, setActiveTab] = useState<Tab>('compose');
 
   function handleSendSuccess() {
@@ -32,9 +36,11 @@ export default function CommunicationPage() {
         subtitle="Send messages, manage templates, and view notification logs"
         icon={<MessageSquare className="h-5 w-5" />}
         actions={
-          <Button variant="outline" onClick={handleNewTemplate}>
-            + New Template
-          </Button>
+          canCreate && (
+            <Button variant="outline" onClick={handleNewTemplate}>
+              + New Template
+            </Button>
+          )
         }
       />
 

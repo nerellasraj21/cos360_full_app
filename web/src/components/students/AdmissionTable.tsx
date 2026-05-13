@@ -123,7 +123,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
   const mediaBase = config.api.baseURL.replace(/\/api\/v\d+$/, '');
 
-  const { data: admissionsResponse, isLoading } = useAdmissions({ skip: page * pageSize, limit: pageSize });
+  const { data: admissionsResponse, isLoading, isError, error } = useAdmissions({ skip: page * pageSize, limit: pageSize });
   const { data: classesData = [] } = useClassSectionsDropdown();
   const { data: academicYears = [] } = useAcademicYears();
   const { data: admissionTypes = [] } = useAdmissionTypesDropdown();
@@ -449,6 +449,14 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       <div className="flex justify-center items-center py-8">
         <Loader2 className="h-8 w-8 animate-spin" />
         <span className="ml-2">Loading admissions...</span>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex justify-center items-center py-8 text-destructive">
+        <span>Failed to load admissions: {(error as Error)?.message || 'Unknown error'}</span>
       </div>
     );
   }

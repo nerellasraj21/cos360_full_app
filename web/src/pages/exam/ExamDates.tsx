@@ -14,10 +14,12 @@ import {
 } from '@/components/ui/dialog'
 import { useExamDates, useCreateExamDate, useUpdateExamDate, useDeleteExamDate, useExamDetail } from '@/api/hooks/exam/useExam'
 import type { ExamDate, ExamDatePayload } from '@/types/exam'
+import { useAuthStore } from '@/lib/authStore'
 
 export default function ExamDates() {
   const { id } = useParams({ strict: false }) as { id: string }
   const navigate = useNavigate()
+  const isParent = useAuthStore(s => s.role?.name?.toLowerCase() === 'parent')
 
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState<ExamDate | null>(null)
@@ -115,10 +117,12 @@ export default function ExamDates() {
             {exam && <p className="text-sm text-muted-foreground">{exam.exam_name}</p>}
           </div>
         </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Date
-        </Button>
+        {!isParent && (
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add Date
+          </Button>
+        )}
       </div>
 
       {dates.length === 0 ? (
@@ -127,10 +131,12 @@ export default function ExamDates() {
             <Calendar className="mb-3 h-10 w-10 text-muted-foreground/40" />
             <p className="font-medium">No exam dates yet</p>
             <p className="mt-1 text-sm text-muted-foreground">Add date, time, and venue for each subject</p>
-            <Button onClick={openCreate} className="mt-4 gap-2">
-              <Plus className="h-4 w-4" />
-              Add First Date
-            </Button>
+            {!isParent && (
+              <Button onClick={openCreate} className="mt-4 gap-2">
+                <Plus className="h-4 w-4" />
+                Add First Date
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -157,12 +163,12 @@ export default function ExamDates() {
                 <th className="px-4 py-3 text-left font-medium">Start</th>
                 <th className="px-4 py-3 text-left font-medium">End</th>
                 <th className="px-4 py-3 text-left font-medium cursor-pointer select-none" onClick={() => handleSort('venue')}>Venue <SortIcon col="venue" /></th>
-                <th className="px-4 py-3 text-right font-medium">Actions</th>
+                {!isParent && <th className="px-4 py-3 text-right font-medium">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {filteredDates.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground text-sm">{searchQuery ? 'No dates match your search' : 'No exam dates'}</td></tr>
+                <tr><td colSpan={isParent ? 8 : 9} className="px-4 py-8 text-center text-muted-foreground text-sm">{searchQuery ? 'No dates match your search' : 'No exam dates'}</td></tr>
               ) : filteredDates.map((date, idx) => (
                 <tr key={date.id} className="border-b transition-colors hover:bg-muted/20" style={{ height: '48px' }}>
                   <td className="px-4 py-3 text-muted-foreground text-sm">{idx + 1}</td>
@@ -173,21 +179,23 @@ export default function ExamDates() {
                   <td className="px-4 py-3 text-muted-foreground">{date.start_time ?? '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground">{date.end_time ?? '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground">{date.venue ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(date)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => setDeleteTarget(date.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
+                  {!isParent && (
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(date)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(date.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

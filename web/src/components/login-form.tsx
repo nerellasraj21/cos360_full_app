@@ -59,7 +59,7 @@ export default function LoginForm({
             navigate({ to: '/set-password' });
             return;
           }
-          navigate({ to: "/" });
+          navigate({ to: "/dashboard" });
         },
         onError: (error) => {
           console.error("Login error:", error);

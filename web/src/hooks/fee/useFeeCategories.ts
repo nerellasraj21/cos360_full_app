@@ -1,5 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { usePermission } from '@/hooks/usePermission';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePermissionProtectedMutation } from '@/hooks/usePermissionProtectedMutation';
 import { toast } from 'sonner';
 import { feeCategoriesApi } from '@/api/fee';
@@ -47,23 +46,10 @@ export function useFeeCategoriesHealth() {
  * @returns Paginated fee categories with total count
  */
 export function useFeeCategories(params?: FeeCategorySearchParams) {
-    const { checkPermission } = usePermission();
-    const hasListPermission = checkPermission('fee_categories', 'list');
-
-    console.log('[useFeeCategories] Hook called with:', {
-        params,
-        hasListPermission,
-        queryKey: feeCategoryKeys.list(params)
-    });
-
     return useQuery<FeeCategoryListResponse>({
         queryKey: feeCategoryKeys.list(params),
-        queryFn: () => {
-            console.log('[useFeeCategories] Fetching data...');
-            return feeCategoriesApi.getAllCategories(params);
-        },
-        enabled: hasListPermission,
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        queryFn: () => feeCategoriesApi.getAllCategories(params),
+        staleTime: 5 * 60 * 1000,
     });
 }
 
@@ -72,13 +58,10 @@ export function useFeeCategories(params?: FeeCategorySearchParams) {
  * @param id - Category ID
  */
 export function useFeeCategory(id: string) {
-    const { checkPermission } = usePermission();
-    const hasReadPermission = checkPermission('fee_categories', 'read');
-
     return useQuery<FeeCategory>({
         queryKey: feeCategoryKeys.detail(id),
         queryFn: () => feeCategoriesApi.getCategory(id),
-        enabled: !!id && hasReadPermission,
+        enabled: !!id,
         staleTime: 5 * 60 * 1000,
     });
 }

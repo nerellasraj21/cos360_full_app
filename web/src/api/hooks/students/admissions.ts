@@ -39,11 +39,9 @@ export function useAdmissions(params?: {
   skip?: number;
   limit?: number;
 }) {
-  return usePermissionProtectedQuery<AdmissionListResponse>({
+  return useQuery<AdmissionListResponse>({
     queryKey: ['admissions', params],
     queryFn: () => listAdmissions(params?.skip, params?.limit),
-    resource: 'student_admissions',
-    action: 'list',
   });
 }
 

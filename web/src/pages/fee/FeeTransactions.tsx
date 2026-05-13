@@ -33,10 +33,10 @@ import type {
   PaymentMethod,
   TransactionStatus
 } from '@/types/fee/transaction';
-import { Plus, Search, Eye, Edit, DollarSign, Receipt, Loader2, Filter, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Search, Eye, Edit, DollarSign, Receipt, Loader2, Filter, ChevronUp, ChevronDown, ChevronsUpDown, ShieldX } from 'lucide-react';
 import { toast } from 'sonner';
 import { PermissionGuard } from '@/components/common';
-import { ShieldX } from 'lucide-react';
+import { usePermission } from '@/hooks/usePermission';
 
 export default function FeeTransactions() {
   return (
@@ -70,6 +70,9 @@ export default function FeeTransactions() {
 
 function FeeTransactionsContent() {
   const { selectedAcademicYearId, academicYears, fetchAndSetAcademicYears } = useAcademicYearStore();
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('fee_transactions', 'create');
+  const canUpdate = checkPermission('fee_transactions', 'update');
   const [searchParams, setSearchParams] = useState<FeeTransactionSearchParams>({
     limit: 50,
     offset: 0
@@ -939,10 +942,12 @@ function FeeTransactionsContent() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-2xl font-bold">Fee Transactions</CardTitle>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Transaction
-            </Button>
+            {canCreate && (
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                New Transaction
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -1198,7 +1203,7 @@ function FeeTransactionsContent() {
               {/* Action Buttons */}
               <div className="flex flex-wrap justify-end gap-2">
                 {/* Receipt Generation */}
-                {selectedTransaction.status === 'completed' && !selectedTransaction.receipt_generated && (
+                {canUpdate && selectedTransaction.status === 'completed' && !selectedTransaction.receipt_generated && (
                   <Button
                     variant="default"
                     onClick={() => handleGenerateReceipt(selectedTransaction.id)}
@@ -1209,7 +1214,7 @@ function FeeTransactionsContent() {
                 )}
 
                 {/* Status Update Actions */}
-                {selectedTransaction.status === 'pending' && (
+                {canUpdate && selectedTransaction.status === 'pending' && (
                   <>
                     <Button
                       variant="default"
@@ -1227,7 +1232,7 @@ function FeeTransactionsContent() {
                 )}
 
                 {/* General Status Updates */}
-                {selectedTransaction.status !== 'completed' && selectedTransaction.status !== 'cancelled' && selectedTransaction.status !== 'bounced' && (
+                {canUpdate && selectedTransaction.status !== 'completed' && selectedTransaction.status !== 'cancelled' && selectedTransaction.status !== 'bounced' && (
                   <>
                     <Button
                       variant="outline"

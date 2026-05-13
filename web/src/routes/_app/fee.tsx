@@ -1,13 +1,12 @@
-import { createFileRoute, Outlet } from '@tanstack/react-router'
+﻿import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
+import { useAuthStore } from '@/lib/authStore'
 
 export const Route = createFileRoute('/_app/fee')({
-    component: FeeLayout,
+    beforeLoad: () => {
+        const role = useAuthStore.getState().role
+        if (role?.name?.toLowerCase() === 'teacher') {
+            throw redirect({ to: '/', replace: true })
+        }
+    },
+    component: () => <Outlet />,
 })
-
-function FeeLayout() {
-    return (
-        <div className="fee-layout">
-            <Outlet />
-        </div>
-    )
-}

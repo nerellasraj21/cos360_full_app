@@ -14,8 +14,15 @@ import { validateCategoryForm } from '@/lib/expenseValidation';
 import { handleExpenseApiError } from '@/lib/expenseErrorHandler';
 import type { ExpenseCategory, ExpenseCategoryCreate } from '@/types/expense';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { usePermission } from '@/hooks/usePermission';
 
 export function ExpenseCategories() {
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('expense_categories', 'create');
+  const canUpdate = checkPermission('expense_categories', 'update');
+  const canDelete = checkPermission('expense_categories', 'delete');
+  const hasAnyAction = canUpdate || canDelete;
+
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [isFormDirty, setIsFormDirty] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
@@ -145,10 +152,12 @@ export function ExpenseCategories() {
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle className="text-2xl font-bold">Expense Categories</CardTitle>
-          <Button onClick={handleCreate} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            New Category
-          </Button>
+          {canCreate && (
+            <Button onClick={handleCreate} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              New Category
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -185,7 +194,7 @@ export function ExpenseCategories() {
               <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('created_at')}>
                 <div className="flex items-center">Created<SortIcon col="created_at" /></div>
               </TableHead>
-              <TableHead>Actions</TableHead>
+              {hasAnyAction && <TableHead>Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -218,26 +227,32 @@ export function ExpenseCategories() {
                   <TableCell>
                     {new Date(category.created_at).toLocaleDateString()}
                   </TableCell>
+                  {hasAnyAction && (
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(category)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(category)}
-                        className="h-8 w-8 p-0 text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canUpdate && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(category)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(category)}
+                          className="h-8 w-8 p-0 text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
+                  )}
                 </TableRow>
               ))
             )}

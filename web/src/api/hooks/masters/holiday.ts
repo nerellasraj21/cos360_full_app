@@ -1,7 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { usePermission } from '@/hooks/usePermission';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePermissionProtectedMutation } from '@/hooks/usePermissionProtectedMutation';
-import { PERMISSIONS } from '@/constants/permissions';
 import type { HolidayRead, HolidayCreate, HolidayUpdate, HolidayDropdown, PaginatedHolidayResponse } from '@/types/masters/holiday';
 import {
   getHolidays,
@@ -22,35 +20,24 @@ export interface HolidayQueryParams {
 }
 
 export function useHolidays(params?: HolidayQueryParams) {
-  const { checkPermission } = usePermission();
-  const hasListPermission = checkPermission('holidays', 'list');
-
   return useQuery<PaginatedHolidayResponse>({
     queryKey: ['holidays', params],
     queryFn: () => getHolidays(params),
-    enabled: hasListPermission,
   });
 }
 
 export function useHoliday(holidayId: string) {
-  const { checkPermission } = usePermission();
-  const hasReadPermission = checkPermission('holidays', 'read');
-
   return useQuery<HolidayRead>({
     queryKey: ['holiday', holidayId],
     queryFn: () => getHoliday(holidayId),
-    enabled: !!holidayId && hasReadPermission,
+    enabled: !!holidayId,
   });
 }
 
 export function useHolidaysDropdown(activeOnly?: boolean) {
-  const { checkPermission } = usePermission();
-  const hasListPermission = checkPermission('holidays', 'list');
-
   return useQuery<HolidayDropdown[]>({
     queryKey: ['holidays-dropdown', activeOnly],
     queryFn: () => getHolidaysDropdown(activeOnly),
-    enabled: hasListPermission,
   });
 }
 

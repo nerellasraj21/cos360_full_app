@@ -1,6 +1,7 @@
 import './timetable.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { usePermission } from '@/hooks/usePermission';
 import { fetchSubjects } from '@/api/masters/subjects';
 import type { Subject } from '@/types/masters/subject';
 import type { FrontendTimetableRead, FrontendTimetableCreate, TimetableSlotOut } from '@/types/masters/timetable';
@@ -150,6 +151,8 @@ function formatTime12hr(time: string) {
 
 export default function TimeTableEditor() {
     const queryClient = useQueryClient();
+    const { checkPermission } = usePermission();
+    const canUpdate = checkPermission('timetable_management', 'update');
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [subjectsLoading, setSubjectsLoading] = useState(true);
     const [selectedClass, setSelectedClass] = useState<SelectOption>(null);
@@ -294,14 +297,14 @@ export default function TimeTableEditor() {
             // 404 error, timetable not found
             setTimetableData(null);
             setRows([]);
-            setIsEditing(true);
-            console.log('Set isEditing to true (404 error)');
+            setIsEditing(canUpdate);
+            console.log('Set isEditing to', canUpdate, '(404 error)');
         } else if (selectedSection && !isFrontendError) {
             // No existing data, set to null
             setTimetableData(null);
             setRows([]);
-            setIsEditing(true);
-            console.log('Set isEditing to true (no data, no error)');
+            setIsEditing(canUpdate);
+            console.log('Set isEditing to', canUpdate, '(no data, no error)');
         }
     }, [frontendTimetableData, frontendFetching, selectedSection, isFrontendError, frontendError]);
 
@@ -588,7 +591,7 @@ export default function TimeTableEditor() {
         <Card className="p-4">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
-                    {isClassAndSectionSelected && (
+                    {isClassAndSectionSelected && canUpdate && (
                         <Button
                             variant={isEditing ? 'secondary' : 'default'}
                             size="sm"
@@ -655,7 +658,7 @@ export default function TimeTableEditor() {
                             </DropdownMenuContent>
                         </DropdownMenu>
                     )}
-                    {isEditing && isClassAndSectionSelected && (
+                    {isEditing && isClassAndSectionSelected && canUpdate && (
                         <div className="flex items-center gap-2 ml-4">
                             <input
                                 type="checkbox"
@@ -853,7 +856,7 @@ export default function TimeTableEditor() {
                                         </td>
                                     )}
 
-                                    {isEditing && (
+                                    {isEditing && canUpdate && (
                                         <td className="align-middle text-center">
                                             <div className="timetable-action-btns">
                                                 <Button
@@ -876,7 +879,7 @@ export default function TimeTableEditor() {
             )}
             {isClassAndSectionSelected && (
                 <div className="mt-4 flex gap-2">
-                    {isEditing && <>
+                    {isEditing && canUpdate && <>
                         <Button onClick={() => addRow('subject')}>+ Add Subject Row</Button>
                         <Button variant="secondary" onClick={() => addRow('special')}>+ Add Special Row</Button>
                         <Button

@@ -16,13 +16,14 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { usePermission } from '@/hooks/usePermission';
 import { useStaff } from '@/api/staff';
+import { useStaffAttendanceByDate } from '@/api/hooks/staff/attendance';
 import {
-    useStaffAttendanceByDate,
-    useCreateStaffAttendance,
-    useUpdateStaffAttendance,
-    useDeleteStaffAttendance
-} from '@/api/hooks/staff/attendance';
+    createStaffAttendance,
+    updateStaffAttendance,
+    deleteStaffAttendance,
+} from '@/api/staff/attendance';
 import type {
     StaffAttendanceCreate,
     StaffAttendanceUpdate,
@@ -50,6 +51,11 @@ interface StaffAttendanceRow {
 }
 
 const StaffAttendancePage: React.FC = () => {
+    const { checkPermission } = usePermission();
+    const canCreate = checkPermission('staff_attendance', 'create');
+    const canUpdate = checkPermission('staff_attendance', 'update');
+    const canWrite = canCreate || canUpdate;
+
     // Selection state
     const [selectedDate, setSelectedDate] = useState<string>(() => {
         const today = new Date();
@@ -78,11 +84,6 @@ const StaffAttendancePage: React.FC = () => {
     // Data fetching
     const { data: staffData, isLoading: staffLoading } = useStaff({ is_active: true });
     const { data: attendanceData, isLoading: attendanceLoading, isFetching: attendanceFetching, refetch: refetchAttendance } = useStaffAttendanceByDate(selectedDate);
-
-    // Mutations
-    const createMutation = useCreateStaffAttendance();
-    const updateMutation = useUpdateStaffAttendance();
-    const deleteMutation = useDeleteStaffAttendance();
 
     // Staff data from API
     const staff = useMemo(() => {
@@ -163,74 +164,81 @@ const StaffAttendancePage: React.FC = () => {
         setSaveError(null);
 
         try {
-            const promises: Promise<any>[] = [];
+            // Snapshot modified records before async ops
+            const toCreate: { staffId: string; status: 'absent' | 'late' | 'half_day' }[] = [];
+            const toUpdate: { id: string; staffId: string; status: 'absent' | 'late' | 'half_day' }[] = [];
+            const toDelete: string[] = [];
+            const toDeleteStaffIds: string[] = [];
 
             staffAttendances.forEach((attendance, staffId) => {
                 if (!attendance.isModified) return;
-
                 if (attendance.status === 'present') {
-                    // Delete existing record if it exists (since present is default, no record needed)
                     if (attendance.existingRecord) {
-                        promises.push(deleteMutation.mutateAsync(attendance.existingRecord.id));
+                        toDelete.push(attendance.existingRecord.id);
+                        toDeleteStaffIds.push(staffId);
                     }
                 } else {
-                    // For absent or late status, create/update record
                     if (attendance.existingRecord) {
-                        const updateData: StaffAttendanceUpdate = {
-                            status: attendance.status,
-                            remarks: ''
-                        };
-                        promises.push(updateMutation.mutateAsync({
-                            id: attendance.existingRecord.id,
-                            data: updateData
-                        }));
+                        toUpdate.push({ id: attendance.existingRecord.id, staffId, status: attendance.status });
                     } else {
-                        // Create new record
-                        const createData: StaffAttendanceCreate = {
-                            staff_id: staffId,
-                            date: selectedDate,
-                            status: attendance.status,
-                            remarks: ''
-                        };
-                        promises.push(createMutation.mutateAsync(createData));
+                        toCreate.push({ staffId, status: attendance.status });
                     }
                 }
             });
 
-            // Execute all operations
-            await Promise.all(promises);
-            setSaveMessage('Attendance saved successfully!');
-            toast.success('Attendance saved successfully!');
+            // Run all operations in parallel — direct API calls (same pattern as student attendance)
+            const createdRecords: StaffAttendanceOut[] = [];
+            const ops: Promise<any>[] = [
+                ...toUpdate.map(u => updateStaffAttendance(u.id, { status: u.status, remarks: '' })),
+                ...toDelete.map(id => deleteStaffAttendance(id)),
+                ...toCreate.map(c =>
+                    createStaffAttendance({ staff_id: c.staffId, date: selectedDate, status: c.status, remarks: '' })
+                        .then(r => { createdRecords.push(r); })
+                ),
+            ];
+            await Promise.all(ops);
 
-            // Auto-dismiss success message after 3 seconds
-            setTimeout(() => {
-                setSaveMessage(null);
-            }, 3000);
+            // Update existingAttendances with saved records so any future useEffect
+            // re-initialization (triggered by React Query auto-refetch) uses correct data
+            setExistingAttendances(prev => {
+                const remaining = prev.filter(r => !toDelete.includes(r.id));
+                const updated = remaining.map(r => {
+                    const u = toUpdate.find(u => u.id === r.id);
+                    return u ? { ...r, status: u.status } : r;
+                });
+                return [...updated, ...createdRecords];
+            });
 
-            // Small delay to ensure data is saved before reloading
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Reload data to get updated records
-            await refetchAttendance();
-
-            // Reset modification flags
+            // Also patch staffAttendances in-place for immediate UI update
             setStaffAttendances(prev => {
                 const newMap = new Map(prev);
-                newMap.forEach(att => {
-                    att.isModified = false;
+                toDeleteStaffIds.forEach(staffId => {
+                    const att = newMap.get(staffId);
+                    if (att) newMap.set(staffId, { ...att, isModified: false, existingRecord: undefined });
+                });
+                toUpdate.forEach(u => {
+                    const att = newMap.get(u.staffId);
+                    if (att) newMap.set(u.staffId, {
+                        ...att, isModified: false,
+                        existingRecord: att.existingRecord ? { ...att.existingRecord, status: u.status } : undefined,
+                    });
+                });
+                createdRecords.forEach(newRecord => {
+                    const att = newMap.get(newRecord.staff_id);
+                    if (att) newMap.set(newRecord.staff_id, { ...att, isModified: false, existingRecord: newRecord });
                 });
                 return newMap;
             });
+
+            setSaveMessage('Attendance saved successfully!');
+            toast.success('Attendance saved successfully!');
+            setTimeout(() => setSaveMessage(null), 3000);
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to save attendance';
             setSaveError(errorMessage);
             toast.error(errorMessage);
-
-            // Auto-dismiss error message after 5 seconds
-            setTimeout(() => {
-                setSaveError(null);
-            }, 5000);
+            setTimeout(() => setSaveError(null), 5000);
         } finally {
             setIsSaving(false);
         }
@@ -271,7 +279,10 @@ const StaffAttendancePage: React.FC = () => {
             label: 'Status',
             editable: false, // Make non-editable since we're using custom render
             render: (value: 'present' | 'absent' | 'late' | 'half_day', row: StaffAttendanceRow) => {
-                // Direct dropdown - no edit mode needed
+                if (!canWrite) {
+                    const labelMap = { present: 'Present', absent: 'Absent', late: 'Late', half_day: 'Half Day' };
+                    return <span className="text-sm">{labelMap[value]}</span>;
+                }
                 return (
                     <Select
                         value={value}
@@ -405,10 +416,12 @@ const StaffAttendancePage: React.FC = () => {
                                 {attendanceFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🔄</span>}
                                 Refresh
                             </Button>
-                            <Button size="sm" onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
-                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                {isSaving ? 'Saving...' : 'Save Attendance'}
-                            </Button>
+                            {canWrite && (
+                                <Button size="sm" onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
+                                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                    {isSaving ? 'Saving...' : 'Save Attendance'}
+                                </Button>
+                            )}
                         </div>
                     </CardTitle>
                 </CardHeader>

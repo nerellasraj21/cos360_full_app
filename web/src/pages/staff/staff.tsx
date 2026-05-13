@@ -38,7 +38,7 @@ export function StaffPage() {
                     </Card>
                 </PermissionGuard>
 
-                <PermissionGuard resource="staff_attendance" action="list">
+                <PermissionGuard resource="staff_attendance" action="read">
                     <Card className="hover:shadow-lg transition-shadow">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
