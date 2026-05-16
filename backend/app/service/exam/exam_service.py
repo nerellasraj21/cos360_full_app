@@ -346,3 +346,32 @@ async def clone_exam(
     db.add(cloned)
     await db.flush()
     return cloned
+
+
+# ── deactivate_exam ────────────────────────────────────────────────────────────
+
+
+async def deactivate_exam(db: AsyncSession, exam_id: UUID) -> Exam:
+    """Transition an active exam back to draft. Caller commits."""
+    exam = await get_exam_or_404(db, exam_id)
+    if exam.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Exam status '{exam.status}' cannot be deactivated. Only active exams can be set to draft.",
+        )
+    exam.status = "draft"
+    await db.flush()
+    return exam
+
+
+async def activate_exam(db: AsyncSession, exam_id: UUID) -> Exam:
+    """Transition a draft exam to active. Caller commits."""
+    exam = await get_exam_or_404(db, exam_id)
+    if exam.status != "draft":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Exam status '{exam.status}' cannot be activated. Only draft exams can be set to active.",
+        )
+    exam.status = "active"
+    await db.flush()
+    return exam

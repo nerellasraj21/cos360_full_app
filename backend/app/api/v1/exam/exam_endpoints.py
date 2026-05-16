@@ -16,8 +16,10 @@ from app.schemas.exam.exam_subject_config_schema import ExamSubjectConfigRead, E
 from app.schemas.exam.result_schema import UnlockExamRequest, UnlockExamResponse
 from app.service.exam.audit_service import log_action
 from app.service.exam.exam_service import (
+    activate_exam,
     clone_exam,
     create_full_exam,
+    deactivate_exam,
     delete_exam,
     get_class_sections_for_exam,
     get_exam_or_404,
@@ -268,3 +270,38 @@ async def unlock_exam_endpoint(
         status=exam.status,
         reason=payload.reason,
     )
+
+
+class DeactivateExamResponse(BaseModel):
+    exam_id: uuid.UUID
+    status: str
+
+
+@router.post("/{exam_id}/deactivate", response_model=DeactivateExamResponse)
+async def deactivate_exam_endpoint(
+    exam_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Revert an active exam to draft."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "update")
+    exam = await deactivate_exam(db, exam_id)
+    await db.commit()
+    return DeactivateExamResponse(exam_id=exam.id, status=exam.status)
+
+
+@router.post("/{exam_id}/activate", response_model=DeactivateExamResponse)
+async def activate_exam_endpoint(
+    exam_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Promote a draft exam to active."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "update")
+    exam = await activate_exam(db, exam_id)
+    await db.commit()
+    return DeactivateExamResponse(exam_id=exam.id, status=exam.status)
