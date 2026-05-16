@@ -20,7 +20,7 @@ import {
   createTransaction,
   getTransactionHistory
 } from '@/api/fee/transactions';
-import { generateReceipt } from '@/api/fee/receipts';
+import { useGenerateReceipt } from '@/api/hooks/fee/receipts';
 import { getDropdownOptions } from '@/api/fee/types';
 import { getTermsDropdown, getTerm } from '@/api/fee/terms';
 import { getClassesDropdown, getSectionsByClassId } from '@/api/masters/classesandsections';
@@ -73,6 +73,7 @@ function FeeTransactionsContent() {
   const { checkPermission } = usePermission();
   const canCreate = checkPermission('fee_transactions', 'create');
   const canUpdate = checkPermission('fee_transactions', 'update');
+  const generateReceiptMutation = useGenerateReceipt();
   const [searchParams, setSearchParams] = useState<FeeTransactionSearchParams>({
     limit: 50,
     offset: 0
@@ -385,16 +386,12 @@ function FeeTransactionsContent() {
     }
   };
 
-  const handleGenerateReceipt = async (transactionId: string) => {
-    try {
-      await generateReceipt(transactionId);
-      toast.success('Receipt generated successfully');
-      refetch();
-      setShowViewDialog(false);
-    } catch (error) {
-      console.error('Failed to generate receipt:', error);
-      toast.error('Failed to generate receipt');
-    }
+  const handleGenerateReceipt = (transactionId: string) => {
+    generateReceiptMutation.mutate(transactionId, {
+      onSuccess: () => {
+        setShowViewDialog(false);
+      },
+    });
   };
 
 
@@ -1207,6 +1204,7 @@ function FeeTransactionsContent() {
                   <Button
                     variant="default"
                     onClick={() => handleGenerateReceipt(selectedTransaction.id)}
+                    disabled={generateReceiptMutation.isPending}
                   >
                     <Receipt className="h-4 w-4 mr-2" />
                     Generate Receipt

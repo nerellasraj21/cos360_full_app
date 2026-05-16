@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { FileText, Download, RefreshCw, Shield, Search, Plus, Eye, Printer, Receipt, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { feeReceiptsApi } from '@/api/fee/receipts';
+import { useGenerateReceipt } from '@/api/hooks/fee/receipts';
 import { searchTransactions } from '@/api/fee/transactions';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { usePermission } from '@/hooks/usePermission';
@@ -31,6 +32,7 @@ interface ReceiptManagementProps {
 export function ReceiptManagement({ className }: ReceiptManagementProps) {
   const { selectedAcademicYearId } = useAcademicYearStore();
   const { checkPermission } = usePermission();
+  const generateReceiptMutation = useGenerateReceipt();
   const canCreate = checkPermission('fee_receipts', 'create');
   const canUpdate = checkPermission('fee_receipts', 'update');
   const [receipts, setReceipts] = useState<FeeReceipt[]>([]);
@@ -179,23 +181,20 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
     }
   };
 
-  const handleGenerateReceipt = async () => {
+  const handleGenerateReceipt = () => {
     if (!selectedTransactionId.trim()) {
       toast.error('Please select a transaction');
       return;
     }
 
-    try {
-      const newReceipt = await feeReceiptsApi.generateReceipt(selectedTransactionId);
-      toast.success('Receipt generated successfully');
-      setIsFormDirty(false);
-      setShowGenerateDialog(false);
-      setSelectedTransactionId('');
-      loadReceipts(); // Refresh the list
-    } catch (error) {
-      console.error('Error generating receipt:', error);
-      toast.error('Failed to generate receipt');
-    }
+    generateReceiptMutation.mutate(selectedTransactionId, {
+      onSuccess: () => {
+        setIsFormDirty(false);
+        setShowGenerateDialog(false);
+        setSelectedTransactionId('');
+        loadReceipts();
+      },
+    });
   };
 
   const handleDownloadReceipt = async () => {
@@ -311,7 +310,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                 </DialogClose>
                 <Button
                   onClick={handleGenerateReceipt}
-                  disabled={!selectedTransactionId || transactionsLoading}
+                  disabled={!selectedTransactionId || generateReceiptMutation.isPending}
                 >
                   Generate Receipt
                 </Button>

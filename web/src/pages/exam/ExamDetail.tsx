@@ -20,6 +20,8 @@ import {
   useDeleteExam,
   useCloneExam,
   useUpdateExam,
+  useActivateExam,
+  useDeactivateExam,
   useExamClassSections,
   useExamSubjectConfigs,
   useExamDates,
@@ -43,7 +45,7 @@ export default function ExamDetail() {
   const { id } = useParams({ strict: false }) as { id: string }
   const navigate = useNavigate()
   const isAdmin = useAuthStore(s => {
-    const roleName = s.user?.role?.name?.toLowerCase() ?? ''
+    const roleName = s.role?.name?.toLowerCase() ?? ''
     return roleName === 'admin' || roleName === 'superadmin' || roleName === 'principal'
   })
   const { setActiveExam } = useExamStore()
@@ -52,6 +54,8 @@ export default function ExamDetail() {
   const [showClone, setShowClone] = useState(false)
   const [cloneName, setCloneName] = useState('')
   const [showDelete, setShowDelete] = useState(false)
+  const [showActivate, setShowActivate] = useState(false)
+  const [showDeactivate, setShowDeactivate] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [isEditDirty, setIsEditDirty] = useState(false)
   const [isCloneDirty, setIsCloneDirty] = useState(false)
@@ -69,6 +73,8 @@ export default function ExamDetail() {
   const deleteMutation = useDeleteExam()
   const cloneMutation = useCloneExam()
   const updateMutation = useUpdateExam(id)
+  const activateMutation = useActivateExam(id)
+  const deactivateMutation = useDeactivateExam(id)
   const { data: classSections = [], isError: sectionsError } = useExamClassSections(id)
   const { data: subjectConfigs = [], isError: configsError } = useExamSubjectConfigs(id)
   const { data: examDates = [] } = useExamDates(id)
@@ -152,10 +158,6 @@ export default function ExamDetail() {
     { key: 'overview', label: 'Overview', icon: ClipboardList },
     { key: 'dates', label: 'Dates', icon: Calendar },
     { key: 'marks', label: 'Marks', icon: BarChart3 },
-    ...(isAdmin ? [
-      { key: 'permissions', label: 'Permissions', icon: Users },
-      { key: 'audit', label: 'Audit', icon: FileText },
-    ] : []),
   ] as const
 
   return (
@@ -196,6 +198,28 @@ export default function ExamDetail() {
               <Copy className="h-4 w-4" />
               Clone
             </Button>
+            {exam.status === 'draft' && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 text-blue-600 hover:text-blue-600"
+                onClick={() => setShowActivate(true)}
+              >
+                <CheckCircle className="h-4 w-4" />
+                Activate
+              </Button>
+            )}
+            {exam.status === 'active' && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 text-amber-600 hover:text-amber-600"
+                onClick={() => setShowDeactivate(true)}
+              >
+                <Lock className="h-4 w-4" />
+                Deactivate
+              </Button>
+            )}
             {exam.status === 'draft' && (
               <Button
                 variant="outline"
@@ -510,47 +534,54 @@ export default function ExamDetail() {
         </div>
       )}
 
-      {/* Quick actions if admin */}
-      {isAdmin && activeTab === 'overview' && (
-        <div className="flex flex-wrap gap-2 border-t pt-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate({ to: `/exam/exams/${exam.id}/dates` as any })}
-            className="gap-1"
-          >
-            <Calendar className="h-4 w-4" />
-            Manage Dates
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate({ to: `/exam/marks/${exam.id}/summary` as any })}
-            className="gap-1"
-          >
-            <BarChart3 className="h-4 w-4" />
-            Mark Entry Summary
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate({ to: `/exam/exams/${exam.id}/results` as any })}
-            className="gap-1"
-          >
-            <CheckCircle className="h-4 w-4" />
-            Results & Publish
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate({ to: `/exam/hall-tickets/${exam.id}` as any })}
-            className="gap-1"
-          >
-            <FileText className="h-4 w-4" />
-            Hall Tickets
-          </Button>
-        </div>
-      )}
+
+      {/* Activate Dialog */}
+      <Dialog open={showActivate} onOpenChange={setShowActivate}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Activate Exam?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Activating <strong>{exam.exam_name}</strong> will allow mark entry and hall ticket processing.
+            You can still edit the exam after activation.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowActivate(false)}>Cancel</Button>
+            <Button
+              disabled={activateMutation.isPending}
+              onClick={() => activateMutation.mutate(undefined, { onSuccess: () => setShowActivate(false) })}
+              className="gap-2"
+            >
+              {activateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Activate
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deactivate Dialog */}
+      <Dialog open={showDeactivate} onOpenChange={setShowDeactivate}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Exam?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will move <strong>{exam.exam_name}</strong> back to Draft. Mark entry and hall ticket processing will be paused.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowDeactivate(false)}>Cancel</Button>
+            <Button
+              variant="outline"
+              className="text-amber-600 hover:text-amber-600"
+              disabled={deactivateMutation.isPending}
+              onClick={() => deactivateMutation.mutate(undefined, { onSuccess: () => { setShowDeactivate(false); navigate({ to: '/exam/exams' as any }) } })}
+            >
+              {deactivateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Deactivate
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={showEdit} onOpenChange={setShowEdit} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>

@@ -189,7 +189,7 @@ export default function ExamList() {
     if (academicYears.length === 0) fetchAndSetAcademicYears()
   }, [academicYears.length, fetchAndSetAcademicYears])
   const isAdmin = useAuthStore(s => {
-    const roleName = s.user?.role?.name?.toLowerCase() ?? ''
+    const roleName = s.role?.name?.toLowerCase() ?? ''
     return roleName === 'admin' || roleName === 'superadmin' || roleName === 'principal'
   })
   const [statusFilter, setStatusFilter] = useState<string>('all')

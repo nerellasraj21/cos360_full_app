@@ -473,6 +473,39 @@ export function useCloneExam() {
 }
 
 // ---------------------------------------------------------------------------
+// Activate Exam (draft → active)
+// ---------------------------------------------------------------------------
+export function useActivateExam(examId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => examApi.activateExam(examId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examKeys.detail(examId) })
+      queryClient.invalidateQueries({ queryKey: examKeys.lists() })
+      toast.success('Exam activated')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to activate exam')
+    },
+  })
+}
+
+export function useDeactivateExam(examId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => examApi.deactivateExam(examId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examKeys.detail(examId) })
+      queryClient.invalidateQueries({ queryKey: examKeys.lists() })
+      toast.success('Exam moved back to draft')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to deactivate exam')
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Publish / Compute / Unlock
 // ---------------------------------------------------------------------------
 export function useComputeAggregate(examId: string) {

@@ -78,7 +78,7 @@ export default function ExamDashboard() {
   }, [academicYears.length, fetchAndSetAcademicYears])
 
   const isAdmin = useAuthStore(s => {
-    const roleName = s.user?.role?.name?.toLowerCase() ?? ''
+    const roleName = s.role?.name?.toLowerCase() ?? ''
     return roleName === 'admin' || roleName === 'superadmin' || roleName === 'principal'
   })
 

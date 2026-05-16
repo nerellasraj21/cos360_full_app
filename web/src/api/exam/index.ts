@@ -253,6 +253,14 @@ export const unlockExam = async (examId: string, reason: string): Promise<void> 
   await CAxios.post(`/exams/${examId}/unlock`, { reason })
 }
 
+export const activateExam = async (examId: string): Promise<void> => {
+  await CAxios.post(`/exams/${examId}/activate`)
+}
+
+export const deactivateExam = async (examId: string): Promise<void> => {
+  await CAxios.post(`/exams/${examId}/deactivate`)
+}
+
 // ---------------------------------------------------------------------------
 // Exam Dates
 // Backend: /exams/{exam_id}/dates
