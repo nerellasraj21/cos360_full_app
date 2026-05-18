@@ -24,3 +24,17 @@ class StudentDocumentOut(StudentDocumentBase):
     upload_date: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UnifiedDocumentItem(BaseModel):
+    id: UUID
+    student_id: UUID
+    source: str  # "document", "certificate", "receipt"
+    document_type: str
+    file_path: str | None = None
+    upload_date: datetime
+    certificate_category: str | None = None
+    type_name: str | None = None
+    receipt_number: str | None = None
+
+    model_config = {"from_attributes": True}

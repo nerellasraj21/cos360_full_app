@@ -1154,7 +1154,14 @@ async def get_all_admissions(db: AsyncSession, skip: int = 0, limit: int = 10):
     return {"items": admissions, "total_count": total_count, "has_next": has_next}
 
 
-async def get_all_admissions_with_context(db: AsyncSession, user_context: UserContext, skip: int = 0, limit: int = 10):
+async def get_all_admissions_with_context(
+    db: AsyncSession,
+    user_context: UserContext,
+    skip: int = 0,
+    limit: int = 10,
+    class_id: UUID | None = None,
+    section_id: UUID | None = None,
+):
     """
     Get admissions with user-specific filtering applied
 
@@ -1163,6 +1170,8 @@ async def get_all_admissions_with_context(db: AsyncSession, user_context: UserCo
         user_context: User context with access scope
         skip: Number of records to skip (pagination)
         limit: Number of records to return
+        class_id: Optional filter by class ID
+        section_id: Optional filter by section ID
 
     Returns:
         Dict with filtered admissions, count, and pagination info
@@ -1177,6 +1186,11 @@ async def get_all_admissions_with_context(db: AsyncSession, user_context: UserCo
     # Apply user scoping to count query
     filtered_count_stmt = await scoped_service.get_user_scoped_query(count_stmt, user_context, Admission, "list")
 
+    if class_id:
+        filtered_count_stmt = filtered_count_stmt.where(Admission.current_class_id == class_id)
+    if section_id:
+        filtered_count_stmt = filtered_count_stmt.where(Admission.current_section_id == section_id)
+
     count_result = await db.execute(filtered_count_stmt)
     total_count = count_result.scalar() or 0
 
@@ -1188,6 +1202,11 @@ async def get_all_admissions_with_context(db: AsyncSession, user_context: UserCo
 
     # Apply user scoping to main query
     filtered_stmt = await scoped_service.get_user_scoped_query(base_stmt, user_context, Admission, "list")
+
+    if class_id:
+        filtered_stmt = filtered_stmt.where(Admission.current_class_id == class_id)
+    if section_id:
+        filtered_stmt = filtered_stmt.where(Admission.current_section_id == section_id)
 
     # Apply pagination and ordering
     stmt = filtered_stmt.offset(skip).limit(limit).order_by(Admission.admission_date.desc())

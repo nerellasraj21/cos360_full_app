@@ -9,6 +9,9 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.db.tenant_session import get_tenant_db
+from app.models.fee.fee_receipt_model import FeeReceipt
+from app.models.fee.fee_transaction_model import FeeTransaction
+from app.models.student.student_certificate_model import CertificateIssue
 from app.models.student.student_document_model import StudentDocument
 from app.models.student.student_model import Student
 from app.tools.database_error_mapper import map_database_error
@@ -498,4 +501,93 @@ async def delete_document_file(
         logger.error(f"Error deleting document {document_id}: {str(e)}")
         raise create_error_response(
             error_code=ErrorCategory.SYSTEM_ERROR, message="Failed to delete document", status_code=500, request=request
+        )
+
+
+async def get_all_documents_for_student(
+    student_id: UUID,
+    db: AsyncSession,
+    request=None,
+):
+    """
+    Aggregate all document types for a student:
+    - General uploads from student_documents
+    - Certificates (received + issued) from student_certificates
+    - Fee receipts from fee_receipts via fee_transactions
+    """
+    from app.schemas.student.student_document_schema import UnifiedDocumentItem
+
+    try:
+        student_result = await db.execute(select(Student).where(Student.id == student_id))
+        if not student_result.scalar_one_or_none():
+            raise create_not_found_error(
+                message="Student not found", resource_type="student", resource_id=str(student_id), request=request
+            )
+
+        unified = []
+
+        # 1. General uploaded documents
+        docs_result = await db.execute(
+            select(StudentDocument).where(StudentDocument.student_id == student_id)
+        )
+        for doc in docs_result.scalars().all():
+            unified.append(UnifiedDocumentItem(
+                id=doc.id,
+                student_id=doc.student_id,
+                source="document",
+                document_type=doc.document_type,
+                file_path=doc.file_path,
+                upload_date=doc.upload_date,
+            ))
+
+        # 2. Certificates (received and issued)
+        certs_result = await db.execute(
+            select(CertificateIssue)
+            .options(selectinload(CertificateIssue.certificate_type))
+            .where(CertificateIssue.student_id == student_id)
+        )
+        for cert in certs_result.scalars().all():
+            type_name = cert.certificate_type.name if cert.certificate_type else None
+            unified.append(UnifiedDocumentItem(
+                id=cert.id,
+                student_id=cert.student_id,
+                source="certificate",
+                document_type=type_name or (
+                    "Issued Certificate" if cert.certificate_category == "issued" else "Received Document"
+                ),
+                file_path=cert.file_path,
+                upload_date=cert.created_at,
+                certificate_category=cert.certificate_category,
+                type_name=type_name,
+            ))
+
+        # 3. Fee receipts via fee_transactions join
+        receipts_result = await db.execute(
+            select(FeeReceipt)
+            .join(FeeTransaction, FeeReceipt.fee_transaction_id == FeeTransaction.id)
+            .where(FeeTransaction.student_id == student_id)
+        )
+        for receipt in receipts_result.scalars().all():
+            unified.append(UnifiedDocumentItem(
+                id=receipt.id,
+                student_id=student_id,
+                source="receipt",
+                document_type="Fee Receipt",
+                file_path=receipt.pdf_file_path,
+                upload_date=receipt.generated_at,
+                receipt_number=receipt.receipt_number,
+            ))
+
+        unified.sort(key=lambda x: x.upload_date, reverse=True)
+        return unified
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching all documents for student {student_id}: {str(e)}")
+        raise create_error_response(
+            error_code=ErrorCategory.SYSTEM_ERROR,
+            message="Failed to fetch student documents",
+            status_code=500,
+            request=request,
         )

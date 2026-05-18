@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
-from app.schemas.student.student_document_schema import StudentDocumentOut
+from app.schemas.student.student_document_schema import StudentDocumentOut, UnifiedDocumentItem
 from app.service.student.student_document_service import (
     delete_document_file,
+    get_all_documents_for_student,
     get_document_by_id,
     get_documents_by_student,
     update_document_file,
@@ -53,6 +54,18 @@ async def get_documents(student_id: UUID, request: Request, db: AsyncSession = D
     await check_role_plan_permission_with_error(db, request, role, "student_documents", "list")
 
     return await get_documents_by_student(student_id, db, request)
+
+
+# Get all documents (uploads + certificates + receipts) for a student
+@router.get("/all", response_model=list[UnifiedDocumentItem])
+async def get_all_documents(student_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
+    """Get all documents including certificates and receipts for a student"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    await check_role_plan_permission_with_error(db, request, role, "student_documents", "list")
+
+    return await get_all_documents_for_student(student_id, db, request)
 
 
 # Get single document by ID

@@ -155,6 +155,8 @@ async def list_admissions(
     db: AsyncSession = Depends(get_tenant_db),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
+    class_id: UUID | None = Query(None, description="Filter by class ID"),
+    section_id: UUID | None = Query(None, description="Filter by section ID"),
 ):
     """List student admissions with user-specific filtering - All authenticated users"""
 
@@ -162,7 +164,7 @@ async def list_admissions(
     user_context = await check_user_resource_access(db, request, "student_admissions", "list")
 
     # Use user-context aware service method
-    return await get_all_admissions_with_context(db, user_context, skip, limit)
+    return await get_all_admissions_with_context(db, user_context, skip, limit, class_id, section_id)
 
 
 @router.delete("/{admission_id}", status_code=status.HTTP_200_OK, response_model=StudentAdmissionResponse)
