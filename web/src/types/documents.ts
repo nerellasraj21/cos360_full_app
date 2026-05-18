@@ -82,3 +82,18 @@ export interface DocumentTypeInput {
   max_file_size?: number;
   allowed_extensions?: string[];
 }
+
+// Unified "all documents" item returned by GET /students/documents/all
+export interface StudentAllDocumentItem {
+  id: string;
+  student_id: string;
+  source: 'document' | 'certificate' | 'receipt';
+  document_type?: string;
+  file_path?: string;
+  upload_date?: string;
+  // certificate-specific
+  certificate_category?: string;
+  type_name?: string;
+  // receipt-specific
+  receipt_number?: string;
+}

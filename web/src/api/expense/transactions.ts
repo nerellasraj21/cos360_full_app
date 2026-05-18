@@ -27,7 +27,7 @@ export const expenseTransactionsApi = {
         if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString());
         if (params?.limit !== undefined) queryParams.append('limit', params.limit.toString());
 
-        const response = await CAxios.get(`/expense/transactions?${queryParams.toString()}`);
+        const response = await CAxios.get(`/expense/transactions/?${queryParams.toString()}`);
         console.log('[DEBUG] expenseTransactionsApi.getAllTransactions returning:', response.data.length, 'transactions');
         return response.data;
     },
@@ -46,7 +46,7 @@ export const expenseTransactionsApi = {
         console.log('[DEBUG] expenseTransactionsApi.createTransaction called with data:', data);
 
         try {
-            const response = await CAxios.post('/expense/transactions', data);
+            const response = await CAxios.post('/expense/transactions/', data);
             console.log('[DEBUG] expenseTransactionsApi.createTransaction success:', response.data);
             return response.data;
         } catch (error) {

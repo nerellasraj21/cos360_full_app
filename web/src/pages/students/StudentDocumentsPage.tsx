@@ -1,21 +1,22 @@
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
 import { FileText, Download, Search, FolderOpen } from "lucide-react";
 import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from "sonner";
-import { useStudentDocuments, useDownloadStudentDocument } from "@/api/hooks/students/documents";
+import { useAllStudentDocuments, useDownloadStudentDocument } from "@/api/hooks/students/documents";
 import { useStudentsDropdown } from "@/api/hooks/students/useAdmission";
-import type { Document } from "@/types/documents";
+import type { StudentAllDocumentItem } from "@/types/documents";
 
 export const StudentDocumentsPage: React.FC = () => {
     const [selectedStudent, setSelectedStudent] = useState<string>("");
 
     const { data: students = [] } = useStudentsDropdown();
-    const { data: documents = [], isLoading } = useStudentDocuments(selectedStudent);
+    const { data: documents = [], isLoading } = useAllStudentDocuments(selectedStudent);
     const downloadDocument = useDownloadStudentDocument();
 
     const handleDownload = async (documentId: string) => {
@@ -26,38 +27,61 @@ export const StudentDocumentsPage: React.FC = () => {
         }
     };
 
-    const columns: TableColumn<Document>[] = [
+    const sourceLabel: Record<StudentAllDocumentItem['source'], string> = {
+        document: 'Document',
+        certificate: 'Certificate',
+        receipt: 'Receipt',
+    };
+
+    const sourceBadgeVariant: Record<StudentAllDocumentItem['source'], 'default' | 'secondary' | 'outline'> = {
+        document: 'default',
+        certificate: 'secondary',
+        receipt: 'outline',
+    };
+
+    const columns: TableColumn<StudentAllDocumentItem>[] = [
         {
-            key: "document_type",
-            label: "Document Type",
-            render: (value) => (
-                <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    {value}
-                </div>
+            key: "source",
+            label: "Source",
+            render: (value: StudentAllDocumentItem['source']) => (
+                <Badge variant={sourceBadgeVariant[value]}>{sourceLabel[value]}</Badge>
             )
         },
         {
+            key: "document_type",
+            label: "Name / Type",
+            render: (_, row) => {
+                const label =
+                    row.source === 'certificate' ? (row.type_name ?? row.certificate_category ?? '-') :
+                    row.source === 'receipt'      ? (row.receipt_number ?? '-') :
+                                                   (row.document_type ?? '-');
+                return (
+                    <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 shrink-0" />
+                        {label}
+                    </div>
+                );
+            }
+        },
+        {
             key: "upload_date",
-            label: "Upload Date",
+            label: "Date",
             render: (value) => value ? new Date(value).toLocaleDateString() : '-'
         },
         {
             key: "file_path",
             label: "Actions",
-            render: (_, row) => (
-                <div className="flex gap-2">
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDownload(row.id)}
-                        disabled={downloadDocument.isPending}
-                    >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                    </Button>
-                </div>
-            )
+            render: (_, row) => row.source === 'document' ? (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDownload(row.id)}
+                    disabled={downloadDocument.isPending}
+                >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                </Button>
+            ) : null
         }
     ];
 
@@ -112,7 +136,7 @@ export const StudentDocumentsPage: React.FC = () => {
                             </div>
                             <Table
                                 columns={columns}
-                                data={documents}
+                                data={documents as StudentAllDocumentItem[]}
                                 onEdit={() => {}}
                                 onDelete={() => {}}
                                 isEditing={false}

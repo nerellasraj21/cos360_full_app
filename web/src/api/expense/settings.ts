@@ -16,7 +16,7 @@ export const expenseSettingsApi = {
         if (params?.limit !== undefined) queryParams.append('limit', params.limit.toString());
         if (params?.department_id) queryParams.append('department_id', params.department_id);
 
-        const response = await CAxios.get(`/expense/settings?${queryParams.toString()}`);
+        const response = await CAxios.get(`/expense/settings/?${queryParams.toString()}`);
         console.log('[DEBUG] expenseSettingsApi.getAllSettings returning:', response.data);
         return response.data;
     },
@@ -34,7 +34,7 @@ export const expenseSettingsApi = {
     createSetting: async (data: ExpenseSettingsCreateRequest): Promise<ExpenseSettings> => {
         console.log('[DEBUG] expenseSettingsApi.createSetting called with data:', data);
 
-        const response = await CAxios.post('/expense/settings', data);
+        const response = await CAxios.post('/expense/settings/', data);
         console.log('[DEBUG] expenseSettingsApi.createSetting success:', response.data);
         return response.data;
     },
@@ -60,7 +60,7 @@ export const expenseSettingsApi = {
     getSettings: async (): Promise<ExpenseSettings[]> => {
         console.log('[DEBUG] expenseSettingsApi.getSettings called (legacy)');
 
-        const response = await CAxios.get('/expense/settings');
+        const response = await CAxios.get('/expense/settings/');
         console.log('[DEBUG] expenseSettingsApi.getSettings returning (legacy):', response.data);
         return response.data.items || response.data;
     },

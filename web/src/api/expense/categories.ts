@@ -15,7 +15,7 @@ export const expenseCategoriesApi = {
         if (params?.active_only !== undefined) queryParams.append('active_only', params.active_only.toString());
         if (params?.include_budget !== undefined) queryParams.append('include_budget', params.include_budget.toString());
 
-        const response = await CAxios.get(`/expense/categories?${queryParams.toString()}`);
+        const response = await CAxios.get(`/expense/categories/?${queryParams.toString()}`);
             console.log('[DEBUG] expenseCategoriesApi.getAllCategories returning:', response.data.length, 'categories');
             return response.data.data || response.data;
     },
@@ -34,7 +34,7 @@ export const expenseCategoriesApi = {
         console.log('[DEBUG] expenseCategoriesApi.createCategory called with data:', data);
 
         try {
-            const response = await CAxios.post('/expense/categories', data);
+            const response = await CAxios.post('/expense/categories/', data);
             console.log('[DEBUG] expenseCategoriesApi.createCategory success:', response.data);
             return response.data;
         } catch (error) {

@@ -20,7 +20,7 @@ export const expenseReportsApi = {
         if (params.department) queryParams.append('department', params.department);
         if (params.include_pending !== undefined) queryParams.append('include_pending', params.include_pending.toString());
 
-        const response = await CAxios.get(`/expense/reports/summary?${queryParams.toString()}`);
+        const response = await CAxios.get(`/expense/reports/summary/?${queryParams.toString()}`);
         console.log('[DEBUG] expenseReportsApi.getSummaryReport returning report');
         return response.data;
     },
@@ -33,7 +33,7 @@ export const expenseReportsApi = {
         queryParams.append('period', params.period);
         if (params.category_id) queryParams.append('category_id', params.category_id);
 
-        const response = await CAxios.get(`/expense/reports/budget-analysis?${queryParams.toString()}`);
+        const response = await CAxios.get(`/expense/reports/budget-analysis/?${queryParams.toString()}`);
         console.log('[DEBUG] expenseReportsApi.getBudgetAnalysis returning analysis');
         return response.data;
     },

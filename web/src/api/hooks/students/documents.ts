@@ -1,13 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { Document, DocumentInput } from '@/types/documents';
+import type { Document, DocumentInput, StudentAllDocumentItem } from '@/types/documents';
 import {
   uploadStudentDocument,
   getStudentDocuments,
   getStudentDocument,
   updateStudentDocument,
   deleteStudentDocument,
-  downloadStudentDocument
+  downloadStudentDocument,
+  getAllStudentDocuments,
 } from '@/api/students/documents';
 import { useAuthStore } from '@/lib/authStore';
 
@@ -143,4 +144,13 @@ export function useDocumentTypes() {
 export function useMyDocuments() {
   const { studentId } = useAuthStore();
   return useStudentDocuments(studentId || "");
+}
+
+// Get unified all-documents list (documents + certificates + receipts)
+export function useAllStudentDocuments(studentId: string) {
+  return useQuery<StudentAllDocumentItem[]>({
+    queryKey: ['documents', 'all', studentId],
+    queryFn: () => getAllStudentDocuments(studentId),
+    enabled: !!studentId,
+  });
 }

@@ -16,7 +16,7 @@ export const expenseTypesApi = {
         if (params?.recurring_only !== undefined) queryParams.append('recurring_only', params.recurring_only.toString());
         if (params?.active_only !== undefined) queryParams.append('active_only', params.active_only.toString());
 
-        const response = await CAxios.get(`/expense/types?${queryParams.toString()}`);
+        const response = await CAxios.get(`/expense/types/?${queryParams.toString()}`);
         console.log('[DEBUG] expenseTypesApi.getAllTypes returning:', response.data.length, 'types');
         return response.data;
     },
@@ -35,7 +35,7 @@ export const expenseTypesApi = {
         console.log('[DEBUG] expenseTypesApi.createType called with data:', data);
 
         try {
-            const response = await CAxios.post('/expense/types', data);
+            const response = await CAxios.post('/expense/types/', data);
             console.log('[DEBUG] expenseTypesApi.createType success:', response.data);
             return response.data;
         } catch (error) {

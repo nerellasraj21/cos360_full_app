@@ -6,15 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Loader2, Save, CheckCircle, XCircle, UserCheck, Users, Filter, Search, X } from 'lucide-react';
+import { Loader2, Save, UserCheck, Users, Filter, Search, X } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from 'sonner';
 import { useClassSectionsDropdown, useStudentsByClassSection } from '@/api/hooks/masters/classesandsections';
 import { useStudentAttendance } from '@/api/hooks/students/attendance';
 import {
-  createAttendance,
   updateAttendance,
-  deleteAttendance,
   getAttendanceByDate,
   bulkUpdateAttendanceByDate
 } from '@/api/students/attendance';
@@ -329,8 +327,6 @@ function StaffView() {
 
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
 
@@ -353,8 +349,6 @@ function StaffView() {
     if (selectedDate) {
       setStudentAttendances(new Map());
       setExistingAttendances([]);
-      setSaveMessage(null);
-      setSaveError(null);
     }
   }, [selectedDate]);
 
@@ -447,23 +441,15 @@ function StaffView() {
     try {
       // Snapshot before async ops
       const toCreate: BulkAttendanceUpdate[] = [];
-      const toUpdate: { id: string; studentId: string; status: 'absent' | 'late' }[] = [];
-      const toDelete: string[] = []; // record IDs to delete
-      const toDeleteStudentIds: string[] = []; // student IDs whose records are removed
+      const toUpdate: { id: string; studentId: string; status: 'present' | 'absent' | 'late' }[] = [];
 
       studentAttendances.forEach((attendance) => {
         if (!attendance.isModified) return;
-        if (attendance.status === 'present') {
-          if (attendance.existingRecord) {
-            toDelete.push(attendance.existingRecord.id);
-            toDeleteStudentIds.push(attendance.student_id);
-          }
-        } else {
-          if (attendance.existingRecord) {
-            toUpdate.push({ id: attendance.existingRecord.id, studentId: attendance.student_id, status: attendance.status });
-          } else {
-            toCreate.push({ student_id: attendance.student_id, status: attendance.status, remarks: '' });
-          }
+        if (attendance.existingRecord) {
+          // PATCH to any status (including 'present') — avoids DELETE permission requirement
+          toUpdate.push({ id: attendance.existingRecord.id, studentId: attendance.student_id, status: attendance.status });
+        } else if (attendance.status !== 'present') {
+          toCreate.push({ student_id: attendance.student_id, status: attendance.status, remarks: '' });
         }
       });
 
@@ -471,7 +457,6 @@ function StaffView() {
       let bulkResponse: StudentAttendanceOut[] = [];
       const ops: Promise<any>[] = [
         ...toUpdate.map(u => updateAttendance(u.id, { status: u.status, remarks: '' })),
-        ...toDelete.map(id => deleteAttendance(id)),
       ];
       if (toCreate.length > 0) {
         ops.push(bulkUpdateAttendanceByDate(selectedDate, toCreate).then(r => { bulkResponse = r; }));
@@ -482,12 +467,7 @@ function StaffView() {
       // so the useEffect never fires and the full list never rebuilds
       setStudentAttendances(prev => {
         const newMap = new Map(prev);
-        // Cleared to present: remove existingRecord
-        toDeleteStudentIds.forEach(studentId => {
-          const att = newMap.get(studentId);
-          if (att) newMap.set(studentId, { ...att, isModified: false, existingRecord: undefined });
-        });
-        // Updated (absent ↔ late): patch existingRecord status
+        // Updated records: patch existingRecord status
         toUpdate.forEach(u => {
           const att = newMap.get(u.studentId);
           if (att) newMap.set(u.studentId, {
@@ -503,11 +483,9 @@ function StaffView() {
         return newMap;
       });
 
-      setSaveMessage('Attendance saved successfully!');
       toast.success('Attendance saved successfully!');
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to save attendance';
-      setSaveError(msg);
       toast.error(msg);
     } finally {
       setIsSaving(false);
@@ -645,18 +623,6 @@ function StaffView() {
                     </span>
                   </div>
                 </>
-              )}
-              {saveMessage && (
-                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <span className="text-green-800 text-sm">{saveMessage}</span>
-                </div>
-              )}
-              {saveError && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md">
-                  <XCircle className="h-5 w-5 text-red-600" />
-                  <span className="text-red-800 text-sm">{saveError}</span>
-                </div>
               )}
             </div>
 

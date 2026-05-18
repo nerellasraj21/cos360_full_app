@@ -90,17 +90,17 @@ export function useStudentsSearch(query: string) {
   });
 }
 
-export function useStudentsDropdown(activeOnly = true) {
+export function useStudentsDropdown(activeOnly = true, classId?: string, sectionId?: string) {
   return useQuery<StudentDropdownItem[]>({
-    queryKey: ['students', 'dropdown', activeOnly],
-    queryFn: () => fetchStudentsDropdown(activeOnly),
+    queryKey: ['students', 'dropdown', activeOnly, classId, sectionId],
+    queryFn: () => fetchStudentsDropdown(activeOnly, classId, sectionId),
   });
 }
 
-export function useStudentsDropdownSimple(activeOnly = true) {
+export function useStudentsDropdownSimple(activeOnly = true, classId?: string, sectionId?: string) {
   return useQuery<StudentDropdownSimpleItem[]>({
-    queryKey: ['students', 'dropdown-simple', activeOnly],
-    queryFn: () => fetchStudentsDropdownSimple(activeOnly),
+    queryKey: ['students', 'dropdown-simple', activeOnly, classId, sectionId],
+    queryFn: () => fetchStudentsDropdownSimple(activeOnly, classId, sectionId),
   });
 }
 

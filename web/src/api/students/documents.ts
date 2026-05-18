@@ -1,4 +1,4 @@
-import type { Document, DocumentInput } from '@/types/documents';
+import type { Document, DocumentInput, StudentAllDocumentItem } from '@/types/documents';
 import type { ApiError } from '@/types/common';
 import CAxios from '../index';
 
@@ -97,6 +97,20 @@ export const downloadStudentDocument = async (
       responseType: 'blob',
     });
     return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Get unified all-documents list (documents + certificates + receipts)
+export const getAllStudentDocuments = async (
+  studentId: string
+): Promise<StudentAllDocumentItem[]> => {
+  try {
+    const { data } = await CAxios.get('/students/documents/all', {
+      params: { student_id: studentId },
+    });
+    return data;
   } catch (error) {
     throw handleApiError(error);
   }

@@ -144,11 +144,17 @@ export const toggleStudentActiveStatus = async (studentId: string, isActive: boo
 
 // Get students dropdown (detailed)
 export const fetchStudentsDropdown = async (
-  activeOnly = true
+  activeOnly = true,
+  classId?: string,
+  sectionId?: string
 ): Promise<StudentDropdownItem[]> => {
   try {
     const { data } = await CAxios.get(STUDENT_ADMISSIONS_DROPDOWN, {
-      params: { active_only: activeOnly }
+      params: {
+        active_only: activeOnly,
+        ...(classId && { class_id: classId }),
+        ...(sectionId && { section_id: sectionId }),
+      }
     });
     return data;
   } catch (error) {
@@ -158,11 +164,17 @@ export const fetchStudentsDropdown = async (
 
 // Get students dropdown (simple)
 export const fetchStudentsDropdownSimple = async (
-  activeOnly = true
+  activeOnly = true,
+  classId?: string,
+  sectionId?: string
 ): Promise<StudentDropdownSimpleItem[]> => {
   try {
     const { data } = await CAxios.get(STUDENT_ADMISSIONS_DROPDOWN_SIMPLE, {
-      params: { active_only: activeOnly }
+      params: {
+        active_only: activeOnly,
+        ...(classId && { class_id: classId }),
+        ...(sectionId && { section_id: sectionId }),
+      }
     });
     return data;
   } catch (error) {
