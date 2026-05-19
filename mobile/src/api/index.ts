@@ -171,6 +171,15 @@ export {
   validateDate,
 } from './profile';
 export {
+  UserWithDetails,
+  UserListResponse,
+  UserListParams,
+  UserUpdatePayload,
+  ChangePasswordPayload,
+  adminUsersApi,
+  userProfileApi,
+} from './users';
+export {
   feeCollectionApi,
   feeConcessionsApi,
   feeCategoriesApi,
