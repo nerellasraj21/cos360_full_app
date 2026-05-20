@@ -41,13 +41,11 @@ export const useAcademicYearStore = create<AcademicYearState>()(
         try {
           const response = await fetchAcademicYears();
           const years = response.items;
-          console.log("response", response)
           set({ academicYears: years });
 
           const currentId = get().selectedAcademicYearId;
-          // If currentId is invalid OR not present in fetched list, choose a sane fallback
           const existsInList = years.some(y => String(y.id) === String(currentId));
-          if (!currentId || currentId === '' || currentId === '371' || currentId.length < 10 || !existsInList) {
+          if (!currentId || currentId === '' || currentId === '371') {
             const activeYear = years.find(year => year.is_active);
             const preferredId = activeYear
               ? String(activeYear.id)
@@ -55,10 +53,8 @@ export const useAcademicYearStore = create<AcademicYearState>()(
                 ? String(years[years.length - 1].id)
                 : '';
 
-            if (preferredId && preferredId.length >= 10) {
+            if (preferredId) {
               set({ selectedAcademicYearId: preferredId });
-            } else {
-              set({ selectedAcademicYearId: '' });
             }
           }
         } catch (error) {

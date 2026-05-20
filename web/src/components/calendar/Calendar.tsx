@@ -99,11 +99,13 @@ export function Calendar() {
   const [allEventsSortKey, setAllEventsSortKey] = useState<string | null>(null);
   const [allEventsSortDir, setAllEventsSortDir] = useState<'asc' | 'desc'>('asc');
 
-  const { selectedAcademicYearId, fetchAndSetAcademicYears } = useAcademicYearStore();
+  const { selectedAcademicYearId, academicYears, fetchAndSetAcademicYears } = useAcademicYearStore();
 
   useEffect(() => {
-    fetchAndSetAcademicYears();
-  }, []);
+    if (academicYears.length === 0) {
+      fetchAndSetAcademicYears();
+    }
+  }, [academicYears.length]);
 
   const holidaysQueryParams =
     view === "all"

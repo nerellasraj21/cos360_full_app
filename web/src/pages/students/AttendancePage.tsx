@@ -411,8 +411,6 @@ function StaffView() {
     setSelectedDate(date);
     setStudentAttendances(new Map());
     setExistingAttendances([]);
-    setSaveMessage(null);
-    setSaveError(null);
   };
 
   const handleAttendanceChange = (studentId: string, status: 'present' | 'absent' | 'late') => {
@@ -430,14 +428,10 @@ function StaffView() {
       }
       return newMap;
     });
-    setSaveMessage(null);
-    setSaveError(null);
   };
 
   const handleSave = async () => {
     setIsSaving(true);
-    setSaveMessage(null);
-    setSaveError(null);
     try {
       // Snapshot before async ops
       const toCreate: BulkAttendanceUpdate[] = [];

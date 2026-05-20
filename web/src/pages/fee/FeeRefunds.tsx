@@ -143,10 +143,6 @@ function FeeRefundsContent() {
     }
   }, [academicYears.length, fetchAndSetAcademicYears]);
 
-  // Ensure academic years are loaded when component mounts
-  useEffect(() => {
-    fetchAndSetAcademicYears();
-  }, []);
 
   // Update search params and form when academic year changes
   useEffect(() => {

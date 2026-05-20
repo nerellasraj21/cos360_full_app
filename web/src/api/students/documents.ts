@@ -38,7 +38,8 @@ export const getStudentDocuments = async (
 ): Promise<Document[]> => {
   try {
     const { data } = await CAxios.get(`/students/documents/?student_id=${studentId}`);
-    return data;
+    // Handle both paginated DRF response { results: [] } and plain array
+    return Array.isArray(data) ? data : (data.results ?? []);
   } catch (error) {
     throw handleApiError(error);
   }

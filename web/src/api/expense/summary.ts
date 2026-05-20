@@ -17,7 +17,7 @@ export const expenseSummaryApi = {
     if (params?.status_filter) queryParams.append('status_filter', params.status_filter);
 
     const query = queryParams.toString();
-    const response = await CAxios.get(`/expense/summary${query ? `?${query}` : ''}`);
+    const response = await CAxios.get(`/expense/summary/${query ? `?${query}` : ''}`);
     return response.data;
   },
 };
