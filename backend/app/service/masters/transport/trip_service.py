@@ -9,6 +9,11 @@ from app.schemas.masters.transport import TripCreate, TripUpdate
 
 
 async def add_trip(data: TripCreate, db: AsyncSession):
+    existing = await db.execute(
+        select(Trip).where(Trip.vehicle_id == data.vehicle_id, Trip.route_id == data.route_id)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(400, "This vehicle is already assigned to this route")
     trip = Trip(**data.dict())
     db.add(trip)
     await db.commit()

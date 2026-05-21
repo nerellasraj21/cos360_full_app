@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import TIMESTAMP, Column, ForeignKey, SmallInteger, String, func
+from sqlalchemy import TIMESTAMP, Column, ForeignKey, SmallInteger, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -13,6 +13,8 @@ class RemarkGradeSet(BaseOrg):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     name = Column(String(100), nullable=False)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("name", name="uq_remark_grade_set_name"),)
 
     options = relationship(
         "RemarkGradeOption",

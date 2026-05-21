@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, Column, Integer, String, Time
+from sqlalchemy import Boolean, Column, Integer, String, Time, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -20,6 +20,8 @@ class Route(BaseOrg):
     start_time = Column(Time)
     end_time = Column(Time)
     is_active = Column(Boolean, default=True)
+
+    __table_args__ = (UniqueConstraint("route_name", name="uq_route_name"),)
 
     stops = relationship("RouteStop", back_populates="route")
     trips = relationship("Trip", back_populates="route")

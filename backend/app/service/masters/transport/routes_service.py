@@ -14,6 +14,9 @@ log = log.getLogger("masters.transport.routes_service")
 
 
 async def add_route(data: RouteCreate, db: AsyncSession):
+    existing = await db.execute(select(Route).where(Route.route_name == data.route_name))
+    if existing.scalar_one_or_none():
+        raise HTTPException(400, f"Route '{data.route_name}' already exists")
     route = Route(**data.dict())
     db.add(route)
     await db.commit()
@@ -43,6 +46,10 @@ async def update__all_details_route(route_id: UUID, data: RouteCreate, db: Async
     route = result.scalar_one_or_none()
     if not route:
         raise HTTPException(404, "Route not found")
+    if data.route_name != route.route_name:
+        dup = await db.execute(select(Route).where(Route.route_name == data.route_name))
+        if dup.scalar_one_or_none():
+            raise HTTPException(400, f"Route '{data.route_name}' already exists")
     for key, value in data.dict().items():
         setattr(route, key, value)
     await db.commit()
@@ -55,6 +62,10 @@ async def update_partial_details_route(route_id: UUID, data: RouteUpdate, db: As
     route = result.scalar_one_or_none()
     if not route:
         raise HTTPException(404, "Route not found")
+    if data.route_name and data.route_name != route.route_name:
+        dup = await db.execute(select(Route).where(Route.route_name == data.route_name))
+        if dup.scalar_one_or_none():
+            raise HTTPException(400, f"Route '{data.route_name}' already exists")
     for key, value in data.dict(exclude_unset=True).items():
         setattr(route, key, value)
     await db.commit()

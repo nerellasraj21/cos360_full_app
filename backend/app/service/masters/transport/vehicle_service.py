@@ -9,6 +9,12 @@ from app.schemas.masters.transport import VehicleCreate, VehicleUpdate
 
 
 async def add_vehicle(data: VehicleCreate, db: AsyncSession):
+    if data.registration_number:
+        existing = await db.execute(
+            select(Vehicle).where(Vehicle.registration_number == data.registration_number)
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(400, f"Vehicle '{data.registration_number}' already registered")
     vehicle = Vehicle(**data.dict())
     db.add(vehicle)
     await db.commit()
@@ -34,6 +40,12 @@ async def update_all_details_vehicle(vehicle_id: UUID, data: VehicleCreate, db: 
     vehicle = result.scalar_one_or_none()
     if not vehicle:
         raise HTTPException(404, detail="Vehicle not found")
+    if data.registration_number and data.registration_number != vehicle.registration_number:
+        dup = await db.execute(
+            select(Vehicle).where(Vehicle.registration_number == data.registration_number)
+        )
+        if dup.scalar_one_or_none():
+            raise HTTPException(400, f"Vehicle '{data.registration_number}' already registered")
     for key, value in data.dict().items():
         setattr(vehicle, key, value)
     await db.commit()
@@ -46,6 +58,12 @@ async def update_partial_details_vehicle(vehicle_id: UUID, data: VehicleUpdate, 
     vehicle = result.scalar_one_or_none()
     if not vehicle:
         raise HTTPException(404, detail="Vehicle not found")
+    if data.registration_number and data.registration_number != vehicle.registration_number:
+        dup = await db.execute(
+            select(Vehicle).where(Vehicle.registration_number == data.registration_number)
+        )
+        if dup.scalar_one_or_none():
+            raise HTTPException(400, f"Vehicle '{data.registration_number}' already registered")
     for key, value in data.dict(exclude_unset=True).items():
         setattr(vehicle, key, value)
     await db.commit()
@@ -104,7 +122,7 @@ async def get_vehicle_route_stops(db: AsyncSession, vehicle_id: UUID, route_id: 
         # First verify that this vehicle is assigned to this route
         trip_query = select(Trip.id).where(Trip.vehicle_id == vehicle_id, Trip.route_id == route_id)
         trip_result = await db.execute(trip_query)
-        if not trip_result.scalar_one_or_none():
+        if not trip_result.scalars().first():
             raise HTTPException(status_code=404, detail="Vehicle is not assigned to this route")
 
         # Get all stops for this route

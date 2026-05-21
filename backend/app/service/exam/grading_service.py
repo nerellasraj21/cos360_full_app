@@ -137,6 +137,10 @@ async def _check_exam_grade_scheme_not_in_use(scheme_id: UUID, db: AsyncSession)
 async def create_exam_grade_scheme(db: AsyncSession, payload: ExamGradeSchemeCreate) -> ExamGradeScheme:
     """Insert the parent scheme first, flush to get id, then bulk-insert bands."""
     try:
+        existing = await db.execute(select(ExamGradeScheme).where(ExamGradeScheme.name == payload.name))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail=f"Exam grade scheme '{payload.name}' already exists")
+
         scheme = ExamGradeScheme(
             id=uuid.uuid4(),
             name=payload.name,
@@ -224,6 +228,11 @@ async def update_exam_grade_scheme(
     try:
         scheme = await _get_exam_grade_scheme_or_404(scheme_id, db)
 
+        if payload.name != scheme.name:
+            dup = await db.execute(select(ExamGradeScheme).where(ExamGradeScheme.name == payload.name))
+            if dup.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail=f"Exam grade scheme '{payload.name}' already exists")
+
         scheme.name = payload.name
         scheme.description = payload.description
         scheme.is_default = payload.is_default
@@ -304,6 +313,10 @@ async def delete_exam_grade_scheme(db: AsyncSession, scheme_id: UUID) -> None:
 async def create_subject_grade_scheme(db: AsyncSession, payload: SubjectGradeSchemeCreate) -> SubjectGradeScheme:
     """Insert the parent scheme first, flush to get id, then bulk-insert bands."""
     try:
+        existing = await db.execute(select(SubjectGradeScheme).where(SubjectGradeScheme.name == payload.name))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail=f"Subject grade scheme '{payload.name}' already exists")
+
         scheme = SubjectGradeScheme(
             id=uuid.uuid4(),
             name=payload.name,
@@ -391,6 +404,12 @@ async def update_subject_grade_scheme(
     """Update scalar fields and replace all bands."""
     try:
         scheme = await _get_subject_grade_scheme_or_404(scheme_id, db)
+
+        if payload.name != scheme.name:
+            dup = await db.execute(select(SubjectGradeScheme).where(SubjectGradeScheme.name == payload.name))
+            if dup.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail=f"Subject grade scheme '{payload.name}' already exists")
+
         scheme.name = payload.name
         scheme.description = payload.description
         scheme.is_default = payload.is_default

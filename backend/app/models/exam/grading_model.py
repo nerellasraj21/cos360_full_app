@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import TIMESTAMP, Boolean, Column, ForeignKey, Numeric, SmallInteger, String, Text, func
+from sqlalchemy import TIMESTAMP, Boolean, Column, ForeignKey, Numeric, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -16,6 +16,8 @@ class ExamGradeScheme(BaseOrg):
     is_default = Column(Boolean, nullable=False, default=False)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (UniqueConstraint("name", name="uq_exam_grade_scheme_name"),)
 
     bands = relationship(
         "ExamGradeBand", back_populates="scheme", cascade="all, delete-orphan", order_by="ExamGradeBand.sort_order"
@@ -55,6 +57,8 @@ class SubjectGradeScheme(BaseOrg):
     is_default = Column(Boolean, nullable=False, default=False)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (UniqueConstraint("name", name="uq_subject_grade_scheme_name"),)
 
     bands = relationship(
         "SubjectGradeBand",

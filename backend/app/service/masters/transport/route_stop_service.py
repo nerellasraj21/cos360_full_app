@@ -10,6 +10,11 @@ from app.schemas.masters.transport import RouteStopCreate, RouteStopUpdate
 
 
 async def add_route_stop(data: RouteStopCreate, db: AsyncSession):
+    existing = await db.execute(
+        select(RouteStop).where(RouteStop.route_id == data.route_id, RouteStop.number == data.number)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(400, f"Stop number {data.number} already exists on this route")
     stop = RouteStop(**data.dict())
     db.add(stop)
     await db.commit()
@@ -82,6 +87,16 @@ async def update_all_details_route_stop(stop_id: UUID, data: RouteStopCreate, db
     stop = result.scalar_one_or_none()
     if not stop:
         raise HTTPException(404, detail="Route stop not found")
+    if data.number != stop.number or data.route_id != stop.route_id:
+        dup = await db.execute(
+            select(RouteStop).where(
+                RouteStop.route_id == data.route_id,
+                RouteStop.number == data.number,
+                RouteStop.id != stop_id,
+            )
+        )
+        if dup.scalar_one_or_none():
+            raise HTTPException(400, f"Stop number {data.number} already exists on this route")
     for key, value in data.dict().items():
         setattr(stop, key, value)
     await db.commit()
@@ -108,6 +123,18 @@ async def update_partial_details_route_stop(stop_id: UUID, data: RouteStopUpdate
     stop = result.scalar_one_or_none()
     if not stop:
         raise HTTPException(404, detail="Route stop not found")
+    new_number = data.number if data.number is not None else stop.number
+    new_route_id = data.route_id if data.route_id is not None else stop.route_id
+    if new_number != stop.number or new_route_id != stop.route_id:
+        dup = await db.execute(
+            select(RouteStop).where(
+                RouteStop.route_id == new_route_id,
+                RouteStop.number == new_number,
+                RouteStop.id != stop_id,
+            )
+        )
+        if dup.scalar_one_or_none():
+            raise HTTPException(400, f"Stop number {new_number} already exists on this route")
     for key, value in data.dict(exclude_unset=True).items():
         setattr(stop, key, value)
     await db.commit()

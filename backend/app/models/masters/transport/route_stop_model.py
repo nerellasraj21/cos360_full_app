@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Time
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Time, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -19,5 +19,7 @@ class RouteStop(BaseOrg):
     drop_time = Column(Time, nullable=True)
     fees = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True)
+
+    __table_args__ = (UniqueConstraint("route_id", "number", name="uq_route_stop_number"),)
 
     route = relationship("Route", back_populates="stops")

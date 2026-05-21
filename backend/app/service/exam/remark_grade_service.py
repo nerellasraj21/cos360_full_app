@@ -41,6 +41,10 @@ async def _get_remark_grade_set_or_404(set_id: UUID, db: AsyncSession) -> Remark
 async def create_remark_grade_set(db: AsyncSession, payload: RemarkGradeSetCreate) -> RemarkGradeSet:
     """Insert the parent set first, flush to get id, then bulk-insert options."""
     try:
+        existing = await db.execute(select(RemarkGradeSet).where(RemarkGradeSet.name == payload.name))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail=f"Remark grade set '{payload.name}' already exists")
+
         grade_set = RemarkGradeSet(
             id=uuid.uuid4(),
             name=payload.name,
@@ -118,6 +122,10 @@ async def update_remark_grade_set(db: AsyncSession, set_id: UUID, payload: "Rema
     """Update name and replace all options of a remark grade set."""
     try:
         grade_set = await _get_remark_grade_set_or_404(set_id, db)
+        if payload.name and payload.name != grade_set.name:
+            dup = await db.execute(select(RemarkGradeSet).where(RemarkGradeSet.name == payload.name))
+            if dup.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail=f"Remark grade set '{payload.name}' already exists")
         if payload.name is not None:
             grade_set.name = payload.name
 
