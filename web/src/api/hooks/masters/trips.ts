@@ -18,8 +18,8 @@ export function useCreateTrip() {
             toast.success('Trip created!');
             queryClient.invalidateQueries({ queryKey: ['trips'] });
         },
-        onError: () => {
-            toast.error('Failed to create trip');
+        onError: (error) => {
+            toast.error(error.message || 'Failed to create trip');
         },
     });
 }
@@ -32,8 +32,8 @@ export function useUpdateTrip() {
             toast.success('Trip updated!');
             queryClient.invalidateQueries({ queryKey: ['trips'] });
         },
-        onError: () => {
-            toast.error('Failed to update trip');
+        onError: (error) => {
+            toast.error(error.message || 'Failed to update trip');
         },
     });
 }
@@ -46,8 +46,8 @@ export function useDeleteTrip() {
             toast.success('Trip deleted!');
             queryClient.invalidateQueries({ queryKey: ['trips'] });
         },
-        onError: () => {
-            toast.error('Failed to delete trip');
+        onError: (error) => {
+            toast.error(error.message || 'Failed to delete trip');
         },
     });
 }

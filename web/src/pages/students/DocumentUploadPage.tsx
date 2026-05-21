@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
-import { FileText, Trash2, RotateCcw, ChevronDown, ChevronUp, Upload, Eye, Download, FolderOpen, Edit } from "lucide-react";
+import { FileText, Trash2, RotateCcw, ChevronDown, ChevronUp, Upload, Eye, Download, FolderOpen, Edit, CheckCircle } from "lucide-react";
 import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from "sonner";
 import { useStudentDocuments, useUploadStudentDocument, useDeleteStudentDocument, useDownloadStudentDocument } from "@/api/hooks/students/documents";
+import { useDocumentTypes, useVerifyDocument } from "@/api/documents";
 import { useStudentsDropdown } from "@/api/hooks/students/useAdmission";
+import { useAuthStore } from "@/lib/authStore";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { usePermission } from "@/hooks/usePermission";
 import { ViewButton, EditButton, DeleteButton, DownloadButton, TableActionGroup } from "@/components/common/TableActions";
@@ -22,9 +24,15 @@ interface DocumentActionsCellProps {
     row: Document;
     onDelete: (row: Document) => void;
     onDownload: (id: string) => void;
+    onVerify: (id: string, remarks: string) => void;
     canDelete: boolean;
+    canVerify: boolean;
     deleteDialogOpen: string | null;
     setDeleteDialogOpen: (id: string | null) => void;
+    verifyDialogOpen: string | null;
+    setVerifyDialogOpen: (id: string | null) => void;
+    verifyRemarks: string;
+    setVerifyRemarks: (v: string) => void;
     mediaBase: string;
 }
 
@@ -32,9 +40,15 @@ const DocumentActionsCell: React.FC<DocumentActionsCellProps> = ({
     row,
     onDelete,
     onDownload,
+    onVerify,
     canDelete,
+    canVerify,
     deleteDialogOpen,
     setDeleteDialogOpen,
+    verifyDialogOpen,
+    setVerifyDialogOpen,
+    verifyRemarks,
+    setVerifyRemarks,
     mediaBase,
 }) => (
     <TableActionGroup>
@@ -54,6 +68,45 @@ const DocumentActionsCell: React.FC<DocumentActionsCellProps> = ({
             disabled
             title="Edit (Not Supported)"
         />
+        {canVerify && (
+            <Dialog
+                open={verifyDialogOpen === row.id}
+                onOpenChange={(open) => {
+                    setVerifyDialogOpen(open ? row.id : null);
+                    if (!open) setVerifyRemarks('');
+                }}
+            >
+                <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" title="Verify Document">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                    </Button>
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Verify Document</DialogTitle>
+                        <DialogDescription>
+                            Mark this document as verified. Add optional remarks.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 py-2">
+                        <Label>Remarks (optional)</Label>
+                        <Input
+                            value={verifyRemarks}
+                            onChange={(e) => setVerifyRemarks(e.target.value)}
+                            placeholder="Add verification remarks..."
+                        />
+                    </div>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <Button onClick={() => onVerify(row.id, verifyRemarks)}>
+                            Verify
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        )}
         {canDelete && (
             <Dialog open={deleteDialogOpen === row.id} onOpenChange={(open) => setDeleteDialogOpen(open ? row.id : null)}>
                 <DialogTrigger asChild>
@@ -89,21 +142,26 @@ const DocumentActionsCell: React.FC<DocumentActionsCellProps> = ({
 export const DocumentUploadPage: React.FC = () => {
     const { checkPermission } = usePermission();
     const mediaBase = config.api.baseURL.replace(/\/api\/v\d+$/, '');
+    const user = useAuthStore(s => s.user);
     const [selectedStudent, setSelectedStudent] = useState<string>("");
     const [documentType, setDocumentType] = useState<string>("");
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
+    const [verifyDialogOpen, setVerifyDialogOpen] = useState<string | null>(null);
+    const [verifyRemarks, setVerifyRemarks] = useState<string>("");
     const [isUploadSectionOpen, setIsUploadSectionOpen] = useState(false);
 
     // API hooks
     const { data: students = [] } = useStudentsDropdown();
+    const { data: documentTypes = [], isLoading: typesLoading } = useDocumentTypes({ is_active: true });
 
     const { data: documents = [], isLoading: documentsLoading } = useStudentDocuments(selectedStudent);
 
     const createDocument = useUploadStudentDocument();
     const deleteDocument = useDeleteStudentDocument();
     const downloadDocument = useDownloadStudentDocument();
+    const verifyDocumentMutation = useVerifyDocument();
 
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -149,6 +207,23 @@ export const DocumentUploadPage: React.FC = () => {
     };
 
     const canDelete = checkPermission('student_documents', 'delete');
+    const canVerify = checkPermission('student_documents', 'update');
+
+    const handleVerify = async (documentId: string, remarks: string) => {
+        const verifiedBy = (user as any)?.full_name || (user as any)?.name || (user as any)?.username || 'Staff';
+        try {
+            await verifyDocumentMutation.mutateAsync({
+                document_id: documentId,
+                verified_by: verifiedBy,
+                remarks: remarks || undefined,
+            });
+            toast.success('Document verified successfully!');
+            setVerifyDialogOpen(null);
+            setVerifyRemarks('');
+        } catch {
+            toast.error('Failed to verify document');
+        }
+    };
 
     const columns: TableColumn<Document>[] = [
         {
@@ -182,9 +257,15 @@ export const DocumentUploadPage: React.FC = () => {
                     row={row}
                     onDelete={handleDelete}
                     onDownload={(id) => downloadDocument.mutate(id)}
+                    onVerify={handleVerify}
                     canDelete={canDelete}
+                    canVerify={canVerify}
                     deleteDialogOpen={deleteDialogOpen}
                     setDeleteDialogOpen={setDeleteDialogOpen}
+                    verifyDialogOpen={verifyDialogOpen}
+                    setVerifyDialogOpen={setVerifyDialogOpen}
+                    verifyRemarks={verifyRemarks}
+                    setVerifyRemarks={setVerifyRemarks}
                     mediaBase={mediaBase}
                 />
             )
@@ -249,11 +330,18 @@ export const DocumentUploadPage: React.FC = () => {
 
                                 <div className="space-y-2">
                                     <Label htmlFor="document-type">Document Type *</Label>
-                                    <Input
-                                        value={documentType}
-                                        onChange={(e) => setDocumentType(e.target.value)}
-                                        placeholder="Enter document type (e.g., Birth Certificate, ID Proof)"
-                                    />
+                                    <Select value={documentType} onValueChange={setDocumentType} disabled={typesLoading}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder={typesLoading ? "Loading types..." : "Select document type"} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {documentTypes.map(type => (
+                                                <SelectItem key={type.id} value={type.name}>
+                                                    {type.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
 
@@ -317,27 +405,6 @@ export const DocumentUploadPage: React.FC = () => {
                             <div className="flex items-center gap-2">
                                 <FileText className="h-5 w-5" />
                                 <CardTitle>Uploaded Documents</CardTitle>
-                            </div>
-                            <div className="flex gap-2">
-                                {canDelete && documents.length > 0 && (
-                                    <PermissionGuard
-                                        resource="student_documents"
-                                        action="delete"
-                                        fallback={null}
-                                    >
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                // Handle bulk delete or show delete instructions
-                                                toast.info("Select a document row and use delete button");
-                                            }}
-                                        >
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Delete
-                                        </Button>
-                                    </PermissionGuard>
-                                )}
                             </div>
                         </div>
                     </CardHeader>

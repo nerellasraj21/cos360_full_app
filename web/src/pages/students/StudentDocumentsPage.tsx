@@ -5,11 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
-import { FileText, Download, Search, FolderOpen } from "lucide-react";
+import { FileText, Search, FolderOpen } from "lucide-react";
 import { PageHeader } from '@/components/ui/PageHeader';
-import { toast } from "sonner";
-import { useAllStudentDocuments, useDownloadStudentDocument } from "@/api/hooks/students/documents";
+import { useAllStudentDocuments } from "@/api/hooks/students/documents";
 import { useStudentsDropdown } from "@/api/hooks/students/useAdmission";
+import { PermissionGuard } from "@/components/PermissionGuard";
 import type { StudentAllDocumentItem } from "@/types/documents";
 
 export const StudentDocumentsPage: React.FC = () => {
@@ -17,16 +17,6 @@ export const StudentDocumentsPage: React.FC = () => {
 
     const { data: students = [] } = useStudentsDropdown();
     const { data: documents = [], isLoading } = useAllStudentDocuments(selectedStudent);
-    const downloadDocument = useDownloadStudentDocument();
-
-    const handleDownload = async (documentId: string) => {
-        try {
-            await downloadDocument.mutateAsync(documentId);
-        } catch (error) {
-            toast.error("Failed to download document");
-        }
-    };
-
     const sourceLabel: Record<StudentAllDocumentItem['source'], string> = {
         document: 'Document',
         certificate: 'Certificate',
@@ -69,23 +59,26 @@ export const StudentDocumentsPage: React.FC = () => {
             render: (value) => value ? new Date(value).toLocaleDateString() : '-'
         },
         {
-            key: "file_path",
-            label: "Actions",
-            render: (_, row) => row.source === 'document' ? (
-                <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDownload(row.id)}
-                    disabled={downloadDocument.isPending}
-                >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                </Button>
-            ) : null
-        }
+            key: "actions",
+            label: "",
+            sortable: false,
+            render: () => null
+        },
     ];
 
     return (
+        <PermissionGuard
+            permissions={[['student_documents', 'list'], ['student_documents', 'list_own']]}
+            fallback={
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <FolderOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                        <h2 className="text-lg font-semibold">Access Denied</h2>
+                        <p className="text-sm text-muted-foreground">You don't have permission to view student documents.</p>
+                    </div>
+                </div>
+            }
+        >
         <div className="container mx-auto p-6 space-y-6">
             <PageHeader title="Student Documents" icon={<FolderOpen className="h-5 w-5" />} />
 
@@ -147,5 +140,6 @@ export const StudentDocumentsPage: React.FC = () => {
                 </CardContent>
             </Card>
         </div>
+        </PermissionGuard>
     );
 };

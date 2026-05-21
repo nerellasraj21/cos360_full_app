@@ -12,6 +12,7 @@ import { FileText, Download, Upload, Plus, FolderOpen } from "lucide-react";
 import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from "sonner";
 import { useMyDocuments, useDownloadStudentDocument, useUploadMyDocument } from "@/api/hooks/students/documents";
+import { useDocumentTypes } from "@/api/documents";
 import { useAuthStore } from "@/lib/authStore";
 import type { Document } from "@/types/documents";
 
@@ -24,6 +25,7 @@ export const MyDocumentsPage: React.FC = () => {
     const { data: documents = [], isLoading } = useMyDocuments();
     const downloadDocument = useDownloadStudentDocument();
     const uploadDocument = useUploadMyDocument();
+    const { data: documentTypes = [], isLoading: typesLoading } = useDocumentTypes({ is_active: true });
 
     const handleDownload = async (documentId: string, fileName?: string) => {
         try {
@@ -168,17 +170,16 @@ export const MyDocumentsPage: React.FC = () => {
                         <div className="space-y-4">
                             <div>
                                 <Label htmlFor="document-type">Document Type</Label>
-                                <Select value={documentType} onValueChange={setDocumentType}>
+                                <Select value={documentType} onValueChange={setDocumentType} disabled={typesLoading}>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select document type" />
+                                        <SelectValue placeholder={typesLoading ? "Loading types..." : "Select document type"} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="birth_certificate">Birth Certificate</SelectItem>
-                                        <SelectItem value="marksheet">Marksheet</SelectItem>
-                                        <SelectItem value="aadhar_card">Aadhar Card</SelectItem>
-                                        <SelectItem value="passport">Passport</SelectItem>
-                                        <SelectItem value="medical_certificate">Medical Certificate</SelectItem>
-                                        <SelectItem value="other">Other</SelectItem>
+                                        {documentTypes.map(type => (
+                                            <SelectItem key={type.id} value={type.name}>
+                                                {type.name}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
