@@ -32,6 +32,7 @@ class Student(BaseOrg):
     nationality = Column(String(100), default="Indian")
     mother_tongue = Column(String(100), default="Telugu")
     identification_marks = Column(String(100), nullable=True)
+    primary_phone = Column(String(15), nullable=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
 
     # Caste master foreign keys (new structure)

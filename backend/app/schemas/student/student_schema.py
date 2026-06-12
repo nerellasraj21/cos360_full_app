@@ -26,12 +26,20 @@ class StudentBase(BaseModel):
     nationality: str | None = "Indian"
     mother_tongue: str | None = "Telugu"
     identification_marks: str | None = None
+    primary_phone: str | None = None
 
     @field_validator("aadhar_number", "apaar_number")
     @classmethod
     def validate_aadhar(cls, v):
         if v and (not v.isdigit() or len(v) != 12):
             raise ValueError("Must be a 12-digit number")
+        return v
+
+    @field_validator("primary_phone")
+    @classmethod
+    def validate_primary_phone(cls, v):
+        if v and (not v.isdigit() or len(v) != 10):
+            raise ValueError("Must be a 10-digit number")
         return v
 
 

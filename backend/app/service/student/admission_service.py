@@ -143,7 +143,37 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
         admission_type = admission.admission_type or (
             "primary" if admission.student.is_primary == "primary" else "non_primary"
         )
-        admission_number = await generate_admission_number(db, admission.admission_date, admission_type)
+
+        # Admission number is MANUAL for both primary and non-primary admissions:
+        # the admin must always enter it (non-primary per government rules). It is
+        # free text but must be unique, since the number doubles as the student's
+        # login username. A blank value is rejected (no auto-generation).
+        manual_number = (admission.admission_number or "").strip()
+        if not manual_number:
+            raise create_validation_error(
+                message="Admission number is required and must be entered manually",
+                field="admission_number",
+                value=admission.admission_number,
+                request=request,
+            )
+
+        dup_admission = await db.execute(
+            select(Admission).where(Admission.admission_number == manual_number)
+        )
+        if dup_admission.scalar_one_or_none():
+            raise create_business_rule_error(
+                message=f"Admission number '{manual_number}' is already in use",
+                rule="duplicate_admission_number",
+                request=request,
+            )
+        dup_user = await db.execute(select(User).where(User.username == manual_number))
+        if dup_user.scalar_one_or_none():
+            raise create_business_rule_error(
+                message=f"Admission number '{manual_number}' is already in use as a login",
+                rule="duplicate_admission_number",
+                request=request,
+            )
+        admission_number = manual_number
 
         admission_dict = admission.dict(exclude={"student"})
         admission_dict["admission_number"] = admission_number
@@ -564,6 +594,15 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
                 request=request,
             )
 
+        # Auto-apply any mandatory (all_by_default) class fees to the newly admitted student.
+        # A failure here must never block admission, so it is logged and swallowed.
+        try:
+            from app.service.fee.fee_class_mapping_service import auto_apply_mandatory_fees_to_admission
+
+            await auto_apply_mandatory_fees_to_admission(db, new_admission)
+        except Exception as e:
+            logger.error(f"Error auto-applying mandatory fees to admission {new_admission.id}: {str(e)}")
+
         # Fetch the created admission with all relationships before commit
         try:
             logger.info(f"Fetching created admission with id: {new_admission.id}")
@@ -896,7 +935,7 @@ async def update_partial_details_admission(
         HTTPException: For not found, validation, or database errors
     """
     # Separate field groups
-    STUDENT_FIELDS = {"first_name", "last_name", "date_of_birth", "gender", "is_primary", "aadhar_number", "apaar_number", "nationality", "mother_tongue", "caste", "caste_id", "sub_caste", "sub_caste_id", "community", "identification_marks"}
+    STUDENT_FIELDS = {"first_name", "last_name", "date_of_birth", "gender", "is_primary", "aadhar_number", "apaar_number", "nationality", "mother_tongue", "caste", "caste_id", "sub_caste", "sub_caste_id", "community", "identification_marks", "primary_phone"}
     FATHER_FIELDS = {"father_name", "father_email", "father_phone", "father_occupation", "father_aadhar_number", "father_gender", "father_salary_range"}
     MOTHER_FIELDS = {"mother_name", "mother_email", "mother_phone", "mother_occupation", "mother_aadhar_number", "mother_gender", "mother_salary_range"}
     GUARDIAN_FIELDS = {"guardian_name", "guardian_email", "guardian_phone", "guardian_occupation", "guardian_aadhar_number", "guardian_gender", "guardian_salary_range", "guardian_relation_to_student"}
@@ -931,6 +970,31 @@ async def update_partial_details_admission(
                     value=str(update_data["admission_date"]),
                     request=request,
                 )
+
+        # Validate a manually-changed admission number for uniqueness.
+        # Note: the student's login username is NOT changed here — it keeps the
+        # value assigned at admission time.
+        if "admission_number" in update_data:
+            new_number = (update_data["admission_number"] or "").strip()
+            if not new_number:
+                # Don't allow clearing the number to empty/blank.
+                update_data.pop("admission_number")
+            elif new_number != admission.admission_number:
+                dup = await db.execute(
+                    select(Admission).where(
+                        and_(
+                            Admission.admission_number == new_number,
+                            Admission.id != admission.id,
+                        )
+                    )
+                )
+                if dup.scalar_one_or_none():
+                    raise create_business_rule_error(
+                        message=f"Admission number '{new_number}' is already in use",
+                        rule="duplicate_admission_number",
+                        request=request,
+                    )
+                update_data["admission_number"] = new_number
 
         # Update admission-level fields
         for field, value in update_data.items():

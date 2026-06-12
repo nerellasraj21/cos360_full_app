@@ -28,6 +28,10 @@ class StudentAdmissionBase(BaseModel):
 
 class StudentAdmissionCreate(StudentAdmissionBase):
     student: StudentCreate
+    # Optional manual admission number. If provided, it is used as-is (after a
+    # uniqueness check) for both primary and non-primary admissions. If omitted
+    # or blank, the number is auto-generated (P{YEAR}{SEQ} / NP{YEAR}{SEQ}).
+    admission_number: str | None = None
     state_id: UUID | None = None
     district_id: UUID | None = None
     mandal_id: UUID | None = None
@@ -56,6 +60,7 @@ class StudentAdmissionUpdate(BaseModel):
     # Admission fields
     admission_date: date | None = None
     admission_type: Literal["primary", "non_primary"] | None = None
+    admission_number: str | None = None
     academic_year_id: UUID | None = None
     admitted_academic_year_id: UUID | None = None
     admitted_class_id: UUID | None = None
@@ -90,6 +95,7 @@ class StudentAdmissionUpdate(BaseModel):
     sub_caste_id: UUID | None = None
     community: str | None = None
     identification_marks: str | None = None
+    primary_phone: str | None = None
 
     # Father fields
     father_name: str | None = None

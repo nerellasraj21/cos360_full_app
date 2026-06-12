@@ -23,6 +23,137 @@ from app.schemas.fee.fee_class_mapping_schema import (
 log = log.getLogger("fee.class_mapping_service")
 
 
+async def auto_map_students_for_class_mapping(db: AsyncSession, class_mapping: FeeClassMappingModel) -> int:
+    """Auto-create student fee mappings for a mandatory (all_by_default) class mapping.
+
+    Finds every student currently admitted to the mapping's class for the same academic
+    year and creates a FeeStudentMapping (+ term amounts) for each. Students who already
+    have a mapping for the same fee type + academic year are skipped (no duplicates).
+
+    Returns the number of student mappings created.
+    """
+    # Local imports to avoid a circular import with the student-mapping service
+    from app.models.fee.fee_student_mapping_model import FeeStudentMapping as FeeStudentMappingModel
+    from app.models.masters.admission_model import Admission
+    from app.service.fee.fee_student_mapping_service import create_term_amounts
+
+    # All students admitted to this class for this academic year
+    result = await db.execute(
+        select(Admission).where(
+            and_(
+                Admission.current_class_id == class_mapping.class_id,
+                Admission.academic_year_id == class_mapping.academic_year_id,
+            )
+        )
+    )
+    admissions = result.scalars().all()
+
+    created_count = 0
+    for admission in admissions:
+        # Skip admissions missing the fields required to build a student mapping
+        if not admission.current_section_id or not admission.admission_number:
+            log.warning(
+                f"Skipping auto-map for student {admission.student_id}: "
+                f"missing current_section_id or admission_number"
+            )
+            continue
+
+        # Skip if the student already has a mapping for this fee type + academic year
+        existing = await db.execute(
+            select(FeeStudentMappingModel).where(
+                and_(
+                    FeeStudentMappingModel.student_id == admission.student_id,
+                    FeeStudentMappingModel.fee_type_id == class_mapping.fee_type_id,
+                    FeeStudentMappingModel.academic_year_id == class_mapping.academic_year_id,
+                )
+            )
+        )
+        if existing.scalar_one_or_none():
+            continue
+
+        student_mapping = FeeStudentMappingModel(
+            student_id=admission.student_id,
+            student_admission_num=admission.admission_number,
+            class_id=class_mapping.class_id,
+            section_id=admission.current_section_id,
+            fee_type_id=class_mapping.fee_type_id,
+            total_fee=class_mapping.total_fee,
+            academic_year_id=class_mapping.academic_year_id,
+        )
+        db.add(student_mapping)
+        await db.flush()
+        await create_term_amounts(db, student_mapping.id, class_mapping.total_fee, class_mapping.fee_type_id)
+        created_count += 1
+
+    log.info(
+        f"Auto-mapped {created_count} students for class mapping {class_mapping.id} "
+        f"(class={class_mapping.class_id}, fee_type={class_mapping.fee_type_id})"
+    )
+    return created_count
+
+
+async def auto_apply_mandatory_fees_to_admission(db: AsyncSession, admission) -> int:
+    """Apply all mandatory (all_by_default) class fees to a newly admitted student.
+
+    Finds every mandatory class mapping for the admission's class + academic year and
+    creates a FeeStudentMapping (+ term amounts) for the student, skipping any fee type
+    the student already has. Returns the number of student mappings created.
+    """
+    # Local import to avoid a circular import with the student-mapping service
+    from app.models.fee.fee_student_mapping_model import FeeStudentMapping as FeeStudentMappingModel
+    from app.service.fee.fee_student_mapping_service import create_term_amounts
+
+    # Need class, section, academic year and admission number to build a mapping
+    if not admission.current_class_id or not admission.academic_year_id:
+        return 0
+    if not admission.current_section_id or not admission.admission_number:
+        return 0
+
+    # All mandatory class mappings for this class + academic year
+    result = await db.execute(
+        select(FeeClassMappingModel).where(
+            and_(
+                FeeClassMappingModel.class_id == admission.current_class_id,
+                FeeClassMappingModel.academic_year_id == admission.academic_year_id,
+                FeeClassMappingModel.all_by_default.is_(True),
+            )
+        )
+    )
+    class_mappings = result.scalars().all()
+
+    created_count = 0
+    for cm in class_mappings:
+        # Skip if the student already has a mapping for this fee type + academic year
+        existing = await db.execute(
+            select(FeeStudentMappingModel).where(
+                and_(
+                    FeeStudentMappingModel.student_id == admission.student_id,
+                    FeeStudentMappingModel.fee_type_id == cm.fee_type_id,
+                    FeeStudentMappingModel.academic_year_id == cm.academic_year_id,
+                )
+            )
+        )
+        if existing.scalar_one_or_none():
+            continue
+
+        student_mapping = FeeStudentMappingModel(
+            student_id=admission.student_id,
+            student_admission_num=admission.admission_number,
+            class_id=admission.current_class_id,
+            section_id=admission.current_section_id,
+            fee_type_id=cm.fee_type_id,
+            total_fee=cm.total_fee,
+            academic_year_id=cm.academic_year_id,
+        )
+        db.add(student_mapping)
+        await db.flush()
+        await create_term_amounts(db, student_mapping.id, cm.total_fee, cm.fee_type_id)
+        created_count += 1
+
+    log.info(f"Auto-applied {created_count} mandatory fees to admission {admission.id}")
+    return created_count
+
+
 async def validate_class_exists(db: AsyncSession, class_id: UUID):
     """Validate that class exists"""
     result = await db.execute(select(Class).where(Class.id == class_id))
@@ -109,6 +240,10 @@ async def create_fee_class_mapping(db: AsyncSession, mapping_data: FeeClassMappi
 
         db.add(db_mapping)
         await db.flush()
+
+        # If this is a mandatory fee, auto-map it to all students currently in the class
+        if mapping_data.all_by_default:
+            await auto_map_students_for_class_mapping(db, db_mapping)
 
         # Load with all relationships for response before commit
         result = await db.execute(
@@ -320,6 +455,9 @@ async def update_fee_class_mapping(db: AsyncSession, mapping_id: UUID, mapping_d
 
             await check_mapping_unique(db, new_class_id, new_fee_type_id, new_academic_year_id, exclude_id=mapping_id)
 
+        # Capture the previous flag value to detect an Optional -> Mandatory flip
+        was_mandatory = db_mapping.all_by_default
+
         # Update mapping fields
         if mapping_data.class_id is not None:
             db_mapping.class_id = mapping_data.class_id
@@ -333,6 +471,10 @@ async def update_fee_class_mapping(db: AsyncSession, mapping_id: UUID, mapping_d
             db_mapping.all_by_default = mapping_data.all_by_default
 
         await db.flush()
+
+        # If the mapping was just switched to mandatory, auto-map all students in the class
+        if db_mapping.all_by_default and not was_mandatory:
+            await auto_map_students_for_class_mapping(db, db_mapping)
 
         # Load updated mapping with all relationships before commit
         result = await db.execute(
@@ -418,6 +560,50 @@ async def delete_fee_class_mapping(db: AsyncSession, mapping_id: UUID):
         )
 
 
+async def toggle_class_mapping_mandatory(db: AsyncSession, mapping_id: UUID):
+    """Toggle a class mapping's mandatory (all_by_default) flag in one call.
+
+    Flips the flag. When it turns ON, the fee is auto-mapped to all students currently
+    in the class (so it appears in their fee summaries). When it turns OFF, existing
+    student mappings are left untouched. Returns the updated mapping with relationships.
+    """
+    try:
+        result = await db.execute(select(FeeClassMappingModel).where(FeeClassMappingModel.id == mapping_id))
+        db_mapping = result.scalar_one_or_none()
+
+        if not db_mapping:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Fee class mapping with id {mapping_id} not found"
+            )
+
+        # Flip the mandatory flag
+        db_mapping.all_by_default = not db_mapping.all_by_default
+        await db.flush()
+
+        # If it just turned mandatory, auto-map the fee to all students in the class
+        if db_mapping.all_by_default:
+            await auto_map_students_for_class_mapping(db, db_mapping)
+
+        await db.commit()
+
+        # Return the updated mapping with all relationships
+        return await get_fee_class_mapping_by_id(db, mapping_id)
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except ValueError:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid fee class mapping ID format")
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error toggling fee class mapping mandatory flag: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while toggling fee class mapping mandatory flag",
+        )
+
+
 async def create_bulk_fee_class_mappings(db: AsyncSession, bulk_data: FeeClassMappingBulkCreate):
     """Create fee mappings for multiple classes with comprehensive error handling"""
     try:
@@ -448,6 +634,10 @@ async def create_bulk_fee_class_mappings(db: AsyncSession, bulk_data: FeeClassMa
 
                 db.add(db_mapping)
                 await db.flush()  # Flush to get the ID without committing
+
+                # If this is a mandatory fee, auto-map it to all students currently in the class
+                if bulk_data.all_by_default:
+                    await auto_map_students_for_class_mapping(db, db_mapping)
 
                 # Load with relationships for response
                 result = await db.execute(

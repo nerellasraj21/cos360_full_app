@@ -19,6 +19,7 @@ from app.service.fee.fee_class_mapping_service import (
     delete_fee_class_mapping,
     get_all_fee_class_mappings,
     get_fee_class_mapping_by_id,
+    toggle_class_mapping_mandatory,
     update_fee_class_mapping,
 )
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
@@ -94,6 +95,25 @@ async def update_fee_class_mapping_endpoint(
     await check_role_plan_permission_with_error(db, request, role, "fee_class_mappings", "update")
 
     return await update_fee_class_mapping(db, mapping_id, mapping_data)
+
+
+# Toggle Mandatory (all_by_default) flag - one-click inline toggle for the data table
+@router.patch("/{mapping_id}/toggle-mandatory", response_model=FeeClassMappingRead, status_code=status.HTTP_200_OK)
+async def toggle_fee_class_mapping_mandatory_endpoint(
+    request: Request, mapping_id: UUID, db: AsyncSession = Depends(get_tenant_db)
+):
+    """Toggle a fee class mapping's mandatory (all_by_default) flag.
+
+    When toggled ON, the fee is auto-mapped to all students currently in the class.
+    When toggled OFF, existing student mappings are left untouched.
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    # Multi-layer permission check: Role + Plan validation (same as update)
+    await check_role_plan_permission_with_error(db, request, role, "fee_class_mappings", "update")
+
+    return await toggle_class_mapping_mandatory(db, mapping_id)
 
 
 # Delete Fee Class Mapping
