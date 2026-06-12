@@ -114,6 +114,25 @@ export function useDeleteFeeClassMapping() {
     });
 }
 
+// Toggle mandatory flag mutation (PATCH /fee/class-mappings/{id}/toggle-mandatory)
+export function useToggleMandatoryFeeClassMapping() {
+    const queryClient = useQueryClient();
+
+    return useMutation<FeeClassMapping, Error, string>({
+        mutationFn: (id) => feeClassMappingsApi.toggleMandatory(id),
+        onSuccess: (data) => {
+            queryClient.setQueryData(feeClassMappingKeys.detail(data.id), data);
+            queryClient.invalidateQueries({ queryKey: feeClassMappingKeys.lists() });
+            if (data.all_by_default) {
+                toast.success('Fee applied to all students in this class.');
+            }
+        },
+        onError: (error) => {
+            toast.error(`Failed to toggle mandatory status: ${error.message}`);
+        },
+    });
+}
+
 // Bulk create fee class mappings mutation
 export function useBulkCreateFeeClassMappings() {
     const queryClient = useQueryClient();

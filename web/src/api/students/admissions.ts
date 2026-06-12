@@ -10,6 +10,7 @@ import type {
 import type { ApiError, PaginatedResponse } from '@/types/common';
 import CAxios from '../index';
 import {
+  STUDENTS_BASE,
   STUDENT_ADMISSIONS,
   STUDENT_ADMISSIONS_LIST,
   STUDENT_ADMISSIONS_SEARCH,
@@ -41,6 +42,23 @@ const handleApiError = (error: any): Error => {
     return new Error('An error occurred');
   }
   return new Error(error.message || 'Network error');
+};
+
+export interface NextAdmissionNumberResponse {
+  next_number: string;
+  format: string;
+  type: string;
+  note: string;
+}
+
+// Fetch format hint for admission number input
+export const getNextAdmissionNumber = async (
+  type: 'primary' | 'non_primary'
+): Promise<NextAdmissionNumberResponse> => {
+  const { data } = await CAxios.get(`${STUDENTS_BASE}/admission/next-admission-number`, {
+    params: { type },
+  });
+  return data;
 };
 
 // Create student admission

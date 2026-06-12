@@ -1,14 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { EditButton, DeleteButton, TableActionGroup } from '@/components/common/TableActions';
-import { Edit, Trash2, Plus, Calculator, AlertCircle, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Search } from 'lucide-react';
+import { Edit, Trash2, Plus, Calculator, AlertCircle, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ReactSelect from 'react-select';
 import { useSelectStyles } from '@/lib/useSelectStyles';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { useFeeClassMappings, useCreateFeeClassMapping, useUpdateFeeClassMapping, useDeleteFeeClassMapping } from '@/hooks/fee/useFeeMappings';
+import { Switch } from '@/components/ui/switch';
+import { useFeeClassMappings, useCreateFeeClassMapping, useUpdateFeeClassMapping, useDeleteFeeClassMapping, useToggleMandatoryFeeClassMapping } from '@/hooks/fee/useFeeMappings';
 import { useFeeTypes } from '@/hooks/fee/useFeeTypes';
 import { useFeeCategories } from '@/hooks/fee/useFeeCategories';
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections';
@@ -62,6 +64,8 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
     const [searchQuery, setSearchQuery] = useState('');
     const [sortKey, setSortKey] = useState<SortKey | null>(null);
     const [sortDir, setSortDir] = useState<SortDir>('asc');
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(5);
 
     const { data: mappingsResponse, isLoading, error } = useFeeClassMappings({
         academic_year_id: selectedAcademicYearId || undefined,
@@ -90,6 +94,7 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
     const createMutation = useCreateFeeClassMapping();
     const updateMutation = useUpdateFeeClassMapping();
     const deleteMutation = useDeleteFeeClassMapping();
+    const toggleMandatoryMutation = useToggleMandatoryFeeClassMapping();
 
     // Sort handler
     const handleSort = (key: SortKey) => {
@@ -181,6 +186,9 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                 };
 
                 await createMutation.mutateAsync(createData);
+                if (createData.all_by_default) {
+                    toast.success('Fee applied to all students in this class.');
+                }
             }
 
             setIsFormDirty(false);
@@ -275,6 +283,12 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
         return filtered;
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mappings, searchQuery, sortKey, sortDir]);
+
+    // Reset to first page when filters/sort/page size change
+    useEffect(() => {
+        setPage(1);
+    }, [searchQuery, sortKey, sortDir, pageSize]);
+
     if (!selectedAcademicYearId) {
         return (
             <div className={cn("p-6", className)}>
@@ -344,6 +358,10 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
         );
     }
 
+    const totalPages = Math.max(1, Math.ceil(processedMappings.length / pageSize));
+    const currentPage = Math.min(page, totalPages);
+    const paginatedMappings = processedMappings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
     return (
         <div className={cn("space-y-4", className)}>
             {/* Header */}
@@ -412,7 +430,7 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                                         className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground"
                                         onClick={() => handleSort('assignmentType')}
                                     >
-                                        Assignment Type {<SortIcon colKey='assignmentType' />}
+                                        Mandatory {<SortIcon colKey='assignmentType' />}
                                     </th>
                                     {hasAnyAction && (
                                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -422,7 +440,7 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                                 </tr>
                             </thead>
                             <tbody className="bg-card divide-y divide-border">
-                                {processedMappings.map((mapping, index) => {
+                                {paginatedMappings.map((mapping, index) => {
                                     const termStatus = getTermAmountStatus(mapping);
                                     const feeType = getFeeType(mapping.fee_type_id);
 
@@ -436,7 +454,7 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                                             style={{ height: '48px' }}
                                         >
                                             <td className="px-4 py-3 text-sm text-muted-foreground align-middle">
-                                                {index + 1}
+                                                {(currentPage - 1) * pageSize + index + 1}
                                             </td>
                                             <td className="px-4 py-3 text-sm font-medium text-foreground align-middle">
                                                 {getClassName(mapping.class_id)}
@@ -471,12 +489,17 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-sm align-middle">
-                                                <Badge
-                                                    variant={mapping.all_by_default ? 'default' : 'secondary'}
-                                                    className="text-xs"
-                                                >
-                                                    {mapping.all_by_default ? 'Default' : 'Custom'}
-                                                </Badge>
+                                                <div className="flex items-center gap-2">
+                                                    <Switch
+                                                        checked={mapping.all_by_default}
+                                                        onCheckedChange={() => toggleMandatoryMutation.mutate(mapping.id)}
+                                                        disabled={toggleMandatoryMutation.isPending}
+                                                        aria-label="Toggle mandatory"
+                                                    />
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {mapping.all_by_default ? 'Mandatory' : 'Optional'}
+                                                    </span>
+                                                </div>
                                             </td>
                                             {hasAnyAction && (
                                                 <td className="px-4 py-3 text-sm align-middle">
@@ -516,6 +539,48 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Pagination */}
+                    {processedMappings.length > 0 && (
+                        <div className="flex items-center justify-between flex-wrap gap-3 p-4 border-t border-border">
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    disabled={currentPage <= 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage >= totalPages}
+                                >
+                                    Next <ChevronRight className="h-4 w-4 ml-1" />
+                                </Button>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                <div className="flex items-center gap-1.5">
+                                    <span>Rows per page</span>
+                                    <Select value={String(pageSize)} onValueChange={(val) => setPageSize(Number(val))}>
+                                        <SelectTrigger className="w-16 h-8">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {[5, 10, 20, 50].map((size) => (
+                                                <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <span>
+                                    Page {currentPage} of {totalPages} ({processedMappings.length} mappings)
+                                </span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             ) : (
                 <div className="text-center py-8 text-muted-foreground bg-card border border-border rounded-lg">
@@ -582,17 +647,22 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                             />
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                id="all_by_default"
-                                checked={formData.all_by_default}
-                                onChange={(e) => setFormData({ ...formData, all_by_default: e.target.checked })}
-                                className="rounded border-border"
-                            />
-                            <label htmlFor="all_by_default" className="text-sm font-medium text-foreground">
-                                Apply to all students by default
-                            </label>
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id="all_by_default"
+                                    checked={formData.all_by_default}
+                                    onChange={(e) => setFormData({ ...formData, all_by_default: e.target.checked })}
+                                    className="rounded border-border"
+                                />
+                                <label htmlFor="all_by_default" className="text-sm font-medium text-foreground">
+                                    Mandatory fee (apply to all students in this class)
+                                </label>
+                            </div>
+                            <p className="text-xs text-muted-foreground ml-6">
+                                When ticked, this fee is automatically applied to all current and future students in this class. Untick to assign students manually.
+                            </p>
                         </div>
                     </div>
 

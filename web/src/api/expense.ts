@@ -72,7 +72,7 @@ class ExpenseService {
   };
 
   getCategoryDropdown = async (): Promise<ExpenseCategoryDropdown[]> => {
-    return this.request(`${EXPENSE_ENDPOINTS.CATEGORIES}/dropdown`);
+    return this.request(`${EXPENSE_ENDPOINTS.CATEGORIES}dropdown`);
   };
 
   createCategory = async (data: ExpenseCategoryCreate): Promise<ExpenseCategory> => {
@@ -83,18 +83,18 @@ class ExpenseService {
   };
 
   updateCategory = async (id: string, data: ExpenseCategoryUpdate): Promise<ExpenseCategory> => {
-    return this.request(`${EXPENSE_ENDPOINTS.CATEGORIES}/${id}`, {
+    return this.request(`${EXPENSE_ENDPOINTS.CATEGORIES}${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   };
 
   getCategoryById = async (id: string): Promise<ExpenseCategory> => {
-    return this.request(`${EXPENSE_ENDPOINTS.CATEGORIES}/${id}`);
+    return this.request(`${EXPENSE_ENDPOINTS.CATEGORIES}${id}`);
   };
 
   deleteCategory = async (id: string): Promise<void> => {
-    return this.request(`${EXPENSE_ENDPOINTS.CATEGORIES}/${id}`, {
+    return this.request(`${EXPENSE_ENDPOINTS.CATEGORIES}${id}`, {
       method: 'DELETE',
     });
   };
@@ -117,7 +117,7 @@ class ExpenseService {
 
   getTypeDropdown = async (categoryId?: string): Promise<ExpenseTypeDropdown[]> => {
     const query = categoryId ? `?category_id=${categoryId}` : '';
-    return this.request(`${EXPENSE_ENDPOINTS.TYPES}/dropdown${query}`);
+    return this.request(`${EXPENSE_ENDPOINTS.TYPES}dropdown${query}`);
   };
 
   createType = async (data: ExpenseTypeCreate): Promise<ExpenseType> => {
@@ -128,24 +128,24 @@ class ExpenseService {
   };
 
   updateType = async (id: string, data: ExpenseTypeUpdate): Promise<ExpenseType> => {
-    return this.request(`${EXPENSE_ENDPOINTS.TYPES}/${id}`, {
+    return this.request(`${EXPENSE_ENDPOINTS.TYPES}${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   };
 
   getTypeById = async (id: string): Promise<ExpenseType> => {
-    return this.request(`${EXPENSE_ENDPOINTS.TYPES}/${id}`);
+    return this.request(`${EXPENSE_ENDPOINTS.TYPES}${id}`);
   };
 
   deleteType = async (id: string): Promise<void> => {
-    return this.request(`${EXPENSE_ENDPOINTS.TYPES}/${id}`, {
+    return this.request(`${EXPENSE_ENDPOINTS.TYPES}${id}`, {
       method: 'DELETE',
     });
   };
 
   deleteTransaction = async (id: string): Promise<void> => {
-    return this.request(`${EXPENSE_ENDPOINTS.TRANSACTIONS}/${id}`, {
+    return this.request(`${EXPENSE_ENDPOINTS.TRANSACTIONS}${id}`, {
       method: 'DELETE',
     });
   };
@@ -169,7 +169,7 @@ class ExpenseService {
   };
 
   getTransaction = async (id: string): Promise<ExpenseTransaction> => {
-    return this.request(`${EXPENSE_ENDPOINTS.TRANSACTIONS}/${id}`);
+    return this.request(`${EXPENSE_ENDPOINTS.TRANSACTIONS}${id}`);
   };
 
   createTransaction = async (data: ExpenseTransactionCreate): Promise<ExpenseTransaction> => {
@@ -180,14 +180,14 @@ class ExpenseService {
   };
 
   updateTransaction = async (id: string, data: ExpenseTransactionUpdate): Promise<ExpenseTransaction> => {
-    return this.request(`${EXPENSE_ENDPOINTS.TRANSACTIONS}/${id}`, {
+    return this.request(`${EXPENSE_ENDPOINTS.TRANSACTIONS}${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   };
 
   approveTransaction = async (id: string, data: ExpenseTransactionApproval): Promise<ExpenseTransaction> => {
-    return this.request(`${EXPENSE_ENDPOINTS.TRANSACTIONS}/${id}/approval`, {
+    return this.request(`${EXPENSE_ENDPOINTS.TRANSACTIONS}${id}/approval`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -201,7 +201,7 @@ class ExpenseService {
     if (params?.skip) query.set('skip', params.skip.toString());
     if (params?.limit) query.set('limit', params.limit.toString());
 
-    return this.request(`${EXPENSE_ENDPOINTS.TRANSACTIONS}/pending/approval?${query}`);
+    return this.request(`${EXPENSE_ENDPOINTS.TRANSACTIONS}pending/approval?${query}`);
   };
 
   // Attachments
@@ -211,7 +211,7 @@ class ExpenseService {
     formData.append('document_type', documentType);
     if (departmentId) formData.append('department_id', departmentId);
 
-    const response = await CAxios.post(`${EXPENSE_ENDPOINTS.ATTACHMENTS}/transactions/${transactionId}/upload`, formData, {
+    const response = await CAxios.post(`${EXPENSE_ENDPOINTS.ATTACHMENTS}transactions/${transactionId}/upload`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -221,12 +221,12 @@ class ExpenseService {
   };
 
   getTransactionAttachments = async (transactionId: string): Promise<ExpenseAttachment[]> => {
-    return this.request(`${EXPENSE_ENDPOINTS.ATTACHMENTS}/transactions/${transactionId}/list`);
+    return this.request(`${EXPENSE_ENDPOINTS.ATTACHMENTS}transactions/${transactionId}/list`);
   };
 
   downloadAttachment = async (attachmentId: string): Promise<Blob> => {
     const response = await CAxios({
-      url: `${EXPENSE_ENDPOINTS.ATTACHMENTS}/${attachmentId}/download`,
+      url: `${EXPENSE_ENDPOINTS.ATTACHMENTS}${attachmentId}/download`,
       method: 'GET',
       responseType: 'blob',
     });
@@ -235,14 +235,14 @@ class ExpenseService {
   };
 
   updateAttachment = async (attachmentId: string, data: ExpenseAttachmentUpdate): Promise<ExpenseAttachment> => {
-    return this.request(`${EXPENSE_ENDPOINTS.ATTACHMENTS}/${attachmentId}`, {
+    return this.request(`${EXPENSE_ENDPOINTS.ATTACHMENTS}${attachmentId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   };
 
   deleteAttachment = async (attachmentId: string): Promise<void> => {
-    return this.request(`${EXPENSE_ENDPOINTS.ATTACHMENTS}/${attachmentId}`, {
+    return this.request(`${EXPENSE_ENDPOINTS.ATTACHMENTS}${attachmentId}`, {
       method: 'DELETE',
     });
   };
@@ -256,7 +256,7 @@ class ExpenseService {
     if (params?.skip) query.set('skip', params.skip.toString());
     if (params?.limit) query.set('limit', params.limit.toString());
 
-    return this.request(`${EXPENSE_ENDPOINTS.AUDIT}/transactions/${transactionId}/logs?${query}`);
+    return this.request(`${EXPENSE_ENDPOINTS.AUDIT}transactions/${transactionId}/logs?${query}`);
   };
 
   getAuditLogs = async (params?: {
@@ -281,7 +281,7 @@ class ExpenseService {
   };
 
   getAuditSummary = async (transactionId: string): Promise<ExpenseAuditLogSummary> => {
-    return this.request(`${EXPENSE_ENDPOINTS.AUDIT}/transactions/${transactionId}/summary`);
+    return this.request(`${EXPENSE_ENDPOINTS.AUDIT}transactions/${transactionId}/summary`);
   };
 
   // Settings
@@ -311,15 +311,15 @@ class ExpenseService {
   };
 
   getDepartmentDropdown = async (): Promise<ExpenseDepartmentDropdown[]> => {
-    return this.request(`${EXPENSE_ENDPOINTS.DEPARTMENTS}/dropdown`);
+    return this.request(`${EXPENSE_ENDPOINTS.DEPARTMENTS}dropdown`);
   };
 
   getSettingValue = async (key: string): Promise<ExpenseSettingsValue> => {
-    return this.request(`${EXPENSE_ENDPOINTS.SETTINGS}/key/${key}/value`);
+    return this.request(`${EXPENSE_ENDPOINTS.SETTINGS}key/${key}/value`);
   };
 
   getCommonSettings = async (): Promise<ExpenseCommonSettings> => {
-    return this.request(`${EXPENSE_ENDPOINTS.SETTINGS}/ui/common`);
+    return this.request(`${EXPENSE_ENDPOINTS.SETTINGS}ui/common`);
   };
 
   createSetting = async (data: ExpenseSettingsCreate): Promise<ExpenseSettings> => {
@@ -330,18 +330,18 @@ class ExpenseService {
   };
 
   updateSetting = async (id: string, data: ExpenseSettingsUpdate): Promise<ExpenseSettings> => {
-    return this.request(`${EXPENSE_ENDPOINTS.SETTINGS}/${id}`, {
+    return this.request(`${EXPENSE_ENDPOINTS.SETTINGS}${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   };
 
   getSettingById = async (id: string): Promise<ExpenseSettings> => {
-    return this.request(`${EXPENSE_ENDPOINTS.SETTINGS}/${id}`);
+    return this.request(`${EXPENSE_ENDPOINTS.SETTINGS}${id}`);
   };
 
   deleteSetting = async (id: string): Promise<void> => {
-    return this.request(`${EXPENSE_ENDPOINTS.SETTINGS}/${id}`, {
+    return this.request(`${EXPENSE_ENDPOINTS.SETTINGS}${id}`, {
       method: 'DELETE',
     });
   };
@@ -359,7 +359,7 @@ class ExpenseService {
       }
     });
 
-    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}/by-category?${query}`);
+    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}by-category?${query}`);
   };
 
   getTypeReport = async (filters: ExpenseReportFilter): Promise<ExpenseTypeReport> => {
@@ -374,7 +374,7 @@ class ExpenseService {
       }
     });
 
-    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}/by-type?${query}`);
+    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}by-type?${query}`);
   };
 
   getTrendReport = async (filters: ExpenseReportFilter): Promise<ExpenseTrendReport> => {
@@ -389,11 +389,11 @@ class ExpenseService {
       }
     });
 
-    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}/trend?${query}`);
+    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}trend?${query}`);
   };
 
   getExpenseSummary = async (periodDays: number = 30): Promise<any> => {
-    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}/summary?period_days=${periodDays}`);
+    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}summary?period_days=${periodDays}`);
   };
 
   getSummaryReport = async (params: {
@@ -411,7 +411,7 @@ class ExpenseService {
         }
       }
     });
-    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}/summary?${query}`);
+    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}summary?${query}`);
   };
 
   generateReport = async (type: string, params?: Record<string, string | number | string[] | undefined>): Promise<any> => {
@@ -429,7 +429,7 @@ class ExpenseService {
   };
 
   getExportStatus = async (exportId: string): Promise<ExpenseReportExportResponse> => {
-    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}/export/${exportId}/status`);
+    return this.request(`${EXPENSE_ENDPOINTS.REPORTS}export/${exportId}/status`);
   };
 }
 

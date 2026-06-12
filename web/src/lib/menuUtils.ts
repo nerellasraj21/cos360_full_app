@@ -17,13 +17,36 @@ const isFeeItem = (item: MenuItem): boolean => {
 };
 
 const filterMenuForRole = (items: MenuItem[], roleName: string): MenuItem[] => {
-    if (roleName !== 'teacher') return items;
-    return items
-        .filter(item => !isFeeItem(item))
-        .map(item => ({
-            ...item,
-            children: item.children ? filterMenuForRole(item.children, roleName) : [],
-        }));
+    if (roleName === 'teacher') {
+        return items
+            .filter(item => !isFeeItem(item))
+            .map(item => ({
+                ...item,
+                children: item.children ? filterMenuForRole(item.children, roleName) : [],
+            }));
+    }
+
+    // Students get a stripped-down Fee menu if the backend didn't include one
+    if (roleName === 'student') {
+        const hasFeeInMenu = items.some(item => isFeeItem(item));
+        if (!hasFeeInMenu) {
+            return [
+                ...items,
+                {
+                    id: 99001,
+                    name: 'Fee',
+                    url: '/fee',
+                    level: 'L0' as const,
+                    children: [
+                        { id: 99002, name: 'My Fees',     url: '/fee/my-fees',     level: 'L1' as const, children: [] },
+                        { id: 99003, name: 'My Receipts', url: '/fee/my-receipts', level: 'L1' as const, children: [] },
+                    ],
+                },
+            ];
+        }
+    }
+
+    return items;
 };
 
 

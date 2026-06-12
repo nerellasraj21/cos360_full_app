@@ -1,9 +1,16 @@
-import { useState, useCallback } from 'react';
-import { Search, Loader2, User } from 'lucide-react';
+import { useState, useCallback, useMemo } from 'react';
+import { Search, Loader2, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
 import { FilterBar } from '@/components/ui/FilterBar';
 import {
   Select,
@@ -26,6 +33,8 @@ export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
   const [sectionId, setSectionId] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useState<StudentSearchParams>({});
   const [searchEnabled, setSearchEnabled] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const { data: classes = [] } = useClassesDropdown();
   const { data: sections = [] } = useSectionsByClassId(classId || '');
@@ -45,6 +54,7 @@ export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
     if (sectionId) params.section_id = sectionId;
     setSearchParams(params);
     setSearchEnabled(true);
+    setPage(1);
   }, [query, classId, sectionId, hasAnyFilter]);
 
   const handleClear = useCallback(() => {
@@ -53,6 +63,7 @@ export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
     setSectionId(null);
     setSearchParams({});
     setSearchEnabled(false);
+    setPage(1);
   }, []);
 
   const handleKeyDown = useCallback(
@@ -60,6 +71,13 @@ export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
       if (e.key === 'Enter' && hasAnyFilter) handleSearch();
     },
     [handleSearch, hasAnyFilter]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(results.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedResults = useMemo(
+    () => results.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [results, currentPage, pageSize]
   );
 
   return (
@@ -131,51 +149,111 @@ export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
       )}
 
       {results.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {results.map((student) => (
-            <Card
-              key={student.student_id}
-              className="cursor-pointer hover:border-primary transition-colors"
-              onClick={() => onSelectStudent(student)}
-            >
-              <CardContent className="py-3 px-4">
-                <div className="flex items-center gap-3">
-                  {student.photo_url ? (
-                    <img
-                      src={student.photo_url}
-                      alt={`${student.first_name} ${student.last_name}`}
-                      className="h-10 w-10 rounded-full object-cover shrink-0"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                        (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : null}
-                  <div className={`h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0 ${student.photo_url ? 'hidden' : ''}`}>
-                    <User className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm truncate">
-                      {student.first_name} {student.last_name}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5">
+        <div className="space-y-3">
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">S.No.</TableHead>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Admission No.</TableHead>
+                  <TableHead>Class–Section</TableHead>
+                  <TableHead>Parent</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedResults.map((student, index) => (
+                  <TableRow
+                    key={student.student_id}
+                    className="cursor-pointer"
+                    onClick={() => onSelectStudent(student)}
+                  >
+                    <TableCell className="py-2 text-muted-foreground">
+                      {(currentPage - 1) * pageSize + index + 1}
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <div className="flex items-center gap-3">
+                        {student.photo_url ? (
+                          <img
+                            src={student.photo_url}
+                            alt={`${student.first_name} ${student.last_name}`}
+                            className="h-9 w-9 rounded-full object-cover shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <div className={`h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0 ${student.photo_url ? 'hidden' : ''}`}>
+                          <User className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <span className="font-medium truncate">
+                          {student.first_name} {student.last_name}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2">
                       <Badge variant="outline" className="text-xs">
                         {student.admission_number}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {student.class_name}-{student.section_name}
-                      </span>
-                    </div>
-                    {student.parent_name && (
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        Parent: {student.parent_name}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    </TableCell>
+                    <TableCell className="py-2 text-muted-foreground">
+                      {student.class_name}-{student.section_name}
+                    </TableCell>
+                    <TableCell className="py-2 text-muted-foreground">
+                      {student.parent_name || '—'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <span>Rows per page</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(val) => {
+                    setPageSize(Number(val));
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-16 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[5, 10, 20, 50].map((size) => (
+                      <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <span>
+                Page {currentPage} of {totalPages} ({results.length} students)
+              </span>
+            </div>
+          </div>
         </div>
       )}
     </div>

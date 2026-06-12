@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { useFeeCategories, useCreateFeeCategory, useUpdateFeeCategory, useDeleteFeeCategory } from '@/hooks/fee/useFeeCategories';
 import { useFeeCategoryTypes } from '@/hooks/fee/useFeeCategories';
@@ -31,136 +32,88 @@ interface CategoryNodeProps {
     canManageTypes: boolean;
 }
 
-function CategoryNode({ category, serialNumber, onEdit, onDelete, onManageTypes, canUpdate, canDelete, canViewTypes, canManageTypes }: CategoryNodeProps) {
+function CategoryRow({ category, serialNumber, onEdit, onDelete, onManageTypes, canUpdate, canDelete, canViewTypes, canManageTypes }: CategoryNodeProps) {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [showActions, setShowActions] = useState(false);
     const { data: feeTypes = [], isLoading: typesLoading } = useFeeCategoryTypes(category.id, canViewTypes);
 
-    const toggleExpanded = () => {
-        setIsExpanded(!isExpanded);
-    };
-
     return (
-        <div className="border border-border rounded-lg mb-2">
-            {/* Category Header */}
-            <div
-                className={cn(
-                    "flex items-center justify-between p-3 hover:bg-muted",
-                    canViewTypes ? "cursor-pointer" : "cursor-default"
-                )}
-                onMouseEnter={() => setShowActions(true)}
-                onMouseLeave={() => setShowActions(false)}
+        <>
+            <TableRow
+                className={canViewTypes ? 'cursor-pointer' : undefined}
+                onClick={canViewTypes ? () => setIsExpanded(!isExpanded) : undefined}
             >
-                <div className="flex items-center flex-1" onClick={canViewTypes ? toggleExpanded : undefined}>
-                    <span className="w-8 text-xs text-muted-foreground font-medium shrink-0 text-center">{serialNumber}</span>
-                    <button className="mr-2 p-1 hover:bg-muted rounded">
-                        {isExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                        ) : (
-                            <ChevronRight className="h-4 w-4" />
+                <TableCell className="w-8 pr-0 py-2">
+                    {canViewTypes && (
+                        isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                    )}
+                </TableCell>
+                <TableCell className="w-12 py-2 text-muted-foreground text-sm">{serialNumber}</TableCell>
+                <TableCell className="py-2 font-medium">{category.category_name}</TableCell>
+                <TableCell className="py-2"><StatusBadge status={category.category_status} /></TableCell>
+                <TableCell className="py-2 text-sm text-muted-foreground">
+                    {canViewTypes ? `${feeTypes.length} fee type${feeTypes.length !== 1 ? 's' : ''}` : '—'}
+                </TableCell>
+                <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1">
+                        {canManageTypes && (
+                            <Button variant="ghost" size="sm" onClick={() => onManageTypes(category)} className="h-8 w-8 p-0" title="Manage Fee Types">
+                                <Plus className="h-4 w-4" />
+                            </Button>
                         )}
-                    </button>
-                    <div className="flex-1">
-                        <h3 className="font-medium text-foreground">{category.category_name}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                            <StatusBadge status={category.category_status} />
-                            {canViewTypes && (
-                                <span className="text-xs text-muted-foreground">
-                                    {feeTypes.length} fee type{feeTypes.length !== 1 ? 's' : ''}
-                                </span>
-                            )}
-                        </div>
+                        {canUpdate && (
+                            <Button variant="ghost" size="sm" onClick={() => onEdit(category)} className="h-8 w-8 p-0" title="Edit Category">
+                                <Edit className="h-4 w-4" />
+                            </Button>
+                        )}
+                        {canDelete && (
+                            <Button variant="ghost" size="sm" onClick={() => onDelete(category)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700" title="Delete Category">
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        )}
                     </div>
-                </div>
+                </TableCell>
+            </TableRow>
 
-                {/* Action Buttons */}
-                <div className={cn(
-                    "flex items-center gap-1 transition-opacity",
-                    showActions ? "opacity-100" : "opacity-0"
-                )}>
-                    {canManageTypes && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onManageTypes(category);
-                            }}
-                            className="h-8 w-8 p-0"
-                            title="Manage Fee Types"
-                        >
-                            <Plus className="h-4 w-4" />
-                        </Button>
-                    )}
-                    {canUpdate && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onEdit(category);
-                            }}
-                            className="h-8 w-8 p-0"
-                            title="Edit Category"
-                        >
-                            <Edit className="h-4 w-4" />
-                        </Button>
-                    )}
-                    {canDelete && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onDelete(category);
-                            }}
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                            title="Delete Category"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            {/* Fee Types List */}
+            {/* Expanded Fee Types row */}
             {isExpanded && canViewTypes && (
-                <div className="border-t border-border bg-muted/30">
-                    {typesLoading ? (
-                        <div className="p-4 flex justify-center items-center">
-                            <Loader2 className="h-6 w-6 animate-spin" />
-                            <span className="ml-2 text-muted-foreground">Loading fee types...</span>
-                        </div>
-                    ) : feeTypes.length > 0 ? (
-                        <div className="p-3 space-y-2">
-                            {feeTypes.map((feeType: FeeType) => (
-                                <div key={feeType.id} className="flex items-center justify-between p-2 bg-card rounded border border-border">
-                                    <div>
-                                        <span className="font-medium text-sm text-foreground">{feeType.type_name}</span>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <StatusBadge status={feeType.fee_status} />
-                                            <span className="text-xs text-muted-foreground">
-                                                Term: {(() => {
-                                                    if (!feeType.fee_term_name) return 'Unknown';
-                                                    if (feeType.fee_term_name === feeType.fee_term_id) {
-                                                        return `Installment ${feeType.fee_term_name ? 1 : 'N/A'}`;
-                                                    }
-                                                    return feeType.fee_term_name;
-                                                })()}
-                                            </span>
+                <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={6} className="bg-muted/30 p-0">
+                        {typesLoading ? (
+                            <div className="p-4 flex justify-center items-center">
+                                <Loader2 className="h-6 w-6 animate-spin" />
+                                <span className="ml-2 text-muted-foreground">Loading fee types...</span>
+                            </div>
+                        ) : feeTypes.length > 0 ? (
+                            <div className="p-3 space-y-2">
+                                {feeTypes.map((feeType: FeeType) => (
+                                    <div key={feeType.id} className="flex items-center justify-between p-2 bg-card rounded border border-border">
+                                        <div>
+                                            <span className="font-medium text-sm text-foreground">{feeType.type_name}</span>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <StatusBadge status={feeType.fee_status} />
+                                                <span className="text-xs text-muted-foreground">
+                                                    Term: {(() => {
+                                                        if (!feeType.fee_term_name) return 'Unknown';
+                                                        if (feeType.fee_term_name === feeType.fee_term_id) {
+                                                            return `Installment ${feeType.fee_term_name ? 1 : 'N/A'}`;
+                                                        }
+                                                        return feeType.fee_term_name;
+                                                    })()}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="p-4 text-center text-muted-foreground">
-                            No fee types found. Click the + button to add fee types.
-                        </div>
-                    )}
-                </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="p-4 text-center text-muted-foreground">
+                                No fee types found. Click the + button to add fee types.
+                            </div>
+                        )}
+                    </TableCell>
+                </TableRow>
             )}
-        </div>
+        </>
     );
 }
 
@@ -382,23 +335,37 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
                 Showing {categories.length > 0 ? skip + 1 : 0}-{Math.min(skip + pageSize, totalCategories)} of {totalCategories} categories
             </div>
 
-            {/* Categories List */}
+            {/* Categories Table */}
             {categories.length > 0 ? (
-                <div className="space-y-2">
-                    {categories.map((category, index) => (
-                        <CategoryNode
-                            key={category.id}
-                            category={category}
-                            serialNumber={skip + index + 1}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                            onManageTypes={handleManageTypes}
-                            canUpdate={canUpdate}
-                            canDelete={canDelete}
-                            canViewTypes={canViewTypes}
-                            canManageTypes={canManageTypes}
-                        />
-                    ))}
+                <div className="rounded-lg border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-8"></TableHead>
+                                <TableHead className="w-12">S.No.</TableHead>
+                                <TableHead>Category Name</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Fee Types</TableHead>
+                                <TableHead>Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {categories.map((category, index) => (
+                                <CategoryRow
+                                    key={category.id}
+                                    category={category}
+                                    serialNumber={skip + index + 1}
+                                    onEdit={handleEdit}
+                                    onDelete={handleDelete}
+                                    onManageTypes={handleManageTypes}
+                                    canUpdate={canUpdate}
+                                    canDelete={canDelete}
+                                    canViewTypes={canViewTypes}
+                                    canManageTypes={canManageTypes}
+                                />
+                            ))}
+                        </TableBody>
+                    </Table>
                 </div>
             ) : (
                 <div className="text-center py-8 text-muted-foreground">

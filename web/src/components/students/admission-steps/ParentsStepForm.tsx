@@ -9,6 +9,20 @@ import { Search, Loader2 } from 'lucide-react';
 import { searchParentByPhone } from '@/api/masters/parents';
 import { SalaryRangeDropdown } from '@/components/dropdown/SalaryRangeDropdown';
 
+// Phone is optional, but if entered it must be exactly 10 digits.
+// Returns a clear message indicating whether the number is too short or too long.
+const validatePhoneDigits = (value?: string): true | string => {
+  if (!value || value.trim() === '') return true; // optional
+  if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
+  if (value.length < 10) return `Number is less than 10 digits — you entered ${value.length}. Please enter exactly 10 digits`;
+  if (value.length > 10) return `Number exceeds 10 digits — you entered ${value.length}. Please enter exactly 10 digits`;
+  return true;
+};
+
+// True only when the value is exactly 10 digits (used to show the green "valid" hint).
+const isValidPhone = (value?: string): boolean =>
+  !!value && /^\d{10}$/.test(value);
+
 export const ParentsStepForm = () => {
   const { register, setValue, watch, formState: { errors } } = useFormContext();
   const [fatherSearching, setFatherSearching] = useState(false);
@@ -113,14 +127,13 @@ export const ParentsStepForm = () => {
                 <Input
                   id="father_phone"
                   {...register('father_phone', {
-                    pattern: {
-                      value: /^[\+]?[1-9][\d]{0,15}$/,
-                      message: 'Invalid phone number format'
-                    }
+                    validate: validatePhoneDigits
                   })}
                 />
-                {errors.father_phone && (
+                {errors.father_phone ? (
                   <span className="text-red-500 text-sm">{errors.father_phone.message as string}</span>
+                ) : isValidPhone(watch('father_phone')) && (
+                  <span className="text-green-600 text-sm">Mobile number is valid</span>
                 )}
               </div>
               <Button
@@ -249,14 +262,13 @@ export const ParentsStepForm = () => {
                 <Input
                   id="mother_phone"
                   {...register('mother_phone', {
-                    pattern: {
-                      value: /^[\+]?[1-9][\d]{0,15}$/,
-                      message: 'Invalid phone number format'
-                    }
+                    validate: validatePhoneDigits
                   })}
                 />
-                {errors.mother_phone && (
+                {errors.mother_phone ? (
                   <span className="text-red-500 text-sm">{errors.mother_phone.message as string}</span>
+                ) : isValidPhone(watch('mother_phone')) && (
+                  <span className="text-green-600 text-sm">Mobile number is valid</span>
                 )}
               </div>
               <Button
@@ -379,14 +391,13 @@ export const ParentsStepForm = () => {
                   <Input
                     id="guardian_phone"
                     {...register('guardian_phone', {
-                      pattern: {
-                        value: /^[\+]?[1-9][\d]{0,15}$/,
-                        message: 'Invalid phone number format'
-                      }
+                      validate: validatePhoneDigits
                     })}
                   />
-                  {errors.guardian_phone && (
+                  {errors.guardian_phone ? (
                     <span className="text-red-500 text-sm">{errors.guardian_phone.message as string}</span>
+                  ) : isValidPhone(watch('guardian_phone')) && (
+                    <span className="text-green-600 text-sm">Mobile number is valid</span>
                   )}
                 </div>
               </div>

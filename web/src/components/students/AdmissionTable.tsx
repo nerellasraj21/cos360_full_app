@@ -42,6 +42,19 @@ interface AdmissionTableData {
   current_section_id: string;
 }
 
+const aadharMsg = (val: string, label: string): string => {
+  if (!val) return '';
+  if (!/^\d+$/.test(val)) return `${label} must contain digits only`;
+  if (val.length < 12) return `${label} must be exactly 12 digits — you entered ${val.length}`;
+  if (val.length > 12) return `${label} must be exactly 12 digits — you entered ${val.length}`;
+  return '';
+};
+
+const emailMsg = (val: string): string => {
+  if (!val) return '';
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val) ? '' : 'Invalid email format';
+};
+
 interface AdmissionTableProps {
    searchQuery?: string;
    searchResults?: StudentOut[];
@@ -59,8 +72,10 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
   const [selectedAdmission, setSelectedAdmission] = useState<StudentAdmissionResponse | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [editAdmissionNumError, setEditAdmissionNumError] = useState('');
   const [editForm, setEditForm] = useState({
     // Admission fields
+    admission_number: '',
     admission_date: '',
     admission_type: '',
     academic_year_id: '',
@@ -87,6 +102,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
     is_primary: 'not_primary',
     aadhar_number: '',
     apaar_number: '',
+    primary_phone: '',
     nationality: '',
     mother_tongue: '',
     caste: '',
@@ -352,8 +368,10 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                     const s = admission.student as any;
                     const a = admission as any;
                     setSelectedAdmission(admission);
+                    setEditAdmissionNumError('');
                     setEditForm({
                       // Admission fields
+                      admission_number: admission.admission_number || '',
                       admission_date: admission.admission_date || '',
                       admission_type: admission.admission_type || '',
                       academic_year_id: admission.academic_year_id || '',
@@ -380,6 +398,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       is_primary: s?.is_primary || 'not_primary',
                       aadhar_number: s?.aadhar_number || '',
                       apaar_number: s?.apaar_number || '',
+                      primary_phone: s?.primary_phone || '',
                       nationality: s?.nationality || '',
                       mother_tongue: s?.mother_tongue || '',
                       caste: s?.caste || '',
@@ -564,6 +583,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       { label: 'Gender', value: formatGender(studentData.gender) },
       { label: 'Aadhar Number', value: studentData.aadhar_number || 'N/A' },
       { label: 'APAAR Number', value: studentData.apaar_number || 'N/A' },
+      { label: 'Primary Phone', value: studentData.primary_phone || 'N/A' },
       { label: 'Caste', value: studentData.caste ? getCasteName(studentData.caste) : 'N/A' },
       { label: 'Sub Caste', value: studentData.sub_caste ? getSubCasteName(studentData.sub_caste) : 'N/A' },
       { label: 'Community', value: studentData.community || 'N/A' },
@@ -684,6 +704,25 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
               {/* Admission Info */}
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label htmlFor="edit-admission-number">
+                    Admission Number <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="edit-admission-number"
+                    value={editForm.admission_number}
+                    onChange={(e) => {
+                      setEditForm(prev => ({ ...prev, admission_number: e.target.value }));
+                      if (editAdmissionNumError) setEditAdmissionNumError('');
+                    }}
+                  />
+                  {!editForm.admission_number ? (
+                    <span className="text-red-500 text-sm">Admission number is required</span>
+                  ) : editAdmissionNumError ? (
+                    <span className="text-red-500 text-sm">{editAdmissionNumError}</span>
+                  ) : null}
+                </div>
+
                 <div>
                   <Label htmlFor="edit-admission-date">Admission Date</Label>
                   <Input
@@ -1029,21 +1068,24 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-first-name">First Name</Label>
+                  <Label htmlFor="edit-first-name">First Name <span className="text-red-500">*</span></Label>
                   <Input id="edit-first-name" value={editForm.first_name} onChange={(e) => setEditForm(prev => ({ ...prev, first_name: e.target.value }))} />
+                  {!editForm.first_name?.trim() && <span className="text-red-500 text-sm">First name is required</span>}
                 </div>
                 <div>
-                  <Label htmlFor="edit-last-name">Last Name</Label>
+                  <Label htmlFor="edit-last-name">Last Name <span className="text-red-500">*</span></Label>
                   <Input id="edit-last-name" value={editForm.last_name} onChange={(e) => setEditForm(prev => ({ ...prev, last_name: e.target.value }))} />
+                  {!editForm.last_name?.trim() && <span className="text-red-500 text-sm">Last name is required</span>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-dob">Date of Birth</Label>
+                  <Label htmlFor="edit-dob">Date of Birth <span className="text-red-500">*</span></Label>
                   <Input id="edit-dob" type="date" value={editForm.date_of_birth} onChange={(e) => setEditForm(prev => ({ ...prev, date_of_birth: e.target.value }))} />
+                  {!editForm.date_of_birth && <span className="text-red-500 text-sm">Date of birth is required</span>}
                 </div>
                 <div>
-                  <Label htmlFor="edit-gender">Gender</Label>
+                  <Label htmlFor="edit-gender">Gender <span className="text-red-500">*</span></Label>
                   <Select value={editForm.gender} onValueChange={(v) => setEditForm(prev => ({ ...prev, gender: v }))}>
                     <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
                     <SelectContent>
@@ -1052,6 +1094,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       <SelectItem value="O">Other</SelectItem>
                     </SelectContent>
                   </Select>
+                  {!editForm.gender && <span className="text-red-500 text-sm">Gender is required</span>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1069,13 +1112,44 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-aadhar">Aadhar Number</Label>
+                  <Label htmlFor="edit-aadhar">Aadhar Number (Optional)</Label>
                   <Input id="edit-aadhar" value={editForm.aadhar_number} onChange={(e) => setEditForm(prev => ({ ...prev, aadhar_number: e.target.value }))} />
+                  {aadharMsg(editForm.aadhar_number, 'Aadhar') && (
+                    <span className="text-red-500 text-sm">{aadharMsg(editForm.aadhar_number, 'Aadhar')}</span>
+                  )}
+                  {editForm.aadhar_number && /^\d{12}$/.test(editForm.aadhar_number) && (
+                    <span className="text-green-600 text-sm">Aadhar number is valid</span>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="edit-apaar">APAAR Number</Label>
+                  <Label htmlFor="edit-apaar">APAAR Number (Optional)</Label>
                   <Input id="edit-apaar" value={editForm.apaar_number} onChange={(e) => setEditForm(prev => ({ ...prev, apaar_number: e.target.value }))} />
+                  {aadharMsg(editForm.apaar_number, 'APAAR') && (
+                    <span className="text-red-500 text-sm">{aadharMsg(editForm.apaar_number, 'APAAR')}</span>
+                  )}
+                  {editForm.apaar_number && /^\d{12}$/.test(editForm.apaar_number) && (
+                    <span className="text-green-600 text-sm">APAAR number is valid</span>
+                  )}
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-primary-phone">Primary Phone <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="edit-primary-phone"
+                    inputMode="numeric"
+                    value={editForm.primary_phone}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, primary_phone: e.target.value }))}
+                  />
+                  {!editForm.primary_phone ? (
+                    <span className="text-red-500 text-sm">Primary phone is required</span>
+                  ) : !/^\d{10}$/.test(editForm.primary_phone) ? (
+                    <span className="text-red-500 text-sm">Must be a 10-digit number</span>
+                  ) : (
+                    <span className="text-green-600 text-sm">Primary phone is valid</span>
+                  )}
+                </div>
+                <div>{/* spacer */}</div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1125,6 +1199,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                 <div>
                   <Label htmlFor="edit-father-email">Email</Label>
                   <Input id="edit-father-email" type="email" value={editForm.father_email} onChange={(e) => setEditForm(prev => ({ ...prev, father_email: e.target.value }))} />
+                  {emailMsg(editForm.father_email) && <span className="text-red-500 text-sm">{emailMsg(editForm.father_email)}</span>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1141,6 +1216,9 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                 <div>
                   <Label htmlFor="edit-father-aadhar">Aadhar Number</Label>
                   <Input id="edit-father-aadhar" value={editForm.father_aadhar_number} onChange={(e) => setEditForm(prev => ({ ...prev, father_aadhar_number: e.target.value }))} />
+                  {aadharMsg(editForm.father_aadhar_number, 'Father Aadhar') && (
+                    <span className="text-red-500 text-sm">{aadharMsg(editForm.father_aadhar_number, 'Father Aadhar')}</span>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="edit-father-gender">Gender (Optional)</Label>
@@ -1180,6 +1258,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                 <div>
                   <Label htmlFor="edit-mother-email">Email</Label>
                   <Input id="edit-mother-email" type="email" value={editForm.mother_email} onChange={(e) => setEditForm(prev => ({ ...prev, mother_email: e.target.value }))} />
+                  {emailMsg(editForm.mother_email) && <span className="text-red-500 text-sm">{emailMsg(editForm.mother_email)}</span>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1196,6 +1275,9 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                 <div>
                   <Label htmlFor="edit-mother-aadhar">Aadhar Number</Label>
                   <Input id="edit-mother-aadhar" value={editForm.mother_aadhar_number} onChange={(e) => setEditForm(prev => ({ ...prev, mother_aadhar_number: e.target.value }))} />
+                  {aadharMsg(editForm.mother_aadhar_number, 'Mother Aadhar') && (
+                    <span className="text-red-500 text-sm">{aadharMsg(editForm.mother_aadhar_number, 'Mother Aadhar')}</span>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="edit-mother-gender">Gender (Optional)</Label>
@@ -1235,6 +1317,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                 <div>
                   <Label htmlFor="edit-guardian-email">Email</Label>
                   <Input id="edit-guardian-email" type="email" value={editForm.guardian_email} onChange={(e) => setEditForm(prev => ({ ...prev, guardian_email: e.target.value }))} />
+                  {emailMsg(editForm.guardian_email) && <span className="text-red-500 text-sm">{emailMsg(editForm.guardian_email)}</span>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1251,6 +1334,9 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                 <div>
                   <Label htmlFor="edit-guardian-aadhar">Aadhar Number</Label>
                   <Input id="edit-guardian-aadhar" value={editForm.guardian_aadhar_number} onChange={(e) => setEditForm(prev => ({ ...prev, guardian_aadhar_number: e.target.value }))} />
+                  {aadharMsg(editForm.guardian_aadhar_number, 'Guardian Aadhar') && (
+                    <span className="text-red-500 text-sm">{aadharMsg(editForm.guardian_aadhar_number, 'Guardian Aadhar')}</span>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="edit-guardian-gender">Gender (Optional)</Label>
@@ -1290,8 +1376,58 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
               onClick={async () => {
                 if (selectedAdmission) {
                   try {
+                    // Admission number is required
+                    if (!editForm.admission_number?.trim()) {
+                      setEditAdmissionNumError('Admission number is required.');
+                      return;
+                    }
+                    // Required student fields
+                    if (!editForm.first_name?.trim()) {
+                      toast.error('First name is required');
+                      return;
+                    }
+                    if (!editForm.last_name?.trim()) {
+                      toast.error('Last name is required');
+                      return;
+                    }
+                    if (!editForm.date_of_birth) {
+                      toast.error('Date of birth is required');
+                      return;
+                    }
+                    if (!editForm.gender) {
+                      toast.error('Gender is required');
+                      return;
+                    }
+                    // Primary phone is mandatory and must be exactly 10 digits
+                    if (!/^\d{10}$/.test(editForm.primary_phone)) {
+                      toast.error('Primary phone is required and must be exactly 10 digits');
+                      return;
+                    }
+                    // Aadhar / APAAR format checks (optional fields — only validate if non-empty)
+                    const aadharErrors = [
+                      aadharMsg(editForm.aadhar_number, 'Aadhar'),
+                      aadharMsg(editForm.apaar_number, 'APAAR'),
+                      aadharMsg(editForm.father_aadhar_number, 'Father Aadhar'),
+                      aadharMsg(editForm.mother_aadhar_number, 'Mother Aadhar'),
+                      aadharMsg(editForm.guardian_aadhar_number, 'Guardian Aadhar'),
+                    ].filter(Boolean);
+                    if (aadharErrors.length > 0) {
+                      toast.error(aadharErrors[0]!);
+                      return;
+                    }
+                    // Email format checks (optional fields — only validate if non-empty)
+                    const emailErrors = [
+                      emailMsg(editForm.father_email) ? `Father email: ${emailMsg(editForm.father_email)}` : '',
+                      emailMsg(editForm.mother_email) ? `Mother email: ${emailMsg(editForm.mother_email)}` : '',
+                      emailMsg(editForm.guardian_email) ? `Guardian email: ${emailMsg(editForm.guardian_email)}` : '',
+                    ].filter(Boolean);
+                    if (emailErrors.length > 0) {
+                      toast.error(emailErrors[0]!);
+                      return;
+                    }
                     const updateData = {
                       // Admission fields
+                      admission_number: editForm.admission_number,
                       admission_date: editForm.admission_date || selectedAdmission.admission_date,
                       admission_type: editForm.admission_type || undefined,
                       academic_year_id: editForm.academic_year_id || selectedAdmission.academic_year_id,
@@ -1319,6 +1455,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       is_primary: editForm.is_primary || undefined,
                       aadhar_number: editForm.aadhar_number || undefined,
                       apaar_number: editForm.apaar_number || undefined,
+                      primary_phone: editForm.primary_phone,  // flat field, mandatory (10 digits)
                       nationality: editForm.nationality || undefined,
                       mother_tongue: editForm.mother_tongue || undefined,
                       caste: editForm.caste_id || editForm.caste || undefined,
@@ -1361,8 +1498,13 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                     setSelectedAdmission(refreshed);
                     setIsEditDirty(false);
                     setEditModalOpen(false);
-                  } catch (error) {
-                    console.error('Error updating admission:', error);
+                  } catch (error: any) {
+                    const msg: string = error?.message ?? '';
+                    if (msg.toLowerCase().includes('is already in use')) {
+                      setEditAdmissionNumError('Admission number already exists. It must be unique.');
+                    } else if (msg) {
+                      toast.error(msg);
+                    }
                   }
                 }
               }}

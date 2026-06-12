@@ -73,7 +73,21 @@ export const Select: React.FC<SelectProps> = ({ value, onValueChange, children, 
   extractFromChildren(children);
 
   const [isOpen, setIsOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const selectRef = useRef<HTMLDivElement>(null);
+
+  // Open upward when there isn't enough room below the trigger (e.g. selects
+  // sitting at the bottom of a page/card, like pagination "rows per page").
+  const handleToggle = () => {
+    if (disabled) return;
+    if (!isOpen && selectRef.current) {
+      const rect = selectRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const menuMaxHeight = 240; // matches max-h-60
+      setDropUp(spaceBelow < menuMaxHeight && rect.top > spaceBelow);
+    }
+    setIsOpen(prev => !prev);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -104,7 +118,7 @@ export const Select: React.FC<SelectProps> = ({ value, onValueChange, children, 
       {/* Trigger Button */}
       <button
         type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={handleToggle}
         disabled={disabled}
         className={cn(
           // Base styling to match react-select AcademicYearSelect
@@ -138,11 +152,12 @@ export const Select: React.FC<SelectProps> = ({ value, onValueChange, children, 
       {/* Dropdown Menu */}
       {isOpen && (
         <div className={cn(
-          "absolute z-50 w-full mt-1 overflow-hidden",
+          "absolute z-50 w-full overflow-hidden",
+          dropUp ? "bottom-full mb-1" : "top-full mt-1",
           "rounded-xl bg-[var(--color-card)] shadow-[0_8px_32px_0_rgba(0,0,0,0.12)]",
           "border border-[var(--color-border)]"
         )}>
-          <div className="max-h-60 overflow-y-auto scrollbar-none">
+          <div className="max-h-60 overflow-y-auto">
             {placeholder && !value && (
               <button
                 type="button"

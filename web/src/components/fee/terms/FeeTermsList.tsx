@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Plus, Edit, Trash2, Calendar, AlertTriangle, Loader2, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, AlertTriangle, Loader2, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useFeeTerms, useDeleteFeeTerm } from '@/hooks/fee/useFeeTerms';
@@ -32,6 +33,8 @@ export function FeeTermsList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortKey, setSortKey] = useState<string | null>(null);
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(5);
 
     const handleSort = (key: string) => {
         if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -65,6 +68,15 @@ export function FeeTermsList() {
         }
         return items;
     }, [terms, searchQuery, sortKey, sortDir]);
+
+    // Reset to first page when filters/sort/page size change
+    useEffect(() => {
+        setPage(1);
+    }, [searchQuery, sortKey, sortDir, pageSize]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredTerms.length / pageSize));
+    const currentPage = Math.min(page, totalPages);
+    const paginatedTerms = filteredTerms.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     const deleteTermMutation = useDeleteFeeTerm();
 
@@ -205,12 +217,12 @@ export function FeeTermsList() {
                             <TableBody>
                                 {filteredTerms.length === 0 ? (
                                     <TableRow><TableCell colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-sm">{searchQuery ? 'No terms match your search' : 'No fee terms'}</TableCell></TableRow>
-                                ) : filteredTerms.map((term, index) => {
+                                ) : paginatedTerms.map((term, index) => {
                                     const paymentSummary = getPaymentDatesSummary(term);
 
                                     return (
                                         <TableRow key={term.id} style={{ height: '48px' }}>
-                                            <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
+                                            <TableCell className="text-muted-foreground text-sm">{(currentPage - 1) * pageSize + index + 1}</TableCell>
                                             <TableCell className="font-medium">
                                                 {term.term_name}
                                             </TableCell>
@@ -282,6 +294,48 @@ export function FeeTermsList() {
                                 })}
                             </TableBody>
                         </Table>
+
+                        {/* Pagination */}
+                        {filteredTerms.length > 0 && (
+                            <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                        disabled={currentPage <= 1}
+                                    >
+                                        <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage >= totalPages}
+                                    >
+                                        Next <ChevronRight className="h-4 w-4 ml-1" />
+                                    </Button>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                    <div className="flex items-center gap-1.5">
+                                        <span>Rows per page</span>
+                                        <Select value={String(pageSize)} onValueChange={(val) => setPageSize(Number(val))}>
+                                            <SelectTrigger className="w-16 h-8">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {[5, 10, 20, 50].map((size) => (
+                                                    <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <span>
+                                        Page {currentPage} of {totalPages} ({filteredTerms.length} terms)
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                         </div>
                     )}
                 </CardContent>

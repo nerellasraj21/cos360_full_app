@@ -42,7 +42,7 @@ const navigationItems: NavigationItem[] = [
     {
         title: 'Fee Term Amounts',
         description: 'Manage fee term amount configurations',
-        path: '/fee/termamounts',
+        path: '/fee/term-amounts',
         icon: '💰',
         color: 'bg-chart-5/10 border-chart-5/20',
     },

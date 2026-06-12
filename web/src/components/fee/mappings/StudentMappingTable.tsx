@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { EditButton, DeleteButton, TableActionGroup } from '@/components/common/TableActions';
-import { Plus, Search, Filter, Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Search, Filter, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useFeeStudentMappings, useDeleteFeeStudentMapping } from '@/hooks/fee/useFeeMappings';
 import { useStudentsDropdown } from '@/api/hooks/students/admissions';
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections';
@@ -35,6 +35,8 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
   const [isBulkDirty, setIsBulkDirty] = useState(false);
   const [isCreateDirty, setIsCreateDirty] = useState(false);
   const [isEditDirty, setIsEditDirty] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   // Clear section when class changes
   useEffect(() => { setSelectedSection(''); }, [selectedClass]);
@@ -107,6 +109,15 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
         return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
       })
     : filteredMappings;
+
+  // Reset to first page when filters/sort/page size change
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, selectedClass, selectedSection, selectedFeeType, sortKey, sortDir, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(displayMappings.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedMappings = displayMappings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleFormSuccess = () => {
     setIsBulkDirty(false);
@@ -230,9 +241,9 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
                   </TableCell>
                 </TableRow>
               ) : (
-                displayMappings.map((mapping, index) => (
+                paginatedMappings.map((mapping, index) => (
                   <TableRow key={mapping.id} style={{ height: '48px' }}>
-                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{(currentPage - 1) * pageSize + index + 1}</TableCell>
                     <TableCell>
                       <div className="font-medium">{getStudentName(mapping.student_id)}</div>
                     </TableCell>
@@ -279,6 +290,48 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
               )}
             </TableBody>
           </Table>
+
+          {/* Pagination */}
+          {!isLoading && displayMappings.length > 0 && (
+            <div className="flex items-center justify-between flex-wrap gap-3 p-4 border-t">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Next <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <span>Rows per page</span>
+                  <Select value={String(pageSize)} onValueChange={(val) => setPageSize(Number(val))}>
+                    <SelectTrigger className="w-16 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[5, 10, 20, 50].map((size) => (
+                        <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <span>
+                  Page {currentPage} of {totalPages} ({displayMappings.length} mappings)
+                </span>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

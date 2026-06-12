@@ -32,6 +32,7 @@ export interface StudentCreate {
   sub_caste?: string; // Optional
   community?: string; // Optional
   identification_marks?: string; // Optional
+  primary_phone?: string | null; // Optional — exactly 10 digits if provided
   father: ParentCreate;
   mother: ParentCreate;
 }
@@ -55,6 +56,7 @@ export interface StudentOut {
   is_primary?: string;
   aadhar_number?: string;
   apaar_number?: string;
+  primary_phone?: string | null;
   caste?: string;
   sub_caste?: string;
   community?: string;
@@ -99,6 +101,9 @@ export interface StudentAdmissionBase {
 export interface StudentAdmissionCreate extends StudentAdmissionBase {
   student?: StudentCreate; // Optional for backward compatibility
 
+  // Admission number (required, must be unique)
+  admission_number?: string;
+
   // Admission type
   admission_type?: string;
 
@@ -109,6 +114,7 @@ export interface StudentAdmissionCreate extends StudentAdmissionBase {
   pincode?: string;
 
   // Flat fields for form handling
+  primary_phone?: string | null;
   student_first_name?: string;
   student_last_name?: string;
   student_date_of_birth?: string;
@@ -167,6 +173,7 @@ export interface StudentAdmissionResponse extends StudentAdmissionBase {
 
 export interface StudentAdmissionUpdate {
   // Admission fields
+  admission_number?: string;
   admission_date?: string;
   admission_type?: string;
   academic_year_id?: string;
@@ -194,6 +201,7 @@ export interface StudentAdmissionUpdate {
   is_primary?: string;
   aadhar_number?: string;
   apaar_number?: string;
+  primary_phone?: string | null; // flat field on edit (PATCH)
   nationality?: string;
   mother_tongue?: string;
   caste?: string;

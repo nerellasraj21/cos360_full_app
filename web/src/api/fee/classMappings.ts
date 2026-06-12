@@ -89,6 +89,12 @@ export const feeClassMappingsApi = {
             throw error;
         }
     },
+
+    // Toggle mandatory flag (flips all_by_default, no body required)
+    toggleMandatory: async (id: string): Promise<FeeClassMapping> => {
+        const response = await CAxios.patch(`/fee/class-mappings/${id}/toggle-mandatory`);
+        return response.data;
+    },
 };
 
 export const {
@@ -98,4 +104,5 @@ export const {
     updateMapping,
     deleteMapping,
     bulkCreateMappings,
+    toggleMandatory,
 } = feeClassMappingsApi;

@@ -24,7 +24,8 @@ export function useClassesDropdown(active_only?: boolean) {
 export function useSectionsByClassId(classId: string) {
     return useQuery<SectionDropdown[]>({
         queryKey: classesAndSectionsKeys.sectionsByClass(classId),
-        queryFn: () => classId ? getSectionsByClassId(classId) : Promise.resolve([]),
+        queryFn: () => getSectionsByClassId(classId),
+        enabled: !!classId,
         staleTime: 5 * 60 * 1000, // 5 minutes
     });
 }

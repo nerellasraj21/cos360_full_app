@@ -127,6 +127,19 @@ const DEFAULT_DEGREES_BY_LEVEL: Record<string, DegreeOption[]> = {
     ],
 };
 
+// Phone is optional, but if entered it must be exactly 10 digits.
+// Returns a clear message indicating whether the number is too short or too long.
+const validatePhoneMessage = (value: string): string => {
+    if (!value) return ''; // optional
+    if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
+    if (value.length < 10) return `Number is less than 10 digits — you entered ${value.length}. Please enter exactly 10 digits`;
+    if (value.length > 10) return `Number exceeds 10 digits — you entered ${value.length}. Please enter exactly 10 digits`;
+    return '';
+};
+
+// True only when the value is exactly 10 digits (used to show the green "valid" hint).
+const isValidPhone = (value: string): boolean => /^\d{10}$/.test(value);
+
 export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
     const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -481,6 +494,21 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
 
         if (!formData.joining_date) {
             toast.error('Joining date is required');
+            return;
+        }
+
+        if (formData.phone && !isValidPhone(formData.phone)) {
+            toast.error('Phone number must be exactly 10 digits');
+            return;
+        }
+
+        if (formData.uan_number && !/^\d{12}$/.test(formData.uan_number)) {
+            toast.error('UAN Number must be exactly 12 digits');
+            return;
+        }
+
+        if (formData.pf_account_number && !/^[A-Za-z0-9]+\/[A-Za-z0-9/]+$/.test(formData.pf_account_number)) {
+            toast.error('Invalid PF Account Number format (e.g. AP/HYD/12345)');
             return;
         }
 
@@ -1050,17 +1078,19 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     </label>
                     <Input
                         value={formData.phone}
+                        inputMode="numeric"
                         onChange={(e) => {
-                            if (e.target.value.length > 10) {
-                                setPhoneError('Phone number cannot exceed 10 digits');
-                            } else {
-                                setPhoneError('');
-                            }
-                            setFormData({ ...formData, phone: e.target.value });
+                            const val = e.target.value;
+                            setPhoneError(validatePhoneMessage(val));
+                            setFormData({ ...formData, phone: val });
                         }}
                         placeholder="Enter phone number"
                     />
-                    {phoneError && <span className="text-red-500">{phoneError}</span>}
+                    {phoneError ? (
+                        <span className="text-red-500 text-sm">{phoneError}</span>
+                    ) : isValidPhone(formData.phone) && (
+                        <span className="text-green-600 text-sm">Mobile number is valid</span>
+                    )}
                 </div>
 
                 <div>

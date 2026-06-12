@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Download, RefreshCw, Shield, Search, Plus, Eye, Printer, Receipt, Loader2 } from 'lucide-react';
+import { FileText, Download, RefreshCw, Shield, Search, Plus, Eye, Printer, Receipt, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { feeReceiptsApi } from '@/api/fee/receipts';
 import { useGenerateReceipt } from '@/api/hooks/fee/receipts';
@@ -50,11 +50,18 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
   const [showReprintDialog, setShowReprintDialog] = useState(false);
   const [isFormDirty, setIsFormDirty] = useState(false);
   const [selectedTransactionId, setSelectedTransactionId] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   // Load receipts on component mount and when search params change
   useEffect(() => {
     loadReceipts();
   }, [searchParams]);
+
+  // Reset to first page whenever the receipts list or page size changes
+  useEffect(() => {
+    setPage(1);
+  }, [receipts, pageSize]);
 
   // Load transactions when generate dialog opens
   useEffect(() => {
@@ -208,6 +215,11 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
       toast.error('Failed to download receipt PDF');
     }
   };
+
+  // Client-side pagination for the Recent Receipts table
+  const totalPages = Math.max(1, Math.ceil(receipts.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedReceipts = receipts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -646,9 +658,9 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                   </TableCell>
                 </TableRow>
               ) : (
-                receipts.map((receipt, index) => (
+                paginatedReceipts.map((receipt, index) => (
                   <TableRow key={receipt.id} style={{ height: '48px' }}>
-                    <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{(currentPage - 1) * pageSize + index + 1}</TableCell>
                     <TableCell className="font-medium">{receipt.receipt_number}</TableCell>
                     <TableCell>
                       <div>
@@ -685,6 +697,48 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
               )}
             </TableBody>
           </Table>
+
+          {/* Pagination */}
+          {receipts.length > 0 && (
+            <div className="flex items-center justify-between flex-wrap gap-3 pt-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Next <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <span>Rows per page</span>
+                  <Select value={String(pageSize)} onValueChange={(val) => setPageSize(Number(val))}>
+                    <SelectTrigger className="w-16 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[5, 10, 20, 50].map((size) => (
+                        <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <span>
+                  Page {currentPage} of {totalPages} ({receipts.length} receipts)
+                </span>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

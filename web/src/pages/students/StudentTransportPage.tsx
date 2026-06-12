@@ -31,6 +31,9 @@ import { useStudentsDropdownSimple } from '@/api/hooks/students/admissions';
 import { useTrips } from '@/api/hooks/masters/trips';
 import { useRouteStops } from '@/api/hooks/masters/routeStops';
 import { useTransportPricingDropdown } from '@/api/hooks/masters/transportPricing';
+import { useQuery } from '@tanstack/react-query';
+import { feeStudentMappingsApi } from '@/api/fee/studentMappings';
+import { useFeeTypes } from '@/hooks/fee/useFeeTypes';
 import type { StudentTransportOut, StudentTransportCreate, StudentTransportUpdate } from '@/types/masters/studentTransport';
 import { PageHeader } from '@/components/ui/PageHeader';
 
@@ -294,6 +297,39 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
   const vehicleId = selectedTrip?.vehicle_id;
   const { data: pricingOptions = [] } = useTransportPricingDropdown(vehicleId);
 
+  // ── Auto-fill Fee per Term from the student's assigned transport fee ─────────
+  // Identify which fee types count as "transport" (by category or name).
+  const { data: feeTypes = [] } = useFeeTypes();
+  const transportFeeTypeIds = useMemo(
+    () => new Set(
+      feeTypes
+        .filter(ft => /transport|bus/i.test(`${ft.fee_category_name ?? ''} ${ft.type_name ?? ''}`))
+        .map(ft => ft.id)
+    ),
+    [feeTypes]
+  );
+
+  // Fetch the selected student's fee mappings (create mode only).
+  const { data: studentMappingsRaw } = useQuery({
+    queryKey: ['fee-student-mappings', 'for-transport', studentId],
+    queryFn: () => feeStudentMappingsApi.getAllMappings({ student_id: studentId }),
+    enabled: !!studentId && !isEdit,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const transportFee = useMemo(() => {
+    const list = Array.isArray(studentMappingsRaw) ? studentMappingsRaw : (studentMappingsRaw?.items ?? []);
+    const match = list.find((m: any) => transportFeeTypeIds.has(m.fee_type_id))
+      ?? list.find((m: any) => /transport|bus/i.test(m.fee_type_name ?? ''));
+    return match ? Number(match.total_fee) : null;
+  }, [studentMappingsRaw, transportFeeTypeIds]);
+
+  // Prefill Fee per Term when a transport fee is found for the selected student.
+  useEffect(() => {
+    if (isEdit || transportFee == null) return;
+    setFeePerTerm(String(transportFee));
+  }, [studentId, transportFee, isEdit]);
+
   useEffect(() => {
     if (open) {
       setStudentId(transport?.student_id ?? '');
@@ -414,6 +450,16 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
               onChange={(e) => setFeePerTerm(e.target.value)}
               placeholder="e.g. 1500"
             />
+            {!isEdit && transportFee != null && (
+              <p className="text-xs text-green-600">
+                Auto-loaded from the student's assigned transport fee (₹{transportFee.toLocaleString()}). You can edit it if needed.
+              </p>
+            )}
+            {!isEdit && studentId && transportFee == null && (
+              <p className="text-xs text-muted-foreground">
+                No transport fee assigned to this student — enter the amount manually.
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>

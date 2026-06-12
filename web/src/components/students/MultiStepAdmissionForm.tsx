@@ -40,9 +40,12 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
   const selectedAcademicYearId = useAcademicYearStore((state) => state.selectedAcademicYearId);
 
   const methods = useForm<StudentAdmissionCreate>({
+    mode: 'onChange', // validate live as the user types (show errors immediately)
     defaultValues: {
+      admission_number: '',
       admission_date: new Date().toISOString().split('T')[0],
       admission_type: 'non_primary',
+      primary_phone: '',
       academic_year_id: selectedAcademicYearId || '',
       admitted_academic_year_id: selectedAcademicYearId || '',
       admitted_class_id: '',
@@ -131,8 +134,8 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
     // Define ONLY required fields for each step
     const stepFields = {
       0: ['admission_date'], // Academic Details
-      1: ['student_first_name', 'student_last_name', 'student_date_of_birth', 'student_gender'], // Student Details - only required fields
-      2: ['father_name', 'father_email', 'mother_name', 'mother_email'], // Parent Details - only required fields
+      1: ['admission_number', 'student_first_name', 'student_last_name', 'student_date_of_birth', 'student_gender', 'student_aadhar_number', 'student_apaar_number', 'primary_phone'], // Student Details
+      2: ['father_name', 'father_email', 'mother_name', 'mother_email', 'father_phone', 'mother_phone', 'guardian_phone'], // Parent Details - required fields + phone format (10 digits)
       3: ['address_line1', 'city', 'state_id'], // Address Details - including required state
       4: [], // Previous School (no required fields)
       5: [] // Summary (no validation needed)
@@ -171,11 +174,13 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
       // Validate required fields before submission
       const requiredFields = {
         'Academic Year': currentAcademicYearId,
+        'Admission Number': data.admission_number,
         'Admission Date': data.admission_date,
         'Student First Name': data.student_first_name,
         'Student Last Name': data.student_last_name,
         'Student Date of Birth': data.student_date_of_birth,
         'Student Gender': data.student_gender,
+        'Primary Phone': data.primary_phone,
         "Father's Name": data.father_name,
         "Father's Email": data.father_email,
         "Mother's Name": data.mother_name,
@@ -208,6 +213,7 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
       // Restructure flat form data into nested API format
       // Use current academic year from store
       const cleanedData = {
+        admission_number: data.admission_number,
         admission_date: data.admission_date,
         admission_type: data.admission_type || 'non_primary',
         academic_year_id: currentAcademicYearId,
@@ -242,6 +248,7 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
           sub_caste: data.sub_caste_id || '',                // Field name is 'sub_caste' not 'sub_caste_id'
           community: data.student_community || '',           // Required - send empty string if not provided
           identification_marks: data.student_identification_marks || '',  // Required - send empty string if not provided
+          primary_phone: data.primary_phone || '',  // Primary contact phone (required in the form, 10 digits)
           father: {
             name: data.father_name || '',
             email: data.father_email || undefined,
@@ -306,6 +313,21 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
       console.error('Full error object:', error);
       console.error('Error response:', error?.response);
       console.error('Error data:', error?.response?.data);
+
+      // Duplicate admission number — set field error and return to Student Details step
+      // Note: handleApiError in the API layer converts Axios errors to plain Error objects,
+      // so we check error.message (which contains the backend's detail string) not error.response.
+      const isDuplicate =
+        typeof error?.message === 'string' &&
+        error.message.toLowerCase().includes('is already in use');
+
+      if (isDuplicate) {
+        methods.setError('admission_number', {
+          message: 'Admission number already exists. It must be unique.',
+        });
+        setCurrentStep(1);
+        return;
+      }
 
       // Show detailed error message
       let errorMessage = 'Failed to create admission: ';

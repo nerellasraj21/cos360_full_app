@@ -16,6 +16,19 @@ interface StaffEnrollmentFormProps {
   onCancel?: () => void;
 }
 
+// Phone is optional, but if entered it must be exactly 10 digits.
+// Returns a clear message indicating whether the number is too short or too long.
+const validatePhoneMessage = (value: string): string => {
+  if (!value) return ''; // optional
+  if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
+  if (value.length < 10) return `Number is less than 10 digits — you entered ${value.length}. Please enter exactly 10 digits`;
+  if (value.length > 10) return `Number exceeds 10 digits — you entered ${value.length}. Please enter exactly 10 digits`;
+  return '';
+};
+
+// True only when the value is exactly 10 digits (used to show the green "valid" hint).
+const isValidPhone = (value: string): boolean => /^\d{10}$/.test(value);
+
 export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffEnrollmentFormProps) {
   const [phoneError, setPhoneError] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -52,6 +65,11 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
 
     if (!formData.joining_date) {
       toast.error('Joining date is required');
+      return;
+    }
+
+    if (formData.phone && !isValidPhone(formData.phone)) {
+      toast.error('Phone number must be exactly 10 digits');
       return;
     }
 
@@ -142,18 +160,20 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
                   <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
+                    inputMode="numeric"
                     value={formData.phone}
                     onChange={(e) => {
-                      if (e.target.value.length > 10) {
-                        setPhoneError('Phone number cannot exceed 10 digits');
-                      } else {
-                        setPhoneError('');
-                      }
-                      handleInputChange('phone', e.target.value);
+                      const val = e.target.value;
+                      setPhoneError(validatePhoneMessage(val));
+                      handleInputChange('phone', val);
                     }}
                     placeholder="Enter phone number"
                   />
-                  {phoneError && <span className="text-red-500">{phoneError}</span>}
+                  {phoneError ? (
+                    <span className="text-red-500 text-sm">{phoneError}</span>
+                  ) : isValidPhone(formData.phone) && (
+                    <span className="text-green-600 text-sm">Mobile number is valid</span>
+                  )}
                 </div>
               </div>
 

@@ -93,6 +93,7 @@ export function SummaryStepForm() {
           <CardTitle>Student Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
+          <p><strong>Admission Number:</strong> {formData.admission_number}</p>
           <p><strong>Name:</strong> {formData.student_first_name} {formData.student_last_name}</p>
           <p><strong>Date of Birth:</strong> {formData.student_date_of_birth}</p>
           <p><strong>Gender:</strong> {formData.student_gender}</p>
