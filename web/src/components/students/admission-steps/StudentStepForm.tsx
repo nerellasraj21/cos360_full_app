@@ -1,5 +1,5 @@
 import { useFormContext } from 'react-hook-form';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,6 +32,8 @@ export const StudentStepForm = () => {
   const { register, setValue, setError, clearErrors, watch, formState: { errors } } = useFormContext();
   const [selectedCasteId, setSelectedCasteId] = useState<string | undefined>();
   const [isCheckingNum, setIsCheckingNum] = useState(false);
+  const [isPhoneRequired, setIsPhoneRequired] = useState(false);
+  const phoneRequiredRef = useRef(false);
 
   // On-blur duplicate check against the search endpoint
   const checkAdmissionNumberExists = async (value: string) => {
@@ -43,7 +45,7 @@ export const StudentStepForm = () => {
         (r) => r.admission_number.toLowerCase() === value.trim().toLowerCase()
       );
       if (duplicate) {
-        setError('admission_number', { message: 'Admission number already exists. It must be unique.' });
+        setError('admission_number', { message: 'Admission number already exists. Please use a different number.' });
       } else {
         clearErrors('admission_number');
       }
@@ -54,15 +56,28 @@ export const StudentStepForm = () => {
     }
   };
 
-  // Watch primary status for admission number hint
-  const isPrimary = watch('student_is_primary') === 'primary';
-  const admissionType = isPrimary ? 'primary' : 'non_primary';
+  // Derive admission type from the AcademicStepForm field (set in step 1)
+  const admissionTypeValue = watch('admission_type');
+  const apiAdmissionType: 'primary' | 'non_primary' =
+    admissionTypeValue === 'primary' ? 'primary' : 'non_primary';
 
   const { data: admissionHint } = useQuery({
-    queryKey: ['next-admission-number', admissionType],
-    queryFn: () => getNextAdmissionNumber(admissionType),
+    queryKey: ['next-admission-number', apiAdmissionType],
+    queryFn: () => getNextAdmissionNumber(apiAdmissionType),
     staleTime: 60 * 1000,
   });
+
+  const { getValues } = useFormContext();
+
+  // Auto-fill admission number with the next available number when field is empty
+  useEffect(() => {
+    if (admissionHint?.next_number) {
+      const current = getValues('admission_number');
+      if (!current || current.trim() === '') {
+        setValue('admission_number', admissionHint.next_number);
+      }
+    }
+  }, [admissionHint?.next_number, getValues, setValue]);
 
   // Register admission_number once — override onBlur to chain duplicate check
   const admissionNumberField = register('admission_number', { required: 'Admission number is required' });
@@ -100,35 +115,22 @@ export const StudentStepForm = () => {
                 admissionNumberField.onBlur(e);
                 await checkAdmissionNumberExists(e.target.value);
               }}
-              placeholder={isPrimary ? 'e.g. P2025001' : 'e.g. NP2025001'}
+              placeholder={apiAdmissionType === 'primary' ? 'e.g. P2026001' : 'e.g. 2026001'}
               className="flex-1"
             />
             {isCheckingNum && <Loader2 className="h-4 w-4 animate-spin self-center text-muted-foreground" />}
-            {!isCheckingNum && admissionHint?.next_number && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="whitespace-nowrap"
-                onClick={() => setValue('admission_number', admissionHint.next_number)}
-              >
-                Use suggested
-              </Button>
-            )}
           </div>
           {errors.admission_number ? (
             <span className="text-red-500 text-sm">{errors.admission_number.message as string}</span>
           ) : admissionHint && (
             <p className="text-xs text-muted-foreground mt-1">
-              {isPrimary
-                ? `Format: ${admissionHint.format} — e.g. ${admissionHint.next_number}`
-                : `Enter as per government rules — e.g. ${admissionHint.next_number}`}
+              Next available: <strong>{admissionHint.next_number}</strong>
             </p>
           )}
         </div>
 
         <div>
-          <Label htmlFor="student_first_name">First Name</Label>
+          <Label htmlFor="student_first_name">First Name <span className="text-red-500">*</span></Label>
           <Input
             id="student_first_name"
             {...register('student_first_name', { required: 'First name is required' })}
@@ -179,14 +181,14 @@ export const StudentStepForm = () => {
         </div>
 
         <div>
-          <Label htmlFor="student_is_primary">Primary Status</Label>
+          <Label htmlFor="student_is_primary">Student Type</Label>
           <select
             id="student_is_primary"
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             {...register('student_is_primary')}
           >
-            <option value="not_primary">Not Primary</option>
-            <option value="primary">Primary</option>
+            <option value="not_primary">Day Scholar</option>
+            <option value="primary">Hostel</option>
           </select>
         </div>
 
@@ -250,22 +252,51 @@ export const StudentStepForm = () => {
           )}
         </div>
 
-        <div>
-          <Label htmlFor="primary_phone">
-            Primary Phone <span className="text-red-500">*</span>
-          </Label>
+        <div className="col-span-2">
+          <div className="flex items-center gap-3 mb-1">
+            <Label htmlFor="primary_phone">
+              Phone Number{isPhoneRequired && <span className="text-red-500"> *</span>}
+            </Label>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                id="phone_mandatory_toggle"
+                checked={isPhoneRequired}
+                onChange={(e) => {
+                  phoneRequiredRef.current = e.target.checked;
+                  setIsPhoneRequired(e.target.checked);
+                  if (!e.target.checked) clearErrors('primary_phone');
+                }}
+                className="w-4 h-4 cursor-pointer"
+              />
+              <label htmlFor="phone_mandatory_toggle" className="text-sm text-muted-foreground cursor-pointer select-none">
+                Mandatory
+              </label>
+            </div>
+          </div>
           <Input
             id="primary_phone"
             inputMode="numeric"
+            placeholder="10-digit phone number"
             {...register('primary_phone', {
-              required: 'Primary phone is required',
-              validate: makeExactDigitsValidator('Primary phone', 10),
+              validate: (value) => {
+                if (phoneRequiredRef.current) {
+                  if (!value || value.trim() === '') return 'Phone number is required';
+                  if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
+                  if (value.length !== 10) return `Must be exactly 10 digits — you entered ${value.length}`;
+                  return true;
+                }
+                if (!value || value.trim() === '') return true;
+                if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
+                if (value.length !== 10) return `Must be exactly 10 digits — you entered ${value.length}`;
+                return true;
+              }
             })}
           />
           {errors.primary_phone ? (
             <span className="text-red-500 text-sm">{errors.primary_phone.message as string}</span>
           ) : isExactDigits(watch('primary_phone'), 10) && (
-            <span className="text-green-600 text-sm">Primary phone is valid</span>
+            <span className="text-green-600 text-sm">Phone number is valid</span>
           )}
         </div>
 

@@ -62,6 +62,7 @@ export interface FeePaymentRequest {
   academic_year_id: string;
   amount_to_pay: number;
   payment_method: CollectionPaymentMethod;
+  receipt_number?: string;
   upi_reference?: string;
   bank_reference?: string;
   cheque_number?: string;

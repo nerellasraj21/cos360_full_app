@@ -32,7 +32,23 @@ export const fetchRouteStops = async (activeOnly = true): Promise<RouteStop[]> =
     const { data } = await CAxios.get(ROUTE_STOPS_API_BASE, {
       params: { active_only: activeOnly }
     });
-    return data;
+    console.log('[RouteStops] raw API response:', data);
+    // Handle both plain array and paginated { items: [...] } responses
+    const result = Array.isArray(data) ? data : (data.items || data.results || []);
+    console.log('[RouteStops] parsed stops count:', result.length, result);
+    return result;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// List Route Stops by Route ID
+export const fetchRouteStopsByRouteId = async (routeId: string): Promise<RouteStop[]> => {
+  try {
+    const { data } = await CAxios.get(ROUTE_STOPS_API_BASE, {
+      params: { route_id: routeId, active_only: false }
+    });
+    return Array.isArray(data) ? data : (data.items || data.results || []);
   } catch (error) {
     throw handleApiError(error);
   }

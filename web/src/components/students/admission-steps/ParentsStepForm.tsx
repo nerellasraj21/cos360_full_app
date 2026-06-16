@@ -1,12 +1,8 @@
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Search, Loader2 } from 'lucide-react';
-import { searchParentByPhone } from '@/api/masters/parents';
 import { SalaryRangeDropdown } from '@/components/dropdown/SalaryRangeDropdown';
 
 // Phone is optional, but if entered it must be exactly 10 digits.
@@ -24,63 +20,14 @@ const isValidPhone = (value?: string): boolean =>
   !!value && /^\d{10}$/.test(value);
 
 export const ParentsStepForm = () => {
-  const { register, setValue, watch, formState: { errors } } = useFormContext();
-  const [fatherSearching, setFatherSearching] = useState(false);
-  const [motherSearching, setMotherSearching] = useState(false);
-  const [fatherFound, setFatherFound] = useState<boolean | null>(null);
-  const [motherFound, setMotherFound] = useState<boolean | null>(null);
+  const { register, watch, setValue, clearErrors, formState: { errors } } = useFormContext();
 
-  const handleFatherPhoneSearch = async (phone: string) => {
-    if (!phone || phone.length < 10) return;
-
-    setFatherSearching(true);
-    setFatherFound(null);
-
-    try {
-      const parent = await searchParentByPhone(phone);
-      if (parent) {
-        setFatherFound(true);
-        setValue('father_name', parent.name || '');
-        setValue('father_email', parent.email || '');
-        setValue('father_occupation', parent.occupation || '');
-        setValue('father_aadhar_number', parent.aadhar_number || '');
-        setValue('father_gender', parent.gender || '');
-      } else {
-        setFatherFound(false);
-      }
-    } catch (error) {
-      console.error('Error searching for father:', error);
-      setFatherFound(false);
-    } finally {
-      setFatherSearching(false);
-    }
-  };
-
-  const handleMotherPhoneSearch = async (phone: string) => {
-    if (!phone || phone.length < 10) return;
-
-    setMotherSearching(true);
-    setMotherFound(null);
-
-    try {
-      const parent = await searchParentByPhone(phone);
-      if (parent) {
-        setMotherFound(true);
-        setValue('mother_name', parent.name || '');
-        setValue('mother_email', parent.email || '');
-        setValue('mother_occupation', parent.occupation || '');
-        setValue('mother_aadhar_number', parent.aadhar_number || '');
-        setValue('mother_gender', parent.gender || '');
-      } else {
-        setMotherFound(false);
-      }
-    } catch (error) {
-      console.error('Error searching for mother:', error);
-      setMotherFound(false);
-    } finally {
-      setMotherSearching(false);
-    }
-  };
+  const [fatherPhoneRequired, setFatherPhoneRequired] = useState(false);
+  const fatherPhoneRequiredRef = useRef(false);
+  const [motherPhoneRequired, setMotherPhoneRequired] = useState(false);
+  const motherPhoneRequiredRef = useRef(false);
+  const [guardianPhoneRequired, setGuardianPhoneRequired] = useState(false);
+  const guardianPhoneRequiredRef = useRef(false);
 
   return (
     <div className="space-y-4">
@@ -92,7 +39,7 @@ export const ParentsStepForm = () => {
           <h3 className="text-lg font-medium">Father's Information</h3>
 
           <div>
-            <Label htmlFor="father_name">Name</Label>
+            <Label htmlFor="father_name">Name *</Label>
             <Input
               id="father_name"
               {...register('father_name', { required: "Father's name is required" })}
@@ -121,43 +68,50 @@ export const ParentsStepForm = () => {
           </div>
 
           <div>
-            <Label htmlFor="father_phone">Phone (Optional)</Label>
-            <div className="flex gap-2 items-start">
-              <div className="flex-1">
-                <Input
-                  id="father_phone"
-                  {...register('father_phone', {
-                    validate: validatePhoneDigits
-                  })}
+            <div className="flex items-center gap-3 mb-1">
+              <Label htmlFor="father_phone">
+                Phone{fatherPhoneRequired && <span className="text-red-500"> *</span>}
+              </Label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  id="father_phone_mandatory"
+                  checked={fatherPhoneRequired}
+                  onChange={(e) => {
+                    fatherPhoneRequiredRef.current = e.target.checked;
+                    setFatherPhoneRequired(e.target.checked);
+                    if (!e.target.checked) clearErrors('father_phone');
+                  }}
+                  className="w-4 h-4 cursor-pointer"
                 />
-                {errors.father_phone ? (
-                  <span className="text-red-500 text-sm">{errors.father_phone.message as string}</span>
-                ) : isValidPhone(watch('father_phone')) && (
-                  <span className="text-green-600 text-sm">Mobile number is valid</span>
-                )}
+                <label htmlFor="father_phone_mandatory" className="text-sm text-muted-foreground cursor-pointer select-none">
+                  Mandatory
+                </label>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const phone = (document.getElementById('father_phone') as HTMLInputElement)?.value;
-                  handleFatherPhoneSearch(phone);
-                }}
-                disabled={fatherSearching}
-                className="mt-0"
-              >
-                {fatherSearching ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-              </Button>
             </div>
-            {fatherFound !== null && (
-              <Badge variant={fatherFound ? "default" : "secondary"} className="mt-1">
-                {fatherFound ? 'Parent found' : 'New parent'}
-              </Badge>
+            <Input
+              id="father_phone"
+              inputMode="numeric"
+              placeholder="10-digit phone number"
+              {...register('father_phone', {
+                validate: (value) => {
+                  if (fatherPhoneRequiredRef.current) {
+                    if (!value || value.trim() === '') return 'Phone number is required';
+                    if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
+                    if (value.length !== 10) return `Must be exactly 10 digits — you entered ${value.length}`;
+                    return true;
+                  }
+                  if (!value || value.trim() === '') return true;
+                  if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
+                  if (value.length !== 10) return `Must be exactly 10 digits — you entered ${value.length}`;
+                  return true;
+                }
+              })}
+            />
+            {errors.father_phone ? (
+              <span className="text-red-500 text-sm">{errors.father_phone.message as string}</span>
+            ) : isValidPhone(watch('father_phone')) && (
+              <span className="text-green-600 text-sm">Mobile number is valid</span>
             )}
           </div>
 
@@ -172,7 +126,8 @@ export const ParentsStepForm = () => {
           <SalaryRangeDropdown
             id="father_salary_range"
             label="Salary Range (Optional)"
-            register={register('father_salary_range')}
+            value={watch('father_salary_range') || ''}
+            onChange={(val) => setValue('father_salary_range', val)}
           />
 
           <div>
@@ -221,7 +176,7 @@ export const ParentsStepForm = () => {
           <h3 className="text-lg font-medium">Mother's Information</h3>
 
           <div>
-            <Label htmlFor="mother_name">Name</Label>
+            <Label htmlFor="mother_name">Name *</Label>
             <Input
               id="mother_name"
               {...register('mother_name', { required: "Mother's name is required" })}
@@ -256,43 +211,50 @@ export const ParentsStepForm = () => {
           </div>
 
           <div>
-            <Label htmlFor="mother_phone">Phone (Optional)</Label>
-            <div className="flex gap-2 items-start">
-              <div className="flex-1">
-                <Input
-                  id="mother_phone"
-                  {...register('mother_phone', {
-                    validate: validatePhoneDigits
-                  })}
+            <div className="flex items-center gap-3 mb-1">
+              <Label htmlFor="mother_phone">
+                Phone{motherPhoneRequired && <span className="text-red-500"> *</span>}
+              </Label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  id="mother_phone_mandatory"
+                  checked={motherPhoneRequired}
+                  onChange={(e) => {
+                    motherPhoneRequiredRef.current = e.target.checked;
+                    setMotherPhoneRequired(e.target.checked);
+                    if (!e.target.checked) clearErrors('mother_phone');
+                  }}
+                  className="w-4 h-4 cursor-pointer"
                 />
-                {errors.mother_phone ? (
-                  <span className="text-red-500 text-sm">{errors.mother_phone.message as string}</span>
-                ) : isValidPhone(watch('mother_phone')) && (
-                  <span className="text-green-600 text-sm">Mobile number is valid</span>
-                )}
+                <label htmlFor="mother_phone_mandatory" className="text-sm text-muted-foreground cursor-pointer select-none">
+                  Mandatory
+                </label>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const phone = (document.getElementById('mother_phone') as HTMLInputElement)?.value;
-                  handleMotherPhoneSearch(phone);
-                }}
-                disabled={motherSearching}
-                className="mt-0"
-              >
-                {motherSearching ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-              </Button>
             </div>
-            {motherFound !== null && (
-              <Badge variant={motherFound ? "default" : "secondary"} className="mt-1">
-                {motherFound ? 'Parent found' : 'New parent'}
-              </Badge>
+            <Input
+              id="mother_phone"
+              inputMode="numeric"
+              placeholder="10-digit phone number"
+              {...register('mother_phone', {
+                validate: (value) => {
+                  if (motherPhoneRequiredRef.current) {
+                    if (!value || value.trim() === '') return 'Phone number is required';
+                    if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
+                    if (value.length !== 10) return `Must be exactly 10 digits — you entered ${value.length}`;
+                    return true;
+                  }
+                  if (!value || value.trim() === '') return true;
+                  if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
+                  if (value.length !== 10) return `Must be exactly 10 digits — you entered ${value.length}`;
+                  return true;
+                }
+              })}
+            />
+            {errors.mother_phone ? (
+              <span className="text-red-500 text-sm">{errors.mother_phone.message as string}</span>
+            ) : isValidPhone(watch('mother_phone')) && (
+              <span className="text-green-600 text-sm">Mobile number is valid</span>
             )}
           </div>
 
@@ -307,7 +269,8 @@ export const ParentsStepForm = () => {
           <SalaryRangeDropdown
             id="mother_salary_range"
             label="Salary Range (Optional)"
-            register={register('mother_salary_range')}
+            value={watch('mother_salary_range') || ''}
+            onChange={(val) => setValue('mother_salary_range', val)}
           />
 
           <div>
@@ -385,22 +348,51 @@ export const ParentsStepForm = () => {
             </div>
 
             <div>
-              <Label htmlFor="guardian_phone">Phone (Optional)</Label>
-              <div className="flex gap-2 items-start">
-                <div className="flex-1">
-                  <Input
-                    id="guardian_phone"
-                    {...register('guardian_phone', {
-                      validate: validatePhoneDigits
-                    })}
+              <div className="flex items-center gap-3 mb-1">
+                <Label htmlFor="guardian_phone">
+                  Phone{guardianPhoneRequired && <span className="text-red-500"> *</span>}
+                </Label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    id="guardian_phone_mandatory"
+                    checked={guardianPhoneRequired}
+                    onChange={(e) => {
+                      guardianPhoneRequiredRef.current = e.target.checked;
+                      setGuardianPhoneRequired(e.target.checked);
+                      if (!e.target.checked) clearErrors('guardian_phone');
+                    }}
+                    className="w-4 h-4 cursor-pointer"
                   />
-                  {errors.guardian_phone ? (
-                    <span className="text-red-500 text-sm">{errors.guardian_phone.message as string}</span>
-                  ) : isValidPhone(watch('guardian_phone')) && (
-                    <span className="text-green-600 text-sm">Mobile number is valid</span>
-                  )}
+                  <label htmlFor="guardian_phone_mandatory" className="text-sm text-muted-foreground cursor-pointer select-none">
+                    Mandatory
+                  </label>
                 </div>
               </div>
+              <Input
+                id="guardian_phone"
+                inputMode="numeric"
+                placeholder="10-digit phone number"
+                {...register('guardian_phone', {
+                  validate: (value) => {
+                    if (guardianPhoneRequiredRef.current) {
+                      if (!value || value.trim() === '') return 'Phone number is required';
+                      if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
+                      if (value.length !== 10) return `Must be exactly 10 digits — you entered ${value.length}`;
+                      return true;
+                    }
+                    if (!value || value.trim() === '') return true;
+                    if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
+                    if (value.length !== 10) return `Must be exactly 10 digits — you entered ${value.length}`;
+                    return true;
+                  }
+                })}
+              />
+              {errors.guardian_phone ? (
+                <span className="text-red-500 text-sm">{errors.guardian_phone.message as string}</span>
+              ) : isValidPhone(watch('guardian_phone')) && (
+                <span className="text-green-600 text-sm">Mobile number is valid</span>
+              )}
             </div>
 
             <div>
@@ -416,7 +408,8 @@ export const ParentsStepForm = () => {
               <SalaryRangeDropdown
                 id="guardian_salary_range"
                 label=""
-                register={register('guardian_salary_range')}
+                value={watch('guardian_salary_range') || ''}
+                onChange={(val) => setValue('guardian_salary_range', val)}
               />
             </div>
 

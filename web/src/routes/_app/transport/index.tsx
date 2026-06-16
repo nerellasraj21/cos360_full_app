@@ -41,7 +41,10 @@ function TransportDashboard() {
   const transportMenu = menuItems.find(
     (item) => item.name.toLowerCase() === 'transport'
   )
-  const sections = transportMenu?.children ?? []
+  const HIDDEN = new Set(['route stops', 'transport trips'])
+  const sections = (transportMenu?.children ?? []).filter(
+    (c) => !HIDDEN.has(c.name.toLowerCase())
+  )
 
   return (
     <div className="space-y-6">

@@ -4,9 +4,18 @@ export interface Vehicle {
   registration_number: string;
   vehicle_type: 'Bus' | 'Van' | 'Auto';
   fees?: number;
-  last_inspected_date: string; // Date in YYYY-MM-DD format
-  pollution_renewal_date: string; // Date in YYYY-MM-DD format
+  last_inspected_date: string;
+  pollution_renewal_date: string;
+  is_ac?: boolean | null;
+  driver_name?: string | null;
+  co_driver_name?: string | null;
+  driving_licence_no?: string | null;
+  driving_licence_exp_date?: string | null;
+  bus_insurance_vendor?: string | null;
+  insurance_expiry_date?: string | null;
   is_active: boolean;
+  trip_count?: number;
+  number_of_trips?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -16,8 +25,16 @@ export interface VehicleInput {
   registration_number: string;
   vehicle_type: 'Bus' | 'Van' | 'Auto';
   fees?: number;
-  last_inspected_date: string; // Date in YYYY-MM-DD format
-  pollution_renewal_date: string; // Date in YYYY-MM-DD format
+  last_inspected_date: string;
+  pollution_renewal_date: string;
+  is_ac?: boolean | null;
+  driver_name?: string | null;
+  co_driver_name?: string | null;
+  driving_licence_no?: string | null;
+  driving_licence_exp_date?: string | null;
+  bus_insurance_vendor?: string | null;
+  insurance_expiry_date?: string | null;
+  number_of_trips?: number | null;
   is_active?: boolean;
 }
 
@@ -28,6 +45,14 @@ export interface VehicleUpdate {
   fees?: number;
   last_inspected_date?: string;
   pollution_renewal_date?: string;
+  is_ac?: boolean | null;
+  driver_name?: string | null;
+  co_driver_name?: string | null;
+  driving_licence_no?: string | null;
+  driving_licence_exp_date?: string | null;
+  bus_insurance_vendor?: string | null;
+  insurance_expiry_date?: string | null;
+  number_of_trips?: number | null;
   is_active?: boolean;
 }
 

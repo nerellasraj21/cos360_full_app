@@ -127,7 +127,7 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
 
   function handleSaveAll() {
     const concessions = rows
-      .filter((r) => r.concession_amount > 0)
+      .filter((r) => r.concession_amount > 0 && r.reason.length >= 5 && r.approved_by)
       .map((r) => ({
         fee_type_id: r.fee_type_id,
         concession_amount: r.concession_amount,

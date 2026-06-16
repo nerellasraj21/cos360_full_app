@@ -9,6 +9,7 @@ import type {
 } from '@/types/masters/routeStop';
 import {
   fetchRouteStops,
+  fetchRouteStopsByRouteId,
   fetchRouteStopById,
   createRouteStop,
   updateRouteStop,
@@ -33,6 +34,16 @@ export function useRouteStops(activeOnly = true) {
     queryKey: routeStopsKeys.list(activeOnly),
     queryFn: () => fetchRouteStops(activeOnly),
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+// Get route stops by route ID (for the stops manager panel)
+export function useRouteStopsByRoute(routeId: string) {
+  return useQuery<RouteStop[]>({
+    queryKey: [...routeStopsKeys.lists(), 'byRoute', routeId],
+    queryFn: () => fetchRouteStopsByRouteId(routeId),
+    enabled: !!routeId,
+    staleTime: 2 * 60 * 1000,
   });
 }
 

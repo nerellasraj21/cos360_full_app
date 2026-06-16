@@ -131,20 +131,31 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
   const { trigger } = methods;
 
   const nextStep = async () => {
-    // Define ONLY required fields for each step
     const stepFields = {
-      0: ['admission_date'], // Academic Details
-      1: ['admission_number', 'student_first_name', 'student_last_name', 'student_date_of_birth', 'student_gender', 'student_aadhar_number', 'student_apaar_number', 'primary_phone'], // Student Details
-      2: ['father_name', 'father_email', 'mother_name', 'mother_email', 'father_phone', 'mother_phone', 'guardian_phone'], // Parent Details - required fields + phone format (10 digits)
-      3: ['address_line1', 'city', 'state_id'], // Address Details - including required state
-      4: [], // Previous School (no required fields)
-      5: [] // Summary (no validation needed)
+      0: ['admission_date'],
+      1: ['admission_number', 'student_first_name', 'student_last_name', 'student_date_of_birth', 'student_gender', 'student_aadhar_number', 'student_apaar_number', 'primary_phone'],
+      2: ['father_name', 'father_email', 'mother_name', 'mother_email', 'father_phone', 'mother_phone', 'guardian_phone'],
+      3: ['address_line1', 'city', 'state_id'],
+      4: [],
+      5: []
     };
 
+    // Step 0: manually check dropdown fields (they use setValue, not register, so trigger() skips them)
+    if (currentStep === 0) {
+      const values = methods.getValues();
+      const missing: string[] = [];
+      if (!values.admission_type) missing.push('Admission Type');
+      if (!values.admitted_class_id) missing.push('Joining Class');
+      if (!values.current_class_id) missing.push('Current Class');
+      if (!values.current_section_id) missing.push('Current Section');
+      if (missing.length > 0) {
+        toast.error(`Please fill in required fields: ${missing.join(', ')}`);
+        return;
+      }
+    }
+
     const fieldsToValidate = stepFields[currentStep as keyof typeof stepFields] || [];
-    console.log(`Step ${currentStep} validation - fields to validate:`, fieldsToValidate);
     const isValid = await trigger(fieldsToValidate as any);
-    console.log(`Step ${currentStep} validation result:`, isValid);
     if (isValid) {
       setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
     }
@@ -172,35 +183,36 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
       }
 
       // Validate required fields before submission
-      const requiredFields = {
-        'Academic Year': currentAcademicYearId,
-        'Admission Number': data.admission_number,
-        'Admission Date': data.admission_date,
-        'Student First Name': data.student_first_name,
-        'Student Last Name': data.student_last_name,
-        'Student Date of Birth': data.student_date_of_birth,
-        'Student Gender': data.student_gender,
-        'Primary Phone': data.primary_phone,
-        "Father's Name": data.father_name,
-        "Father's Email": data.father_email,
-        "Mother's Name": data.mother_name,
-        "Mother's Email": data.mother_email,
-        'Address Line 1': data.address_line1,
-        'City': data.city,
-        'State': data.state_id,
+      const requiredFields: Record<string, { value: string | undefined; step: number }> = {
+        'Academic Year':       { value: currentAcademicYearId, step: 0 },
+        'Admission Date':      { value: data.admission_date,   step: 0 },
+        'Admission Type':      { value: data.admission_type,   step: 0 },
+        'Joining Class':       { value: data.admitted_class_id, step: 0 },
+        'Current Class':       { value: data.current_class_id,  step: 0 },
+        'Current Section':     { value: data.current_section_id, step: 0 },
+        'Admission Number':    { value: data.admission_number, step: 1 },
+        'Student First Name':  { value: data.student_first_name, step: 1 },
+        'Student Last Name':   { value: data.student_last_name, step: 1 },
+        'Student Date of Birth': { value: data.student_date_of_birth, step: 1 },
+        'Student Gender':      { value: data.student_gender, step: 1 },
+        "Father's Name":       { value: data.father_name, step: 2 },
+        "Father's Email":      { value: data.father_email, step: 2 },
+        "Mother's Name":       { value: data.mother_name, step: 2 },
+        "Mother's Email":      { value: data.mother_email, step: 2 },
+        'Address Line 1':      { value: data.address_line1, step: 3 },
+        'City':                { value: data.city, step: 3 },
+        'State':               { value: data.state_id, step: 3 },
       };
 
-      const missingFields = Object.entries(requiredFields)
-        .filter(([_, value]) => {
-          if (!value) return true;
-          if (typeof value === 'string' && value.trim() === '') return true;
-          return false;
-        })
-        .map(([fieldName]) => fieldName);
+      const missingEntries = Object.entries(requiredFields).filter(([, { value }]) =>
+        !value || (typeof value === 'string' && value.trim() === '')
+      );
 
-      if (missingFields.length > 0) {
-        console.error('Missing required fields:', missingFields);
-        toast.error(`Please fill in all required fields: ${missingFields.join(', ')}`);
+      if (missingEntries.length > 0) {
+        const missingNames = missingEntries.map(([name]) => name);
+        const earliestStep = Math.min(...missingEntries.map(([, { step }]) => step));
+        setCurrentStep(earliestStep);
+        toast.error(`Please fill in required fields: ${missingNames.join(', ')}`);
         return;
       }
 
@@ -323,7 +335,7 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
 
       if (isDuplicate) {
         methods.setError('admission_number', {
-          message: 'Admission number already exists. It must be unique.',
+          message: 'Admission number already exists. Please use a different number.',
         });
         setCurrentStep(1);
         return;

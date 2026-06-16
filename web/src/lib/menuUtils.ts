@@ -10,6 +10,14 @@ export interface MenuItem {
     children?: MenuItem[];
 }
 
+const HIDDEN_MENU_ITEMS = new Set([
+    'route stops',
+    'transport trips',
+]);
+
+const isHiddenItem = (item: MenuItem): boolean =>
+    HIDDEN_MENU_ITEMS.has(item.name.toLowerCase());
+
 const isFeeItem = (item: MenuItem): boolean => {
     const url = item.url ?? '';
     const name = item.name.toLowerCase();
@@ -17,8 +25,11 @@ const isFeeItem = (item: MenuItem): boolean => {
 };
 
 const filterMenuForRole = (items: MenuItem[], roleName: string): MenuItem[] => {
+    // Always hide these items regardless of role
+    const visible = items.filter(item => !isHiddenItem(item));
+
     if (roleName === 'teacher') {
-        return items
+        return visible
             .filter(item => !isFeeItem(item))
             .map(item => ({
                 ...item,
@@ -28,10 +39,10 @@ const filterMenuForRole = (items: MenuItem[], roleName: string): MenuItem[] => {
 
     // Students get a stripped-down Fee menu if the backend didn't include one
     if (roleName === 'student') {
-        const hasFeeInMenu = items.some(item => isFeeItem(item));
+        const hasFeeInMenu = visible.some(item => isFeeItem(item));
         if (!hasFeeInMenu) {
             return [
-                ...items,
+                ...visible,
                 {
                     id: 99001,
                     name: 'Fee',
@@ -46,7 +57,10 @@ const filterMenuForRole = (items: MenuItem[], roleName: string): MenuItem[] => {
         }
     }
 
-    return items;
+    return visible.map(item => ({
+        ...item,
+        children: item.children ? filterMenuForRole(item.children, roleName) : [],
+    }));
 };
 
 

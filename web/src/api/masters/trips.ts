@@ -34,15 +34,28 @@ export const tripsApi = {
   },
 
   // Get all trips
-  getAllTrips: async (): Promise<TripOut[]> => {
+  getAllTrips: async (): Promise<TripOut[] | TripListResponse> => {
     console.log('[DEBUG] tripsApi.getAllTrips called');
 
     try {
-      const response = await CAxios.get(TRIPS_API_BASE);
+      const response = await CAxios.get(TRIPS_API_BASE, { params: { limit: 1000 } });
       console.log('[DEBUG] tripsApi.getAllTrips success:', response.data);
       return response.data;
     } catch (error) {
       console.error('[DEBUG] tripsApi.getAllTrips failed:', error);
+      throw handleApiError(error);
+    }
+  },
+
+  // Get trips by vehicle ID
+  getTripsByVehicle: async (vehicleId: string): Promise<TripOut[]> => {
+    try {
+      const response = await CAxios.get(TRIPS_API_BASE, {
+        params: { vehicle_id: vehicleId, limit: 100 },
+      });
+      const data = response.data;
+      return Array.isArray(data) ? data : (data.items || data.results || []);
+    } catch (error) {
       throw handleApiError(error);
     }
   },
@@ -124,6 +137,7 @@ export const {
   createTrip,
   getAllTrips,
   getTripById,
+  getTripsByVehicle,
   updateTrip,
   updateTripPartial,
   deleteTrip,

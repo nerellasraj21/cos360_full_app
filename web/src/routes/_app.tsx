@@ -47,7 +47,7 @@ export const Route = createFileRoute('/_app')({
         {/* Overlay for mobile when sidebar is open */}
         {isMobile && sidebarOpen && (
           <div 
-            className="fixed inset-0 bg-black/50 z-40 md:hidden "
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden "
             onClick={() => setSidebarOpen(false)}
           />
         )}

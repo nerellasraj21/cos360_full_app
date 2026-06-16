@@ -141,6 +141,7 @@ export default function StudentFeeDetailPage({ studentId }: StudentFeeDetailPage
         {activeTab === 'summary' && (
           <FeeSummaryTab
             studentId={student.id}
+            classId={admission.current_class_id ?? ''}
             onNavigateToOldFees={handleNavigateToOldFees}
           />
         )}

@@ -57,13 +57,13 @@ export const AcademicStepForm = () => {
 
         <AdmissionTypeDropdown
           id="admission_type"
-          label="Admission Type"
+          label="Admission Type *"
           value={watch('admission_type')}
           onChange={(value) => setValue('admission_type', value)}
         />
 
         <div>
-          <Label htmlFor="admitted_class_id">Class</Label>
+          <Label htmlFor="admitted_class_id">Joining Class <span className="text-red-500">*</span></Label>
           <Select
             value={selectedClassId || ''}
             onValueChange={(value) => {
@@ -86,7 +86,7 @@ export const AcademicStepForm = () => {
         </div>
 
         <div>
-          <Label htmlFor="admitted_section_id">Section</Label>
+          <Label htmlFor="admitted_section_id">Joining Section</Label>
           <Select
             value={watch('admitted_section_id') || ''}
             onValueChange={(value) => setValue('admitted_section_id', value)}
@@ -119,7 +119,7 @@ export const AcademicStepForm = () => {
         </div>
 
         <div>
-          <Label htmlFor="current_class_id">Current Class</Label>
+          <Label htmlFor="current_class_id">Current Class <span className="text-red-500">*</span></Label>
           <Select
             value={watch('current_class_id') || ''}
             onValueChange={(value) => {
@@ -145,7 +145,7 @@ export const AcademicStepForm = () => {
         </div>
 
         <div>
-          <Label htmlFor="current_section_id">Current Section</Label>
+          <Label htmlFor="current_section_id">Current Section <span className="text-red-500">*</span></Label>
           <Select
             value={watch('current_section_id') || ''}
             onValueChange={(value) => setValue('current_section_id', value)}

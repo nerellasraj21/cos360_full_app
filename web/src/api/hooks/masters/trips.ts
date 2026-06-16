@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAllTrips, getTripById, createTrip, updateTrip, deleteTrip } from '@/api/masters/trips';
+import { getAllTrips, getTripById, getTripsByVehicle, createTrip, updateTrip, deleteTrip } from '@/api/masters/trips';
 import type { TripOut, TripCreate, TripListResponse } from '@/types/masters/trip';
 import { toast } from 'sonner';
 
@@ -10,13 +10,23 @@ export function useTrips() {
     });
 }
 
+export function useTripsByVehicle(vehicleId: string) {
+    return useQuery<TripOut[]>({
+        queryKey: ['trips', 'by-vehicle', vehicleId],
+        queryFn: () => getTripsByVehicle(vehicleId),
+        enabled: !!vehicleId,
+        staleTime: 30 * 1000,
+    });
+}
+
 export function useCreateTrip() {
     const queryClient = useQueryClient();
     return useMutation<TripOut, Error, TripCreate>({
         mutationFn: createTrip,
-        onSuccess: () => {
+        onSuccess: (data) => {
             toast.success('Trip created!');
             queryClient.invalidateQueries({ queryKey: ['trips'] });
+            queryClient.invalidateQueries({ queryKey: ['trips', 'by-vehicle', data.vehicle_id] });
         },
         onError: (error) => {
             toast.error(error.message || 'Failed to create trip');

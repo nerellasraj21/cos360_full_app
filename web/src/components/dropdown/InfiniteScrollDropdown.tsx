@@ -82,10 +82,10 @@ export const InfiniteScrollDropdown: React.FC<InfiniteScrollDropdownProps> = ({
     refetch: () => {},
   };
 
-  const options = data || fetchedOptions;
-  console.log("Options:", options);
-  console.log("Fetched options:", fetchedOptions);
-  console.log("Static data:", data);
+  const rawOptions = data || fetchedOptions;
+  const options = data && debouncedSearchTerm
+    ? rawOptions.filter(opt => opt.label.toLowerCase().includes(debouncedSearchTerm.toLowerCase()))
+    : rawOptions;
   // console.log("Value:", value);
   // Reset when cascading dependency changes
   useEffect(() => {

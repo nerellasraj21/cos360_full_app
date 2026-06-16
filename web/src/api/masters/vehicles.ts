@@ -29,13 +29,27 @@ export const createVehicle = async (vehicle: VehicleInput): Promise<Vehicle> => 
   }
 };
 
+const normalizeVehicle = (v: any): Vehicle => ({
+  ...v,
+  driver_name: v.driver_name ?? '',
+  co_driver_name: v.co_driver_name ?? '',
+  driving_licence_no: v.driving_licence_no ?? '',
+  driving_licence_exp_date: v.driving_licence_exp_date ?? '',
+  bus_insurance_vendor: v.bus_insurance_vendor ?? '',
+  insurance_expiry_date: v.insurance_expiry_date ?? '',
+  is_ac: v.is_ac ?? false,
+  trip_count: v.trip_count ?? 0,
+  number_of_trips: v.number_of_trips ?? null,
+});
+
 // List All Vehicles
 export const fetchVehicles = async (activeOnly = true): Promise<Vehicle[]> => {
   try {
     const { data } = await CAxios.get(VEHICLES_API_BASE, {
       params: { active_only: activeOnly }
     });
-    return data;
+    const items = Array.isArray(data) ? data : (data.items || data.results || []);
+    return items.map(normalizeVehicle);
   } catch (error) {
     throw handleApiError(error);
   }
@@ -45,7 +59,7 @@ export const fetchVehicles = async (activeOnly = true): Promise<Vehicle[]> => {
 export const fetchVehicleById = async (id: string): Promise<Vehicle> => {
   try {
     const { data } = await CAxios.get(`${VEHICLES_API_BASE}${id}`);
-    return data;
+    return normalizeVehicle(data);
   } catch (error) {
     throw handleApiError(error);
   }

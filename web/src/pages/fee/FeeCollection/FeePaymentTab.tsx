@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, CheckCircle, Download, CalendarDays } from 'lucide-react';
+import { Loader2, CheckCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { feeReceiptsApi } from '@/api/fee/receipts';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
@@ -44,66 +44,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { usePayFee, useFeeSummary, useTermsDue } from '@/hooks/fee';
+import { usePayFee, useFeeSummary, useTermsDue, useConcessionSummary } from '@/hooks/fee';
 import { formatCurrency } from './FeeSummaryTab';
-import type { FeePaymentResponse, CollectionPaymentMethod, FeePaymentRequest, TermsDueItem } from '@/types/fee';
+import type { FeePaymentResponse, CollectionPaymentMethod, FeePaymentRequest } from '@/types/fee';
 
-function TermsDueSection({ title, items, total }: { title: string; items: TermsDueItem[]; total: number }) {
-  if (items.length === 0) {
-    return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        </CardHeader>
-        <CardContent className="py-3 text-sm text-muted-foreground">No pending terms.</CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fee Type</TableHead>
-                <TableHead>Term</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead className="text-right">Term Amount</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
-                <TableHead className="text-right">Pending</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item) => (
-                <TableRow key={item.term_date_id} className="h-10">
-                  <TableCell className="text-sm">{item.fee_type_name}</TableCell>
-                  <TableCell className="text-sm">{item.term_name}</TableCell>
-                  <TableCell className="text-sm">
-                    {new Date(item.due_date).toLocaleDateString('en-IN')}
-                  </TableCell>
-                  <TableCell className="text-right text-sm">{formatCurrency(item.term_amount)}</TableCell>
-                  <TableCell className="text-right text-sm">{formatCurrency(item.paid_amount)}</TableCell>
-                  <TableCell className="text-right text-sm font-medium text-red-600">
-                    {formatCurrency(item.pending_amount)}
-                  </TableCell>
-                </TableRow>
-              ))}
-              <TableRow className="bg-muted/50 font-semibold h-10">
-                <TableCell colSpan={5} className="text-right text-sm">Total Pending</TableCell>
-                <TableCell className="text-right text-sm text-red-600">{formatCurrency(total)}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 const PAYMENT_METHODS: { value: CollectionPaymentMethod; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -113,7 +57,17 @@ const PAYMENT_METHODS: { value: CollectionPaymentMethod; label: string }[] = [
   { value: 'dd', label: 'Demand Draft' },
 ];
 
+function generateReceiptNumber(): string {
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const seq = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+  return `RCP-${yy}${mm}${dd}-${seq}`;
+}
+
 const paymentSchema = z.object({
+  receipt_number: z.string().min(1, 'Receipt number is required').max(30, 'Max 30 characters'),
   amount_to_pay: z.number({ required_error: 'Amount is required' }).positive('Amount must be greater than 0'),
   payment_method: z.enum(['cash', 'upi', 'cheque', 'bank_transfer', 'dd'] as const),
   upi_reference: z.string().max(30, 'Max 30 characters').optional(),
@@ -161,8 +115,78 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
   const { data: summaryData } = useFeeSummary(studentId, selectedAcademicYearId);
   const payFeeMutation = usePayFee();
 
+  // Fetch ALL this student's term installment dates using a far-future sentinel.
+  // useTermsDue is student-scoped, so it returns only dates relevant to this student's fee types.
+  const { data: allTermsDue, isLoading: allTermsLoading } = useTermsDue(
+    studentId,
+    selectedAcademicYearId,
+    '2099-12-31'
+  );
+
+  const installmentOptions = useMemo(() => {
+    if (!allTermsDue) return [];
+    const allItems = [
+      ...(allTermsDue.overdue_terms ?? []),
+      ...(allTermsDue.current_month_terms ?? []),
+    ];
+    const seen = new Set<string>();
+    const options: { value: string; label: string }[] = [];
+    allItems
+      .sort((a, b) => a.due_date.localeCompare(b.due_date))
+      .forEach((item) => {
+        if (!seen.has(item.due_date)) {
+          seen.add(item.due_date);
+          const displayDate = new Date(item.due_date).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          });
+          options.push({
+            value: item.due_date,
+            label: `${item.term_name} (${displayDate})`,
+          });
+        }
+      });
+    return options;
+  }, [allTermsDue]);
+
   const [asOfDate, setAsOfDate] = useState('');
   const { data: termsDue, isFetching: termsFetching } = useTermsDue(studentId, selectedAcademicYearId, asOfDate);
+  const { data: concessionData } = useConcessionSummary(studentId, selectedAcademicYearId);
+
+  // Compute fee rows — concession-adjusted pending amounts per fee type up to selected date
+  const feeRows = useMemo(() => {
+    if (!asOfDate || !termsDue) return [];
+    const all = [...(termsDue.overdue_terms ?? []), ...(termsDue.current_month_terms ?? [])];
+
+    // Sum raw pending per fee type
+    const map = new Map<string, { name: string; amount: number }>();
+    all.forEach((item) => {
+      const ex = map.get(item.fee_type_id);
+      if (ex) ex.amount += item.pending_amount;
+      else map.set(item.fee_type_id, { name: item.fee_type_name, amount: item.pending_amount });
+    });
+
+    // Apply concession per fee type
+    concessionData?.items.forEach((c) => {
+      const entry = map.get(c.fee_type_id);
+      if (entry && c.concession_amount > 0) {
+        entry.amount = Math.max(0, entry.amount - c.concession_amount);
+      }
+    });
+
+    const rows: { fee_type_id: string; fee_type_name: string; amount: number }[] = [];
+    map.forEach((v, k) => { if (v.amount > 0) rows.push({ fee_type_id: k, fee_type_name: v.name, amount: v.amount }); });
+    return rows;
+  }, [asOfDate, termsDue, concessionData]);
+
+  // Received amounts per fee type — blank by default, user enters what they collect
+  const [receivedAmounts, setReceivedAmounts] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setReceivedAmounts({});
+  }, [feeRows]);
+
+  const totalReceived = feeRows.reduce((s, r) => s + (parseFloat(receivedAmounts[r.fee_type_id] || '0') || 0), 0);
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -179,6 +203,7 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
   } = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
+      receipt_number: generateReceiptNumber(),
       payment_method: 'cash',
       send_sms: true,
       print_duplicate: false,
@@ -186,8 +211,12 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
   });
 
   const paymentMethod = watch('payment_method');
-  const amountToPay = watch('amount_to_pay');
   const totalDue = summaryData?.grand_total_due ?? 0;
+
+  // Keep amount_to_pay in sync with the receivedAmounts table so Zod validates correctly on submit
+  useEffect(() => {
+    setValue('amount_to_pay', totalReceived, { shouldValidate: false });
+  }, [totalReceived, setValue]);
 
   function onSubmitForm() {
     setShowConfirm(true);
@@ -203,6 +232,7 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
       academic_year_id: selectedAcademicYearId,
       amount_to_pay: formData.amount_to_pay,
       payment_method: formData.payment_method,
+      receipt_number: formData.receipt_number,
       send_sms: formData.send_sms,
       print_duplicate: formData.print_duplicate,
     };
@@ -219,7 +249,7 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
       onSuccess: (result) => {
         setPaymentResult(result);
         setShowSuccess(true);
-        reset();
+        reset({ receipt_number: generateReceiptNumber(), payment_method: 'cash', send_sms: true, print_duplicate: false });
       },
     });
   }
@@ -246,56 +276,103 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
         </Card>
       )}
 
-      {/* Date Picker */}
+      {/* Installment Dropdown */}
       <Card>
         <CardContent className="py-4">
           <div className="flex items-center gap-3">
-            <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-            <Label htmlFor="terms-date" className="shrink-0">View dues as of</Label>
-            <Input
-              id="terms-date"
-              type="date"
-              className="w-44"
-              value={asOfDate}
-              onChange={(e) => setAsOfDate(e.target.value)}
-            />
-            {termsFetching && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <Label className="shrink-0 text-sm">Payment Up To</Label>
+            <Select value={asOfDate} onValueChange={setAsOfDate} disabled={allTermsLoading}>
+              <SelectTrigger className="w-80">
+                <SelectValue placeholder={
+                  allTermsLoading
+                    ? 'Loading installments...'
+                    : installmentOptions.length === 0
+                    ? 'No installments for this student'
+                    : 'Select installment...'
+                } />
+              </SelectTrigger>
+              <SelectContent>
+                {installmentOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(allTermsLoading || termsFetching) && (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Terms Due Sections */}
-      {termsDue && (
-        <>
-          <TermsDueSection
-            title={`${termsDue.selected_month} Terms`}
-            items={termsDue.current_month_terms}
-            total={termsDue.total_current_month_pending}
-          />
-          <TermsDueSection
-            title="Overdue Terms"
-            items={termsDue.overdue_terms}
-            total={termsDue.total_overdue_pending}
-          />
-          {termsDue.grand_total_pending > 0 && (
-            <Card>
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Grand Total Pending</p>
-                    <p className="text-2xl font-bold text-red-600">{formatCurrency(termsDue.grand_total_pending)}</p>
-                  </div>
-                  <Button
-                    onClick={() => setValue('amount_to_pay', termsDue.grand_total_pending, { shouldValidate: true })}
-                  >
-                    Pay {formatCurrency(termsDue.grand_total_pending)}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+      {/* Fees to Pay — editable received amount per fee head */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">
+            {asOfDate
+              ? `Fees Due Up To ${new Date(asOfDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`
+              : 'Fee Heads'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {termsFetching ? (
+            <div className="flex justify-center items-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : feeRows.length === 0 ? (
+            <div className="text-center py-6 text-sm text-muted-foreground">
+              {asOfDate ? 'No fees due for this term.' : 'Select a "Payment Up To" date above to see fee heads.'}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">S.No.</TableHead>
+                    <TableHead>Particulars</TableHead>
+                    <TableHead className="text-right">Actual Amount</TableHead>
+                    <TableHead className="w-36">Received Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {feeRows.map((row, idx) => (
+                    <TableRow key={row.fee_type_id} className="h-11">
+                      <TableCell className="text-sm text-center">{idx + 1}</TableCell>
+                      <TableCell className="text-sm font-medium">{row.fee_type_name}</TableCell>
+                      <TableCell className="text-right text-sm text-red-600 font-medium">
+                        {formatCurrency(row.amount)}
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className="h-8 w-32"
+                          placeholder="Amount"
+                          value={receivedAmounts[row.fee_type_id] ?? ''}
+                          onChange={(e) => {
+                            setReceivedAmounts((prev) => ({ ...prev, [row.fee_type_id]: e.target.value }));
+                          }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-muted/50 font-semibold h-10">
+                    <TableCell colSpan={2} className="text-right text-sm">Total</TableCell>
+                    <TableCell className="text-right text-sm text-red-600">
+                      {formatCurrency(feeRows.reduce((s, r) => s + r.amount, 0))}
+                    </TableCell>
+                    <TableCell className="text-sm font-bold text-green-700 pl-2">
+                      {totalReceived > 0 ? formatCurrency(totalReceived) : '—'}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
           )}
-        </>
-      )}
+        </CardContent>
+      </Card>
 
       {/* Payment Form */}
       <Card>
@@ -310,28 +387,16 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
           )}
           <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Amount */}
+              {/* Receipt Number */}
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount to Pay *</Label>
+                <Label htmlFor="receipt_number">Receipt Number *</Label>
                 <Input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  max={totalDue || undefined}
-                  placeholder="0.00"
-                  {...register('amount_to_pay', {
-                    valueAsNumber: true,
-                    onBlur: (e) => {
-                      const val = parseFloat(e.target.value);
-                      if (totalDue > 0 && val > totalDue) {
-                        setValue('amount_to_pay', totalDue, { shouldValidate: true });
-                      }
-                    },
-                  })}
+                  id="receipt_number"
+                  placeholder="e.g. RCP-260616-0930"
+                  {...register('receipt_number')}
                 />
-                {errors.amount_to_pay && (
-                  <p className="text-sm text-destructive">{errors.amount_to_pay.message}</p>
+                {errors.receipt_number && (
+                  <p className="text-sm text-destructive">{errors.receipt_number.message}</p>
                 )}
               </div>
 
@@ -437,7 +502,7 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
             {/* Submit */}
             <Button
               type="submit"
-              disabled={payFeeMutation.isPending || !amountToPay || amountToPay <= 0 || Object.keys(errors).length > 0}
+              disabled={payFeeMutation.isPending || totalReceived <= 0 || Object.keys(errors).length > 0}
               className="w-full md:w-auto"
             >
               {payFeeMutation.isPending ? (
@@ -458,7 +523,7 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Payment</AlertDialogTitle>
             <AlertDialogDescription>
-              Collect <strong>{amountToPay ? formatCurrency(amountToPay) : '...'}</strong> from{' '}
+              Collect <strong>{formatCurrency(totalReceived)}</strong> from{' '}
               <strong>{studentName}</strong> via{' '}
               <strong>{PAYMENT_METHODS.find((m) => m.value === paymentMethod)?.label}</strong>?
             </AlertDialogDescription>

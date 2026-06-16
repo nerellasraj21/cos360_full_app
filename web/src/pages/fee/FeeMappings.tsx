@@ -3,6 +3,7 @@ import { useLocation } from '@tanstack/react-router';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClassMappingTable } from '@/components/fee/mappings/ClassMappingTable';
 import { StudentMappingTable } from '@/components/fee/mappings/StudentMappingTable';
+import { StudentFeeAssignmentPanel } from '@/components/fee/mappings/StudentFeeAssignmentPanel';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { Card, CardContent } from '@/components/ui/card';
@@ -86,13 +87,18 @@ function FeeMappingsContent() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="student-mappings">Student Mappings</TabsTrigger>
+                    <TabsTrigger value="assign-student-fees">Assign Student Fees</TabsTrigger>
                     <TabsTrigger value="class-mappings">Class Mappings</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="student-mappings" className="space-y-6">
                     <StudentMappingTable academicYearId={selectedAcademicYearId} />
+                </TabsContent>
+
+                <TabsContent value="assign-student-fees" className="space-y-6">
+                    <StudentFeeAssignmentPanel />
                 </TabsContent>
 
                 <TabsContent value="class-mappings" className="space-y-6">

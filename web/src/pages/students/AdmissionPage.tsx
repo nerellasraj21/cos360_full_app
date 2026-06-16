@@ -58,8 +58,19 @@ const AdmissionPage = () => {
           </Card>
         )}
 
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen} modal={false}>
-          <DialogContent className="w-full max-w-4xl" customLayout>
+        {isFormOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+          />
+        )}
+
+        <Dialog open={isFormOpen} onOpenChange={() => {}} modal={false}>
+          <DialogContent
+            className="left-16 lg:left-64 right-2 w-auto max-w-none translate-x-0"
+            customLayout
+            onEscapeKeyDown={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
+          >
             <DialogHeader>
               <DialogTitle>New Student Admission</DialogTitle>
             </DialogHeader>

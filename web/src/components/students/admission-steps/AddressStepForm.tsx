@@ -41,7 +41,7 @@ export const AddressStepForm = () => {
       
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="address_line1">Address Line 1</Label>
+          <Label htmlFor="address_line1">Address Line 1 <span className="text-red-500">*</span></Label>
           <Input
             id="address_line1"
             {...register('address_line1', { required: 'Address is required' })}
