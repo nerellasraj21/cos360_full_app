@@ -534,7 +534,11 @@ class FeeTransactionService:
             # Load with all relationships before commit (proper refresh pattern)
             result = await db.execute(
                 select(FeeTransaction)
-                .options(selectinload(FeeTransaction.transaction_items), selectinload(FeeTransaction.student))
+                .options(
+                    selectinload(FeeTransaction.transaction_items),
+                    selectinload(FeeTransaction.student),
+                    selectinload(FeeTransaction.fee_receipts),
+                )
                 .where(FeeTransaction.id == db_transaction.id)
             )
             db_transaction = result.scalar_one()
@@ -548,6 +552,17 @@ class FeeTransactionService:
                 db_transaction.student_full_name = (
                     f"{db_transaction.student.first_name} {db_transaction.student.last_name}"
                 )
+
+            # Auto-generate receipt for completed transactions
+            if db_transaction.status == "completed":
+                try:
+                    from app.service.fee.fee_receipt_service import FeeReceiptService
+                    receipt = await FeeReceiptService.create_receipt(db, db_transaction.id, collected_by_user_id)
+                    db_transaction.receipt_number = receipt.receipt_number
+                except Exception as _e:
+                    log.warning(f"Auto receipt generation failed for {db_transaction.transaction_number}: {_e}")
+            elif db_transaction.fee_receipts:
+                db_transaction.receipt_number = db_transaction.fee_receipts[0].receipt_number
 
             log.info(
                 f"Successfully created fee transaction: {transaction_number} for student {transaction_data.student_id}"
@@ -606,7 +621,11 @@ class FeeTransactionService:
 
             result = await db.execute(
                 select(FeeTransaction)
-                .options(selectinload(FeeTransaction.transaction_items), selectinload(FeeTransaction.student))
+                .options(
+                    selectinload(FeeTransaction.transaction_items),
+                    selectinload(FeeTransaction.student),
+                    selectinload(FeeTransaction.fee_receipts),
+                )
                 .where(FeeTransaction.id == transaction_id)
             )
             transaction = result.scalar_one_or_none()
@@ -624,6 +643,9 @@ class FeeTransactionService:
                 transaction.student_first_name = transaction.student.first_name
                 transaction.student_last_name = transaction.student.last_name
                 transaction.student_full_name = f"{transaction.student.first_name} {transaction.student.last_name}"
+
+            if transaction.fee_receipts:
+                transaction.receipt_number = transaction.fee_receipts[0].receipt_number
 
             return transaction
 
@@ -817,7 +839,9 @@ class FeeTransactionService:
         """Search transactions with filters"""
         try:
             query = select(FeeTransaction).options(
-                selectinload(FeeTransaction.transaction_items), selectinload(FeeTransaction.student)
+                selectinload(FeeTransaction.transaction_items),
+                selectinload(FeeTransaction.student),
+                selectinload(FeeTransaction.fee_receipts),
             )
 
             conditions = []
@@ -851,6 +875,8 @@ class FeeTransactionService:
                     transaction.student_first_name = transaction.student.first_name
                     transaction.student_last_name = transaction.student.last_name
                     transaction.student_full_name = f"{transaction.student.first_name} {transaction.student.last_name}"
+                if transaction.fee_receipts:
+                    transaction.receipt_number = transaction.fee_receipts[0].receipt_number
 
             return transactions
 
@@ -926,6 +952,8 @@ class FeeTransactionService:
                     transaction.student_first_name = transaction.student.first_name
                     transaction.student_last_name = transaction.student.last_name
                     transaction.student_full_name = f"{transaction.student.first_name} {transaction.student.last_name}"
+                if transaction.fee_receipts:
+                    transaction.receipt_number = transaction.fee_receipts[0].receipt_number
 
             has_next = (skip + limit) < total_count
 
@@ -1024,6 +1052,8 @@ class FeeTransactionService:
                     transaction.student_first_name = transaction.student.first_name
                     transaction.student_last_name = transaction.student.last_name
                     transaction.student_full_name = f"{transaction.student.first_name} {transaction.student.last_name}"
+                if transaction.fee_receipts:
+                    transaction.receipt_number = transaction.fee_receipts[0].receipt_number
 
             has_next = (skip + limit) < total_count
 

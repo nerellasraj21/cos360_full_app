@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
-from app.schemas.fee import FeeReceiptRead, ReceiptContent
+from app.schemas.fee import FeeReceiptRead, FeeReceiptNumberUpdate, ReceiptContent
 from app.service.fee.fee_receipt_service import FeeReceiptService
 from app.tools.enhanced_permissions import check_user_resource_access
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
@@ -133,6 +133,24 @@ async def get_receipt_content_for_pdf(receipt_id: UUID, request: Request, db: As
     content.receipt_number = receipt.receipt_number
 
     return content
+
+
+@router.patch("/{receipt_id}/number", response_model=FeeReceiptRead)
+async def update_receipt_number(
+    receipt_id: UUID,
+    body: FeeReceiptNumberUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """
+    Update the receipt number on an existing receipt.
+
+    **Required permissions**: fee_receipts:update
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "fee_receipts", "update")
+    return await FeeReceiptService.update_receipt_number(db, receipt_id, body.receipt_number)
 
 
 @router.post("/{receipt_id}/reprint", response_model=FeeReceiptRead)

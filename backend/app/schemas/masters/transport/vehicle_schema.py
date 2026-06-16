@@ -11,6 +11,14 @@ class VehicleBase(BaseModel):
     last_inspected_date: date
     pollution_renewal_date: date
     fees: float | None = None
+    driver_name: str | None = None
+    co_driver_name: str | None = None
+    driving_licence_no: str | None = None
+    driving_licence_exp_date: date | None = None
+    bus_insurance_vendor: str | None = None
+    number_of_trips: int | None = None
+    insurance_expiry_date: date | None = None
+    is_ac: bool | None = None
     is_active: bool = True
 
 
@@ -25,6 +33,14 @@ class VehicleUpdate(BaseModel):
     last_inspected_date: date | None = None
     pollution_renewal_date: date | None = None
     fees: float | None = None
+    driver_name: str | None = None
+    co_driver_name: str | None = None
+    driving_licence_no: str | None = None
+    driving_licence_exp_date: date | None = None
+    bus_insurance_vendor: str | None = None
+    number_of_trips: int | None = None
+    insurance_expiry_date: date | None = None
+    is_ac: bool | None = None
     is_active: bool | None = None
 
     model_config = {"from_attributes": True}

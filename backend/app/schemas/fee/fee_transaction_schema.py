@@ -123,6 +123,8 @@ class FeeTransactionRead(FeeTransactionBase):
     student_last_name: str | None = None
     student_full_name: str | None = None
 
+    receipt_number: str | None = None
+
     transaction_items: list[FeeTransactionItemRead] = []
 
     model_config = {"from_attributes": True}

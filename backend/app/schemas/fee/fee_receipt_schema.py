@@ -28,6 +28,10 @@ class FeeReceiptUpdate(BaseModel):
     remarks: str | None = None
 
 
+class FeeReceiptNumberUpdate(BaseModel):
+    receipt_number: str
+
+
 class FeeReceiptRead(FeeReceiptBase):
     id: UUID
     pdf_file_path: str | None = None

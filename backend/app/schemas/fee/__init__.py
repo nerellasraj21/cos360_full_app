@@ -2,6 +2,7 @@
 from .enums import CategoryStatus, PaymentMethod, RefundReason, RefundStatus, TransactionStatus, TypeStatus
 from .fee_receipt_schema import (
     FeeReceiptCreate,
+    FeeReceiptNumberUpdate,
     FeeReceiptRead,
     FeeReceiptSummary,
     FeeReceiptUpdate,
@@ -41,6 +42,7 @@ __all__ = [
     "TransactionHistoryItem",
     "StudentTransactionHistory",
     "FeeReceiptCreate",
+    "FeeReceiptNumberUpdate",
     "FeeReceiptUpdate",
     "FeeReceiptRead",
     "FeeReceiptSummary",

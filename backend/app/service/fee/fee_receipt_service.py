@@ -273,6 +273,32 @@ class FeeReceiptService:
             )
 
     @staticmethod
+    async def update_receipt_number(db: AsyncSession, receipt_id: UUID, new_number: str) -> FeeReceiptRead:
+        """Update the receipt number — validates uniqueness before saving."""
+        result = await db.execute(select(FeeReceipt).where(FeeReceipt.id == receipt_id))
+        receipt = result.scalar_one_or_none()
+        if not receipt:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
+
+        if new_number != receipt.receipt_number:
+            dup = await db.execute(
+                select(FeeReceipt.id).where(
+                    FeeReceipt.receipt_number == new_number,
+                    FeeReceipt.id != receipt_id,
+                )
+            )
+            if dup.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Receipt number '{new_number}' is already in use",
+                )
+            receipt.receipt_number = new_number
+            await db.commit()
+            await db.refresh(receipt)
+
+        return await FeeReceiptService._enrich_receipt_fields(db, receipt)
+
+    @staticmethod
     async def _enrich_receipt_fields(db: AsyncSession, receipt: FeeReceipt) -> FeeReceiptRead:
         """
         Convert ORM receipt to FeeReceiptRead, back-filling class_section / academic_year

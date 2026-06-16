@@ -20,6 +20,7 @@ class StudentAdmissionBase(BaseModel):
     address_line2: str | None = None
     city: str
     state: str
+    roll_no: str | None = None
     is_previous_school: bool | None = False
     previous_school_name: str | None = None
     previous_class: str | None = None
@@ -61,6 +62,7 @@ class StudentAdmissionUpdate(BaseModel):
     admission_date: date | None = None
     admission_type: Literal["primary", "non_primary"] | None = None
     admission_number: str | None = None
+    roll_no: str | None = None
     academic_year_id: UUID | None = None
     admitted_academic_year_id: UUID | None = None
     admitted_class_id: UUID | None = None

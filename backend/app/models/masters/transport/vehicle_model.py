@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, Column, Date, Numeric, String
+from sqlalchemy import Boolean, Column, Date, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -17,6 +17,14 @@ class Vehicle(BaseOrg):
     last_inspected_date = Column(Date)
     pollution_renewal_date = Column(Date)
     fees = Column(Numeric(10, 2), nullable=True)
+    driver_name = Column(String, nullable=True)  # selected from staff dropdown by name
+    co_driver_name = Column(String, nullable=True)
+    driving_licence_no = Column(String, nullable=True)
+    driving_licence_exp_date = Column(Date, nullable=True)
+    bus_insurance_vendor = Column(String, nullable=True)
+    insurance_expiry_date = Column(Date, nullable=True)
+    is_ac = Column(Boolean, nullable=True)
     is_active = Column(Boolean, default=True)
 
+    number_of_trips = Column(Integer, nullable=True)
     trips = relationship("Trip", back_populates="vehicle")

@@ -39,6 +39,8 @@ class Admission(BaseOrg):
     district_id = Column(UUID(as_uuid=True), nullable=True)
     mandal_id = Column(UUID(as_uuid=True), nullable=True)
 
+    roll_no = Column(String(50), nullable=True)
+
     is_previous_school = Column(Boolean, default=False)
     previous_school_name = Column(String(255), nullable=True)
     previous_class = Column(String(50), nullable=True)
