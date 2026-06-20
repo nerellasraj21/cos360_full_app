@@ -64,6 +64,36 @@ const filterMenuForRole = (items: MenuItem[], roleName: string): MenuItem[] => {
 };
 
 
+const SCHOOL_REG_ITEM: MenuItem = {
+    id: 99010,
+    name: 'School Registration',
+    url: '/settings/school',
+    level: 'L1',
+    children: [],
+};
+
+const injectSchoolSettings = (items: MenuItem[], roleName: string): MenuItem[] => {
+    if (roleName === 'teacher' || roleName === 'student') return items;
+
+    // Check if already present anywhere (backend may add it later)
+    const alreadyExists = items.some(item =>
+        item.children?.some(child => child.url === '/settings/school')
+    );
+    if (alreadyExists) return items;
+
+    // Inject under Masters
+    const mastersIdx = items.findIndex(item => item.name.toLowerCase() === 'masters');
+    if (mastersIdx !== -1) {
+        return items.map((item, i) =>
+            i === mastersIdx
+                ? { ...item, children: [...(item.children ?? []), SCHOOL_REG_ITEM] }
+                : item
+        );
+    }
+
+    return items;
+};
+
 export const useMenuData = () => {
     const { menuItems, user, isAuthenticated, role } = useAuthStore();
 
@@ -93,8 +123,9 @@ export const useMenuData = () => {
             const transformedMenu = menuItems.map((item: any) => transformMenuItem(item, 0));
             const roleName = role?.name?.toLowerCase() ?? '';
             const filteredMenu = filterMenuForRole(transformedMenu, roleName);
-            console.log('Transformed menu data:', filteredMenu);
-            return filteredMenu;
+            const enrichedMenu = injectSchoolSettings(filteredMenu, roleName);
+            console.log('Transformed menu data:', enrichedMenu);
+            return enrichedMenu;
         },
         enabled: !!user && !!menuItems && menuItems.length > 0
     });

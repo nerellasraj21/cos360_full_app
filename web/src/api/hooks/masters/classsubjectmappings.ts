@@ -10,12 +10,14 @@ import type {
 import {
   fetchClassSubjectMappings,
   fetchMappingsByClass,
+  fetchMappingsByClasses,
   fetchMappingsDropdown,
   fetchMappingById,
   createClassSubjectMapping,
   createBulkClassSubjectMappings,
   updateClassSubjectMapping,
-  deleteClassSubjectMapping
+  deleteClassSubjectMapping,
+  type ByClassesSubjectEntry,
 } from '@/api/masters/classsubjectmappings';
 import { toast } from 'sonner';
 
@@ -113,6 +115,14 @@ export function useDeleteClassSubjectMapping() {
     onError: (error) => {
       toast.error(`Failed to delete mapping: ${error.message}`);
     },
+  });
+}
+
+export function useMappingsByClasses(classIds: string[], academicYearId?: string) {
+  return useQuery<Record<string, ByClassesSubjectEntry[]>>({
+    queryKey: ['class-subject-mappings', 'by-classes', classIds, academicYearId],
+    queryFn: () => fetchMappingsByClasses({ class_ids: classIds, academic_year_id: academicYearId, active_only: true }),
+    enabled: classIds.length > 0,
   });
 }
 

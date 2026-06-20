@@ -22,6 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useStudentAdmissionDetail } from '@/api/hooks/students/admissions';
+import { useReadAllClassSections } from '@/api/hooks/masters/classesandsections';
 import {
   useFeeClassMappings,
   useFeeStudentMappings,
@@ -38,17 +39,20 @@ type StudentOption = { value: string; label: string } | null;
 
 export function StudentFeeAssignmentPanel() {
   const { selectedAcademicYearId } = useAcademicYearStore();
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [students, setStudents] = useState<StudentDropdownItem[]>([]);
-  const [studentsLoading, setStudentsLoading] = useState(true);
+  const [studentsLoading, setStudentsLoading] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentOption>(null);
   const [transportStopId, setTransportStopId] = useState<string>('');
 
   useEffect(() => {
-    fetchStudentsDropdown()
+    setStudentsLoading(true);
+    fetchStudentsDropdown(true, selectedClassId || undefined, selectedSectionId || undefined)
       .then(setStudents)
       .catch(console.error)
       .finally(() => setStudentsLoading(false));
-  }, []);
+  }, [selectedClassId, selectedSectionId]);
 
   const studentOptions = useMemo(
     () => students.map((s) => ({ value: s.id, label: s.display_name || s.name })),
@@ -57,10 +61,10 @@ export function StudentFeeAssignmentPanel() {
 
   const studentId = selectedStudent?.value ?? '';
 
-  // Reset transport stop when student changes
   useEffect(() => { setTransportStopId(''); }, [studentId]);
 
   const { data: admission, isLoading: admissionLoading } = useStudentAdmissionDetail(studentId);
+  const { data: allClasses = [] } = useReadAllClassSections();
 
   const classId = (admission as any)?.current_class_id ?? '';
   const sectionId = (admission as any)?.current_section_id ?? '';
@@ -69,6 +73,10 @@ export function StudentFeeAssignmentPanel() {
   const studentName = student
     ? `${student.first_name || ''} ${student.last_name || ''}`.trim()
     : selectedStudent?.label ?? '';
+
+  const classObj = allClasses.find((c) => c.id === classId);
+  const className = classObj?.name ?? classId;
+  const sectionName = classObj?.sections.find((s) => s.id === sectionId)?.name ?? sectionId;
 
   const { data: classMappingsRaw, isLoading: mappingsLoading } = useFeeClassMappings(
     classId && selectedAcademicYearId
@@ -141,26 +149,74 @@ export function StudentFeeAssignmentPanel() {
 
   return (
     <div className="space-y-4">
-      {/* Student Search */}
+      {/* Filters + Student Search */}
       <Card>
         <CardContent className="py-4">
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium shrink-0">Select Student</label>
-            <div className="w-80">
-              <Select
-                options={studentOptions}
-                value={selectedStudent}
-                onChange={(opt: SingleValue<StudentOption>) => setSelectedStudent(opt ?? null)}
-                isLoading={studentsLoading}
-                placeholder="Search by name or admission no..."
-                isClearable
-                classNamePrefix="react-select"
-                menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                styles={{
-                  menuPortal: (base) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
-                  menu: (base) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium shrink-0">Class</label>
+              <ShadSelect
+                value={selectedClassId}
+                onValueChange={(val) => {
+                  setSelectedClassId(val === '__all__' ? '' : val);
+                  setSelectedSectionId('');
+                  setSelectedStudent(null);
                 }}
-              />
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="All Classes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Classes</SelectItem>
+                  {allClasses.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </ShadSelect>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium shrink-0">Section</label>
+              <ShadSelect
+                value={selectedSectionId}
+                onValueChange={(val) => {
+                  setSelectedSectionId(val === '__all__' ? '' : val);
+                  setSelectedStudent(null);
+                }}
+                disabled={!selectedClassId}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="All Sections" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Sections</SelectItem>
+                  {allClasses
+                    .find((c) => c.id === selectedClassId)
+                    ?.sections.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                </SelectContent>
+              </ShadSelect>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium shrink-0">Student</label>
+              <div className="w-72">
+                <Select
+                  options={studentOptions}
+                  value={selectedStudent}
+                  onChange={(opt: SingleValue<StudentOption>) => setSelectedStudent(opt ?? null)}
+                  isLoading={studentsLoading}
+                  placeholder="Search by name or admission no..."
+                  isClearable
+                  classNamePrefix="react-select"
+                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                  styles={{
+                    menuPortal: (base) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                    menu: (base) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                  }}
+                />
+              </div>
             </div>
           </div>
         </CardContent>
@@ -187,8 +243,8 @@ export function StudentFeeAssignmentPanel() {
               <div className="flex flex-wrap gap-6 text-sm">
                 <div><span className="text-muted-foreground">Student: </span><strong>{studentName}</strong></div>
                 <div><span className="text-muted-foreground">Admission No: </span><strong>{admissionNumber || '—'}</strong></div>
-                <div><span className="text-muted-foreground">Class: </span><strong>{(student as any)?.class_name ?? classId}</strong></div>
-                <div><span className="text-muted-foreground">Section: </span><strong>{(student as any)?.section_name ?? sectionId}</strong></div>
+                <div><span className="text-muted-foreground">Class: </span><strong>{className}</strong></div>
+                <div><span className="text-muted-foreground">Section: </span><strong>{sectionName}</strong></div>
               </div>
             </CardContent>
           </Card>

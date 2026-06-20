@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 import { MasterPage } from "../masters/common/MasterPage";
 import type { MasterPageConfig, FormField } from "../masters/common/MasterPage";
@@ -8,6 +8,7 @@ import { useRouteStops, useCreateRouteStop, useDeleteRouteStop } from '@/api/hoo
 import { PermissionGuard } from '@/components/common';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -38,10 +39,28 @@ import {
     TableRow,
 } from '@/components/ui/table';
 
-const MAX_STOPS = 5;
+const BUS_AC_OPTIONS = ['A', 'B', 'C', 'D', 'E'] as const;
 
 const createColumns = (onView: (routeId: string) => void) => [
     { key: "route_name", label: "Route Name", editable: true },
+    {
+        key: "route_type",
+        label: "Bus AC",
+        editable: true,
+        render: (v: string | null) => v ? (
+            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">{v}</span>
+        ) : '—',
+        renderEdit: (value: any, _row: Route, onChange: (val: any) => void) => (
+            <select
+                value={value ?? ''}
+                onChange={e => onChange(e.target.value || null)}
+                className="h-7 rounded border border-input bg-background px-2 text-xs focus:outline-none"
+            >
+                <option value="">—</option>
+                {BUS_AC_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+        ),
+    },
     { key: "starting_stop", label: "Starting Point", editable: true },
     { key: "ending_stop", label: "Ending Point", editable: true },
     { key: "number_of_stops", label: "Number of Stops", editable: true },
@@ -102,7 +121,7 @@ const defaultValues: RouteInput = {
     route_name: "",
     starting_stop: "",
     ending_stop: "",
-    number_of_stops: 8,
+    number_of_stops: 0,
     route_type: '',
     trip_type: '',
     start_time: "07:00:00",
@@ -131,19 +150,34 @@ function RouteAddDialog() {
     const createRoute = useCreateRoute();
     const createStop = useCreateRouteStop();
 
-    const canAddStop = pendingStops.length < MAX_STOPS;
-
-    function addStop() {
-        if (!canAddStop) return;
-        setPendingStops(prev => [...prev, { _key: Date.now(), name: '', fees: '', pickup_time: '07:00', drop_time: '08:30' }]);
-    }
+    // Auto-sync stop rows with number_of_stops field
+    useEffect(() => {
+        const count = Math.max(0, Number(formData.number_of_stops) || 0);
+        setPendingStops(prev => {
+            if (prev.length === count) return prev;
+            if (prev.length < count) {
+                const toAdd = count - prev.length;
+                const newRows: PendingRow[] = Array.from({ length: toAdd }, (_, i) => ({
+                    _key: Date.now() + i,
+                    name: '',
+                    fees: '',
+                    pickup_time: '07:00',
+                    drop_time: '08:30',
+                }));
+                return [...prev, ...newRows];
+            }
+            return prev.slice(0, count);
+        });
+    }, [formData.number_of_stops]);
 
     function updateStop(key: number, field: keyof Omit<PendingRow, '_key'>, value: string) {
         setPendingStops(prev => prev.map(s => s._key === key ? { ...s, [field]: value } : s));
     }
 
     function removeStop(key: number) {
-        setPendingStops(prev => prev.filter(s => s._key !== key));
+        const newStops = pendingStops.filter(s => s._key !== key);
+        setPendingStops(newStops);
+        setFormData(prev => ({ ...prev, number_of_stops: newStops.length }));
     }
 
     function handleClose() {
@@ -210,6 +244,19 @@ function RouteAddDialog() {
                                     />
                                 </div>
                                 <div className="space-y-1">
+                                    <Label htmlFor="route_type">Bus AC</Label>
+                                    <Select value={formData.route_type} onValueChange={v => setFormData(p => ({ ...p, route_type: v }))}>
+                                        <SelectTrigger id="route_type">
+                                            <SelectValue placeholder="Select category…" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {BUS_AC_OPTIONS.map(o => (
+                                                <SelectItem key={o} value={o}>Category {o}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
                                     <Label htmlFor="starting_stop">Starting Point <span className="text-destructive">*</span></Label>
                                     <Input
                                         id="starting_stop"
@@ -237,6 +284,7 @@ function RouteAddDialog() {
                                         min={0}
                                         value={formData.number_of_stops}
                                         onChange={e => setFormData(p => ({ ...p, number_of_stops: Number(e.target.value) }))}
+                                        placeholder="0"
                                     />
                                 </div>
                             </div>
@@ -256,21 +304,17 @@ function RouteAddDialog() {
                             <div className="border rounded-md">
                                 <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
                                     <span className="text-sm font-medium">
-                                        Route Stops <span className="text-muted-foreground font-normal">({pendingStops.length}/{MAX_STOPS})</span>
+                                        Route Stops
+                                        <span className="ml-1 text-muted-foreground font-normal text-xs">
+                                            (auto-filled from "Number of Stops")
+                                        </span>
                                     </span>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        onClick={addStop}
-                                        disabled={!canAddStop}
-                                    >
-                                        <Plus className="h-4 w-4 mr-1" /> Add Stop
-                                    </Button>
+                                    <Badge variant="secondary" className="text-xs">{pendingStops.length} stop{pendingStops.length !== 1 ? 's' : ''}</Badge>
                                 </div>
 
                                 {pendingStops.length === 0 ? (
                                     <p className="text-sm text-muted-foreground text-center py-6">
-                                        No stops added yet. Click "Add Stop" to add one.
+                                        Enter a number in "Number of Stops" to add stop rows.
                                     </p>
                                 ) : (
                                     <Table>

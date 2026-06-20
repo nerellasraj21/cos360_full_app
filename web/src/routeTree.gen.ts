@@ -18,6 +18,7 @@ import { Route as AuthForgotPasswordRouteImport } from './routes/_auth/forgot-pa
 import { Route as AuthAuthRouteImport } from './routes/_auth/auth'
 import { Route as AppSuperorgRouteImport } from './routes/_app/superorg'
 import { Route as AppStudentsRouteImport } from './routes/_app/students'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppProfileRouteImport } from './routes/_app/profile'
 import { Route as AppFeesRouteImport } from './routes/_app/fees'
 import { Route as AppFeeRouteImport } from './routes/_app/fee'
@@ -63,6 +64,7 @@ import { Route as AppStaffProfileRouteImport } from './routes/_app/staff/profile
 import { Route as AppStaffEnrollmentRouteImport } from './routes/_app/staff/enrollment'
 import { Route as AppStaffDesignationsRouteImport } from './routes/_app/staff/designations'
 import { Route as AppStaffAttendanceRouteImport } from './routes/_app/staff/attendance'
+import { Route as AppSettingsSchoolRouteImport } from './routes/_app/settings/school'
 import { Route as AppMastersVehiclesRouteImport } from './routes/_app/masters/vehicles'
 import { Route as AppMastersTripsRouteImport } from './routes/_app/masters/trips'
 import { Route as AppMastersSubjectsRouteImport } from './routes/_app/masters/subjects'
@@ -178,6 +180,11 @@ const AppSuperorgRoute = AppSuperorgRouteImport.update({
 const AppStudentsRoute = AppStudentsRouteImport.update({
   id: '/students',
   path: '/students',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
 const AppProfileRoute = AppProfileRouteImport.update({
@@ -414,6 +421,11 @@ const AppStaffAttendanceRoute = AppStaffAttendanceRouteImport.update({
   id: '/staff/attendance',
   path: '/staff/attendance',
   getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsSchoolRoute = AppSettingsSchoolRouteImport.update({
+  id: '/school',
+  path: '/school',
+  getParentRoute: () => AppSettingsRoute,
 } as any)
 const AppMastersVehiclesRoute = AppMastersVehiclesRouteImport.update({
   id: '/masters/vehicles',
@@ -808,6 +820,7 @@ export interface FileRoutesByFullPath {
   '/fee': typeof AppFeeRouteWithChildren
   '/fees': typeof AppFeesRoute
   '/profile': typeof AppProfileRoute
+  '/settings': typeof AppSettingsRouteWithChildren
   '/students': typeof AppStudentsRouteWithChildren
   '/superorg': typeof AppSuperorgRoute
   '/auth': typeof AuthAuthRoute
@@ -860,6 +873,7 @@ export interface FileRoutesByFullPath {
   '/masters/subjects': typeof AppMastersSubjectsRoute
   '/masters/trips': typeof AppMastersTripsRoute
   '/masters/vehicles': typeof AppMastersVehiclesRoute
+  '/settings/school': typeof AppSettingsSchoolRoute
   '/staff/attendance': typeof AppStaffAttendanceRoute
   '/staff/designations': typeof AppStaffDesignationsRoute
   '/staff/enrollment': typeof AppStaffEnrollmentRoute
@@ -931,6 +945,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardRoute
   '/fees': typeof AppFeesRoute
   '/profile': typeof AppProfileRoute
+  '/settings': typeof AppSettingsRouteWithChildren
   '/superorg': typeof AppSuperorgRoute
   '/auth': typeof AuthAuthRoute
   '/forgot-password': typeof AuthForgotPasswordRoute
@@ -976,6 +991,7 @@ export interface FileRoutesByTo {
   '/masters/subjects': typeof AppMastersSubjectsRoute
   '/masters/trips': typeof AppMastersTripsRoute
   '/masters/vehicles': typeof AppMastersVehiclesRoute
+  '/settings/school': typeof AppSettingsSchoolRoute
   '/staff/attendance': typeof AppStaffAttendanceRoute
   '/staff/designations': typeof AppStaffDesignationsRoute
   '/staff/enrollment': typeof AppStaffEnrollmentRoute
@@ -1053,6 +1069,7 @@ export interface FileRoutesById {
   '/_app/fee': typeof AppFeeRouteWithChildren
   '/_app/fees': typeof AppFeesRoute
   '/_app/profile': typeof AppProfileRoute
+  '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/students': typeof AppStudentsRouteWithChildren
   '/_app/superorg': typeof AppSuperorgRoute
   '/_auth/auth': typeof AuthAuthRoute
@@ -1105,6 +1122,7 @@ export interface FileRoutesById {
   '/_app/masters/subjects': typeof AppMastersSubjectsRoute
   '/_app/masters/trips': typeof AppMastersTripsRoute
   '/_app/masters/vehicles': typeof AppMastersVehiclesRoute
+  '/_app/settings/school': typeof AppSettingsSchoolRoute
   '/_app/staff/attendance': typeof AppStaffAttendanceRoute
   '/_app/staff/designations': typeof AppStaffDesignationsRoute
   '/_app/staff/enrollment': typeof AppStaffEnrollmentRoute
@@ -1182,6 +1200,7 @@ export interface FileRouteTypes {
     | '/fee'
     | '/fees'
     | '/profile'
+    | '/settings'
     | '/students'
     | '/superorg'
     | '/auth'
@@ -1234,6 +1253,7 @@ export interface FileRouteTypes {
     | '/masters/subjects'
     | '/masters/trips'
     | '/masters/vehicles'
+    | '/settings/school'
     | '/staff/attendance'
     | '/staff/designations'
     | '/staff/enrollment'
@@ -1305,6 +1325,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/fees'
     | '/profile'
+    | '/settings'
     | '/superorg'
     | '/auth'
     | '/forgot-password'
@@ -1350,6 +1371,7 @@ export interface FileRouteTypes {
     | '/masters/subjects'
     | '/masters/trips'
     | '/masters/vehicles'
+    | '/settings/school'
     | '/staff/attendance'
     | '/staff/designations'
     | '/staff/enrollment'
@@ -1426,6 +1448,7 @@ export interface FileRouteTypes {
     | '/_app/fee'
     | '/_app/fees'
     | '/_app/profile'
+    | '/_app/settings'
     | '/_app/students'
     | '/_app/superorg'
     | '/_auth/auth'
@@ -1478,6 +1501,7 @@ export interface FileRouteTypes {
     | '/_app/masters/subjects'
     | '/_app/masters/trips'
     | '/_app/masters/vehicles'
+    | '/_app/settings/school'
     | '/_app/staff/attendance'
     | '/_app/staff/designations'
     | '/_app/staff/enrollment'
@@ -1611,6 +1635,13 @@ declare module '@tanstack/react-router' {
       path: '/students'
       fullPath: '/students'
       preLoaderRoute: typeof AppStudentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/profile': {
@@ -1927,6 +1958,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/staff/attendance'
       preLoaderRoute: typeof AppStaffAttendanceRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/settings/school': {
+      id: '/_app/settings/school'
+      path: '/school'
+      fullPath: '/settings/school'
+      preLoaderRoute: typeof AppSettingsSchoolRouteImport
+      parentRoute: typeof AppSettingsRoute
     }
     '/_app/masters/vehicles': {
       id: '/_app/masters/vehicles'
@@ -2719,6 +2757,18 @@ const AppFeeRouteChildren: AppFeeRouteChildren = {
 const AppFeeRouteWithChildren =
   AppFeeRoute._addFileChildren(AppFeeRouteChildren)
 
+interface AppSettingsRouteChildren {
+  AppSettingsSchoolRoute: typeof AppSettingsSchoolRoute
+}
+
+const AppSettingsRouteChildren: AppSettingsRouteChildren = {
+  AppSettingsSchoolRoute: AppSettingsSchoolRoute,
+}
+
+const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
+  AppSettingsRouteChildren,
+)
+
 interface AppStudentsAdmissionRouteChildren {
   AppStudentsAdmissionAdmissionIdRoute: typeof AppStudentsAdmissionAdmissionIdRoute
 }
@@ -2779,6 +2829,7 @@ interface AppRouteChildren {
   AppFeeRoute: typeof AppFeeRouteWithChildren
   AppFeesRoute: typeof AppFeesRoute
   AppProfileRoute: typeof AppProfileRoute
+  AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppStudentsRoute: typeof AppStudentsRouteWithChildren
   AppSuperorgRoute: typeof AppSuperorgRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -2826,6 +2877,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppFeeRoute: AppFeeRouteWithChildren,
   AppFeesRoute: AppFeesRoute,
   AppProfileRoute: AppProfileRoute,
+  AppSettingsRoute: AppSettingsRouteWithChildren,
   AppStudentsRoute: AppStudentsRouteWithChildren,
   AppSuperorgRoute: AppSuperorgRoute,
   AppIndexRoute: AppIndexRoute,

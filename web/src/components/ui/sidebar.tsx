@@ -120,6 +120,7 @@ export const getIconForMenuItem = (name: string) => {
         Administration: Building2,
 
         // ── Masters submodules ─────────────────────────────────────────────────
+        "School Registration": School,
         Classes: School,
         Sections: Layers,
         Academics: BookOpen,

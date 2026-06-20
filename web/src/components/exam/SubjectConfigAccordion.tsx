@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Copy, Plus, Trash2, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -45,6 +45,7 @@ export function SubjectConfigAccordion({
   subjectSchemes,
 }: SubjectConfigAccordionProps) {
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set())
+  const [bulkMarks, setBulkMarks] = useState('')
 
   const getConfig = (subjectId: string) =>
     value.find(c => c.class_id === classSection.class_id && c.section_id === classSection.section_id && c.subject_id === subjectId)
@@ -103,17 +104,112 @@ export function SubjectConfigAccordion({
     setExpandedSubjects(next)
   }
 
+  const applyFirstToAll = () => {
+    if (subjects.length <= 1) return
+    const firstConfig = getConfig(subjects[0].id)
+    if (!firstConfig) return
+    let newConfigs = [...value]
+    for (let i = 1; i < subjects.length; i++) {
+      const subjectId = subjects[i].id
+      const clonedComponents = firstConfig.components.map(c => ({ ...c }))
+      const exists = newConfigs.find(
+        c => c.class_id === classSection.class_id && c.section_id === classSection.section_id && c.subject_id === subjectId
+      )
+      if (exists) {
+        newConfigs = newConfigs.map(c =>
+          c.class_id === classSection.class_id && c.section_id === classSection.section_id && c.subject_id === subjectId
+            ? { ...c, components: clonedComponents }
+            : c
+        )
+      } else {
+        newConfigs = [...newConfigs, {
+          class_id: classSection.class_id,
+          section_id: classSection.section_id,
+          subject_id: subjectId,
+          components: clonedComponents,
+          has_internal_external_split: firstConfig.has_internal_external_split,
+          credit_hours: firstConfig.credit_hours,
+          subject_grade_scheme_id: firstConfig.subject_grade_scheme_id,
+          internal_max_marks: firstConfig.internal_max_marks,
+          internal_min_pass: firstConfig.internal_min_pass,
+          external_max_marks: firstConfig.external_max_marks,
+          external_min_pass: firstConfig.external_min_pass,
+        }]
+      }
+    }
+    onChange(newConfigs)
+  }
+
+  const applyBulkMarks = () => {
+    const marks = parseFloat(bulkMarks)
+    if (!marks || marks <= 0) return
+    let newConfigs = [...value]
+    for (const subject of subjects) {
+      const existing = newConfigs.find(
+        c => c.class_id === classSection.class_id && c.section_id === classSection.section_id && c.subject_id === subject.id
+      )
+      if (existing) {
+        newConfigs = newConfigs.map(c =>
+          c.class_id === classSection.class_id && c.section_id === classSection.section_id && c.subject_id === subject.id
+            ? { ...c, components: c.components.map((comp, i) => i === 0 && comp.entry_type === 'marks' ? { ...comp, max_marks: marks } : comp) }
+            : c
+        )
+      } else {
+        newConfigs = [...newConfigs, {
+          class_id: classSection.class_id,
+          section_id: classSection.section_id,
+          subject_id: subject.id,
+          components: [{ ...defaultComponent(0), max_marks: marks }],
+          has_internal_external_split: false,
+          credit_hours: null,
+          subject_grade_scheme_id: null,
+          internal_max_marks: null,
+          internal_min_pass: null,
+          external_max_marks: null,
+          external_min_pass: null,
+        }]
+      }
+    }
+    onChange(newConfigs)
+    setBulkMarks('')
+  }
+
   const label = classSection.section_name
     ? `${classSection.class_name ?? classSection.class_id} — Section ${classSection.section_name}`
     : (classSection.class_name ?? classSection.class_id)
 
   return (
     <div className="rounded-lg border">
-      <div className="border-b bg-muted/20 px-4 py-2.5">
-        <span className="font-medium text-sm">{label}</span>
-        <Badge variant="secondary" className="ml-2 text-xs">
-          {subjects.length} subjects
-        </Badge>
+      <div className="border-b bg-muted/20 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm">{label}</span>
+          <Badge variant="secondary" className="text-xs">
+            {subjects.length} subjects
+          </Badge>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Set all max marks:</span>
+          <Input
+            type="number"
+            value={bulkMarks}
+            onChange={e => setBulkMarks(e.target.value)}
+            className="h-6 w-16 text-xs px-1.5"
+            placeholder="100"
+            min={0}
+            onKeyDown={e => e.key === 'Enter' && applyBulkMarks()}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-6 text-xs px-2 gap-1"
+            disabled={!bulkMarks || isNaN(Number(bulkMarks)) || Number(bulkMarks) <= 0}
+            onClick={applyBulkMarks}
+          >
+            <Zap className="h-3 w-3" />
+            Apply
+          </Button>
+        </div>
       </div>
       <div className="divide-y">
         {subjects.map((subject) => {
@@ -158,17 +254,6 @@ export function SubjectConfigAccordion({
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Credit Hours</label>
-                      <Input
-                        type="number"
-                        value={config?.credit_hours ?? ''}
-                        onChange={(e) => upsertConfig(subject.id, { credit_hours: e.target.value ? parseInt(e.target.value) : null })}
-                        className="h-8 text-xs"
-                        min={0}
-                        placeholder="—"
-                      />
                     </div>
                   </div>
 
@@ -306,6 +391,21 @@ export function SubjectConfigAccordion({
           )
         })}
       </div>
+      {subjects.length > 1 && (
+        <div className="border-t px-4 py-2.5 flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            disabled={!getConfig(subjects[0].id)}
+            onClick={applyFirstToAll}
+          >
+            <Copy className="h-3 w-3" />
+            Apply same marks to all subjects in this class
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

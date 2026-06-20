@@ -35,6 +35,13 @@ interface TripRow {
   driver_id: string;
 }
 
+const DEFAULT_TRIPS: TripRow[] = [
+  { _key: 1, route_id: '', driver_id: '' },
+  { _key: 2, route_id: '', driver_id: '' },
+];
+
+const TRIP_TYPE_LABELS: Record<number, string> = { 1: 'AC', 2: 'Non-AC' };
+
 const defaultForm = {
   name: '',
   registration_number: '',
@@ -45,7 +52,7 @@ const defaultForm = {
   driving_licence_exp_date: '',
   bus_insurance_vendor: '',
   insurance_expiry_date: '',
-  number_of_trips: '' as string | number,
+  number_of_trips: 2 as string | number,
   is_ac: false,
   is_active: true,
 };
@@ -60,8 +67,8 @@ const selectStyles = {
 function VehicleAddDialog() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...defaultForm });
-  const [trips, setTrips] = useState<TripRow[]>([]);
-  const [counter, setCounter] = useState(0);
+  const [trips, setTrips] = useState<TripRow[]>([...DEFAULT_TRIPS]);
+  const [counter, setCounter] = useState(DEFAULT_TRIPS.length);
   const [submitting, setSubmitting] = useState(false);
 
   const { data: routes = [] } = useRoutes(false);
@@ -95,10 +102,16 @@ function VehicleAddDialog() {
     ? allStaff.filter(s => s.designation_id === driverDesignation.id)
     : allStaff;
 
-  const routeOptions = (routes as any[]).map(r => ({
-    value: r.id,
-    label: r.route_name + (r.starting_stop && r.ending_stop ? ` (${r.starting_stop} → ${r.ending_stop})` : ''),
-  }));
+  const buildRouteLabel = (r: any) => {
+    const cat = r.route_type ? ` [${r.route_type}]` : '';
+    const ends = r.starting_stop && r.ending_stop ? ` (${r.starting_stop} → ${r.ending_stop})` : '';
+    return `${r.route_name}${cat}${ends}`;
+  };
+
+  const acRouteOptions = (routes as any[]).filter(r => r.route_type).map(r => ({ value: r.id, label: buildRouteLabel(r) }));
+  const nonAcRouteOptions = (routes as any[]).filter(r => !r.route_type).map(r => ({ value: r.id, label: buildRouteLabel(r) }));
+  const allRouteOptions = (routes as any[]).map(r => ({ value: r.id, label: buildRouteLabel(r) }));
+  const getRouteOptionsForTrip = (idx: number) => idx === 0 ? acRouteOptions : idx === 1 ? nonAcRouteOptions : allRouteOptions;
 
   const driverOptions = driverStaff.map(d => ({
     value: d.id,
@@ -126,8 +139,8 @@ function VehicleAddDialog() {
 
   const resetAndClose = () => {
     setForm({ ...defaultForm });
-    setTrips([]);
-    setCounter(0);
+    setTrips([...DEFAULT_TRIPS]);
+    setCounter(DEFAULT_TRIPS.length);
     setOpen(false);
   };
 
@@ -338,53 +351,63 @@ function VehicleAddDialog() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs text-muted-foreground border-b">
-                      <th className="pb-1 w-14">#</th>
+                      <th className="pb-1 w-20">Trip Type</th>
                       <th className="pb-1 pr-2">Route</th>
                       <th className="pb-1 pr-2">Driver</th>
                       <th className="pb-1 w-8"></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {trips.map((trip, idx) => (
-                      <tr key={trip._key} className="border-b last:border-0">
-                        <td className="py-2 pr-2 text-xs font-medium text-muted-foreground whitespace-nowrap">
-                          Trip {idx + 1}
-                        </td>
-                        <td className="py-1 pr-2">
-                          <Select
-                            options={routeOptions}
-                            value={routeOptions.find(o => o.value === trip.route_id) || null}
-                            onChange={opt => updateTrip(trip._key, { route_id: opt?.value || '' })}
-                            placeholder="Select route..."
-                            styles={selectStyles}
-                            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                            classNamePrefix="react-select"
-                          />
-                        </td>
-                        <td className="py-1 pr-2">
-                          <Select
-                            options={driverOptions}
-                            value={driverOptions.find(o => o.value === trip.driver_id) || null}
-                            onChange={opt => updateTrip(trip._key, { driver_id: opt?.value || '' })}
-                            placeholder="Select driver..."
-                            styles={selectStyles}
-                            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                            classNamePrefix="react-select"
-                          />
-                        </td>
-                        <td className="py-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeTrip(trip._key)}
-                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                    {trips.map((trip, idx) => {
+                      const typeLabel = TRIP_TYPE_LABELS[idx + 1] ?? `Trip ${idx + 1}`;
+                      const opts = getRouteOptionsForTrip(idx);
+                      return (
+                        <tr key={trip._key} className="border-b last:border-0">
+                          <td className="py-2 pr-2 whitespace-nowrap">
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              typeLabel === 'AC'
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                            }`}>
+                              {typeLabel}
+                            </span>
+                          </td>
+                          <td className="py-1 pr-2">
+                            <Select
+                              options={opts}
+                              value={opts.find(o => o.value === trip.route_id) || null}
+                              onChange={opt => updateTrip(trip._key, { route_id: opt?.value || '' })}
+                              placeholder={idx === 0 ? 'AC route (A–E)...' : idx === 1 ? 'Non-AC route...' : 'Select route...'}
+                              styles={selectStyles}
+                              menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                              classNamePrefix="react-select"
+                            />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <Select
+                              options={driverOptions}
+                              value={driverOptions.find(o => o.value === trip.driver_id) || null}
+                              onChange={opt => updateTrip(trip._key, { driver_id: opt?.value || '' })}
+                              placeholder="Select driver..."
+                              styles={selectStyles}
+                              menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                              classNamePrefix="react-select"
+                            />
+                          </td>
+                          <td className="py-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeTrip(trip._key)}
+                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
@@ -444,10 +467,16 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
     value: d.id,
     label: [d.first_name, d.last_name].filter(Boolean).join(' '),
   }));
-  const routeOptions = (routes as any[]).map(r => ({
-    value: r.id,
-    label: r.route_name + (r.starting_stop && r.ending_stop ? ` (${r.starting_stop} → ${r.ending_stop})` : ''),
-  }));
+  const buildRouteLabel2 = (r: any) => {
+    const cat = r.route_type ? ` [${r.route_type}]` : '';
+    const ends = r.starting_stop && r.ending_stop ? ` (${r.starting_stop} → ${r.ending_stop})` : '';
+    return `${r.route_name}${cat}${ends}`;
+  };
+  const editAcOpts = (routes as any[]).filter(r => r.route_type).map(r => ({ value: r.id, label: buildRouteLabel2(r) }));
+  const editNonAcOpts = (routes as any[]).filter(r => !r.route_type).map(r => ({ value: r.id, label: buildRouteLabel2(r) }));
+  const editAllOpts = (routes as any[]).map(r => ({ value: r.id, label: buildRouteLabel2(r) }));
+  const getEditRouteOpts = (idx: number) => idx === 0 ? editAcOpts : idx === 1 ? editNonAcOpts : editAllOpts;
+
   const vehicleTypeOptions = [
     { value: 'Bus', label: 'Bus' },
     { value: 'Van', label: 'Van' },
@@ -679,53 +708,63 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs text-muted-foreground border-b">
-                      <th className="pb-1 w-14">#</th>
+                      <th className="pb-1 w-20">Trip Type</th>
                       <th className="pb-1 pr-2">Route</th>
                       <th className="pb-1 pr-2">Driver</th>
                       <th className="pb-1 w-8"></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {trips.map((trip, idx) => (
-                      <tr key={trip._key} className="border-b last:border-0">
-                        <td className="py-2 pr-2 text-xs font-medium text-muted-foreground whitespace-nowrap">
-                          Trip {idx + 1}
-                        </td>
-                        <td className="py-1 pr-2">
-                          <Select
-                            options={routeOptions}
-                            value={routeOptions.find(o => o.value === trip.route_id) || null}
-                            onChange={opt => updateTripRow(trip._key, { route_id: opt?.value || '' })}
-                            placeholder="Select route..."
-                            styles={selectStyles}
-                            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                            classNamePrefix="react-select"
-                          />
-                        </td>
-                        <td className="py-1 pr-2">
-                          <Select
-                            options={driverOptions}
-                            value={driverOptions.find(o => o.value === trip.driver_id) || null}
-                            onChange={opt => updateTripRow(trip._key, { driver_id: opt?.value || '' })}
-                            placeholder="Select driver..."
-                            styles={selectStyles}
-                            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                            classNamePrefix="react-select"
-                          />
-                        </td>
-                        <td className="py-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeTrip(trip._key)}
-                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                    {trips.map((trip, idx) => {
+                      const typeLabel = TRIP_TYPE_LABELS[idx + 1] ?? `Trip ${idx + 1}`;
+                      const opts = getEditRouteOpts(idx);
+                      return (
+                        <tr key={trip._key} className="border-b last:border-0">
+                          <td className="py-2 pr-2 whitespace-nowrap">
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              typeLabel === 'AC'
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                            }`}>
+                              {typeLabel}
+                            </span>
+                          </td>
+                          <td className="py-1 pr-2">
+                            <Select
+                              options={opts}
+                              value={opts.find(o => o.value === trip.route_id) || null}
+                              onChange={opt => updateTripRow(trip._key, { route_id: opt?.value || '' })}
+                              placeholder={idx === 0 ? 'AC route (A–E)...' : idx === 1 ? 'Non-AC route...' : 'Select route...'}
+                              styles={selectStyles}
+                              menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                              classNamePrefix="react-select"
+                            />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <Select
+                              options={driverOptions}
+                              value={driverOptions.find(o => o.value === trip.driver_id) || null}
+                              onChange={opt => updateTripRow(trip._key, { driver_id: opt?.value || '' })}
+                              placeholder="Select driver..."
+                              styles={selectStyles}
+                              menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                              classNamePrefix="react-select"
+                            />
+                          </td>
+                          <td className="py-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeTrip(trip._key)}
+                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}

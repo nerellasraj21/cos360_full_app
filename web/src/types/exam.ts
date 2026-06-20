@@ -173,6 +173,7 @@ export interface ExamDetailsPayload {
   weightage_percent?: number | null
   academic_year_id: string
   exam_grade_scheme_id?: string | null
+  subject_grade_scheme_id?: string | null
   status?: ExamStatus
   mark_entry_deadline?: string | null
   publish_rank?: boolean

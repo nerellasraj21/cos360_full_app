@@ -17,6 +17,7 @@ export const examDetailsSchema = z.object({
   weightage_percent: z.number().min(0).max(100).optional().nullable(),
   academic_year_id: z.string().min(1, 'Academic year is required'),
   exam_grade_scheme_id: z.string().optional().nullable(),
+  subject_grade_scheme_id: z.string().optional().nullable(),
   status: z.enum(['draft', 'active', 'published', 'locked', 'finalized']).default('draft'),
   mark_entry_deadline: z
     .preprocess(

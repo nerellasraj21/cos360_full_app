@@ -1,10 +1,9 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useState, useMemo } from 'react'
-import { Loader2, BookOpen, ClipboardList, Award, Ticket, Settings, Plus, Filter, Search } from 'lucide-react'
+import { Loader2, BookOpen, ClipboardList, Award, Ticket, Settings, Plus, Filter, Search, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useExamList } from '@/api/hooks/exam/useExam'
 import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
@@ -20,52 +19,65 @@ const statusColor: Record<string, string> = {
   finalized: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
 }
 
-function ExamCard({ exam, subjectNameMap }: { exam: ExamListItem; subjectNameMap: Record<string, string> }) {
+function ExamTable({ exams, subjectNameMap, sectionLabel }: { exams: ExamListItem[]; subjectNameMap: Record<string, string>; sectionLabel: string }) {
   const navigate = useNavigate()
+  if (exams.length === 0) return null
   return (
-    <Card
-      className="cursor-pointer hover:shadow-md transition-shadow"
-      onClick={() => navigate({ to: `/exam/exams/${exam.id}` as any })}
-    >
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-base leading-tight">{exam.exam_name}</CardTitle>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusColor[exam.status] ?? ''}`}>
-            {exam.status}
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="flex flex-wrap gap-1">
-          <Badge variant="secondary" className="text-xs">{exam.board}</Badge>
-          <Badge variant="outline" className="text-xs capitalize">{exam.nature}</Badge>
-          {exam.exam_type && (
-            <Badge variant="outline" className="text-xs">{exam.exam_type}</Badge>
-          )}
-        </div>
-        {exam.subjects && exam.subjects.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {exam.subjects.slice(0, 4).map((s) => (
-              <Badge key={s} variant="secondary" className="text-xs">
-                {subjectNameMap[s] ?? s}
-              </Badge>
+    <section>
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+        {sectionLabel}
+      </h2>
+      <div className="overflow-hidden rounded-lg border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/40">
+              <th className="px-4 py-2.5 text-left font-medium">#</th>
+              <th className="px-4 py-2.5 text-left font-medium">Exam Name</th>
+              <th className="px-4 py-2.5 text-left font-medium">Board</th>
+              <th className="px-4 py-2.5 text-left font-medium">Nature</th>
+              <th className="px-4 py-2.5 text-left font-medium">Subjects</th>
+              <th className="px-4 py-2.5 text-left font-medium">Deadline</th>
+              <th className="px-4 py-2.5 text-left font-medium">Status</th>
+              <th className="px-4 py-2.5 text-center font-medium">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {exams.map((exam, i) => (
+              <tr key={exam.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                <td className="px-4 py-2.5 text-muted-foreground">{i + 1}</td>
+                <td className="px-4 py-2.5 font-medium">{exam.exam_name}</td>
+                <td className="px-4 py-2.5">
+                  <Badge variant="secondary" className="text-xs">{exam.board}</Badge>
+                </td>
+                <td className="px-4 py-2.5 capitalize text-muted-foreground">{exam.nature}</td>
+                <td className="px-4 py-2.5 text-muted-foreground">
+                  {(exam.subject_config_count ?? 0) > 0
+                    ? `${exam.subject_config_count} subject${exam.subject_config_count !== 1 ? 's' : ''}`
+                    : '—'}
+                </td>
+                <td className="px-4 py-2.5 text-muted-foreground">{exam.mark_entry_deadline ?? '—'}</td>
+                <td className="px-4 py-2.5">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusColor[exam.status] ?? ''}`}>
+                    {exam.status}
+                  </span>
+                </td>
+                <td className="px-4 py-2.5 text-center">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-xs"
+                    onClick={() => navigate({ to: `/exam/exams/${exam.id}` as any })}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    View
+                  </Button>
+                </td>
+              </tr>
             ))}
-            {exam.subjects.length > 4 && (
-              <Badge variant="outline" className="text-xs">+{exam.subjects.length - 4} more</Badge>
-            )}
-          </div>
-        ) : (exam.subject_config_count ?? 0) > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            {exam.subject_config_count} subject{exam.subject_config_count !== 1 ? 's' : ''} configured
-          </p>
-        ) : null}
-        {exam.mark_entry_deadline && (
-          <p className="text-xs text-muted-foreground">
-            Deadline: {exam.mark_entry_deadline}
-          </p>
-        )}
-      </CardContent>
-    </Card>
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 
@@ -161,34 +173,17 @@ export default function ExamDashboard() {
         ))}
       </div>
 
-      {/* Active Exams */}
+      {/* Exam Tables */}
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <>
-          {byStatus('active').length > 0 && (
-            <section>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Active Exams
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {byStatus('active').map(e => <ExamCard key={e.id} exam={e} subjectNameMap={subjectNameMap} />)}
-              </div>
-            </section>
-          )}
-
-          {byStatus('draft').length > 0 && (
-            <section>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Draft Exams
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {byStatus('draft').map(e => <ExamCard key={e.id} exam={e} subjectNameMap={subjectNameMap} />)}
-              </div>
-            </section>
-          )}
+        <div className="space-y-6">
+          <ExamTable exams={byStatus('active')} subjectNameMap={subjectNameMap} sectionLabel="Active Exams" />
+          <ExamTable exams={byStatus('draft')} subjectNameMap={subjectNameMap} sectionLabel="Draft Exams" />
+          <ExamTable exams={byStatus('locked')} subjectNameMap={subjectNameMap} sectionLabel="Locked Exams" />
+          <ExamTable exams={byStatus('published')} subjectNameMap={subjectNameMap} sectionLabel="Published Exams" />
 
           {filteredExams.length === 0 && (
             <div className="rounded-lg border bg-muted/20 p-8 text-center">
@@ -208,7 +203,7 @@ export default function ExamDashboard() {
               )}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )

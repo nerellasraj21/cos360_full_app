@@ -83,3 +83,24 @@ export const updateClassSubjectMapping = async (id: string, mapping: ClassSubjec
 export const deleteClassSubjectMapping = async (id: string): Promise<void> => {
   await CAxios.delete(`${CLASS_SUBJECT_MAPPINGS_API_BASE}${id}`);
 };
+
+export interface ByClassesSubjectEntry {
+  subject_id: string;
+  subject_name: string;
+  order: number;
+  exclude_marks: boolean;
+}
+
+export const fetchMappingsByClasses = async (params: {
+  class_ids: string[];
+  academic_year_id?: string;
+  active_only?: boolean;
+}): Promise<Record<string, ByClassesSubjectEntry[]>> => {
+  const queryParams = new URLSearchParams();
+  params.class_ids.forEach(id => queryParams.append('class_ids', id));
+  if (params.academic_year_id) queryParams.append('academic_year_id', params.academic_year_id);
+  if (params.active_only !== undefined) queryParams.append('active_only', params.active_only.toString());
+
+  const { data } = await CAxios.get(`${CLASS_SUBJECT_MAPPINGS_API_BASE}by-classes?${queryParams.toString()}`);
+  return data;
+};

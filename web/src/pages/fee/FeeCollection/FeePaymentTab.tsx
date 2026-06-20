@@ -553,7 +553,7 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
                   {!isChequePending && (
                     <>
                       <span className="text-muted-foreground">Receipt #:</span>
-                      <span className="font-medium">{paymentResult.receipt_number}</span>
+                      <span className="font-semibold text-primary">{paymentResult.receipt_number}</span>
                     </>
                   )}
                   <span className="text-muted-foreground">Amount Paid:</span>

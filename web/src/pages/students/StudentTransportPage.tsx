@@ -291,6 +291,7 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
   const [stopId, setStopId] = useState('');
   const [feePerTerm, setFeePerTerm] = useState('');
   const [pricingId, setPricingId] = useState('');
+  const [feeSource, setFeeSource] = useState<'stop' | 'student' | 'pricing' | ''>('');
 
   // Derive vehicleId from selected trip for pricing dropdown
   const selectedTrip = trips.find(t => t.id === tripId);
@@ -328,6 +329,7 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
   useEffect(() => {
     if (isEdit || transportFee == null) return;
     setFeePerTerm(String(transportFee));
+    setFeeSource('student');
   }, [studentId, transportFee, isEdit]);
 
   useEffect(() => {
@@ -337,6 +339,7 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
       setStopId(transport?.stop_id ?? '');
       setFeePerTerm(transport?.fee_per_term?.toString() ?? '');
       setPricingId(transport?.pricing_id ?? '');
+      setFeeSource('');
     }
   }, [open, transport]);
 
@@ -409,7 +412,17 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
             <ReactSelect
               options={stops.map(s => ({ value: s.id, label: `#${s.number} – ${s.name}` }))}
               value={stopId ? { value: stopId, label: (() => { const s = stops.find(s => s.id === stopId); return s ? `#${s.number} – ${s.name}` : ''; })() } : null}
-              onChange={opt => setStopId(opt?.value ?? '')}
+              onChange={opt => {
+                const newStopId = opt?.value ?? '';
+                setStopId(newStopId);
+                if (newStopId && !pricingId) {
+                  const selectedStop = stops.find(s => s.id === newStopId);
+                  if (selectedStop?.fees != null && selectedStop.fees > 0) {
+                    setFeePerTerm(String(selectedStop.fees));
+                    setFeeSource('stop');
+                  }
+                }
+              }}
               placeholder="Select stop..."
               isClearable
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
@@ -423,7 +436,10 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
               <Select value={pricingId} onValueChange={(val) => {
                 setPricingId(val);
                 const selected = pricingOptions.find(p => p.id === val);
-                if (selected) setFeePerTerm(selected.amount.toString());
+                if (selected) {
+                  setFeePerTerm(selected.amount.toString());
+                  setFeeSource('pricing');
+                }
               }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select pricing..." />
@@ -450,14 +466,24 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
               onChange={(e) => setFeePerTerm(e.target.value)}
               placeholder="e.g. 1500"
             />
-            {!isEdit && transportFee != null && (
+            {!isEdit && feeSource === 'stop' && (
+              <p className="text-xs text-green-600">
+                Auto-filled from stop fee. You can edit it if needed.
+              </p>
+            )}
+            {!isEdit && feeSource === 'student' && transportFee != null && (
               <p className="text-xs text-green-600">
                 Auto-loaded from the student's assigned transport fee (₹{transportFee.toLocaleString()}). You can edit it if needed.
               </p>
             )}
-            {!isEdit && studentId && transportFee == null && (
+            {!isEdit && feeSource === 'pricing' && (
+              <p className="text-xs text-green-600">
+                Auto-filled from selected pricing plan. You can edit it if needed.
+              </p>
+            )}
+            {!isEdit && studentId && !feePerTerm && feeSource === '' && (
               <p className="text-xs text-muted-foreground">
-                No transport fee assigned to this student — enter the amount manually.
+                No transport fee assigned to this stop or student — enter the amount manually.
               </p>
             )}
           </div>

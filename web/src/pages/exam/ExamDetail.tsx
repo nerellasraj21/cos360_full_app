@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import ReactSelect from 'react-select'
 import {
   useExamDetail,
   useDeleteExam,
@@ -25,12 +26,14 @@ import {
   useExamClassSections,
   useExamSubjectConfigs,
   useExamDates,
+  useGradingSchemes,
 } from '@/api/hooks/exam/useExam'
 import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections'
 import { useAuthStore } from '@/lib/authStore'
 import { useAcademicYearStore } from '@/lib/academicYearStore'
 import { useExamStore } from '@/lib/examStore'
+import { useSelectStyles } from '@/lib/useSelectStyles'
 import type { ExamStatus } from '@/types/exam'
 
 const STATUS_BADGE: Record<ExamStatus, string> = {
@@ -61,13 +64,18 @@ export default function ExamDetail() {
   const [isCloneDirty, setIsCloneDirty] = useState(false)
   const [editForm, setEditForm] = useState({
     exam_name: '',
+    exam_grade_scheme_id: null as string | null,
+    subject_grade_scheme_id: null as string | null,
     mark_entry_deadline: '',
     hall_ticket_min_attendance: '',
     attendance_from_date: '',
     attendance_to_date: '',
-    publish_rank: false,
+    term: '',
   })
   const [activeTab, setActiveTab] = useState<'overview' | 'dates' | 'marks' | 'permissions' | 'audit'>('overview')
+
+  const selectStyles = useSelectStyles()
+  const { examSchemes, subjectSchemes } = useGradingSchemes()
 
   const { data: exam, isLoading } = useExamDetail(id)
   const deleteMutation = useDeleteExam()
@@ -130,11 +138,13 @@ export default function ExamDetail() {
   const openEdit = () => {
     setEditForm({
       exam_name: exam.exam_name ?? '',
+      exam_grade_scheme_id: (exam as any).exam_grade_scheme_id ?? null,
+      subject_grade_scheme_id: (exam as any).subject_grade_scheme_id ?? null,
       mark_entry_deadline: exam.mark_entry_deadline ?? '',
       hall_ticket_min_attendance: exam.hall_ticket_min_attendance != null ? String(exam.hall_ticket_min_attendance) : '',
       attendance_from_date: exam.attendance_from_date ?? '',
       attendance_to_date: exam.attendance_to_date ?? '',
-      publish_rank: !!exam.publish_rank,
+      term: (exam as any).term ?? '',
     })
     setIsEditDirty(false)
     setShowEdit(true)
@@ -144,12 +154,14 @@ export default function ExamDetail() {
     updateMutation.mutate(
       {
         exam_name: editForm.exam_name || undefined,
-        mark_entry_deadline: editForm.mark_entry_deadline || undefined,
-        hall_ticket_min_attendance: editForm.hall_ticket_min_attendance !== '' ? Number(editForm.hall_ticket_min_attendance) : undefined,
-        attendance_from_date: editForm.attendance_from_date || undefined,
-        attendance_to_date: editForm.attendance_to_date || undefined,
-        publish_rank: editForm.publish_rank,
-      },
+        exam_grade_scheme_id: editForm.exam_grade_scheme_id ?? null,
+        subject_grade_scheme_id: editForm.subject_grade_scheme_id ?? null,
+        mark_entry_deadline: editForm.mark_entry_deadline || null,
+        hall_ticket_min_attendance: editForm.hall_ticket_min_attendance !== '' ? Number(editForm.hall_ticket_min_attendance) : null,
+        attendance_from_date: editForm.attendance_from_date || null,
+        attendance_to_date: editForm.attendance_to_date || null,
+        term: editForm.term || null,
+      } as any,
       { onSuccess: () => { setIsEditDirty(false); setShowEdit(false) } }
     )
   }
@@ -326,21 +338,6 @@ export default function ExamDetail() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground">Options</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1 text-sm">
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" checked={!!exam.publish_rank} readOnly className="h-3.5 w-3.5" />
-                  <span>Publish rank</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" checked={!!exam.is_internal} readOnly className="h-3.5 w-3.5" />
-                  <span>Internal exam</span>
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Configured Subjects */}
@@ -584,7 +581,7 @@ export default function ExamDetail() {
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog open={showEdit} onOpenChange={setShowEdit} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
+      <Dialog open={showEdit} onOpenChange={setShowEdit} modal={false} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Exam</DialogTitle>
@@ -598,6 +595,26 @@ export default function ExamDetail() {
               <Input
                 value={editForm.exam_name}
                 onChange={(e) => setEditForm(p => ({ ...p, exam_name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Exam Grade Scheme</label>
+              <ReactSelect
+                options={[{ value: '__none__', label: '— None —' }, ...(examSchemes.data ?? []).map(s => ({ value: s.id, label: s.name }))]}
+                value={(() => { const v = editForm.exam_grade_scheme_id; if (!v) return { value: '__none__', label: '— None —' }; const s = (examSchemes.data ?? []).find(s => s.id === v); return s ? { value: s.id, label: s.name } : { value: '__none__', label: '— None —' }; })()}
+                onChange={opt => { setEditForm(p => ({ ...p, exam_grade_scheme_id: (!opt || opt.value === '__none__') ? null : opt.value })); setIsEditDirty(true) }}
+                menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                styles={{ ...selectStyles, menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }), menu: base => ({ ...base, pointerEvents: 'auto' }) }}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Subject Grade Scheme</label>
+              <ReactSelect
+                options={[{ value: '__none__', label: '— None —' }, ...(subjectSchemes.data ?? []).map(s => ({ value: s.id, label: s.name }))]}
+                value={(() => { const v = editForm.subject_grade_scheme_id; if (!v) return { value: '__none__', label: '— None —' }; const s = (subjectSchemes.data ?? []).find(s => s.id === v); return s ? { value: s.id, label: s.name } : { value: '__none__', label: '— None —' }; })()}
+                onChange={opt => { setEditForm(p => ({ ...p, subject_grade_scheme_id: (!opt || opt.value === '__none__') ? null : opt.value })); setIsEditDirty(true) }}
+                menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                styles={{ ...selectStyles, menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }), menu: base => ({ ...base, pointerEvents: 'auto' }) }}
               />
             </div>
             <div className="space-y-1">
@@ -635,15 +652,13 @@ export default function ExamDetail() {
                 onChange={(e) => setEditForm(p => ({ ...p, attendance_to_date: e.target.value }))}
               />
             </div>
-            <div className="flex items-center gap-2 pt-5">
-              <input
-                type="checkbox"
-                id="edit_publish_rank"
-                checked={editForm.publish_rank}
-                onChange={(e) => setEditForm(p => ({ ...p, publish_rank: e.target.checked }))}
-                className="h-4 w-4"
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Term</label>
+              <Input
+                value={editForm.term}
+                onChange={(e) => setEditForm(p => ({ ...p, term: e.target.value }))}
+                placeholder="e.g. Term 1"
               />
-              <label htmlFor="edit_publish_rank" className="cursor-pointer text-sm">Publish Rank</label>
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-1">
