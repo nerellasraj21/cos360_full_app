@@ -8,12 +8,14 @@ from app.db.tenant_session import get_tenant_db
 from app.schemas.exam.exam_date_schema import (
     ExamDateBulkCreate,
     ExamDateCreate,
+    ExamDateMultiSectionCreate,
     ExamDateRead,
     ExamDateUpdate,
 )
 from app.service.exam.exam_date_service import (
     bulk_create_exam_dates,
     create_exam_date,
+    create_exam_dates_for_multi_section,
     delete_exam_date,
     get_dates_for_exam,
     update_exam_date,
@@ -52,6 +54,22 @@ async def bulk_add_exam_dates(
     await check_role_plan_permission_with_error(db, request, role, "exams", "update")
     user_id = uuid.UUID(current_user.get("id"))
     results = await bulk_create_exam_dates(db, payload, created_by=user_id)
+    await db.commit()
+    return results
+
+
+@router.post("/multi-section", response_model=list[ExamDateRead], status_code=status.HTTP_201_CREATED)
+async def add_exam_dates_multi_section(
+    exam_id: uuid.UUID,
+    payload: ExamDateMultiSectionCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    await check_role_plan_permission_with_error(db, request, role, "exams", "update")
+    user_id = uuid.UUID(current_user.get("id"))
+    results = await create_exam_dates_for_multi_section(db, payload, created_by=user_id)
     await db.commit()
     return results
 

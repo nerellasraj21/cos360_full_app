@@ -15,7 +15,7 @@ class StudentTransportBase(BaseModel):
 
 
 class StudentTransportCreate(StudentTransportBase):
-    pass
+    fee_per_term: float | None = None  # auto-filled from stop.fees if not provided
 
 
 class StudentTransportUpdate(BaseModel):

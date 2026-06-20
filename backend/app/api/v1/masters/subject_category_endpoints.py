@@ -47,7 +47,7 @@ async def create_category(request: Request, data: SubjectCategoryCreate, db: Asy
 async def list_categories(
     request: Request,
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=1000),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     """Get all subject categories with pagination"""
@@ -141,7 +141,7 @@ async def create_category_alias(
 async def list_categories_alias(
     request: Request,
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=1000),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     """Get all subject categories with pagination (alias endpoint)."""

@@ -230,6 +230,103 @@ async def verify_fee_permissions_all_tenants():
         )
 
 
+@router.post("/school-settings", status_code=status.HTTP_201_CREATED)
+async def fix_school_settings_permissions():
+    """
+    Add school_settings permissions (read, update) to Admin role across all tenant schemas.
+    """
+    try:
+        async with get_public_db() as db:
+            tenants_result = await db.execute(text("""
+                SELECT schema_name, client_name
+                FROM public.tenants
+                WHERE is_active = true
+            """))
+            tenants = tenants_result.fetchall()
+
+            if not tenants:
+                return {"message": "No active tenants found", "tenants_processed": 0, "permissions_added": 0}
+
+            summary = {
+                "tenants_processed": 0,
+                "tenants_updated": 0,
+                "permissions_added": 0,
+                "tenants_skipped": 0,
+                "details": [],
+            }
+
+            actions = ["read", "update"]
+
+            for tenant in tenants:
+                schema_name = tenant.schema_name
+                client_name = tenant.client_name
+
+                try:
+                    check_schema = await db.execute(text(f"""
+                        SELECT EXISTS (
+                            SELECT 1 FROM information_schema.tables
+                            WHERE table_schema = '{schema_name}'
+                            AND table_name = 'roles'
+                        )
+                    """))
+                    if not check_schema.scalar():
+                        summary["tenants_skipped"] += 1
+                        summary["details"].append({"schema": schema_name, "status": "skipped", "reason": "roles table not found"})
+                        continue
+
+                    admin_role_result = await db.execute(text(f"""
+                        SELECT id FROM "{schema_name}".roles WHERE name = 'Admin' LIMIT 1
+                    """))
+                    admin_role = admin_role_result.fetchone()
+
+                    if not admin_role:
+                        summary["tenants_skipped"] += 1
+                        summary["details"].append({"schema": schema_name, "status": "skipped", "reason": "Admin role not found"})
+                        continue
+
+                    admin_role_id = admin_role.id
+                    permissions_added_count = 0
+
+                    for action in actions:
+                        await db.execute(
+                            text(f"""
+                            INSERT INTO "{schema_name}".resource_permissions
+                            (id, role_id, resource, action, is_granted)
+                            VALUES (gen_random_uuid(), :role_id, 'school_settings', :action, true)
+                            ON CONFLICT (role_id, resource, action) DO UPDATE
+                            SET is_granted = true
+                        """),
+                            {"role_id": admin_role_id, "action": action},
+                        )
+                        permissions_added_count += 1
+
+                    await db.commit()
+
+                    summary["tenants_processed"] += 1
+                    summary["tenants_updated"] += 1
+                    summary["permissions_added"] += permissions_added_count
+                    summary["details"].append({
+                        "schema": schema_name,
+                        "client": client_name,
+                        "status": "success",
+                        "permissions_added": permissions_added_count,
+                    })
+
+                except Exception as tenant_error:
+                    logger.error(f"Error processing tenant {schema_name}: {str(tenant_error)}")
+                    summary["details"].append({"schema": schema_name, "status": "error", "error": str(tenant_error)})
+
+            return {
+                "message": f"Successfully processed {summary['tenants_updated']} tenants",
+                "summary": summary,
+                "next_steps": ["Users must log out and log back in to refresh their JWT tokens"],
+            }
+
+    except Exception as e:
+        logger.error(f"Error fixing school_settings permissions: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to fix permissions: {str(e)}")
+
+
 @router.get("/missing-fee-permissions")
 async def check_missing_fee_permissions():
     """

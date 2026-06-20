@@ -8,6 +8,7 @@ class ExamSettingsBase(BaseModel):
     default_board: str | None = None
     custom_board_name: str | None = None
     hall_ticket_min_attendance: Decimal | None = Field(None, ge=0, le=100)
+    hall_ticket_min_fee_paid_pct: Decimal | None = Field(None, ge=0, le=100)
     exam_fee_type_id: UUID | None = None
     grace_max_per_subject: int | None = Field(None, ge=0, le=100)
     grace_max_subjects: int | None = Field(None, ge=0, le=50)

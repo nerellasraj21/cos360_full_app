@@ -13,6 +13,7 @@ class ExamSettings(BaseOrg):
     default_board = Column(String(50), nullable=True)
     custom_board_name = Column(String(100), nullable=True)
     hall_ticket_min_attendance = Column(Numeric(5, 2), nullable=True, default=75.00)
+    hall_ticket_min_fee_paid_pct = Column(Numeric(5, 2), nullable=True)
     # FK to fee_types.id — kept as plain UUID to avoid cross-module model import
     exam_fee_type_id = Column(UUID(as_uuid=True), nullable=True)
     grace_max_per_subject = Column(SmallInteger, nullable=True)

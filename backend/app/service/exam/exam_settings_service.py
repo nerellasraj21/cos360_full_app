@@ -44,6 +44,7 @@ async def upsert_settings(db: AsyncSession, payload: ExamSettingsUpdate) -> Exam
             settings.default_board = payload.default_board
             settings.custom_board_name = payload.custom_board_name
             settings.hall_ticket_min_attendance = payload.hall_ticket_min_attendance
+            settings.hall_ticket_min_fee_paid_pct = payload.hall_ticket_min_fee_paid_pct
             settings.exam_fee_type_id = payload.exam_fee_type_id
             settings.grace_max_per_subject = payload.grace_max_per_subject
             settings.grace_max_subjects = payload.grace_max_subjects
@@ -55,6 +56,7 @@ async def upsert_settings(db: AsyncSession, payload: ExamSettingsUpdate) -> Exam
                 default_board=payload.default_board,
                 custom_board_name=payload.custom_board_name,
                 hall_ticket_min_attendance=payload.hall_ticket_min_attendance,
+                hall_ticket_min_fee_paid_pct=payload.hall_ticket_min_fee_paid_pct,
                 exam_fee_type_id=payload.exam_fee_type_id,
                 grace_max_per_subject=payload.grace_max_per_subject,
                 grace_max_subjects=payload.grace_max_subjects,

@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.exam.exam_date_model import ExamDate
-from app.schemas.exam.exam_date_schema import ExamDateBulkCreate, ExamDateCreate, ExamDateUpdate
+from app.schemas.exam.exam_date_schema import ExamDateBulkCreate, ExamDateCreate, ExamDateMultiSectionCreate, ExamDateUpdate
 
 log = logging.getLogger("exam.exam_date_service")
 
@@ -126,6 +126,58 @@ async def bulk_create_exam_dates(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while bulk-creating exam dates.",
+        )
+
+
+async def create_exam_dates_for_multi_section(
+    db: AsyncSession,
+    payload: ExamDateMultiSectionCreate,
+    created_by: UUID = None,
+) -> list[ExamDate]:
+    """
+    Create one ExamDate row per class-section for a single subject + date + time.
+    All rows are inserted atomically — any duplicate raises 409 and rolls back the batch.
+    """
+    try:
+        created: list[ExamDate] = []
+        for cs in payload.class_sections:
+            exam_date = ExamDate(
+                id=uuid.uuid4(),
+                exam_id=payload.exam_id,
+                class_id=cs.class_id,
+                section_id=cs.section_id,
+                subject_id=payload.subject_id,
+                exam_date=payload.exam_date,
+                start_time=payload.start_time,
+                end_time=payload.end_time,
+                venue=payload.venue,
+                notes=payload.notes,
+                created_by=created_by,
+            )
+            db.add(exam_date)
+            created.append(exam_date)
+
+        await db.flush()
+        return created
+
+    except IntegrityError as e:
+        await db.rollback()
+        log.error("IntegrityError during multi-section ExamDate creation: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "One or more exam dates already exist "
+                "(duplicate exam/class/section/subject combination)."
+            ),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        log.error("Error during multi-section ExamDate creation: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating exam dates for multiple sections.",
         )
 
 

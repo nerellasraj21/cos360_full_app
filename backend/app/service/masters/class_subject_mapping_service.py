@@ -278,6 +278,45 @@ async def get_class_subject_mappings_by_class(
     return result.scalars().all()
 
 
+async def get_class_subject_mappings_by_classes(
+    db: AsyncSession,
+    class_ids: list[UUID],
+    academic_year_id: UUID | None = None,
+    active_only: bool = True,
+) -> dict[str, list[ClassSubjectMap]]:
+    """Get subject mappings for multiple class_ids in one query, grouped by class_id string."""
+    if not class_ids:
+        return {}
+
+    query = (
+        select(ClassSubjectMap)
+        .options(
+            selectinload(ClassSubjectMap.class_),
+            selectinload(ClassSubjectMap.section),
+            selectinload(ClassSubjectMap.subject),
+            selectinload(ClassSubjectMap.academic_year),
+        )
+        .where(ClassSubjectMap.class_id.in_(class_ids))
+    )
+
+    if academic_year_id:
+        query = query.where(ClassSubjectMap.academic_year_id == academic_year_id)
+
+    if active_only:
+        query = query.where(ClassSubjectMap.is_active)
+
+    query = query.order_by(ClassSubjectMap.order.asc().nullsfirst())
+
+    result = await db.execute(query)
+    mappings = result.scalars().all()
+
+    grouped: dict[str, list[ClassSubjectMap]] = {str(cid): [] for cid in class_ids}
+    for mapping in mappings:
+        grouped[str(mapping.class_id)].append(mapping)
+
+    return grouped
+
+
 async def get_all_class_subject_mappings(
     db: AsyncSession,
     skip: int = 0,

@@ -46,6 +46,7 @@ from app.api.v1.fee.fee_collection_endpoints import router as fee_collection_rou
 from app.api.v1.fee.fee_concession_endpoints import router as fee_concession_router
 from app.api.v1.fee.fee_old_endpoints import router as fee_old_router
 from app.api.v1.masters.academic_year_routes import router as academic_year_router
+from app.api.v1.masters.school_settings_endpoints import router as school_settings_router
 from app.api.v1.masters.caste_endpoints import router as caste_router
 from app.api.v1.masters.class_endpoints import router as class_router
 from app.api.v1.masters.class_subject_mapping_endpoints import router as class_subject_mapping_router
@@ -93,6 +94,7 @@ from app.api.v1.super_admin.tenant_data_endpoints import router as super_admin_t
 
 router = APIRouter()
 router.include_router(academic_year_router)
+router.include_router(school_settings_router)
 router.include_router(class_router)
 router.include_router(class_subject_mapping_router)
 router.include_router(subject_router)

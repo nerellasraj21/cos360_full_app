@@ -20,6 +20,7 @@ from app.service.masters.class_subject_mapping_service import (
     get_all_class_subject_mappings,
     get_class_subject_mapping_by_id,
     get_class_subject_mappings_by_class,
+    get_class_subject_mappings_by_classes,
     get_class_subject_mappings_dropdown,
     update_class_subject_mapping,
 )
@@ -178,6 +179,29 @@ async def get_mappings_by_class(
 
     # Convert to read schema
     return [ClassSubjectMapRead(**_mapping_to_read_dict(mapping)) for mapping in mappings]
+
+
+@router.get("/by-classes", response_model=dict[str, list[ClassSubjectMapRead]])
+async def get_mappings_by_classes(
+    request: Request,
+    class_ids: list[UUID] = Query(...),
+    academic_year_id: UUID | None = None,
+    active_only: bool = True,
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Get subject mappings for multiple classes in one call, grouped by class_id.
+    Used by the Subject Configuration step in the create exam form."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    await check_role_plan_permission_with_error(db, request, role, "class_subject_mappings", "read")
+
+    grouped = await get_class_subject_mappings_by_classes(db, class_ids, academic_year_id, active_only)
+
+    return {
+        class_id_str: [ClassSubjectMapRead(**_mapping_to_read_dict(m)) for m in mappings]
+        for class_id_str, mappings in grouped.items()
+    }
 
 
 @router.get("/dropdown", response_model=list[ClassSubjectMapDropdown])

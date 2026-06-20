@@ -24,6 +24,22 @@ class ExamDateBulkCreate(BaseModel):
     dates: list[ExamDateCreate] = Field(..., min_length=1)
 
 
+class ClassSectionRef(BaseModel):
+    class_id: UUID
+    section_id: UUID | None = None
+
+
+class ExamDateMultiSectionCreate(BaseModel):
+    exam_id: UUID
+    subject_id: UUID
+    exam_date: date
+    start_time: time | None = None
+    end_time: time | None = None
+    venue: str | None = Field(None, max_length=100)
+    notes: str | None = Field(None, max_length=300)
+    class_sections: list[ClassSectionRef] = Field(..., min_length=1)
+
+
 class ExamDateUpdate(BaseModel):
     exam_date: date | None = None
     start_time: time | None = None

@@ -105,17 +105,31 @@ async def add_student_transport(data: StudentTransportCreate, db: AsyncSession, 
                     request=request,
                 )
 
+        # Auto-fill fee_per_term from stop.fees if not provided
+        resolved_fee = data.fee_per_term
+        if resolved_fee is None:
+            if stop.fees is None:
+                raise create_validation_error(
+                    message="This stop has no default fee — enter the amount manually",
+                    field="fee_per_term",
+                    value=None,
+                    request=request,
+                )
+            resolved_fee = float(stop.fees)
+
         # Validate fee amount
-        if data.fee_per_term < 0:
+        if resolved_fee < 0:
             raise create_validation_error(
                 message="Fee per term cannot be negative",
                 field="fee_per_term",
-                value=data.fee_per_term,
+                value=resolved_fee,
                 request=request,
             )
 
         # Create transport assignment
-        new_assignment = StudentTransportAssignment(**data.dict())
+        assignment_data = data.dict()
+        assignment_data["fee_per_term"] = resolved_fee
+        new_assignment = StudentTransportAssignment(**assignment_data)
         db.add(new_assignment)
 
         # Use flush pattern to avoid schema context issues
