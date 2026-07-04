@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 
 import { MasterPage } from "../masters/common/MasterPage";
 import type { MasterPageConfig, FormField } from "../masters/common/MasterPage";
 import type { Route, RouteInput } from "@/types/masters/route";
 import { useRoutes, useCreateRoute, useUpdateRoute, useDeleteRoute } from '@/api/hooks/masters/routes';
-import { useRouteStops, useCreateRouteStop, useDeleteRouteStop } from '@/api/hooks/masters/routeStops';
+import { useRouteStops, useCreateRouteStop, useUpdateRouteStopPartial, useDeleteRouteStop } from '@/api/hooks/masters/routeStops';
+import type { RouteStop } from '@/types/masters/routeStop';
 import { PermissionGuard } from '@/components/common';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { ShieldX, Loader2, Plus, Trash2, Eye } from 'lucide-react';
+import { ShieldX, Loader2, Plus, Trash2, Eye, Edit, Check, X } from 'lucide-react';
 import { TimePicker } from '@/components/ui/TimePicker';
 import {
     Dialog,
@@ -23,13 +24,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { InfiniteScrollDropdown } from '@/components/dropdown/InfiniteScrollDropdown';
 import {
     Table,
     TableBody,
@@ -39,28 +34,8 @@ import {
     TableRow,
 } from '@/components/ui/table';
 
-const BUS_AC_OPTIONS = ['A', 'B', 'C', 'D', 'E'] as const;
-
 const createColumns = (onView: (routeId: string) => void) => [
     { key: "route_name", label: "Route Name", editable: true },
-    {
-        key: "route_type",
-        label: "Bus AC",
-        editable: true,
-        render: (v: string | null) => v ? (
-            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">{v}</span>
-        ) : '—',
-        renderEdit: (value: any, _row: Route, onChange: (val: any) => void) => (
-            <select
-                value={value ?? ''}
-                onChange={e => onChange(e.target.value || null)}
-                className="h-7 rounded border border-input bg-background px-2 text-xs focus:outline-none"
-            >
-                <option value="">—</option>
-                {BUS_AC_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-        ),
-    },
     { key: "starting_stop", label: "Starting Point", editable: true },
     { key: "ending_stop", label: "Ending Point", editable: true },
     { key: "number_of_stops", label: "Number of Stops", editable: true },
@@ -244,19 +219,6 @@ function RouteAddDialog() {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label htmlFor="route_type">Bus AC</Label>
-                                    <Select value={formData.route_type} onValueChange={v => setFormData(p => ({ ...p, route_type: v }))}>
-                                        <SelectTrigger id="route_type">
-                                            <SelectValue placeholder="Select category…" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {BUS_AC_OPTIONS.map(o => (
-                                                <SelectItem key={o} value={o}>Category {o}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-1">
                                     <Label htmlFor="starting_stop">Starting Point <span className="text-destructive">*</span></Label>
                                     <Input
                                         id="starting_stop"
@@ -408,27 +370,183 @@ function RouteStopsManager({
 
     const { data: allStops = [], isLoading } = useRouteStops(false);
     const deleteMutation = useDeleteRouteStop();
+    const updateStopMutation = useUpdateRouteStopPartial();
+    const createStopMutation = useCreateRouteStop();
+
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editDraft, setEditDraft] = useState<{ name: string; fees: string; pickup_time: string; drop_time: string }>({
+        name: '', fees: '', pickup_time: '', drop_time: '',
+    });
+
+    const [isAddOpen, setIsAddOpen] = useState(false);
+    const [addDraft, setAddDraft] = useState({
+        name: '', number: '', fees: '', pickup_time: '', drop_time: '', is_active: true,
+    });
 
     const sortedStops = allStops
         .filter(s => s.route_id === selectedRouteId)
         .sort((a, b) => a.number - b.number);
+
+    function openAddDialog() {
+        setAddDraft({
+            name: '',
+            number: String(sortedStops.length + 1),
+            fees: '',
+            pickup_time: '',
+            drop_time: '',
+            is_active: true,
+        });
+        setIsAddOpen(true);
+    }
+
+    function submitAddStop() {
+        if (!selectedRouteId || !addDraft.name.trim() || !addDraft.number) return;
+        const pickupTime = addDraft.pickup_time.length === 5 ? addDraft.pickup_time + ':00' : addDraft.pickup_time;
+        const dropTime = addDraft.drop_time.length === 5 ? addDraft.drop_time + ':00' : addDraft.drop_time;
+        createStopMutation.mutate(
+            {
+                route_id: selectedRouteId,
+                name: addDraft.name.trim(),
+                number: parseInt(addDraft.number, 10),
+                reaching_time: pickupTime || '00:00:00',
+                pickup_time: pickupTime || undefined,
+                drop_time: dropTime || undefined,
+                fees: parseFloat(addDraft.fees) || 0,
+                is_active: addDraft.is_active,
+            },
+            { onSuccess: () => setIsAddOpen(false) }
+        );
+    }
+
+    function startEdit(stop: RouteStop) {
+        setEditingId(stop.id);
+        setEditDraft({
+            name: stop.name,
+            fees: String(stop.fees ?? 0),
+            pickup_time: stop.pickup_time ? stop.pickup_time.substring(0, 5) : '',
+            drop_time: stop.drop_time ? stop.drop_time.substring(0, 5) : '',
+        });
+    }
+
+    function cancelEdit() {
+        setEditingId(null);
+    }
+
+    function saveEdit(stop: RouteStop) {
+        updateStopMutation.mutate(
+            {
+                id: stop.id,
+                routeStop: {
+                    name: editDraft.name.trim(),
+                    fees: parseFloat(editDraft.fees) || 0,
+                    pickup_time: editDraft.pickup_time.length === 5 ? editDraft.pickup_time + ':00' : editDraft.pickup_time,
+                    drop_time: editDraft.drop_time.length === 5 ? editDraft.drop_time + ':00' : editDraft.drop_time,
+                },
+            },
+            { onSuccess: () => setEditingId(null) }
+        );
+    }
 
     return (
         <Card>
             <CardContent className="pt-4 pb-4">
                 <div className="flex items-center gap-3 mb-4">
                     <span className="text-sm font-medium shrink-0">Route Name:</span>
-                    <Select value={selectedRouteId} onValueChange={onSelectRoute}>
-                        <SelectTrigger className="flex-1 max-w-sm h-9">
-                            <SelectValue placeholder="Select a route to view stops..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {routes.map(r => (
-                                <SelectItem key={r.id} value={r.id}>{r.route_name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <InfiniteScrollDropdown
+                        className="flex-1 max-w-sm"
+                        data={routes.map(r => ({ id: r.id, label: r.route_name, value: r.id }))}
+                        value={selectedRouteId}
+                        onChange={(val) => onSelectRoute(String(val))}
+                        placeholder="Select a route to view stops..."
+                        clearable={false}
+                    />
+                    <PermissionGuard resource="route_stops" action="create">
+                        <Button size="sm" className="h-9" disabled={!selectedRouteId} onClick={openAddDialog}>
+                            <Plus className="h-4 w-4 mr-1" /> Add Stop
+                        </Button>
+                    </PermissionGuard>
                 </div>
+
+                <Dialog open={isAddOpen} onOpenChange={setIsAddOpen} modal={false}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Add Stop</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-3">
+                            <div>
+                                <Label htmlFor="add-stop-name">Stop Name <span className="text-destructive">*</span></Label>
+                                <Input
+                                    id="add-stop-name"
+                                    value={addDraft.name}
+                                    onChange={e => setAddDraft(d => ({ ...d, name: e.target.value }))}
+                                    placeholder="Stop name"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <Label htmlFor="add-stop-number">Stop Number <span className="text-destructive">*</span></Label>
+                                    <Input
+                                        id="add-stop-number"
+                                        type="number"
+                                        min={1}
+                                        value={addDraft.number}
+                                        onChange={e => setAddDraft(d => ({ ...d, number: e.target.value }))}
+                                    />
+                                </div>
+                                <div>
+                                    <Label htmlFor="add-stop-fees">Amount (₹/yr)</Label>
+                                    <Input
+                                        id="add-stop-fees"
+                                        type="number"
+                                        min={0}
+                                        value={addDraft.fees}
+                                        onChange={e => setAddDraft(d => ({ ...d, fees: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <Label>Up Journey Time <span className="text-destructive">*</span></Label>
+                                    <TimePicker
+                                        value={addDraft.pickup_time}
+                                        onChange={v => setAddDraft(d => ({ ...d, pickup_time: v }))}
+                                    />
+                                </div>
+                                <div>
+                                    <Label>Down Journey Time</Label>
+                                    <TimePicker
+                                        value={addDraft.drop_time}
+                                        onChange={v => setAddDraft(d => ({ ...d, drop_time: v }))}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    id="add-stop-active"
+                                    type="checkbox"
+                                    className="w-4 h-4"
+                                    checked={addDraft.is_active}
+                                    onChange={e => setAddDraft(d => ({ ...d, is_active: e.target.checked }))}
+                                />
+                                <Label htmlFor="add-stop-active" className="cursor-pointer">Active</Label>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button variant="outline">Cancel</Button>
+                            </DialogClose>
+                            <Button
+                                onClick={submitAddStop}
+                                disabled={createStopMutation.isPending || !addDraft.name.trim() || !addDraft.number}
+                            >
+                                {createStopMutation.isPending ? (
+                                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                ) : null}
+                                Add Stop
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {!selectedRouteId && (
                     <p className="text-sm text-muted-foreground text-center py-4">
@@ -458,30 +576,110 @@ function RouteStopsManager({
                                 <TableHead className="w-36">Amount (₹/yr)</TableHead>
                                 <TableHead className="w-36">Up Journey Time</TableHead>
                                 <TableHead className="w-36">Down Journey Time</TableHead>
-                                <TableHead className="w-20 text-center">Remove</TableHead>
+                                <TableHead className="w-32 text-center">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {sortedStops.map((stop, idx) => (
-                                <TableRow key={stop.id}>
-                                    <TableCell className="text-sm">{idx + 1}</TableCell>
-                                    <TableCell className="text-sm font-medium">{stop.name}</TableCell>
-                                    <TableCell className="text-sm">₹{stop.fees?.toLocaleString('en-IN') ?? 0}</TableCell>
-                                    <TableCell className="text-sm">{stop.pickup_time?.substring(0, 5) ?? '—'}</TableCell>
-                                    <TableCell className="text-sm">{stop.drop_time?.substring(0, 5) ?? '—'}</TableCell>
-                                    <TableCell className="text-center">
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                                            disabled={deleteMutation.isPending}
-                                            onClick={() => deleteMutation.mutate(stop.id)}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                            {sortedStops.map((stop, idx) => {
+                                const isEditing = editingId === stop.id;
+                                return (
+                                    <TableRow key={stop.id}>
+                                        <TableCell className="text-sm">{idx + 1}</TableCell>
+                                        <TableCell className="py-2">
+                                            {isEditing ? (
+                                                <Input
+                                                    className="h-8 text-sm"
+                                                    value={editDraft.name}
+                                                    onChange={e => setEditDraft(d => ({ ...d, name: e.target.value }))}
+                                                />
+                                            ) : (
+                                                <span className="text-sm font-medium">{stop.name}</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="py-2">
+                                            {isEditing ? (
+                                                <Input
+                                                    type="number"
+                                                    min={0}
+                                                    className="h-8 text-sm"
+                                                    value={editDraft.fees}
+                                                    onChange={e => setEditDraft(d => ({ ...d, fees: e.target.value }))}
+                                                />
+                                            ) : (
+                                                <span className="text-sm">₹{stop.fees?.toLocaleString('en-IN') ?? 0}</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="py-2">
+                                            {isEditing ? (
+                                                <TimePicker
+                                                    value={editDraft.pickup_time}
+                                                    onChange={v => setEditDraft(d => ({ ...d, pickup_time: v }))}
+                                                />
+                                            ) : (
+                                                <span className="text-sm">{stop.pickup_time?.substring(0, 5) ?? '—'}</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="py-2">
+                                            {isEditing ? (
+                                                <TimePicker
+                                                    value={editDraft.drop_time}
+                                                    onChange={v => setEditDraft(d => ({ ...d, drop_time: v }))}
+                                                />
+                                            ) : (
+                                                <span className="text-sm">{stop.drop_time?.substring(0, 5) ?? '—'}</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            {isEditing ? (
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0 text-primary"
+                                                        disabled={updateStopMutation.isPending}
+                                                        onClick={() => saveEdit(stop)}
+                                                    >
+                                                        {updateStopMutation.isPending ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                        ) : (
+                                                            <Check className="h-4 w-4" />
+                                                        )}
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0"
+                                                        disabled={updateStopMutation.isPending}
+                                                        onClick={cancelEdit}
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0"
+                                                        onClick={() => startEdit(stop)}
+                                                    >
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                                        disabled={deleteMutation.isPending}
+                                                        onClick={() => deleteMutation.mutate(stop.id)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 )}
@@ -494,6 +692,7 @@ function RouteStopsManager({
 export default function RoutesPage() {
     const [page, setPage] = useState(0);
     const [pageSize, setPageSize] = useState(PAGE_SIZE_DEFAULT);
+    const [searchQuery, setSearchQuery] = useState('');
     const [viewRouteId, setViewRouteId] = useState('');
     const stopsRef = React.useRef<HTMLDivElement>(null);
 
@@ -501,8 +700,33 @@ export default function RoutesPage() {
     const updateRoute = useUpdateRoute();
     const deleteRoute = useDeleteRoute();
 
-    const total = routes.length;
-    const paginatedData = routes.slice(page * pageSize, (page + 1) * pageSize);
+    const handleViewStops = (routeId: string) => {
+        setViewRouteId(routeId);
+        setTimeout(() => stopsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    };
+
+    const columns = createColumns(handleViewStops);
+
+    // Filter the full route list first, then paginate the filtered result —
+    // searching must scan all routes, not just the ones on the current page.
+    const filteredRoutes = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        if (!q) return routes;
+        return routes.filter((route) =>
+            columns.some((col) => {
+                const val = (route as any)[col.key as string];
+                if (val !== null && val !== undefined && String(val).toLowerCase().includes(q)) return true;
+                if (col.render) {
+                    const rendered = col.render(val, route);
+                    if ((typeof rendered === 'string' || typeof rendered === 'number') && String(rendered).toLowerCase().includes(q)) return true;
+                }
+                return false;
+            })
+        );
+    }, [routes, searchQuery, columns]);
+
+    const total = filteredRoutes.length;
+    const paginatedData = filteredRoutes.slice(page * pageSize, (page + 1) * pageSize);
     const hasMore = (page + 1) * pageSize < total;
 
     const handlePageChange = (newPage: number) => {
@@ -515,12 +739,10 @@ export default function RoutesPage() {
         setPage(0);
     };
 
-    const handleViewStops = (routeId: string) => {
-        setViewRouteId(routeId);
-        setTimeout(() => stopsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    const handleSearchChange = (q: string) => {
+        setSearchQuery(q);
+        setPage(0);
     };
-
-    const columns = createColumns(handleViewStops);
 
     const config: MasterPageConfig<Route, RouteInput> = {
         title: "Routes",
@@ -535,6 +757,7 @@ export default function RoutesPage() {
         onDelete: (id) => deleteRoute.mutate((id as any).toString()),
         isCreatePending: false,
         resetForm: () => {},
+        onSearchChange: handleSearchChange,
         pagination: {
             page,
             pageSize,

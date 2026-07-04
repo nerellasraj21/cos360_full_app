@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useClassesDropdown, useSectionsByClassId } from '@/hooks/masters/useClassesAndSections';
 import { AdmissionTypeDropdown } from '@/components/dropdown/AdmissionTypeDropdown';
+import { InfiniteScrollDropdown } from '@/components/dropdown/InfiniteScrollDropdown';
 
 export const AcademicStepForm = () => {
   const { register, setValue, watch, formState: { errors } } = useFormContext();
@@ -30,7 +30,11 @@ export const AcademicStepForm = () => {
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold">Academic Details</h2>
-      
+      {/* Hidden inputs attach refs so trigger() can validate dropdown-controlled fields */}
+      <input type="hidden" {...register('admitted_class_id', { required: 'Joining Class is required' })} />
+      <input type="hidden" {...register('current_class_id', { required: 'Current Class is required' })} />
+      <input type="hidden" {...register('current_section_id', { required: 'Current Section is required' })} />
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="admission_date">Admission Date *</Label>
@@ -64,45 +68,32 @@ export const AcademicStepForm = () => {
 
         <div>
           <Label htmlFor="admitted_class_id">Joining Class <span className="text-red-500">*</span></Label>
-          <Select
+          <InfiniteScrollDropdown
+            data={classes.map(c => ({ id: c.id, value: c.id, label: c.name }))}
             value={selectedClassId || ''}
-            onValueChange={(value) => {
-              setValue('admitted_class_id', value);
-              setValue('admitted_section_id', ''); // Reset section when class changes
+            onChange={(value) => {
+              setValue('admitted_class_id', value as string, { shouldValidate: true });
+              setValue('admitted_section_id', '');
             }}
+            placeholder="Select Class"
             disabled={classesLoading}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select Class" />
-            </SelectTrigger>
-            <SelectContent>
-              {classes.map((cls) => (
-                <SelectItem key={cls.id} value={cls.id}>
-                  {cls.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            clearable={false}
+          />
+          {errors.admitted_class_id && (
+            <span className="text-red-500 text-sm">{errors.admitted_class_id.message as string}</span>
+          )}
         </div>
 
         <div>
           <Label htmlFor="admitted_section_id">Joining Section</Label>
-          <Select
+          <InfiniteScrollDropdown
+            data={sections.map(s => ({ id: s.id, value: s.id, label: s.name }))}
             value={watch('admitted_section_id') || ''}
-            onValueChange={(value) => setValue('admitted_section_id', value)}
+            onChange={(value) => setValue('admitted_section_id', value as string)}
+            placeholder="Select Section"
             disabled={sectionsLoading || !selectedClassId}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select Section" />
-            </SelectTrigger>
-            <SelectContent>
-              {sections.map((section) => (
-                <SelectItem key={section.id} value={section.id}>
-                  {section.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            clearable={false}
+          />
         </div>
 
         <div className="col-span-2">
@@ -120,50 +111,34 @@ export const AcademicStepForm = () => {
 
         <div>
           <Label htmlFor="current_class_id">Current Class <span className="text-red-500">*</span></Label>
-          <Select
+          <InfiniteScrollDropdown
+            data={classes.map(c => ({ id: c.id, value: c.id, label: c.name }))}
             value={watch('current_class_id') || ''}
-            onValueChange={(value) => {
-              setValue('current_class_id', value);
-              setValue('current_section_id', ''); // Reset current section when class changes
+            onChange={(value) => {
+              setValue('current_class_id', value as string, { shouldValidate: true });
+              setValue('current_section_id', '');
             }}
+            placeholder="Select Current Class"
             disabled={classesLoading || syncClassSection}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select Current Class" />
-            </SelectTrigger>
-            <SelectContent>
-              {classes.map((cls) => (
-                <SelectItem key={cls.id} value={cls.id}>
-                  {cls.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            clearable={false}
+          />
           {errors.current_class_id && (
-            <span className="text-red-500">{errors.current_class_id.message as string}</span>
+            <span className="text-red-500 text-sm">{errors.current_class_id.message as string}</span>
           )}
         </div>
 
         <div>
           <Label htmlFor="current_section_id">Current Section <span className="text-red-500">*</span></Label>
-          <Select
+          <InfiniteScrollDropdown
+            data={currentSections.map(s => ({ id: s.id, value: s.id, label: s.name }))}
             value={watch('current_section_id') || ''}
-            onValueChange={(value) => setValue('current_section_id', value)}
-            disabled={currentSectionsLoading || !watch('current_class_id') || syncClassSection}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select Current Section" />
-            </SelectTrigger>
-            <SelectContent>
-              {currentSections.map((section) => (
-                <SelectItem key={section.id} value={section.id}>
-                  {section.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(value) => setValue('current_section_id', value as string, { shouldValidate: true })}
+            placeholder="Select Current Section"
+            disabled={currentSectionsLoading || !watch('current_class_id')}
+            clearable={false}
+          />
           {errors.current_section_id && (
-            <span className="text-red-500">{errors.current_section_id.message as string}</span>
+            <span className="text-red-500 text-sm">{errors.current_section_id.message as string}</span>
           )}
         </div>
       </div>

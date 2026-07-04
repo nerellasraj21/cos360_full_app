@@ -83,7 +83,10 @@ export const InfiniteScrollDropdown: React.FC<InfiniteScrollDropdownProps> = ({
   };
 
   const rawOptions = data || fetchedOptions;
-  const options = data && debouncedSearchTerm
+  // Client-side filter when using static data, or when the endpoint has no
+  // searchParam configured (so the typed text is never sent to the backend).
+  const shouldClientFilter = !!debouncedSearchTerm && (!!data || !endpoint?.searchParam);
+  const options = shouldClientFilter
     ? rawOptions.filter(opt => opt.label.toLowerCase().includes(debouncedSearchTerm.toLowerCase()))
     : rawOptions;
   // console.log("Value:", value);

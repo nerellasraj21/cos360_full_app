@@ -29,7 +29,9 @@ import {
   useCreateFeeStudentMapping,
   useDeleteFeeStudentMapping,
 } from '@/hooks/fee';
-import { useRouteStops } from '@/api/hooks/masters/routeStops';
+import { useVehiclesDropdown, useVehicle } from '@/api/hooks/masters/vehicles';
+import { useRoutesDropdown } from '@/api/hooks/masters/routes';
+import { useRouteStopsByRoute } from '@/api/hooks/masters/routeStops';
 import { fetchStudentsDropdown } from '@/api/students/admissions';
 import { formatCurrency } from '@/pages/fee/FeeCollection/FeeSummaryTab';
 import type { StudentDropdownItem } from '@/types/admission';
@@ -44,11 +46,13 @@ export function StudentFeeAssignmentPanel() {
   const [students, setStudents] = useState<StudentDropdownItem[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentOption>(null);
+  const [transportVehicleId, setTransportVehicleId] = useState<string>('');
+  const [transportRouteId, setTransportRouteId] = useState<string>('');
   const [transportStopId, setTransportStopId] = useState<string>('');
 
   useEffect(() => {
     setStudentsLoading(true);
-    fetchStudentsDropdown(true, selectedClassId || undefined, selectedSectionId || undefined)
+    fetchStudentsDropdown(false, selectedClassId || undefined, selectedSectionId || undefined)
       .then(setStudents)
       .catch(console.error)
       .finally(() => setStudentsLoading(false));
@@ -61,14 +65,44 @@ export function StudentFeeAssignmentPanel() {
 
   const studentId = selectedStudent?.value ?? '';
 
-  useEffect(() => { setTransportStopId(''); }, [studentId]);
+  useEffect(() => {
+    setTransportVehicleId('');
+    setTransportRouteId('');
+    setTransportStopId('');
+  }, [studentId]);
 
   const { data: admission, isLoading: admissionLoading } = useStudentAdmissionDetail(studentId);
   const { data: allClasses = [] } = useReadAllClassSections();
 
-  const classId = (admission as any)?.current_class_id ?? '';
-  const sectionId = (admission as any)?.current_section_id ?? '';
+  const classOptions = useMemo(
+    () => allClasses.map((c) => ({ value: c.id, label: c.name })),
+    [allClasses]
+  );
+
+  const sectionOptions = useMemo(
+    () => allClasses.find((c) => c.id === selectedClassId)?.sections.map((s) => ({ value: s.id, label: s.name })) ?? [],
+    [allClasses, selectedClassId]
+  );
+
+  const selectedClassOption = useMemo(
+    () => classOptions.find((o) => o.value === selectedClassId) ?? null,
+    [classOptions, selectedClassId]
+  );
+
+  const selectedSectionOption = useMemo(
+    () => sectionOptions.find((o) => o.value === selectedSectionId) ?? null,
+    [sectionOptions, selectedSectionId]
+  );
+
+  const classId = (admission as any)?.current_class_id || (admission as any)?.admitted_class_id || '';
+  const sectionId = (admission as any)?.current_section_id || (admission as any)?.admitted_section_id || '';
   const admissionNumber = (admission as any)?.admission_number ?? '';
+
+  // Auto-fill Class and Section dropdowns when student admission loads
+  useEffect(() => {
+    if (studentId && classId) setSelectedClassId(classId);
+    if (studentId && sectionId) setSelectedSectionId(sectionId);
+  }, [studentId, classId, sectionId]);
   const student = (admission as any)?.student;
   const studentName = student
     ? `${student.first_name || ''} ${student.last_name || ''}`.trim()
@@ -90,7 +124,21 @@ export function StudentFeeAssignmentPanel() {
       : undefined
   );
 
-  const { data: routeStops = [] } = useRouteStops();
+  const { data: vehiclesDropdown = [] } = useVehiclesDropdown();
+  const { data: selectedVehicle } = useVehicle(transportVehicleId);
+  const { data: routesDropdown = [], isLoading: routesLoading } = useRoutesDropdown();
+  const { data: routeStops = [], isLoading: routeStopsLoading } = useRouteStopsByRoute(transportRouteId);
+  // Safety filter: the backend has historically ignored route_id-scoped query params,
+  // so re-filter (and dedupe) client-side to only the selected route.
+  const filteredRouteStops = useMemo(() => {
+    if (!transportRouteId) return [];
+    const seen = new Set<string>();
+    return routeStops.filter(s => {
+      if (s.route_id !== transportRouteId || seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
+  }, [routeStops, transportRouteId]);
 
   const createMutation = useCreateFeeStudentMapping();
   const deleteMutation = useDeleteFeeStudentMapping();
@@ -126,7 +174,7 @@ export function StudentFeeAssignmentPanel() {
     m.fee_type_name?.toLowerCase().includes('transport')
   );
 
-  const selectedStop = routeStops.find((s) => s.id === transportStopId);
+  const annualBusFee = selectedVehicle?.fees ?? 0;
 
   function assignFee(feeTypeId: string, totalFee: number) {
     if (!studentId || !classId) return;
@@ -155,48 +203,60 @@ export function StudentFeeAssignmentPanel() {
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium shrink-0">Class</label>
-              <ShadSelect
-                value={selectedClassId}
-                onValueChange={(val) => {
-                  setSelectedClassId(val === '__all__' ? '' : val);
-                  setSelectedSectionId('');
-                  setSelectedStudent(null);
-                }}
-              >
-                <SelectTrigger className="w-44">
-                  <SelectValue placeholder="All Classes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All Classes</SelectItem>
-                  {allClasses.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </ShadSelect>
+              <div className="w-44">
+                <Select
+                  options={classOptions}
+                  value={selectedClassOption}
+                  onChange={(opt) => {
+                    setSelectedClassId(opt?.value ?? '');
+                    setSelectedSectionId('');
+                    setSelectedStudent(null);
+                  }}
+                  placeholder="All Classes"
+                  isClearable
+                  classNamePrefix="react-select"
+                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                  styles={{
+                    menuPortal: (base) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                    menu: (base) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                    option: (base, state) => ({
+                      ...base,
+                      backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
+                      color: state.isSelected ? 'white' : 'black',
+                      cursor: 'pointer',
+                    }),
+                  }}
+                />
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium shrink-0">Section</label>
-              <ShadSelect
-                value={selectedSectionId}
-                onValueChange={(val) => {
-                  setSelectedSectionId(val === '__all__' ? '' : val);
-                  setSelectedStudent(null);
-                }}
-                disabled={!selectedClassId}
-              >
-                <SelectTrigger className="w-44">
-                  <SelectValue placeholder="All Sections" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All Sections</SelectItem>
-                  {allClasses
-                    .find((c) => c.id === selectedClassId)
-                    ?.sections.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                    ))}
-                </SelectContent>
-              </ShadSelect>
+              <div className="w-44">
+                <Select
+                  options={sectionOptions}
+                  value={selectedSectionOption}
+                  onChange={(opt) => {
+                    setSelectedSectionId(opt?.value ?? '');
+                    setSelectedStudent(null);
+                  }}
+                  placeholder="All Sections"
+                  isClearable
+                  isDisabled={!selectedClassId}
+                  classNamePrefix="react-select"
+                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                  styles={{
+                    menuPortal: (base) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                    menu: (base) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                    option: (base, state) => ({
+                      ...base,
+                      backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
+                      color: state.isSelected ? 'white' : 'black',
+                      cursor: 'pointer',
+                    }),
+                  }}
+                />
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -214,6 +274,12 @@ export function StudentFeeAssignmentPanel() {
                   styles={{
                     menuPortal: (base) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
                     menu: (base) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' }),
+                    option: (base, state) => ({
+                      ...base,
+                      backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
+                      color: state.isSelected ? 'white' : 'black',
+                      cursor: 'pointer',
+                    }),
                   }}
                 />
               </div>
@@ -357,44 +423,101 @@ export function StudentFeeAssignmentPanel() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
+                {/* Bus → Trip → Stop selectors */}
+                <div className="px-4 py-3 space-y-3 border-b">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground">Bus</label>
+                      <ShadSelect
+                        value={transportVehicleId}
+                        onValueChange={(val) => {
+                          setTransportVehicleId(val);
+                          setTransportRouteId('');
+                          setTransportStopId('');
+                        }}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="Select bus..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vehiclesDropdown.map((v) => (
+                            <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </ShadSelect>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground">Trip</label>
+                      <ShadSelect
+                        value={transportRouteId}
+                        onValueChange={(val) => {
+                          setTransportRouteId(val);
+                          setTransportStopId('');
+                        }}
+                        disabled={!transportVehicleId || routesLoading}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder={routesLoading ? 'Loading...' : 'Select trip...'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {routesDropdown.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>{r.route_name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </ShadSelect>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground">Stop</label>
+                      <ShadSelect
+                        value={transportStopId}
+                        onValueChange={setTransportStopId}
+                        disabled={!transportRouteId || routeStopsLoading}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder={routeStopsLoading ? 'Loading...' : 'Select stop...'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredRouteStops.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </ShadSelect>
+                    </div>
+                  </div>
+
+                  {/* Annual fee display */}
+                  {transportVehicleId && (
+                    <div className="flex items-center gap-2 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 px-3 py-2">
+                      <Bus className="h-4 w-4 text-blue-500 shrink-0" />
+                      <span className="text-sm text-muted-foreground">Annual Bus Fee:</span>
+                      <span className="text-base font-semibold text-blue-700 dark:text-blue-300">
+                        {annualBusFee > 0 ? formatCurrency(annualBusFee) : '—'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Fee assignment table */}
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12 text-center">S.No.</TableHead>
                       <TableHead>Fee Type</TableHead>
-                      <TableHead>Route Stop</TableHead>
-                      <TableHead className="text-right">Fee (from stop)</TableHead>
+                      <TableHead className="text-right">Annual Fee</TableHead>
                       <TableHead className="text-center w-32">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {transportFees.map((fee, idx) => {
                       const existingId = existingMap.get(fee.fee_type_id);
-                      const stopFee = selectedStop?.fees ?? 0;
                       return (
-                        <TableRow key={fee.id} className="h-14">
+                        <TableRow key={fee.id} className="h-12">
                           <TableCell className="text-center text-sm">{idx + 1}</TableCell>
                           <TableCell className="font-medium text-sm">{fee.fee_type_name}</TableCell>
-                          <TableCell>
-                            <ShadSelect
-                              value={transportStopId}
-                              onValueChange={setTransportStopId}
-                              disabled={!!existingId}
-                            >
-                              <SelectTrigger className="h-8 w-52">
-                                <SelectValue placeholder="Select stop..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {routeStops.map((stop) => (
-                                  <SelectItem key={stop.id} value={stop.id}>
-                                    {stop.name} — {formatCurrency(stop.fees)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </ShadSelect>
-                          </TableCell>
                           <TableCell className="text-right text-sm font-medium">
-                            {selectedStop ? formatCurrency(stopFee) : '—'}
+                            {annualBusFee > 0 ? formatCurrency(annualBusFee) : '—'}
                           </TableCell>
                           <TableCell className="text-center">
                             {existingId ? (
@@ -411,8 +534,14 @@ export function StudentFeeAssignmentPanel() {
                               <Button
                                 size="sm"
                                 className="h-7 text-xs"
-                                disabled={!transportStopId || createMutation.isPending}
-                                onClick={() => assignFee(fee.fee_type_id, stopFee)}
+                                disabled={
+                                  !transportVehicleId ||
+                                  !transportRouteId ||
+                                  !transportStopId ||
+                                  annualBusFee === 0 ||
+                                  createMutation.isPending
+                                }
+                                onClick={() => assignFee(fee.fee_type_id, annualBusFee)}
                               >
                                 Assign
                               </Button>

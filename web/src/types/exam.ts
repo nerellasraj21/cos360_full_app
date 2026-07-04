@@ -46,6 +46,7 @@ export interface ExamSettings {
   default_board: ExamBoard | null
   custom_board_name: string | null
   hall_ticket_min_attendance: number | null
+  hall_ticket_min_fee_paid_pct: number | null
   exam_fee_type_id: string | null
   grace_max_per_subject: number | null
   grace_max_subjects: number | null

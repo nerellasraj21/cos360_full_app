@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { EditButton, DeleteButton, TableActionGroup } from '@/components/common/TableActions';
 import { Edit, Trash2, Plus, Calculator, AlertCircle, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,13 +11,16 @@ import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFo
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
-import { useFeeClassMappings, useCreateFeeClassMapping, useUpdateFeeClassMapping, useDeleteFeeClassMapping, useToggleMandatoryFeeClassMapping } from '@/hooks/fee/useFeeMappings';
+import { useFeeClassMappings, useCreateFeeClassMapping, useUpdateFeeClassMapping, useDeleteFeeClassMapping, useToggleMandatoryFeeClassMapping, feeStudentMappingKeys } from '@/hooks/fee/useFeeMappings';
+import { feeCollectionKeys } from '@/hooks/fee/useFeeCollection';
 import { useFeeTypes } from '@/hooks/fee/useFeeTypes';
 import { useFeeCategories } from '@/hooks/fee/useFeeCategories';
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { usePermission } from '@/hooks/usePermission';
 import { TermAmountModal } from './TermAmountModal';
+import { feeStudentMappingsApi } from '@/api/fee/studentMappings';
+import { fetchStudentsDropdown } from '@/api/students/admissions';
 import type { FeeClassMapping, FeeType } from '@/types/fee';
 import { toast } from 'sonner';
 
@@ -95,6 +99,51 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
     const updateMutation = useUpdateFeeClassMapping();
     const deleteMutation = useDeleteFeeClassMapping();
     const toggleMandatoryMutation = useToggleMandatoryFeeClassMapping();
+    const queryClient = useQueryClient();
+    const [bulkApplyingId, setBulkApplyingId] = useState<string | null>(null);
+
+    // Creates the actual per-student fee records for every currently enrolled
+    // student in the class. Marking a class mapping "mandatory" only sets a
+    // flag on the class-level row; Fee Collection reads student-level records,
+    // so without this the fee never shows up for already-enrolled students.
+    const applyMandatoryFeeToAllStudents = async (target: {
+        class_id: string;
+        fee_type_id: string;
+        total_fee: number;
+    }) => {
+        const classItem = classes.find(c => c.id === target.class_id);
+        if (!classItem || classItem.sections.length === 0) return;
+
+        let successCount = 0;
+        let attemptedCount = 0;
+
+        for (const section of classItem.sections) {
+            try {
+                const sectionStudents = await fetchStudentsDropdown(true, target.class_id, section.id);
+                if (sectionStudents.length === 0) continue;
+
+                const result = await feeStudentMappingsApi.bulkCreateMappings({
+                    student_ids: sectionStudents.map(s => s.id),
+                    class_id: target.class_id,
+                    section_id: section.id,
+                    fee_type_id: target.fee_type_id,
+                    total_fee: target.total_fee,
+                    academic_year_id: selectedAcademicYearId || '',
+                });
+                successCount += result.success_count;
+                attemptedCount += result.total_count;
+            } catch (error) {
+                console.error('[DEBUG] Failed to apply mandatory fee for section', section.id, error);
+            }
+        }
+
+        queryClient.invalidateQueries({ queryKey: feeStudentMappingKeys.lists() });
+        queryClient.invalidateQueries({ queryKey: feeCollectionKeys.all });
+
+        if (attemptedCount > 0) {
+            toast.success(`Fee applied to ${successCount} of ${attemptedCount} students in this class.`);
+        }
+    };
 
     // Sort handler
     const handleSort = (key: SortKey) => {
@@ -175,6 +224,16 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                     id: editingMapping.id,
                     data: updateData
                 });
+
+                if (formData.all_by_default) {
+                    setBulkApplyingId(editingMapping.id);
+                    await applyMandatoryFeeToAllStudents({
+                        class_id: editingMapping.class_id,
+                        fee_type_id: editingMapping.fee_type_id,
+                        total_fee: formData.total_fee,
+                    });
+                    setBulkApplyingId(null);
+                }
             } else {
                 // CREATE: Send all required fields
                 const createData = {
@@ -185,9 +244,15 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                     all_by_default: formData.all_by_default
                 };
 
-                await createMutation.mutateAsync(createData);
+                const created = await createMutation.mutateAsync(createData);
                 if (createData.all_by_default) {
-                    toast.success('Fee applied to all students in this class.');
+                    setBulkApplyingId(created.id);
+                    await applyMandatoryFeeToAllStudents({
+                        class_id: createData.class_id,
+                        fee_type_id: createData.fee_type_id,
+                        total_fee: createData.total_fee,
+                    });
+                    setBulkApplyingId(null);
                 }
             }
 
@@ -492,10 +557,27 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                                                 <div className="flex items-center gap-2">
                                                     <Switch
                                                         checked={mapping.all_by_default}
-                                                        onCheckedChange={() => toggleMandatoryMutation.mutate(mapping.id)}
-                                                        disabled={toggleMandatoryMutation.isPending}
+                                                        onCheckedChange={() => {
+                                                            toggleMandatoryMutation.mutate(mapping.id, {
+                                                                onSuccess: async (data) => {
+                                                                    if (data.all_by_default) {
+                                                                        setBulkApplyingId(mapping.id);
+                                                                        await applyMandatoryFeeToAllStudents({
+                                                                            class_id: data.class_id,
+                                                                            fee_type_id: data.fee_type_id,
+                                                                            total_fee: data.total_fee,
+                                                                        });
+                                                                        setBulkApplyingId(null);
+                                                                    }
+                                                                },
+                                                            });
+                                                        }}
+                                                        disabled={toggleMandatoryMutation.isPending || bulkApplyingId === mapping.id}
                                                         aria-label="Toggle mandatory"
                                                     />
+                                                    {bulkApplyingId === mapping.id && (
+                                                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                                                    )}
                                                     <span className="text-xs text-muted-foreground">
                                                         {mapping.all_by_default ? 'Mandatory' : 'Optional'}
                                                     </span>
@@ -670,9 +752,13 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                         <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                         <Button
                             onClick={handleSubmit}
-                            disabled={createMutation.isPending || updateMutation.isPending}
+                            disabled={createMutation.isPending || updateMutation.isPending || bulkApplyingId !== null}
                         >
-                            {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save'}
+                            {createMutation.isPending || updateMutation.isPending
+                                ? 'Saving...'
+                                : bulkApplyingId !== null
+                                    ? 'Applying to students...'
+                                    : 'Save'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

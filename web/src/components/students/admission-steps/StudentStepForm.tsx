@@ -1,14 +1,41 @@
 import { useFormContext } from 'react-hook-form';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { CasteDropdown } from '@/components/dropdown/CasteDropdown';
 import { SubCasteDropdown } from '@/components/dropdown/SubCasteDropdown';
+import { InfiniteScrollDropdown } from '@/components/dropdown/InfiniteScrollDropdown';
+import type { DropdownOption } from '@/types/dropdown';
 import { getNextAdmissionNumber } from '@/api/students/admissions';
+import { useAdmissionTypesDropdown } from '@/api/hooks/students/admissions';
 import { feeCollectionApi } from '@/api/fee/collection';
+
+const GENDER_OPTIONS: DropdownOption[] = [
+  { id: 'M', value: 'M', label: 'Male' },
+  { id: 'F', value: 'F', label: 'Female' },
+  { id: 'O', value: 'O', label: 'Other' },
+];
+
+const STUDENT_TYPE_OPTIONS: DropdownOption[] = [
+  { id: 'not_primary', value: 'not_primary', label: 'Day Scholar' },
+  { id: 'primary', value: 'primary', label: 'Hostel' },
+];
+
+const MOTHER_TONGUE_OPTIONS: DropdownOption[] = [
+  { id: 'Telugu', value: 'Telugu', label: 'Telugu' },
+  { id: 'Hindi', value: 'Hindi', label: 'Hindi' },
+  { id: 'English', value: 'English', label: 'English' },
+  { id: 'Tamil', value: 'Tamil', label: 'Tamil' },
+  { id: 'Malayalam', value: 'Malayalam', label: 'Malayalam' },
+  { id: 'Kannada', value: 'Kannada', label: 'Kannada' },
+  { id: 'Marathi', value: 'Marathi', label: 'Marathi' },
+  { id: 'Bengali', value: 'Bengali', label: 'Bengali' },
+  { id: 'Gujarati', value: 'Gujarati', label: 'Gujarati' },
+  { id: 'Urdu', value: 'Urdu', label: 'Urdu' },
+  { id: 'Others', value: 'Others', label: 'Others' },
+];
 
 // Optional numeric field that, if entered, must be exactly `length` digits.
 // Returns a clear message indicating whether the number is too short or too long.
@@ -28,12 +55,30 @@ const isExactDigits = (value: string | undefined, length: number): boolean =>
 const validateAadharDigits = makeExactDigitsValidator('Aadhar number', 12);
 const validateApaarDigits = makeExactDigitsValidator('APAAR number', 12);
 
+// Exact-match existence check against the search endpoint (no form side-effects)
+const admissionNumberExists = async (value: string): Promise<boolean> => {
+  try {
+    const results = await feeCollectionApi.searchStudents({ q: value });
+    return results.some(
+      (r) => r.admission_number.toLowerCase() === value.toLowerCase()
+    );
+  } catch {
+    return false; // network error — assume free; backend will catch on submit
+  }
+};
+
+// Increments a purely numeric admission number, preserving zero-padding/length.
+// Non-numeric formats are returned unchanged since we can't safely bump them.
+const incrementAdmissionNumber = (value: string): string => {
+  if (!/^\d+$/.test(value)) return value;
+  const next = (BigInt(value) + BigInt(1)).toString();
+  return next.padStart(value.length, '0');
+};
+
 export const StudentStepForm = () => {
   const { register, setValue, setError, clearErrors, watch, formState: { errors } } = useFormContext();
   const [selectedCasteId, setSelectedCasteId] = useState<string | undefined>();
   const [isCheckingNum, setIsCheckingNum] = useState(false);
-  const [isPhoneRequired, setIsPhoneRequired] = useState(false);
-  const phoneRequiredRef = useRef(false);
 
   // On-blur duplicate check against the search endpoint
   const checkAdmissionNumberExists = async (value: string) => {
@@ -56,10 +101,13 @@ export const StudentStepForm = () => {
     }
   };
 
-  // Derive admission type from the AcademicStepForm field (set in step 1)
+  // Derive admission type from the AcademicStepForm field (set in step 1).
+  // Match on the backend label since t.value is the API-supplied identifier.
   const admissionTypeValue = watch('admission_type');
-  const apiAdmissionType: 'primary' | 'non_primary' =
-    admissionTypeValue === 'primary' ? 'primary' : 'non_primary';
+  const { data: admissionTypes = [] } = useAdmissionTypesDropdown();
+  const selectedAdmissionType = admissionTypes.find(t => t.value === admissionTypeValue);
+  const apiAdmissionType: 'pre_primary' | 'regular' =
+    selectedAdmissionType?.label === 'Pre Primary Admission' ? 'pre_primary' : 'regular';
 
   const { data: admissionHint } = useQuery({
     queryKey: ['next-admission-number', apiAdmissionType],
@@ -69,14 +117,36 @@ export const StudentStepForm = () => {
 
   const { getValues } = useFormContext();
 
-  // Auto-fill admission number with the next available number when field is empty
+  const [verifiedNextNumber, setVerifiedNextNumber] = useState<string | null>(null);
+  const [isVerifyingNextNumber, setIsVerifyingNextNumber] = useState(false);
+
+  // Verify the backend's suggested number against existing students; if it's
+  // already taken, keep incrementing until a free one is found, then auto-fill
+  // it when the field is empty.
   useEffect(() => {
-    if (admissionHint?.next_number) {
+    if (!admissionHint?.next_number) return;
+    let cancelled = false;
+
+    (async () => {
+      setIsVerifyingNextNumber(true);
+      let candidate = admissionHint.next_number;
+      for (let attempts = 0; attempts < 50; attempts++) {
+        const exists = await admissionNumberExists(candidate);
+        if (!exists) break;
+        candidate = incrementAdmissionNumber(candidate);
+      }
+      if (cancelled) return;
+      setVerifiedNextNumber(candidate);
       const current = getValues('admission_number');
       if (!current || current.trim() === '') {
-        setValue('admission_number', admissionHint.next_number);
+        setValue('admission_number', candidate);
       }
-    }
+      setIsVerifyingNextNumber(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [admissionHint?.next_number, getValues, setValue]);
 
   // Register admission_number once — override onBlur to chain duplicate check
@@ -115,16 +185,18 @@ export const StudentStepForm = () => {
                 admissionNumberField.onBlur(e);
                 await checkAdmissionNumberExists(e.target.value);
               }}
-              placeholder={apiAdmissionType === 'primary' ? 'e.g. P2026001' : 'e.g. 2026001'}
+              placeholder={apiAdmissionType === 'primary' ? 'e.g. 20260001' : 'e.g. 2026001'}
               className="flex-1"
             />
-            {isCheckingNum && <Loader2 className="h-4 w-4 animate-spin self-center text-muted-foreground" />}
+            {(isCheckingNum || isVerifyingNextNumber) && (
+              <Loader2 className="h-4 w-4 animate-spin self-center text-muted-foreground" />
+            )}
           </div>
           {errors.admission_number ? (
             <span className="text-red-500 text-sm">{errors.admission_number.message as string}</span>
-          ) : admissionHint && (
+          ) : verifiedNextNumber && (
             <p className="text-xs text-muted-foreground mt-1">
-              Next available: <strong>{admissionHint.next_number}</strong>
+              Next available: <strong>{verifiedNextNumber}</strong>
             </p>
           )}
         </div>
@@ -144,7 +216,7 @@ export const StudentStepForm = () => {
           <Label htmlFor="student_last_name">Last Name</Label>
           <Input
             id="student_last_name"
-            {...register('student_last_name', { required: 'Last name is required' })}
+            {...register('student_last_name')}
           />
           {errors.student_last_name && (
             <span className="text-red-500">{errors.student_last_name.message as string}</span>
@@ -164,32 +236,30 @@ export const StudentStepForm = () => {
         </div>
 
         <div>
-          <Label htmlFor="student_gender">Gender</Label>
-          <select
-            id="student_gender"
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            {...register('student_gender', { required: 'Gender is required' })}
-          >
-            <option value="">Select Gender</option>
-            <option value="M">Male</option>
-            <option value="F">Female</option>
-            <option value="O">Other</option>
-          </select>
+          <Label htmlFor="student_gender">Gender <span className="text-red-500">*</span></Label>
+          <input type="hidden" {...register('student_gender', { required: 'Gender is required' })} />
+          <InfiniteScrollDropdown
+            data={GENDER_OPTIONS}
+            value={watch('student_gender') || ''}
+            onChange={(val) => setValue('student_gender', val as string, { shouldValidate: true })}
+            placeholder="Select Gender"
+            clearable={false}
+            error={errors.student_gender ? (errors.student_gender.message as string) : undefined}
+          />
           {errors.student_gender && (
-            <span className="text-red-500">{errors.student_gender.message as string}</span>
+            <span className="text-red-500 text-sm">{errors.student_gender.message as string}</span>
           )}
         </div>
 
         <div>
           <Label htmlFor="student_is_primary">Student Type</Label>
-          <select
-            id="student_is_primary"
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            {...register('student_is_primary')}
-          >
-            <option value="not_primary">Day Scholar</option>
-            <option value="primary">Hostel</option>
-          </select>
+          <InfiniteScrollDropdown
+            data={STUDENT_TYPE_OPTIONS}
+            value={watch('student_is_primary') || 'not_primary'}
+            onChange={(val) => setValue('student_is_primary', val as string)}
+            placeholder="Select Student Type"
+            clearable={false}
+          />
         </div>
 
         <div>
@@ -203,23 +273,13 @@ export const StudentStepForm = () => {
 
         <div>
           <Label htmlFor="student_mother_tongue">Mother Tongue</Label>
-          <select
-            id="student_mother_tongue"
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            {...register('student_mother_tongue')}
-          >
-            <option value="Telugu">Telugu</option>
-            <option value="Hindi">Hindi</option>
-            <option value="English">English</option>
-            <option value="Tamil">Tamil</option>
-            <option value="Malayalam">Malayalam</option>
-            <option value="Kannada">Kannada</option>
-            <option value="Marathi">Marathi</option>
-            <option value="Bengali">Bengali</option>
-            <option value="Gujarati">Gujarati</option>
-            <option value="Urdu">Urdu</option>
-            <option value="Others">Others</option>
-          </select>
+          <InfiniteScrollDropdown
+            data={MOTHER_TONGUE_OPTIONS}
+            value={watch('student_mother_tongue') || 'Telugu'}
+            onChange={(val) => setValue('student_mother_tongue', val as string)}
+            placeholder="Select Mother Tongue"
+            clearable={false}
+          />
         </div>
 
         <div>
@@ -249,54 +309,6 @@ export const StudentStepForm = () => {
             <span className="text-red-500 text-sm">{errors.student_apaar_number.message as string}</span>
           ) : isExactDigits(watch('student_apaar_number'), 12) && (
             <span className="text-green-600 text-sm">APAAR number is valid</span>
-          )}
-        </div>
-
-        <div className="col-span-2">
-          <div className="flex items-center gap-3 mb-1">
-            <Label htmlFor="primary_phone">
-              Phone Number{isPhoneRequired && <span className="text-red-500"> *</span>}
-            </Label>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                id="phone_mandatory_toggle"
-                checked={isPhoneRequired}
-                onChange={(e) => {
-                  phoneRequiredRef.current = e.target.checked;
-                  setIsPhoneRequired(e.target.checked);
-                  if (!e.target.checked) clearErrors('primary_phone');
-                }}
-                className="w-4 h-4 cursor-pointer"
-              />
-              <label htmlFor="phone_mandatory_toggle" className="text-sm text-muted-foreground cursor-pointer select-none">
-                Mandatory
-              </label>
-            </div>
-          </div>
-          <Input
-            id="primary_phone"
-            inputMode="numeric"
-            placeholder="10-digit phone number"
-            {...register('primary_phone', {
-              validate: (value) => {
-                if (phoneRequiredRef.current) {
-                  if (!value || value.trim() === '') return 'Phone number is required';
-                  if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
-                  if (value.length !== 10) return `Must be exactly 10 digits — you entered ${value.length}`;
-                  return true;
-                }
-                if (!value || value.trim() === '') return true;
-                if (!/^\d+$/.test(value)) return 'Phone number must contain digits only';
-                if (value.length !== 10) return `Must be exactly 10 digits — you entered ${value.length}`;
-                return true;
-              }
-            })}
-          />
-          {errors.primary_phone ? (
-            <span className="text-red-500 text-sm">{errors.primary_phone.message as string}</span>
-          ) : isExactDigits(watch('primary_phone'), 10) && (
-            <span className="text-green-600 text-sm">Phone number is valid</span>
           )}
         </div>
 

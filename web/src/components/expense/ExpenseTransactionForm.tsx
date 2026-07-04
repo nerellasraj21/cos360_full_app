@@ -1,12 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { InfiniteScrollDropdown } from '@/components/dropdown/InfiniteScrollDropdown';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateExpenseTransaction, useUpdateExpenseTransaction, useExpenseTypeDropdown } from '@/hooks/expense';
+import type { DropdownOption } from '@/types/dropdown';
 import { validateTransactionForm, generateIdempotencyKey } from '@/lib/expenseValidation';
 import { handleExpenseTransactionError } from '@/lib/expenseErrorHandler';
 import type { ExpenseTransaction, ExpenseTransactionCreate, ExpenseTransactionUpdate } from '@/types/expense';
@@ -36,6 +37,8 @@ export function ExpenseTransactionForm({ transaction, onSubmit, onCancel }: Expe
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: expenseTypes = [] } = useExpenseTypeDropdown();
+  const typeOptions: DropdownOption[] = useMemo(() =>
+    expenseTypes.map(t => ({ id: t.id, value: t.id, label: t.name })), [expenseTypes]);
   const createMutation = useCreateExpenseTransaction();
   const updateMutation = useUpdateExpenseTransaction();
 
@@ -86,24 +89,14 @@ export function ExpenseTransactionForm({ transaction, onSubmit, onCancel }: Expe
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="expense_type_id">Expense Type *</Label>
-          <Select
-            value={formData.expense_type_id}
-            onValueChange={(value) => handleInputChange('expense_type_id', value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select expense type" />
-            </SelectTrigger>
-            <SelectContent>
-              {expenseTypes.map(type => (
-                <SelectItem key={type.id} value={type.id}>
-                  {type.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.expense_type_id && (
-            <p className="text-sm text-destructive mt-1">{errors.expense_type_id}</p>
-          )}
+          <InfiniteScrollDropdown
+            data={typeOptions}
+            value={formData.expense_type_id || ''}
+            onChange={(val) => handleInputChange('expense_type_id', val)}
+            placeholder="Select expense type"
+            clearable={false}
+            error={errors.expense_type_id}
+          />
         </div>
 
         <div>
@@ -142,23 +135,14 @@ export function ExpenseTransactionForm({ transaction, onSubmit, onCancel }: Expe
 
         <div>
           <Label htmlFor="payment_method">Payment Method *</Label>
-          <Select
+          <InfiniteScrollDropdown
+            data={[{id:'cash',value:'cash',label:'Cash'},{id:'cheque',value:'cheque',label:'Cheque'},{id:'bank_transfer',value:'bank_transfer',label:'Bank Transfer'},{id:'upi',value:'upi',label:'UPI'}]}
             value={formData.payment_method}
-            onValueChange={(value) => handleInputChange('payment_method', value)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="cash">Cash</SelectItem>
-              <SelectItem value="cheque">Cheque</SelectItem>
-              <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-              <SelectItem value="upi">UPI</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.payment_method && (
-            <p className="text-sm text-destructive mt-1">{errors.payment_method}</p>
-          )}
+            onChange={(value) => handleInputChange('payment_method', value)}
+            placeholder="Select payment method"
+            clearable={false}
+            error={errors.payment_method}
+          />
         </div>
       </div>
 

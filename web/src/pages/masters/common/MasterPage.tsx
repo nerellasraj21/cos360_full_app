@@ -64,6 +64,7 @@ export interface MasterPageConfig<T, TInput> {
   isEditing?: boolean;
   addModal?: React.ReactNode;
   showColumnSelector?: boolean;
+  onSearchChange?: (q: string) => void;
   pagination?: {
     page: number;
     pageSize: number;
@@ -107,6 +108,10 @@ export function MasterPage<
 >({ config }: MasterPageProps<T, TInput>) {
   const [formData, setFormData] = useState<TInput>(config.defaultValues);
   const [searchQuery, setSearchQuery] = useState("");
+  const handleSearchChange = (q: string) => {
+    setSearchQuery(q);
+    config.onSearchChange?.(q);
+  };
   const [localModalOpen, setLocalModalOpen] = useState(false);
   const pendingCloseRef = useRef(false);
   const prevIsPendingRef = useRef(false);
@@ -548,7 +553,7 @@ export function MasterPage<
               isEditing={config.isEditing}
               pagination={config.pagination}
               searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
+              onSearchChange={handleSearchChange}
               permissions={{
                 resource: config.permissions?.resource
                   ? getResourceName(config.permissions.resource)

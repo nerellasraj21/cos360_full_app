@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { InfiniteScrollDropdown } from '@/components/dropdown/InfiniteScrollDropdown';
 import ReactSelect from 'react-select';
 import { useSelectStyles } from '@/lib/useSelectStyles';
 import {
@@ -433,26 +433,20 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
           {pricingOptions.length > 0 && (
             <div className="space-y-2">
               <Label>Pricing Plan (optional)</Label>
-              <Select value={pricingId} onValueChange={(val) => {
-                setPricingId(val);
-                const selected = pricingOptions.find(p => p.id === val);
-                if (selected) {
-                  setFeePerTerm(selected.amount.toString());
-                  setFeeSource('pricing');
-                }
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select pricing..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">None</SelectItem>
-                  {pricingOptions.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.cycle_name} — ₹{Number(p.amount).toLocaleString()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <InfiniteScrollDropdown
+                data={[{id:'',value:'',label:'None'}, ...pricingOptions.map(p => ({ id: p.id, value: p.id, label: `${p.cycle_name} — ₹${Number(p.amount).toLocaleString()}` }))]}
+                value={pricingId}
+                onChange={(val) => {
+                  setPricingId(val as string);
+                  const selected = pricingOptions.find(p => p.id === val);
+                  if (selected) {
+                    setFeePerTerm(selected.amount.toString());
+                    setFeeSource('pricing');
+                  }
+                }}
+                placeholder="Select pricing..."
+                clearable={false}
+              />
             </div>
           )}
 
@@ -554,20 +548,15 @@ function ParentView({ parentEntityId }: { parentEntityId: string | null }) {
               No children found for this account.
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 max-w-xs">
               <Label>Child</Label>
-              <Select value={selectedChildId} onValueChange={setSelectedChildId}>
-                <SelectTrigger className="w-72">
-                  <SelectValue placeholder="Select child" />
-                </SelectTrigger>
-                <SelectContent>
-                  {children.map((child) => (
-                    <SelectItem key={child.id} value={child.id}>
-                      {child.name || `${child.first_name} ${child.last_name}`.trim()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <InfiniteScrollDropdown
+                data={children.map(c => ({ id: c.id, value: c.id, label: c.name || `${c.first_name} ${c.last_name}`.trim() }))}
+                value={selectedChildId}
+                onChange={(v) => setSelectedChildId(v as string)}
+                placeholder="Select child"
+                clearable={false}
+              />
             </div>
           )}
         </CardContent>

@@ -41,7 +41,7 @@ function TransportDashboard() {
   const transportMenu = menuItems.find(
     (item) => item.name.toLowerCase() === 'transport'
   )
-  const HIDDEN = new Set(['route stops', 'transport trips'])
+  const HIDDEN = new Set(['route stops', 'transport trips', 'student transport'])
   const sections = (transportMenu?.children ?? []).filter(
     (c) => !HIDDEN.has(c.name.toLowerCase())
   )

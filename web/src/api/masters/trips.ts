@@ -50,8 +50,8 @@ export const tripsApi = {
   // Get trips by vehicle ID
   getTripsByVehicle: async (vehicleId: string): Promise<TripOut[]> => {
     try {
-      const response = await CAxios.get(TRIPS_API_BASE, {
-        params: { vehicle_id: vehicleId, limit: 100 },
+      const response = await CAxios.get(`/masters/vehicles/${vehicleId}/trips`, {
+        params: { limit: 100 },
       });
       const data = response.data;
       return Array.isArray(data) ? data : (data.items || data.results || []);

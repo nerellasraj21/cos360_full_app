@@ -50,12 +50,11 @@ export const ParentsStepForm = () => {
           </div>
 
           <div>
-            <Label htmlFor="father_email">Email *</Label>
+            <Label htmlFor="father_email">Email (Optional)</Label>
             <Input
               id="father_email"
               type="email"
               {...register('father_email', {
-                required: "Father's email is required",
                 pattern: {
                   value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
                   message: 'Invalid email address'
@@ -85,7 +84,7 @@ export const ParentsStepForm = () => {
                   className="w-4 h-4 cursor-pointer"
                 />
                 <label htmlFor="father_phone_mandatory" className="text-sm text-muted-foreground cursor-pointer select-none">
-                  Mandatory
+                  Primary
                 </label>
               </div>
             </div>
@@ -187,18 +186,18 @@ export const ParentsStepForm = () => {
           </div>
 
           <div>
-            <Label htmlFor="mother_email">Email *</Label>
+            <Label htmlFor="mother_email">Email (Optional)</Label>
             <Input
               id="mother_email"
               type="email"
               {...register('mother_email', {
-                required: "Mother's email is required",
                 pattern: {
                   value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
                   message: 'Invalid email address'
                 },
                 validate: {
                   differentFromFather: (value) => {
+                    if (!value || value.trim() === '') return true;
                     const fatherEmail = watch('father_email');
                     return value !== fatherEmail || "Mother's email must be different from father's email";
                   }
@@ -228,7 +227,7 @@ export const ParentsStepForm = () => {
                   className="w-4 h-4 cursor-pointer"
                 />
                 <label htmlFor="mother_phone_mandatory" className="text-sm text-muted-foreground cursor-pointer select-none">
-                  Mandatory
+                  Primary
                 </label>
               </div>
             </div>
@@ -365,7 +364,7 @@ export const ParentsStepForm = () => {
                     className="w-4 h-4 cursor-pointer"
                   />
                   <label htmlFor="guardian_phone_mandatory" className="text-sm text-muted-foreground cursor-pointer select-none">
-                    Mandatory
+                    Primary
                   </label>
                 </div>
               </div>

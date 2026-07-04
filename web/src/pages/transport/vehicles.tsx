@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { MasterPage, type MasterPageConfig, type FormField } from '@/pages/masters/common/MasterPage';
 import type { TableColumn } from '@/components/common/table';
 import { useVehicles, useCreateVehicle, useUpdateVehicle, useDeleteVehicle } from '@/hooks/masters/useVehicles';
-import { useTrips, useCreateTrip, useDeleteTrip, useTripsByVehicle } from '@/api/hooks/masters/trips';
+import { useTrips, useCreateTrip, useDeleteTrip } from '@/api/hooks/masters/trips';
 import { useRoutes } from '@/api/hooks/masters/routes';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { staffApi } from '@/api/masters/staff';
+import { feeCategoriesApi, feeTypesApi } from '@/api/fee';
 import { PermissionGuard } from '@/components/common';
 import type { Vehicle, VehicleInput } from '@/types/masters/vehicle';
 import type { TripOut } from '@/types/masters/trip';
@@ -19,13 +20,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import {
-  Select as ShadSelect,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TripRow {
@@ -40,7 +34,20 @@ const DEFAULT_TRIPS: TripRow[] = [
   { _key: 2, route_id: '', driver_id: '' },
 ];
 
-const TRIP_TYPE_LABELS: Record<number, string> = { 1: 'AC', 2: 'Non-AC' };
+const TRIP_TYPE_LABELS: Record<number, string> = { 1: 'Trip 1', 2: 'Trip 2' };
+
+const DRIVING_LICENCE_MAX_LENGTH = 16;
+
+const handleDrivingLicenceChange = (
+  value: string,
+  setField: (key: string, value: any) => void
+) => {
+  if (value.length > DRIVING_LICENCE_MAX_LENGTH) {
+    toast.error(`Driving Licence No. cannot exceed ${DRIVING_LICENCE_MAX_LENGTH} characters`);
+    return;
+  }
+  setField('driving_licence_no', value);
+};
 
 const defaultForm = {
   name: '',
@@ -55,12 +62,52 @@ const defaultForm = {
   number_of_trips: 2 as string | number,
   is_ac: false,
   is_active: true,
+  fee_category_id: '' as string,
+  fee_type_id: '' as string,
 };
 
 const selectStyles = {
   menuPortal: (base: any) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' as const }),
-  menu: (base: any) => ({ ...base, zIndex: 9999, pointerEvents: 'auto' as const }),
-  control: (base: any) => ({ ...base, minHeight: '36px', fontSize: '14px' }),
+  menu: (base: any) => ({
+    ...base,
+    zIndex: 9999,
+    pointerEvents: 'auto' as const,
+    backgroundColor: 'var(--background)',
+    border: '1px solid var(--border)',
+    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.3)',
+  }),
+  menuList: (base: any) => ({
+    ...base,
+    backgroundColor: 'var(--background)',
+    padding: '4px',
+  }),
+  control: (base: any, state: any) => ({
+    ...base,
+    minHeight: '36px',
+    fontSize: '14px',
+    backgroundColor: 'var(--background)',
+    borderColor: state.isFocused ? 'var(--primary)' : 'var(--border)',
+    boxShadow: state.isFocused ? '0 0 0 1px var(--primary)' : 'none',
+    '&:hover': { borderColor: 'var(--primary)' },
+  }),
+  option: (base: any, state: any) => ({
+    ...base,
+    backgroundColor: state.isSelected
+      ? 'var(--primary)'
+      : state.isFocused
+        ? 'var(--accent)'
+        : 'transparent',
+    color: state.isSelected ? 'var(--primary-foreground)' : 'var(--foreground)',
+    borderRadius: '4px',
+    cursor: 'pointer',
+  }),
+  singleValue: (base: any) => ({ ...base, color: 'var(--foreground)' }),
+  input: (base: any) => ({ ...base, color: 'var(--foreground)' }),
+  placeholder: (base: any) => ({ ...base, color: 'var(--muted-foreground)' }),
+  indicatorSeparator: (base: any) => ({ ...base, backgroundColor: 'var(--border)' }),
+  dropdownIndicator: (base: any) => ({ ...base, color: 'var(--muted-foreground)' }),
+  clearIndicator: (base: any) => ({ ...base, color: 'var(--muted-foreground)' }),
+  noOptionsMessage: (base: any) => ({ ...base, color: 'var(--muted-foreground)', backgroundColor: 'var(--background)' }),
 };
 
 // ── Vehicle Add Dialog ────────────────────────────────────────────────────────
@@ -75,6 +122,22 @@ function VehicleAddDialog() {
   const createVehicle = useCreateVehicle();
   const updateVehicle = useUpdateVehicle();
   const createTrip = useCreateTrip();
+
+  const { data: feeCategoriesRaw } = useQuery({
+    queryKey: ['fee-categories', 'dropdown-vehicles'],
+    queryFn: () => feeCategoriesApi.getAllCategories({ limit: 200 }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const feeCategoryOptions = (feeCategoriesRaw?.items ?? []).map((c: any) => ({ value: c.id, label: c.category_name }));
+  const { data: feeTypesRaw } = useQuery({
+    queryKey: ['fee-types', 'vehicles', form.fee_category_id],
+    queryFn: () => feeTypesApi.getAllTypes({ category_id: form.fee_category_id, limit: 200 }),
+    enabled: !!form.fee_category_id,
+    staleTime: 5 * 60 * 1000,
+  });
+  const feeTypeOptions = (feeTypesRaw ?? [])
+    .filter((t: any) => t.fee_category_id === form.fee_category_id)
+    .map((t: any) => ({ value: t.id, label: t.type_name || t.name }));
 
   // Direct query — no permission gate so drivers always load
   const { data: staffRaw } = useQuery({
@@ -108,21 +171,13 @@ function VehicleAddDialog() {
     return `${r.route_name}${cat}${ends}`;
   };
 
-  const acRouteOptions = (routes as any[]).filter(r => r.route_type).map(r => ({ value: r.id, label: buildRouteLabel(r) }));
-  const nonAcRouteOptions = (routes as any[]).filter(r => !r.route_type).map(r => ({ value: r.id, label: buildRouteLabel(r) }));
   const allRouteOptions = (routes as any[]).map(r => ({ value: r.id, label: buildRouteLabel(r) }));
-  const getRouteOptionsForTrip = (idx: number) => idx === 0 ? acRouteOptions : idx === 1 ? nonAcRouteOptions : allRouteOptions;
+  const getRouteOptionsForTrip = (_idx: number) => allRouteOptions;
 
   const driverOptions = driverStaff.map(d => ({
     value: d.id,
     label: [d.first_name, d.last_name].filter(Boolean).join(' '),
   }));
-
-  const vehicleTypeOptions = [
-    { value: 'Bus', label: 'Bus' },
-    { value: 'Van', label: 'Van' },
-    { value: 'Auto', label: 'Auto' },
-  ];
 
   const setField = (key: string, value: any) => setForm(prev => ({ ...prev, [key]: value }));
 
@@ -149,6 +204,10 @@ function VehicleAddDialog() {
       toast.error('Vehicle Name and Registration Number are required');
       return;
     }
+    if (!form.driving_licence_no.trim()) {
+      toast.error('Driving Licence No. is required');
+      return;
+    }
     setSubmitting(true);
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -165,7 +224,7 @@ function VehicleAddDialog() {
       // Step 2: patch with extended fields so they are persisted
       const hasExtended = form.driver_name || form.co_driver_name || form.driving_licence_no ||
         form.driving_licence_exp_date || form.bus_insurance_vendor || form.insurance_expiry_date ||
-        form.number_of_trips !== '';
+        form.number_of_trips !== '' || form.fee_category_id || form.fee_type_id;
       if (hasExtended || form.is_ac) {
         await updateVehicle.mutateAsync({
           id: newVehicle.id,
@@ -184,6 +243,8 @@ function VehicleAddDialog() {
             insurance_expiry_date: form.insurance_expiry_date || null,
             number_of_trips: form.number_of_trips === '' ? null : Number(form.number_of_trips),
             is_ac: form.is_ac,
+            fee_category_id: form.fee_category_id || null,
+            fee_type_id: form.fee_type_id || null,
           },
         });
       }
@@ -239,21 +300,38 @@ function VehicleAddDialog() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Vehicle Type</Label>
+                <Label>Fee Category</Label>
                 <Select
-                  options={vehicleTypeOptions}
-                  value={vehicleTypeOptions.find(o => o.value === form.vehicle_type) || null}
-                  onChange={opt => setField('vehicle_type', opt?.value || 'Bus')}
+                  options={feeCategoryOptions}
+                  value={feeCategoryOptions.find(o => o.value === form.fee_category_id) || null}
+                  onChange={opt => { setField('fee_category_id', opt?.value || ''); setField('fee_type_id', ''); }}
+                  placeholder="Select fee category..."
+                  isClearable
                   styles={selectStyles}
                   menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                   classNamePrefix="react-select"
                 />
               </div>
               <div className="space-y-1">
-                <Label>Driving Licence No.</Label>
+                <Label>Fee Type</Label>
+                <Select
+                  options={feeTypeOptions}
+                  value={feeTypeOptions.find(o => o.value === form.fee_type_id) || null}
+                  onChange={opt => setField('fee_type_id', opt?.value || '')}
+                  placeholder={form.fee_category_id ? 'Select fee type...' : 'Select a category first'}
+                  isClearable
+                  isDisabled={!form.fee_category_id}
+                  styles={selectStyles}
+                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                  classNamePrefix="react-select"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Driving Licence No. <span className="text-red-500">*</span></Label>
                 <Input
                   value={form.driving_licence_no}
-                  onChange={e => setField('driving_licence_no', e.target.value)}
+                  maxLength={DRIVING_LICENCE_MAX_LENGTH}
+                  onChange={e => handleDrivingLicenceChange(e.target.value, setField)}
                 />
               </div>
               <div className="space-y-1">
@@ -317,15 +395,6 @@ function VehicleAddDialog() {
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={form.is_ac}
-                  onChange={e => setField('is_ac', e.target.checked)}
-                  className="w-4 h-4"
-                />
-                AC Bus
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
                   checked={form.is_active}
                   onChange={e => setField('is_active', e.target.checked)}
                   className="w-4 h-4"
@@ -365,7 +434,7 @@ function VehicleAddDialog() {
                         <tr key={trip._key} className="border-b last:border-0">
                           <td className="py-2 pr-2 whitespace-nowrap">
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                              typeLabel === 'AC'
+                              idx === 0
                                 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                                 : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
                             }`}>
@@ -377,7 +446,8 @@ function VehicleAddDialog() {
                               options={opts}
                               value={opts.find(o => o.value === trip.route_id) || null}
                               onChange={opt => updateTrip(trip._key, { route_id: opt?.value || '' })}
-                              placeholder={idx === 0 ? 'AC route (A–E)...' : idx === 1 ? 'Non-AC route...' : 'Select route...'}
+                              placeholder="Type to search route..."
+                              isSearchable
                               styles={selectStyles}
                               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                               classNamePrefix="react-select"
@@ -440,9 +510,30 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
   const [tripsInitialized, setTripsInitialized] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: existingTripsRaw = [], isLoading: tripsLoading } = useTripsByVehicle(open ? vehicle.id : '');
-  const existingTrips = existingTripsRaw.filter(t => t.vehicle_id === vehicle.id);
+  // Reuse the same all-trips cache used by VehicleTripsPanel (which reliably shows trip counts)
+  // rather than the per-vehicle endpoint, which does not return data.
+  const { data: allTripsRaw, isLoading: tripsLoading } = useTrips();
+  const allTrips: TripOut[] = Array.isArray(allTripsRaw)
+    ? allTripsRaw
+    : ((allTripsRaw as any)?.items ?? []);
+  const existingTrips = allTrips.filter(t => t.vehicle_id === vehicle.id);
   const { data: routes = [] } = useRoutes(false);
+
+  const { data: feeCategoriesRaw } = useQuery({
+    queryKey: ['fee-categories', 'dropdown-vehicles'],
+    queryFn: () => feeCategoriesApi.getAllCategories({ limit: 200 }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const feeCategoryOptions = (feeCategoriesRaw?.items ?? []).map((c: any) => ({ value: c.id, label: c.category_name }));
+  const { data: feeTypesRaw } = useQuery({
+    queryKey: ['fee-types', 'vehicles', form.fee_category_id],
+    queryFn: () => feeTypesApi.getAllTypes({ category_id: form.fee_category_id, limit: 200 }),
+    enabled: !!form.fee_category_id,
+    staleTime: 5 * 60 * 1000,
+  });
+  const feeTypeOptions = (feeTypesRaw ?? [])
+    .filter((t: any) => t.fee_category_id === form.fee_category_id)
+    .map((t: any) => ({ value: t.id, label: t.type_name || t.name }));
 
   const { data: staffRaw } = useQuery({
     queryKey: ['staff', 'all-for-vehicles'],
@@ -472,16 +563,8 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
     const ends = r.starting_stop && r.ending_stop ? ` (${r.starting_stop} → ${r.ending_stop})` : '';
     return `${r.route_name}${cat}${ends}`;
   };
-  const editAcOpts = (routes as any[]).filter(r => r.route_type).map(r => ({ value: r.id, label: buildRouteLabel2(r) }));
-  const editNonAcOpts = (routes as any[]).filter(r => !r.route_type).map(r => ({ value: r.id, label: buildRouteLabel2(r) }));
   const editAllOpts = (routes as any[]).map(r => ({ value: r.id, label: buildRouteLabel2(r) }));
-  const getEditRouteOpts = (idx: number) => idx === 0 ? editAcOpts : idx === 1 ? editNonAcOpts : editAllOpts;
-
-  const vehicleTypeOptions = [
-    { value: 'Bus', label: 'Bus' },
-    { value: 'Van', label: 'Van' },
-    { value: 'Auto', label: 'Auto' },
-  ];
+  const getEditRouteOpts = (_idx: number) => editAllOpts;
 
   const queryClient = useQueryClient();
   const updateVehicleMutation = useUpdateVehicle();
@@ -529,6 +612,8 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
       number_of_trips: vehicle.number_of_trips ?? '',
       is_ac: vehicle.is_ac ?? false,
       is_active: vehicle.is_active ?? true,
+      fee_category_id: vehicle.fee_category_id ?? '',
+      fee_type_id: vehicle.fee_type_id ?? '',
     });
     setTrips([]);
     setCounter(0);
@@ -540,6 +625,10 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
   const handleSubmit = async () => {
     if (!form.name.trim() || !form.registration_number.trim()) {
       toast.error('Vehicle Name and Registration Number are required');
+      return;
+    }
+    if (!form.driving_licence_no.trim()) {
+      toast.error('Driving Licence No. is required');
       return;
     }
     setSubmitting(true);
@@ -562,6 +651,8 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
           is_active: form.is_active,
           last_inspected_date: vehicle.last_inspected_date || new Date().toISOString().split('T')[0],
           pollution_renewal_date: vehicle.pollution_renewal_date || new Date().toISOString().split('T')[0],
+          fee_category_id: form.fee_category_id || null,
+          fee_type_id: form.fee_type_id || null,
         },
       });
 
@@ -622,19 +713,39 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
                 <Input value={form.registration_number} onChange={e => setField('registration_number', e.target.value)} placeholder="KA01AB1234" />
               </div>
               <div className="space-y-1">
-                <Label>Vehicle Type</Label>
+                <Label>Fee Category</Label>
                 <Select
-                  options={vehicleTypeOptions}
-                  value={vehicleTypeOptions.find(o => o.value === form.vehicle_type) || null}
-                  onChange={opt => setField('vehicle_type', opt?.value || 'Bus')}
+                  options={feeCategoryOptions}
+                  value={feeCategoryOptions.find(o => o.value === form.fee_category_id) || null}
+                  onChange={opt => { setField('fee_category_id', opt?.value || ''); setField('fee_type_id', ''); }}
+                  placeholder="Select fee category..."
+                  isClearable
                   styles={selectStyles}
                   menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                   classNamePrefix="react-select"
                 />
               </div>
               <div className="space-y-1">
-                <Label>Driving Licence No.</Label>
-                <Input value={form.driving_licence_no} onChange={e => setField('driving_licence_no', e.target.value)} />
+                <Label>Fee Type</Label>
+                <Select
+                  options={feeTypeOptions}
+                  value={feeTypeOptions.find(o => o.value === form.fee_type_id) || null}
+                  onChange={opt => setField('fee_type_id', opt?.value || '')}
+                  placeholder={form.fee_category_id ? 'Select fee type...' : 'Select a category first'}
+                  isClearable
+                  isDisabled={!form.fee_category_id}
+                  styles={selectStyles}
+                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                  classNamePrefix="react-select"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Driving Licence No. <span className="text-red-500">*</span></Label>
+                <Input
+                  value={form.driving_licence_no}
+                  maxLength={DRIVING_LICENCE_MAX_LENGTH}
+                  onChange={e => handleDrivingLicenceChange(e.target.value, setField)}
+                />
               </div>
               <div className="space-y-1">
                 <Label>Driver Name</Label>
@@ -679,10 +790,6 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
 
             <div className="flex gap-6 items-center">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={form.is_ac} onChange={e => setField('is_ac', e.target.checked)} className="w-4 h-4" />
-                AC Bus
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={form.is_active} onChange={e => setField('is_active', e.target.checked)} className="w-4 h-4" />
                 Active
               </label>
@@ -722,7 +829,7 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
                         <tr key={trip._key} className="border-b last:border-0">
                           <td className="py-2 pr-2 whitespace-nowrap">
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                              typeLabel === 'AC'
+                              idx === 0
                                 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                                 : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
                             }`}>
@@ -734,7 +841,8 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
                               options={opts}
                               value={opts.find(o => o.value === trip.route_id) || null}
                               onChange={opt => updateTripRow(trip._key, { route_id: opt?.value || '' })}
-                              placeholder={idx === 0 ? 'AC route (A–E)...' : idx === 1 ? 'Non-AC route...' : 'Select route...'}
+                              placeholder="Type to search route..."
+                              isSearchable
                               styles={selectStyles}
                               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                               classNamePrefix="react-select"
@@ -810,23 +918,26 @@ function VehicleTripsPanel({ vehicles }: { vehicles: Vehicle[] }) {
     return `Trip ${trip.trip_number}  ${route.route_name}  ${acLabel}  (${route.starting_stop ?? 'Starting Point'} → ${route.ending_stop ?? 'Ending Point'})`;
   };
 
+  const vehicleOptions = vehicles.map(v => ({ value: v.id, label: `${v.name} (${v.registration_number})` }));
+
   return (
     <Card>
       <CardContent className="pt-4 pb-4">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-sm font-medium shrink-0">Vehicle:</span>
-          <ShadSelect value={selectedVehicleId} onValueChange={setSelectedVehicleId}>
-            <SelectTrigger className="flex-1 max-w-sm h-9">
-              <SelectValue placeholder="Select a vehicle..." />
-            </SelectTrigger>
-            <SelectContent>
-              {vehicles.map(v => (
-                <SelectItem key={v.id} value={v.id}>
-                  {v.name} ({v.registration_number})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </ShadSelect>
+          <div className="flex-1 max-w-sm">
+            <Select
+              options={vehicleOptions}
+              value={vehicleOptions.find(o => o.value === selectedVehicleId) || null}
+              onChange={opt => setSelectedVehicleId(opt?.value || '')}
+              placeholder="Type to search vehicle..."
+              isClearable
+              isSearchable
+              styles={selectStyles}
+              menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+              classNamePrefix="react-select"
+            />
+          </div>
         </div>
 
         {!selectedVehicleId && (
@@ -878,9 +989,20 @@ function VehicleTripsPanel({ vehicles }: { vehicles: Vehicle[] }) {
 export default function VehiclePage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
+  const [searchTerm, setSearchTerm] = useState('');
   const { data: vehicles = [], isLoading } = useVehicles();
-  const total = vehicles.length;
-  const paginatedData = vehicles.slice(page * pageSize, (page + 1) * pageSize);
+
+  const filteredVehicles = useMemo(() => {
+    if (!searchTerm.trim()) return vehicles;
+    const q = searchTerm.toLowerCase();
+    return vehicles.filter(v =>
+      [v.name, v.registration_number, v.driver_name, v.co_driver_name, v.driving_licence_no, v.bus_insurance_vendor]
+        .some(val => val && String(val).toLowerCase().includes(q))
+    );
+  }, [vehicles, searchTerm]);
+
+  const total = filteredVehicles.length;
+  const paginatedData = filteredVehicles.slice(page * pageSize, (page + 1) * pageSize);
   const hasMore = (page + 1) * pageSize < total;
 
   const deleteVehicle = useDeleteVehicle();
@@ -914,15 +1036,6 @@ export default function VehiclePage() {
       render: v => v ? new Date(v).toLocaleDateString() : '—',
     },
     {
-      key: 'is_ac',
-      label: 'AC',
-      render: v => (
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${v ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-          {v ? 'AC' : 'Non AC'}
-        </span>
-      ),
-    },
-    {
       key: 'trip_count' as any,
       label: 'Trips',
       render: (_: any, row: Vehicle) => (
@@ -949,6 +1062,11 @@ export default function VehiclePage() {
     setPage(0);
   };
 
+  const handleSearchChange = (q: string) => {
+    setSearchTerm(q);
+    setPage(0);
+  };
+
   const config: MasterPageConfig<Vehicle, VehicleInput> = {
     title: 'Vehicles',
     columns,
@@ -969,6 +1087,7 @@ export default function VehiclePage() {
     },
     formFields,
     addModal: <VehicleAddDialog />,
+    onSearchChange: handleSearchChange,
     isLoading,
     data: paginatedData,
     onCreate: () => {},

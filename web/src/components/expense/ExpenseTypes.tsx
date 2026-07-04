@@ -3,8 +3,9 @@ import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { InfiniteScrollDropdown } from '@/components/dropdown/InfiniteScrollDropdown';
+import type { DropdownOption } from '@/types/dropdown';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -37,6 +38,8 @@ export function ExpenseTypes() {
     category_id: categoryFilter || undefined
   });
   const { data: categories = [] } = useExpenseCategoryDropdown();
+  const categoryOptions: DropdownOption[] = useMemo(() =>
+    categories.map(c => ({ id: c.id, value: c.id, label: c.name })), [categories]);
   const createMutation = useCreateExpenseType();
   const updateMutation = useUpdateExpenseType();
   const deleteMutation = useDeleteExpenseType();
@@ -184,19 +187,14 @@ export function ExpenseTypes() {
                 className="pl-8 h-8 text-sm"
               />
             </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-48 h-8 text-sm">
-                <SelectValue placeholder="Filter by category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
-                {categories.map(category => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <InfiniteScrollDropdown
+              data={categoryOptions}
+              value={categoryFilter}
+              onChange={(val) => setCategoryFilter(val as string)}
+              placeholder="All Categories"
+              clearable
+              className="w-48 h-8 text-sm"
+            />
           </div>
         </div>
 
@@ -309,24 +307,14 @@ export function ExpenseTypes() {
 
             <div>
               <Label htmlFor="category_id">Category *</Label>
-              <Select
+              <InfiniteScrollDropdown
+                data={categoryOptions}
                 value={formData.category_id}
-                onValueChange={(value) => handleInputChange('category_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(category => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.category_id && (
-                <p className="text-sm text-destructive mt-1">{errors.category_id}</p>
-              )}
+                onChange={(val) => handleInputChange('category_id', val as string)}
+                placeholder="Select category"
+                clearable={false}
+                error={errors.category_id}
+              />
             </div>
 
             <div>

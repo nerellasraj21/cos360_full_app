@@ -24,8 +24,8 @@ export const AdmissionTypeDropdown: React.FC<AdmissionTypeDropdownProps> = ({
   const options: DropdownOption[] = useMemo(() =>
     admissionTypes.map(t => {
       const displayLabel =
-        t.label === 'Primary Admission' ? 'Pre Primary' :
-        t.label === 'Non-Primary Admission' ? 'Regular' :
+        t.label === 'Pre Primary Admission' ? 'Pre Primary' :
+        t.label === 'Regular Admission' ? 'Regular' :
         t.label;
       return { id: t.value, value: t.value, label: displayLabel };
     }), [admissionTypes]);

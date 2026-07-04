@@ -4,6 +4,8 @@ export interface Vehicle {
   registration_number: string;
   vehicle_type: 'Bus' | 'Van' | 'Auto';
   fees?: number;
+  fee_category_id?: string | null;
+  fee_type_id?: string | null;
   last_inspected_date: string;
   pollution_renewal_date: string;
   is_ac?: boolean | null;
@@ -25,6 +27,8 @@ export interface VehicleInput {
   registration_number: string;
   vehicle_type: 'Bus' | 'Van' | 'Auto';
   fees?: number;
+  fee_category_id?: string | null;
+  fee_type_id?: string | null;
   last_inspected_date: string;
   pollution_renewal_date: string;
   is_ac?: boolean | null;
@@ -43,6 +47,8 @@ export interface VehicleUpdate {
   registration_number?: string;
   vehicle_type?: 'Bus' | 'Van' | 'Auto';
   fees?: number;
+  fee_category_id?: string | null;
+  fee_type_id?: string | null;
   last_inspected_date?: string;
   pollution_renewal_date?: string;
   is_ac?: boolean | null;

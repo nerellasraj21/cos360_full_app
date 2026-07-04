@@ -3,7 +3,6 @@ import CreatableSelect from 'react-select/creatable';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -140,6 +139,8 @@ const validatePhoneMessage = (value: string): string => {
 // True only when the value is exactly 10 digits (used to show the green "valid" hint).
 const isValidPhone = (value: string): boolean => /^\d{10}$/.test(value);
 
+const isValidEmail = (value: string): boolean => /^[^\s@]+@gmail\.com$/i.test(value);
+
 export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
     const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -159,6 +160,8 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
     const [localSearch, setLocalSearch] = useState('');
     const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+    const [firstNameError, setFirstNameError] = useState('');
+    const [joiningDateError, setJoiningDateError] = useState('');
     const [phoneError, setPhoneError] = useState('');
     const [emailError, setEmailError] = useState('');
     const [experienceError, setExperienceError] = useState('');
@@ -426,6 +429,8 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
         setRemovedQualIds([]);
         setIsFormDirty(false);
         setPendingPhotoFile(null);
+        setFirstNameError('');
+        setJoiningDateError('');
         setEditingStaff(null);
         setShowCreateDialog(true);
     };
@@ -473,6 +478,8 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
         setRemovedQualIds([]);
         setIsFormDirty(false);
         setPendingPhotoFile(null);
+        setFirstNameError('');
+        setJoiningDateError('');
         setEditingStaff(staff);
         setShowCreateDialog(true);
     };
@@ -487,18 +494,23 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     };
 
     const handleSubmit = async () => {
-        if (!formData.first_name.trim()) {
-            toast.error('First name is required');
-            return;
-        }
+        const nextFirstNameError = formData.first_name.trim() ? '' : 'First name is required';
+        const nextJoiningDateError = formData.joining_date ? '' : 'Joining date is required';
+        setFirstNameError(nextFirstNameError);
+        setJoiningDateError(nextJoiningDateError);
 
-        if (!formData.joining_date) {
-            toast.error('Joining date is required');
+        if (nextFirstNameError || nextJoiningDateError) {
+            toast.error('Please fill in the required fields');
             return;
         }
 
         if (formData.phone && !isValidPhone(formData.phone)) {
             toast.error('Phone number must be exactly 10 digits');
+            return;
+        }
+
+        if (formData.email && !isValidEmail(formData.email)) {
+            toast.error('Only Gmail addresses are accepted (e.g. name@gmail.com)');
             return;
         }
 
@@ -913,17 +925,14 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                 </div>
                                 <div className="flex items-center gap-2 text-sm">
                                     <span className="text-muted-foreground">Rows per page:</span>
-                                    <Select value={pageSize.toString()} onValueChange={(value) => { setPageSize(Number(value)); setCurrentPage(1); }}>
-                                        <SelectTrigger className="w-16 h-8">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="5">5</SelectItem>
-                                            <SelectItem value="10">10</SelectItem>
-                                            <SelectItem value="20">20</SelectItem>
-                                            <SelectItem value="50">50</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    <InfiniteScrollDropdown
+                                        data={[{id:'5',value:'5',label:'5'},{id:'10',value:'10',label:'10'},{id:'20',value:'20',label:'20'},{id:'50',value:'50',label:'50'}]}
+                                        value={pageSize.toString()}
+                                        onChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}
+                                        placeholder="10"
+                                        clearable={false}
+                                        className="w-24"
+                                    />
                                     <span className="text-muted-foreground">
                                         {filteredData.length === 0 ? '0' : `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, filteredData.length)}`} of {filteredData.length}
                                     </span>
@@ -1038,9 +1047,14 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     </label>
                     <Input
                         value={formData.first_name}
-                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setFirstNameError(val.trim() ? '' : 'First name is required');
+                            setFormData({ ...formData, first_name: val });
+                        }}
                         placeholder="Enter first name"
                     />
+                    {firstNameError && <span className="text-red-500 text-sm">{firstNameError}</span>}
                 </div>
 
                 <div>
@@ -1063,8 +1077,8 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                         value={formData.email}
                         onChange={(e) => {
                             const val = e.target.value;
-                            const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-                            setEmailError(val && !valid ? 'Please enter a valid email address' : '');
+                            const valid = isValidEmail(val);
+                            setEmailError(val && !valid ? 'Only Gmail addresses are accepted (e.g. name@gmail.com)' : '');
                             setFormData({ ...formData, email: val });
                         }}
                         placeholder="Enter email address"
@@ -1097,19 +1111,13 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     <label className="block text-sm font-medium text-foreground mb-1">
                         Gender
                     </label>
-                    <Select
+                    <InfiniteScrollDropdown
+                        data={[{id:'Male',value:'Male',label:'Male'},{id:'Female',value:'Female',label:'Female'},{id:'Other',value:'Other',label:'Other'}]}
                         value={formData.gender || ''}
-                        onValueChange={(value) => setFormData({ ...formData, gender: value as 'Male' | 'Female' | 'Other' })}
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Male">Male</SelectItem>
-                            <SelectItem value="Female">Female</SelectItem>
-                            <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                    </Select>
+                        onChange={(v) => setFormData({ ...formData, gender: v as 'Male' | 'Female' | 'Other' })}
+                        placeholder="Select gender"
+                        clearable={false}
+                    />
                 </div>
 
                 <div>
@@ -1129,10 +1137,15 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     </label>
                     <DatePicker
                         value={formData.joining_date}
-                        onChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, joining_date: v }); }}
+                        onChange={(v) => {
+                            setIsFormDirty(true);
+                            setJoiningDateError(v ? '' : 'Joining date is required');
+                            setFormData({ ...formData, joining_date: v });
+                        }}
                         placeholder="Select joining date"
                         required
                     />
+                    {joiningDateError && <span className="text-red-500 text-sm">{joiningDateError}</span>}
                 </div>
 
                 <div>
@@ -1201,16 +1214,13 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className="block text-xs font-medium mb-1">Level *</label>
-                                    <Select value={qual.level} onValueChange={(v) => handleQualChange(idx, 'level', v)}>
-                                        <SelectTrigger className="h-8 text-xs">
-                                            <SelectValue placeholder="Select level" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {QUALIFICATION_LEVELS.map(l => (
-                                                <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <InfiniteScrollDropdown
+                                        data={QUALIFICATION_LEVELS.map(l => ({ id: l.value, value: l.value, label: l.label }))}
+                                        value={qual.level}
+                                        onChange={(v) => handleQualChange(idx, 'level', v as string)}
+                                        placeholder="Select level"
+                                        clearable={false}
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium mb-1">Degree / Course *</label>
@@ -1407,15 +1417,13 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-foreground mb-1">Account Type</label>
-                    <Select value={formData.account_type || ''} onValueChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, account_type: v as 'Savings' | 'Current' }); }}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select account type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Savings">Savings</SelectItem>
-                            <SelectItem value="Current">Current</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <InfiniteScrollDropdown
+                        data={[{id:'Savings',value:'Savings',label:'Savings'},{id:'Current',value:'Current',label:'Current'}]}
+                        value={formData.account_type || ''}
+                        onChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, account_type: v as 'Savings' | 'Current' }); }}
+                        placeholder="Select account type"
+                        clearable={false}
+                    />
                 </div>
 
                 {/* Salary & PF */}

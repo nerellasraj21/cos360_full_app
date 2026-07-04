@@ -71,16 +71,22 @@ export const AddressStepForm = () => {
           )}
         </div>
 
-        <StateDropdown
-          id="state_id"
-          label="State"
-          value={stateId || ''}
-          required={true}
-          onChange={(value) => {
-            console.log('State selected:', value);
-            setValue('state_id', value || '', { shouldValidate: true, shouldDirty: true });
-          }}
-        />
+        <div>
+          <input type="hidden" {...register('state_id', { required: 'State is required' })} />
+          <StateDropdown
+            id="state_id"
+            label="State"
+            value={stateId || ''}
+            required={true}
+            onChange={(value) => {
+              console.log('State selected:', value);
+              setValue('state_id', value || '', { shouldValidate: true, shouldDirty: true });
+            }}
+          />
+          {errors.state_id && (
+            <span className="text-red-500 text-sm">{errors.state_id.message as string}</span>
+          )}
+        </div>
 
         <DistrictDropdown
           id="district_id"

@@ -239,6 +239,8 @@ export interface StudentDropdownItem {
   name: string;
   admission_number?: string;
   display_name?: string;
+  current_class_id?: string;
+  current_section_id?: string;
 }
 
 export interface StudentDropdownSimpleItem {

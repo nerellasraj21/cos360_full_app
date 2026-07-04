@@ -110,6 +110,13 @@ export default function CreateExam() {
     }
   }, [academicYears.length, fetchAndSetAcademicYears])
 
+  // Keep form academic_year_id in sync with the globally selected academic year
+  useEffect(() => {
+    if (selectedAcademicYearId) {
+      form.setValue('academic_year_id', selectedAcademicYearId)
+    }
+  }, [selectedAcademicYearId])
+
   // Load available classes — correct endpoint: /masters/class_sections/read_all
   useEffect(() => {
     CAxios.get('/masters/class_sections/read_all').then(r => {
@@ -400,17 +407,12 @@ export default function CreateExam() {
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Academic Year *</label>
-                <ReactSelect
-                  options={academicYears.map(ay => ({ value: String(ay.id), label: ay.title ?? String(ay.id) }))}
-                  value={form.watch('academic_year_id') ? { value: form.watch('academic_year_id'), label: academicYears.find(ay => String(ay.id) === form.watch('academic_year_id'))?.title ?? form.watch('academic_year_id') } : null}
-                  onChange={opt => form.setValue('academic_year_id', opt?.value ?? '')}
-                  placeholder="Select year"
-                  menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                  styles={selectStyles}
+                <Input
+                  value={academicYears.find(ay => String(ay.id) === form.watch('academic_year_id'))?.title ?? form.watch('academic_year_id') ?? ''}
+                  readOnly
+                  disabled
+                  className="cursor-not-allowed opacity-75"
                 />
-                {form.formState.errors.academic_year_id && (
-                  <p className="text-xs text-destructive">{form.formState.errors.academic_year_id.message}</p>
-                )}
               </div>
 
               <div className="space-y-1">

@@ -33,6 +33,9 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
   const [phoneError, setPhoneError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [experienceError, setExperienceError] = useState('');
+  const [firstNameError, setFirstNameError] = useState('');
+  const [joiningDateError, setJoiningDateError] = useState('');
+  const [roleError, setRoleError] = useState('');
   const [formData, setFormData] = useState({
     first_name: initialData?.first_name || '',
     last_name: initialData?.last_name || '',
@@ -58,18 +61,18 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.first_name.trim()) {
-      toast.error('First name is required');
-      return;
-    }
+    const nextFirstNameError = formData.first_name.trim() ? '' : 'First name is required';
+    const nextJoiningDateError = formData.joining_date ? '' : 'Joining date is required';
+    const nextRoleError = formData.role_id ? '' : 'Role is required';
+    const nextPhoneError = validatePhoneMessage(formData.phone);
 
-    if (!formData.joining_date) {
-      toast.error('Joining date is required');
-      return;
-    }
+    setFirstNameError(nextFirstNameError);
+    setJoiningDateError(nextJoiningDateError);
+    setRoleError(nextRoleError);
+    setPhoneError(nextPhoneError);
 
-    if (formData.phone && !isValidPhone(formData.phone)) {
-      toast.error('Phone number must be exactly 10 digits');
+    if (nextFirstNameError || nextJoiningDateError || nextRoleError || nextPhoneError || emailError || experienceError) {
+      toast.error('Please fix the highlighted fields before saving');
       return;
     }
 
@@ -123,10 +126,15 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
                   <Input
                     id="first_name"
                     value={formData.first_name}
-                    onChange={(e) => handleInputChange('first_name', e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFirstNameError(val.trim() ? '' : 'First name is required');
+                      handleInputChange('first_name', val);
+                    }}
                     placeholder="Enter first name"
                     required
                   />
+                  {firstNameError && <span className="text-red-500 text-sm">{firstNameError}</span>}
                 </div>
                 <div>
                   <Label htmlFor="last_name">Last Name</Label>
@@ -203,10 +211,14 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
                   <Label>Joining Date *</Label>
                   <DatePicker
                     value={formData.joining_date}
-                    onChange={(v) => handleInputChange('joining_date', v)}
+                    onChange={(v) => {
+                      setJoiningDateError(v ? '' : 'Joining date is required');
+                      handleInputChange('joining_date', v);
+                    }}
                     placeholder="Select joining date"
                     required
                   />
+                  {joiningDateError && <span className="text-red-500 text-sm">{joiningDateError}</span>}
                 </div>
               </div>
             </div>
@@ -271,7 +283,13 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
 
               <div>
                 <Label htmlFor="role_id">Role *</Label>
-                <Select value={formData.role_id} onValueChange={(value) => handleInputChange('role_id', value)}>
+                <Select
+                  value={formData.role_id}
+                  onValueChange={(value) => {
+                    setRoleError(value ? '' : 'Role is required');
+                    handleInputChange('role_id', value);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
@@ -283,6 +301,7 @@ export function StaffEnrollmentForm({ initialData, onSuccess, onCancel }: StaffE
                     ))}
                   </SelectContent>
                 </Select>
+                {roleError && <span className="text-red-500 text-sm">{roleError}</span>}
               </div>
             </div>
 

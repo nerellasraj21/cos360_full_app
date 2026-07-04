@@ -46,7 +46,10 @@ function StudentsDashboard() {
   const studentsMenu = menuItems.find(
     (item) => item.name.toLowerCase() === 'students'
   )
-  const sections = studentsMenu?.children ?? []
+  const HIDDEN = new Set(['student transport'])
+  const sections = (studentsMenu?.children ?? []).filter(
+    (c) => !HIDDEN.has(c.name.toLowerCase())
+  )
 
   return (
     <div className="space-y-6">

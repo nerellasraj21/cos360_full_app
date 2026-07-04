@@ -1,7 +1,7 @@
-import React from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import React, { useMemo } from 'react';
+import { InfiniteScrollDropdown } from '@/components/dropdown/InfiniteScrollDropdown';
 import { useExpenseCategoryDropdown } from '@/hooks/expense';
-import type { ExpenseCategoryDropdown as ExpenseCategoryDropdownType } from '@/types/expense/index';
+import type { DropdownOption } from '@/types/dropdown';
 
 interface ExpenseCategoryDropdownProps {
   value?: string;
@@ -20,25 +20,24 @@ export function ExpenseCategoryDropdown({
 }: ExpenseCategoryDropdownProps) {
   const { data: categories = [], isLoading } = useExpenseCategoryDropdown();
 
+  const options: DropdownOption[] = useMemo(() =>
+    categories.map(c => ({
+      id: c.id,
+      value: c.id,
+      label: c.name,
+    })), [categories]);
+
   return (
-    <Select
-      value={value}
-      onValueChange={onValueChange}
+    <InfiniteScrollDropdown
+      data={options}
+      value={value || ''}
+      onChange={(val) => onValueChange?.(val as string)}
+      placeholder={placeholder}
       disabled={disabled || isLoading}
-    >
-      <SelectTrigger className={className}>
-        <SelectValue placeholder={isLoading ? "Loading..." : placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {categories.map((category: ExpenseCategoryDropdownType) => (
-          <SelectItem key={category.id} value={category.id}>
-            {category.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+      clearable={false}
+      className={className}
+    />
   );
 }
 
-// Export for use in other components
 export default ExpenseCategoryDropdown;

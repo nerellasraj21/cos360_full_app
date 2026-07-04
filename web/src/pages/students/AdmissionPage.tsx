@@ -64,7 +64,7 @@ const AdmissionPage = () => {
           />
         )}
 
-        <Dialog open={isFormOpen} onOpenChange={() => {}} modal={false}>
+        <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) setIsFormOpen(false); }} modal={false}>
           <DialogContent
             className="left-16 lg:left-64 right-2 w-auto max-w-none translate-x-0"
             customLayout

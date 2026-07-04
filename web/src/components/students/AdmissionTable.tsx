@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ViewButton, EditButton, ActivateButton, DeactivateButton, TableActionGroup } from '@/components/common/TableActions';
 import { Loader2, Eye, Edit, CheckCircle, XCircle, UserCircle, X, Plus } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { InfiniteScrollDropdown } from '@/components/dropdown/InfiniteScrollDropdown';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -258,29 +258,19 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       label: 'Class',
       editable: true,
       renderEdit: (value, row, onChange) => (
-        <Select
+        <InfiniteScrollDropdown
+          data={classesData.map(c => ({ id: c.id, value: c.id, label: c.name }))}
           value={row.current_class_id}
-          onValueChange={(classId) => {
-            const className = getClassName(classId);
+          onChange={(classId) => {
+            const className = getClassName(classId as string);
             onChange(className);
-            // Also update the class_id in the row data
-            row.current_class_id = classId;
-            // Reset section when class changes
+            row.current_class_id = classId as string;
             row.current_section_id = '';
             row.section_name = 'Select Section';
           }}
-        >
-          <SelectTrigger className="h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {classesData.map((classItem) => (
-              <SelectItem key={classItem.id} value={classItem.id}>
-                {classItem.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          placeholder="Select Class"
+          clearable={false}
+        />
       )
     },
     {
@@ -290,28 +280,19 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       renderEdit: (value, row, onChange) => {
         const selectedClass = classesData.find(c => c.id === row.current_class_id);
         const sections = selectedClass?.sections || [];
-
         return (
-          <Select
+          <InfiniteScrollDropdown
+            data={sections.map(s => ({ id: s.id, value: s.id, label: s.name }))}
             value={row.current_section_id}
-            onValueChange={(sectionId) => {
-              const sectionName = getSectionName(row.current_class_id, sectionId);
+            onChange={(sectionId) => {
+              const sectionName = getSectionName(row.current_class_id, sectionId as string);
               onChange(sectionName);
-              row.current_section_id = sectionId;
+              row.current_section_id = sectionId as string;
             }}
+            placeholder="Select Section"
             disabled={!row.current_class_id}
-          >
-            <SelectTrigger className="h-8">
-              <SelectValue placeholder="Select Section" />
-            </SelectTrigger>
-            <SelectContent>
-              {sections.map((section) => (
-                <SelectItem key={section.id} value={section.id}>
-                  {section.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            clearable={false}
+          />
         );
       }
     },
@@ -735,42 +716,26 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
                 <div>
                   <Label htmlFor="edit-admission-type">Admission Type</Label>
-                  <Select
+                  <InfiniteScrollDropdown
+                    data={admissionTypes.map(t => ({ id: t.value, value: t.value, label: t.label }))}
                     value={editForm.admission_type}
-                    onValueChange={(value) => setEditForm(prev => ({ ...prev, admission_type: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {admissionTypes.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => setEditForm(prev => ({ ...prev, admission_type: value as string }))}
+                    placeholder="Select type"
+                    clearable={false}
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-academic-year">Academic Year</Label>
-                  <Select
+                  <InfiniteScrollDropdown
+                    data={academicYears.map(y => ({ id: String(y.id), value: String(y.id), label: y.title }))}
                     value={editForm.academic_year_id}
-                    onValueChange={(value) => setEditForm(prev => ({ ...prev, academic_year_id: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select academic year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {academicYears.map((year) => (
-                        <SelectItem key={String(year.id)} value={String(year.id)}>
-                          {year.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => setEditForm(prev => ({ ...prev, academic_year_id: value as string }))}
+                    placeholder="Select academic year"
+                    clearable={false}
+                  />
                 </div>
 
                 <div>{/* spacer */}</div>
@@ -780,49 +745,28 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-admitted-class">Admitted Class</Label>
-                  <Select
+                  <InfiniteScrollDropdown
+                    data={classesData.map(c => ({ id: String(c.id), value: String(c.id), label: c.name }))}
                     value={editForm.admitted_class_id}
-                    onValueChange={(value) => {
-                      setEditForm(prev => ({
-                        ...prev,
-                        admitted_class_id: value,
-                        admitted_section_id: ''
-                      }));
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select class" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {classesData.map((classItem) => (
-                        <SelectItem key={String(classItem.id)} value={String(classItem.id)}>
-                          {classItem.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => setEditForm(prev => ({ ...prev, admitted_class_id: value as string, admitted_section_id: '' }))}
+                    placeholder="Select class"
+                    clearable={false}
+                  />
                 </div>
 
                 <div>
                   <Label htmlFor="edit-admitted-section">Admitted Section</Label>
-                  <Select
+                  <InfiniteScrollDropdown
+                    data={(editForm.admitted_class_id
+                      ? classesData.find(c => String(c.id) === String(editForm.admitted_class_id))?.sections ?? []
+                      : []
+                    ).map(s => ({ id: String(s.id), value: String(s.id), label: s.name }))}
                     value={editForm.admitted_section_id}
-                    onValueChange={(value) => setEditForm(prev => ({ ...prev, admitted_section_id: value }))}
+                    onChange={(value) => setEditForm(prev => ({ ...prev, admitted_section_id: value as string }))}
+                    placeholder="Select section"
                     disabled={!editForm.admitted_class_id}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select section" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {editForm.admitted_class_id && classesData
-                        .find(c => String(c.id) === String(editForm.admitted_class_id))
-                        ?.sections.map((section) => (
-                          <SelectItem key={String(section.id)} value={String(section.id)}>
-                            {section.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                    clearable={false}
+                  />
                 </div>
               </div>
 
@@ -830,49 +774,28 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-class">Current Class</Label>
-                  <Select
+                  <InfiniteScrollDropdown
+                    data={classesData.map(c => ({ id: String(c.id), value: String(c.id), label: c.name }))}
                     value={editForm.current_class_id}
-                    onValueChange={(value) => {
-                      setEditForm(prev => ({
-                        ...prev,
-                        current_class_id: value,
-                        current_section_id: '' // Reset section when class changes
-                      }));
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select class" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {classesData.map((classItem) => (
-                        <SelectItem key={String(classItem.id)} value={String(classItem.id)}>
-                          {classItem.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => setEditForm(prev => ({ ...prev, current_class_id: value as string, current_section_id: '' }))}
+                    placeholder="Select class"
+                    clearable={false}
+                  />
                 </div>
 
                 <div>
                   <Label htmlFor="edit-section">Current Section</Label>
-                  <Select
+                  <InfiniteScrollDropdown
+                    data={(editForm.current_class_id
+                      ? classesData.find(c => String(c.id) === String(editForm.current_class_id))?.sections ?? []
+                      : []
+                    ).map(s => ({ id: String(s.id), value: String(s.id), label: s.name }))}
                     value={editForm.current_section_id}
-                    onValueChange={(value) => setEditForm(prev => ({ ...prev, current_section_id: value }))}
+                    onChange={(value) => setEditForm(prev => ({ ...prev, current_section_id: value as string }))}
+                    placeholder="Select section"
                     disabled={!editForm.current_class_id}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select section" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {editForm.current_class_id && classesData
-                        .find(c => String(c.id) === String(editForm.current_class_id))
-                        ?.sections.map((section) => (
-                          <SelectItem key={String(section.id)} value={String(section.id)}>
-                            {section.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                    clearable={false}
+                  />
                 </div>
               </div>
 
@@ -1086,27 +1009,26 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                 </div>
                 <div>
                   <Label htmlFor="edit-gender">Gender <span className="text-red-500">*</span></Label>
-                  <Select value={editForm.gender} onValueChange={(v) => setEditForm(prev => ({ ...prev, gender: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="M">Male</SelectItem>
-                      <SelectItem value="F">Female</SelectItem>
-                      <SelectItem value="O">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <InfiniteScrollDropdown
+                    data={[{id:'M',value:'M',label:'Male'},{id:'F',value:'F',label:'Female'},{id:'O',value:'O',label:'Other'}]}
+                    value={editForm.gender}
+                    onChange={(v) => setEditForm(prev => ({ ...prev, gender: v as string }))}
+                    placeholder="Select gender"
+                    clearable={false}
+                  />
                   {!editForm.gender && <span className="text-red-500 text-sm">Gender is required</span>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-is-primary">Primary Status</Label>
-                  <Select value={editForm.is_primary} onValueChange={(v) => setEditForm(prev => ({ ...prev, is_primary: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="not_primary">Not Primary</SelectItem>
-                      <SelectItem value="primary">Primary</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <InfiniteScrollDropdown
+                    data={[{id:'not_primary',value:'not_primary',label:'Not Primary'},{id:'primary',value:'primary',label:'Primary'}]}
+                    value={editForm.is_primary}
+                    onChange={(v) => setEditForm(prev => ({ ...prev, is_primary: v as string }))}
+                    placeholder="Select status"
+                    clearable={false}
+                  />
                 </div>
                 <div>{/* spacer */}</div>
               </div>
@@ -1222,29 +1144,25 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                 </div>
                 <div>
                   <Label htmlFor="edit-father-gender">Gender (Optional)</Label>
-                  <Select value={editForm.father_gender} onValueChange={(v) => setEditForm(prev => ({ ...prev, father_gender: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="M">Male</SelectItem>
-                      <SelectItem value="F">Female</SelectItem>
-                      <SelectItem value="O">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <InfiniteScrollDropdown
+                    data={[{id:'M',value:'M',label:'Male'},{id:'F',value:'F',label:'Female'},{id:'O',value:'O',label:'Other'}]}
+                    value={editForm.father_gender}
+                    onChange={(v) => setEditForm(prev => ({ ...prev, father_gender: v as string }))}
+                    placeholder="Select gender"
+                    clearable={false}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-father-salary">Salary Range (Optional)</Label>
-                  <Select value={editForm.father_salary_range} onValueChange={(v) => setEditForm(prev => ({ ...prev, father_salary_range: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select salary range" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="below_1l">Below 1L</SelectItem>
-                      <SelectItem value="1l_3l">1L - 3L</SelectItem>
-                      <SelectItem value="3l_5l">3L - 5L</SelectItem>
-                      <SelectItem value="5l_10l">5L - 10L</SelectItem>
-                      <SelectItem value="above_10l">Above 10L</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <InfiniteScrollDropdown
+                    data={[{id:'below_1l',value:'below_1l',label:'Below 1L'},{id:'1l_3l',value:'1l_3l',label:'1L - 3L'},{id:'3l_5l',value:'3l_5l',label:'3L - 5L'},{id:'5l_10l',value:'5l_10l',label:'5L - 10L'},{id:'above_10l',value:'above_10l',label:'Above 10L'}]}
+                    value={editForm.father_salary_range}
+                    onChange={(v) => setEditForm(prev => ({ ...prev, father_salary_range: v as string }))}
+                    placeholder="Select salary range"
+                    clearable={false}
+                  />
                 </div>
               </div>
 
@@ -1281,29 +1199,25 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                 </div>
                 <div>
                   <Label htmlFor="edit-mother-gender">Gender (Optional)</Label>
-                  <Select value={editForm.mother_gender} onValueChange={(v) => setEditForm(prev => ({ ...prev, mother_gender: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="M">Male</SelectItem>
-                      <SelectItem value="F">Female</SelectItem>
-                      <SelectItem value="O">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <InfiniteScrollDropdown
+                    data={[{id:'M',value:'M',label:'Male'},{id:'F',value:'F',label:'Female'},{id:'O',value:'O',label:'Other'}]}
+                    value={editForm.mother_gender}
+                    onChange={(v) => setEditForm(prev => ({ ...prev, mother_gender: v as string }))}
+                    placeholder="Select gender"
+                    clearable={false}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-mother-salary">Salary Range (Optional)</Label>
-                  <Select value={editForm.mother_salary_range} onValueChange={(v) => setEditForm(prev => ({ ...prev, mother_salary_range: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select salary range" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="below_1l">Below 1L</SelectItem>
-                      <SelectItem value="1l_3l">1L - 3L</SelectItem>
-                      <SelectItem value="3l_5l">3L - 5L</SelectItem>
-                      <SelectItem value="5l_10l">5L - 10L</SelectItem>
-                      <SelectItem value="above_10l">Above 10L</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <InfiniteScrollDropdown
+                    data={[{id:'below_1l',value:'below_1l',label:'Below 1L'},{id:'1l_3l',value:'1l_3l',label:'1L - 3L'},{id:'3l_5l',value:'3l_5l',label:'3L - 5L'},{id:'5l_10l',value:'5l_10l',label:'5L - 10L'},{id:'above_10l',value:'above_10l',label:'Above 10L'}]}
+                    value={editForm.mother_salary_range}
+                    onChange={(v) => setEditForm(prev => ({ ...prev, mother_salary_range: v as string }))}
+                    placeholder="Select salary range"
+                    clearable={false}
+                  />
                 </div>
               </div>
 
@@ -1340,29 +1254,25 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                 </div>
                 <div>
                   <Label htmlFor="edit-guardian-gender">Gender (Optional)</Label>
-                  <Select value={editForm.guardian_gender} onValueChange={(v) => setEditForm(prev => ({ ...prev, guardian_gender: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="M">Male</SelectItem>
-                      <SelectItem value="F">Female</SelectItem>
-                      <SelectItem value="O">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <InfiniteScrollDropdown
+                    data={[{id:'M',value:'M',label:'Male'},{id:'F',value:'F',label:'Female'},{id:'O',value:'O',label:'Other'}]}
+                    value={editForm.guardian_gender}
+                    onChange={(v) => setEditForm(prev => ({ ...prev, guardian_gender: v as string }))}
+                    placeholder="Select gender"
+                    clearable={false}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-guardian-salary">Salary Range (Optional)</Label>
-                  <Select value={editForm.guardian_salary_range} onValueChange={(v) => setEditForm(prev => ({ ...prev, guardian_salary_range: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select salary range" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="below_1l">Below 1L</SelectItem>
-                      <SelectItem value="1l_3l">1L - 3L</SelectItem>
-                      <SelectItem value="3l_5l">3L - 5L</SelectItem>
-                      <SelectItem value="5l_10l">5L - 10L</SelectItem>
-                      <SelectItem value="above_10l">Above 10L</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <InfiniteScrollDropdown
+                    data={[{id:'below_1l',value:'below_1l',label:'Below 1L'},{id:'1l_3l',value:'1l_3l',label:'1L - 3L'},{id:'3l_5l',value:'3l_5l',label:'3L - 5L'},{id:'5l_10l',value:'5l_10l',label:'5L - 10L'},{id:'above_10l',value:'above_10l',label:'Above 10L'}]}
+                    value={editForm.guardian_salary_range}
+                    onChange={(v) => setEditForm(prev => ({ ...prev, guardian_salary_range: v as string }))}
+                    placeholder="Select salary range"
+                    clearable={false}
+                  />
                 </div>
               </div>
             </div>

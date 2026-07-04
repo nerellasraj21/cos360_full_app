@@ -13,6 +13,7 @@ export interface MenuItem {
 const HIDDEN_MENU_ITEMS = new Set([
     'route stops',
     'transport trips',
+    'student transport',
 ]);
 
 const isHiddenItem = (item: MenuItem): boolean =>
@@ -72,6 +73,62 @@ const SCHOOL_REG_ITEM: MenuItem = {
     children: [],
 };
 
+// Matches the sections on FeeDashboard's FeeNavigation cards
+const FEE_SUBMENU_ITEMS: MenuItem[] = [
+    { id: 99101, name: 'Fee Categories',    url: '/fee/categories',    level: 'L1', children: [] },
+    { id: 99102, name: 'Fee Types',         url: '/fee/types',         level: 'L1', children: [] },
+    { id: 99103, name: 'Fee Terms',         url: '/fee/terms',         level: 'L1', children: [] },
+    { id: 99104, name: 'Fee Mappings',      url: '/fee/mappings',      level: 'L1', children: [] },
+    { id: 99105, name: 'Fee Term Amounts',  url: '/fee/term-amounts',  level: 'L1', children: [] },
+    { id: 99106, name: 'Fee Collection',    url: '/fee/collection',    level: 'L1', children: [] },
+    { id: 99107, name: 'Fee Receipts',      url: '/fee/receipts',      level: 'L1', children: [] },
+    { id: 99108, name: 'Fee Refunds',       url: '/fee/refunds',       level: 'L1', children: [] },
+];
+
+// Backend sometimes sends "Fee Management" as a flat L0 link with no children.
+// Only admin/staff-type roles should get the full admin submodule list here —
+// students and parents have their own restricted Fee views handled elsewhere.
+const injectFeeSubmenu = (items: MenuItem[], roleName: string): MenuItem[] => {
+    if (roleName === 'student' || roleName === 'parent' || roleName === 'teacher') return items;
+
+    return items.map(item => {
+        if (isFeeItem(item) && item.level === 'L0' && (!item.children || item.children.length === 0)) {
+            return { ...item, children: FEE_SUBMENU_ITEMS };
+        }
+        return item;
+    });
+};
+
+// Canonical top-level menu order as agreed in MOM 13-6-2026
+const MENU_ORDER: string[] = [
+    'dashboard',
+    'students',
+    'student',
+    'staff management',
+    'staff',
+    'exam management',
+    'exams',
+    'fee management',
+    'fee',
+    'fees',
+    'expense',
+    'expenses',
+    'communication',
+    'reports',
+    'masters',
+    'administration',
+    'transport',
+];
+
+const menuOrderIndex = (item: MenuItem): number => {
+    const name = item.name.toLowerCase();
+    const idx = MENU_ORDER.indexOf(name);
+    return idx === -1 ? MENU_ORDER.length : idx;
+};
+
+const reorderMenu = (items: MenuItem[]): MenuItem[] =>
+    [...items].sort((a, b) => menuOrderIndex(a) - menuOrderIndex(b));
+
 const injectSchoolSettings = (items: MenuItem[], roleName: string): MenuItem[] => {
     if (roleName === 'teacher' || roleName === 'student') return items;
 
@@ -123,9 +180,11 @@ export const useMenuData = () => {
             const transformedMenu = menuItems.map((item: any) => transformMenuItem(item, 0));
             const roleName = role?.name?.toLowerCase() ?? '';
             const filteredMenu = filterMenuForRole(transformedMenu, roleName);
-            const enrichedMenu = injectSchoolSettings(filteredMenu, roleName);
-            console.log('Transformed menu data:', enrichedMenu);
-            return enrichedMenu;
+            const feeEnrichedMenu = injectFeeSubmenu(filteredMenu, roleName);
+            const enrichedMenu = injectSchoolSettings(feeEnrichedMenu, roleName);
+            const orderedMenu = reorderMenu(enrichedMenu);
+            console.log('Transformed menu data:', orderedMenu);
+            return orderedMenu;
         },
         enabled: !!user && !!menuItems && menuItems.length > 0
     });

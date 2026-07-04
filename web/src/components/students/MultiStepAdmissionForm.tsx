@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +33,11 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
   const [currentStep, setCurrentStep] = useState(0);
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+  }, [currentStep]);
 
   const mediaBase = config.api.baseURL.replace(/\/api\/v\d+$/, '');
   const createAdmission = useCreateAdmission();
@@ -44,7 +49,7 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
     defaultValues: {
       admission_number: '',
       admission_date: new Date().toISOString().split('T')[0],
-      admission_type: 'non_primary',
+      admission_type: 'regular',
       primary_phone: '',
       academic_year_id: selectedAcademicYearId || '',
       admitted_academic_year_id: selectedAcademicYearId || '',
@@ -132,27 +137,13 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
 
   const nextStep = async () => {
     const stepFields = {
-      0: ['admission_date'],
-      1: ['admission_number', 'student_first_name', 'student_last_name', 'student_date_of_birth', 'student_gender', 'student_aadhar_number', 'student_apaar_number', 'primary_phone'],
+      0: ['admission_date', 'admitted_class_id', 'current_class_id', 'current_section_id'],
+      1: ['admission_number', 'student_first_name', 'student_last_name', 'student_date_of_birth', 'student_gender', 'student_aadhar_number', 'student_apaar_number'],
       2: ['father_name', 'father_email', 'mother_name', 'mother_email', 'father_phone', 'mother_phone', 'guardian_phone'],
       3: ['address_line1', 'city', 'state_id'],
       4: [],
       5: []
     };
-
-    // Step 0: manually check dropdown fields (they use setValue, not register, so trigger() skips them)
-    if (currentStep === 0) {
-      const values = methods.getValues();
-      const missing: string[] = [];
-      if (!values.admission_type) missing.push('Admission Type');
-      if (!values.admitted_class_id) missing.push('Joining Class');
-      if (!values.current_class_id) missing.push('Current Class');
-      if (!values.current_section_id) missing.push('Current Section');
-      if (missing.length > 0) {
-        toast.error(`Please fill in required fields: ${missing.join(', ')}`);
-        return;
-      }
-    }
 
     const fieldsToValidate = stepFields[currentStep as keyof typeof stepFields] || [];
     const isValid = await trigger(fieldsToValidate as any);
@@ -192,13 +183,10 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
         'Current Section':     { value: data.current_section_id, step: 0 },
         'Admission Number':    { value: data.admission_number, step: 1 },
         'Student First Name':  { value: data.student_first_name, step: 1 },
-        'Student Last Name':   { value: data.student_last_name, step: 1 },
         'Student Date of Birth': { value: data.student_date_of_birth, step: 1 },
         'Student Gender':      { value: data.student_gender, step: 1 },
         "Father's Name":       { value: data.father_name, step: 2 },
-        "Father's Email":      { value: data.father_email, step: 2 },
         "Mother's Name":       { value: data.mother_name, step: 2 },
-        "Mother's Email":      { value: data.mother_email, step: 2 },
         'Address Line 1':      { value: data.address_line1, step: 3 },
         'City':                { value: data.city, step: 3 },
         'State':               { value: data.state_id, step: 3 },
@@ -227,7 +215,7 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
       const cleanedData = {
         admission_number: data.admission_number,
         admission_date: data.admission_date,
-        admission_type: data.admission_type || 'non_primary',
+        admission_type: data.admission_type || 'regular',
         academic_year_id: currentAcademicYearId,
         admitted_academic_year_id: currentAcademicYearId,
         admitted_class_id: data.admitted_class_id || undefined,
@@ -254,13 +242,13 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
           is_primary: data.student_is_primary || 'not_primary',
           nationality: data.student_nationality || 'Indian',
           mother_tongue: data.student_mother_tongue || 'Telugu',
-          aadhar_number: data.student_aadhar_number || '',  // Required - send empty string if not provided
-          apaar_number: data.student_apaar_number || '',     // Required - send empty string if not provided
-          caste: data.caste_id || '',                        // Field name is 'caste' not 'caste_id'
-          sub_caste: data.sub_caste_id || '',                // Field name is 'sub_caste' not 'sub_caste_id'
-          community: data.student_community || '',           // Required - send empty string if not provided
-          identification_marks: data.student_identification_marks || '',  // Required - send empty string if not provided
-          primary_phone: data.primary_phone || '',  // Primary contact phone (required in the form, 10 digits)
+          aadhar_number: data.student_aadhar_number || undefined,
+          apaar_number: data.student_apaar_number || undefined,
+          caste: data.caste_id || undefined,
+          sub_caste: data.sub_caste_id || undefined,
+          community: data.student_community || undefined,
+          identification_marks: data.student_identification_marks || undefined,
+          primary_phone: data.primary_phone || null,
           father: {
             name: data.father_name || '',
             email: data.father_email || undefined,
@@ -387,7 +375,7 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
           }
         }}
       >
-        <div className="flex-1 overflow-y-auto">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">

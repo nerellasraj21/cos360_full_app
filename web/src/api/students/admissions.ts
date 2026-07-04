@@ -27,7 +27,7 @@ const handleApiError = (error: any): Error => {
     if (Array.isArray(apiError.detail)) {
       const validationErrors = apiError.detail
         .map((err: any) => {
-          const field = err.loc?.[1] || err.loc?.[0] || 'unknown';
+          const field = err.loc?.[err.loc.length - 1] || err.loc?.[0] || 'unknown';
           return `${field}: ${err.msg}`;
         })
         .join('; ');
@@ -39,7 +39,16 @@ const handleApiError = (error: any): Error => {
       return new Error(apiError.detail);
     }
 
-    return new Error('An error occurred');
+    // Handle object detail (e.g. FastAPI nested errors)
+    if (apiError.detail && typeof apiError.detail === 'object') {
+      return new Error(JSON.stringify(apiError.detail));
+    }
+
+    // Handle non-standard formats
+    if (apiError.message) return new Error(apiError.message);
+    if (typeof apiError === 'string') return new Error(apiError);
+
+    return new Error(`Server error (${error.response.status})`);
   }
   return new Error(error.message || 'Network error');
 };
@@ -53,7 +62,7 @@ export interface NextAdmissionNumberResponse {
 
 // Fetch format hint for admission number input
 export const getNextAdmissionNumber = async (
-  type: 'primary' | 'non_primary'
+  type: 'pre_primary' | 'regular'
 ): Promise<NextAdmissionNumberResponse> => {
   const { data } = await CAxios.get(`${STUDENTS_BASE}/admission/next-admission-number`, {
     params: { type },

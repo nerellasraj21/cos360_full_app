@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useClassesDropdown, useSectionsByClassId } from '@/hooks/masters/useClassesAndSections';
+import { ClassesDropdown } from '@/components/dropdown-system/components/ClassesDropdown';
+import { SectionsByClassDropdown } from '@/components/dropdown-system/components/SectionsByClassDropdown';
 import { useStudentSearch } from '@/hooks/fee';
 import type { StudentSearchParams, StudentSearchResult } from '@/types/fee';
 
@@ -35,9 +36,6 @@ export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
-
-  const { data: classes = [] } = useClassesDropdown();
-  const { data: sections = [] } = useSectionsByClassId(classId || '');
 
   const hasAnyFilter = !!(query.trim() || classId || sectionId);
 
@@ -90,36 +88,24 @@ export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
           onKeyDown={handleKeyDown}
           className="w-64"
         />
-        <Select
-          value={classId || ''}
-          onValueChange={(val) => {
-            setClassId(val || null);
-            setSectionId(null);
-          }}
-        >
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Class" />
-          </SelectTrigger>
-          <SelectContent>
-            {classes.map((c) => (
-              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={sectionId || ''}
-          onValueChange={(val) => setSectionId(val || null)}
-          disabled={!classId}
-        >
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Section" />
-          </SelectTrigger>
-          <SelectContent>
-            {sections.map((s) => (
-              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="w-40">
+          <ClassesDropdown
+            value={classId || ''}
+            onChange={(val) => {
+              setClassId(val || null);
+              setSectionId(null);
+            }}
+            placeholder="Class"
+          />
+        </div>
+        <div className="w-40">
+          <SectionsByClassDropdown
+            classId={classId || undefined}
+            value={sectionId || ''}
+            onChange={(val) => setSectionId(val || null)}
+            placeholder="Section"
+          />
+        </div>
         <Button onClick={handleSearch} disabled={!hasAnyFilter || isLoading} size="sm">
           <Search className="h-4 w-4 mr-1" /> Search
         </Button>
