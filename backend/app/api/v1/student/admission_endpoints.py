@@ -63,16 +63,16 @@ async def create_admission(
 async def get_next_admission_number(
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
-    type: Literal["primary", "non_primary"] = Query(
-        "non_primary", description="Admission type: primary or non_primary"
+    type: Literal["pre_primary", "regular"] = Query(
+        "regular", description="Admission type: pre_primary or regular"
     ),
 ):
     """
     Preview next admission number (non-binding).
 
     Returns the next available admission number for the specified type:
-    - Primary: P{YEAR}{SEQ} (e.g., P2024001)
-    - Non-Primary: NP{YEAR}{SEQ} (e.g., NP2024001)
+    - Pre-Primary: {YEAR}{SEQ:04d} (e.g., 20260001), sequence resets every year
+    - Regular: {SEQ:03d} (e.g., 001), sequence increments globally and never resets
 
     **Note**: This is a preview only. The actual number will be generated during admission creation.
 
@@ -89,7 +89,7 @@ async def get_next_admission_number(
 
     return {
         "next_number": preview_number,
-        "format": "P{YEAR}{SEQ}" if type == "primary" else "NP{YEAR}{SEQ}",
+        "format": "{YEAR}{SEQ:04d}" if type == "pre_primary" else "{SEQ:03d}",
         "type": type,
         "note": "Preview only. Actual number generated during admission creation.",
     }
@@ -327,6 +327,6 @@ async def get_admission_types_dropdown(request: Request, db: AsyncSession = Depe
     await check_role_plan_permission_with_error(db, request, role, "student_admissions", "read")
 
     return [
-        {"value": "primary", "label": "Primary Admission"},
-        {"value": "non_primary", "label": "Non-Primary Admission"},
+        {"value": "pre_primary", "label": "Pre Primary Admission"},
+        {"value": "regular", "label": "Regular Admission"},
     ]

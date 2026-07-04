@@ -9,8 +9,8 @@ from app.db.base import BaseOrg
 
 
 class AdmissionTypeEnum(enum.Enum):
-    primary = "primary"
-    non_primary = "non_primary"
+    pre_primary = "pre_primary"
+    regular = "regular"
 
 
 class Admission(BaseOrg):

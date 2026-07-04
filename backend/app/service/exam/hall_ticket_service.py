@@ -3,8 +3,9 @@ hall_ticket_service.py
 
 Eligibility check logic:
   - Attendance: query student_attendance table (raw SQL, cross-module)
-  - Fee: if exam_settings.exam_fee_type_id is set, check fee_transactions;
-         if not configured → treat all students as fee-paid.
+  - Fee: if exam_settings.hall_ticket_min_fee_paid_pct is set, compute
+         (total paid / total assigned) * 100 across all fee types for the
+         exam's academic year; if not configured → treat all students as fee-paid.
   - Upserts into hall_ticket_eligibility (one row per exam+student).
 """
 
@@ -80,32 +81,41 @@ async def _get_attendance_percent(
     return None
 
 
-async def _check_fee_paid(
+async def _get_fee_payment_pct(
     db: AsyncSession,
     student_id: UUID,
-    exam_fee_type_id: UUID | None,
-) -> bool:
-    """Returns True if fee_type is not configured or if fee is paid."""
-    if not exam_fee_type_id:
-        return True  # No exam fee configured → treat as paid
+    academic_year_id: UUID,
+) -> Decimal:
+    """
+    Returns (total paid / total assigned) * 100 across all fee types
+    for the student in the given academic year. Returns 0 if no fees assigned.
+    """
     sql = text("""
-        SELECT COUNT(*)
-        FROM fee_transactions ft
-        JOIN fee_transaction_items fti ON fti.fee_transaction_id = ft.id
-        WHERE ft.student_id = :sid
-          AND fti.fee_type_id = :fee_type_id
-          AND ft.status = 'paid'
+        SELECT
+            COALESCE(SUM(fsm.total_fee), 0) AS total_assigned,
+            COALESCE((
+                SELECT SUM(ft.total_amount)
+                FROM fee_transactions ft
+                WHERE ft.student_id = :sid
+                  AND ft.academic_year_id = :academic_year_id
+                  AND ft.status = 'completed'
+            ), 0) AS total_paid
+        FROM fee_student_mappings fsm
+        WHERE fsm.student_id = :sid
+          AND fsm.academic_year_id = :academic_year_id
     """)
     row = (
         await db.execute(
             sql,
             {
                 "sid": str(student_id),
-                "fee_type_id": str(exam_fee_type_id),
+                "academic_year_id": str(academic_year_id),
             },
         )
     ).fetchone()
-    return bool(row and row[0] > 0)
+    if not row or not row[0] or Decimal(str(row[0])) == 0:
+        return Decimal("0")
+    return (Decimal(str(row[1])) / Decimal(str(row[0]))) * Decimal("100")
 
 
 async def _generate_hall_ticket_number(exam_id: UUID, sequence: int, academic_year: str = "2025") -> str:
@@ -121,7 +131,7 @@ async def compute_eligibility(
     min_attendance = (
         settings.hall_ticket_min_attendance if settings and settings.hall_ticket_min_attendance else Decimal("75.00")
     )
-    exam_fee_type_id = settings.exam_fee_type_id if settings else None
+    min_fee_pct = settings.hall_ticket_min_fee_paid_pct if settings else None
 
     students = await _get_enrolled_students(db, exam_id)
     if not students:
@@ -149,8 +159,12 @@ async def compute_eligibility(
             )
             attendance_ok = att_pct is not None and att_pct >= min_attendance
 
-        # Check fee
-        fee_paid = await _check_fee_paid(db, student_id, exam_fee_type_id)
+        # Check fee payment percentage across all fee types for this academic year
+        if min_fee_pct is None:
+            fee_paid = True
+        else:
+            fee_pct = await _get_fee_payment_pct(db, student_id, exam.academic_year_id)
+            fee_paid = fee_pct >= Decimal(str(min_fee_pct))
 
         # Determine eligibility
         final_att_ok = attendance_ok

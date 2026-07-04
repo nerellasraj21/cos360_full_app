@@ -113,6 +113,27 @@ async def get_vehicle_routes(db: AsyncSession, vehicle_id: UUID):
         raise HTTPException(status_code=500, detail=f"Error retrieving vehicle routes: {str(e)}")
 
 
+async def get_vehicle_trips(db: AsyncSession, vehicle_id: UUID):
+    try:
+        from app.models.masters.transport.route_model import Route
+        from app.models.masters.transport.trip_model import Trip
+
+        query = (
+            select(Trip.id, Trip.trip_number, Trip.route_id, Route.route_name)
+            .join(Route, Route.id == Trip.route_id)
+            .where(Trip.vehicle_id == vehicle_id)
+            .order_by(Trip.trip_number)
+        )
+
+        result = await db.execute(query)
+        return [
+            {"id": trip.id, "trip_number": trip.trip_number, "route_id": trip.route_id, "route_name": trip.route_name}
+            for trip in result
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving vehicle trips: {str(e)}")
+
+
 async def get_vehicle_route_stops(db: AsyncSession, vehicle_id: UUID, route_id: UUID):
     """Get stops for a specific vehicle-route combination"""
     try:

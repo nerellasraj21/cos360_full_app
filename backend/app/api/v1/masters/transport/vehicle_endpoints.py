@@ -7,6 +7,7 @@ from app.db.tenant_session import get_tenant_db
 from app.schemas.masters.transport import (
     RouteDropdown,
     RouteStopDropdown,
+    TripDropdown,
     VehicleCreate,
     VehicleDropdown,
     VehicleOut,
@@ -18,6 +19,7 @@ from app.service.masters.transport import (
     get_individual_vehicle_by_id,
     get_vehicle_route_stops,
     get_vehicle_routes,
+    get_vehicle_trips,
     get_vehicles,
     get_vehicles_dropdown,
     update_all_details_vehicle,
@@ -74,6 +76,18 @@ async def get_vehicle_routes_endpoint(request: Request, vehicle_id: UUID, db: As
     await check_role_plan_permission_with_error(db, request, role, "vehicles", "read")
 
     return await get_vehicle_routes(db, vehicle_id)
+
+
+@router.get("/{vehicle_id}/trips", response_model=list[TripDropdown])
+async def get_vehicle_trips_endpoint(request: Request, vehicle_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
+    """Get trips associated with a specific vehicle."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, "vehicles", "read")
+
+    return await get_vehicle_trips(db, vehicle_id)
 
 
 @router.get("/{vehicle_id}/routes/{route_id}/stops", response_model=list[RouteStopDropdown])

@@ -51,28 +51,34 @@ from app.service.base.user_scoped_service import UserScopedService  # noqa: E402
 logger = logging.getLogger(__name__)
 
 
-async def generate_admission_number(db: AsyncSession, admission_date, admission_type: str = "non_primary") -> str:
+async def generate_admission_number(db: AsyncSession, admission_date, admission_type: str = "regular") -> str:
     """
-    Generate admission number with type-specific prefixes:
-    - Primary: P{YEAR}{SEQUENCE} (e.g., P2024001)
-    - Non-Primary: NP{YEAR}{SEQUENCE} (e.g., NP2024001)
+    Generate admission number without prefix:
+    - Pre-Primary: {YEAR}{SEQUENCE:04d} (e.g., 20260001), sequence resets every year
+    - Regular: {SEQUENCE:03d} (e.g., 001), sequence increments globally and never resets
     """
     year = admission_date.year
-    prefix = "P" if admission_type == "primary" else "NP"
+    is_pre_primary = admission_type == "pre_primary"
 
-    # Get the count of admissions for the current year AND type
-    count_stmt = select(func.count(Admission.id)).where(
-        and_(
-            extract("year", Admission.admission_date) == year,
+    if is_pre_primary:
+        # Pre-primary sequence is scoped to the admission year
+        count_stmt = select(func.count(Admission.id)).where(
+            and_(
+                extract("year", Admission.admission_date) == year,
+                func.cast(Admission.admission_type, String) == admission_type,
+            )
+        )
+    else:
+        # Regular sequence is global (no year prefix, so it must never repeat)
+        count_stmt = select(func.count(Admission.id)).where(
             func.cast(Admission.admission_type, String) == admission_type,
         )
-    )
     result = await db.execute(count_stmt)
     count = result.scalar() or 0
 
-    # Generate next sequence number (padded to 3 digits)
+    # 4-digit sequence for pre_primary, 3-digit for regular
     sequence = count + 1
-    admission_number = f"{prefix}{year}{sequence:03d}"
+    admission_number = f"{year}{sequence:04d}" if is_pre_primary else f"{sequence:03d}"
 
     # Check if admission number already exists (for safety)
     existing_stmt = select(Admission).where(Admission.admission_number == admission_number)
@@ -80,10 +86,9 @@ async def generate_admission_number(db: AsyncSession, admission_date, admission_
     existing = existing_result.scalar_one_or_none()
 
     if existing:
-        # If exists, increment until we find a unique one
         while existing:
             sequence += 1
-            admission_number = f"{prefix}{year}{sequence:03d}"
+            admission_number = f"{year}{sequence:04d}" if is_pre_primary else f"{sequence:03d}"
             existing_stmt = select(Admission).where(Admission.admission_number == admission_number)
             existing_result = await db.execute(existing_stmt)
             existing = existing_result.scalar_one_or_none()
@@ -141,7 +146,7 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
         # Generate admission number
         # Determine admission_type from admission or student.is_primary
         admission_type = admission.admission_type or (
-            "primary" if admission.student.is_primary == "primary" else "non_primary"
+            "pre_primary" if admission.student.is_primary == "primary" else "regular"
         )
 
         # Admission number is MANUAL for both primary and non-primary admissions:
@@ -183,11 +188,6 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
         if not admission.student.first_name or not admission.student.first_name.strip():
             raise create_validation_error(
                 message="Student first name is required", field="student.first_name", request=request
-            )
-
-        if not admission.student.last_name or not admission.student.last_name.strip():
-            raise create_validation_error(
-                message="Student last name is required", field="student.last_name", request=request
             )
 
         if not admission.student.date_of_birth:
@@ -254,6 +254,9 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
 
         # Convert student fields, excluding the nested ones
         student_data = admission.student.dict(exclude={"father", "mother", "guardian"})
+        # last_name is optional on the admission form; the DB column is NOT NULL,
+        # so a missing value is stored as an empty string rather than None.
+        student_data["last_name"] = (student_data.get("last_name") or "").strip()
 
         # Validate student data before creating objects
         try:

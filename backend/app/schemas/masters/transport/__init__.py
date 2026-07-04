@@ -2,7 +2,7 @@ from .route_schema import RouteBase, RouteCreate, RouteDropdown, RouteOut, Route
 from .route_stop_schema import RouteStopBase, RouteStopCreate, RouteStopDropdown, RouteStopOut, RouteStopUpdate
 from .route_type_schema import RouteTypeBase, RouteTypeCreate, RouteTypeDropdown, RouteTypeOut, RouteTypeUpdate
 from .student_trip_schema import StudentTripBase, StudentTripCreate, StudentTripOut, StudentTripUpdate
-from .trip_schema import TripBase, TripCreate, TripOut, TripUpdate
+from .trip_schema import TripBase, TripCreate, TripDropdown, TripOut, TripUpdate
 from .trip_type_schema import TripTypeBase, TripTypeCreate, TripTypeDropdown, TripTypeOut, TripTypeUpdate
 from .transport_pricing_schema import (
     TransportPricingCreate,
@@ -31,6 +31,7 @@ __all__ = [
     "TripCreate",
     "TripOut",
     "TripUpdate",
+    "TripDropdown",
     "VehicleBase",
     "VehicleCreate",
     "VehicleOut",

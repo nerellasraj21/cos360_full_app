@@ -70,7 +70,7 @@ async def create_new_certificate(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
-    tenant_schema = request.headers.get("cschema", "test_tenant_schema")
+    tenant_schema = request.headers.get("cschema", "little_bunny")
 
     # Permission check
     await check_role_plan_permission_with_error(
@@ -252,7 +252,7 @@ async def create_received_document_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
-    tenant_schema = request.headers.get("cschema", "test_tenant_schema")
+    tenant_schema = request.headers.get("cschema", "little_bunny")
 
     if role != "Admin":
         raise HTTPException(
@@ -301,7 +301,7 @@ async def create_issued_certificate_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
-    tenant_schema = request.headers.get("cschema", "test_tenant_schema")
+    tenant_schema = request.headers.get("cschema", "little_bunny")
 
     if role != "Admin":
         raise HTTPException(
@@ -742,7 +742,7 @@ async def update_certificate_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
-    tenant_schema = request.headers.get("cschema", "test_tenant_schema")
+    tenant_schema = request.headers.get("cschema", "little_bunny")
 
     # Permission check
     await check_role_plan_permission_with_error(
@@ -783,7 +783,7 @@ async def delete_certificate_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
-    tenant_schema = request.headers.get("cschema", "test_tenant_schema")
+    tenant_schema = request.headers.get("cschema", "little_bunny")
 
     # Permission check
     await check_role_plan_permission_with_error(
@@ -826,7 +826,7 @@ async def download_certificate_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
-    tenant_schema = request.headers.get("cschema", "test_tenant_schema")
+    tenant_schema = request.headers.get("cschema", "little_bunny")
 
     # Permission check
     read_action = "read_own" if role == "Student" else "read"

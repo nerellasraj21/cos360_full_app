@@ -9,7 +9,7 @@ from app.schemas.student.student_schema import StudentCreate, StudentOut
 
 class StudentAdmissionBase(BaseModel):
     admission_date: date
-    admission_type: Literal["primary", "non_primary"] | None = None
+    admission_type: Literal["pre_primary", "regular"] | None = None
     academic_year_id: UUID  # Required: Academic year for admission
     admitted_academic_year_id: UUID | None = None
     admitted_class_id: UUID  # Required: Class student is admitted to
@@ -60,7 +60,7 @@ class StudentAdmissionResponse(StudentAdmissionBase):
 class StudentAdmissionUpdate(BaseModel):
     # Admission fields
     admission_date: date | None = None
-    admission_type: Literal["primary", "non_primary"] | None = None
+    admission_type: Literal["pre_primary", "regular"] | None = None
     admission_number: str | None = None
     roll_no: str | None = None
     academic_year_id: UUID | None = None

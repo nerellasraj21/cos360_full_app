@@ -31,3 +31,12 @@ class TripOut(TripBase):
 
     class Config:
         from_attributes = True
+
+
+class TripDropdown(BaseModel):
+    id: UUID
+    trip_number: int
+    route_id: UUID
+    route_name: str
+
+    model_config = {"from_attributes": True}

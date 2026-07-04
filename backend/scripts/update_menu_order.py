@@ -25,7 +25,7 @@ MENU_ORDER = [
     ("Students",         2),
     ("Staff Management", 3),
     ("Exam Management",  4),
-    ("Fee Management",   5),
+    ("Fee",              5),
     ("Expense",          6),
     ("Communication",    7),
     ("Reports",          8),
@@ -34,7 +34,7 @@ MENU_ORDER = [
     ("Transport",       11),
 ]
 
-SCHEMAS = ["cos360_master", "test_tenant_schema"]
+SCHEMAS = ["cos360_main", "test_tenant_schema"]
 
 
 async def apply_order(db, schema: str):
