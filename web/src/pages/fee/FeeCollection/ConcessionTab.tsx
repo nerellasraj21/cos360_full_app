@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { Badge } from '@/components/ui/badge';
@@ -126,16 +127,33 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
   }
 
   function handleSaveAll() {
-    const concessions = rows
-      .filter((r) => r.concession_amount > 0 && r.reason.length >= 5 && r.approved_by)
-      .map((r) => ({
-        fee_type_id: r.fee_type_id,
-        concession_amount: r.concession_amount,
-        reason: r.reason,
-        approved_by: r.approved_by as 'owner' | 'principal' | 'management' | 'correspondent',
-      }));
+    const isValidRow = (r: ConcessionRow) =>
+      r.concession_amount > 0 && r.reason.trim().length >= 5 && !!r.approved_by;
+    const isTouchedRow = (r: ConcessionRow) =>
+      r.concession_amount > 0 || r.reason.trim().length > 0 || !!r.approved_by;
 
-    if (concessions.length === 0) return;
+    const validRows = rows.filter(isValidRow);
+    const incompleteRows = rows.filter((r) => isTouchedRow(r) && !isValidRow(r));
+
+    if (validRows.length === 0) {
+      toast.error('Enter a concession amount, a reason (min 5 characters), and select an approver before saving.');
+      return;
+    }
+
+    if (incompleteRows.length > 0) {
+      toast.error(
+        `Skipped ${incompleteRows.length} incomplete row(s): ${incompleteRows
+          .map((r) => r.fee_type_name)
+          .join(', ')} — amount, reason (min 5 chars), and approver are all required.`
+      );
+    }
+
+    const concessions = validRows.map((r) => ({
+      fee_type_id: r.fee_type_id,
+      concession_amount: r.concession_amount,
+      reason: r.reason,
+      approved_by: r.approved_by as 'owner' | 'principal' | 'management' | 'correspondent',
+    }));
 
     bulkCreateMutation.mutate({
       student_id: studentId,
@@ -166,7 +184,6 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
     deleteMutation.mutate(deleteId, { onSuccess: () => setDeleteId(null) });
   }
 
-  const hasValidConcessions = rows.some((r) => r.concession_amount > 0 && r.reason.length >= 5 && r.approved_by);
 
   if (isLoading) {
     return (
@@ -188,7 +205,7 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
               <Button
                 size="sm"
                 onClick={handleSaveAll}
-                disabled={!hasValidConcessions || bulkCreateMutation.isPending}
+                disabled={bulkCreateMutation.isPending}
               >
                 {bulkCreateMutation.isPending ? (
                   <>

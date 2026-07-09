@@ -3,7 +3,8 @@ import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ViewButton, EditButton, ActivateButton, DeactivateButton, TableActionGroup } from '@/components/common/TableActions';
-import { Loader2, Eye, Edit, CheckCircle, XCircle, UserCircle, X, Plus } from 'lucide-react';
+import { Loader2, Eye, Edit, CheckCircle, XCircle, UserCircle, X, Plus, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { InfiniteScrollDropdown } from '@/components/dropdown/InfiniteScrollDropdown';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -73,6 +74,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [editAdmissionNumError, setEditAdmissionNumError] = useState('');
+  const [editMissingFields, setEditMissingFields] = useState<string[]>([]);
   const [editForm, setEditForm] = useState({
     // Admission fields
     admission_number: '',
@@ -235,7 +237,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
         student_name: item.student ? `${item.student.first_name} ${item.student.last_name || ''}`.trim() : 'N/A',
         class_name: getClassName(item.current_class_id || ''),
         section_name: getSectionName(item.current_class_id || '', item.current_section_id || ''),
-        academic_year: getAcademicYearName(item.admitted_academic_year_id || ''),
+        academic_year: getAcademicYearName(item.admitted_academic_year_id || item.academic_year_id || ''),
         admission_date: item.admission_date,
         is_active: item.student?.is_active ?? true,
         student_id: item.student_id || item.student?.id || '',
@@ -350,6 +352,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                     const a = admission as any;
                     setSelectedAdmission(admission);
                     setEditAdmissionNumError('');
+                    setEditMissingFields([]);
                     setEditForm({
                       // Admission fields
                       admission_number: admission.admission_number || '',
@@ -364,7 +367,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       address_line2: admission.address_line2 || '',
                       city: admission.city || '',
                       state: admission.state || '',
-                      state_id: admission.state || '',
+                      state_id: a.state_id || admission.state || '',
                       district_id: a.district_id || '',
                       mandal_id: a.mandal_id || '',
                       is_previous_school: admission.is_previous_school || false,
@@ -383,9 +386,9 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       nationality: s?.nationality || '',
                       mother_tongue: s?.mother_tongue || '',
                       caste: s?.caste || '',
-                      caste_id: s?.caste || '',
+                      caste_id: s?.caste_id || s?.caste || '',
                       sub_caste: s?.sub_caste || '',
-                      sub_caste_id: s?.sub_caste || '',
+                      sub_caste_id: s?.sub_caste_id || s?.sub_caste || '',
                       community: s?.community || '',
                       identification_marks: s?.identification_marks || '',
                       // Father fields
@@ -680,6 +683,14 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
             <DialogTitle>Edit Admission - {selectedAdmission?.admission_number}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-6">
+          {editMissingFields.length > 0 && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Please fix the following required fields: {editMissingFields.join(', ')}
+              </AlertDescription>
+            </Alert>
+          )}
           {selectedAdmission && (
             <div className="space-y-4 pr-1 pb-2" onChange={() => setIsEditDirty(true)}>
 
@@ -1286,33 +1297,16 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
               onClick={async () => {
                 if (selectedAdmission) {
                   try {
-                    // Admission number is required
-                    if (!editForm.admission_number?.trim()) {
-                      setEditAdmissionNumError('Admission number is required.');
-                      return;
-                    }
-                    // Required student fields
-                    if (!editForm.first_name?.trim()) {
-                      toast.error('First name is required');
-                      return;
-                    }
-                    if (!editForm.last_name?.trim()) {
-                      toast.error('Last name is required');
-                      return;
-                    }
-                    if (!editForm.date_of_birth) {
-                      toast.error('Date of birth is required');
-                      return;
-                    }
-                    if (!editForm.gender) {
-                      toast.error('Gender is required');
-                      return;
-                    }
-                    // Primary phone is mandatory and must be exactly 10 digits
-                    if (!/^\d{10}$/.test(editForm.primary_phone)) {
-                      toast.error('Primary phone is required and must be exactly 10 digits');
-                      return;
-                    }
+                    // Collect every mandatory/format error at once so the user sees the
+                    // full list instead of fixing one field, saving, and hitting the next.
+                    const missing: string[] = [];
+                    if (!editForm.admission_number?.trim()) missing.push('Admission Number');
+                    if (!editForm.first_name?.trim()) missing.push('First Name');
+                    if (!editForm.last_name?.trim()) missing.push('Last Name');
+                    if (!editForm.date_of_birth) missing.push('Date of Birth');
+                    if (!editForm.gender) missing.push('Gender');
+                    if (!/^\d{10}$/.test(editForm.primary_phone)) missing.push('Primary Phone (must be 10 digits)');
+
                     // Aadhar / APAAR format checks (optional fields — only validate if non-empty)
                     const aadharErrors = [
                       aadharMsg(editForm.aadhar_number, 'Aadhar'),
@@ -1320,21 +1314,25 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                       aadharMsg(editForm.father_aadhar_number, 'Father Aadhar'),
                       aadharMsg(editForm.mother_aadhar_number, 'Mother Aadhar'),
                       aadharMsg(editForm.guardian_aadhar_number, 'Guardian Aadhar'),
-                    ].filter(Boolean);
-                    if (aadharErrors.length > 0) {
-                      toast.error(aadharErrors[0]!);
-                      return;
-                    }
+                    ].filter(Boolean) as string[];
+                    missing.push(...aadharErrors);
+
                     // Email format checks (optional fields — only validate if non-empty)
                     const emailErrors = [
                       emailMsg(editForm.father_email) ? `Father email: ${emailMsg(editForm.father_email)}` : '',
                       emailMsg(editForm.mother_email) ? `Mother email: ${emailMsg(editForm.mother_email)}` : '',
                       emailMsg(editForm.guardian_email) ? `Guardian email: ${emailMsg(editForm.guardian_email)}` : '',
-                    ].filter(Boolean);
-                    if (emailErrors.length > 0) {
-                      toast.error(emailErrors[0]!);
+                    ].filter(Boolean) as string[];
+                    missing.push(...emailErrors);
+
+                    if (missing.length > 0) {
+                      setEditAdmissionNumError(!editForm.admission_number?.trim() ? 'Admission number is required.' : '');
+                      setEditMissingFields(missing);
+                      toast.error('Please fix the highlighted fields before saving');
                       return;
                     }
+                    setEditAdmissionNumError('');
+                    setEditMissingFields([]);
                     const updateData = {
                       // Admission fields
                       admission_number: editForm.admission_number,

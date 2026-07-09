@@ -340,7 +340,8 @@ function StaffView() {
 
   const { data: studentsData, isLoading: studentsLoading } = useStudentsByClassSection(
     selectedClass,
-    selectedSection
+    selectedSection,
+    selectedDate
   );
 
   const students = useMemo(() => studentsData || [], [studentsData]);

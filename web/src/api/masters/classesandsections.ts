@@ -114,9 +114,10 @@ export const deleteSectionById = async (sectionId: string): Promise<void> => {
 // Get students by class and section
 export const getStudentsByClassSection = async (
   classId: string,
-  sectionId: string
+  sectionId: string,
+  asOfDate?: string
 ): Promise<StudentAdmissionResponse[]> => {
-  console.log('getStudentsByClassSection called with:', { classId, sectionId });
+  console.log('getStudentsByClassSection called with:', { classId, sectionId, asOfDate });
 
   const queryParams = new URLSearchParams();
   queryParams.append('class_id', classId);
@@ -124,6 +125,9 @@ export const getStudentsByClassSection = async (
     queryParams.append('section_id', sectionId);
   }
   queryParams.append('active_only', 'true');
+  if (asOfDate) {
+    queryParams.append('as_of_date', asOfDate);
+  }
 
   // Use the correct student admission endpoint
   const url = `/students/admission/?${queryParams.toString()}`;

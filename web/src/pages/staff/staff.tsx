@@ -17,8 +17,8 @@ export function StaffPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <PermissionGuard resource="staff" action="list">
-                    <Card className="hover:shadow-lg transition-shadow">
-                        <CardHeader>
+                    <Card className="hover:shadow-lg transition-shadow flex flex-col h-full">
+                        <CardHeader className="flex-1">
                             <CardTitle className="flex items-center gap-2">
                                 <Users className="h-5 w-5" />
                                 Staff Enrollment
@@ -39,8 +39,8 @@ export function StaffPage() {
                 </PermissionGuard>
 
                 <PermissionGuard resource="staff_attendance" action="read">
-                    <Card className="hover:shadow-lg transition-shadow">
-                        <CardHeader>
+                    <Card className="hover:shadow-lg transition-shadow flex flex-col h-full">
+                        <CardHeader className="flex-1">
                             <CardTitle className="flex items-center gap-2">
                                 <Calendar className="h-5 w-5" />
                                 Staff Attendance
@@ -61,8 +61,8 @@ export function StaffPage() {
                 </PermissionGuard>
 
                 <PermissionGuard resource="designations" action="list">
-                    <Card className="hover:shadow-lg transition-shadow">
-                        <CardHeader>
+                    <Card className="hover:shadow-lg transition-shadow flex flex-col h-full">
+                        <CardHeader className="flex-1">
                             <CardTitle className="flex items-center gap-2">
                                 <Briefcase className="h-5 w-5" />
                                 Staff Designations

@@ -107,12 +107,12 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
     },
   });
 
-  // Fetch students data
+  // Fetch students data, filtered by the selected class/section (if any)
   useEffect(() => {
     const fetchStudents = async () => {
       try {
         setStudentsLoading(true);
-        const studentsData = await fetchStudentsDropdown();
+        const studentsData = await fetchStudentsDropdown(true, selectedClass?.value, selectedSection?.value);
         setStudents(studentsData);
       } catch (error) {
         console.error('Error fetching students:', error);
@@ -123,7 +123,7 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
     };
 
     fetchStudents();
-  }, []);
+  }, [selectedClass?.value, selectedSection?.value]);
 
   // Initialize selected values when data loads
   useEffect(() => {

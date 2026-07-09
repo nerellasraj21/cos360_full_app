@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { MasterPage, type MasterPageConfig, type FormField } from '@/pages/masters/common/MasterPage';
 import type { TableColumn } from '@/components/common/table';
-import { useVehicles, useCreateVehicle, useUpdateVehicle, useDeleteVehicle } from '@/hooks/masters/useVehicles';
-import { useTrips, useCreateTrip, useDeleteTrip } from '@/api/hooks/masters/trips';
+import { useVehicles, useVehicle, useCreateVehicle, useUpdateVehicle, useDeleteVehicle } from '@/hooks/masters/useVehicles';
+import { useTrips, useCreateTrip, useUpdateTrip, useDeleteTrip } from '@/api/hooks/masters/trips';
 import { useRoutes } from '@/api/hooks/masters/routes';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { staffApi } from '@/api/masters/staff';
@@ -60,6 +60,7 @@ const defaultForm = {
   bus_insurance_vendor: '',
   insurance_expiry_date: '',
   number_of_trips: 2 as string | number,
+  fees: '' as string | number,
   is_ac: false,
   is_active: true,
   fee_category_id: '' as string,
@@ -224,7 +225,7 @@ function VehicleAddDialog() {
       // Step 2: patch with extended fields so they are persisted
       const hasExtended = form.driver_name || form.co_driver_name || form.driving_licence_no ||
         form.driving_licence_exp_date || form.bus_insurance_vendor || form.insurance_expiry_date ||
-        form.number_of_trips !== '' || form.fee_category_id || form.fee_type_id;
+        form.number_of_trips !== '' || form.fees !== '' || form.fee_category_id || form.fee_type_id;
       if (hasExtended || form.is_ac) {
         await updateVehicle.mutateAsync({
           id: newVehicle.id,
@@ -242,6 +243,7 @@ function VehicleAddDialog() {
             bus_insurance_vendor: form.bus_insurance_vendor || null,
             insurance_expiry_date: form.insurance_expiry_date || null,
             number_of_trips: form.number_of_trips === '' ? null : Number(form.number_of_trips),
+            fees: form.fees === '' ? undefined : Number(form.fees),
             is_ac: form.is_ac,
             fee_category_id: form.fee_category_id || null,
             fee_type_id: form.fee_type_id || null,
@@ -380,6 +382,16 @@ function VehicleAddDialog() {
                   placeholder="0"
                 />
               </div>
+              <div className="space-y-1">
+                <Label>Fees</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.fees}
+                  onChange={e => setField('fees', e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="0"
+                />
+              </div>
               <div className="space-y-1 col-span-2 max-w-xs">
                 <Label>Insurance Expiry Date</Label>
                 <Input
@@ -507,8 +519,15 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
   const [trips, setTrips] = useState<TripRow[]>([]);
   const [counter, setCounter] = useState(0);
   const [originalTripIds, setOriginalTripIds] = useState<Set<string>>(new Set());
+  const [originalTripValues, setOriginalTripValues] = useState<Record<string, { route_id: string; driver_id: string }>>({});
   const [tripsInitialized, setTripsInitialized] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // The table row's vehicle object comes from the list endpoint, which may return a
+  // trimmed-down record. Fetch the single-vehicle detail endpoint so fields like
+  // fee_category_id/fee_type_id (possibly list-omitted) are available when editing.
+  const { data: vehicleDetail } = useVehicle(vehicle.id);
+  const vehicleForForm = vehicleDetail ?? vehicle;
 
   // Reuse the same all-trips cache used by VehicleTripsPanel (which reliably shows trip counts)
   // rather than the per-vehicle endpoint, which does not return data.
@@ -569,6 +588,7 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
   const queryClient = useQueryClient();
   const updateVehicleMutation = useUpdateVehicle();
   const createTripMutation = useCreateTrip();
+  const updateTripMutation = useUpdateTrip();
   const deleteTripMutation = useDeleteTrip();
 
   // Populate trips state once the query resolves after dialog opens
@@ -582,6 +602,9 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
         driver_id: (t as any).driver_id ?? '',
       })));
       setOriginalTripIds(new Set(sorted.map(t => t.id)));
+      setOriginalTripValues(Object.fromEntries(
+        sorted.map(t => [t.id, { route_id: t.route_id, driver_id: (t as any).driver_id ?? '' }])
+      ));
       setCounter(sorted.length);
       setTripsInitialized(true);
     }
@@ -600,24 +623,26 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
 
   const handleOpen = () => {
     setForm({
-      name: vehicle.name ?? '',
-      registration_number: vehicle.registration_number ?? '',
-      vehicle_type: vehicle.vehicle_type ?? 'Bus',
-      driver_name: vehicle.driver_name ?? '',
-      co_driver_name: vehicle.co_driver_name ?? '',
-      driving_licence_no: vehicle.driving_licence_no ?? '',
-      driving_licence_exp_date: vehicle.driving_licence_exp_date ?? '',
-      bus_insurance_vendor: vehicle.bus_insurance_vendor ?? '',
-      insurance_expiry_date: vehicle.insurance_expiry_date ?? '',
-      number_of_trips: vehicle.number_of_trips ?? '',
-      is_ac: vehicle.is_ac ?? false,
-      is_active: vehicle.is_active ?? true,
-      fee_category_id: vehicle.fee_category_id ?? '',
-      fee_type_id: vehicle.fee_type_id ?? '',
+      name: vehicleForForm.name ?? '',
+      registration_number: vehicleForForm.registration_number ?? '',
+      vehicle_type: vehicleForForm.vehicle_type ?? 'Bus',
+      driver_name: vehicleForForm.driver_name ?? '',
+      co_driver_name: vehicleForForm.co_driver_name ?? '',
+      driving_licence_no: vehicleForForm.driving_licence_no ?? '',
+      driving_licence_exp_date: vehicleForForm.driving_licence_exp_date ?? '',
+      bus_insurance_vendor: vehicleForForm.bus_insurance_vendor ?? '',
+      insurance_expiry_date: vehicleForForm.insurance_expiry_date ?? '',
+      number_of_trips: vehicleForForm.number_of_trips ?? '',
+      fees: vehicleForForm.fees ?? '',
+      is_ac: vehicleForForm.is_ac ?? false,
+      is_active: vehicleForForm.is_active ?? true,
+      fee_category_id: vehicleForForm.fee_category_id ?? '',
+      fee_type_id: vehicleForForm.fee_type_id ?? '',
     });
     setTrips([]);
     setCounter(0);
     setOriginalTripIds(new Set());
+    setOriginalTripValues({});
     setTripsInitialized(false);
     setOpen(true);
   };
@@ -647,6 +672,7 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
           bus_insurance_vendor: form.bus_insurance_vendor || null,
           insurance_expiry_date: form.insurance_expiry_date || null,
           number_of_trips: form.number_of_trips === '' ? null : Number(form.number_of_trips),
+          fees: form.fees === '' ? undefined : Number(form.fees),
           is_ac: form.is_ac,
           is_active: form.is_active,
           last_inspected_date: vehicle.last_inspected_date || new Date().toISOString().split('T')[0],
@@ -664,9 +690,28 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
         }
       }
 
-      // 3. Create newly added trips
+      // 3. Update existing trips whose route/driver changed in place
+      const keptTrips = trips.filter(t => !!t.id);
+      for (let i = 0; i < keptTrips.length; i++) {
+        const t = keptTrips[i];
+        const original = originalTripValues[t.id!];
+        const tripNumber = i + 1;
+        if (!original || original.route_id !== t.route_id || original.driver_id !== t.driver_id) {
+          await updateTripMutation.mutateAsync({
+            id: t.id!,
+            trip: {
+              vehicle_id: vehicle.id,
+              route_id: t.route_id,
+              driver_id: t.driver_id,
+              trip_number: tripNumber,
+            },
+          });
+        }
+      }
+
+      // 4. Create newly added trips
       const newTrips = trips.filter(t => !t.id && t.route_id && t.driver_id);
-      const keptCount = trips.filter(t => !!t.id).length;
+      const keptCount = keptTrips.length;
       for (let i = 0; i < newTrips.length; i++) {
         await createTripMutation.mutateAsync({
           vehicle_id: vehicle.id,
@@ -779,6 +824,16 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
                   min={0}
                   value={form.number_of_trips}
                   onChange={e => setField('number_of_trips', e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Fees</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.fees}
+                  onChange={e => setField('fees', e.target.value === '' ? '' : Number(e.target.value))}
                   placeholder="0"
                 />
               </div>

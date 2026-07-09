@@ -352,11 +352,11 @@ export function useCreateSectionsBulk() {
 }
 
 // Hook for fetching students by class and section
-export function useStudentsByClassSection(classId: string, sectionId: string) {
-  // console.log("useStudentsByClassSection called with:", { classId, sectionId });
+export function useStudentsByClassSection(classId: string, sectionId: string, asOfDate?: string) {
+  // console.log("useStudentsByClassSection called with:", { classId, sectionId, asOfDate });
   return useQuery<StudentAdmissionResponse[]>({
-    queryKey: ["students", "by-class-section", classId, sectionId],
-    queryFn: () => getStudentsByClassSection(classId, sectionId),
+    queryKey: ["students", "by-class-section", classId, sectionId, asOfDate],
+    queryFn: () => getStudentsByClassSection(classId, sectionId, asOfDate),
     enabled: !!classId,
   });
 }

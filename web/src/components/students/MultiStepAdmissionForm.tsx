@@ -15,6 +15,8 @@ import { PreviousSchoolStepForm } from './admission-steps/PreviousSchoolStepForm
 import { SummaryStepForm } from './admission-steps/SummaryStepForm';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { toast } from 'sonner';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface MultiStepAdmissionFormProps {
   onComplete: () => void;
@@ -29,8 +31,33 @@ const steps = [
   { id: 'summary', title: 'Review & Submit', component: SummaryStepForm },
 ];
 
+const FIELD_LABELS: Record<string, string> = {
+  admission_date: 'Admission Date',
+  admitted_class_id: 'Joining Class',
+  current_class_id: 'Current Class',
+  current_section_id: 'Current Section',
+  admission_number: 'Admission Number',
+  student_first_name: 'Student First Name',
+  student_last_name: 'Student Last Name',
+  student_date_of_birth: 'Student Date of Birth',
+  student_gender: 'Student Gender',
+  student_aadhar_number: 'Student Aadhar Number',
+  student_apaar_number: 'Student Apaar Number',
+  father_name: "Father's Name",
+  father_email: "Father's Email",
+  mother_name: "Mother's Name",
+  mother_email: "Mother's Email",
+  father_phone: "Father's Phone",
+  mother_phone: "Mother's Phone",
+  guardian_phone: "Guardian's Phone",
+  address_line1: 'Address Line 1',
+  city: 'City',
+  state_id: 'State',
+};
+
 const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  const [stepMissingFields, setStepMissingFields] = useState<string[]>([]);
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -133,7 +160,7 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
     },
   });
 
-  const { trigger } = methods;
+  const { trigger, formState } = methods;
 
   const nextStep = async () => {
     const stepFields = {
@@ -148,11 +175,16 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
     const fieldsToValidate = stepFields[currentStep as keyof typeof stepFields] || [];
     const isValid = await trigger(fieldsToValidate as any);
     if (isValid) {
+      setStepMissingFields([]);
       setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
+    } else {
+      const invalidFields = fieldsToValidate.filter((name) => formState.errors[name as keyof typeof formState.errors]);
+      setStepMissingFields(invalidFields.map((name) => FIELD_LABELS[name] || name));
     }
   };
 
   const prevStep = () => {
+    setStepMissingFields([]);
     setCurrentStep((prev) => Math.max(prev - 1, 0));
   };
 
@@ -199,6 +231,7 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
       if (missingEntries.length > 0) {
         const missingNames = missingEntries.map(([name]) => name);
         const earliestStep = Math.min(...missingEntries.map(([, { step }]) => step));
+        setStepMissingFields(missingNames);
         setCurrentStep(earliestStep);
         toast.error(`Please fill in required fields: ${missingNames.join(', ')}`);
         return;
@@ -392,6 +425,14 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
               </div>
             </CardHeader>
             <CardContent>
+              {stepMissingFields.length > 0 && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Please fill in the required fields before continuing: {stepMissingFields.join(', ')}
+                  </AlertDescription>
+                </Alert>
+              )}
               {steps.map((step, index) => (
                 <div key={step.id} style={{ display: index === currentStep ? 'block' : 'none' }}>
                   {/* Photo picker shown on Student Details step */}
