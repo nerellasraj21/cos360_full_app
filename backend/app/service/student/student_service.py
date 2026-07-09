@@ -1,4 +1,5 @@
 import os
+from datetime import date
 from uuid import UUID
 
 from fastapi import HTTPException, UploadFile
@@ -11,11 +12,17 @@ from app.models.student.student_model import Student
 
 
 async def get_students_dropdown(
-    db: AsyncSession, class_id: UUID | None = None, section_id: UUID | None = None, active_only: bool = True
+    db: AsyncSession,
+    class_id: UUID | None = None,
+    section_id: UUID | None = None,
+    active_only: bool = True,
+    as_of_date: date | None = None,
 ) -> list[dict]:
     """
     Get students dropdown data with name + admission number.
     Supports filtering by class_id, section_id, and active status.
+    as_of_date: if given, excludes students whose admission_date is after this date
+    (e.g. for building an attendance roster for a past date).
     Returns: [{"id": "uuid", "display_name": "First Last (ADM001)", "first_name": "First", "last_name": "Last", "admission_number": "ADM001"}]
     """
     stmt = (
@@ -32,6 +39,9 @@ async def get_students_dropdown(
 
     if section_id:
         stmt = stmt.where(Admission.current_section_id == section_id)
+
+    if as_of_date:
+        stmt = stmt.where(Admission.admission_date <= as_of_date)
 
     result = await db.execute(stmt)
     students_data = result.all()
@@ -56,11 +66,17 @@ async def get_students_dropdown(
 
 
 async def get_students_simple_dropdown(
-    db: AsyncSession, class_id: UUID | None = None, section_id: UUID | None = None, active_only: bool = True
+    db: AsyncSession,
+    class_id: UUID | None = None,
+    section_id: UUID | None = None,
+    active_only: bool = True,
+    as_of_date: date | None = None,
 ) -> list[dict]:
     """
     Get simple students dropdown data.
     Supports filtering by class_id, section_id, and active status.
+    as_of_date: if given, excludes students whose admission_date is after this date
+    (e.g. for building an attendance roster for a past date).
     Returns: [{"id": "uuid", "name": "First Last"}]
     """
     stmt = select(Student).join(Admission, Student.id == Admission.student_id).options(selectinload(Student.user))
@@ -73,6 +89,9 @@ async def get_students_simple_dropdown(
 
     if section_id:
         stmt = stmt.where(Admission.current_section_id == section_id)
+
+    if as_of_date:
+        stmt = stmt.where(Admission.admission_date <= as_of_date)
 
     result = await db.execute(stmt)
     students = result.scalars().all()

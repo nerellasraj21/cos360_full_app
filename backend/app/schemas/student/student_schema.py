@@ -21,7 +21,9 @@ class StudentBase(BaseModel):
     aadhar_number: str | None = None
     apaar_number: str | None = None
     caste: str | None = None
+    caste_id: UUID | None = None
     sub_caste: str | None = None
+    sub_caste_id: UUID | None = None
     community: str | None = None
     nationality: str | None = "Indian"
     mother_tongue: str | None = "Telugu"

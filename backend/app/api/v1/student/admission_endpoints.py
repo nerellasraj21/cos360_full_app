@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -157,6 +157,9 @@ async def list_admissions(
     limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
     class_id: UUID | None = Query(None, description="Filter by class ID"),
     section_id: UUID | None = Query(None, description="Filter by section ID"),
+    as_of_date: date | None = Query(
+        None, description="Exclude students who joined after this date (e.g. for a past attendance date)"
+    ),
 ):
     """List student admissions with user-specific filtering - All authenticated users"""
 
@@ -164,7 +167,7 @@ async def list_admissions(
     user_context = await check_user_resource_access(db, request, "student_admissions", "list")
 
     # Use user-context aware service method
-    return await get_all_admissions_with_context(db, user_context, skip, limit, class_id, section_id)
+    return await get_all_admissions_with_context(db, user_context, skip, limit, class_id, section_id, as_of_date)
 
 
 @router.delete("/{admission_id}", status_code=status.HTTP_200_OK, response_model=StudentAdmissionResponse)
@@ -222,6 +225,9 @@ async def get_student_dropdown(
     class_id: UUID | None = Query(None, description="Filter by class ID"),
     section_id: UUID | None = Query(None, description="Filter by section ID"),
     active_only: bool = Query(True, description="Filter only active students"),
+    as_of_date: date | None = Query(
+        None, description="Exclude students who joined after this date (e.g. for a past attendance date)"
+    ),
 ):
     """
     Get students dropdown data with display name including admission number.
@@ -231,6 +237,7 @@ async def get_student_dropdown(
     - class_id: Filter students by class
     - section_id: Filter students by section
     - active_only: Filter only active students (default: True)
+    - as_of_date: Exclude students whose admission date is after this date
 
     **Required Permission**: students:list
     """
@@ -240,7 +247,7 @@ async def get_student_dropdown(
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, "students", "list")
 
-    return await get_students_dropdown(db, class_id, section_id, active_only)
+    return await get_students_dropdown(db, class_id, section_id, active_only, as_of_date)
 
 
 @router.get("/students/dropdown/simple", response_model=list[StudentSimpleDropdown], status_code=status.HTTP_200_OK)
@@ -250,6 +257,9 @@ async def get_student_simple_dropdown(
     class_id: UUID | None = Query(None, description="Filter by class ID"),
     section_id: UUID | None = Query(None, description="Filter by section ID"),
     active_only: bool = Query(True, description="Filter only active students"),
+    as_of_date: date | None = Query(
+        None, description="Exclude students who joined after this date (e.g. for a past attendance date)"
+    ),
 ):
     """
     Get simple students dropdown data with just ID and name.
@@ -259,6 +269,7 @@ async def get_student_simple_dropdown(
     - class_id: Filter students by class
     - section_id: Filter students by section
     - active_only: Filter only active students (default: True)
+    - as_of_date: Exclude students whose admission date is after this date
 
     **Required Permission**: students:list
     """
@@ -268,7 +279,7 @@ async def get_student_simple_dropdown(
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, "students", "list")
 
-    return await get_students_simple_dropdown(db, class_id, section_id, active_only)
+    return await get_students_simple_dropdown(db, class_id, section_id, active_only, as_of_date)
 
 
 # User-Specific Self-Access Endpoints

@@ -125,6 +125,5 @@ class StudentAdmissionUpdate(BaseModel):
     guardian_aadhar_number: str | None = None
     guardian_gender: str | None = None
     guardian_salary_range: str | None = None
-    guardian_relation_to_student: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

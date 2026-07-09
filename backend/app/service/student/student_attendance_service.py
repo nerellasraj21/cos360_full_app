@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
+from app.models.masters.admission_model import Admission
 from app.models.masters.attendance_model import StudentAttendance
 from app.models.student.student_model import Student
 from app.schemas.student.attendance_schema import StudentAttendanceCreate, StudentAttendanceOut, StudentAttendanceUpdate
@@ -22,6 +23,12 @@ from app.tools.error_handler import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def get_student_admission_date(student_id: UUID, db: AsyncSession) -> date | None:
+    """Return the student's admission (join) date, or None if no admission record exists."""
+    result = await db.execute(select(Admission.admission_date).where(Admission.student_id == student_id))
+    return result.scalar_one_or_none()
 
 
 async def add_attendance(attendance: StudentAttendanceCreate, db: AsyncSession, request: Request | None = None):
@@ -55,6 +62,16 @@ async def add_attendance(attendance: StudentAttendanceCreate, db: AsyncSession, 
         if attendance.date > date.today():
             raise create_validation_error(
                 message="Attendance date cannot be in the future",
+                field="date",
+                value=str(attendance.date),
+                request=request,
+            )
+
+        # Attendance cannot be marked before the student's admission (join) date
+        admission_date = await get_student_admission_date(attendance.student_id, db)
+        if admission_date and attendance.date < admission_date:
+            raise create_validation_error(
+                message=f"Attendance cannot be marked before the student's admission date ({admission_date})",
                 field="date",
                 value=str(attendance.date),
                 request=request,
@@ -245,6 +262,15 @@ async def update_partial_details_attendance(
             if update_dict["date"] > date.today():
                 raise create_validation_error(
                     message="Attendance date cannot be in the future",
+                    field="date",
+                    value=str(update_dict["date"]),
+                    request=request,
+                )
+
+            admission_date = await get_student_admission_date(attendance.student_id, db)
+            if admission_date and update_dict["date"] < admission_date:
+                raise create_validation_error(
+                    message=f"Attendance cannot be marked before the student's admission date ({admission_date})",
                     field="date",
                     value=str(update_dict["date"]),
                     request=request,
@@ -548,6 +574,15 @@ async def update_attendance_by_date(
             new_remarks = update_data.get("remarks")
 
             if not student_id or not new_status:
+                continue
+
+            # Skip students who hadn't joined yet as of this attendance date
+            admission_date = await get_student_admission_date(student_id, db)
+            if admission_date and attendance_date < admission_date:
+                logger.warning(
+                    f"Skipping attendance for student {student_id} on {attendance_date}: "
+                    f"before admission date ({admission_date})"
+                )
                 continue
 
             # Validate status

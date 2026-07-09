@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 import logging
 from uuid import UUID
 
@@ -941,7 +941,7 @@ async def update_partial_details_admission(
     STUDENT_FIELDS = {"first_name", "last_name", "date_of_birth", "gender", "is_primary", "aadhar_number", "apaar_number", "nationality", "mother_tongue", "caste", "caste_id", "sub_caste", "sub_caste_id", "community", "identification_marks", "primary_phone"}
     FATHER_FIELDS = {"father_name", "father_email", "father_phone", "father_occupation", "father_aadhar_number", "father_gender", "father_salary_range"}
     MOTHER_FIELDS = {"mother_name", "mother_email", "mother_phone", "mother_occupation", "mother_aadhar_number", "mother_gender", "mother_salary_range"}
-    GUARDIAN_FIELDS = {"guardian_name", "guardian_email", "guardian_phone", "guardian_occupation", "guardian_aadhar_number", "guardian_gender", "guardian_salary_range", "guardian_relation_to_student"}
+    GUARDIAN_FIELDS = {"guardian_name", "guardian_email", "guardian_phone", "guardian_occupation", "guardian_aadhar_number", "guardian_gender", "guardian_salary_range"}
 
     try:
         # Fetch with eager loading so we can update student + parent in same transaction
@@ -998,6 +998,56 @@ async def update_partial_details_admission(
                         request=request,
                     )
                 update_data["admission_number"] = new_number
+
+        # Reject clearing mandatory student fields (same rules as admission creation)
+        if "first_name" in update_data and not (update_data["first_name"] or "").strip():
+            raise create_validation_error(
+                message="Student first name is required", field="first_name", request=request
+            )
+
+        if "date_of_birth" in update_data and not update_data["date_of_birth"]:
+            raise create_validation_error(
+                message="Student date of birth is required", field="date_of_birth", request=request
+            )
+
+        # Reject clearing/duplicating mandatory parent emails (same rules as admission creation)
+        if "father_email" in update_data and not (update_data["father_email"] or "").strip():
+            raise create_validation_error(
+                message="Father email is required", field="father_email", request=request
+            )
+
+        if "mother_email" in update_data and not (update_data["mother_email"] or "").strip():
+            raise create_validation_error(
+                message="Mother email is required", field="mother_email", request=request
+            )
+
+        new_father_email = update_data.get("father_email")
+        new_mother_email = update_data.get("mother_email")
+        if new_father_email or new_mother_email:
+            current_father_email = next(
+                (
+                    link.parent.email
+                    for link in admission.student.parent_links
+                    if (link.parent.relation_to_student or "").lower() == "father"
+                ),
+                None,
+            )
+            current_mother_email = next(
+                (
+                    link.parent.email
+                    for link in admission.student.parent_links
+                    if (link.parent.relation_to_student or "").lower() == "mother"
+                ),
+                None,
+            )
+            effective_father_email = new_father_email or current_father_email
+            effective_mother_email = new_mother_email or current_mother_email
+            if effective_father_email and effective_father_email == effective_mother_email:
+                raise create_validation_error(
+                    message="Father and mother cannot have the same email address",
+                    field="father_email",
+                    request=request,
+                )
 
         # Update admission-level fields
         for field, value in update_data.items():
@@ -1228,6 +1278,7 @@ async def get_all_admissions_with_context(
     limit: int = 10,
     class_id: UUID | None = None,
     section_id: UUID | None = None,
+    as_of_date: date | None = None,
 ):
     """
     Get admissions with user-specific filtering applied
@@ -1239,6 +1290,8 @@ async def get_all_admissions_with_context(
         limit: Number of records to return
         class_id: Optional filter by class ID
         section_id: Optional filter by section ID
+        as_of_date: Optional filter excluding students whose admission_date is after this date
+            (e.g. for building an attendance roster for a past date)
 
     Returns:
         Dict with filtered admissions, count, and pagination info
@@ -1257,6 +1310,8 @@ async def get_all_admissions_with_context(
         filtered_count_stmt = filtered_count_stmt.where(Admission.current_class_id == class_id)
     if section_id:
         filtered_count_stmt = filtered_count_stmt.where(Admission.current_section_id == section_id)
+    if as_of_date:
+        filtered_count_stmt = filtered_count_stmt.where(Admission.admission_date <= as_of_date)
 
     count_result = await db.execute(filtered_count_stmt)
     total_count = count_result.scalar() or 0
@@ -1274,6 +1329,8 @@ async def get_all_admissions_with_context(
         filtered_stmt = filtered_stmt.where(Admission.current_class_id == class_id)
     if section_id:
         filtered_stmt = filtered_stmt.where(Admission.current_section_id == section_id)
+    if as_of_date:
+        filtered_stmt = filtered_stmt.where(Admission.admission_date <= as_of_date)
 
     # Apply pagination and ordering
     stmt = filtered_stmt.offset(skip).limit(limit).order_by(Admission.admission_date.desc())

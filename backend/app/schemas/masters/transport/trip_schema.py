@@ -7,7 +7,7 @@ from pydantic import BaseModel
 class TripBase(BaseModel):
     vehicle_id: UUID
     route_id: UUID
-    driver_id: UUID
+    driver_id: UUID | None = None
     trip_number: int
 
 
@@ -19,7 +19,7 @@ class TripUpdate(BaseModel):
     vehicle_id: UUID | None = None
     route_id: UUID | None = None
     driver_id: UUID | None = None
-    trip_number: UUID | None = None
+    trip_number: int | None = None
 
     model_config = {"from_attributes": True}
 
