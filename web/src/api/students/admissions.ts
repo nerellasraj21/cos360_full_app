@@ -5,7 +5,8 @@ import type {
   StudentDropdownItem,
   StudentDropdownSimpleItem,
   StudentOut,
-  AdmissionTypeOption
+  AdmissionTypeOption,
+  BulkAdmissionUploadResponse
 } from '@/types/admission';
 import type { ApiError, PaginatedResponse } from '@/types/common';
 import CAxios from '../index';
@@ -15,7 +16,9 @@ import {
   STUDENT_ADMISSIONS_LIST,
   STUDENT_ADMISSIONS_SEARCH,
   STUDENT_ADMISSIONS_DROPDOWN,
-  STUDENT_ADMISSIONS_DROPDOWN_SIMPLE
+  STUDENT_ADMISSIONS_DROPDOWN_SIMPLE,
+  STUDENT_ADMISSIONS_BULK_TEMPLATE,
+  STUDENT_ADMISSIONS_BULK_UPLOAD
 } from '@/constants/api/students';
 
 // Helper function to handle API errors
@@ -242,6 +245,34 @@ export const uploadStudentPhoto = async (
 export const deleteStudentPhoto = async (studentId: string): Promise<void> => {
   try {
     await CAxios.delete(`${STUDENT_ADMISSIONS}id/${studentId}/photo`);
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Download bulk admission upload template
+export const downloadBulkAdmissionTemplate = async (): Promise<Blob> => {
+  try {
+    const response = await CAxios.get(STUDENT_ADMISSIONS_BULK_TEMPLATE, {
+      responseType: 'blob',
+    });
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Bulk upload admissions via spreadsheet
+export const bulkUploadAdmissions = async (
+  file: File
+): Promise<BulkAdmissionUploadResponse> => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await CAxios.post(STUDENT_ADMISSIONS_BULK_UPLOAD, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
   } catch (error) {
     throw handleApiError(error);
   }

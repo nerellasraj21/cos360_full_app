@@ -6,6 +6,7 @@ import { Loader2, CheckCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { feeReceiptsApi } from '@/api/fee/receipts';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
+import { QuickSendButton } from '@/components/communication/QuickSendButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -226,11 +227,22 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
     setShowConfirm(false);
     const formData = watch();
 
+    // Carry the per-fee-type amounts the user actually entered through to the
+    // API, so payment is applied to the fee types selected — not
+    // auto-distributed top-down across whatever fee types have dues.
+    const fee_items = feeRows
+      .map((row) => ({
+        fee_type_id: row.fee_type_id,
+        amount: parseFloat(receivedAmounts[row.fee_type_id] || '0') || 0,
+      }))
+      .filter((item) => item.amount > 0);
+
     // Clean up optional fields - remove undefined/empty values
     const cleanedData: Record<string, any> = {
       student_id: studentId,
       academic_year_id: selectedAcademicYearId,
       amount_to_pay: formData.amount_to_pay,
+      fee_items,
       payment_method: formData.payment_method,
       receipt_number: formData.receipt_number,
       send_sms: formData.send_sms,
@@ -592,6 +604,20 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
                   </div>
                 ) : (
                   <div className="flex justify-end gap-2">
+                    <QuickSendButton
+                      templateName="Fee Collection"
+                      targetType="individual_student"
+                      targetRef={{ student_id: studentId }}
+                      recipientLabel={studentName}
+                      variant="button"
+                      label="Send Receipt SMS"
+                      variables={{
+                        student_name: studentName,
+                        amount: paymentResult.amount_paid,
+                        receipt_no: paymentResult.receipt_number,
+                      }}
+                      title="Send Fee Collection Message"
+                    />
                     <Button
                       variant="outline"
                       disabled={isDownloading}

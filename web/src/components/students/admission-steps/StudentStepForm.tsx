@@ -101,7 +101,7 @@ export const StudentStepForm = () => {
     }
   };
 
-  // Derive admission type from the AcademicStepForm field (set in step 1).
+  // Derive admission type from the AcademicStepForm field on this same step.
   // Match on the backend label since t.value is the API-supplied identifier.
   const admissionTypeValue = watch('admission_type');
   const { data: admissionTypes = [] } = useAdmissionTypesDropdown();
@@ -175,7 +175,7 @@ export const StudentStepForm = () => {
         {/* Admission Number — spans full width */}
         <div className="col-span-2">
           <Label htmlFor="admission_number">
-            Admission Number <span className="text-red-500">*</span>
+            Admission Number
           </Label>
           <div className="flex gap-2">
             <Input
@@ -228,7 +228,7 @@ export const StudentStepForm = () => {
           <Input
             id="student_date_of_birth"
             type="date"
-            {...register('student_date_of_birth', { required: 'Date of birth is required' })}
+            {...register('student_date_of_birth')}
           />
           {errors.student_date_of_birth && (
             <span className="text-red-500">{errors.student_date_of_birth.message as string}</span>
@@ -236,19 +236,15 @@ export const StudentStepForm = () => {
         </div>
 
         <div>
-          <Label htmlFor="student_gender">Gender <span className="text-red-500">*</span></Label>
-          <input type="hidden" {...register('student_gender', { required: 'Gender is required' })} />
+          <Label htmlFor="student_gender">Gender</Label>
+          <input type="hidden" {...register('student_gender')} />
           <InfiniteScrollDropdown
             data={GENDER_OPTIONS}
             value={watch('student_gender') || ''}
-            onChange={(val) => setValue('student_gender', val as string, { shouldValidate: true })}
+            onChange={(val) => setValue('student_gender', val as string)}
             placeholder="Select Gender"
             clearable={false}
-            error={errors.student_gender ? (errors.student_gender.message as string) : undefined}
           />
-          {errors.student_gender && (
-            <span className="text-red-500 text-sm">{errors.student_gender.message as string}</span>
-          )}
         </div>
 
         <div>

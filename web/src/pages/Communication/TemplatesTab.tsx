@@ -15,7 +15,12 @@ import {
   useCreateTemplate,
   useUpdateTemplate,
   useDeactivateTemplate,
+  communicationKeys,
 } from '@/api/hooks/communication/communication';
+import { communicationApi } from '@/api/communication/communicationApi';
+import { DEFAULT_COMMUNICATION_TEMPLATES } from '@/lib/defaultCommunicationTemplates';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import type { Channel, Template, TemplateCreate, TemplateUpdate } from '@/types/communication';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -285,6 +290,8 @@ export default function TemplatesTab() {
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Template | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<Template | null>(null);
+  const [seeding, setSeeding] = useState(false);
+  const queryClient = useQueryClient();
 
   const isActiveFilter =
     statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : undefined;
@@ -311,6 +318,54 @@ export default function TemplatesTab() {
   function openEdit(t: Template) {
     setEditTarget(t);
     setFormOpen(true);
+  }
+
+  /**
+   * Creates any of the built-in default templates that don't exist yet.
+   * Existing templates (matched by name, case-insensitive) are left untouched.
+   */
+  async function handleLoadDefaults() {
+    setSeeding(true);
+
+    // Fetch unfiltered — the visible list may be narrowed by channel/status filters.
+    let existing: Set<string>;
+    try {
+      const all = await communicationApi.getTemplates({ page_size: 200 });
+      existing = new Set(all.items.map((t) => t.name.trim().toLowerCase()));
+    } catch {
+      setSeeding(false);
+      toast.error('Could not check existing templates. Please try again.');
+      return;
+    }
+
+    const missing = DEFAULT_COMMUNICATION_TEMPLATES.filter(
+      (t) => !existing.has(t.name.trim().toLowerCase()),
+    );
+
+    if (missing.length === 0) {
+      setSeeding(false);
+      toast.info('All default templates already exist.');
+      return;
+    }
+
+    let created = 0;
+    const failed: string[] = [];
+    for (const tpl of missing) {
+      try {
+        await communicationApi.createTemplate({
+          ...tpl,
+          variables: detectVariables(tpl.body),
+        });
+        created += 1;
+      } catch {
+        failed.push(tpl.name);
+      }
+    }
+    setSeeding(false);
+    queryClient.invalidateQueries({ queryKey: communicationKeys.templates() });
+
+    if (created > 0) toast.success(`${created} default template(s) created.`);
+    if (failed.length > 0) toast.error(`Failed to create: ${failed.join(', ')}`);
   }
 
   function handleDeactivate() {
@@ -357,9 +412,21 @@ export default function TemplatesTab() {
         />
 
         {canCreate && (
-          <Button onClick={openCreate} className="ml-auto whitespace-nowrap">
-            + New Template
-          </Button>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleLoadDefaults}
+              disabled={seeding || isLoading}
+              className="whitespace-nowrap"
+              title="Create the built-in Welcome / Attendance / Fee / Exam / Holiday templates"
+            >
+              {seeding && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Load Default Templates
+            </Button>
+            <Button onClick={openCreate} className="whitespace-nowrap">
+              + New Template
+            </Button>
+          </div>
         )}
       </div>
 

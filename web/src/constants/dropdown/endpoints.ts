@@ -6,15 +6,14 @@ import type { DropdownEndpoint } from '../../types/dropdown';
 export const DROPDOWN_ENDPOINTS: Record<string, DropdownEndpoint> = {
   ACADEMIC_YEARS: {
     key: 'academic_years',
-    url: '/masters/academic-years',
+    url: '/masters/academic_years/dropdown',
     method: 'GET',
-    labelField: 'year_name',
+    labelField: 'title',
     valueField: 'id',
-    dataPath: 'data',
-    pageParam: 'page',
-    pageSizeParam: 'limit',
-    pageSize: 20,
-    searchParam: 'search',
+    dataPath: '',
+    queryParams: {
+      active_only: true,
+    },
     cacheTime: 5 * 60 * 1000, // 5 minutes
     staleTime: 2 * 60 * 1000, // 2 minutes
   },

@@ -174,7 +174,9 @@ export function StudentFeeAssignmentPanel() {
     m.fee_type_name?.toLowerCase().includes('transport')
   );
 
-  const annualBusFee = selectedVehicle?.fees ?? 0;
+  // Transport fee is defined per stop (RouteStop.fees), not per vehicle.
+  const selectedStop = filteredRouteStops.find((s) => s.id === transportStopId);
+  const annualBusFee = selectedStop?.fees ?? 0;
 
   function assignFee(feeTypeId: string, totalFee: number) {
     if (!studentId || !classId) return;
@@ -487,11 +489,11 @@ export function StudentFeeAssignmentPanel() {
                     </div>
                   </div>
 
-                  {/* Annual fee display */}
-                  {transportVehicleId && (
+                  {/* Annual fee display — fee comes from the selected stop */}
+                  {transportStopId && (
                     <div className="flex items-center gap-2 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 px-3 py-2">
                       <Bus className="h-4 w-4 text-blue-500 shrink-0" />
-                      <span className="text-sm text-muted-foreground">Annual Bus Fee:</span>
+                      <span className="text-sm text-muted-foreground">Stop Fee:</span>
                       <span className="text-base font-semibold text-blue-700 dark:text-blue-300">
                         {annualBusFee > 0 ? formatCurrency(annualBusFee) : '—'}
                       </span>

@@ -28,6 +28,7 @@ import {
   useExamDates,
   useGradingSchemes,
 } from '@/api/hooks/exam/useExam'
+import { QuickSendButton } from '@/components/communication/QuickSendButton'
 import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections'
 import { useAuthStore } from '@/lib/authStore'
@@ -371,7 +372,21 @@ export default function ExamDetail() {
                 ].filter(Boolean).join(' – ') || cs.class_id
                 return (
                   <div key={cs.id} className="border-b px-4 py-3 last:border-0">
-                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">{csLabel}</p>
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-muted-foreground">{csLabel}</p>
+                      <QuickSendButton
+                        templateName="Exam Schedule"
+                        targetType="class_section_parents"
+                        targetRef={{ class_id: cs.class_id, section_id: cs.section_id ?? '' }}
+                        recipientLabel={`Parents of ${csLabel}`}
+                        variables={{
+                          exam_name: exam.exam_name,
+                          class_name: cs.class_name ?? classNameMap[cs.class_id],
+                          section_name: cs.section_name ?? (cs.section_id ? sectionNameMap[cs.section_id] : ''),
+                        }}
+                        title="Send Exam Schedule Message"
+                      />
+                    </div>
                     <div className="flex flex-wrap gap-1.5">
                       {configs.map((cfg) => (
                         <Badge key={cfg.id} variant="secondary" className="text-xs">

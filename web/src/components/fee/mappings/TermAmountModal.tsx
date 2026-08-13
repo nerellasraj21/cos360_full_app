@@ -111,13 +111,16 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                     const existingAmount = existingTermAmounts[i];
                     const termDate = termDates[i];
 
+                    // The freshly-loaded term dates are the source of truth: if the fee
+                    // term's dates were edited, the amounts saved earlier still carry the
+                    // old (now deleted) term_date_id, which the backend would reject.
                     initialTermAmounts.push({
                         term_number: i + 1,
                         term_amount: existingAmount ? existingAmount.term_amount : 0,
-                        term_date_id: existingAmount?.term_date_id || termDate.id, // ✅ Use term_date_id
-                        term_id: existingAmount?.term_id || feeTerm.id, // ⚠️ Keep for backward compatibility
-                        term_name: existingAmount?.term_name || (feeTerm.term_name ? `${feeTerm.term_name} - Term ${i + 1}` : `Term ${i + 1}`),
-                        due_date: existingAmount?.term_date || termDate.fee_term_date
+                        term_date_id: termDate.id, // ✅ Always the current term date
+                        term_id: feeTerm.id, // ⚠️ Keep for backward compatibility
+                        term_name: feeTerm.term_name ? `${feeTerm.term_name} - Term ${i + 1}` : `Term ${i + 1}`,
+                        due_date: termDate.fee_term_date
                     });
                 }
             } else {
@@ -230,51 +233,50 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
             return;
         }
 
+        // Tracks whether the failure came from a mutation (which toasts on its own)
+        // or from our own payload building (which would otherwise fail silently).
+        let mutationStarted = false;
+
         try {
-            const isUpdate = existingTermAmounts.length > 0;
+            // A term already saved for this mapping has a row id and must go through PUT;
+            // terms added since (e.g. the fee term's number_of_terms grew) have no row id
+            // yet and must go through POST. Both can be present at the same time.
+            const toUpdate: { id: string; term_date_id: string; term_amount: number }[] = [];
+            const toCreate: { term_date_id: string; term_amount: number }[] = [];
 
-            if (isUpdate) {
-                // Use PUT for updates
-                const termAmountData = termAmounts.map((ta, index) => {
-                    const existing = existingTermAmounts[index];
+            termAmounts.forEach((ta, index) => {
+                const termDateId = ta.term_date_id || ta.term_id || ta.term_number.toString();
+                const existingId = existingTermAmounts[index]?.id;
 
-                    // Validate required fields
-                    if (!existing?.id) {
-                        throw new Error(`Missing ID for term ${index + 1}. Cannot update without existing ID.`);
-                    }
-
-                    const termDateId = ta.term_date_id || ta.term_id || ta.term_number.toString();
-
-                    return {
-                        id: existing.id, // Must be valid UUID
+                if (existingId) {
+                    toUpdate.push({
+                        id: existingId, // Must be valid UUID
                         term_date_id: termDateId, // Backend schema field name
                         term_amount: ta.term_amount || 0
-                    };
-                });
-
-                console.log('TermAmountModal: Updating term amounts:', termAmountData);
-
-                await updateTermAmountsMutation.mutateAsync({
-                    fee_class_mapping_id: mapping.id.toString(),
-                    term_amounts: termAmountData
-                });
-            } else {
-                // Use POST for new
-                const termAmountData = termAmounts.map(ta => {
-                    // Backend CREATE expects term_date_id (see BACKEND_HANDOVER_FEE_TERM_AMOUNTS.md)
-                    const termDateId = ta.term_date_id || ta.term_id || ta.term_number.toString();
-
-                    return {
+                    });
+                } else {
+                    toCreate.push({
                         term_date_id: termDateId, // Backend expects this field for CREATE
                         term_amount: ta.term_amount || 0
-                    };
+                    });
+                }
+            });
+
+            console.log('TermAmountModal: Saving term amounts:', { toUpdate, toCreate });
+
+            if (toUpdate.length > 0) {
+                mutationStarted = true;
+                await updateTermAmountsMutation.mutateAsync({
+                    fee_class_mapping_id: mapping.id.toString(),
+                    term_amounts: toUpdate
                 });
+            }
 
-                console.log('TermAmountModal: Creating term amounts:', termAmountData);
-
+            if (toCreate.length > 0) {
+                mutationStarted = true;
                 await createTermAmountsMutation.mutateAsync({
                     fee_class_mapping_id: mapping.id.toString(),
-                    term_amounts: termAmountData
+                    term_amounts: toCreate
                 });
             }
 
@@ -282,7 +284,11 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
             onOpenChange(false);
         } catch (error) {
             console.error('TermAmountModal: Save error:', error);
-            // Error handling is done in the mutation hook
+            // The mutation hooks toast their own failures; anything thrown before a
+            // mutation ran would otherwise disappear silently.
+            if (!mutationStarted) {
+                toast.error(error instanceof Error ? error.message : 'Failed to save term amounts');
+            }
         }
     };
 
@@ -307,7 +313,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                         </DialogTitle>
                     </DialogHeader>
                     <div className="flex items-center justify-center py-8">
-                        <div className="text-gray-500">Loading term amounts...</div>
+                        <div className="text-muted-foreground">Loading term amounts...</div>
                     </div>
                 </DialogContent>
             </Dialog>
@@ -327,27 +333,27 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                     </DialogHeader>
 
                     <div className="space-y-4">
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                            <div className="flex items-center gap-2 text-red-700">
+                        <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+                            <div className="flex items-center gap-2 text-destructive">
                                 <AlertCircle className="h-5 w-5" />
                                 <span className="font-medium">Configuration Error</span>
                             </div>
-                            <p className="text-red-600 mt-2">
+                            <p className="text-destructive mt-2">
                                 The selected fee type does not have a valid fee term assigned.
                                 Please ensure the fee type is properly configured with a fee term before managing term amounts.
                             </p>
                         </div>
 
-                        <div className="bg-gray-50 p-4 rounded-lg">
+                        <div className="bg-muted p-4 rounded-lg">
                             <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
-                                    <span className="font-medium text-gray-700">Fee Type:</span>
-                                    <div className="text-gray-900">{feeType?.type_name || `Fee Type ${mapping.fee_type_id}`}</div>
-                                    <div className="text-xs text-gray-500">{feeType?.fee_category_name || 'Category info not available'}</div>
+                                    <span className="font-medium text-foreground">Fee Type:</span>
+                                    <div className="text-foreground">{feeType?.type_name || `Fee Type ${mapping.fee_type_id}`}</div>
+                                    <div className="text-xs text-muted-foreground">{feeType?.fee_category_name || 'Category info not available'}</div>
                                 </div>
                                 <div>
-                                    <span className="font-medium text-gray-700">Fee Term ID:</span>
-                                    <div className="text-gray-900">{feeType?.fee_term_id || 'Not assigned'}</div>
+                                    <span className="font-medium text-foreground">Fee Term ID:</span>
+                                    <div className="text-foreground">{feeType?.fee_term_id || 'Not assigned'}</div>
                                 </div>
                             </div>
                         </div>
@@ -375,26 +381,26 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
 
                 <div className="space-y-6">
                     {/* Mapping Info */}
-                    <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="bg-muted p-4 rounded-lg">
                         <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
-                                <span className="font-medium text-gray-700">Fee Type:</span>
-                                <div className="text-gray-900">{feeType?.type_name || `Fee Type ${mapping.fee_type_id}`}</div>
-                                <div className="text-xs text-gray-500">{feeType?.fee_category_name || 'Category info not available'}</div>
+                                <span className="font-medium text-foreground">Fee Type:</span>
+                                <div className="text-foreground">{feeType?.type_name || `Fee Type ${mapping.fee_type_id}`}</div>
+                                <div className="text-xs text-muted-foreground">{feeType?.fee_category_name || 'Category info not available'}</div>
                             </div>
                             <div>
-                                <span className="font-medium text-gray-700">Total Amount:</span>
-                                <div className="text-lg font-semibold text-gray-900">
+                                <span className="font-medium text-foreground">Total Amount:</span>
+                                <div className="text-lg font-semibold text-foreground">
                                     ₹{(mapping.total_fee || 0).toLocaleString()}
                                 </div>
                             </div>
                             <div>
-                                <span className="font-medium text-gray-700">Number of Terms:</span>
-                                <div className="text-gray-900">{feeTerm?.number_of_terms || termAmounts.length}</div>
+                                <span className="font-medium text-foreground">Number of Terms:</span>
+                                <div className="text-foreground">{feeTerm?.number_of_terms || termAmounts.length}</div>
                             </div>
                             <div>
-                                <span className="font-medium text-gray-700">Term Structure:</span>
-                                <div className="text-gray-900">{feeTerm?.term_name || 'Not available'}</div>
+                                <span className="font-medium text-foreground">Term Structure:</span>
+                                <div className="text-foreground">{feeTerm?.term_name || 'Not available'}</div>
                             </div>
                         </div>
                     </div>
@@ -402,7 +408,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                     {/* Distribution Options */}
                     {canWrite && (
                         <div className="space-y-3">
-                            <h3 className="font-medium text-gray-900">Distribution Options</h3>
+                            <h3 className="font-medium text-foreground">Distribution Options</h3>
                             <div className="flex gap-3">
                                 <Button
                                     variant={distributionMode === 'equal' ? 'default' : 'outline'}
@@ -426,18 +432,18 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
 
                     {/* Term Amounts */}
                     <div className="space-y-3">
-                        <h3 className="font-medium text-gray-900">Term-wise Amount Distribution</h3>
+                        <h3 className="font-medium text-foreground">Term-wise Amount Distribution</h3>
                         <div className="space-y-3">
                             {termAmounts.map((termAmount) => {
                                 const paymentDate = getPaymentDate(termAmount.term_number);
                                 return (
-                                    <div key={termAmount.term_number} className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg">
+                                    <div key={termAmount.term_number} className="flex items-center gap-4 p-3 border border-border rounded-lg">
                                         <div className="flex-1">
-                                            <div className="font-medium text-sm text-gray-900">
+                                            <div className="font-medium text-sm text-foreground">
                                                 {getTermName(termAmount.term_number)}
                                             </div>
                                             {paymentDate && (
-                                                <div className="text-xs text-gray-500">
+                                                <div className="text-xs text-muted-foreground">
                                                     Due: {paymentDate}
                                                 </div>
                                             )}
@@ -457,7 +463,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                                                 className="text-right"
                                             />
                                         </div>
-                                        <div className="w-20 text-right text-sm text-gray-600">
+                                        <div className="w-20 text-right text-sm text-muted-foreground">
                                             ₹{(termAmount.term_amount || 0).toLocaleString()}
                                         </div>
                                     </div>
@@ -467,31 +473,31 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                     </div>
 
                     {/* Validation Summary */}
-                    <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="bg-muted p-4 rounded-lg">
                         <div className="flex items-center justify-between">
                             <div>
-                                <div className="text-sm font-medium text-gray-700">Total Term Amount:</div>
-                                <div className="text-lg font-semibold text-gray-900">
+                                <div className="text-sm font-medium text-foreground">Total Term Amount:</div>
+                                <div className="text-lg font-semibold text-foreground">
                                     ₹{(getTotalTermAmount() || 0).toLocaleString()}
                                 </div>
                             </div>
                             <div className="text-right">
-                                <div className="text-sm font-medium text-gray-700">Difference:</div>
+                                <div className="text-sm font-medium text-foreground">Difference:</div>
                                 <div className={cn(
                                     "text-lg font-semibold",
-                                    isValidDistribution() ? "text-green-600" : "text-red-600"
+                                    isValidDistribution() ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                                 )}>
                                     {getAmountDifference() >= 0 ? '+' : ''}₹{(getAmountDifference() || 0).toFixed(2)}
                                 </div>
                             </div>
                             <div className="flex items-center">
                                 {isValidDistribution() ? (
-                                    <div className="flex items-center gap-2 text-green-600">
+                                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                                         <CheckCircle className="h-5 w-5" />
                                         <span className="text-sm font-medium">Valid</span>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center gap-2 text-red-600">
+                                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                                         <AlertCircle className="h-5 w-5" />
                                         <span className="text-sm font-medium">Invalid</span>
                                     </div>
@@ -500,7 +506,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                         </div>
 
                         {!isValidDistribution() && (
-                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                            <div className="mt-2 p-2 bg-destructive/10 border border-destructive/30 rounded text-sm text-destructive">
                                 <AlertCircle className="h-4 w-4 inline mr-1" />
                                 The sum of term amounts must equal the total fee amount (₹{(mapping.total_fee || 0).toLocaleString()}).
                             </div>

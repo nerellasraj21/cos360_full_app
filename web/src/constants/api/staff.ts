@@ -4,6 +4,10 @@ export const STAFF_BASE = '/staff';
 // Enrollment
 export const STAFF_ENROLLMENT = `${STAFF_BASE}/enrollment`;
 
+// Bulk enrollment upload
+export const STAFF_ENROLLMENT_BULK_TEMPLATE = `${STAFF_BASE}/enrollment/bulk-upload/template`;
+export const STAFF_ENROLLMENT_BULK_UPLOAD = `${STAFF_BASE}/enrollment/bulk-upload`;
+
 // Staff List
 export const STAFF_LIST = `${STAFF_BASE}/`;
 

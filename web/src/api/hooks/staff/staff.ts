@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import CAxios from '@/api/index';
 
 import type { Staff, StaffInput, Designation, DesignationInput, StaffPerformance, StaffPerformanceInput, StaffEnrollmentRequest, StaffEnrollmentResponse } from '@/types/staff';
-import type { StaffAttendance, StaffAttendanceCreateRequest, StaffAttendanceUpdateRequest } from '@/types/staff/staff';
+import type { StaffAttendance, StaffAttendanceCreateRequest, StaffAttendanceUpdateRequest, BulkStaffUploadResponse } from '@/types/staff/staff';
 import {
   fetchStaff,
   fetchStaffById,
@@ -31,6 +31,7 @@ import {
   updateStaffPerformance
 } from '@/api/staff';
 import {
+  staffApi,
   getAllStaffAttendance,
   getStaffAttendanceById,
   createStaffAttendance,
@@ -378,5 +379,41 @@ export function useStaffAttendanceByDateRange(staffId: string, params?: {
     queryKey: ['staff-attendance', staffId, 'date-range', params],
     queryFn: () => getStaffAttendanceByDateRange(staffId, params),
     enabled: !!staffId,
+  });
+}
+
+// Bulk Staff Enrollment Hooks
+export function useDownloadBulkStaffTemplate() {
+  return useMutation<Blob, Error, void>({
+    mutationFn: () => staffApi.downloadBulkStaffTemplate(),
+    onSuccess: (blob) => {
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'staff_bulk_upload_template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || error.message || 'Failed to download template');
+    },
+  });
+}
+
+export function useBulkUploadStaff() {
+  const queryClient = useQueryClient();
+  return useMutation<BulkStaffUploadResponse, Error, File>({
+    mutationFn: (file: File) => staffApi.bulkUploadStaff(file),
+    onSuccess: (data) => {
+      if (data.created.length > 0) {
+        queryClient.invalidateQueries({ queryKey: ['staff'] });
+        queryClient.invalidateQueries({ queryKey: ['staff-enrollments'] });
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || error.message || 'Bulk upload failed');
+    },
   });
 }

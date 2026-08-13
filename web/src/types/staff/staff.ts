@@ -77,7 +77,7 @@ export interface StaffInput {
   phone?: string;
   gender?: 'Male' | 'Female' | 'Other';
   date_of_birth?: string;
-  joining_date: string;
+  joining_date?: string;
   qualification?: string;
   experience_years?: number;
   address?: string;
@@ -212,4 +212,18 @@ export interface StaffProfile {
   date_of_joining: string | null;
   is_active: boolean;
   profile_photo_url: string | null;
+}
+
+// Bulk staff enrollment upload
+export interface BulkStaffCreatedRow {
+  row: number;
+  staff_id: string;
+  name: string;
+  email: string;
+}
+
+export interface BulkStaffUploadResponse {
+  created: BulkStaffCreatedRow[];
+  errors: string[];
+  total_rows: number;
 }

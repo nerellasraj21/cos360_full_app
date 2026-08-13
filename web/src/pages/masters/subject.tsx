@@ -9,17 +9,11 @@ import { SubjectCategoriesInfiniteDropdown, CreateCategoryPopover } from '@/comp
 import { useAcademicYearStore } from "@/lib/academicYearStore";
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PermissionGuard } from '@/components/PermissionGuard';
-import { usePermission } from '@/hooks/usePermission';
 
 export default function SubjectPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
   const { academicYears, selectedAcademicYearId, fetchAndSetAcademicYears } = useAcademicYearStore();
-  const { checkPermission } = usePermission();
-
-  // Check permissions
-  const hasListPermission = checkPermission('subjects', 'list');
-
   // Initialize academic years if not loaded
   useEffect(() => {
     if (academicYears.length === 0) {
@@ -30,7 +24,7 @@ export default function SubjectPage() {
   const {
     data,
     isLoading,
-  } = useSubjectsPaginated(page, pageSize, hasListPermission);
+  } = useSubjectsPaginated(page, pageSize);
 
   const subjects = data?.data || [];
   const total = data?.total || subjects.length;

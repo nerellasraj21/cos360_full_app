@@ -22,7 +22,11 @@
       "Bash(xargs:*)",
       "Bash(pip show:*)",
       "Bash(pip install:*)",
-      "Bash(del:*)"
+      "Bash(del:*)",
+      "Bash(npm run *)",
+      "Bash(node \"C:/Users/ADMIN/AppData/Local/Temp/claude/c--Users-ADMIN-Documents-workspace-ReactWorkspace-Cos360-frontend-cos360-frontend/96274633-5a99-45cd-8d4b-5be593ee3ae5/scratchpad/move_student_block.js\")",
+      "Read(//c/Users/ADMIN/Documents/workspace/cos360_mobile_app/**)",
+      "Read(//c/Users/ADMIN/Documents/workspace/cos360_mobile_app/app/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\nerel\\Documents\\Workspace\\React Workspace\\cos360_mobile\\cos360_mobile_app\\app\\transport",

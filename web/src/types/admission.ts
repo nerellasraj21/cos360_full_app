@@ -261,3 +261,17 @@ export interface StudentDropdownItemLegacy {
 export interface StudentAdmissionRequest extends StudentAdmissionCreate {}
 
 export interface StudentAdmission extends StudentAdmissionCreate {}
+
+// Bulk admission upload
+export interface BulkAdmissionCreatedRow {
+  row: number;
+  student_id: string;
+  admission_number: string;
+  name: string;
+}
+
+export interface BulkAdmissionUploadResponse {
+  created: BulkAdmissionCreatedRow[];
+  errors: string[];
+  total_rows: number;
+}

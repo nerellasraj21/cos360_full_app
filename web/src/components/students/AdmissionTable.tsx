@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ViewButton, EditButton, ActivateButton, DeactivateButton, TableActionGroup } from '@/components/common/TableActions';
+import { QuickSendButton } from '@/components/communication/QuickSendButton';
 import { Loader2, Eye, Edit, CheckCircle, XCircle, UserCircle, X, Plus, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { InfiniteScrollDropdown } from '@/components/dropdown/InfiniteScrollDropdown';
@@ -319,6 +320,19 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       label: 'Actions',
       render: (_, row) => (
         <TableActionGroup>
+          <QuickSendButton
+            templateName="Welcome"
+            targetType="individual_student"
+            targetRef={{ student_id: row.student_id }}
+            recipientLabel={`${row.student_name} — ${row.class_name} ${row.section_name}`}
+            variables={{
+              student_name: row.student_name,
+              admission_no: row.admission_no,
+              class_name: row.class_name,
+              section_name: row.section_name,
+            }}
+            title="Send Welcome Message"
+          />
           <ViewButton
             onClick={async () => {
               const listItem = admissionsResponse?.items?.find(item => item.id === row.id);
@@ -694,6 +708,200 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
           {selectedAdmission && (
             <div className="space-y-4 pr-1 pb-2" onChange={() => setIsEditDirty(true)}>
 
+              {/* Student Details */}
+              <p className="text-sm font-semibold text-muted-foreground pt-2">Student Details</p>
+
+              {/* Student photo */}
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  {selectedAdmission.student?.photo_url ? (
+                    <img
+                      src={`${mediaBase}${selectedAdmission.student.photo_url}`}
+                      alt="Student photo"
+                      className="h-20 w-20 rounded-full object-cover border-2 border-border"
+                    />
+                  ) : (
+                    <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center border-2 border-border">
+                      <UserCircle className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                  )}
+                  {selectedAdmission.student?.photo_url && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const studentId = selectedAdmission.student.id;
+                        deletePhotoMutation.mutate(studentId, {
+                          onSuccess: async () => {
+                            const refreshed = await getAdmissionByStudentId(studentId);
+                            setSelectedAdmission(refreshed);
+                          },
+                        });
+                      }}
+                      disabled={deletePhotoMutation.isPending}
+                      className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/80"
+                      title="Remove photo"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="block text-sm font-medium text-foreground">Student Photo</label>
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      disabled={uploadPhotoMutation.isPending || deletePhotoMutation.isPending}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 2 * 1024 * 1024) {
+                          toast.error('Photo must be under 2 MB');
+                          e.target.value = '';
+                          return;
+                        }
+                        const studentId = selectedAdmission?.student.id;
+                        if (!studentId) return;
+                        uploadPhotoMutation.mutate({ studentId, file }, {
+                          onSuccess: async () => {
+                            const refreshed = await getAdmissionByStudentId(studentId);
+                            setSelectedAdmission(refreshed);
+                          },
+                        });
+                        e.target.value = '';
+                      }}
+                    />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-background text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                      {uploadPhotoMutation.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Plus className="h-3.5 w-3.5" />
+                      )}
+                      {uploadPhotoMutation.isPending ? 'Uploading…' : 'Choose photo'}
+                    </span>
+                  </label>
+                  <span className="text-xs text-muted-foreground">JPG, PNG or WebP · max 2 MB</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-first-name">First Name <span className="text-red-500">*</span></Label>
+                  <Input id="edit-first-name" value={editForm.first_name} onChange={(e) => setEditForm(prev => ({ ...prev, first_name: e.target.value }))} />
+                  {!editForm.first_name?.trim() && <span className="text-red-500 text-sm">First name is required</span>}
+                </div>
+                <div>
+                  <Label htmlFor="edit-last-name">Last Name</Label>
+                  <Input id="edit-last-name" value={editForm.last_name} onChange={(e) => setEditForm(prev => ({ ...prev, last_name: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-dob">Date of Birth</Label>
+                  <Input id="edit-dob" type="date" value={editForm.date_of_birth} onChange={(e) => setEditForm(prev => ({ ...prev, date_of_birth: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-gender">Gender</Label>
+                  <InfiniteScrollDropdown
+                    data={[{id:'M',value:'M',label:'Male'},{id:'F',value:'F',label:'Female'},{id:'O',value:'O',label:'Other'}]}
+                    value={editForm.gender}
+                    onChange={(v) => setEditForm(prev => ({ ...prev, gender: v as string }))}
+                    placeholder="Select gender"
+                    clearable={false}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-is-primary">Primary Status</Label>
+                  <InfiniteScrollDropdown
+                    data={[{id:'not_primary',value:'not_primary',label:'Not Primary'},{id:'primary',value:'primary',label:'Primary'}]}
+                    value={editForm.is_primary}
+                    onChange={(v) => setEditForm(prev => ({ ...prev, is_primary: v as string }))}
+                    placeholder="Select status"
+                    clearable={false}
+                  />
+                </div>
+                <div>{/* spacer */}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-aadhar">Aadhar Number (Optional)</Label>
+                  <Input id="edit-aadhar" value={editForm.aadhar_number} onChange={(e) => setEditForm(prev => ({ ...prev, aadhar_number: e.target.value }))} />
+                  {aadharMsg(editForm.aadhar_number, 'Aadhar') && (
+                    <span className="text-red-500 text-sm">{aadharMsg(editForm.aadhar_number, 'Aadhar')}</span>
+                  )}
+                  {editForm.aadhar_number && /^\d{12}$/.test(editForm.aadhar_number) && (
+                    <span className="text-green-600 text-sm">Aadhar number is valid</span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="edit-apaar">APAAR Number (Optional)</Label>
+                  <Input id="edit-apaar" value={editForm.apaar_number} onChange={(e) => setEditForm(prev => ({ ...prev, apaar_number: e.target.value }))} />
+                  {aadharMsg(editForm.apaar_number, 'APAAR') && (
+                    <span className="text-red-500 text-sm">{aadharMsg(editForm.apaar_number, 'APAAR')}</span>
+                  )}
+                  {editForm.apaar_number && /^\d{12}$/.test(editForm.apaar_number) && (
+                    <span className="text-green-600 text-sm">APAAR number is valid</span>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-primary-phone">Primary Phone</Label>
+                  <Input
+                    id="edit-primary-phone"
+                    inputMode="numeric"
+                    value={editForm.primary_phone}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, primary_phone: e.target.value }))}
+                  />
+                  {editForm.primary_phone && !/^\d{10}$/.test(editForm.primary_phone) ? (
+                    <span className="text-red-500 text-sm">Must be a 10-digit number</span>
+                  ) : editForm.primary_phone && /^\d{10}$/.test(editForm.primary_phone) ? (
+                    <span className="text-green-600 text-sm">Primary phone is valid</span>
+                  ) : null}
+                </div>
+                <div>{/* spacer */}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-nationality">Nationality</Label>
+                  <Input id="edit-nationality" value={editForm.nationality} onChange={(e) => setEditForm(prev => ({ ...prev, nationality: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-mother-tongue">Mother Tongue</Label>
+                  <Input id="edit-mother-tongue" value={editForm.mother_tongue} onChange={(e) => setEditForm(prev => ({ ...prev, mother_tongue: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <CasteDropdown
+                    id="edit-caste"
+                    value={editForm.caste_id}
+                    onChange={(value) => setEditForm(prev => ({ ...prev, caste_id: value || '', caste: value || '', sub_caste_id: '', sub_caste: '' }))}
+                  />
+                </div>
+                <div>
+                  <SubCasteDropdown
+                    id="edit-sub-caste"
+                    casteId={editForm.caste_id || undefined}
+                    value={editForm.sub_caste_id}
+                    onChange={(value) => setEditForm(prev => ({ ...prev, sub_caste_id: value || '', sub_caste: value || '' }))}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-community">Community</Label>
+                  <Input id="edit-community" value={editForm.community} onChange={(e) => setEditForm(prev => ({ ...prev, community: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-id-marks">Identification Marks</Label>
+                  <Input id="edit-id-marks" value={editForm.identification_marks} onChange={(e) => setEditForm(prev => ({ ...prev, identification_marks: e.target.value }))} />
+                </div>
+              </div>
+
               {/* Admission Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
@@ -739,7 +947,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-academic-year">Academic Year</Label>
+                  <Label htmlFor="edit-academic-year">Academic Year <span className="text-red-500">*</span></Label>
                   <InfiniteScrollDropdown
                     data={academicYears.map(y => ({ id: String(y.id), value: String(y.id), label: y.title }))}
                     value={editForm.academic_year_id}
@@ -755,7 +963,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
               {/* Admitted To */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-admitted-class">Admitted Class</Label>
+                  <Label htmlFor="edit-admitted-class">Admitted Class <span className="text-red-500">*</span></Label>
                   <InfiniteScrollDropdown
                     data={classesData.map(c => ({ id: String(c.id), value: String(c.id), label: c.name }))}
                     value={editForm.admitted_class_id}
@@ -812,7 +1020,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-address1">Address Line 1</Label>
+                  <Label htmlFor="edit-address1">Address Line 1 <span className="text-red-500">*</span></Label>
                   <Input
                     id="edit-address1"
                     value={editForm.address_line1}
@@ -923,210 +1131,11 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                 </div>
               )}
 
-              {/* Student Details */}
-              <p className="text-sm font-semibold text-muted-foreground pt-2">Student Details</p>
-
-              {/* Student photo */}
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  {selectedAdmission.student?.photo_url ? (
-                    <img
-                      src={`${mediaBase}${selectedAdmission.student.photo_url}`}
-                      alt="Student photo"
-                      className="h-20 w-20 rounded-full object-cover border-2 border-border"
-                    />
-                  ) : (
-                    <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center border-2 border-border">
-                      <UserCircle className="h-10 w-10 text-muted-foreground" />
-                    </div>
-                  )}
-                  {selectedAdmission.student?.photo_url && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const studentId = selectedAdmission.student.id;
-                        deletePhotoMutation.mutate(studentId, {
-                          onSuccess: async () => {
-                            const refreshed = await getAdmissionByStudentId(studentId);
-                            setSelectedAdmission(refreshed);
-                          },
-                        });
-                      }}
-                      disabled={deletePhotoMutation.isPending}
-                      className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/80"
-                      title="Remove photo"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="block text-sm font-medium text-foreground">Student Photo</label>
-                  <label className="cursor-pointer">
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      disabled={uploadPhotoMutation.isPending || deletePhotoMutation.isPending}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        if (file.size > 2 * 1024 * 1024) {
-                          toast.error('Photo must be under 2 MB');
-                          e.target.value = '';
-                          return;
-                        }
-                        const studentId = selectedAdmission?.student.id;
-                        if (!studentId) return;
-                        uploadPhotoMutation.mutate({ studentId, file }, {
-                          onSuccess: async () => {
-                            const refreshed = await getAdmissionByStudentId(studentId);
-                            setSelectedAdmission(refreshed);
-                          },
-                        });
-                        e.target.value = '';
-                      }}
-                    />
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-background text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                      {uploadPhotoMutation.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Plus className="h-3.5 w-3.5" />
-                      )}
-                      {uploadPhotoMutation.isPending ? 'Uploading…' : 'Choose photo'}
-                    </span>
-                  </label>
-                  <span className="text-xs text-muted-foreground">JPG, PNG or WebP · max 2 MB</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-first-name">First Name <span className="text-red-500">*</span></Label>
-                  <Input id="edit-first-name" value={editForm.first_name} onChange={(e) => setEditForm(prev => ({ ...prev, first_name: e.target.value }))} />
-                  {!editForm.first_name?.trim() && <span className="text-red-500 text-sm">First name is required</span>}
-                </div>
-                <div>
-                  <Label htmlFor="edit-last-name">Last Name <span className="text-red-500">*</span></Label>
-                  <Input id="edit-last-name" value={editForm.last_name} onChange={(e) => setEditForm(prev => ({ ...prev, last_name: e.target.value }))} />
-                  {!editForm.last_name?.trim() && <span className="text-red-500 text-sm">Last name is required</span>}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-dob">Date of Birth <span className="text-red-500">*</span></Label>
-                  <Input id="edit-dob" type="date" value={editForm.date_of_birth} onChange={(e) => setEditForm(prev => ({ ...prev, date_of_birth: e.target.value }))} />
-                  {!editForm.date_of_birth && <span className="text-red-500 text-sm">Date of birth is required</span>}
-                </div>
-                <div>
-                  <Label htmlFor="edit-gender">Gender <span className="text-red-500">*</span></Label>
-                  <InfiniteScrollDropdown
-                    data={[{id:'M',value:'M',label:'Male'},{id:'F',value:'F',label:'Female'},{id:'O',value:'O',label:'Other'}]}
-                    value={editForm.gender}
-                    onChange={(v) => setEditForm(prev => ({ ...prev, gender: v as string }))}
-                    placeholder="Select gender"
-                    clearable={false}
-                  />
-                  {!editForm.gender && <span className="text-red-500 text-sm">Gender is required</span>}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-is-primary">Primary Status</Label>
-                  <InfiniteScrollDropdown
-                    data={[{id:'not_primary',value:'not_primary',label:'Not Primary'},{id:'primary',value:'primary',label:'Primary'}]}
-                    value={editForm.is_primary}
-                    onChange={(v) => setEditForm(prev => ({ ...prev, is_primary: v as string }))}
-                    placeholder="Select status"
-                    clearable={false}
-                  />
-                </div>
-                <div>{/* spacer */}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-aadhar">Aadhar Number (Optional)</Label>
-                  <Input id="edit-aadhar" value={editForm.aadhar_number} onChange={(e) => setEditForm(prev => ({ ...prev, aadhar_number: e.target.value }))} />
-                  {aadharMsg(editForm.aadhar_number, 'Aadhar') && (
-                    <span className="text-red-500 text-sm">{aadharMsg(editForm.aadhar_number, 'Aadhar')}</span>
-                  )}
-                  {editForm.aadhar_number && /^\d{12}$/.test(editForm.aadhar_number) && (
-                    <span className="text-green-600 text-sm">Aadhar number is valid</span>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="edit-apaar">APAAR Number (Optional)</Label>
-                  <Input id="edit-apaar" value={editForm.apaar_number} onChange={(e) => setEditForm(prev => ({ ...prev, apaar_number: e.target.value }))} />
-                  {aadharMsg(editForm.apaar_number, 'APAAR') && (
-                    <span className="text-red-500 text-sm">{aadharMsg(editForm.apaar_number, 'APAAR')}</span>
-                  )}
-                  {editForm.apaar_number && /^\d{12}$/.test(editForm.apaar_number) && (
-                    <span className="text-green-600 text-sm">APAAR number is valid</span>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-primary-phone">Primary Phone <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="edit-primary-phone"
-                    inputMode="numeric"
-                    value={editForm.primary_phone}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, primary_phone: e.target.value }))}
-                  />
-                  {!editForm.primary_phone ? (
-                    <span className="text-red-500 text-sm">Primary phone is required</span>
-                  ) : !/^\d{10}$/.test(editForm.primary_phone) ? (
-                    <span className="text-red-500 text-sm">Must be a 10-digit number</span>
-                  ) : (
-                    <span className="text-green-600 text-sm">Primary phone is valid</span>
-                  )}
-                </div>
-                <div>{/* spacer */}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-nationality">Nationality</Label>
-                  <Input id="edit-nationality" value={editForm.nationality} onChange={(e) => setEditForm(prev => ({ ...prev, nationality: e.target.value }))} />
-                </div>
-                <div>
-                  <Label htmlFor="edit-mother-tongue">Mother Tongue</Label>
-                  <Input id="edit-mother-tongue" value={editForm.mother_tongue} onChange={(e) => setEditForm(prev => ({ ...prev, mother_tongue: e.target.value }))} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <CasteDropdown
-                    id="edit-caste"
-                    value={editForm.caste_id}
-                    onChange={(value) => setEditForm(prev => ({ ...prev, caste_id: value || '', caste: value || '', sub_caste_id: '', sub_caste: '' }))}
-                  />
-                </div>
-                <div>
-                  <SubCasteDropdown
-                    id="edit-sub-caste"
-                    casteId={editForm.caste_id || undefined}
-                    value={editForm.sub_caste_id}
-                    onChange={(value) => setEditForm(prev => ({ ...prev, sub_caste_id: value || '', sub_caste: value || '' }))}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-community">Community</Label>
-                  <Input id="edit-community" value={editForm.community} onChange={(e) => setEditForm(prev => ({ ...prev, community: e.target.value }))} />
-                </div>
-                <div>
-                  <Label htmlFor="edit-id-marks">Identification Marks</Label>
-                  <Input id="edit-id-marks" value={editForm.identification_marks} onChange={(e) => setEditForm(prev => ({ ...prev, identification_marks: e.target.value }))} />
-                </div>
-              </div>
-
               {/* Father Details */}
               <p className="text-sm font-semibold text-muted-foreground pt-2">Father's Details</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-father-name">Name</Label>
+                  <Label htmlFor="edit-father-name">Name <span className="text-red-500">*</span></Label>
                   <Input id="edit-father-name" value={editForm.father_name} onChange={(e) => setEditForm(prev => ({ ...prev, father_name: e.target.value }))} />
                 </div>
                 <div>
@@ -1137,7 +1146,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-father-phone">Phone</Label>
+                  <Label htmlFor="edit-father-phone">Phone <span className="text-red-500">*</span></Label>
                   <Input id="edit-father-phone" value={editForm.father_phone} onChange={(e) => setEditForm(prev => ({ ...prev, father_phone: e.target.value }))} />
                 </div>
                 <div>
@@ -1299,13 +1308,24 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
                   try {
                     // Collect every mandatory/format error at once so the user sees the
                     // full list instead of fixing one field, saving, and hitting the next.
+                    // Mandatory per the admission contract (mirrors the create form).
+                    // These may be changed but never cleared on edit.
                     const missing: string[] = [];
                     if (!editForm.admission_number?.trim()) missing.push('Admission Number');
+                    // Mandatory fields mirror the create form: Admission Date, Academic Year,
+                    // Admitted Class, Address Line 1, First Name, Father Name, Father Phone.
+                    // Sections, Current Class/Section, DOB and parent emails are optional.
+                    // Check the effective value (edit value falls back to the existing
+                    // record) so populated records don't false-flag. State stays optional.
+                    if (!(editForm.admission_date || selectedAdmission.admission_date)) missing.push('Admission Date');
+                    if (!(editForm.academic_year_id || selectedAdmission.academic_year_id)) missing.push('Academic Year');
+                    if (!(editForm.admitted_class_id || selectedAdmission.admitted_class_id)) missing.push('Admitted Class');
+                    if (!editForm.address_line1?.trim()) missing.push('Address Line 1');
                     if (!editForm.first_name?.trim()) missing.push('First Name');
-                    if (!editForm.last_name?.trim()) missing.push('Last Name');
-                    if (!editForm.date_of_birth) missing.push('Date of Birth');
-                    if (!editForm.gender) missing.push('Gender');
-                    if (!/^\d{10}$/.test(editForm.primary_phone)) missing.push('Primary Phone (must be 10 digits)');
+                    if (!editForm.father_name?.trim()) missing.push('Father Name');
+                    if (!/^\d{10}$/.test(editForm.father_phone || '')) missing.push('Father Phone (must be 10 digits)');
+                    // Student phone is optional — only validate its format when provided.
+                    if (editForm.primary_phone && !/^\d{10}$/.test(editForm.primary_phone)) missing.push('Primary Phone (must be 10 digits)');
 
                     // Aadhar / APAAR format checks (optional fields — only validate if non-empty)
                     const aadharErrors = [

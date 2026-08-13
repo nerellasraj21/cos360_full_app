@@ -7,8 +7,7 @@ import { useCreateAdmission, useUploadStudentPhoto } from '@/api/hooks/students/
 import type { StudentAdmissionCreate } from '@/types/admission';
 import { UserCircle, X, Plus, Loader2 } from 'lucide-react';
 import { config } from '@/lib/config';
-import { AcademicStepForm } from './admission-steps/AcademicStepForm';
-import { StudentStepForm } from './admission-steps/StudentStepForm';
+import { AcademicAndStudentStepForm } from './admission-steps/AcademicAndStudentStepForm';
 import { ParentsStepForm } from './admission-steps/ParentsStepForm';
 import { AddressStepForm } from './admission-steps/AddressStepForm';
 import { PreviousSchoolStepForm } from './admission-steps/PreviousSchoolStepForm';
@@ -23,8 +22,7 @@ interface MultiStepAdmissionFormProps {
 }
 
 const steps = [
-  { id: 'academic', title: 'Academic Details', component: AcademicStepForm },
-  { id: 'student', title: 'Student Details', component: StudentStepForm },
+  { id: 'academic-student', title: 'Student & Academic Details', component: AcademicAndStudentStepForm },
   { id: 'parents', title: 'Parent Details', component: ParentsStepForm },
   { id: 'address', title: 'Address Details', component: AddressStepForm },
   { id: 'previous-school', title: 'Previous School', component: PreviousSchoolStepForm },
@@ -34,6 +32,7 @@ const steps = [
 const FIELD_LABELS: Record<string, string> = {
   admission_date: 'Admission Date',
   admitted_class_id: 'Joining Class',
+  admitted_section_id: 'Joining Section',
   current_class_id: 'Current Class',
   current_section_id: 'Current Section',
   admission_number: 'Admission Number',
@@ -50,6 +49,7 @@ const FIELD_LABELS: Record<string, string> = {
   father_phone: "Father's Phone",
   mother_phone: "Mother's Phone",
   guardian_phone: "Guardian's Phone",
+  guardian_email: "Guardian's Email",
   address_line1: 'Address Line 1',
   city: 'City',
   state_id: 'State',
@@ -164,12 +164,11 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
 
   const nextStep = async () => {
     const stepFields = {
-      0: ['admission_date', 'admitted_class_id', 'current_class_id', 'current_section_id'],
-      1: ['admission_number', 'student_first_name', 'student_last_name', 'student_date_of_birth', 'student_gender', 'student_aadhar_number', 'student_apaar_number'],
-      2: ['father_name', 'father_email', 'mother_name', 'mother_email', 'father_phone', 'mother_phone', 'guardian_phone'],
-      3: ['address_line1', 'city', 'state_id'],
-      4: [],
-      5: []
+      0: ['admission_date', 'admitted_class_id', 'admission_number', 'student_first_name', 'student_aadhar_number', 'student_apaar_number'],
+      1: ['father_name', 'father_phone', 'mother_phone', 'guardian_phone', 'guardian_email'],
+      2: ['address_line1'],
+      3: [],
+      4: []
     };
 
     const fieldsToValidate = stepFields[currentStep as keyof typeof stepFields] || [];
@@ -207,21 +206,13 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
 
       // Validate required fields before submission
       const requiredFields: Record<string, { value: string | undefined; step: number }> = {
-        'Academic Year':       { value: currentAcademicYearId, step: 0 },
-        'Admission Date':      { value: data.admission_date,   step: 0 },
-        'Admission Type':      { value: data.admission_type,   step: 0 },
-        'Joining Class':       { value: data.admitted_class_id, step: 0 },
-        'Current Class':       { value: data.current_class_id,  step: 0 },
-        'Current Section':     { value: data.current_section_id, step: 0 },
-        'Admission Number':    { value: data.admission_number, step: 1 },
-        'Student First Name':  { value: data.student_first_name, step: 1 },
-        'Student Date of Birth': { value: data.student_date_of_birth, step: 1 },
-        'Student Gender':      { value: data.student_gender, step: 1 },
-        "Father's Name":       { value: data.father_name, step: 2 },
-        "Mother's Name":       { value: data.mother_name, step: 2 },
-        'Address Line 1':      { value: data.address_line1, step: 3 },
-        'City':                { value: data.city, step: 3 },
-        'State':               { value: data.state_id, step: 3 },
+        'Academic Year':         { value: currentAcademicYearId,      step: 0 },
+        'Admission Number':      { value: data.admission_number,      step: 0 },
+        'Joining Class':         { value: data.admitted_class_id,     step: 0 },
+        'Student First Name':    { value: data.student_first_name,    step: 0 },
+        "Father's Name":         { value: data.father_name,           step: 1 },
+        "Father's Phone":        { value: data.father_phone,          step: 1 },
+        'Address Line 1':        { value: data.address_line1,         step: 2 },
       };
 
       const missingEntries = Object.entries(requiredFields).filter(([, { value }]) =>
@@ -358,7 +349,7 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
         methods.setError('admission_number', {
           message: 'Admission number already exists. Please use a different number.',
         });
-        setCurrentStep(1);
+        setCurrentStep(0);
         return;
       }
 
@@ -435,8 +426,8 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
               )}
               {steps.map((step, index) => (
                 <div key={step.id} style={{ display: index === currentStep ? 'block' : 'none' }}>
-                  {/* Photo picker shown on Student Details step */}
-                  {index === 1 && (
+                  {/* Photo picker shown on Academic & Student Details step */}
+                  {index === 0 && (
                     <div className="flex items-center gap-4 mb-4">
                       <div className="relative">
                         {photoPreviewUrl ? (

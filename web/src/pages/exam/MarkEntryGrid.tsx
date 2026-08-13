@@ -19,6 +19,7 @@ import {
   useRemarkGradeSets,
 } from '@/api/hooks/exam/useExam'
 import { getMarkTemplate, uploadMarks } from '@/api/exam'
+import { QuickSendButton } from '@/components/communication/QuickSendButton'
 import { toast } from 'sonner'
 
 export default function MarkEntryGrid() {
@@ -234,6 +235,19 @@ export default function MarkEntryGrid() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <QuickSendButton
+            templateName="Mark Entry"
+            targetType="class_section_parents"
+            targetRef={{ class_id: classId, section_id: resolvedSectionId }}
+            recipientLabel={`Parents of ${csLabel}`}
+            variant="button"
+            label="Send Marks"
+            variables={{
+              exam_name: exam?.exam_name ?? '',
+              subject_code: subjectLabel,
+            }}
+            title="Send Mark Entry Message to parents"
+          />
           <Button
             variant="outline"
             size="sm"

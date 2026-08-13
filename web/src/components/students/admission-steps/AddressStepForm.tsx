@@ -44,7 +44,7 @@ export const AddressStepForm = () => {
           <Label htmlFor="address_line1">Address Line 1 <span className="text-red-500">*</span></Label>
           <Input
             id="address_line1"
-            {...register('address_line1', { required: 'Address is required' })}
+            {...register('address_line1', { required: 'Address Line 1 is required' })}
           />
           {errors.address_line1 && (
             <span className="text-red-500">{errors.address_line1.message as string}</span>
@@ -61,10 +61,10 @@ export const AddressStepForm = () => {
         </div>
 
         <div>
-          <Label htmlFor="city">City</Label>
+          <Label htmlFor="city">City (Optional)</Label>
           <Input
             id="city"
-            {...register('city', { required: 'City is required' })}
+            {...register('city')}
           />
           {errors.city && (
             <span className="text-red-500">{errors.city.message as string}</span>
@@ -72,12 +72,12 @@ export const AddressStepForm = () => {
         </div>
 
         <div>
-          <input type="hidden" {...register('state_id', { required: 'State is required' })} />
+          <input type="hidden" {...register('state_id')} />
           <StateDropdown
             id="state_id"
-            label="State"
+            label="State (Optional)"
             value={stateId || ''}
-            required={true}
+            required={false}
             onChange={(value) => {
               console.log('State selected:', value);
               setValue('state_id', value || '', { shouldValidate: true, shouldDirty: true });

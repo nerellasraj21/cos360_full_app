@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { usePermission } from '@/hooks/usePermission';
+import { QuickSendButton } from '@/components/communication/QuickSendButton';
 import { useStaff } from '@/api/staff';
 import { useStaffAttendanceByDate } from '@/api/hooks/staff/attendance';
 import {
@@ -78,7 +79,7 @@ const StaffAttendancePage: React.FC = () => {
     const [currentPage, setCurrentPage] = useState<number>(0);
     const [pageSize, setPageSize] = useState<number>(10);
     const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
-        new Set(['staff_name', 'email', 'department', 'status', 'isModified'])
+        new Set(['staff_name', 'email', 'department', 'status', 'isModified', 'actions'])
     );
 
     // Data fetching
@@ -309,6 +310,30 @@ const StaffAttendancePage: React.FC = () => {
             editable: false,
             render: (value: boolean) =>
                 value ? <Badge variant="secondary">Modified</Badge> : null,
+        },
+        {
+            key: 'actions',
+            label: 'Actions',
+            editable: false,
+            render: (_value: unknown, row: StaffAttendanceRow) => (
+                <QuickSendButton
+                    templateName="Staff Attendance"
+                    targetType="individual_staff"
+                    targetRef={{ staff_id: row.staff_id }}
+                    recipientLabel={row.staff_name}
+                    variables={{
+                        staff_name: row.staff_name,
+                        date: selectedDate,
+                    }}
+                    // Only meaningful for staff who aren't fully present today.
+                    disabled={row.status === 'present'}
+                    title={
+                        row.status === 'present'
+                            ? 'Staff is present — no notification needed'
+                            : 'Send Attendance Message'
+                    }
+                />
+            ),
         },
     ];
 

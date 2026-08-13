@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import ComposeTab from './ComposeTab';
+import SendMessagePanel from './SendMessagePanel';
 import TemplatesTab from './TemplatesTab';
 import LogsTab from './LogsTab';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -67,7 +67,7 @@ export default function CommunicationPage() {
 
       {/* Tab content */}
       <div className="pb-20 md:pb-0">
-        {activeTab === 'compose' && <ComposeTab onSendSuccess={handleSendSuccess} />}
+        {activeTab === 'compose' && <SendMessagePanel onSendSuccess={handleSendSuccess} />}
         {activeTab === 'templates' && <TemplatesTab />}
         {activeTab === 'logs' && <LogsTab />}
       </div>

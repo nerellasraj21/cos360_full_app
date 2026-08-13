@@ -1,11 +1,20 @@
 
+import { useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 export const PreviousSchoolStepForm = () => {
-  const { register, watch, formState: { errors } } = useFormContext();
-  const hasPreviousSchool = watch('is_previous_school');
+  const { register, watch, setValue, formState: { errors } } = useFormContext();
+  const hasPreviousSchool = watch('is_previous_school') === 'true';
+
+  useEffect(() => {
+    if (!hasPreviousSchool) {
+      setValue('previous_school_name', '');
+      setValue('previous_class', '');
+      setValue('previous_school_remark', '');
+    }
+  }, [hasPreviousSchool, setValue]);
 
   return (
     <div className="space-y-4">

@@ -57,10 +57,19 @@ export interface FeeSummaryResponse {
 
 // ---- Fee Payment ----
 
+export interface FeePaymentItemRequest {
+  fee_type_id: string;
+  amount: number;
+}
+
 export interface FeePaymentRequest {
   student_id: string;
   academic_year_id: string;
   amount_to_pay: number;
+  // Explicit per-fee-type breakdown. When provided, the backend allocates
+  // strictly to these fee types (each for its own amount) instead of
+  // auto-distributing top-down across whatever fee types have dues.
+  fee_items?: FeePaymentItemRequest[];
   payment_method: CollectionPaymentMethod;
   receipt_number?: string;
   upi_reference?: string;

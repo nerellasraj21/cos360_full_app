@@ -178,7 +178,7 @@ export function useUpdateClassMappingTermAmounts() {
 
     return useMutation<any, Error, {
         fee_class_mapping_id: string;
-        term_amounts: { id: string; term_id: string; term_amount: number }[];
+        term_amounts: { id: string; term_date_id: string; term_amount: number }[];
     }>({
         mutationFn: updateClassMappingTermAmounts,
         onSuccess: () => {

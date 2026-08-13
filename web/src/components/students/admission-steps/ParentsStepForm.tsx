@@ -22,8 +22,10 @@ const isValidPhone = (value?: string): boolean =>
 export const ParentsStepForm = () => {
   const { register, watch, setValue, clearErrors, formState: { errors } } = useFormContext();
 
-  const [fatherPhoneRequired, setFatherPhoneRequired] = useState(false);
-  const fatherPhoneRequiredRef = useRef(false);
+  // Father phone is mandatory per the admission contract; the "Primary" toggle
+  // defaults on so it is required unless the user explicitly opts out.
+  const [fatherPhoneRequired, setFatherPhoneRequired] = useState(true);
+  const fatherPhoneRequiredRef = useRef(true);
   const [motherPhoneRequired, setMotherPhoneRequired] = useState(false);
   const motherPhoneRequiredRef = useRef(false);
   const [guardianPhoneRequired, setGuardianPhoneRequired] = useState(false);
@@ -50,14 +52,14 @@ export const ParentsStepForm = () => {
           </div>
 
           <div>
-            <Label htmlFor="father_email">Email (Optional)</Label>
+            <Label htmlFor="father_email">Email</Label>
             <Input
               id="father_email"
               type="email"
               {...register('father_email', {
-                pattern: {
-                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: 'Invalid email address'
+                validate: (value) => {
+                  if (!value || value.trim() === '') return true;
+                  return /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value) || 'Invalid email address';
                 }
               })}
             />
@@ -175,10 +177,10 @@ export const ParentsStepForm = () => {
           <h3 className="text-lg font-medium">Mother's Information</h3>
 
           <div>
-            <Label htmlFor="mother_name">Name *</Label>
+            <Label htmlFor="mother_name">Name</Label>
             <Input
               id="mother_name"
-              {...register('mother_name', { required: "Mother's name is required" })}
+              {...register('mother_name')}
             />
             {errors.mother_name && (
               <span className="text-red-500">{errors.mother_name.message as string}</span>
@@ -186,16 +188,16 @@ export const ParentsStepForm = () => {
           </div>
 
           <div>
-            <Label htmlFor="mother_email">Email (Optional)</Label>
+            <Label htmlFor="mother_email">Email</Label>
             <Input
               id="mother_email"
               type="email"
               {...register('mother_email', {
-                pattern: {
-                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: 'Invalid email address'
-                },
                 validate: {
+                  format: (value) => {
+                    if (!value || value.trim() === '') return true;
+                    return /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value) || 'Invalid email address';
+                  },
                   differentFromFather: (value) => {
                     if (!value || value.trim() === '') return true;
                     const fatherEmail = watch('father_email');
@@ -212,7 +214,7 @@ export const ParentsStepForm = () => {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <Label htmlFor="mother_phone">
-                Phone{motherPhoneRequired && <span className="text-red-500"> *</span>}
+                Phone
               </Label>
               <div className="flex items-center gap-1.5">
                 <input
@@ -330,14 +332,18 @@ export const ParentsStepForm = () => {
             </div>
 
             <div>
-              <Label htmlFor="guardian_email">Email (Optional)</Label>
+              <Label htmlFor="guardian_email">
+                Email (Optional)
+              </Label>
               <Input
                 id="guardian_email"
                 type="email"
                 {...register('guardian_email', {
-                  pattern: {
-                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: 'Invalid email address'
+                  validate: (value) => {
+                    if (!value || value.trim() === '') {
+                      return watch('guardian_name') ? "Guardian's email is required" : true;
+                    }
+                    return /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value) || 'Invalid email address';
                   }
                 })}
               />
@@ -349,7 +355,7 @@ export const ParentsStepForm = () => {
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <Label htmlFor="guardian_phone">
-                  Phone{guardianPhoneRequired && <span className="text-red-500"> *</span>}
+                  Phone
                 </Label>
                 <div className="flex items-center gap-1.5">
                   <input

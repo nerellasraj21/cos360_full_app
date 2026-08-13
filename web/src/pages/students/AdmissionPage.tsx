@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { GraduationCap } from 'lucide-react';
 import MultiStepAdmissionForm from '@/components/students/MultiStepAdmissionForm';
 import AdmissionTable from '@/components/students/AdmissionTable';
+import BulkAdmissionUploadDialog from '@/components/students/BulkAdmissionUploadDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { usePermission } from '@/hooks/usePermission';
@@ -11,6 +12,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 
 const AdmissionPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
 
   const { checkPermission } = usePermission();
 
@@ -39,9 +41,14 @@ const AdmissionPage = () => {
               action="create"
               fallback={null}
             >
-              <Button onClick={() => setIsFormOpen(true)}>
-                New Admission
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setIsBulkUploadOpen(true)}>
+                  Bulk Upload
+                </Button>
+                <Button onClick={() => setIsFormOpen(true)}>
+                  New Admission
+                </Button>
+              </div>
             </PermissionGuard>
           }
         />
@@ -77,6 +84,11 @@ const AdmissionPage = () => {
             <MultiStepAdmissionForm onComplete={() => setIsFormOpen(false)} />
           </DialogContent>
         </Dialog>
+
+        <BulkAdmissionUploadDialog
+          open={isBulkUploadOpen}
+          onOpenChange={setIsBulkUploadOpen}
+        />
       </div>
     </PermissionGuard>
   );

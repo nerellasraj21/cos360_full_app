@@ -92,6 +92,10 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
       return true;
     });
   }, [routeStops, selectedTrip?.route_id]);
+  const selectedStop = useMemo(
+    () => filteredRouteStops.find(s => s.id === transportStopId),
+    [filteredRouteStops, transportStopId]
+  );
   const { data: existingTransports = [] } = useStudentTransportsByStudent(mapping ? (selectedStudent?.value || '') : '');
 
   const form = useForm<FormData>({
@@ -210,12 +214,13 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
     }
   }, [mapping, isTransportFee, existingTransports]);
 
-  // Auto-fill total_fee from selected vehicle's annual fee (skip until a bus is actually chosen,
-  // so editing an existing transport mapping doesn't zero out its saved total_fee before prefill)
+  // Auto-fill total_fee from the selected stop's fee. Transport fee is defined per stop
+  // (RouteStop.fees), not per vehicle. Create mode only — editing an existing mapping keeps
+  // its saved total_fee untouched, matching the class-mapping effect below.
   useEffect(() => {
-    if (!isTransportFee || !transportVehicleId) return;
-    form.setValue('total_fee', selectedVehicle?.fees ?? 0);
-  }, [isTransportFee, transportVehicleId, selectedVehicle]);
+    if (mapping || !isTransportFee || !transportStopId) return;
+    form.setValue('total_fee', selectedStop?.fees ?? 0);
+  }, [mapping, isTransportFee, transportStopId, selectedStop]);
 
   // Look up the class-level fee mapping (Fee Mappings > Class Mappings) for the selected
   // class, so total_fee can be auto-filled instead of typed in manually. Create mode only —
@@ -638,13 +643,13 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
               </div>
             </div>
 
-            {/* Annual fee summary */}
-            {transportVehicleId && (
+            {/* Annual fee summary — fee comes from the selected stop */}
+            {transportStopId && (
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">Annual Bus Fee:</span>
+                <span className="text-muted-foreground">Stop Fee:</span>
                 <span className="font-semibold text-blue-700 dark:text-blue-300 text-base">
-                  {(selectedVehicle?.fees ?? 0) > 0
-                    ? `₹${(selectedVehicle?.fees ?? 0).toLocaleString('en-IN')}`
+                  {(selectedStop?.fees ?? 0) > 0
+                    ? `₹${(selectedStop?.fees ?? 0).toLocaleString('en-IN')}`
                     : '—'}
                 </span>
               </div>

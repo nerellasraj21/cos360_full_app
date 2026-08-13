@@ -18,7 +18,12 @@ import type {
   StaffQualification,
   StaffQualificationInput,
   StaffQualificationUpdate,
+  BulkStaffUploadResponse,
 } from '@/types/staff/staff';
+import {
+  STAFF_ENROLLMENT_BULK_TEMPLATE,
+  STAFF_ENROLLMENT_BULK_UPLOAD,
+} from '@/constants/api/staff';
 
 export const staffApi = {
   // Staff Enrollment APIs
@@ -282,6 +287,23 @@ export const staffApi = {
 
   deleteStaffPhoto: async (staffId: string): Promise<void> => {
     await CAxios.delete(`/staff/enrollment/${staffId}/photo`);
+  },
+
+  // Bulk Staff Enrollment APIs
+  downloadBulkStaffTemplate: async (): Promise<Blob> => {
+    const response = await CAxios.get(STAFF_ENROLLMENT_BULK_TEMPLATE, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  bulkUploadStaff: async (file: File): Promise<BulkStaffUploadResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await CAxios.post(STAFF_ENROLLMENT_BULK_UPLOAD, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
   },
 };
 

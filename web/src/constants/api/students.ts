@@ -7,6 +7,8 @@ export const STUDENT_ADMISSIONS_LIST = `${STUDENTS_BASE}/admission/`;
 export const STUDENT_ADMISSIONS_SEARCH = `${STUDENTS_BASE}/admission/search`;
 export const STUDENT_ADMISSIONS_DROPDOWN = `${STUDENTS_BASE}/admission/students/dropdown`;
 export const STUDENT_ADMISSIONS_DROPDOWN_SIMPLE = `${STUDENTS_BASE}/admission/students/dropdown/simple`;
+export const STUDENT_ADMISSIONS_BULK_TEMPLATE = `${STUDENTS_BASE}/admission/bulk-upload/template`;
+export const STUDENT_ADMISSIONS_BULK_UPLOAD = `${STUDENTS_BASE}/admission/bulk-upload`;
 
 // Attendance
 export const STUDENT_ATTENDANCE = `${STUDENTS_BASE}/attendance/`;

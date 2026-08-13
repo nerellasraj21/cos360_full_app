@@ -26,6 +26,7 @@ import type { StudentAdmissionResponse } from '@/types/admission';
 import type { ClassRead } from '@/types/masters/classesandsections';
 import { useAuthStore } from '@/lib/authStore';
 import { useParentChildren } from '@/api/auth';
+import { QuickSendButton } from '@/components/communication/QuickSendButton';
 
 // Returns { start, end } defaulting to 1st of current month → today
 function currentMonthRange() {
@@ -698,19 +699,38 @@ function StaffView() {
                               <div className="text-sm text-muted-foreground">Roll No: {student.admission_number || 'N/A'}</div>
                             </div>
                           </div>
-                          <Select
-                            value={status}
-                            onValueChange={(value) =>
-                              handleAttendanceChange(student.student.id, value as 'present' | 'absent' | 'late')
-                            }
-                          >
-                            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="present">Present</SelectItem>
-                              <SelectItem value="absent">Absent</SelectItem>
-                              <SelectItem value="late">Late</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="flex items-center gap-1">
+                            <QuickSendButton
+                              templateName="Student Absentees"
+                              targetType="individual_student"
+                              targetRef={{ student_id: student.student.id }}
+                              recipientLabel={getStudentName(student.student)}
+                              variables={{
+                                student_name: getStudentName(student.student),
+                                date: selectedDate,
+                              }}
+                              // Absence notice only makes sense when not present.
+                              disabled={status === 'present'}
+                              title={
+                                status === 'present'
+                                  ? 'Student is present — no notification needed'
+                                  : 'Send Absentee Message'
+                              }
+                            />
+                            <Select
+                              value={status}
+                              onValueChange={(value) =>
+                                handleAttendanceChange(student.student.id, value as 'present' | 'absent' | 'late')
+                              }
+                            >
+                              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="present">Present</SelectItem>
+                                <SelectItem value="absent">Absent</SelectItem>
+                                <SelectItem value="late">Late</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                       );
                     })}

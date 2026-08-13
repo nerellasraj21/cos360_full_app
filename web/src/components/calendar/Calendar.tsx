@@ -12,6 +12,7 @@ import { useHolidays, useCreateHoliday, useUpdateHoliday, useDeactivateHoliday a
 import type { HolidayRead } from "@/types/masters/holiday";
 import { useAcademicYearStore } from "@/lib/academicYearStore";
 import { usePermission } from "@/hooks/usePermission";
+import { QuickSendButton } from "@/components/communication/QuickSendButton";
 
 type ViewType = "month" | "week" | "year" | "vertical" | "day" | "all";
 
@@ -568,6 +569,17 @@ export function Calendar() {
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-1">
+                        <QuickSendButton
+                          templateName="Holiday"
+                          targetType="all_parents"
+                          targetRef={{}}
+                          recipientLabel="All parents"
+                          variables={{
+                            date: ev.start_date === ev.end_date ? ev.start_date : `${ev.start_date} to ${ev.end_date}`,
+                            reason: ev.name ? ` (${ev.name})` : '',
+                          }}
+                          title="Send Holiday Message to all parents"
+                        />
                         {hasUpdatePermission && (
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Event" onClick={() => { setSelectedEvent(ev); setIsEditDirty(false); setShowEditDialog(true); }}><Edit className="h-4 w-4" /></Button>
                         )}

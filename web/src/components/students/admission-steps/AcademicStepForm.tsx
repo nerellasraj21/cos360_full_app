@@ -32,12 +32,13 @@ export const AcademicStepForm = () => {
       <h2 className="text-xl font-semibold">Academic Details</h2>
       {/* Hidden inputs attach refs so trigger() can validate dropdown-controlled fields */}
       <input type="hidden" {...register('admitted_class_id', { required: 'Joining Class is required' })} />
-      <input type="hidden" {...register('current_class_id', { required: 'Current Class is required' })} />
-      <input type="hidden" {...register('current_section_id', { required: 'Current Section is required' })} />
+      <input type="hidden" {...register('admitted_section_id')} />
+      <input type="hidden" {...register('current_class_id')} />
+      <input type="hidden" {...register('current_section_id')} />
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="admission_date">Admission Date *</Label>
+          <Label htmlFor="admission_date">Admission Date</Label>
           <Input
             id="admission_date"
             type="date"
@@ -46,7 +47,10 @@ export const AcademicStepForm = () => {
               required: 'Admission date is required',
               validate: {
                 notFuture: (value) => {
-                  const selectedDate = new Date(value);
+                  // Parse as local date (not UTC) so timezones ahead of UTC
+                  // don't get bumped to "tomorrow" and falsely flagged as future.
+                  const [year, month, day] = value.split('-').map(Number);
+                  const selectedDate = new Date(year, month - 1, day);
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
                   return selectedDate <= today || 'Admission date cannot be in the future';
@@ -61,7 +65,7 @@ export const AcademicStepForm = () => {
 
         <AdmissionTypeDropdown
           id="admission_type"
-          label="Admission Type *"
+          label="Admission Type"
           value={watch('admission_type')}
           onChange={(value) => setValue('admission_type', value)}
         />
@@ -89,11 +93,14 @@ export const AcademicStepForm = () => {
           <InfiniteScrollDropdown
             data={sections.map(s => ({ id: s.id, value: s.id, label: s.name }))}
             value={watch('admitted_section_id') || ''}
-            onChange={(value) => setValue('admitted_section_id', value as string)}
+            onChange={(value) => setValue('admitted_section_id', value as string, { shouldValidate: true })}
             placeholder="Select Section"
             disabled={sectionsLoading || !selectedClassId}
             clearable={false}
           />
+          {errors.admitted_section_id && (
+            <span className="text-red-500 text-sm">{errors.admitted_section_id.message as string}</span>
+          )}
         </div>
 
         <div className="col-span-2">
@@ -110,7 +117,7 @@ export const AcademicStepForm = () => {
         </div>
 
         <div>
-          <Label htmlFor="current_class_id">Current Class <span className="text-red-500">*</span></Label>
+          <Label htmlFor="current_class_id">Current Class</Label>
           <InfiniteScrollDropdown
             data={classes.map(c => ({ id: c.id, value: c.id, label: c.name }))}
             value={watch('current_class_id') || ''}
@@ -128,7 +135,7 @@ export const AcademicStepForm = () => {
         </div>
 
         <div>
-          <Label htmlFor="current_section_id">Current Section <span className="text-red-500">*</span></Label>
+          <Label htmlFor="current_section_id">Current Section</Label>
           <InfiniteScrollDropdown
             data={currentSections.map(s => ({ id: s.id, value: s.id, label: s.name }))}
             value={watch('current_section_id') || ''}

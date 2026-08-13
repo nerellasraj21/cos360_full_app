@@ -10,7 +10,8 @@ import type {
   StudentDropdownItem,
   StudentDropdownSimpleItem,
   StudentOut,
-  AdmissionTypeOption
+  AdmissionTypeOption,
+  BulkAdmissionUploadResponse
 } from '@/types/admission';
 import {
   createStudentAdmission,
@@ -24,7 +25,9 @@ import {
   fetchStudentsDropdownSimple,
   fetchAdmissionTypesDropdown,
   uploadStudentPhoto,
-  deleteStudentPhoto
+  deleteStudentPhoto,
+  downloadBulkAdmissionTemplate,
+  bulkUploadAdmissions
 } from '@/api/students/admissions';
 
 // Types
@@ -214,5 +217,42 @@ export function useToggleStudentStatus() {
     },
     resource: 'student_admissions',
     action: 'update',
+  });
+}
+
+export function useDownloadBulkAdmissionTemplate() {
+  return useMutation<Blob, Error, void>({
+    mutationFn: downloadBulkAdmissionTemplate,
+    onSuccess: (blob) => {
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'bulk_admission_template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    },
+    onError: (error) => {
+      toast.error(`Failed to download template: ${error.message}`);
+    },
+  });
+}
+
+export function useBulkUploadAdmissions() {
+  const queryClient = useQueryClient();
+  return usePermissionProtectedMutation<BulkAdmissionUploadResponse, Error, File>({
+    mutationFn: bulkUploadAdmissions,
+    onSuccess: async (data) => {
+      if (data.created.length > 0) {
+        await queryClient.invalidateQueries({ queryKey: ['admissions'], refetchType: 'all' });
+        await queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'all' });
+      }
+    },
+    onError: (error) => {
+      toast.error(`Bulk upload failed: ${error.message}`);
+    },
+    resource: 'student_admissions',
+    action: 'create',
   });
 }

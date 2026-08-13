@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ViewButton, EditButton, DeleteButton, DownloadButton, TableActionGroup } from '@/components/common/TableActions';
-import { Edit, Trash2, Plus, Users, Mail, Phone, Calendar, Award, MapPin, Filter, Download, FileText, FileSpreadsheet, Eye, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Search, GraduationCap, Briefcase, Landmark, Wallet, UserCircle, X } from 'lucide-react';
+import { QuickSendButton } from '@/components/communication/QuickSendButton';
+import { Edit, Trash2, Plus, Users, Mail, Phone, Calendar, Award, MapPin, Filter, Download, Upload, FileText, FileSpreadsheet, Eye, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Search, GraduationCap, Briefcase, Landmark, Wallet, UserCircle, X } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ import { usePermission } from '@/hooks/usePermission';
 import type { Staff, StaffInput, DesignationListResponse, QualificationLevel } from '@/types/staff/staff';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import BulkStaffUploadDialog from './BulkStaffUploadDialog';
 
 interface StaffEnrollmentTableProps {
     className?: string;
@@ -139,11 +141,12 @@ const validatePhoneMessage = (value: string): string => {
 // True only when the value is exactly 10 digits (used to show the green "valid" hint).
 const isValidPhone = (value: string): boolean => /^\d{10}$/.test(value);
 
-const isValidEmail = (value: string): boolean => /^[^\s@]+@gmail\.com$/i.test(value);
+const isValidEmail = (value: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
     const [showCreateDialog, setShowCreateDialog] = useState(false);
+    const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
     const [isFormDirty, setIsFormDirty] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState<Staff | null>(null);
     const [viewingStaff, setViewingStaff] = useState<Staff | null>(null);
@@ -161,9 +164,9 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     const [localSearch, setLocalSearch] = useState('');
     const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
     const [firstNameError, setFirstNameError] = useState('');
-    const [joiningDateError, setJoiningDateError] = useState('');
     const [phoneError, setPhoneError] = useState('');
     const [emailError, setEmailError] = useState('');
+    const [addressError, setAddressError] = useState('');
     const [experienceError, setExperienceError] = useState('');
     const [lastSalaryError, setLastSalaryError] = useState('');
     const [currentSalaryError, setCurrentSalaryError] = useState('');
@@ -430,7 +433,9 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
         setIsFormDirty(false);
         setPendingPhotoFile(null);
         setFirstNameError('');
-        setJoiningDateError('');
+        setEmailError('');
+        setPhoneError('');
+        setAddressError('');
         setEditingStaff(null);
         setShowCreateDialog(true);
     };
@@ -479,7 +484,9 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
         setIsFormDirty(false);
         setPendingPhotoFile(null);
         setFirstNameError('');
-        setJoiningDateError('');
+        setEmailError('');
+        setPhoneError('');
+        setAddressError('');
         setEditingStaff(staff);
         setShowCreateDialog(true);
     };
@@ -494,23 +501,30 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     };
 
     const handleSubmit = async () => {
+        const emailValue = (formData.email ?? '').trim();
+        const phoneValue = (formData.phone ?? '').trim();
+        const addressValue = (formData.address ?? '').trim();
         const nextFirstNameError = formData.first_name.trim() ? '' : 'First name is required';
-        const nextJoiningDateError = formData.joining_date ? '' : 'Joining date is required';
+        const nextEmailError = emailValue && !isValidEmail(emailValue)
+            ? 'Please enter a valid email address'
+            : '';
+        const nextPhoneError = !phoneValue
+            ? 'Phone is required'
+            : validatePhoneMessage(phoneValue);
+        const nextAddressError = addressValue ? '' : 'Address is required';
         setFirstNameError(nextFirstNameError);
-        setJoiningDateError(nextJoiningDateError);
+        setEmailError(nextEmailError);
+        setPhoneError(nextPhoneError);
+        setAddressError(nextAddressError);
 
-        if (nextFirstNameError || nextJoiningDateError) {
+        if (nextFirstNameError || nextEmailError || nextPhoneError || nextAddressError) {
             toast.error('Please fill in the required fields');
             return;
         }
 
-        if (formData.phone && !isValidPhone(formData.phone)) {
-            toast.error('Phone number must be exactly 10 digits');
-            return;
-        }
-
-        if (formData.email && !isValidEmail(formData.email)) {
-            toast.error('Only Gmail addresses are accepted (e.g. name@gmail.com)');
+        const hasUnpairedQual = localQuals.some(q => Boolean(q.level) !== Boolean(q.name.trim()));
+        if (hasUnpairedQual) {
+            toast.error('Qualification Level and Degree / Course must both be filled in, or both left empty');
             return;
         }
 
@@ -522,14 +536,6 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
         if (formData.pf_account_number && !/^[A-Za-z0-9]+\/[A-Za-z0-9/]+$/.test(formData.pf_account_number)) {
             toast.error('Invalid PF Account Number format (e.g. AP/HYD/12345)');
             return;
-        }
-
-        // Validate qualifications
-        for (const q of localQuals) {
-            if (!q.level || !q.name.trim()) {
-                toast.error('Each qualification must have a level and degree name');
-                return;
-            }
         }
 
         try {
@@ -549,7 +555,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                         phone: orUndef(formData.phone),
                         gender: formData.gender,
                         date_of_birth: orUndef(formData.date_of_birth),
-                        joining_date: formData.joining_date,
+                        joining_date: orUndef(formData.joining_date),
                         qualification: orUndef(formData.qualification ? [...new Set(formData.qualification.split(',').map(s => s.trim()).filter(Boolean))].join(', ') : formData.qualification),
                         experience_years: formData.experience_years || undefined,
                         address: orUndef(formData.address),
@@ -581,8 +587,9 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     await staffApi.deleteQualification(staffId, qid);
                 }
 
-                // Update existing / add new qualifications
+                // Update existing / add new qualifications (skip blank rows)
                 for (const q of localQuals) {
+                    if (!q.level || !q.name.trim()) continue;
                     const payload = {
                         level: q.level as QualificationLevel,
                         name: q.name.trim(),
@@ -604,7 +611,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     phone: orUndef(formData.phone),
                     gender: formData.gender,
                     date_of_birth: orUndef(formData.date_of_birth),
-                    joining_date: formData.joining_date,
+                    joining_date: orUndef(formData.joining_date),
                     qualification: orUndef(formData.qualification ? [...new Set(formData.qualification.split(',').map(s => s.trim()).filter(Boolean))].join(', ') : formData.qualification),
                     experience_years: formData.experience_years || undefined,
                     address: orUndef(formData.address),
@@ -768,6 +775,16 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                             {hasCreatePermission && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setShowBulkUploadDialog(true)}
+                                    className="flex items-center gap-2"
+                                >
+                                    <Upload className="h-4 w-4" />
+                                    Bulk Upload
+                                </Button>
+                            )}
+                            {hasCreatePermission && (
                                 <Button onClick={handleCreate} className="flex items-center gap-2">
                                     <Plus className="h-4 w-4" />
                                     Add Staff
@@ -871,6 +888,16 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                             ))}
                                             <TableCell className="py-2 text-right">
                                                 <TableActionGroup>
+                                                    <QuickSendButton
+                                                        templateName="Staff Recruiting"
+                                                        targetType="individual_staff"
+                                                        targetRef={{ staff_id: staffMember.id }}
+                                                        recipientLabel={`${staffMember.first_name ?? ''} ${staffMember.last_name ?? ''}`.trim()}
+                                                        variables={{
+                                                            staff_name: `${staffMember.first_name ?? ''} ${staffMember.last_name ?? ''}`.trim(),
+                                                        }}
+                                                        title="Send Welcome/Recruiting Message"
+                                                    />
                                                     {hasReadPermission && (
                                                         <ViewButton
                                                             onClick={() => handleView(staffMember)}
@@ -1042,7 +1069,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">
+                    <label className="block text-sm font-medium text-orange-600 mb-1">
                         First Name *
                     </label>
                     <Input
@@ -1077,25 +1104,28 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                         value={formData.email}
                         onChange={(e) => {
                             const val = e.target.value;
-                            const valid = isValidEmail(val);
-                            setEmailError(val && !valid ? 'Only Gmail addresses are accepted (e.g. name@gmail.com)' : '');
+                            setEmailError(
+                                val.trim() && !isValidEmail(val)
+                                    ? 'Please enter a valid email address'
+                                    : ''
+                            );
                             setFormData({ ...formData, email: val });
                         }}
                         placeholder="Enter email address"
                     />
-                    {emailError && <span className="text-red-500">{emailError}</span>}
+                    {emailError && <span className="text-red-500 text-sm">{emailError}</span>}
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">
-                        Phone
+                    <label className="block text-sm font-medium text-orange-600 mb-1">
+                        Phone *
                     </label>
                     <Input
                         value={formData.phone}
                         inputMode="numeric"
                         onChange={(e) => {
                             const val = e.target.value;
-                            setPhoneError(validatePhoneMessage(val));
+                            setPhoneError(!val.trim() ? 'Phone is required' : validatePhoneMessage(val));
                             setFormData({ ...formData, phone: val });
                         }}
                         placeholder="Enter phone number"
@@ -1133,19 +1163,16 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
 
                 <div>
                     <label className="block text-sm font-medium text-foreground mb-1">
-                        Joining Date *
+                        Joining Date
                     </label>
                     <DatePicker
                         value={formData.joining_date}
                         onChange={(v) => {
                             setIsFormDirty(true);
-                            setJoiningDateError(v ? '' : 'Joining date is required');
                             setFormData({ ...formData, joining_date: v });
                         }}
                         placeholder="Select joining date"
-                        required
                     />
-                    {joiningDateError && <span className="text-red-500 text-sm">{joiningDateError}</span>}
                 </div>
 
                 <div>
@@ -1178,14 +1205,19 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 </div>
 
                 <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-foreground mb-1">
-                        Address
+                    <label className="block text-sm font-medium text-orange-600 mb-1">
+                        Address *
                     </label>
                     <Input
                         value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setAddressError(val.trim() ? '' : 'Address is required');
+                            setFormData({ ...formData, address: val });
+                        }}
                         placeholder="Enter residential address"
                     />
+                    {addressError && <span className="text-red-500 text-sm">{addressError}</span>}
                 </div>
 
                 {/* Qualifications */}
@@ -1213,7 +1245,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="block text-xs font-medium mb-1">Level *</label>
+                                    <label className="block text-xs font-medium mb-1">Level</label>
                                     <InfiniteScrollDropdown
                                         data={QUALIFICATION_LEVELS.map(l => ({ id: l.value, value: l.value, label: l.label }))}
                                         value={qual.level}
@@ -1223,7 +1255,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium mb-1">Degree / Course *</label>
+                                    <label className="block text-xs font-medium mb-1">Degree / Course</label>
                                     <CreatableSelect
                                         isClearable
                                         placeholder="e.g. B.Tech, MBA"
@@ -1805,6 +1837,12 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        {/* Bulk Upload Dialog */}
+        <BulkStaffUploadDialog
+            open={showBulkUploadDialog}
+            onOpenChange={setShowBulkUploadDialog}
+        />
     </>
     );
 }
