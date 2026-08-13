@@ -4,15 +4,13 @@ Celery application configuration for background jobs
 
 from celery import Celery
 
-from app.config import get_settings
-
-settings = get_settings()
+from app.config import settings
 
 # Create Celery app
 celery_app = Celery(
     "cos360",
-    broker=f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}",
-    backend=f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}",
+    broker=f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}",
+    backend=f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}",
     include=[
         "app.tasks.report_tasks",
         "app.tasks.exam.excel_upload_task",

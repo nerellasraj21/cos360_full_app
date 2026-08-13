@@ -2,24 +2,24 @@ from datetime import date
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.student.student_schema import StudentCreate, StudentOut
 
 
 class StudentAdmissionBase(BaseModel):
-    admission_date: date
+    admission_date: date | None = None
     admission_type: Literal["pre_primary", "regular"] | None = None
     academic_year_id: UUID  # Required: Academic year for admission
     admitted_academic_year_id: UUID | None = None
     admitted_class_id: UUID  # Required: Class student is admitted to
-    admitted_section_id: UUID  # Required: Section student is admitted to
+    admitted_section_id: UUID | None = None  # Optional: Section student is admitted to
     current_class_id: UUID | None = None
     current_section_id: UUID | None = None
-    address_line1: str
+    address_line1: str = Field(..., min_length=1, description="Mandatory address line 1")
     address_line2: str | None = None
-    city: str
-    state: str
+    city: str | None = None
+    state: str | None = None
     roll_no: str | None = None
     is_previous_school: bool | None = False
     previous_school_name: str | None = None

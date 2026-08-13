@@ -52,13 +52,13 @@ SECTIONS = [
 # Classes 1 & 2: Telugu, Hindi, English, Maths
 # Classes 3-5 : Telugu, Hindi, Maths, Science, Social, EVS
 SUBJECTS = [
-    {"name": "Telugu",  "short_code": "TEL", "classes": ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5"]},
-    {"name": "Hindi",   "short_code": "HIN", "classes": ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5"]},
-    {"name": "English", "short_code": "ENG", "classes": ["Class 1", "Class 2"]},
-    {"name": "Maths",   "short_code": "MAT", "classes": ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5"]},
-    {"name": "Science", "short_code": "SCI", "classes": ["Class 3", "Class 4", "Class 5"]},
-    {"name": "Social",  "short_code": "SOC", "classes": ["Class 3", "Class 4", "Class 5"]},
-    {"name": "EVS",     "short_code": "EVS", "classes": ["Class 3", "Class 4", "Class 5"]},
+    {"name": "Telugu",  "short_code": "TEL", "category": "Languages", "classes": ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5"]},
+    {"name": "Hindi",   "short_code": "HIN", "category": "Languages", "classes": ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5"]},
+    {"name": "English", "short_code": "ENG", "category": "Languages", "classes": ["Class 1", "Class 2"]},
+    {"name": "Maths",   "short_code": "MAT", "category": "Academics", "classes": ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5"]},
+    {"name": "Science", "short_code": "SCI", "category": "Academics", "classes": ["Class 3", "Class 4", "Class 5"]},
+    {"name": "Social",  "short_code": "SOC", "category": "Academics", "classes": ["Class 3", "Class 4", "Class 5"]},
+    {"name": "EVS",     "short_code": "EVS", "category": "Academics", "classes": ["Class 3", "Class 4", "Class 5"]},
 ]
 
 # mandatory=True → all_by_default=True in fee_class_mappings
@@ -182,6 +182,26 @@ async def run():
         # STEP 2 — SUBJECTS + CLASS-SUBJECT MAPPINGS
         # ================================================================== #
         sep("STEP 2: Subjects & Class-Subject Mappings")
+        category_ids = {}
+        for cat_name in {subj["category"] for subj in SUBJECTS}:
+            existing_cat = await fetch_one(
+                db,
+                "SELECT id FROM subject_categories WHERE name = :n",
+                {"n": cat_name},
+            )
+            if existing_cat:
+                category_ids[cat_name] = existing_cat
+            else:
+                await db.execute(
+                    text("INSERT INTO subject_categories (id, name) VALUES (gen_random_uuid(), :name)"),
+                    {"name": cat_name},
+                )
+                category_ids[cat_name] = await fetch_one(
+                    db,
+                    "SELECT id FROM subject_categories WHERE name = :n",
+                    {"n": cat_name},
+                )
+
         subject_ids = {}
         for subj in SUBJECTS:
             existing = await fetch_one(
@@ -195,10 +215,15 @@ async def run():
             else:
                 await db.execute(
                     text("""
-                        INSERT INTO subjects (id, name, short_code, is_active, academic_year_id)
-                        VALUES (gen_random_uuid(), :name, :code, true, :ay)
+                        INSERT INTO subjects (id, name, short_code, is_active, academic_year_id, category_id)
+                        VALUES (gen_random_uuid(), :name, :code, true, :ay, :cat)
                     """),
-                    {"name": subj["name"], "code": subj["short_code"], "ay": str(ay_id)},
+                    {
+                        "name": subj["name"],
+                        "code": subj["short_code"],
+                        "ay": str(ay_id),
+                        "cat": str(category_ids[subj["category"]]),
+                    },
                 )
                 new_id = await fetch_one(
                     db,

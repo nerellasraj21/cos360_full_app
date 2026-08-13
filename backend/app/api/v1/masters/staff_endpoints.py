@@ -1,8 +1,11 @@
 from datetime import date
 import enum
+import io
+from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -34,6 +37,10 @@ from app.service.masters.designation_service import (
     get_designations_dropdown,
     update_designation,
 )
+from app.service.masters.staff_bulk_service import (
+    generate_blank_staff_template,
+    parse_and_bulk_create_staff_enrollments,
+)
 from app.service.masters.staff_service import (
     add_staff_qualification,
     create_staff_attendance,
@@ -63,6 +70,10 @@ from app.tools.simple_permissions import check_role_plan_permission_with_error, 
 
 router = APIRouter(prefix="/staff", tags=["Staff"])
 
+BULK_UPLOAD_TEMPLATE_PATH = (
+    Path(__file__).resolve().parents[3] / "static" / "templates" / "staff_bulk_upload_template.xlsx"
+)
+
 
 class GenderEnum(enum.Enum):
     Male = "Male"
@@ -82,6 +93,61 @@ async def create_enrollment(request: Request, data: StaffEnrollmentCreate, db: A
     await check_role_plan_permission_with_error(db, request, role, "staff", "create")
 
     return await create_staff_enrollment(data, db)
+
+
+@router.post("/enrollment/bulk-upload", status_code=status.HTTP_200_OK)
+async def bulk_upload_enrollments(
+    request: Request,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """
+    Bulk-create staff enrollments from the "Staff Admission" sheet of the
+    staff Excel template. Each row is validated and created independently;
+    valid rows are created even if other rows fail.
+
+    Mandatory columns: First Name, Email, Phone, Address.
+
+    Returns: {"created": [...], "errors": [...], "total_rows": int}
+
+    **Required Permission**: staff:create
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, "staff", "create")
+
+    if not file.filename or not file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="File must be an Excel (.xlsx/.xls) file")
+
+    file_bytes = await file.read()
+    return await parse_and_bulk_create_staff_enrollments(file_bytes, db)
+
+
+@router.get("/enrollment/bulk-upload/template")
+async def download_staff_bulk_upload_template(request: Request, db: AsyncSession = Depends(get_tenant_db)):
+    """
+    Download the blank Excel template for bulk staff enrollment upload.
+    Mandatory column headers (First Name, Phone, Address) are orange.
+
+    **Required Permission**: staff:create
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, "staff", "create")
+
+    if not BULK_UPLOAD_TEMPLATE_PATH.exists():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Bulk upload template not found")
+
+    xlsx_bytes = await generate_blank_staff_template(db)
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=staff_bulk_upload_template.xlsx"},
+    )
 
 
 @router.patch("/enrollment/{staff_id}", response_model=StaffEnrollmentOut)
@@ -218,6 +284,90 @@ async def remove_attendance(request: Request, attendance_id: UUID, db: AsyncSess
     await check_role_plan_permission_with_error(db, request, role, "staff_attendance", "delete")
 
     return await delete_staff_attendance(attendance_id, db)
+
+
+# Send Staff Attendance Summary SMS (MANUAL #4)
+@router.post("/send-attendance-summary")
+async def send_attendance_summary(
+    request: Request,
+    staff_ids: list[UUID],
+    period: str = Query(..., description="Period (e.g., July, August, Half-Year)"),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Send attendance summary SMS to staff — HR/Admin only (USE CASE #4)"""
+    import os
+    import uuid as _uuid
+    from sqlalchemy import select
+
+    from app.models.communication.communication_model import NotificationQueue
+    from app.models.masters.staff_model import Staff
+    from app.tasks.communication.send_tasks import send_notification_batch
+
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    triggered_by = _uuid.UUID(current_user.get("sub"))
+
+    await check_role_plan_permission_with_error(db, request, role, "staff_attendance", "send_sms")
+
+    queue_ids = []
+    queued_count = 0
+    skipped_count = 0
+
+    for staff_id in staff_ids:
+        try:
+            staff_result = await db.execute(
+                select(Staff.phone, Staff.first_name, Staff.last_name).where(Staff.id == staff_id)
+            )
+            staff_row = staff_result.first()
+            if not staff_row or not staff_row.phone:
+                skipped_count += 1
+                continue
+
+            staff_name = f"{staff_row.first_name} {staff_row.last_name}"
+            staff_phone = staff_row.phone
+
+            message = (
+                f"Dear {staff_name}, your {period} attendance summary is ready on the portal. "
+                f"View on the app. — COS360"
+            )
+
+            queue_entry = NotificationQueue(
+                id=_uuid.uuid4(),
+                template_id=None,
+                recipient_name=staff_name,
+                recipient_phone=staff_phone,
+                channel="sms",
+                rendered_message=message,
+                status="queued",
+                triggered_by=triggered_by,
+                target_type="staff_attendance_summary",
+                target_ref={
+                    "msg91_template_id": os.environ.get("MSG91_TEMPLATE_ID_STAFF_ATTENDANCE"),
+                    "variables": {
+                        "var1": staff_name,
+                        "var2": period,
+                    },
+                },
+            )
+            db.add(queue_entry)
+            queue_ids.append(str(queue_entry.id))
+            queued_count += 1
+
+        except Exception:
+            skipped_count += 1
+            continue
+
+    await db.commit()
+
+    if queue_ids:
+        send_notification_batch.delay(queue_ids, "sms", request.headers.get("cschema", "public"))
+
+    return {
+        "status": "queued",
+        "queued_count": queued_count,
+        "skipped_count": skipped_count,
+        "detail": f"SMS queued for {queued_count} staff. {skipped_count} skipped.",
+    }
 
 
 # -------------------- Filter Staff Attendance by Date --------------------
@@ -458,3 +608,91 @@ async def get_all_drivers(request: Request, db: AsyncSession = Depends(get_tenan
     await check_role_plan_permission_with_error(db, request, role, "transport_trips", "read")
 
     return await get_all_drivers_list(db)
+
+
+# Send Interview Call SMS (MANUAL #3)
+@router.post("/send-interview-calls")
+async def send_interview_calls(
+    request: Request,
+    candidate_ids: list[UUID],
+    interview_date: str = Query(..., description="Interview date (YYYY-MM-DD)"),
+    interview_time: str = Query(..., description="Interview time (HH:MM AM/PM)"),
+    position: str = Query(..., description="Position name"),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Send interview call SMS to candidates — HR/Recruiter only (USE CASE #3)"""
+    import os
+    import uuid as _uuid
+    from sqlalchemy import select
+
+    from app.models.communication.communication_model import NotificationQueue
+    from app.models.masters.staff_model import Staff
+    from app.tasks.communication.send_tasks import send_notification_batch
+
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    triggered_by = _uuid.UUID(current_user.get("sub"))
+
+    await check_role_plan_permission_with_error(db, request, role, "staff_enrollment", "send_sms")
+
+    queue_ids = []
+    queued_count = 0
+    skipped_count = 0
+
+    for candidate_id in candidate_ids:
+        try:
+            staff_result = await db.execute(
+                select(Staff.phone, Staff.first_name, Staff.last_name).where(Staff.id == candidate_id)
+            )
+            staff_row = staff_result.first()
+            if not staff_row or not staff_row.phone:
+                skipped_count += 1
+                continue
+
+            candidate_name = f"{staff_row.first_name} {staff_row.last_name}"
+            candidate_phone = staff_row.phone
+
+            message = (
+                f"Dear {candidate_name}, your interview for {position} "
+                f"is on {interview_date} at {interview_time}. — COS360"
+            )
+
+            queue_entry = NotificationQueue(
+                id=_uuid.uuid4(),
+                template_id=None,
+                recipient_name=candidate_name,
+                recipient_phone=candidate_phone,
+                channel="sms",
+                rendered_message=message,
+                status="queued",
+                triggered_by=triggered_by,
+                target_type="interview_call",
+                target_ref={
+                    "msg91_template_id": os.environ.get("MSG91_TEMPLATE_ID_STAFF_INTERVIEW"),
+                    "variables": {
+                        "var1": candidate_name,
+                        "var2": interview_date,
+                        "var3": interview_time,
+                        "var4": position,
+                    },
+                },
+            )
+            db.add(queue_entry)
+            queue_ids.append(str(queue_entry.id))
+            queued_count += 1
+
+        except Exception:
+            skipped_count += 1
+            continue
+
+    await db.commit()
+
+    if queue_ids:
+        send_notification_batch.delay(queue_ids, "sms", request.headers.get("cschema", "public"))
+
+    return {
+        "status": "queued",
+        "queued_count": queued_count,
+        "skipped_count": skipped_count,
+        "detail": f"SMS queued for {queued_count} candidate(s). {skipped_count} skipped.",
+    }

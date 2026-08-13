@@ -9,7 +9,7 @@ Results workflow:
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -229,3 +229,117 @@ async def get_child_marks(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot access marks for unrelated student")
 
     return await get_student_raw_marks(db, exam_id, student_id)
+
+
+# Send Results Notification SMS (MANUAL #8 re-send)
+@router.post("/{exam_id}/send-results-notification", status_code=200)
+async def send_results_notification(
+    exam_id: uuid.UUID,
+    request: Request,
+    student_ids: list[uuid.UUID] = Query(..., description="List of student IDs to send SMS to"),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Re-send results published notification SMS — Admin/Exam Coordinator only (USE CASE #8 MANUAL)"""
+    import os
+    from sqlalchemy import select
+
+    from app.models.communication.communication_model import NotificationQueue
+    from app.models.exam.exam_model import Exam
+    from app.models.exam.student_exam_result_model import StudentExamResult
+    from app.models.masters.parent_model import Parent
+    from app.models.student.student_model import Student
+    from app.models.student.student_parent_association_model import StudentParentLink
+    from app.tasks.communication.send_tasks import send_notification_batch
+
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    triggered_by = uuid.UUID(current_user.get("sub"))
+
+    await check_role_plan_permission_with_error(db, request, role, "exams", "send_sms")
+
+    exam_result = await db.execute(select(Exam).where(Exam.id == exam_id))
+    exam = exam_result.scalar_one_or_none()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    queue_ids = []
+    queued_count = 0
+    skipped_count = 0
+
+    for student_id in student_ids:
+        try:
+            student_result = await db.execute(select(Student).where(Student.id == student_id))
+            student = student_result.scalar_one_or_none()
+            if not student:
+                skipped_count += 1
+                continue
+
+            result_rec = await db.execute(
+                select(StudentExamResult).where(
+                    StudentExamResult.exam_id == exam_id,
+                    StudentExamResult.student_id == student_id,
+                )
+            )
+            result = result_rec.scalar_one_or_none()
+            marks = f"{result.marks_obtained}" if result and hasattr(result, 'marks_obtained') else "N/A"
+            percentage = f"{result.percentage}" if result and hasattr(result, 'percentage') else "N/A"
+
+            parent_result = await db.execute(
+                select(Parent.name, Parent.phone)
+                .select_from(StudentParentLink)
+                .join(Parent, Parent.id == StudentParentLink.parent_id)
+                .where(StudentParentLink.student_id == student_id)
+                .limit(1)
+            )
+            parent_row = parent_result.first()
+            if not parent_row or not parent_row.phone:
+                skipped_count += 1
+                continue
+
+            parent_name = parent_row.name or "Parent"
+            student_name = f"{student.first_name} {student.last_name}"
+
+            message = (
+                f"Results for {student_name} — {exam.exam_name} are published. "
+                f"View on the app. — COS360"
+            )
+
+            queue_entry = NotificationQueue(
+                id=uuid.uuid4(),
+                template_id=None,
+                recipient_name=parent_name,
+                recipient_phone=parent_row.phone,
+                channel="sms",
+                rendered_message=message,
+                status="queued",
+                triggered_by=triggered_by,
+                target_type="results_notification",
+                target_ref={
+                    "msg91_template_id": os.environ.get("MSG91_TEMPLATE_ID_RESULTS"),
+                    "variables": {
+                        "var1": student_name,
+                        "var2": exam.exam_name,
+                        "var3": marks,
+                        "var4": percentage,
+                    },
+                },
+            )
+            db.add(queue_entry)
+            queue_ids.append(str(queue_entry.id))
+            queued_count += 1
+
+        except Exception:
+            skipped_count += 1
+            continue
+
+    await db.commit()
+
+    if queue_ids:
+        send_notification_batch.delay(queue_ids, "sms", request.headers.get("cschema", "public"))
+
+    return {
+        "status": "queued",
+        "queued_count": queued_count,
+        "skipped_count": skipped_count,
+        "detail": f"Results notification SMS queued for {queued_count} student(s).",
+    }

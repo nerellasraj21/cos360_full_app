@@ -207,3 +207,115 @@ async def download_all_hall_tickets(
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="hall-tickets-{exam_id}.zip"'},
     )
+
+
+# Send Hall Ticket Notification SMS (MANUAL #7 re-send)
+@router.post("/{exam_id}/send-hall-ticket-notification", status_code=200)
+async def send_hall_ticket_notification(
+    exam_id: uuid.UUID,
+    request: Request,
+    student_ids: list[uuid.UUID] = Query(..., description="List of student IDs to send SMS to"),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Re-send hall ticket notification SMS — Admin/Exam Coordinator only (USE CASE #7 MANUAL)"""
+    import os
+    from sqlalchemy import select
+
+    from app.models.communication.communication_model import NotificationQueue
+    from app.models.exam.exam_model import Exam
+    from app.models.exam.hall_ticket_model import HallTicketEligibility
+    from app.models.masters.parent_model import Parent
+    from app.models.student.student_model import Student
+    from app.models.student.student_parent_association_model import StudentParentLink
+    from app.tasks.communication.send_tasks import send_notification_batch
+
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    triggered_by = uuid.UUID(current_user.get("sub"))
+
+    await check_role_plan_permission_with_error(db, request, role, "exams", "send_sms")
+
+    exam_result = await db.execute(select(Exam).where(Exam.id == exam_id))
+    exam = exam_result.scalar_one_or_none()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    queue_ids = []
+    queued_count = 0
+    skipped_count = 0
+
+    for student_id in student_ids:
+        try:
+            student_result = await db.execute(select(Student).where(Student.id == student_id))
+            student = student_result.scalar_one_or_none()
+            if not student:
+                skipped_count += 1
+                continue
+
+            ht_result = await db.execute(
+                select(HallTicketEligibility).where(
+                    HallTicketEligibility.exam_id == exam_id,
+                    HallTicketEligibility.student_id == student_id,
+                )
+            )
+            ht = ht_result.scalar_one_or_none()
+            hall_ticket_number = ht.hall_ticket_number if ht else "N/A"
+
+            parent_result = await db.execute(
+                select(Parent.name, Parent.phone)
+                .select_from(StudentParentLink)
+                .join(Parent, Parent.id == StudentParentLink.parent_id)
+                .where(StudentParentLink.student_id == student_id)
+                .limit(1)
+            )
+            parent_row = parent_result.first()
+            if not parent_row or not parent_row.phone:
+                skipped_count += 1
+                continue
+
+            parent_name = parent_row.name or "Parent"
+            student_name = f"{student.first_name} {student.last_name}"
+
+            message = (
+                f"Hall ticket for {student_name} ({exam.exam_name}) is ready. "
+                f"Download from the app. — COS360"
+            )
+
+            queue_entry = NotificationQueue(
+                id=uuid.uuid4(),
+                template_id=None,
+                recipient_name=parent_name,
+                recipient_phone=parent_row.phone,
+                channel="sms",
+                rendered_message=message,
+                status="queued",
+                triggered_by=triggered_by,
+                target_type="hall_ticket_notification",
+                target_ref={
+                    "msg91_template_id": os.environ.get("MSG91_TEMPLATE_ID_HALL_TICKET"),
+                    "variables": {
+                        "var1": student_name,
+                        "var2": exam.exam_name,
+                        "var3": hall_ticket_number,
+                    },
+                },
+            )
+            db.add(queue_entry)
+            queue_ids.append(str(queue_entry.id))
+            queued_count += 1
+
+        except Exception:
+            skipped_count += 1
+            continue
+
+    await db.commit()
+
+    if queue_ids:
+        send_notification_batch.delay(queue_ids, "sms", request.headers.get("cschema", "public"))
+
+    return {
+        "status": "queued",
+        "queued_count": queued_count,
+        "skipped_count": skipped_count,
+        "detail": f"Hall ticket notification SMS queued for {queued_count} student(s).",
+    }

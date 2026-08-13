@@ -17,7 +17,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.celery_app import celery_app
-from app.config import get_settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,6 @@ def send_notification_batch(self, queue_ids: List[str], channel: str, tenant_sch
 
 
 async def _process_batch(queue_ids: List[str], channel: str, tenant_schema: str):
-    settings = get_settings()
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
     Session = async_sessionmaker(bind=engine, expire_on_commit=False)
 
@@ -83,12 +82,24 @@ async def _process_single(db: AsyncSession, queue_id_str: str, channel: str):
     queue_row.status = "processing"
     await db.flush()
 
+    # Extract template_id, DLT id and variables from target_ref (for MSG91)
+    template_id = queue_row.template_id
+    dlt_te_id = None
+    variables = None
+    if queue_row.target_ref:
+        if isinstance(queue_row.target_ref, dict):
+            template_id = queue_row.target_ref.get("msg91_template_id") or template_id
+            dlt_te_id = queue_row.target_ref.get("dlt_te_id")
+            variables = queue_row.target_ref.get("variables")
+
     row_data = {
         "recipient_name": queue_row.recipient_name,
         "recipient_phone": queue_row.recipient_phone,
         "recipient_email": queue_row.recipient_email,
         "rendered_message": queue_row.rendered_message,
-        "template_id": queue_row.template_id,
+        "template_id": template_id,
+        "dlt_te_id": dlt_te_id,
+        "variables": variables,
         "triggered_by": queue_row.triggered_by,
         "target_type": queue_row.target_type,
         "target_ref": queue_row.target_ref,
@@ -158,31 +169,10 @@ def _call_provider(channel: str, row_data: Dict[str, Any]) -> str:
 
 
 def _send_sms(row_data: Dict[str, Any]) -> str:
-    """FR-303: SMS via configurable SMS Gateway REST API."""
-    gateway_url = os.environ.get("SMS_GATEWAY_URL", "")
-    sender_id = os.environ.get("SMS_GATEWAY_SENDER_ID", "")
-    api_key = os.environ.get("SMS_GATEWAY_API_KEY", "")
+    """FR-303: SMS via MSG91 Flow API (DLT-compliant)."""
+    from app.service.communication.msg91_service import send_sms_via_msg91
 
-    if not gateway_url:
-        raise ValueError("SMS_GATEWAY_URL not configured")
-
-    phone = row_data.get("recipient_phone", "")
-    # Prefix with +91 for Indian numbers if not already prefixed
-    if phone and not phone.startswith("+"):
-        phone = f"+91{phone}"
-
-    payload = {
-        "to": phone,
-        "sender": sender_id,
-        "message": row_data["rendered_message"],
-    }
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-
-    with httpx.Client(timeout=30.0) as client:
-        response = client.post(gateway_url, json=payload, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-        return data.get("message_id") or data.get("id") or "sms_sent"
+    return send_sms_via_msg91(row_data)
 
 
 def _send_whatsapp(row_data: Dict[str, Any]) -> str:

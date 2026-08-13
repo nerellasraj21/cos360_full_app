@@ -12,11 +12,17 @@ class AdmissionTypeEnum(StrEnum):
     not_primary = "not_primary"
 
 
+# students.date_of_birth is NOT NULL in the database; when the uploader leaves it
+# blank we substitute this sentinel instead of requiring a migration to make the
+# column nullable. Records with this value still need a real DOB filled in later.
+PLACEHOLDER_DATE_OF_BIRTH = date(1900, 1, 1)
+
+
 class StudentBase(BaseModel):
     first_name: str
     last_name: str
-    date_of_birth: date
-    gender: str
+    date_of_birth: date | None = None
+    gender: str | None = None
     is_primary: str | None = "not_primary"
     aadhar_number: str | None = None
     apaar_number: str | None = None
@@ -29,6 +35,13 @@ class StudentBase(BaseModel):
     mother_tongue: str | None = "Telugu"
     identification_marks: str | None = None
     primary_phone: str | None = None
+
+    @field_validator("date_of_birth", mode="before")
+    @classmethod
+    def default_date_of_birth(cls, v):
+        # HTML date inputs send "" (not null) when left blank; intercept before
+        # Pydantic's own date parsing runs, or "" fails with a type error first.
+        return v or PLACEHOLDER_DATE_OF_BIRTH
 
     @field_validator("aadhar_number", "apaar_number")
     @classmethod
@@ -49,6 +62,14 @@ class StudentCreate(StudentBase):
     father: ParentCreate
     mother: ParentCreate
     guardian: ParentCreate | None = None
+
+    @model_validator(mode="after")
+    def require_father_name_and_phone(self):
+        if not self.father.name:
+            raise ValueError("father.name is required")
+        if not self.father.phone:
+            raise ValueError("father.phone is required")
+        return self
 
 
 class StudentDetailsOut(StudentBase):

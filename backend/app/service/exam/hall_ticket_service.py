@@ -9,6 +9,7 @@ Eligibility check logic:
   - Upserts into hall_ticket_eligibility (one row per exam+student).
 """
 
+import logging
 from datetime import datetime
 from decimal import Decimal
 import uuid
@@ -22,6 +23,8 @@ from app.models.exam.exam_model import Exam
 from app.models.exam.exam_settings_model import ExamSettings
 from app.models.exam.hall_ticket_model import HallTicketEligibility
 from app.service.exam.exam_service import get_exam_or_404
+
+logger = logging.getLogger(__name__)
 
 
 async def _get_settings(db: AsyncSession) -> ExamSettings | None:
@@ -366,4 +369,8 @@ async def publish_hall_tickets(db: AsyncSession, exam_id: UUID) -> Exam:
     exam.hall_ticket_published = True
     exam.hall_ticket_published_at = datetime.utcnow()
     await db.flush()
+
+    # Hall ticket SMS is NOT sent automatically on publish. It is sent on demand
+    # via the hall ticket notification endpoint (MANUAL #7).
+
     return exam

@@ -1,8 +1,11 @@
+import io
 from datetime import date, datetime
+from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -13,6 +16,11 @@ from app.schemas.student.admission_schema import (
     StudentAdmissionUpdate,
 )
 from app.schemas.student.student_schema import StudentDropdown, StudentSimpleDropdown, StudentOut
+from app.service.student.admission_bulk_service import (
+    generate_blank_template,
+    generate_prefilled_template,
+    parse_and_bulk_create_student_admissions,
+)
 from app.service.student.admission_service import (
     add_admission,
     delete_admission,
@@ -38,6 +46,10 @@ from app.tools.simple_permissions import (
 
 router = APIRouter(prefix="/students/admission", tags=["Student/Student Admission"])
 
+BULK_UPLOAD_TEMPLATE_PATH = (
+    Path(__file__).resolve().parents[3] / "static" / "templates" / "student_admission_bulk_upload_template.xlsx"
+)
+
 # Note: All endpoints include explicit response_model declarations to ensure proper serialization
 # of nested relationships (student, father, mother). This ensures Pydantic correctly serializes
 # the complex Student object with its parent relationships for API responses.
@@ -57,6 +69,76 @@ async def create_admission(
 
     admission_response = await add_admission(admission, db, request)
     return admission_response
+
+
+@router.post("/bulk-upload", status_code=status.HTTP_200_OK)
+async def bulk_upload_admissions(
+    request: Request,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """
+    Bulk-create student admissions from the "Student Admission" sheet of the
+    admission Excel template. Each row is validated and created independently;
+    valid rows are created even if other rows fail.
+
+    Returns: {"created": [...], "errors": [...], "total_rows": int}
+
+    **Required Permission**: student_admissions:create
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    await check_role_plan_permission_with_error(db, request, role, "student_admissions", "create")
+
+    if not file.filename or not file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="File must be an Excel (.xlsx/.xls) file")
+
+    file_bytes = await file.read()
+    return await parse_and_bulk_create_student_admissions(file_bytes, db, request)
+
+
+@router.get("/bulk-upload/template")
+async def download_bulk_upload_template(
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    include_data: bool = Query(False, description="Auto-fetch: pre-fill the template with existing admissions"),
+):
+    """
+    Download the Excel template for bulk student admission upload.
+
+    - include_data=false (default): blank template, for creating new admissions.
+    - include_data=true ("Auto Fetch Details"): same template pre-filled with
+      one row per existing admission, for review/export or re-upload after edits.
+
+    **Required Permission**: student_admissions:create
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    await check_role_plan_permission_with_error(db, request, role, "student_admissions", "create")
+
+    if include_data:
+        xlsx_bytes = await generate_prefilled_template(db)
+        return StreamingResponse(
+            io.BytesIO(xlsx_bytes),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": "attachment; filename=student_admission_bulk_upload_template.xlsx"
+            },
+        )
+
+    if not BULK_UPLOAD_TEMPLATE_PATH.exists():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Bulk upload template not found")
+
+    xlsx_bytes = await generate_blank_template(db)
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=student_admission_bulk_upload_template.xlsx"
+        },
+    )
 
 
 @router.get("/next-admission-number")
@@ -341,3 +423,109 @@ async def get_admission_types_dropdown(request: Request, db: AsyncSession = Depe
         {"value": "pre_primary", "label": "Pre Primary Admission"},
         {"value": "regular", "label": "Regular Admission"},
     ]
+
+
+# Send Admission Confirmation SMS (MANUAL #1 re-send)
+@router.post("/send-confirmation", status_code=status.HTTP_200_OK)
+async def send_admission_confirmation(
+    request: Request,
+    admission_ids: list[UUID],
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Re-send admission confirmation SMS to parents — Admin only (USE CASE #1 MANUAL)"""
+    import os
+    import uuid as _uuid
+    from sqlalchemy import select
+
+    from app.models.communication.communication_model import NotificationQueue
+    from app.models.masters.admission_model import Admission
+    from app.models.masters.parent_model import Parent
+    from app.models.student.student_model import Student
+    from app.models.student.student_parent_association_model import StudentParentLink
+    from app.tasks.communication.send_tasks import send_notification_batch
+
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    triggered_by = _uuid.UUID(current_user.get("sub"))
+
+    await check_role_plan_permission_with_error(db, request, role, "student_admissions", "send_sms")
+
+    queue_ids = []
+    queued_count = 0
+    skipped_count = 0
+
+    for admission_id in admission_ids:
+        try:
+            admission_result = await db.execute(
+                select(Admission).where(Admission.id == admission_id)
+            )
+            admission = admission_result.scalar_one_or_none()
+            if not admission:
+                skipped_count += 1
+                continue
+
+            student_result = await db.execute(select(Student).where(Student.id == admission.student_id))
+            student = student_result.scalar_one_or_none()
+            if not student:
+                skipped_count += 1
+                continue
+
+            parent_result = await db.execute(
+                select(Parent.name, Parent.phone)
+                .select_from(StudentParentLink)
+                .join(Parent, Parent.id == StudentParentLink.parent_id)
+                .where(StudentParentLink.student_id == admission.student_id)
+                .limit(1)
+            )
+            parent_row = parent_result.first()
+            if not parent_row or not parent_row.phone:
+                skipped_count += 1
+                continue
+
+            parent_name = parent_row.name or "Parent"
+            student_name = f"{student.first_name} {student.last_name}"
+            admission_no = admission.admission_number or "N/A"
+
+            message = (
+                f"Welcome! {student_name}'s admission (No. {admission_no}) "
+                f"is confirmed. — COS360"
+            )
+
+            queue_entry = NotificationQueue(
+                id=_uuid.uuid4(),
+                template_id=None,
+                recipient_name=parent_name,
+                recipient_phone=parent_row.phone,
+                channel="sms",
+                rendered_message=message,
+                status="queued",
+                triggered_by=triggered_by,
+                target_type="admission_confirmation",
+                target_ref={
+                    "msg91_template_id": os.environ.get("MSG91_TEMPLATE_ID_ADMISSION"),
+                    "variables": {
+                        "var1": student_name,
+                        "var2": admission_no,
+                        "var3": "N/A",
+                    },
+                },
+            )
+            db.add(queue_entry)
+            queue_ids.append(str(queue_entry.id))
+            queued_count += 1
+
+        except Exception:
+            skipped_count += 1
+            continue
+
+    await db.commit()
+
+    if queue_ids:
+        send_notification_batch.delay(queue_ids, "sms", request.headers.get("cschema", "public"))
+
+    return {
+        "status": "queued",
+        "queued_count": queued_count,
+        "skipped_count": skipped_count,
+        "detail": f"Admission confirmation SMS queued for {queued_count} admission(s).",
+    }

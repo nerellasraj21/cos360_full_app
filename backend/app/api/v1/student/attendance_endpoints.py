@@ -184,3 +184,103 @@ async def update_attendance_for_date(
     await check_role_plan_permission_with_error(db, request, role, "student_attendance", "update")
 
     return await update_attendance_by_date(db, attendance_date, attendance_updates, request)
+
+
+# Send Absence Alert SMS (MANUAL #2)
+@router.post("/send-absence-alerts")
+async def send_absence_alerts(
+    request: Request,
+    student_ids: list[UUID],
+    attendance_date: date = Query(..., description="Date of absence (YYYY-MM-DD)"),
+    reason: str | None = Query(None, description="Reason for absence"),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Send SMS to parents of absent students — Teacher/Admin only (USE CASE #2)"""
+    import os
+    import uuid as _uuid
+    from sqlalchemy import select
+
+    from app.models.communication.communication_model import NotificationQueue
+    from app.models.masters.parent_model import Parent
+    from app.models.student.student_model import Student
+    from app.models.student.student_parent_association_model import StudentParentLink
+    from app.tasks.communication.send_tasks import send_notification_batch
+
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    triggered_by = _uuid.UUID(current_user.get("sub"))
+
+    await check_role_plan_permission_with_error(db, request, role, "student_attendance", "send_sms")
+
+    queue_ids = []
+    queued_count = 0
+    skipped_count = 0
+
+    for student_id in student_ids:
+        try:
+            student_result = await db.execute(select(Student).where(Student.id == student_id))
+            student = student_result.scalar_one_or_none()
+            if not student:
+                skipped_count += 1
+                continue
+
+            parent_result = await db.execute(
+                select(Parent.name, Parent.phone)
+                .select_from(StudentParentLink)
+                .join(Parent, Parent.id == StudentParentLink.parent_id)
+                .where(StudentParentLink.student_id == student_id)
+                .limit(1)
+            )
+            parent_row = parent_result.first()
+            if not parent_row or not parent_row.phone:
+                skipped_count += 1
+                continue
+
+            parent_name = parent_row.name or "Parent"
+            parent_phone = parent_row.phone
+            student_name = f"{student.first_name} {student.last_name}"
+
+            reason_str = f"({reason})" if reason else ""
+            message = (
+                f"Dear {parent_name}, your ward {student_name} "
+                f"was marked absent today, {attendance_date.strftime('%d-%b')}. {reason_str} — COS360"
+            )
+
+            queue_entry = NotificationQueue(
+                id=_uuid.uuid4(),
+                template_id=None,
+                recipient_name=parent_name,
+                recipient_phone=parent_phone,
+                channel="sms",
+                rendered_message=message,
+                status="queued",
+                triggered_by=triggered_by,
+                target_type="student_absence",
+                target_ref={
+                    "msg91_template_id": os.environ.get("MSG91_TEMPLATE_ID_ABSENTEE"),
+                    "variables": {
+                        "var1": student_name,
+                        "var2": attendance_date.strftime("%d-%b-%Y"),
+                        "var3": reason or "Not specified",
+                    },
+                },
+            )
+            db.add(queue_entry)
+            queue_ids.append(str(queue_entry.id))
+            queued_count += 1
+
+        except Exception as e:
+            skipped_count += 1
+            continue
+
+    await db.commit()
+
+    if queue_ids:
+        send_notification_batch.delay(queue_ids, "sms", request.headers.get("cschema", "public"))
+
+    return {
+        "status": "queued",
+        "queued_count": queued_count,
+        "skipped_count": skipped_count,
+        "detail": f"SMS queued for {queued_count} student(s). {skipped_count} skipped (no phone/not found).",
+    }

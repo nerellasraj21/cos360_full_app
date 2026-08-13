@@ -4,7 +4,7 @@ Schemas for Fee Collection module — Student Search, Fee Summary, Fee Payment.
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
@@ -156,10 +156,20 @@ class FeeHistoryResponse(BaseModel):
 
 # ─── Fee Payment ─────────────────────────────────────────────────────────────
 
+class FeePaymentItemRequest(BaseModel):
+    """One explicit fee-type allocation entered by the collector."""
+
+    fee_type_id: UUID
+    amount: Decimal = Field(gt=0, max_digits=10, decimal_places=2)
+
+
 class FeePaymentRequest(BaseModel):
     student_id: UUID
     academic_year_id: UUID
     amount_to_pay: Decimal = Field(gt=0, max_digits=10, decimal_places=2)
+    # When supplied, the payment is allocated ONLY to these fee types.
+    # When omitted, legacy top-down auto-distribution is used (unchanged).
+    fee_items: Optional[List[FeePaymentItemRequest]] = None
     payment_method: PaymentMethod
     upi_reference: Optional[str] = Field(None, max_length=30)
     bank_reference: Optional[str] = Field(None, max_length=30)
@@ -169,6 +179,25 @@ class FeePaymentRequest(BaseModel):
     send_sms: bool = True
     print_duplicate: bool = False
     remarks: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_fee_items(self):
+        if self.fee_items is not None:
+            if not self.fee_items:
+                raise ValueError("fee_items cannot be an empty list; omit it to auto-distribute")
+
+            seen: set = set()
+            for it in self.fee_items:
+                if it.fee_type_id in seen:
+                    raise ValueError(f"Duplicate fee_type_id in fee_items: {it.fee_type_id}")
+                seen.add(it.fee_type_id)
+
+            items_total = sum((it.amount for it in self.fee_items), Decimal("0.00"))
+            if items_total != self.amount_to_pay:
+                raise ValueError(
+                    f"Sum of fee_items ({items_total}) must equal amount_to_pay ({self.amount_to_pay})"
+                )
+        return self
 
     @model_validator(mode="after")
     def validate_conditional_fields(self):

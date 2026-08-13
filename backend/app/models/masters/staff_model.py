@@ -31,7 +31,7 @@ class Staff(BaseOrg):
     phone = Column(String(15), nullable=True)
     gender = Column(Enum(GenderEnum, name="genderenum", create_type=False), nullable=True)
     date_of_birth = Column(Date, nullable=True)
-    joining_date = Column(Date, nullable=False)
+    joining_date = Column(Date, nullable=True)
     qualification = Column(String(100), nullable=True)
     experience_years = Column(Integer, nullable=True)
     address = Column(String(255), nullable=True)

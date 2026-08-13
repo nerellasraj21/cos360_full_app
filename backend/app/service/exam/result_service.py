@@ -135,6 +135,20 @@ async def get_student_result_or_404(
 
 
 async def publish_exam(db: AsyncSession, exam_id: UUID) -> Exam:
+    import logging
+    import os
+    from uuid import uuid4
+    from sqlalchemy import select
+
+    from app.models.communication.communication_model import NotificationQueue
+    from app.models.masters.parent_model import Parent
+    from app.models.student.student_model import Student
+    from app.models.student.student_parent_association_model import StudentParentLink
+    from app.models.exam.student_exam_result_model import StudentExamResult
+    from app.tasks.communication.send_tasks import send_notification_batch
+
+    logger = logging.getLogger(__name__)
+
     exam = await get_exam_or_404(db, exam_id)
     if exam.status not in ("locked", "active", "finalized"):
         raise HTTPException(
@@ -143,6 +157,10 @@ async def publish_exam(db: AsyncSession, exam_id: UUID) -> Exam:
         )
     exam.status = "published"
     await db.flush()
+
+    # Results SMS is NOT sent automatically on publish. It is sent on demand via
+    # the results notification endpoint (MANUAL #8).
+
     return exam
 
 

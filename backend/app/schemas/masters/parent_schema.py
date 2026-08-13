@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
 
 
 class ParentBase(BaseModel):
-    name: str
+    name: str | None = None
     email: EmailStr | None = None
     phone: str | None = None
     occupation: str | None = None
@@ -15,6 +15,21 @@ class ParentBase(BaseModel):
     gender: str | None = None
     relation_to_student: Literal["Father", "Mother", "Guardian"]
     salary_range: Literal["below_1l", "1l_3l", "3l_5l", "5l_10l", "above_10l"] | None = None
+
+    @field_validator("aadhar_number")
+    @classmethod
+    def validate_aadhar(cls, v):
+        if v and (not v.isdigit() or len(v) != 12):
+            raise ValueError("Must be a 12-digit number")
+        return v
+
+    @model_validator(mode="after")
+    def default_name(self):
+        # parents.name is NOT NULL in the database; when left blank, fall back
+        # to the relation label (e.g. "Mother") instead of requiring a migration.
+        if not self.name or not self.name.strip():
+            self.name = self.relation_to_student
+        return self
 
 
 class ParentCreate(ParentBase):

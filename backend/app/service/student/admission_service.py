@@ -16,6 +16,7 @@ from app.models.masters.parent_model import Parent
 from app.models.masters.student_parent_association_model import StudentParentLink
 from app.models.student.student_model import Student
 from app.schemas.student.admission_schema import StudentAdmissionCreate, StudentAdmissionUpdate
+from app.schemas.student.student_schema import PLACEHOLDER_DATE_OF_BIRTH
 from app.tools.database_error_mapper import map_database_error
 from app.tools.error_handler import (
     ErrorCategory,
@@ -121,6 +122,10 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
         HTTPException: For validation, business rule, or database errors
     """
     try:
+        # Default admission date to today if the client omitted it
+        if admission.admission_date is None:
+            admission.admission_date = datetime.now().date()
+
         # Validate admission date
         if admission.admission_date > datetime.now().date():
             raise create_validation_error(
@@ -149,36 +154,30 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
             "pre_primary" if admission.student.is_primary == "primary" else "regular"
         )
 
-        # Admission number is MANUAL for both primary and non-primary admissions:
-        # the admin must always enter it (non-primary per government rules). It is
-        # free text but must be unique, since the number doubles as the student's
-        # login username. A blank value is rejected (no auto-generation).
+        # Admission number can be entered manually (free text, but must be unique
+        # since it doubles as the student's login username); if left blank it is
+        # auto-generated the same way the "next admission number" preview does.
         manual_number = (admission.admission_number or "").strip()
-        if not manual_number:
-            raise create_validation_error(
-                message="Admission number is required and must be entered manually",
-                field="admission_number",
-                value=admission.admission_number,
-                request=request,
+        if manual_number:
+            dup_admission = await db.execute(
+                select(Admission).where(Admission.admission_number == manual_number)
             )
-
-        dup_admission = await db.execute(
-            select(Admission).where(Admission.admission_number == manual_number)
-        )
-        if dup_admission.scalar_one_or_none():
-            raise create_business_rule_error(
-                message=f"Admission number '{manual_number}' is already in use",
-                rule="duplicate_admission_number",
-                request=request,
-            )
-        dup_user = await db.execute(select(User).where(User.username == manual_number))
-        if dup_user.scalar_one_or_none():
-            raise create_business_rule_error(
-                message=f"Admission number '{manual_number}' is already in use as a login",
-                rule="duplicate_admission_number",
-                request=request,
-            )
-        admission_number = manual_number
+            if dup_admission.scalar_one_or_none():
+                raise create_business_rule_error(
+                    message=f"Admission number '{manual_number}' is already in use",
+                    rule="duplicate_admission_number",
+                    request=request,
+                )
+            dup_user = await db.execute(select(User).where(User.username == manual_number))
+            if dup_user.scalar_one_or_none():
+                raise create_business_rule_error(
+                    message=f"Admission number '{manual_number}' is already in use as a login",
+                    rule="duplicate_admission_number",
+                    request=request,
+                )
+            admission_number = manual_number
+        else:
+            admission_number = await generate_admission_number(db, admission.admission_date, admission_type)
 
         admission_dict = admission.dict(exclude={"student"})
         admission_dict["admission_number"] = admission_number
@@ -190,59 +189,50 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
                 message="Student first name is required", field="student.first_name", request=request
             )
 
-        if not admission.student.date_of_birth:
-            raise create_validation_error(
-                message="Student date of birth is required", field="student.date_of_birth", request=request
-            )
-
         # Validate parent data
         if not admission.student.father or not admission.student.mother:
             raise create_validation_error(
                 message="Both father and mother information are required", field="student.parents", request=request
             )
 
-        # Check for duplicate emails
+        # Father/Mother email are optional; when blank, that parent's login
+        # username falls back to "{admission_number}.father"/".mother" instead.
         father_email = admission.student.father.email
         mother_email = admission.student.mother.email
 
-        if not father_email or not father_email.strip():
-            raise create_validation_error(
-                message="Father email is required", field="student.father.email", request=request
-            )
-
-        if not mother_email or not mother_email.strip():
-            raise create_validation_error(
-                message="Mother email is required", field="student.mother.email", request=request
-            )
-
-        if father_email == mother_email:
+        if father_email and mother_email and father_email == mother_email:
             raise create_validation_error(
                 message="Father and mother cannot have the same email address",
                 field="student.parents.email",
                 request=request,
             )
 
+        provided_emails = [e for e in (father_email, mother_email) if e]
+
         # Check if emails already exist and get existing parent users
         # IMPORTANT: Filter by Parent role to avoid conflicts with other roles
-        existing_users_result = await db.execute(
-            select(User)
-            .options(selectinload(User.role))
-            .join(Role)
-            .where(and_(User.email.in_([father_email, mother_email]), Role.name == "Parent"))
-        )
-        existing_users = existing_users_result.scalars().all()
+        existing_emails: dict[str, User] = {}
+        all_users: list[User] = []
+        if provided_emails:
+            existing_users_result = await db.execute(
+                select(User)
+                .options(selectinload(User.role))
+                .join(Role)
+                .where(and_(User.email.in_(provided_emails), Role.name == "Parent"))
+            )
+            existing_users = existing_users_result.scalars().all()
 
-        # Create dictionaries for easy lookup
-        existing_emails = {user.email: user for user in existing_users}
+            # Create dictionaries for easy lookup
+            existing_emails = {user.email: user for user in existing_users}
 
-        # Check if emails exist with non-parent roles (blocked scenario)
-        all_users_result = await db.execute(
-            select(User).options(selectinload(User.role)).where(User.email.in_([father_email, mother_email]))
-        )
-        all_users = all_users_result.scalars().all()
+            # Check if emails exist with non-parent roles (blocked scenario)
+            all_users_result = await db.execute(
+                select(User).options(selectinload(User.role)).where(User.email.in_(provided_emails))
+            )
+            all_users = all_users_result.scalars().all()
 
         # Allow reuse of parent emails, but prevent conflicts with non-parent users
-        for email in [father_email, mother_email]:
+        for email in provided_emails:
             non_parent_users = [u for u in all_users if u.email == email and u.role.name != "Parent"]
             if non_parent_users:
                 user = non_parent_users[0]
@@ -334,7 +324,7 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
                     )
 
                 father_user_data = User(
-                    username=father_dict.email,
+                    username=father_dict.email or f"{admission_number}.father",
                     email=father_dict.email,
                     password_hash=hash_password("parent@123"),
                     is_active=True,
@@ -386,6 +376,8 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
                 # Update existing parent data with new information
                 logger.info(f"Updating existing mother data for parent_id: {mother_dict.id}")
                 mother_data = admission.student.mother.dict()
+                if mother_data.get("name") is None:
+                    mother_data["name"] = ""
                 for field, value in mother_data.items():
                     # Don't update email (it's the lookup key) or relation_to_student
                     if field not in ["email"] and hasattr(mother_dict, field):
@@ -397,14 +389,17 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
             else:
                 # Create new mother user and parent
                 try:
-                    mother_dict = Parent(**admission.student.mother.dict())
+                    mother_create_data = admission.student.mother.dict()
+                    if mother_create_data.get("name") is None:
+                        mother_create_data["name"] = ""
+                    mother_dict = Parent(**mother_create_data)
                 except Exception as e:
                     raise create_validation_error(
                         message=f"Invalid mother data: {str(e)}", field="student.mother", request=request
                     )
 
                 mother_user_data = User(
-                    username=mother_dict.email,
+                    username=mother_dict.email or f"{admission_number}.mother",
                     email=mother_dict.email,
                     password_hash=hash_password("parent@123"),
                     is_active=True,
@@ -471,6 +466,8 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
                         # Update existing guardian data
                         logger.info(f"Updating existing guardian data for parent_id: {guardian_dict.id}")
                         guardian_data = admission.student.guardian.dict()
+                        if guardian_data.get("name") is None:
+                            guardian_data["name"] = ""
                         for field, value in guardian_data.items():
                             if field not in ["email"] and hasattr(guardian_dict, field):
                                 old_value = getattr(guardian_dict, field)
@@ -481,7 +478,10 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
                     else:
                         # Create new guardian user and parent
                         try:
-                            guardian_dict = Parent(**admission.student.guardian.dict())
+                            guardian_create_data = admission.student.guardian.dict()
+                            if guardian_create_data.get("name") is None:
+                                guardian_create_data["name"] = ""
+                            guardian_dict = Parent(**guardian_create_data)
                         except Exception as e:
                             raise create_validation_error(
                                 message=f"Invalid guardian data: {str(e)}", field="student.guardian", request=request
@@ -630,6 +630,11 @@ async def add_admission(admission: StudentAdmissionCreate, db: AsyncSession, req
                 )
 
             await db.commit()
+
+            # Admission confirmation SMS is NOT sent automatically. It is sent on
+            # demand via POST /students/admission/send-confirmation (MANUAL #1),
+            # so a notification failure can never fail an admission.
+
             return admission_out
 
         except HTTPException:
@@ -966,6 +971,10 @@ async def update_partial_details_admission(
 
         # Validate admission date if being updated
         if "admission_date" in update_data:
+            if update_data["admission_date"] is None:
+                raise create_validation_error(
+                    message="Admission date is required", field="admission_date", request=request
+                )
             if update_data["admission_date"] > datetime.now().date():
                 raise create_validation_error(
                     message="Admission date cannot be in the future",
@@ -1005,21 +1014,37 @@ async def update_partial_details_admission(
                 message="Student first name is required", field="first_name", request=request
             )
 
+        # Date of birth is optional (same as admission creation): a blank value
+        # falls back to the same placeholder instead of being rejected, since
+        # students.date_of_birth is NOT NULL in the database.
         if "date_of_birth" in update_data and not update_data["date_of_birth"]:
+            update_data["date_of_birth"] = PLACEHOLDER_DATE_OF_BIRTH
+
+        # Father/Mother email are optional (same rules as admission creation);
+        # Parent.email is nullable, so clearing them is safe.
+
+        # Reject clearing mandatory father fields (same rules as admission creation,
+        # where father.name and father.phone are required by StudentCreate)
+        if "father_name" in update_data and not (update_data["father_name"] or "").strip():
             raise create_validation_error(
-                message="Student date of birth is required", field="date_of_birth", request=request
+                message="Father name is required", field="father_name", request=request
             )
 
-        # Reject clearing/duplicating mandatory parent emails (same rules as admission creation)
-        if "father_email" in update_data and not (update_data["father_email"] or "").strip():
+        if "father_phone" in update_data and not (update_data["father_phone"] or "").strip():
             raise create_validation_error(
-                message="Father email is required", field="father_email", request=request
+                message="Father phone is required", field="father_phone", request=request
             )
 
-        if "mother_email" in update_data and not (update_data["mother_email"] or "").strip():
-            raise create_validation_error(
-                message="Mother email is required", field="mother_email", request=request
-            )
+        # Reject clearing mandatory admission references (required on creation, so a
+        # PATCH may change them but never null them)
+        for required_ref, ref_label in (
+            ("academic_year_id", "Academic year"),
+            ("admitted_class_id", "Admitted class"),
+        ):
+            if required_ref in update_data and update_data[required_ref] is None:
+                raise create_validation_error(
+                    message=f"{ref_label} is required", field=required_ref, request=request
+                )
 
         new_father_email = update_data.get("father_email")
         new_mother_email = update_data.get("mother_email")

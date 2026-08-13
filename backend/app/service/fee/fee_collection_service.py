@@ -3,6 +3,7 @@ Service for Fee Collection — Student Search, Fee Summary, Fee Payment wrapper.
 """
 
 import logging as log
+import os
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
@@ -553,6 +554,9 @@ async def get_terms_due(
             else:
                 overdue_terms.append(item)
 
+    current_month_terms.sort(key=lambda i: i.due_date)
+    overdue_terms.sort(key=lambda i: i.due_date)
+
     total_current = sum(i.pending_amount for i in current_month_terms)
     total_overdue = sum(i.pending_amount for i in overdue_terms)
     selected_month = as_of_date.strftime("%B %Y")
@@ -672,7 +676,13 @@ async def send_fee_summary_sms(
         "recipient_phone": parent_phone,
         "recipient_email": None,
         "rendered_message": message,
-        "template_id": None,
+        "template_id": os.environ.get("MSG91_TEMPLATE_ID_FEE_REMINDER") or os.environ.get("MSG91_TEMPLATE_ID"),
+        "variables": {
+            "var1": student_name,
+            "var2": admission_no,
+            "var3": f"{due_amount:,.2f}",
+            "var4": summary.academic_year,
+        },
         "triggered_by": str(triggered_by_user_id),
         "target_type": "fee_summary_reminder",
         "target_ref": {"student_id": str(student_id), "academic_year_id": str(academic_year_id)},
@@ -853,10 +863,35 @@ async def _process_fee_payment_inner(
             detail=f"Amount {data.amount_to_pay} exceeds total due {grand_total_due}",
         )
 
-    # ── Distribute across current-year fee types (top-down) ──────────────
+    # ── Distribute across current-year fee types ─────────────────────────
+    # If the collector supplied an explicit per-fee-type breakdown, honour it
+    # exactly: only those fee types are paid, each for its own amount. The
+    # legacy top-down auto-distribution below runs only when fee_items is
+    # omitted, so existing callers are unaffected.
     remaining = data.amount_to_pay
     transaction_items = []
     items_paid: list[FeePaymentItemPaid] = []
+
+    explicit_items = getattr(data, "fee_items", None)
+    if explicit_items:
+        mapping_by_type = {m.fee_type_id: m for m in fee_mappings}
+        ordered_mappings = []
+        requested_amounts: dict = {}
+
+        for req in explicit_items:
+            mapping = mapping_by_type.get(req.fee_type_id)
+            if mapping is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Fee type {req.fee_type_id} is not mapped to this student for this academic year",
+                )
+            ordered_mappings.append(mapping)
+            requested_amounts[req.fee_type_id] = Decimal(str(req.amount))
+
+        # Walk only the requested fee types, in the order the collector entered them.
+        fee_mappings = ordered_mappings
+    else:
+        requested_amounts = None
 
     for mapping in fee_mappings:
         if remaining <= 0:
@@ -890,10 +925,29 @@ async def _process_fee_payment_inner(
         )
         already_paid = Decimal(str(paid_result.scalar_one() or 0))
         outstanding = fee_after_conc - already_paid
-        if outstanding <= 0:
-            continue
 
-        pay_this = min(remaining, outstanding)
+        if requested_amounts is not None:
+            # Explicit mode: pay exactly what was entered for this fee type,
+            # and refuse rather than silently divert money elsewhere.
+            fee_type_label = mapping.fee_type.type_name if mapping.fee_type else str(mapping.fee_type_id)
+            if outstanding <= 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"'{fee_type_label}' has no outstanding due; nothing to pay for this fee type",
+                )
+            pay_this = requested_amounts[mapping.fee_type_id]
+            if pay_this > outstanding:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Amount {pay_this} for '{fee_type_label}' exceeds its outstanding due {outstanding}"
+                    ),
+                )
+        else:
+            if outstanding <= 0:
+                continue
+            pay_this = min(remaining, outstanding)
+
         remaining -= pay_this
 
         # Distribute across term_amounts
@@ -927,6 +981,18 @@ async def _process_fee_payment_inner(
                 "amount_due": ta.term_amount,
                 "amount_paid": ta_pay,
             })
+
+        if requested_amounts is not None and pay_this > 0:
+            # Term schedule could not absorb the entered amount — fail loudly
+            # instead of dropping the remainder or diverting it to another type.
+            fee_type_label = mapping.fee_type.type_name if mapping.fee_type else str(mapping.fee_type_id)
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Amount for '{fee_type_label}' exceeds the scheduled term amounts "
+                    f"by {pay_this}; check the term-wise fee setup"
+                ),
+            )
 
         fee_type_name = mapping.fee_type.type_name if mapping.fee_type else "Unknown"
         paid_for_type = sum(
@@ -1125,16 +1191,18 @@ async def _dispatch_sms_receipt(
     admission: Admission,
 ) -> str:
     """
-    Dispatch SMS receipt via the Communication module's Celery task (spec Section 8.1).
+    Dispatch SMS receipt via MSG91.
     Returns "sent", "failed", or "skipped".
     """
     if not data.send_sms or txn.status != "completed":
         return "skipped"
 
     try:
-        from app.tasks.communication.send_tasks import send_notification_batch
+        import asyncio
 
-        # Build SMS body using the spec template
+        from app.tasks.communication.send_tasks import _call_provider
+
+        # Get parent info
         parent_result = await db.execute(
             select(Parent.name, Parent.phone)
             .select_from(StudentParentLink)
@@ -1143,23 +1211,53 @@ async def _dispatch_sms_receipt(
             .limit(1)
         )
         parent_row = parent_result.first()
-        parent_name = parent_row.name if parent_row else "Parent"
-        parent_phone = parent_row.phone if parent_row else None
+        if not parent_row:
+            log.warning(f"No parent found for student {data.student_id}, skipping SMS")
+            return "skipped"
 
+        parent_name = parent_row.name or "Parent"
+        parent_phone = parent_row.phone
         if not parent_phone:
             log.warning(f"No parent phone for student {data.student_id}, skipping SMS")
             return "skipped"
 
-        # Fire-and-forget Celery task — the Communication module handles retries
-        # We pass minimal info; the task resolves the rest from the queue table.
-        log.info(
-            f"SMS receipt dispatched: receipt={receipt_number}, "
-            f"parent={parent_name}, phone={parent_phone}, amount={txn.total_amount}"
+        # Get student info
+        student_result = await db.execute(select(Student).where(Student.id == data.student_id))
+        student = student_result.scalar_one_or_none()
+        student_name = f"{student.first_name} {student.last_name}" if student else "Student"
+
+        # Build SMS message
+        message = (
+            f"Received ₹ {txn.total_amount:,.2f} for {student_name}. "
+            f"Receipt No. {receipt_number}. — COS360"
         )
-        # NOTE: Full integration requires inserting into notification_queue and calling
-        # send_notification_batch.delay(queue_ids, "sms", tenant_schema).
-        # For now we log at INFO level so the call chain is exercised.
+
+        row_data = {
+            "recipient_name": parent_name,
+            "recipient_phone": parent_phone,
+            "recipient_email": None,
+            "rendered_message": message,
+            "template_id": os.environ.get("MSG91_TEMPLATE_ID_FEE_RECEIPT") or os.environ.get("MSG91_TEMPLATE_ID"),
+            "variables": {
+                "var1": student_name,
+                "var2": receipt_number,
+                "var3": f"{txn.total_amount:,.2f}",
+            },
+            "triggered_by": str(txn.created_by),
+            "target_type": "fee_receipt",
+            "target_ref": {"transaction_id": str(txn.id), "receipt_number": receipt_number},
+        }
+
+        # Call provider synchronously
+        loop = asyncio.get_event_loop()
+        provider_msg_id = await loop.run_in_executor(None, _call_provider, "sms", row_data)
+
+        log.info(
+            f"Fee receipt SMS sent: receipt={receipt_number}, "
+            f"parent={parent_name}, provider_msg_id={provider_msg_id}"
+        )
         return "sent"
+
     except Exception as e:
-        log.warning(f"SMS dispatch failed for transaction {txn.transaction_number}: {e}")
+        log.warning(f"Fee receipt SMS failed for transaction {txn.transaction_number}: {e}")
         return "failed"

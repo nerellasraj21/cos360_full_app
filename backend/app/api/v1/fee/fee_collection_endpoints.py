@@ -324,3 +324,117 @@ async def download_receipt_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# Send Fee Receipt SMS (MANUAL #5 re-send)
+@router.post("/send-receipt-sms", status_code=200)
+async def send_receipt_sms(
+    request: Request,
+    receipt_ids: list[UUID],
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Re-send fee receipt SMS to parents — Admin/Accountant only (USE CASE #5 MANUAL)"""
+    import os
+    import uuid as _uuid
+    from sqlalchemy import select
+
+    from app.models.communication.communication_model import NotificationQueue
+    from app.models.fee.fee_receipt_model import FeeReceipt
+    from app.models.fee.fee_transaction_model import FeeTransaction
+    from app.models.masters.parent_model import Parent
+    from app.models.student.student_model import Student
+    from app.models.student.student_parent_association_model import StudentParentLink
+    from app.tasks.communication.send_tasks import send_notification_batch
+
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+    triggered_by = _uuid.UUID(current_user.get("sub"))
+
+    await check_role_plan_permission_with_error(db, request, role, "fee_collection", "send_sms")
+
+    queue_ids = []
+    queued_count = 0
+    skipped_count = 0
+
+    for receipt_id in receipt_ids:
+        try:
+            receipt_result = await db.execute(
+                select(FeeReceipt).where(FeeReceipt.id == receipt_id)
+            )
+            receipt = receipt_result.scalar_one_or_none()
+            if not receipt:
+                skipped_count += 1
+                continue
+
+            txn_result = await db.execute(
+                select(FeeTransaction).where(FeeTransaction.id == receipt.fee_transaction_id)
+            )
+            txn = txn_result.scalar_one_or_none()
+            if not txn:
+                skipped_count += 1
+                continue
+
+            student_result = await db.execute(select(Student).where(Student.id == txn.student_id))
+            student = student_result.scalar_one_or_none()
+            if not student:
+                skipped_count += 1
+                continue
+
+            parent_result = await db.execute(
+                select(Parent.name, Parent.phone)
+                .select_from(StudentParentLink)
+                .join(Parent, Parent.id == StudentParentLink.parent_id)
+                .where(StudentParentLink.student_id == txn.student_id)
+                .limit(1)
+            )
+            parent_row = parent_result.first()
+            if not parent_row or not parent_row.phone:
+                skipped_count += 1
+                continue
+
+            parent_name = parent_row.name or "Parent"
+            student_name = f"{student.first_name} {student.last_name}"
+
+            message = (
+                f"Received ₹ {txn.total_amount:,.2f} for {student_name}. "
+                f"Receipt No. {receipt.receipt_number}. — COS360"
+            )
+
+            queue_entry = NotificationQueue(
+                id=_uuid.uuid4(),
+                template_id=None,
+                recipient_name=parent_name,
+                recipient_phone=parent_row.phone,
+                channel="sms",
+                rendered_message=message,
+                status="queued",
+                triggered_by=triggered_by,
+                target_type="fee_receipt",
+                target_ref={
+                    "msg91_template_id": os.environ.get("MSG91_TEMPLATE_ID_FEE_RECEIPT"),
+                    "variables": {
+                        "var1": student_name,
+                        "var2": receipt.receipt_number,
+                        "var3": f"{txn.total_amount:,.2f}",
+                    },
+                },
+            )
+            db.add(queue_entry)
+            queue_ids.append(str(queue_entry.id))
+            queued_count += 1
+
+        except Exception:
+            skipped_count += 1
+            continue
+
+    await db.commit()
+
+    if queue_ids:
+        send_notification_batch.delay(queue_ids, "sms", request.headers.get("cschema", "public"))
+
+    return {
+        "status": "queued",
+        "queued_count": queued_count,
+        "skipped_count": skipped_count,
+        "detail": f"Fee receipt SMS queued for {queued_count} receipt(s).",
+    }

@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.models.masters.staff_model import GenderEnum, QualificationLevelEnum
 
@@ -12,8 +12,8 @@ from app.models.masters.staff_model import GenderEnum, QualificationLevelEnum
 
 
 class StaffQualificationCreate(BaseModel):
-    level: QualificationLevelEnum = Field(..., description="Qualification level: Below Graduation / Graduation / Post Graduation / PhD")
-    name: str = Field(..., description="Name of the degree/course (e.g. Inter, B.Tech, M.Tech)")
+    level: QualificationLevelEnum | None = Field(None, description="Qualification level: Below Graduation / Graduation / Post Graduation / PhD")
+    name: str | None = Field(None, description="Name of the degree/course (e.g. Inter, B.Tech, M.Tech)")
     passed_out_year: int | None = Field(None, description="Year of passing (e.g. 2020)")
     percentage: Decimal | None = Field(None, description="Percentage scored (e.g. 78.50)")
     university: str | None = Field(None, description="University or board name")
@@ -49,7 +49,7 @@ class StaffEnrollmentBase(BaseModel):
     phone: str | None = None
     gender: str | None = None
     date_of_birth: date | None = None
-    joining_date: date
+    joining_date: date | None = None
     qualification: str | None = None
     experience_years: int | None = None
     address: str | None = None
@@ -81,6 +81,10 @@ class StaffEnrollmentBase(BaseModel):
 
 class StaffEnrollmentCreate(StaffEnrollmentBase):
     role_id: UUID | None = Field(None, description="Role ID for the staff user account")
+
+    # Mandatory on create (first_name is already mandatory via the base class)
+    phone: str = Field(..., min_length=1, description="Mandatory contact phone")
+    address: str = Field(..., min_length=1, description="Mandatory address")
 
 
 class StaffEnrollmentUpdate(BaseModel):
@@ -119,6 +123,15 @@ class StaffEnrollmentUpdate(BaseModel):
     pf_account_number: str | None = None
     uan_number: str | None = None
 
+    @field_validator("first_name", "email", "phone", "address")
+    @classmethod
+    def _mandatory_fields_cannot_be_cleared(cls, value, info):
+        # Runs only when the field is explicitly sent in the PATCH body;
+        # omitting the field entirely is still allowed (partial update).
+        if value is None or (isinstance(value, str) and not value.strip()):
+            raise ValueError(f"{info.field_name} is mandatory and cannot be empty")
+        return value
+
 
 class StaffEnrollmentOut(StaffEnrollmentBase):
     id: UUID
@@ -151,7 +164,7 @@ class StaffOut(BaseModel):
     phone: str | None
     gender: GenderEnum | None
     date_of_birth: date | None
-    joining_date: date
+    joining_date: date | None
     qualification: str | None
     experience_years: int | None
     address: str | None
