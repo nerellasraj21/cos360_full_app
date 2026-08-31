@@ -235,9 +235,11 @@ class AttendanceReportService(BaseReportService):
             stats_query = (
                 select(
                     func.count(StudentAttendance.id).label("total_records"),
-                    func.count(case((StudentAttendance.status == "Present", 1))).label("present_count"),
-                    func.count(case((StudentAttendance.status == "Absent", 1))).label("absent_count"),
-                    func.count(case((StudentAttendance.status == "Late", 1))).label("late_count"),
+                    func.count(case((StudentAttendance.status == "present", 1))).label("present_count"),
+                    func.count(case((StudentAttendance.status == "absent", 1))).label("absent_count"),
+                    func.count(case((StudentAttendance.status == "late", 1))).label("late_count"),
+                    func.count(case((StudentAttendance.status == "half_day", 1))).label("half_day_count"),
+                    func.count(case((StudentAttendance.status == "leave", 1))).label("leave_count"),
                     func.count(case((StudentAttendance.status == "Excused", 1))).label("excused_count"),
                     func.count(func.distinct(Student.id)).label("total_students"),
                     func.min(StudentAttendance.date).label("date_from"),
@@ -273,7 +275,10 @@ class AttendanceReportService(BaseReportService):
             # Calculate attendance percentage
             total_records = stats_row.total_records or 0
             present_count = stats_row.present_count or 0
-            attendance_percentage = (present_count / total_records * 100) if total_records > 0 else 0.0
+            half_day_count = stats_row.half_day_count or 0
+            attendance_percentage = (
+                (present_count + half_day_count * 0.5) / total_records * 100
+            ) if total_records > 0 else 0.0
 
             # Create date range string
             date_range = None
@@ -286,6 +291,8 @@ class AttendanceReportService(BaseReportService):
                 present_count=present_count,
                 absent_count=stats_row.absent_count or 0,
                 late_count=stats_row.late_count or 0,
+                half_day_count=half_day_count,
+                leave_count=stats_row.leave_count or 0,
                 excused_count=stats_row.excused_count or 0,
                 attendance_percentage=round(attendance_percentage, 2),
                 date_range=date_range,

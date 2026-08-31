@@ -140,6 +140,9 @@ async def preview_count_endpoint(
     parent_id: Optional[str] = Query(None),
     student_id: Optional[str] = Query(None),
     staff_id: Optional[str] = Query(None),
+    parent_ids: Optional[List[str]] = Query(None),
+    student_ids: Optional[List[str]] = Query(None),
+    staff_ids: Optional[List[str]] = Query(None),
     db: AsyncSession = Depends(get_tenant_db),
 ):
     """Return estimated recipient count for a given target_type + ref (no channel filter)."""
@@ -160,6 +163,12 @@ async def preview_count_endpoint(
         target_ref["student_id"] = student_id
     if staff_id:
         target_ref["staff_id"] = staff_id
+    if parent_ids:
+        target_ref["parent_ids"] = parent_ids
+    if student_ids:
+        target_ref["student_ids"] = student_ids
+    if staff_ids:
+        target_ref["staff_ids"] = staff_ids
 
     try:
         recipients = await _resolve_raw(db, target_type, target_ref)
@@ -208,6 +217,8 @@ async def send_notification_endpoint(
         user_vars=data.variables,
         triggered_by=triggered_by,
         tenant_schema=tenant_schema,
+        channel=data.channel.value if data.channel else None,
+        message=data.message,
     )
     return SendResponse(queued_count=queued_count)
 

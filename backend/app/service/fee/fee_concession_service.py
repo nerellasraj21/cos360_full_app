@@ -69,13 +69,6 @@ async def create_bulk_concessions(
                 detail=f"Fee mapping not found for fee_type_id={item.fee_type_id}",
             )
 
-        # CR-02: concession_amount <= assigned_fee
-        if item.concession_amount > mapping.total_fee:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Concession amount {item.concession_amount} exceeds assigned fee {mapping.total_fee} for fee_type_id={item.fee_type_id}",
-            )
-
         # CR-04: validate approved_by
         valid_approvers = {"owner", "principal", "management", "correspondent"}
         if item.approved_by not in valid_approvers:
@@ -97,9 +90,21 @@ async def create_bulk_concessions(
         )
         existing = existing_result.scalar_one_or_none()
 
+        # New concessions are cumulative: newly entered amount is added on top of
+        # whatever concession amount was already saved for this fee type/year.
+        previous_amount = existing.concession_amount if existing else Decimal("0.00")
+        new_total_amount = previous_amount + item.concession_amount
+
+        # CR-02: concession_amount <= assigned_fee (checked against the cumulative total)
+        if new_total_amount > mapping.total_fee:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Concession amount {new_total_amount} (previous {previous_amount} + new {item.concession_amount}) exceeds assigned fee {mapping.total_fee} for fee_type_id={item.fee_type_id}",
+            )
+
         if existing:
-            # Update existing concession
-            existing.concession_amount = item.concession_amount
+            # Update existing concession: add the newly entered amount to the running total
+            existing.concession_amount = new_total_amount
             existing.reason = item.reason
             existing.approved_by = item.approved_by
             existing.recorded_by_user_id = recorded_by

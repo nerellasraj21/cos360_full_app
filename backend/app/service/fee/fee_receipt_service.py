@@ -479,13 +479,19 @@ class FeeReceiptService:
     async def search_receipts(
         db: AsyncSession,
         student_id: UUID | None = None,
+        student_ids: list[UUID] | None = None,
         receipt_number: str | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list[FeeReceiptRead]:
-        """Search receipts with filters"""
+        """Search receipts with filters.
+
+        `student_id` filters to one student (student self-service); `student_ids`
+        filters to a set of students (e.g. a parent's children) — pass at most one
+        of the two.
+        """
         try:
             query = select(FeeReceipt)
 
@@ -494,6 +500,10 @@ class FeeReceiptService:
                 # Join with transaction to filter by student
                 query = query.join(FeeTransaction, FeeReceipt.fee_transaction_id == FeeTransaction.id)
                 conditions.append(FeeTransaction.student_id == student_id)
+            elif student_ids:
+                # Join with transaction to filter by a set of students
+                query = query.join(FeeTransaction, FeeReceipt.fee_transaction_id == FeeTransaction.id)
+                conditions.append(FeeTransaction.student_id.in_(student_ids))
 
             if receipt_number:
                 conditions.append(FeeReceipt.receipt_number.ilike(f"%{receipt_number}%"))

@@ -5,7 +5,7 @@ Returns queued_count immediately.
 """
 import logging
 import uuid
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -22,28 +22,36 @@ logger = logging.getLogger(__name__)
 
 async def queue_and_dispatch(
     db: AsyncSession,
-    template_id: UUID,
+    template_id: Optional[UUID],
     target_type: str,
     target_ref: Dict[str, Any],
     user_vars: Dict[str, Any],
     triggered_by: UUID,
     tenant_schema: str,
+    channel: Optional[str] = None,
+    message: Optional[str] = None,
 ) -> int:
     """
     1. Resolve recipients
-    2. Fetch & validate template
+    2. Fetch & validate template (or, for a template-less WhatsApp send, use
+       the raw `message` body directly — no template row involved)
     3. Validate user_vars cover non-system template variables
     4. For each recipient: render + insert NotificationQueue row
     5. Commit
     6. Dispatch Celery task
     7. Return queued_count
     """
-    # Step 2: fetch template
-    template = await get_template(db, template_id)
-    if not template.is_active:
-        raise HTTPException(status_code=400, detail="Template is inactive and cannot be used for sending.")
+    template = None
+    body = message
 
-    channel = template.channel if isinstance(template.channel, str) else template.channel.value
+    # Step 2: fetch template (skipped for a template-less WhatsApp send —
+    # SendRequest's validator guarantees template_id or (channel=whatsapp + message))
+    if template_id is not None:
+        template = await get_template(db, template_id)
+        if not template.is_active:
+            raise HTTPException(status_code=400, detail="Template is inactive and cannot be used for sending.")
+        channel = template.channel if isinstance(template.channel, str) else template.channel.value
+        body = template.body
 
     # Step 1: resolve recipients
     recipients, skipped = await resolve_recipients(db, target_type, target_ref, channel)
@@ -52,15 +60,17 @@ async def queue_and_dispatch(
         len(recipients), len(skipped), target_type,
     )
 
-    # Step 3: validate user-provided variables
-    all_template_vars = set(template.variables or [])
-    required_user_vars = all_template_vars - SYSTEM_VARS
-    missing = required_user_vars - set(user_vars.keys())
-    if missing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Missing user-provided template variables: {sorted(missing)}",
-        )
+    # Step 3: validate user-provided variables (template-less messages accept
+    # whatever {{vars}} the admin typed — no stored variable list to check against)
+    if template is not None:
+        all_template_vars = set(template.variables or [])
+        required_user_vars = all_template_vars - SYSTEM_VARS
+        missing = required_user_vars - set(user_vars.keys())
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing user-provided template variables: {sorted(missing)}",
+            )
 
     # Step 4: render per recipient and insert queue rows
     queue_ids: List[str] = []
@@ -78,9 +88,9 @@ async def queue_and_dispatch(
         }
         merged_vars = {**system_resolved, **user_vars}
 
-        # Render template body
+        # Render message body (from the template, or the raw free-text message)
         try:
-            rendered = Template(template.body).render(**merged_vars)
+            rendered = Template(body).render(**merged_vars)
         except (UndefinedError, TemplateSyntaxError) as exc:
             logger.warning(
                 "Render failed for recipient %s: %s — skipping",
@@ -101,7 +111,7 @@ async def queue_and_dispatch(
 
         # Render subject for email (if applicable)
         rendered_subject = None
-        if channel == "email" and template.subject:
+        if channel == "email" and template is not None and template.subject:
             try:
                 rendered_subject = Template(template.subject).render(**merged_vars)
             except Exception:

@@ -53,7 +53,7 @@ class NotificationQueue(BaseOrg):
     __tablename__ = "notification_queue"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
-    template_id = Column(UUID(as_uuid=True), ForeignKey("message_templates.id"), nullable=False)
+    template_id = Column(UUID(as_uuid=True), ForeignKey("message_templates.id"), nullable=True)  # nullable: WhatsApp free-text sends have no template
     recipient_name = Column(String(200), nullable=True)
     recipient_phone = Column(String(20), nullable=True)
     recipient_email = Column(String(200), nullable=True)

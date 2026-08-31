@@ -59,6 +59,120 @@ async def create_fee_transaction(
     return await FeeTransactionService.create_transaction(db, transaction_data, collected_by_user_id, request)
 
 
+# User-Specific Self-Access Endpoints for Fee Transactions
+#
+# NOTE: These literal-path routes (/my-fees, /my-children-fees,
+# /my-outstanding-fees) MUST be registered before the dynamic
+# GET /{transaction_id} route below. FastAPI/Starlette matches routes in
+# registration order, so a request to /fee/transactions/my-fees would
+# otherwise be captured by GET /{transaction_id} first, with "my-fees"
+# passed as transaction_id — which then fails UUID validation with
+# "invalid character ... found `m` at 1". This previously broke every
+# self-service endpoint in this router.
+
+
+@router.get("/my-fees", response_model=dict)
+async def get_my_fee_transactions(
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
+):
+    """
+    Get current user's own fee transactions - Student only endpoint
+
+    Returns student's fee transaction history with pagination
+
+    **Required permissions**: fee_transactions:read_own
+    """
+    # Enhanced permission check for student's own fee data
+    user_context = await check_user_resource_access(db, request, "fee_transactions", "read_own")
+
+    if not user_context.student_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only students can access this endpoint")
+
+    # Use user-context aware service method for student's own fee transactions
+    return await FeeTransactionService.get_student_fee_transactions_with_context(
+        db, user_context.student_id, user_context, skip, limit
+    )
+
+
+@router.get("/my-children-fees", response_model=dict)
+async def get_my_children_fee_transactions(
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
+    academic_year_id: UUID | None = Query(None, description="Filter by academic year"),
+    transaction_status: str | None = Query(None, description="Filter by transaction status"),
+):
+    """
+    Get current user's children's fee transactions - Parent only endpoint
+
+    Returns all fee transactions for parent's children with filtering options
+
+    **Required permissions**: fee_transactions:read_related
+    """
+    # Enhanced permission check for parent's children fee data
+    user_context = await check_user_resource_access(db, request, "fee_transactions", "read_related")
+
+    if not user_context.parent_id or not user_context.allowed_entity_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Only parents with children can access this endpoint"
+        )
+
+    # Use user-context aware service method for parent's children fee transactions
+    return await FeeTransactionService.get_user_accessible_fee_transactions(
+        db, user_context, skip, limit, academic_year_id, transaction_status
+    )
+
+
+@router.get("/my-outstanding-fees", response_model=OutstandingFeeSummary)
+async def get_my_outstanding_fees(request: Request, db: AsyncSession = Depends(get_tenant_db)):
+    """
+    Get current user's outstanding fee summary - Student only endpoint
+
+    Returns detailed breakdown of pending fee payments
+
+    **Required permissions**: fee_transactions:read_own
+    """
+    # Enhanced permission check for student's own outstanding fees
+    user_context = await check_user_resource_access(db, request, "fee_transactions", "read_own")
+
+    if not user_context.student_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only students can access this endpoint")
+
+    # Use user-context aware service method for student's outstanding fees
+    return await FeeTransactionService.get_outstanding_fees_with_context(db, user_context.student_id, user_context)
+
+
+@router.get("/child-outstanding-fees/{student_id}", response_model=OutstandingFeeSummary)
+async def get_child_outstanding_fees(student_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
+    """
+    Get outstanding fees for a specific child - Parent only endpoint
+
+    Allows parents to check outstanding fees for their children
+
+    **Required permissions**: fee_transactions:read_related
+    """
+    # Enhanced permission check with entity-specific validation
+    user_context = await check_user_resource_access(
+        db, request, "fee_transactions", "read_related", target_entity_id=student_id
+    )
+
+    if not user_context.parent_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only parents can access this endpoint")
+
+    # Validate that this student is actually the parent's child
+    if student_id not in (user_context.allowed_entity_ids or []):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Cannot access fee data for unrelated student"
+        )
+
+    # Use user-context aware service method for child's outstanding fees
+    return await FeeTransactionService.get_outstanding_fees_with_context(db, student_id, user_context)
+
+
 @router.get("/{transaction_id}", response_model=FeeTransactionRead)
 async def get_fee_transaction(transaction_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """
@@ -223,108 +337,3 @@ async def get_fee_transaction_by_number(
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction with number {transaction_number} not found"
     )
-
-
-# User-Specific Self-Access Endpoints for Fee Transactions
-
-
-@router.get("/my-fees", response_model=dict)
-async def get_my_fee_transactions(
-    request: Request,
-    db: AsyncSession = Depends(get_tenant_db),
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
-):
-    """
-    Get current user's own fee transactions - Student only endpoint
-
-    Returns student's fee transaction history with pagination
-
-    **Required permissions**: fee_transactions:read_own
-    """
-    # Enhanced permission check for student's own fee data
-    user_context = await check_user_resource_access(db, request, "fee_transactions", "read_own")
-
-    if not user_context.student_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only students can access this endpoint")
-
-    # Use user-context aware service method for student's own fee transactions
-    return await FeeTransactionService.get_student_fee_transactions_with_context(
-        db, user_context.student_id, user_context, skip, limit
-    )
-
-
-@router.get("/my-children-fees", response_model=dict)
-async def get_my_children_fee_transactions(
-    request: Request,
-    db: AsyncSession = Depends(get_tenant_db),
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
-    academic_year_id: UUID | None = Query(None, description="Filter by academic year"),
-    transaction_status: str | None = Query(None, description="Filter by transaction status"),
-):
-    """
-    Get current user's children's fee transactions - Parent only endpoint
-
-    Returns all fee transactions for parent's children with filtering options
-
-    **Required permissions**: fee_transactions:read_related
-    """
-    # Enhanced permission check for parent's children fee data
-    user_context = await check_user_resource_access(db, request, "fee_transactions", "read_related")
-
-    if not user_context.parent_id or not user_context.allowed_entity_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Only parents with children can access this endpoint"
-        )
-
-    # Use user-context aware service method for parent's children fee transactions
-    return await FeeTransactionService.get_user_accessible_fee_transactions(
-        db, user_context, skip, limit, academic_year_id, transaction_status
-    )
-
-
-@router.get("/my-outstanding-fees", response_model=OutstandingFeeSummary)
-async def get_my_outstanding_fees(request: Request, db: AsyncSession = Depends(get_tenant_db)):
-    """
-    Get current user's outstanding fee summary - Student only endpoint
-
-    Returns detailed breakdown of pending fee payments
-
-    **Required permissions**: fee_transactions:read_own
-    """
-    # Enhanced permission check for student's own outstanding fees
-    user_context = await check_user_resource_access(db, request, "fee_transactions", "read_own")
-
-    if not user_context.student_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only students can access this endpoint")
-
-    # Use user-context aware service method for student's outstanding fees
-    return await FeeTransactionService.get_outstanding_fees_with_context(db, user_context.student_id, user_context)
-
-
-@router.get("/child-outstanding-fees/{student_id}", response_model=OutstandingFeeSummary)
-async def get_child_outstanding_fees(student_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
-    """
-    Get outstanding fees for a specific child - Parent only endpoint
-
-    Allows parents to check outstanding fees for their children
-
-    **Required permissions**: fee_transactions:read_related
-    """
-    # Enhanced permission check with entity-specific validation
-    user_context = await check_user_resource_access(
-        db, request, "fee_transactions", "read_related", target_entity_id=student_id
-    )
-
-    if not user_context.parent_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only parents can access this endpoint")
-
-    # Validate that this student is actually the parent's child
-    if student_id not in (user_context.allowed_entity_ids or []):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Cannot access fee data for unrelated student"
-        )
-
-    # Use user-context aware service method for child's outstanding fees
-    return await FeeTransactionService.get_outstanding_fees_with_context(db, student_id, user_context)

@@ -12,6 +12,7 @@ class AttendanceStatusEnum(enum.Enum):
     present = "present"
     absent = "absent"
     late = "late"
+    half_day = "half_day"
 
 
 class StudentAttendance(BaseOrg):

@@ -5,12 +5,14 @@ Fee Collection endpoints — Student Search, Fee Summary, Fee Payment.
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
 from app.middleware.rate_limit_middleware import rate_limit_api
+from app.models.fee.fee_transaction_model import FeeTransaction
 from app.schemas.fee.fee_collection_schema import (
     FeeHistoryResponse,
     FeePaymentRequest,
@@ -303,13 +305,35 @@ async def download_receipt_pdf(
     """
     Download receipt as PDF (spec component 11.7).
     Returns binary PDF with Content-Disposition attachment header.
+
+    **Required permissions**: fee_receipts:read (resolved as read_own/read_related/read)
     """
-    current_user = await get_current_user_token(request)
-    role = current_user.get("role")
-    await check_role_plan_permission_with_error(db, request, role, "fee_collection", "read")
+    # Enhanced, scope-aware check — was previously check_role_plan_permission_with_error
+    # against "fee_collection":"read", an exact-match check that ignores _own/_related
+    # grants. Students only have fee_receipts:read_own, so that always 403'd them here
+    # even though they can already list their own receipts via /fee/receipts/my-receipts.
+    user_context = await check_user_resource_access(db, request, "fee_receipts", "read")
 
     # Get receipt record
     receipt = await FeeReceiptService.get_receipt_by_id(db, receipt_id)
+
+    # Entity-ownership check for own/related access scopes — without this, an
+    # "own"/"related" caller could download any receipt by guessing/changing
+    # the receipt_id, since check_user_resource_access alone doesn't scope by
+    # entity for a bare path param.
+    if user_context.access_scope in ("own", "related"):
+        txn_result = await db.execute(
+            select(FeeTransaction.student_id).where(FeeTransaction.id == receipt.fee_transaction_id)
+        )
+        txn_student_id = txn_result.scalar_one_or_none()
+
+        allowed = (
+            user_context.access_scope == "own" and txn_student_id == user_context.student_id
+        ) or (
+            user_context.access_scope == "related" and txn_student_id in (user_context.allowed_entity_ids or [])
+        )
+        if not allowed:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
 
     # Get receipt content for PDF
     content = await FeeReceiptService.get_receipt_content(db, receipt.fee_transaction_id)

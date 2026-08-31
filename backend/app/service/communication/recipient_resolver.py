@@ -67,6 +67,9 @@ async def _resolve_raw(
         "individual_parent": _resolve_individual_parent,
         "individual_student": _resolve_individual_student,
         "individual_staff": _resolve_individual_staff,
+        "multiple_parents": _resolve_multiple_parents,
+        "multiple_students": _resolve_multiple_students,
+        "multiple_staff": _resolve_multiple_staff,
         "class_section_parents": _resolve_class_section_parents,
         "class_section_students": _resolve_class_section_students,
         "all_parents": _resolve_all_parents,
@@ -141,6 +144,77 @@ async def _resolve_individual_staff(db: AsyncSession, target_ref: dict) -> List[
     result = await db.execute(
         text("SELECT id, first_name, last_name, phone, email FROM staff WHERE id = :sid"),
         {"sid": staff_id},
+    )
+    rows = result.fetchall()
+    return [
+        {
+            "name": f"{r.first_name} {r.last_name or ''}".strip(),
+            "phone": r.phone,
+            "email": r.email,
+        }
+        for r in rows
+    ]
+
+
+# ──────────────────────────────────────────────
+# Multi-select resolvers (specific list of ids)
+# ──────────────────────────────────────────────
+
+async def _resolve_multiple_parents(db: AsyncSession, target_ref: dict) -> List[RecipientDict]:
+    parent_ids = target_ref.get("parent_ids") or []
+    if not parent_ids:
+        return []
+    result = await db.execute(
+        text("SELECT id, name, phone, email FROM parents WHERE id = ANY(:pids)"),
+        {"pids": parent_ids},
+    )
+    rows = result.fetchall()
+    return [{"name": r.name, "phone": r.phone, "email": r.email} for r in rows]
+
+
+async def _resolve_multiple_students(db: AsyncSession, target_ref: dict) -> List[RecipientDict]:
+    """Resolve multiple students → linked parents (contact via parent)."""
+    student_ids = target_ref.get("student_ids") or []
+    if not student_ids:
+        return []
+    result = await db.execute(
+        text("""
+            SELECT p.name, p.phone, p.email,
+                   s.first_name AS student_first_name,
+                   s.last_name AS student_last_name,
+                   cl.name AS class_name,
+                   sec.name AS section_name
+            FROM student_parent_links spl
+            JOIN parents p ON spl.parent_id = p.id
+            JOIN students s ON spl.student_id = s.id
+            LEFT JOIN student_admissions sa ON sa.student_id = s.id
+            LEFT JOIN classes cl ON cl.id = sa.current_class_id
+            LEFT JOIN sections sec ON sec.id = sa.current_section_id
+            WHERE spl.student_id = ANY(:sids)
+        """),
+        {"sids": student_ids},
+    )
+    rows = result.fetchall()
+    return [
+        {
+            "name": r.name,
+            "phone": r.phone,
+            "email": r.email,
+            "student_name": f"{r.student_first_name} {r.student_last_name or ''}".strip(),
+            "class_name": r.class_name,
+            "section_name": r.section_name,
+        }
+        for r in rows
+    ]
+
+
+async def _resolve_multiple_staff(db: AsyncSession, target_ref: dict) -> List[RecipientDict]:
+    staff_ids = target_ref.get("staff_ids") or []
+    if not staff_ids:
+        return []
+    result = await db.execute(
+        text("SELECT id, first_name, last_name, phone, email FROM staff WHERE id = ANY(:sids)"),
+        {"sids": staff_ids},
     )
     rows = result.fetchall()
     return [

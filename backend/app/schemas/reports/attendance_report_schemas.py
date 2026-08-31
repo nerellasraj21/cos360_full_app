@@ -89,6 +89,7 @@ class AttendanceSummaryStats(BaseModel):
     absent_count: int = 0
     late_count: int = 0
     half_day_count: int = 0
+    leave_count: int = 0
     excused_count: int = 0
     attendance_percentage: float = 0.0
     date_range: str | None = None

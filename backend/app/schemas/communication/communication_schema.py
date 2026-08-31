@@ -74,11 +74,45 @@ class TemplateUpdate(BaseModel):
         return self
 
 
+# WhatsApp is the only channel that can send without a saved template
+# (free-text compose). When it does, the recipient picker is limited to
+# plain staff/parent/student targeting — no fee-defaulter or role-based
+# criteria, and no combined all_users blast.
+WHATSAPP_TEMPLATE_LESS_TARGET_TYPES = {
+    "individual_parent", "individual_student", "individual_staff",
+    "multiple_parents", "multiple_students", "multiple_staff",
+    "class_section_parents", "class_section_students",
+    "all_parents", "all_students", "all_staff",
+}
+
+
 class SendRequest(BaseModel):
-    template_id: UUID
+    template_id: Optional[UUID] = None
+    channel: Optional[ChannelEnum] = None
+    message: Optional[str] = None  # free-text body, used only when template_id is omitted (WhatsApp only)
     target_type: str
     target_ref: Dict[str, Any] = {}
     variables: Dict[str, Any] = {}  # user-provided vars
+
+    @model_validator(mode="after")
+    def validate_template_or_message(self) -> "SendRequest":
+        if self.template_id is not None:
+            return self
+
+        if self.channel != ChannelEnum.whatsapp:
+            raise ValueError(
+                "template_id is required unless channel is 'whatsapp' with a free-text message."
+            )
+        if not self.message or not self.message.strip():
+            raise ValueError(
+                "message is required for a template-less WhatsApp send."
+            )
+        if self.target_type not in WHATSAPP_TEMPLATE_LESS_TARGET_TYPES:
+            raise ValueError(
+                f"target_type {self.target_type!r} is not allowed for a template-less WhatsApp send. "
+                f"Allowed: {sorted(WHATSAPP_TEMPLATE_LESS_TARGET_TYPES)}"
+            )
+        return self
 
 
 class SendResponse(BaseModel):

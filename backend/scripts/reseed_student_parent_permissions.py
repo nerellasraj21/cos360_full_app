@@ -110,6 +110,10 @@ PARENT_PERMISSIONS = [
     # Hall tickets (children only)
     ("exam_hall_tickets", "read_related"),
     ("exam_hall_tickets", "list_related"),
+    # Fee (children only)
+    ("fee_transactions", "read_related"),
+    ("fee_collection", "read_related"),
+    ("fee_receipts", "read_related"),
 ]
 
 

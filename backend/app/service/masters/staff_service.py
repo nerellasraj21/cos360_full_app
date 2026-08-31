@@ -312,7 +312,7 @@ async def update_staff_attendance_by_date(
             raise HTTPException(status_code=400, detail="No attendance updates provided")
 
         updated_records = []
-        valid_statuses = ["present", "absent", "late", "half_day"]
+        valid_statuses = ["present", "absent", "late", "half_day", "leave"]
 
         for update_data in attendance_updates:
             staff_id = update_data.get("staff_id")

@@ -962,7 +962,7 @@ class FeeTransactionService:
             )
 
             return {
-                "items": transactions,
+                "items": [FeeTransactionRead.model_validate(t) for t in transactions],
                 "student_id": str(student_id),
                 "total_count": total_count,
                 "has_next": has_next,
@@ -1062,7 +1062,7 @@ class FeeTransactionService:
             )
 
             return {
-                "items": transactions,
+                "items": [FeeTransactionRead.model_validate(t) for t in transactions],
                 "total_count": total_count,
                 "has_next": has_next,
                 "filters_applied": {

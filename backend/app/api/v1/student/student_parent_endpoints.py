@@ -103,7 +103,7 @@ async def get_my_children(request: Request, db: AsyncSession = Depends(get_tenan
                     s.first_name,
                     s.last_name,
                     s.first_name || ' ' || s.last_name   AS name,
-                    s.is_active,
+                    u.is_active,
                     s.date_of_birth::text                AS date_of_birth,
                     s.gender,
                     sa.admission_number,
@@ -115,6 +115,7 @@ async def get_my_children(request: Request, db: AsyncSession = Depends(get_tenan
                     sec.name                             AS section_name
                 FROM student_parent_links spl
                 JOIN students s ON s.id = spl.student_id
+                LEFT JOIN users u ON u.id = s.user_id
                 LEFT JOIN student_admissions sa ON sa.student_id = s.id
                 LEFT JOIN academic_years ay ON ay.id = sa.academic_year_id
                 LEFT JOIN classes cl ON cl.id = sa.current_class_id

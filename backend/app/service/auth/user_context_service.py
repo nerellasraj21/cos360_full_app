@@ -89,6 +89,21 @@ class UserContextService:
         4. denied (no permission found)
         """
 
+        # Callers pass an already-scoped permission name (e.g. "read_related",
+        # "list_own"), not a bare action ("read"). Check that literal permission
+        # directly instead of re-appending "_own"/"_related" onto it — doing so
+        # would look up a nonsensical permission like "read_related_related",
+        # never match, and silently fall through to the "standard permission"
+        # tier below, resolving to "all" instead of "related"/"own" and leaving
+        # allowed_entity_ids unpopulated for every relationship-based caller.
+        if action.endswith("_own"):
+            has_permission = await PermissionService.check_role_name_permission(db, context.role, resource, action)
+            return "own" if has_permission else "denied"
+
+        if action.endswith("_related"):
+            has_permission = await PermissionService.check_role_name_permission(db, context.role, resource, action)
+            return "related" if has_permission else "denied"
+
         # Check for _own permissions first (most restrictive)
         has_own_permission = await PermissionService.check_role_name_permission(
             db, context.role, resource, f"{action}_own"
@@ -133,6 +148,7 @@ class UserContextService:
             "student_admissions",
             "fee_transactions",
             "fee_collection",
+            "fee_receipts",
             "student_attendance",
             "student_certificates",
             "student_documents",

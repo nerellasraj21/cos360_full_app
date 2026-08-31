@@ -72,6 +72,36 @@ async def get_my_receipts(
     )
 
 
+@router.get("/my-children-receipts", response_model=list[FeeReceiptRead])
+async def get_my_children_receipts(
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
+    offset: int = Query(0, ge=0, description="Number of records to skip"),
+):
+    """
+    Get current user's children's receipts - Parent only endpoint
+
+    Returns receipts for all of the parent's children
+
+    **Required permissions**: fee_receipts:read_related
+    """
+    # Enhanced permission check for parent's children receipt data
+    user_context = await check_user_resource_access(db, request, "fee_receipts", "read_related")
+
+    if not user_context.parent_id or not user_context.allowed_entity_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Only parents with children can access this endpoint"
+        )
+
+    return await FeeReceiptService.search_receipts(
+        db=db,
+        student_ids=user_context.allowed_entity_ids,
+        limit=limit,
+        offset=offset,
+    )
+
+
 @router.get("/{receipt_id}", response_model=FeeReceiptRead)
 async def get_fee_receipt(receipt_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """

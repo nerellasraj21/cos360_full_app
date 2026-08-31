@@ -91,7 +91,7 @@ async def add_attendance(attendance: StudentAttendanceCreate, db: AsyncSession, 
             )
 
         # Validate attendance status
-        valid_statuses = ["present", "absent", "late"]
+        valid_statuses = ["present", "absent", "late", "half_day", "leave"]
         if attendance.status not in valid_statuses:
             raise create_validation_error(
                 message=f"Invalid attendance status. Must be one of: {', '.join(valid_statuses)}",
@@ -248,7 +248,7 @@ async def update_partial_details_attendance(
 
         # Validate status if being updated
         if "status" in update_dict:
-            valid_statuses = ["present", "absent", "late"]
+            valid_statuses = ["present", "absent", "late", "half_day", "leave"]
             if update_dict["status"] not in valid_statuses:
                 raise create_validation_error(
                     message=f"Invalid attendance status. Must be one of: {', '.join(valid_statuses)}",
@@ -566,7 +566,7 @@ async def update_attendance_by_date(
             )
 
         updated_records = []
-        valid_statuses = ["present", "absent", "late"]
+        valid_statuses = ["present", "absent", "late", "half_day", "leave"]
 
         for update_data in attendance_updates:
             student_id = update_data.get("student_id")
