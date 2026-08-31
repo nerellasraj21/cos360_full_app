@@ -9,6 +9,7 @@ import { useExamList } from '@/api/hooks/exam/useExam'
 import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
 import { useAcademicYearStore } from '@/lib/academicYearStore'
 import { useAuthStore } from '@/lib/authStore'
+import { isAdminRoleName } from '@/lib/roleUtils'
 import type { ExamListItem } from '@/types/exam'
 
 const statusColor: Record<string, string> = {
@@ -89,10 +90,7 @@ export default function ExamDashboard() {
     if (academicYears.length === 0) fetchAndSetAcademicYears()
   }, [academicYears.length, fetchAndSetAcademicYears])
 
-  const isAdmin = useAuthStore(s => {
-    const roleName = s.role?.name?.toLowerCase() ?? ''
-    return roleName === 'admin' || roleName === 'superadmin' || roleName === 'principal'
-  })
+  const isAdmin = useAuthStore(s => isAdminRoleName(s.role?.name))
 
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -115,7 +113,8 @@ export default function ExamDashboard() {
     { label: 'Mark Entry', icon: ClipboardList, to: '/exam/marks' },
     { label: 'Results', icon: Award, to: '/exam/results' },
     { label: 'Hall Tickets', icon: Ticket, to: '/exam/hall-tickets' },
-    { label: 'Settings', icon: Settings, to: '/exam/settings' },
+    // Settings is admin-only (exams:update) — see routes/_app/exam/settings.tsx guard
+    ...(isAdmin ? [{ label: 'Settings', icon: Settings, to: '/exam/settings' }] : []),
   ]
 
   return (

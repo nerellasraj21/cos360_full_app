@@ -3,7 +3,7 @@ export interface AttendanceRequest {
   class_id: string;
   section_id: string;
   attendance_date: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'half_day' | 'leave';
   remarks?: string;
 }
 
@@ -63,7 +63,7 @@ export type AttendanceData = Record<number, AttendanceRecord>;
 export interface StudentAttendanceCreate {
   student_id: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'half_day' | 'leave';
   remarks?: string;
 }
 
@@ -71,7 +71,7 @@ export interface StudentAttendanceOut {
   id: string;
   student_id: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'half_day' | 'leave';
   remarks?: string;
   student?: {
     id: string;
@@ -82,13 +82,13 @@ export interface StudentAttendanceOut {
 }
 
 export interface StudentAttendanceUpdate {
-  status?: 'present' | 'absent' | 'late';
+  status?: 'present' | 'absent' | 'late' | 'half_day' | 'leave';
   remarks?: string;
 }
 
 export interface BulkAttendanceUpdate {
   student_id: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'half_day' | 'leave';
   remarks?: string;
 }
 
@@ -147,6 +147,18 @@ export interface StaffAttendanceSummary {
     from_date: string;
     to_date: string;
   };
+}
+
+export interface StudentAttendanceSummaryStats {
+  total_students: number;
+  present_count: number;
+  absent_count: number;
+  late_count: number;
+  half_day_count: number;
+  leave_count: number;
+  excused_count: number;
+  attendance_percentage: number;
+  date_range: string;
 }
 
 export interface ReportResponse {

@@ -68,6 +68,9 @@ export const communicationApi = {
     if (params.parent_id) query.append('parent_id', params.parent_id);
     if (params.student_id) query.append('student_id', params.student_id);
     if (params.staff_id) query.append('staff_id', params.staff_id);
+    params.parent_ids?.forEach((id) => query.append('parent_ids', id));
+    params.student_ids?.forEach((id) => query.append('student_ids', id));
+    params.staff_ids?.forEach((id) => query.append('staff_ids', id));
 
     const response = await CAxios.get(`/communication/send/preview-count?${query.toString()}`);
     return response.data;

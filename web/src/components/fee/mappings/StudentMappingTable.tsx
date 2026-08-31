@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { EditButton, DeleteButton, TableActionGroup } from '@/components/common/TableActions';
 import { Plus, Search, Filter, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useFeeStudentMappings, useDeleteFeeStudentMapping } from '@/hooks/fee/useFeeMappings';
+import { usePermission } from '@/hooks/usePermission';
 import { useStudentsDropdown } from '@/api/hooks/students/admissions';
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections';
 import { useAcademicYears } from '@/api/hooks/masters/academicyears';
@@ -37,6 +38,11 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
   const [isEditDirty, setIsEditDirty] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('fee_student_mappings', 'create');
+  const canUpdate = checkPermission('fee_student_mappings', 'update');
+  const canDelete = checkPermission('fee_student_mappings', 'delete');
 
   // Clear section when class changes
   useEffect(() => { setSelectedSection(''); }, [selectedClass]);
@@ -137,6 +143,7 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
           <p className="text-muted-foreground">Manage fee assignments for individual students</p>
         </div>
         <div className="flex gap-2">
+          {canCreate && (
           <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog} guardDirty={isBulkDirty} onDirtyDiscard={() => setIsBulkDirty(false)}>
             <DialogTrigger asChild>
               <Button variant="outline" onClick={() => setIsBulkDirty(false)}>
@@ -149,7 +156,9 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
               <BulkStudentMappingForm onSuccess={handleFormSuccess} onCancel={() => setShowBulkDialog(false)} />
             </DialogContent>
           </Dialog>
+          )}
 
+          {canCreate && (
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} guardDirty={isCreateDirty} onDirtyDiscard={() => setIsCreateDirty(false)}>
             <DialogTrigger asChild>
               <Button onClick={() => setIsCreateDirty(false)}>
@@ -162,6 +171,7 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
               <StudentMappingForm academicYearId={academicYearId} onSuccess={handleFormSuccess} onCancel={() => setShowCreateDialog(false)} />
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
@@ -259,7 +269,10 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
                     </TableCell>
                     <TableCell>
                       <TableActionGroup>
-                        <EditButton onClick={() => { setIsEditDirty(false); setEditingMapping(mapping); }} title="Edit Mapping" />
+                        {canUpdate && (
+                          <EditButton onClick={() => { setIsEditDirty(false); setEditingMapping(mapping); }} title="Edit Mapping" />
+                        )}
+                        {canDelete && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <DeleteButton onClick={() => {}} title="Delete Mapping" />
@@ -283,6 +296,7 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
+                        )}
                       </TableActionGroup>
                     </TableCell>
                   </TableRow>

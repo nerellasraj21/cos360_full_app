@@ -15,7 +15,7 @@ interface SubCasteDropdownProps {
 
 export const SubCasteDropdown: React.FC<SubCasteDropdownProps> = ({
   id,
-  label = 'Sub-Caste',
+  label = 'Sub Caste',
   casteId,
   value,
   onChange,
@@ -39,7 +39,7 @@ export const SubCasteDropdown: React.FC<SubCasteDropdownProps> = ({
         data={options}
         value={value || ''}
         onChange={(val) => onChange((val as string) || null)}
-        placeholder="-- Select Sub-Caste --"
+        placeholder="Select"
         disabled={isDisabled || isLoading}
         required={required}
         clearable
@@ -48,7 +48,7 @@ export const SubCasteDropdown: React.FC<SubCasteDropdownProps> = ({
         <p className="text-xs text-gray-500 mt-1">Please select a caste first</p>
       )}
       {!isDisabled && subCastes.length === 0 && !isLoading && (
-        <p className="text-xs text-gray-500 mt-1">No sub-castes available for this caste.</p>
+        <p className="text-xs text-gray-500 mt-1">No sub castes available for this caste.</p>
       )}
     </div>
   );

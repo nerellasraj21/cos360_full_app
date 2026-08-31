@@ -6,6 +6,9 @@ export type TargetType =
   | 'individual_parent'
   | 'individual_student'
   | 'individual_staff'
+  | 'multiple_parents'
+  | 'multiple_students'
+  | 'multiple_staff'
   | 'class_section_parents'
   | 'class_section_students'
   | 'all_parents'
@@ -54,6 +57,9 @@ export type TargetRef =
   | { parent_id: string }
   | { student_id: string }
   | { staff_id: string }
+  | { parent_ids: string[] }
+  | { student_ids: string[] }
+  | { staff_ids: string[] }
   | { class_id: string; section_id: string }
   | { role: string }
   | Record<string, never>;
@@ -62,7 +68,10 @@ export interface SendRequest {
   channel: Channel;
   target_type: TargetType;
   target_ref: TargetRef;
-  template_id: string;
+  // template_id is required for sms/email; omit it for a WhatsApp free-text
+  // send and provide `message` instead (backend enforces this combination).
+  template_id?: string;
+  message?: string;
   extra_variables?: Record<string, string>;
 }
 
@@ -82,6 +91,9 @@ export interface PreviewCountParams {
   parent_id?: string;
   student_id?: string;
   staff_id?: string;
+  parent_ids?: string[];
+  student_ids?: string[];
+  staff_ids?: string[];
 }
 
 export interface PreviewCountResponse {

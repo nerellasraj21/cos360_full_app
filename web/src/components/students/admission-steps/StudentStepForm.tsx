@@ -273,7 +273,7 @@ export const StudentStepForm = () => {
             data={MOTHER_TONGUE_OPTIONS}
             value={watch('student_mother_tongue') || 'Telugu'}
             onChange={(val) => setValue('student_mother_tongue', val as string)}
-            placeholder="Select Mother Tongue"
+            placeholder="Select"
             clearable={false}
           />
         </div>
@@ -320,7 +320,7 @@ export const StudentStepForm = () => {
 
         <SubCasteDropdown
           id="sub_caste_id"
-          label="Sub-Caste (Optional)"
+          label="Sub Caste (Optional)"
           casteId={selectedCasteId}
           value={watch('sub_caste_id')}
           onChange={(value) => setValue('sub_caste_id', value || '')}

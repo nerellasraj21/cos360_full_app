@@ -33,6 +33,8 @@ export const feeStudentMappingsApi = {
         section_id?: string;
         fee_type_id?: string;
         academic_year_id?: string;
+        skip?: number;
+        limit?: number;
     }): Promise<FeeStudentMapping[] | FeeStudentMappingListResponse> => {
         console.log('[DEBUG] feeStudentMappingsApi.getAllMappings called with params:', params);
 
@@ -43,6 +45,8 @@ export const feeStudentMappingsApi = {
         if (params?.fee_type_id) queryParams.append('fee_type_id', params.fee_type_id);
         const academicYearId = params?.academic_year_id || useAcademicYearStore.getState().selectedAcademicYearId;
         if (academicYearId) queryParams.append('academic_year_id', academicYearId);
+        if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString());
+        if (params?.limit !== undefined) queryParams.append('limit', params.limit.toString());
 
 
         const response = await CAxios.get(`${FEE_STUDENT_MAPPINGS}?${queryParams.toString()}`);

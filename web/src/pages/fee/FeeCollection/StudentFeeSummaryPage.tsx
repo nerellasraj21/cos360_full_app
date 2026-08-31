@@ -1,5 +1,4 @@
 import { DollarSign, Loader2 } from 'lucide-react';
-import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -10,12 +9,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useMyFeeSummary } from '@/hooks/fee';
+import { useMyOutstandingFees } from '@/api/hooks/fee/transactions';
 import { formatCurrency } from './FeeSummaryTab';
 
 export default function StudentFeeSummaryPage() {
-  const { selectedAcademicYearId } = useAcademicYearStore();
-  const { data, isLoading, isError, error } = useMyFeeSummary(selectedAcademicYearId);
+  const { data, isLoading, isError, error } = useMyOutstandingFees();
 
   return (
     <div className="space-y-4">
@@ -42,9 +40,7 @@ export default function StudentFeeSummaryPage() {
         <Card>
           <CardContent className="p-0">
             <div className="px-4 py-3 border-b text-sm text-muted-foreground flex gap-4">
-              <span>Student: <strong className="text-foreground">{data.student_name}</strong></span>
-              <span>Class: <strong className="text-foreground">{data.class_name} - {data.section_name}</strong></span>
-              <span>AY: <strong className="text-foreground">{data.academic_year}</strong></span>
+              <span>Admission #: <strong className="text-foreground">{data.student_admission_num}</strong></span>
             </div>
             <div className="overflow-x-auto">
               <Table>
@@ -52,42 +48,38 @@ export default function StudentFeeSummaryPage() {
                   <TableRow>
                     <TableHead className="w-16">S.No.</TableHead>
                     <TableHead>Fee Type</TableHead>
-                    <TableHead className="text-right">Assigned</TableHead>
-                    <TableHead className="text-right">After Concession</TableHead>
-                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead>Fee Term</TableHead>
                     <TableHead className="text-right">Due</TableHead>
-                    <TableHead>Last Paid</TableHead>
-                    <TableHead>Receipt #</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Outstanding</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.items.map((item) => (
-                    <TableRow key={item.fee_type_id} className="h-12">
-                      <TableCell>{item.s_no}</TableCell>
-                      <TableCell className="font-medium">{item.fee_type_name}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.assigned_fee)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.fee_after_concession)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.paid_amount)}</TableCell>
-                      <TableCell className={`text-right font-semibold ${item.due_amount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {formatCurrency(item.due_amount)}
+                  {data.outstanding_items.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        No outstanding fees — you're all paid up.
                       </TableCell>
-                      <TableCell className="text-sm">
-                        {item.last_paid_date
-                          ? new Date(item.last_paid_date).toLocaleDateString('en-IN')
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="text-sm">{item.last_receipt_number || '-'}</TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    data.outstanding_items.map((item, idx) => (
+                      <TableRow key={`${item.fee_type_id}-${item.fee_term_id}`} className="h-12">
+                        <TableCell>{idx + 1}</TableCell>
+                        <TableCell className="font-medium">{item.fee_type_name}</TableCell>
+                        <TableCell>{item.fee_term_name}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(item.amount_due)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(item.amount_paid)}</TableCell>
+                        <TableCell className={`text-right font-semibold ${item.outstanding_amount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {formatCurrency(item.outstanding_amount)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                   <TableRow className="bg-muted/50 font-semibold h-12">
-                    <TableCell colSpan={2}>Grand Total</TableCell>
-                    <TableCell className="text-right">{formatCurrency(data.grand_total_assigned)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(data.grand_total_fee)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(data.grand_total_paid)}</TableCell>
-                    <TableCell className={`text-right ${data.grand_total_due > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      {formatCurrency(data.grand_total_due)}
+                    <TableCell colSpan={5}>Total Outstanding</TableCell>
+                    <TableCell className={`text-right ${data.total_outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {formatCurrency(data.total_outstanding)}
                     </TableCell>
-                    <TableCell colSpan={2} />
                   </TableRow>
                 </TableBody>
               </Table>

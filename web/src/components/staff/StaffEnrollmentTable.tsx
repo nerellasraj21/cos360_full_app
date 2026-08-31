@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1392,100 +1393,121 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     </div>
                 </div>
 
+            </div>
+
+            <Accordion type="multiple" defaultValue={['work-experience', 'bank-details', 'salary-pf']} className="mt-2">
                 {/* Work Experience */}
-                <div className="md:col-span-2">
-                    <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2 border-t pt-3">
-                        <Briefcase className="h-4 w-4" />
-                        Work Experience
-                    </h3>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Previous Organization</label>
-                    <Input value={formData.work_org || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, work_org: e.target.value }); }} placeholder="e.g. ABC School" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Subjects Dealt</label>
-                    <Input value={formData.subjects_dealt || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, subjects_dealt: e.target.value }); }} placeholder="e.g. Maths, Physics" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">From Date</label>
-                    <DatePicker value={formData.work_from_date || ''} onChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, work_from_date: v }); }} placeholder="Select from date" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">To Date</label>
-                    <DatePicker value={formData.work_to_date || ''} onChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, work_to_date: v }); }} placeholder="Select to date" />
-                </div>
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-foreground mb-1">Remarks</label>
-                    <Input value={formData.work_remarks || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, work_remarks: e.target.value }); }} placeholder="Additional remarks about work experience" />
-                </div>
+                <AccordionItem value="work-experience">
+                    <AccordionTrigger>
+                        <span className="flex items-center gap-2">
+                            <Briefcase className="h-4 w-4" />
+                            Work Experience
+                        </span>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">Previous Organization</label>
+                                <Input value={formData.work_org || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, work_org: e.target.value }); }} placeholder="e.g. ABC School" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">Subjects Dealt</label>
+                                <Input value={formData.subjects_dealt || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, subjects_dealt: e.target.value }); }} placeholder="e.g. Maths, Physics" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">From Date</label>
+                                <DatePicker value={formData.work_from_date || ''} onChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, work_from_date: v }); }} placeholder="Select from date" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">To Date</label>
+                                <DatePicker value={formData.work_to_date || ''} onChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, work_to_date: v }); }} placeholder="Select to date" />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-foreground mb-1">Remarks</label>
+                                <Input value={formData.work_remarks || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, work_remarks: e.target.value }); }} placeholder="Additional remarks about work experience" />
+                            </div>
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
 
                 {/* Bank Details */}
-                <div className="md:col-span-2">
-                    <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2 border-t pt-3">
-                        <Landmark className="h-4 w-4" />
-                        Bank Details
-                    </h3>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Bank Name</label>
-                    <Input value={formData.bank_name || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, bank_name: e.target.value }); }} placeholder="e.g. State Bank of India" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Branch</label>
-                    <Input value={formData.bank_branch || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, bank_branch: e.target.value }); }} placeholder="e.g. Hyderabad Main" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Account Number</label>
-                    <Input value={formData.account_number || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, account_number: e.target.value }); }} placeholder="Enter account number" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">IFSC Code</label>
-                    <Input value={formData.ifsc_code || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, ifsc_code: e.target.value.toUpperCase() }); }} placeholder="e.g. SBIN0001234" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Account Holder Name</label>
-                    <Input value={formData.account_holder_name || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, account_holder_name: e.target.value }); }} placeholder="Name as per bank records" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Account Type</label>
-                    <InfiniteScrollDropdown
-                        data={[{id:'Savings',value:'Savings',label:'Savings'},{id:'Current',value:'Current',label:'Current'}]}
-                        value={formData.account_type || ''}
-                        onChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, account_type: v as 'Savings' | 'Current' }); }}
-                        placeholder="Select account type"
-                        clearable={false}
-                    />
-                </div>
+                <AccordionItem value="bank-details">
+                    <AccordionTrigger>
+                        <span className="flex items-center gap-2">
+                            <Landmark className="h-4 w-4" />
+                            Bank Details
+                        </span>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">Bank Name</label>
+                                <Input value={formData.bank_name || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, bank_name: e.target.value }); }} placeholder="e.g. State Bank of India" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">Branch</label>
+                                <Input value={formData.bank_branch || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, bank_branch: e.target.value }); }} placeholder="e.g. Hyderabad Main" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">Account Number</label>
+                                <Input value={formData.account_number || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, account_number: e.target.value }); }} placeholder="Enter account number" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">IFSC Code</label>
+                                <Input value={formData.ifsc_code || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, ifsc_code: e.target.value.toUpperCase() }); }} placeholder="e.g. SBIN0001234" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">Account Holder Name</label>
+                                <Input value={formData.account_holder_name || ''} onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, account_holder_name: e.target.value }); }} placeholder="Name as per bank records" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">Account Type</label>
+                                <InfiniteScrollDropdown
+                                    data={[{id:'Savings',value:'Savings',label:'Savings'},{id:'Current',value:'Current',label:'Current'}]}
+                                    value={formData.account_type || ''}
+                                    onChange={(v) => { setIsFormDirty(true); setFormData({ ...formData, account_type: v as 'Savings' | 'Current' }); }}
+                                    placeholder="Select account type"
+                                    clearable={false}
+                                />
+                            </div>
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
 
                 {/* Salary & PF */}
-                <div className="md:col-span-2">
-                    <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2 border-t pt-3">
-                        <Wallet className="h-4 w-4" />
-                        Salary & PF
-                    </h3>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Last Drawn Salary (₹)</label>
-                    <Input type="number" step="0.01" min="0" value={formData.last_drawn_salary || ''} onChange={(e) => { const val = e.target.value; setLastSalaryError(val && Number(val) > 10000000 ? 'Salary cannot exceed ₹1,00,00,000' : ''); setIsFormDirty(true); setFormData({ ...formData, last_drawn_salary: val }); }} placeholder="e.g. 45000.00" />
-                    {lastSalaryError && <span className="text-red-500">{lastSalaryError}</span>}
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Current Salary (₹)</label>
-                    <Input type="number" step="0.01" min="0" value={formData.current_salary || ''} onChange={(e) => { const val = e.target.value; setCurrentSalaryError(val && Number(val) > 10000000 ? 'Salary cannot exceed ₹1,00,00,000' : ''); setIsFormDirty(true); setFormData({ ...formData, current_salary: val }); }} placeholder="e.g. 50000.00" />
-                    {currentSalaryError && <span className="text-red-500">{currentSalaryError}</span>}
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">PF Account Number</label>
-                    <Input value={formData.pf_account_number || ''} onChange={(e) => { const val = e.target.value; setPfError(val && !/^[A-Za-z0-9]+\/[A-Za-z0-9/]+$/.test(val) ? 'Invalid PF Account Number format (e.g. AP/HYD/12345)' : ''); setIsFormDirty(true); setFormData({ ...formData, pf_account_number: val }); }} placeholder="e.g. AP/HYD/12345" />
-                    {pfError && <span className="text-red-500">{pfError}</span>}
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">UAN Number</label>
-                    <Input value={formData.uan_number || ''} onChange={(e) => { const val = e.target.value; setUanError(val && !/^\d{12}$/.test(val) ? 'UAN Number must be exactly 12 digits' : ''); setIsFormDirty(true); setFormData({ ...formData, uan_number: val }); }} placeholder="12-digit UAN" />
-                    {uanError && <span className="text-red-500">{uanError}</span>}
-                </div>
-            </div>
+                <AccordionItem value="salary-pf">
+                    <AccordionTrigger>
+                        <span className="flex items-center gap-2">
+                            <Wallet className="h-4 w-4" />
+                            Salary & PF
+                        </span>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">Last Drawn Salary (₹)</label>
+                                <Input type="number" step="0.01" min="0" value={formData.last_drawn_salary || ''} onChange={(e) => { const val = e.target.value; setLastSalaryError(val && Number(val) > 10000000 ? 'Salary cannot exceed ₹1,00,00,000' : ''); setIsFormDirty(true); setFormData({ ...formData, last_drawn_salary: val }); }} placeholder="e.g. 45000.00" />
+                                {lastSalaryError && <span className="text-red-500">{lastSalaryError}</span>}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">Current Salary (₹)</label>
+                                <Input type="number" step="0.01" min="0" value={formData.current_salary || ''} onChange={(e) => { const val = e.target.value; setCurrentSalaryError(val && Number(val) > 10000000 ? 'Salary cannot exceed ₹1,00,00,000' : ''); setIsFormDirty(true); setFormData({ ...formData, current_salary: val }); }} placeholder="e.g. 50000.00" />
+                                {currentSalaryError && <span className="text-red-500">{currentSalaryError}</span>}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">PF Account Number</label>
+                                <Input value={formData.pf_account_number || ''} onChange={(e) => { const val = e.target.value; setPfError(val && !/^[A-Za-z0-9]+\/[A-Za-z0-9/]+$/.test(val) ? 'Invalid PF Account Number format (e.g. AP/HYD/12345)' : ''); setIsFormDirty(true); setFormData({ ...formData, pf_account_number: val }); }} placeholder="e.g. AP/HYD/12345" />
+                                {pfError && <span className="text-red-500">{pfError}</span>}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">UAN Number</label>
+                                <Input value={formData.uan_number || ''} onChange={(e) => { const val = e.target.value; setUanError(val && !/^\d{12}$/.test(val) ? 'UAN Number must be exactly 12 digits' : ''); setIsFormDirty(true); setFormData({ ...formData, uan_number: val }); }} placeholder="12-digit UAN" />
+                                {uanError && <span className="text-red-500">{uanError}</span>}
+                            </div>
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
             </div>
 
             <div className="flex-shrink-0 border-t px-6 py-4 flex justify-end gap-3 bg-card">

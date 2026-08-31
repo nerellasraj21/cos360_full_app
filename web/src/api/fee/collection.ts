@@ -39,6 +39,24 @@ import type {
 
 // ===== HELPER FUNCTIONS =====
 
+// FastAPI can send `detail` as a string, a dict, or (for 422s) a list of
+// {loc, msg, type} validation errors. Normalize all shapes to a readable string
+// so callers never end up rendering "[object Object]".
+function extractErrorMessage(detail: unknown): string | undefined {
+  if (!detail) return undefined;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((e) => (typeof e === 'string' ? e : e?.msg || e?.message || JSON.stringify(e)))
+      .join(', ');
+  }
+  if (typeof detail === 'object') {
+    const obj = detail as { msg?: string; message?: string };
+    return obj.msg || obj.message || JSON.stringify(detail);
+  }
+  return String(detail);
+}
+
 function handleApiError(error: unknown): never {
   if (axios.isAxiosError(error)) {
     const status = error.response?.status;
@@ -52,11 +70,13 @@ function handleApiError(error: unknown): never {
         const errorMessages = errors.map((e: { msg?: string; message?: string }) => e.msg || e.message).join(', ');
         throw new Error(`Validation error: ${errorMessages}`);
       }
-      if (detail) throw new Error(detail);
+      const message = extractErrorMessage(detail);
+      if (message) throw new Error(message);
       throw new Error('Validation error. Please check your input.');
     }
 
-    if (detail) throw new Error(detail);
+    const message = extractErrorMessage(detail);
+    if (message) throw new Error(message);
   }
 
   if (error instanceof Error) throw error;

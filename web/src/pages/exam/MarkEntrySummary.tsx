@@ -1,16 +1,27 @@
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Loader2, BarChart3, ChevronRight, AlertCircle, ServerCrash } from 'lucide-react'
+import { ArrowLeft, Loader2, BarChart3, PenLine, AlertCircle, ServerCrash, Search, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useExamDetail, useExamClassSections, useExamSubjectConfigs } from '@/api/hooks/exam/useExam'
 import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
-import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections'
+import { useClassSectionsDropdown, useStudentsByClassSection } from '@/api/hooks/masters/classesandsections'
 import { useAuthStore } from '@/lib/authStore'
-import type { ExamClassSection, ExamSubjectConfig } from '@/types/exam'
+import { useExamStore } from '@/lib/examStore'
 
 export default function MarkEntrySummary() {
   const { examId } = useParams({ strict: false }) as { examId: string }
   const navigate = useNavigate()
+  const setMarkEntryFilter = useExamStore((s) => s.setMarkEntryFilter)
 
   const { data: exam, isLoading: examLoading } = useExamDetail(examId)
   const {
@@ -34,6 +45,71 @@ export default function MarkEntrySummary() {
     s.hasPermission('exams', 'update') || s.hasPermission('exam_marks', 'create')
   )
 
+  // Which of the exam's class-sections is currently selected in the filter.
+  const [selectedCsId, setSelectedCsId] = useState<string>('')
+  const [studentSearch, setStudentSearch] = useState('')
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set())
+
+  // Default to the first class-section once the list loads.
+  useEffect(() => {
+    if (!selectedCsId && classSections.length > 0) {
+      setSelectedCsId(classSections[0].id)
+    }
+  }, [classSections, selectedCsId])
+
+  const selectedCs = classSections.find((cs) => cs.id === selectedCsId)
+  const csLabel = (cs: typeof classSections[number]) => [
+    cs.class_name ?? classNameMap[cs.class_id],
+    cs.section_name ?? (cs.section_id ? sectionNameMap[cs.section_id] : null),
+  ].filter(Boolean).join(' – ') || cs.class_id
+
+  const configs = useMemo(
+    () => subjectConfigs.filter(
+      (cfg) => selectedCs && cfg.class_id === selectedCs.class_id && cfg.section_id === selectedCs.section_id,
+    ),
+    [subjectConfigs, selectedCs],
+  )
+
+  const { data: studentsData = [], isLoading: studentsLoading } = useStudentsByClassSection(
+    selectedCs?.class_id ?? '',
+    selectedCs?.section_id ?? '',
+  )
+
+  const students = useMemo(
+    () => studentsData
+      .filter((s) => !!s.student?.id)
+      .map((s) => ({
+        id: s.student!.id,
+        name: `${s.student!.first_name ?? ''} ${s.student!.last_name ?? ''}`.trim() || 'Unknown Student',
+        admissionNumber: s.admission_number ?? '',
+      })),
+    [studentsData],
+  )
+
+  // Default to "everyone selected" whenever the student list for the chosen class-section changes.
+  useEffect(() => {
+    setSelectedStudentIds(new Set(students.map((s) => s.id)))
+  }, [students])
+
+  const filteredStudents = useMemo(() => {
+    const q = studentSearch.trim().toLowerCase()
+    if (!q) return students
+    return students.filter((s) => s.name.toLowerCase().includes(q) || s.admissionNumber.toLowerCase().includes(q))
+  }, [students, studentSearch])
+
+  const allSelected = students.length > 0 && selectedStudentIds.size === students.length
+  const toggleAll = (checked: boolean) => {
+    setSelectedStudentIds(checked ? new Set(students.map((s) => s.id)) : new Set())
+  }
+  const toggleStudent = (studentId: string, checked: boolean) => {
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(studentId)
+      else next.delete(studentId)
+      return next
+    })
+  }
+
   const isLoading = examLoading || sectionsLoading || configsLoading
   const isBackendError = sectionsError || configsError
 
@@ -45,10 +121,17 @@ export default function MarkEntrySummary() {
     )
   }
 
-  const goToGrid = (cs: ExamClassSection, config: ExamSubjectConfig) => {
-    const sectionId = cs.section_id ?? 'null'
+  const goToGrid = () => {
+    if (!selectedCs) return
+    const sectionId = selectedCs.section_id ?? 'null'
+    setMarkEntryFilter({
+      examId,
+      classId: selectedCs.class_id,
+      sectionId,
+      studentIds: Array.from(selectedStudentIds),
+    })
     navigate({
-      to: `/exam/marks/${examId}/${cs.class_id}/${sectionId}/${config.id}` as any,
+      to: `/exam/marks/${examId}/${selectedCs.class_id}/${sectionId}` as any,
     })
   }
 
@@ -107,24 +190,108 @@ export default function MarkEntrySummary() {
         </div>
       )}
 
-      {/* Class-section groups */}
-      {!isBackendError && classSections.map((cs) => {
-        const csLabel = [
-          cs.class_name ?? classNameMap[cs.class_id],
-          cs.section_name ?? (cs.section_id ? sectionNameMap[cs.section_id] : null),
-        ].filter(Boolean).join(' – ') || cs.class_id
-        const configs = subjectConfigs.filter(
-          (cfg) => cfg.class_id === cs.class_id && cfg.section_id === cs.section_id,
-        )
+      {/* Class-section filter */}
+      {!isBackendError && classSections.length > 0 && (
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-muted-foreground">Class – Section</span>
+          <Select value={selectedCsId} onValueChange={setSelectedCsId}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="Select class-section" />
+            </SelectTrigger>
+            <SelectContent>
+              {classSections.map((cs) => (
+                <SelectItem key={cs.id} value={cs.id}>{csLabel(cs)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selectedCs && (
+            <Badge variant="secondary" className="text-xs">
+              {configs.length} subject{configs.length !== 1 ? 's' : ''}
+            </Badge>
+          )}
+        </div>
+      )}
 
-        return (
-          <div key={cs.id} className="overflow-hidden rounded-lg border">
-            {/* Class-section header */}
-            <div className="flex items-center gap-3 border-b bg-muted/30 px-4 py-3">
-              <span className="font-semibold">{csLabel}</span>
-              <Badge variant="secondary" className="text-xs">
-                {configs.length} subject{configs.length !== 1 ? 's' : ''}
+      {/* Students (left) + Subjects (right) */}
+      {!isBackendError && selectedCs && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
+          {/* Students panel */}
+          <div className="flex flex-col overflow-hidden rounded-lg border">
+            <div className="flex items-center gap-2 border-b bg-muted/30 px-3 py-2.5">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold">Students</span>
+              <Badge variant="secondary" className="ml-auto text-xs">
+                {selectedStudentIds.size}/{students.length}
               </Badge>
+            </div>
+            <div className="border-b px-3 py-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  placeholder="Search name or admission #"
+                  className="h-8 pl-8 text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 border-b px-3 py-2">
+              <Checkbox
+                checked={allSelected}
+                onCheckedChange={(checked) => toggleAll(checked === true)}
+                disabled={students.length === 0}
+              />
+              <span className="text-xs font-medium text-muted-foreground">Select all</span>
+            </div>
+            <div className="max-h-[28rem] overflow-y-auto">
+              {studentsLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredStudents.length === 0 ? (
+                <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                  {studentSearch ? `No students match "${studentSearch}".` : 'No students in this class-section.'}
+                </p>
+              ) : (
+                filteredStudents.map((s) => (
+                  <label
+                    key={s.id}
+                    className="flex cursor-pointer items-center gap-2 border-b px-3 py-2 last:border-0 hover:bg-muted/20"
+                  >
+                    <Checkbox
+                      checked={selectedStudentIds.has(s.id)}
+                      onCheckedChange={(checked) => toggleStudent(s.id, checked === true)}
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{s.name}</p>
+                      <p className="text-xs text-muted-foreground">{s.admissionNumber || '—'}</p>
+                    </div>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Subjects panel */}
+          <div className="overflow-hidden rounded-lg border">
+            <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3">
+              <span className="font-semibold">{csLabel(selectedCs)}</span>
+              {canEnterMarks && configs.length > 0 && (
+                <Button
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={goToGrid}
+                  disabled={selectedStudentIds.size === 0}
+                >
+                  <PenLine className="h-3.5 w-3.5" />
+                  Enter Marks
+                  {selectedStudentIds.size > 0 && selectedStudentIds.size < students.length && (
+                    <Badge variant="secondary" className="ml-1 h-4 px-1.5 text-[10px]">
+                      {selectedStudentIds.size}
+                    </Badge>
+                  )}
+                </Button>
+              )}
             </div>
 
             {configs.length === 0 ? (
@@ -138,21 +305,16 @@ export default function MarkEntrySummary() {
                     <th className="px-4 py-2 text-left">Subject</th>
                     <th className="px-4 py-2 text-left">Components</th>
                     <th className="px-4 py-2 text-left">Max Marks</th>
-                    {canEnterMarks && <th className="px-4 py-2 text-right" />}
                   </tr>
                 </thead>
                 <tbody>
                   {configs.map((cfg) => {
                     const totalMarks = cfg.components
                       .filter((c) => c.include_in_total && c.entry_type === 'marks')
-                      .reduce((sum, c) => sum + (c.max_marks ?? 0), 0)
+                      .reduce((sum, c) => sum + Number(c.max_marks ?? 0), 0)
 
                     return (
-                      <tr
-                        key={cfg.id}
-                        className={`border-b transition-colors last:border-0 ${canEnterMarks ? 'cursor-pointer hover:bg-muted/20' : ''}`}
-                        onClick={canEnterMarks ? () => goToGrid(cs, cfg) : undefined}
-                      >
+                      <tr key={cfg.id} className="border-b transition-colors last:border-0">
                         <td className="px-4 py-3 font-medium">
                           {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? cfg.subject_id}
                         </td>
@@ -162,7 +324,7 @@ export default function MarkEntrySummary() {
                               <Badge key={comp.id} variant="outline" className="text-xs">
                                 {comp.component_name}
                                 {comp.entry_type === 'marks' && comp.max_marks != null && (
-                                  <span className="ml-1 text-muted-foreground">/{comp.max_marks}</span>
+                                  <span className="ml-1 text-muted-foreground">[{comp.max_marks}]</span>
                                 )}
                               </Badge>
                             ))}
@@ -175,14 +337,6 @@ export default function MarkEntrySummary() {
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
-                        {canEnterMarks && (
-                          <td className="px-4 py-3 text-right">
-                            <Button variant="ghost" size="sm" className="gap-1 text-xs">
-                              Enter Marks
-                              <ChevronRight className="h-3 w-3" />
-                            </Button>
-                          </td>
-                        )}
                       </tr>
                     )
                   })}
@@ -190,8 +344,8 @@ export default function MarkEntrySummary() {
               </table>
             )}
           </div>
-        )
-      })}
+        </div>
+      )}
     </div>
   )
 }

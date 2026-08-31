@@ -13,6 +13,9 @@ interface ExamStore {
     classId?: string
     sectionId?: string
     subjectConfigId?: string
+    // Students checked on the Mark Entry summary screen — when set, the mark
+    // entry grid for this exact exam/class/section is limited to just these.
+    studentIds?: string[]
   }
   setMarkEntryFilter: (filter: Partial<ExamStore['markEntryFilter']>) => void
   activeExamId: string | null

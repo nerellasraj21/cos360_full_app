@@ -230,6 +230,8 @@ export function useFeeStudentMappings(params?: {
     section_id?: string;
     fee_type_id?: string;
     academic_year_id?: string;
+    skip?: number;
+    limit?: number;
 }) {
     return useQuery<FeeStudentMapping[] | FeeStudentMappingListResponse>({
         queryKey: feeStudentMappingKeys.list(params),

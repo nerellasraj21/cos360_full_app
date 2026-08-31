@@ -1,18 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
 import { Loader2, Lock, Bus, CheckCircle2 } from 'lucide-react';
+import { usePermission } from '@/hooks/usePermission';
 import Select, { type SingleValue } from 'react-select';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import {
-  Select as ShadSelect,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -29,9 +24,6 @@ import {
   useCreateFeeStudentMapping,
   useDeleteFeeStudentMapping,
 } from '@/hooks/fee';
-import { useVehiclesDropdown, useVehicle } from '@/api/hooks/masters/vehicles';
-import { useRoutesDropdown } from '@/api/hooks/masters/routes';
-import { useRouteStopsByRoute } from '@/api/hooks/masters/routeStops';
 import { fetchStudentsDropdown } from '@/api/students/admissions';
 import { formatCurrency } from '@/pages/fee/FeeCollection/FeeSummaryTab';
 import type { StudentDropdownItem } from '@/types/admission';
@@ -46,9 +38,6 @@ export function StudentFeeAssignmentPanel() {
   const [students, setStudents] = useState<StudentDropdownItem[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentOption>(null);
-  const [transportVehicleId, setTransportVehicleId] = useState<string>('');
-  const [transportRouteId, setTransportRouteId] = useState<string>('');
-  const [transportStopId, setTransportStopId] = useState<string>('');
 
   useEffect(() => {
     setStudentsLoading(true);
@@ -64,12 +53,6 @@ export function StudentFeeAssignmentPanel() {
   );
 
   const studentId = selectedStudent?.value ?? '';
-
-  useEffect(() => {
-    setTransportVehicleId('');
-    setTransportRouteId('');
-    setTransportStopId('');
-  }, [studentId]);
 
   const { data: admission, isLoading: admissionLoading } = useStudentAdmissionDetail(studentId);
   const { data: allClasses = [] } = useReadAllClassSections();
@@ -124,24 +107,12 @@ export function StudentFeeAssignmentPanel() {
       : undefined
   );
 
-  const { data: vehiclesDropdown = [] } = useVehiclesDropdown();
-  const { data: selectedVehicle } = useVehicle(transportVehicleId);
-  const { data: routesDropdown = [], isLoading: routesLoading } = useRoutesDropdown();
-  const { data: routeStops = [], isLoading: routeStopsLoading } = useRouteStopsByRoute(transportRouteId);
-  // Safety filter: the backend has historically ignored route_id-scoped query params,
-  // so re-filter (and dedupe) client-side to only the selected route.
-  const filteredRouteStops = useMemo(() => {
-    if (!transportRouteId) return [];
-    const seen = new Set<string>();
-    return routeStops.filter(s => {
-      if (s.route_id !== transportRouteId || seen.has(s.id)) return false;
-      seen.add(s.id);
-      return true;
-    });
-  }, [routeStops, transportRouteId]);
-
   const createMutation = useCreateFeeStudentMapping();
   const deleteMutation = useDeleteFeeStudentMapping();
+
+  const { checkPermission } = usePermission();
+  const canAssign = checkPermission('fee_student_mappings', 'create');
+  const canUnassign = checkPermission('fee_student_mappings', 'delete');
 
   const classMappings: FeeClassMapping[] = useMemo(() => {
     if (!classMappingsRaw) return [];
@@ -164,6 +135,16 @@ export function StudentFeeAssignmentPanel() {
     return map;
   }, [studentMappings]);
 
+  // fee_type_id → the amount actually saved on the student's existing mapping.
+  // Needed for Transport, whose displayed amount otherwise comes only from the
+  // live Bus/Trip/Stop selection above — which is empty on every page visit,
+  // hiding the real (already-assigned) amount behind a "—".
+  const existingAmountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    studentMappings.forEach((m: any) => map.set(m.fee_type_id, parseFloat(m.total_fee) || 0));
+    return map;
+  }, [studentMappings]);
+
   const mandatoryFees = classMappings.filter(
     (m) => m.all_by_default && !m.fee_type_name?.toLowerCase().includes('transport')
   );
@@ -174,12 +155,12 @@ export function StudentFeeAssignmentPanel() {
     m.fee_type_name?.toLowerCase().includes('transport')
   );
 
-  // Transport fee is defined per stop (RouteStop.fees), not per vehicle.
-  const selectedStop = filteredRouteStops.find((s) => s.id === transportStopId);
-  const annualBusFee = selectedStop?.fees ?? 0;
-
   function assignFee(feeTypeId: string, totalFee: number) {
     if (!studentId || !classId) return;
+    if (!canAssign) {
+      toast.error("You don't have permission to assign fees to students");
+      return;
+    }
     createMutation.mutate({
       student_id: studentId,
       student_admission_num: admissionNumber,
@@ -192,6 +173,10 @@ export function StudentFeeAssignmentPanel() {
   }
 
   function unassignFee(mappingId: string) {
+    if (!canUnassign) {
+      toast.error("You don't have permission to remove fee assignments");
+      return;
+    }
     deleteMutation.mutate(mappingId);
   }
 
@@ -355,7 +340,7 @@ export function StudentFeeAssignmentPanel() {
                                 size="sm"
                                 variant="outline"
                                 className="h-7 text-xs"
-                                disabled={createMutation.isPending}
+                                disabled={createMutation.isPending || !canAssign}
                                 onClick={() => assignFee(fee.fee_type_id, fee.total_fee)}
                               >
                                 Assign
@@ -404,7 +389,11 @@ export function StudentFeeAssignmentPanel() {
                                 if (checked) assignFee(fee.fee_type_id, fee.total_fee);
                                 else if (existingId) unassignFee(existingId);
                               }}
-                              disabled={createMutation.isPending || deleteMutation.isPending}
+                              disabled={
+                                createMutation.isPending ||
+                                deleteMutation.isPending ||
+                                (!!existingId ? !canUnassign : !canAssign)
+                              }
                             />
                           </TableCell>
                         </TableRow>
@@ -425,83 +414,6 @@ export function StudentFeeAssignmentPanel() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                {/* Bus → Trip → Stop selectors */}
-                <div className="px-4 py-3 space-y-3 border-b">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Bus</label>
-                      <ShadSelect
-                        value={transportVehicleId}
-                        onValueChange={(val) => {
-                          setTransportVehicleId(val);
-                          setTransportRouteId('');
-                          setTransportStopId('');
-                        }}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder="Select bus..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {vehiclesDropdown.map((v) => (
-                            <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </ShadSelect>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Trip</label>
-                      <ShadSelect
-                        value={transportRouteId}
-                        onValueChange={(val) => {
-                          setTransportRouteId(val);
-                          setTransportStopId('');
-                        }}
-                        disabled={!transportVehicleId || routesLoading}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder={routesLoading ? 'Loading...' : 'Select trip...'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {routesDropdown.map((r) => (
-                            <SelectItem key={r.id} value={r.id}>{r.route_name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </ShadSelect>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Stop</label>
-                      <ShadSelect
-                        value={transportStopId}
-                        onValueChange={setTransportStopId}
-                        disabled={!transportRouteId || routeStopsLoading}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder={routeStopsLoading ? 'Loading...' : 'Select stop...'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredRouteStops.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </ShadSelect>
-                    </div>
-                  </div>
-
-                  {/* Annual fee display — fee comes from the selected stop */}
-                  {transportStopId && (
-                    <div className="flex items-center gap-2 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 px-3 py-2">
-                      <Bus className="h-4 w-4 text-blue-500 shrink-0" />
-                      <span className="text-sm text-muted-foreground">Stop Fee:</span>
-                      <span className="text-base font-semibold text-blue-700 dark:text-blue-300">
-                        {annualBusFee > 0 ? formatCurrency(annualBusFee) : '—'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Fee assignment table */}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -514,36 +426,29 @@ export function StudentFeeAssignmentPanel() {
                   <TableBody>
                     {transportFees.map((fee, idx) => {
                       const existingId = existingMap.get(fee.fee_type_id);
+                      // Once assigned, show the amount actually saved on her mapping;
+                      // otherwise fall back to the class mapping's flat amount.
+                      const displayFee = existingId
+                        ? (existingAmountMap.get(fee.fee_type_id) ?? 0)
+                        : fee.total_fee;
                       return (
                         <TableRow key={fee.id} className="h-12">
                           <TableCell className="text-center text-sm">{idx + 1}</TableCell>
                           <TableCell className="font-medium text-sm">{fee.fee_type_name}</TableCell>
                           <TableCell className="text-right text-sm font-medium">
-                            {annualBusFee > 0 ? formatCurrency(annualBusFee) : '—'}
+                            {displayFee > 0 ? formatCurrency(displayFee) : '—'}
                           </TableCell>
                           <TableCell className="text-center">
                             {existingId ? (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="h-7 text-xs"
-                                disabled={deleteMutation.isPending}
-                                onClick={() => unassignFee(existingId)}
-                              >
-                                Remove
-                              </Button>
+                              <Badge variant="default" className="gap-1 text-xs">
+                                <CheckCircle2 className="h-3 w-3" /> Assigned
+                              </Badge>
                             ) : (
                               <Button
                                 size="sm"
                                 className="h-7 text-xs"
-                                disabled={
-                                  !transportVehicleId ||
-                                  !transportRouteId ||
-                                  !transportStopId ||
-                                  annualBusFee === 0 ||
-                                  createMutation.isPending
-                                }
-                                onClick={() => assignFee(fee.fee_type_id, annualBusFee)}
+                                disabled={createMutation.isPending || !canAssign}
+                                onClick={() => assignFee(fee.fee_type_id, fee.total_fee)}
                               >
                                 Assign
                               </Button>

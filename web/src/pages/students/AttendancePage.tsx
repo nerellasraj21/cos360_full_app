@@ -24,8 +24,8 @@ import type {
 } from '@/types/attendance';
 import type { StudentAdmissionResponse } from '@/types/admission';
 import type { ClassRead } from '@/types/masters/classesandsections';
+import type { Student } from '@/types/auth';
 import { useAuthStore } from '@/lib/authStore';
-import { useParentChildren } from '@/api/auth';
 import { QuickSendButton } from '@/components/communication/QuickSendButton';
 
 // Returns { start, end } defaulting to 1st of current month → today
@@ -40,7 +40,7 @@ function currentMonthRange() {
 
 interface StudentAttendanceState {
   student_id: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'half_day' | 'leave';
   existingRecord?: StudentAttendanceOut;
   isModified: boolean;
 }
@@ -51,7 +51,7 @@ interface StudentAttendanceState {
 const StudentAttendancePage: React.FC = () => {
   const role = useAuthStore((s) => s.role);
   const studentId = useAuthStore((s) => s.studentId);
-  const entityId = useAuthStore((s) => s.entityId);
+  const selectedStudent = useAuthStore((s) => s.selectedStudent);
 
   const roleName = role?.name.toLowerCase() ?? '';
 
@@ -60,7 +60,7 @@ const StudentAttendancePage: React.FC = () => {
   }
 
   if (roleName === 'parent') {
-    return <ParentView parentEntityId={entityId} />;
+    return <ParentView selectedStudent={selectedStudent} />;
   }
 
   return <StaffView />;
@@ -84,6 +84,8 @@ function StudentOwnView({ studentId }: { studentId: string }) {
     present: records.filter((r) => r.status === 'present').length,
     absent: records.filter((r) => r.status === 'absent').length,
     late: records.filter((r) => r.status === 'late').length,
+    halfDay: records.filter((r) => r.status === 'half_day').length,
+    leave: records.filter((r) => r.status === 'leave').length,
   }), [records]);
 
   return (
@@ -109,7 +111,7 @@ function StudentOwnView({ studentId }: { studentId: string }) {
 
       {/* Summary */}
       {!isLoading && records.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           <Card><CardContent className="pt-4 text-center">
             <p className="text-2xl font-bold">{summary.total}</p>
             <p className="text-sm text-muted-foreground">Total Days</p>
@@ -126,6 +128,14 @@ function StudentOwnView({ studentId }: { studentId: string }) {
             <p className="text-2xl font-bold text-yellow-600">{summary.late}</p>
             <p className="text-sm text-muted-foreground">Late</p>
           </CardContent></Card>
+          <Card><CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-orange-600">{summary.halfDay}</p>
+            <p className="text-sm text-muted-foreground">Half Day</p>
+          </CardContent></Card>
+          <Card><CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-blue-600">{summary.leave}</p>
+            <p className="text-sm text-muted-foreground">Leave</p>
+          </CardContent></Card>
         </div>
       )}
 
@@ -136,77 +146,42 @@ function StudentOwnView({ studentId }: { studentId: string }) {
 }
 
 // ─── Parent child attendance view ─────────────────────────────────────────────
+// Child is chosen via the header's student switcher (authStore.selectedStudent),
+// not a page-local selector — keeps every module in sync with a single source
+// of truth for "which child is active".
 
-function ParentView({ parentEntityId }: { parentEntityId: string | null }) {
-  const { data: children = [], isLoading: childrenLoading, error: childrenError } = useParentChildren(parentEntityId);
-  const [selectedChildId, setSelectedChildId] = useState('');
+function ParentView({ selectedStudent }: { selectedStudent: Student | null }) {
   const [dateFrom, setDateFrom] = useState(() => currentMonthRange().start);
   const [dateTo, setDateTo] = useState(() => currentMonthRange().end);
 
-  // Auto-select first child once loaded
-  useEffect(() => {
-    if (children.length > 0 && !selectedChildId) {
-      setSelectedChildId(children[0].id);
-    }
-  }, [children, selectedChildId]);
-
-  const { data: records = [], isLoading: attendanceLoading } = useStudentAttendance(selectedChildId, {
+  const { data: records = [], isLoading } = useStudentAttendance(selectedStudent?.id ?? '', {
     start_date: dateFrom || undefined,
     end_date: dateTo || undefined,
   });
-
-  const isLoading = attendanceLoading;
-  const selectedChild = children.find((s) => s.id === selectedChildId);
 
   const summary = useMemo(() => ({
     total: records.length,
     present: records.filter((r) => r.status === 'present').length,
     absent: records.filter((r) => r.status === 'absent').length,
     late: records.filter((r) => r.status === 'late').length,
+    halfDay: records.filter((r) => r.status === 'half_day').length,
+    leave: records.filter((r) => r.status === 'leave').length,
   }), [records]);
 
   return (
     <div className="container mx-auto p-4 space-y-6">
       <PageHeader title="Children's Attendance" icon={<Users className="h-5 w-5" />} />
 
-      {/* Child selector + date filter */}
+      {/* Date filter */}
       <Card>
-        <CardHeader><CardTitle>Select Child & Date Range</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Filter by Date</CardTitle></CardHeader>
         <CardContent>
-          {!parentEntityId ? (
+          {!selectedStudent ? (
             <div className="text-center py-4 text-muted-foreground">
-              Session outdated. Please log out and log back in to view children.
-            </div>
-          ) : childrenLoading ? (
-            <div className="flex items-center gap-2 py-4">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Loading children...</span>
-            </div>
-          ) : childrenError ? (
-            <div className="text-center py-4 text-destructive">
-              Failed to load children: {(childrenError as Error).message}
-            </div>
-          ) : children.length === 0 ? (
-            <div className="text-center py-4 text-muted-foreground">
-              No children found for this account.
+              No child selected. Use the child switcher in the header above.
             </div>
           ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Child</Label>
-              <Select value={selectedChildId} onValueChange={setSelectedChildId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select child" />
-                </SelectTrigger>
-                <SelectContent>
-                  {children.map((child) => (
-                    <SelectItem key={child.id} value={child.id}>
-                      {child.name || `${child.first_name} ${child.last_name}`.trim()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>From</Label>
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
@@ -220,8 +195,8 @@ function ParentView({ parentEntityId }: { parentEntityId: string | null }) {
         </CardContent>
       </Card>
 
-      {selectedChild && !isLoading && records.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {selectedStudent && !isLoading && records.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           <Card><CardContent className="pt-4 text-center">
             <p className="text-2xl font-bold">{summary.total}</p>
             <p className="text-sm text-muted-foreground">Total Days</p>
@@ -238,13 +213,21 @@ function ParentView({ parentEntityId }: { parentEntityId: string | null }) {
             <p className="text-2xl font-bold text-yellow-600">{summary.late}</p>
             <p className="text-sm text-muted-foreground">Late</p>
           </CardContent></Card>
+          <Card><CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-orange-600">{summary.halfDay}</p>
+            <p className="text-sm text-muted-foreground">Half Day</p>
+          </CardContent></Card>
+          <Card><CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-blue-600">{summary.leave}</p>
+            <p className="text-sm text-muted-foreground">Leave</p>
+          </CardContent></Card>
         </div>
       )}
 
       <AttendanceRecordList
         records={records}
         isLoading={isLoading}
-        title={selectedChild ? `${selectedChild.name || `${selectedChild.first_name} ${selectedChild.last_name}`.trim()}'s Attendance` : 'Attendance'}
+        title={selectedStudent ? `${selectedStudent.name}'s Attendance` : 'Attendance'}
       />
     </div>
   );
@@ -415,7 +398,7 @@ function StaffView() {
     setExistingAttendances([]);
   };
 
-  const handleAttendanceChange = (studentId: string, status: 'present' | 'absent' | 'late') => {
+  const handleAttendanceChange = (studentId: string, status: 'present' | 'absent' | 'late' | 'half_day' | 'leave') => {
     setStudentAttendances(prev => {
       const newMap = new Map(prev);
       const current = newMap.get(studentId);
@@ -437,7 +420,7 @@ function StaffView() {
     try {
       // Snapshot before async ops
       const toCreate: BulkAttendanceUpdate[] = [];
-      const toUpdate: { id: string; studentId: string; status: 'present' | 'absent' | 'late' }[] = [];
+      const toUpdate: { id: string; studentId: string; status: 'present' | 'absent' | 'late' | 'half_day' | 'leave' }[] = [];
 
       studentAttendances.forEach((attendance) => {
         if (!attendance.isModified) return;
@@ -501,12 +484,15 @@ function StaffView() {
       present: all.filter(a => a.status === 'present').length,
       absent: all.filter(a => a.status === 'absent').length,
       late: all.filter(a => a.status === 'late').length,
+      half_day: all.filter(a => a.status === 'half_day').length,
+      leave: all.filter(a => a.status === 'leave').length,
     };
   }, [studentAttendances]);
 
   const totalStudents = students.length;
+  // Half day counts as 0.5 present, matching the backend attendance_percentage formula
   const attendancePct = totalStudents > 0
-    ? Math.round((attendanceSummary.present / totalStudents) * 100)
+    ? Math.round(((attendanceSummary.present + attendanceSummary.half_day * 0.5) / totalStudents) * 100)
     : 0;
 
   const filteredStudents = useMemo(() => {
@@ -589,7 +575,7 @@ function StaffView() {
                   <span className="text-sm font-semibold">{attendancePct}% Present</span>
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-5 gap-3">
                 <div className="flex flex-col items-center justify-center gap-1 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
                   <span className="text-3xl font-bold text-green-700 dark:text-green-400">{attendanceSummary.present}</span>
                   <span className="text-xs font-medium text-green-600 dark:text-green-500 uppercase tracking-wide">Present</span>
@@ -602,19 +588,31 @@ function StaffView() {
                   <span className="text-3xl font-bold text-yellow-700 dark:text-yellow-400">{attendanceSummary.late}</span>
                   <span className="text-xs font-medium text-yellow-600 dark:text-yellow-500 uppercase tracking-wide">Late</span>
                 </div>
+                <div className="flex flex-col items-center justify-center gap-1 p-4 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg">
+                  <span className="text-3xl font-bold text-orange-700 dark:text-orange-400">{attendanceSummary.half_day}</span>
+                  <span className="text-xs font-medium text-orange-600 dark:text-orange-500 uppercase tracking-wide">Half Day</span>
+                </div>
+                <div className="flex flex-col items-center justify-center gap-1 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <span className="text-3xl font-bold text-blue-700 dark:text-blue-400">{attendanceSummary.leave}</span>
+                  <span className="text-xs font-medium text-blue-600 dark:text-blue-500 uppercase tracking-wide">Leave</span>
+                </div>
               </div>
               {totalStudents > 0 && (
                 <>
                   <div className="flex h-2 rounded-full overflow-hidden bg-muted">
                     <div className="bg-green-500 transition-all duration-300" style={{ width: `${(attendanceSummary.present / totalStudents) * 100}%` }} />
+                    <div className="bg-orange-400 transition-all duration-300" style={{ width: `${(attendanceSummary.half_day / totalStudents) * 100}%` }} />
                     <div className="bg-yellow-400 transition-all duration-300" style={{ width: `${(attendanceSummary.late / totalStudents) * 100}%` }} />
+                    <div className="bg-blue-400 transition-all duration-300" style={{ width: `${(attendanceSummary.leave / totalStudents) * 100}%` }} />
                     <div className="bg-red-400 transition-all duration-300" style={{ width: `${(attendanceSummary.absent / totalStudents) * 100}%` }} />
                   </div>
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{totalStudents} students total</span>
                     <span className="flex items-center gap-3">
                       <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" />Present</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-400" />Half Day</span>
                       <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />Late</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-400" />Leave</span>
                       <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" />Absent</span>
                     </span>
                   </div>
@@ -677,12 +675,19 @@ function StaffView() {
                         present: 'bg-green-100 text-green-700 border-green-300',
                         absent: 'bg-red-100 text-red-700 border-red-300',
                         late: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+                        half_day: 'bg-orange-100 text-orange-700 border-orange-300',
+                        leave: 'bg-blue-100 text-blue-700 border-blue-300',
                       }[status];
                       const rowStyles = status === 'absent'
                         ? 'border-red-200'
                         : status === 'late'
                         ? 'border-yellow-200'
+                        : status === 'half_day'
+                        ? 'border-orange-200'
+                        : status === 'leave'
+                        ? 'border-blue-200'
                         : 'border-border';
+                      const statusLabel = status === 'half_day' ? 'Half Day' : status === 'leave' ? 'Le' : status.charAt(0).toUpperCase();
                       return (
                         <div
                           key={student.id}
@@ -692,7 +697,7 @@ function StaffView() {
                           <div className="flex items-center gap-3">
                             <span className="text-xs text-muted-foreground w-6 text-right shrink-0">{index + 1}</span>
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${statusStyles} capitalize min-w-[60px] justify-center`}>
-                              {status}
+                              {statusLabel}
                             </span>
                             <div>
                               <div className="font-medium">{getStudentName(student.student)}</div>
@@ -720,7 +725,7 @@ function StaffView() {
                             <Select
                               value={status}
                               onValueChange={(value) =>
-                                handleAttendanceChange(student.student.id, value as 'present' | 'absent' | 'late')
+                                handleAttendanceChange(student.student.id, value as 'present' | 'absent' | 'late' | 'half_day' | 'leave')
                               }
                             >
                               <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
@@ -728,6 +733,8 @@ function StaffView() {
                                 <SelectItem value="present">Present</SelectItem>
                                 <SelectItem value="absent">Absent</SelectItem>
                                 <SelectItem value="late">Late</SelectItem>
+                                <SelectItem value="half_day">Half Day</SelectItem>
+                                <SelectItem value="leave">Leave</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>

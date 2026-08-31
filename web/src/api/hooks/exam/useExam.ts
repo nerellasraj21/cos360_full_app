@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import * as examApi from '@/api/exam'
 import type {
@@ -651,6 +651,31 @@ export function useMarkEntry(
   })
 }
 
+// Fetches mark rows for every subject-config of a class-section in parallel, so a
+// combined all-subjects grid can be rendered in one screen (spreadsheet-style).
+export function useMarksForSubjects(
+  examId: string,
+  classId: string,
+  sectionId: string,
+  subjectConfigIds: string[],
+) {
+  return useQueries({
+    queries: subjectConfigIds.map((subjectConfigId) => ({
+      queryKey: [...examKeys.marks(examId, classId, sectionId, subjectConfigId), 'all'],
+      queryFn: () => examApi.getMarks({
+        exam_id: examId,
+        class_id: classId,
+        section_id: sectionId,
+        subject_config_id: subjectConfigId,
+        page: 1,
+        page_size: 1000,
+      }),
+      enabled: !!examId && !!classId && !!sectionId && !!subjectConfigId,
+      staleTime: 30_000,
+    })),
+  })
+}
+
 export function useUpsertMarks() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -677,19 +702,24 @@ export function useUpsertMarks() {
   })
 }
 
-export function useBatchSaveMarks(examId: string, subjectConfigId: string) {
+// Saves marks for one subject-config at a time; subjectConfigId is passed per-call
+// (rather than bound at hook creation) so a single mutation instance can be reused
+// to save several subjects in a row from a combined all-subjects grid.
+export function useSaveMarksForSubject(examId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (marks: Array<{
-      student_id: string
-      component_id: string
-      marks_obtained: number | null
-      is_absent: boolean
-      remark_grade?: string | null
-    }>) => examApi.batchSaveMarks(examId, subjectConfigId, marks),
+    mutationFn: ({ subjectConfigId, marks }: {
+      subjectConfigId: string
+      marks: Array<{
+        student_id: string
+        component_id: string
+        marks_obtained: number | null
+        is_absent: boolean
+        remark_grade?: string | null
+      }>
+    }) => examApi.batchSaveMarks(examId, subjectConfigId, marks),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['marks', examId] })
-      toast.success('Marks saved successfully')
     },
     onError: (error: any) => {
       const msg = error?.response?.data?.detail ?? 'Failed to save marks'

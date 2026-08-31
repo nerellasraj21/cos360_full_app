@@ -82,9 +82,16 @@ CAxios.interceptors.response.use(
       const data = error.response.data;
       const detail = data.detail;
       if (detail) {
-        const message = Array.isArray(detail)
-          ? detail.map((d: any) => d.msg || JSON.stringify(d)).join('; ')
-          : String(detail);
+        let message: string;
+        if (Array.isArray(detail)) {
+          message = detail.map((d: any) => d.msg || JSON.stringify(d)).join('; ');
+        } else if (typeof detail === 'object') {
+          // Object-shaped detail (e.g. nested FastAPI errors) — String(obj)
+          // collapses to "[object Object]", so stringify it properly instead.
+          message = JSON.stringify(detail);
+        } else {
+          message = String(detail);
+        }
         error.message = message;
       }
     }

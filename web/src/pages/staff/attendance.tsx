@@ -5,17 +5,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, CheckCircle, XCircle, Search, Eye, EyeOff, ClipboardCheck, Filter, X } from 'lucide-react';
+import { Loader2, Save, CheckCircle, XCircle, Search, ClipboardCheck, Filter, X } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from 'sonner';
-import { Table } from '@/components/common/table';
-import type { TableColumn } from '@/components/common/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { usePermission } from '@/hooks/usePermission';
 import { QuickSendButton } from '@/components/communication/QuickSendButton';
 import { useStaff } from '@/api/staff';
@@ -37,18 +29,6 @@ interface StaffAttendanceState {
     status: 'present' | 'absent' | 'late' | 'half_day';
     existingRecord?: StaffAttendanceOut;
     isModified: boolean;
-}
-
-// Table row interface for rendering
-interface StaffAttendanceRow {
-    id: string;
-    staff_id: string;
-    staff_name: string;
-    email: string;
-    department: string;
-    status: 'present' | 'absent' | 'late' | 'half_day';
-    isModified: boolean;
-    existingRecord?: StaffAttendanceOut;
 }
 
 const StaffAttendancePage: React.FC = () => {
@@ -74,13 +54,8 @@ const StaffAttendancePage: React.FC = () => {
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
     const [saveError, setSaveError] = useState<string | null>(null);
 
-    // Table state (new)
+    // Filter state
     const [searchQuery, setSearchQuery] = useState<string>('');
-    const [currentPage, setCurrentPage] = useState<number>(0);
-    const [pageSize, setPageSize] = useState<number>(10);
-    const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
-        new Set(['staff_name', 'email', 'department', 'status', 'isModified', 'actions'])
-    );
 
     // Data fetching
     const { data: staffData, isLoading: staffLoading } = useStaff({ is_active: true });
@@ -249,167 +224,19 @@ const StaffAttendancePage: React.FC = () => {
         return `${staff.first_name || ''} ${staff.last_name || ''}`.trim() || 'Unknown Staff';
     };
 
-    const getAttendanceStatus = (staffId: string) => {
-        return staffAttendances.get(staffId);
-    };
-
     const hasUnsavedChanges = Array.from(staffAttendances.values()).some(att => att.isModified);
 
-    // Column definitions for table
-    const columns: TableColumn<StaffAttendanceRow>[] = [
-        {
-            key: 'staff_name',
-            label: 'Staff Name',
-            editable: false,
-            className: 'font-medium',
-        },
-        {
-            key: 'email',
-            label: 'Email',
-            editable: false,
-            className: 'text-sm text-muted-foreground',
-        },
-        {
-            key: 'department',
-            label: 'Department',
-            editable: false,
-            className: 'text-sm',
-        },
-        {
-            key: 'status',
-            label: 'Status',
-            editable: false, // Make non-editable since we're using custom render
-            render: (value: 'present' | 'absent' | 'late' | 'half_day', row: StaffAttendanceRow) => {
-                if (!canWrite) {
-                    const labelMap = { present: 'Present', absent: 'Absent', late: 'Late', half_day: 'Half Day' };
-                    return <span className="text-sm">{labelMap[value]}</span>;
-                }
-                return (
-                    <Select
-                        value={value}
-                        onValueChange={(newValue) => {
-                            handleAttendanceChange(row.staff_id, newValue as 'present' | 'absent' | 'late' | 'half_day');
-                        }}
-                    >
-                        <SelectTrigger className="w-36">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="present">Present</SelectItem>
-                            <SelectItem value="absent">Absent</SelectItem>
-                            <SelectItem value="late">Late</SelectItem>
-                            <SelectItem value="half_day">Half Day</SelectItem>
-                        </SelectContent>
-                    </Select>
-                );
-            },
-        },
-        {
-            key: 'isModified',
-            label: 'Modified',
-            editable: false,
-            render: (value: boolean) =>
-                value ? <Badge variant="secondary">Modified</Badge> : null,
-        },
-        {
-            key: 'actions',
-            label: 'Actions',
-            editable: false,
-            render: (_value: unknown, row: StaffAttendanceRow) => (
-                <QuickSendButton
-                    templateName="Staff Attendance"
-                    targetType="individual_staff"
-                    targetRef={{ staff_id: row.staff_id }}
-                    recipientLabel={row.staff_name}
-                    variables={{
-                        staff_name: row.staff_name,
-                        date: selectedDate,
-                    }}
-                    // Only meaningful for staff who aren't fully present today.
-                    disabled={row.status === 'present'}
-                    title={
-                        row.status === 'present'
-                            ? 'Staff is present — no notification needed'
-                            : 'Send Attendance Message'
-                    }
-                />
-            ),
-        },
-    ];
-
-    // Filter columns based on visibility
-    const filteredColumns = columns.filter((col) =>
-        visibleColumns.has(col.key as string)
-    );
-
-    // Transform staff data into table rows
-    const tableData: StaffAttendanceRow[] = useMemo(() => {
-        return staff.map((staffMember) => {
-            const attendance = staffAttendances.get(staffMember.id);
-            return {
-                id: staffMember.id,
-                staff_id: staffMember.id,
-                staff_name: `${staffMember.first_name || ''} ${staffMember.last_name || ''}`.trim() || 'Unknown Staff',
-                email: staffMember.email || 'N/A',
-                department: staffMember.department || 'N/A',
-                status: attendance?.status || 'present',
-                isModified: attendance?.isModified || false,
-                existingRecord: attendance?.existingRecord,
-            };
+    // Apply search filter directly over staff (name, email, department)
+    const filteredStaff = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        if (!q) return staff;
+        return staff.filter((staffMember) => {
+            const name = getStaffName(staffMember).toLowerCase();
+            const email = (staffMember.email || '').toLowerCase();
+            const department = (staffMember.department || '').toLowerCase();
+            return name.includes(q) || email.includes(q) || department.includes(q);
         });
-    }, [staff, staffAttendances]);
-
-    // Apply search filter
-    const filteredData = useMemo(() => {
-        if (!searchQuery.trim()) return tableData;
-        const query = searchQuery.toLowerCase();
-        return tableData.filter((row) =>
-            row.staff_name.toLowerCase().includes(query) ||
-            row.email.toLowerCase().includes(query) ||
-            row.department.toLowerCase().includes(query)
-        );
-    }, [tableData, searchQuery]);
-
-    // Apply pagination
-    const paginatedData = useMemo(() => {
-        const startIndex = currentPage * pageSize;
-        const endIndex = startIndex + pageSize;
-        return filteredData.slice(startIndex, endIndex);
-    }, [filteredData, currentPage, pageSize]);
-
-    // Column visibility handlers
-    const FIXED_COLUMNS = new Set(['staff_name']);
-
-    const handleColumnToggle = (columnKey: string) => {
-        if (FIXED_COLUMNS.has(columnKey)) return;
-        setVisibleColumns((prev) => {
-            const newSet = new Set(prev);
-            if (newSet.has(columnKey)) {
-                newSet.delete(columnKey);
-            } else {
-                newSet.add(columnKey);
-            }
-            return newSet;
-        });
-    };
-
-    const handleSelectAllColumns = () => {
-        setVisibleColumns(new Set(columns.map((col) => col.key as string)));
-    };
-
-    const handleDeselectAllColumns = () => {
-        setVisibleColumns(new Set(FIXED_COLUMNS));
-    };
-
-    // Dummy handlers for Table component (not used, but required by Table props)
-    const handleEdit = () => {
-        // Not used - status editing is handled directly in render function
-    };
-
-    const handleDelete = () => {
-        // Not applicable - attendance doesn't have delete action
-        // Changing status to "present" removes the record via save logic
-    };
+    }, [staff, searchQuery]);
 
     const attendanceSummary = useMemo(() => {
         const all = Array.from(staffAttendances.values());
@@ -484,23 +311,23 @@ const StaffAttendancePage: React.FC = () => {
                                 <span className="text-3xl font-bold text-yellow-700 dark:text-yellow-400">{attendanceSummary.late}</span>
                                 <span className="text-xs font-medium text-yellow-600 dark:text-yellow-500 uppercase tracking-wide">Late</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center gap-1 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                                <span className="text-3xl font-bold text-blue-700 dark:text-blue-400">{attendanceSummary.half_day}</span>
-                                <span className="text-xs font-medium text-blue-600 dark:text-blue-500 uppercase tracking-wide">Half Day</span>
+                            <div className="flex flex-col items-center justify-center gap-1 p-4 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg">
+                                <span className="text-3xl font-bold text-orange-700 dark:text-orange-400">{attendanceSummary.half_day}</span>
+                                <span className="text-xs font-medium text-orange-600 dark:text-orange-500 uppercase tracking-wide">Half Day</span>
                             </div>
                         </div>
                         <div className="flex h-2 rounded-full overflow-hidden bg-muted">
                             <div className="bg-green-500 transition-all duration-300" style={{ width: `${(attendanceSummary.present / totalStaff) * 100}%` }} />
+                            <div className="bg-orange-400 transition-all duration-300" style={{ width: `${(attendanceSummary.half_day / totalStaff) * 100}%` }} />
                             <div className="bg-yellow-400 transition-all duration-300" style={{ width: `${(attendanceSummary.late / totalStaff) * 100}%` }} />
-                            <div className="bg-blue-400 transition-all duration-300" style={{ width: `${(attendanceSummary.half_day / totalStaff) * 100}%` }} />
                             <div className="bg-red-400 transition-all duration-300" style={{ width: `${(attendanceSummary.absent / totalStaff) * 100}%` }} />
                         </div>
                         <div className="flex justify-between text-xs text-muted-foreground">
                             <span>{totalStaff} staff total</span>
                             <span className="flex items-center gap-3">
                                 <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" />Present</span>
+                                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-400" />Half Day</span>
                                 <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />Late</span>
-                                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-400" />Half Day</span>
                                 <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" />Absent</span>
                             </span>
                         </div>
@@ -520,104 +347,126 @@ const StaffAttendancePage: React.FC = () => {
                 )}
 
                 {/* ── Staff list ── */}
-                <div className="border-t px-6 pb-6 pt-4 space-y-4">
-                    {/* Filter title row */}
-                    <div className="space-y-2">
+                <div className="border-t px-6 pb-6 pt-4">
+                    {/* Filter row */}
+                    <div className="space-y-2 mb-3">
                         <div className="flex items-center gap-2">
                             <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
                             <p className="text-sm font-medium text-muted-foreground">Filter Staff</p>
                             {searchQuery && (
                                 <span className="text-xs text-muted-foreground ml-auto">
-                                    {filteredData.length} of {totalStaff}
+                                    {filteredStaff.length} of {totalStaff}
                                 </span>
                             )}
                         </div>
-                        <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div className="relative flex-1 min-w-[200px] max-w-sm">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                                <Input
-                                    placeholder="Search by name, email, or department..."
-                                    value={searchQuery}
-                                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(0); }}
-                                    className="pl-8 pr-8 h-9"
-                                />
-                                {searchQuery && (
-                                    <button
-                                        onClick={() => { setSearchQuery(''); setCurrentPage(0); }}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                    >
-                                        <X className="h-3.5 w-3.5" />
-                                    </button>
-                                )}
-                            </div>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="gap-2">
-                                    {visibleColumns.size === columns.length ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                                    Columns ({visibleColumns.size}/{columns.length})
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuCheckboxItem
-                                    checked={visibleColumns.size === columns.length}
-                                    onCheckedChange={(checked) => checked ? handleSelectAllColumns() : handleDeselectAllColumns()}
-                                    className="font-semibold"
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                            <Input
+                                placeholder="Search by name, email, or department..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-8 pr-8 h-9 text-sm"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                                 >
-                                    Select All
-                                </DropdownMenuCheckboxItem>
-                                {columns.map((col) => {
-                                    const isFixed = FIXED_COLUMNS.has(col.key as string);
-                                    return (
-                                        <DropdownMenuCheckboxItem
-                                            key={col.key as string}
-                                            checked={visibleColumns.has(col.key as string)}
-                                            onCheckedChange={() => handleColumnToggle(col.key as string)}
-                                            disabled={isFixed}
-                                            className={isFixed ? 'opacity-60 cursor-not-allowed' : ''}
-                                        >
-                                            {col.label}
-                                            {isFixed && <span className="ml-1 text-xs text-muted-foreground">(fixed)</span>}
-                                        </DropdownMenuCheckboxItem>
-                                    );
-                                })}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                                    <X className="h-3.5 w-3.5" />
+                                </button>
+                            )}
                         </div>
                     </div>
 
                     {attendanceLoading || staffLoading ? (
-                        <div className="flex justify-center items-center py-12">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                            <span className="ml-2 text-muted-foreground">Loading staff...</span>
+                        <div className="flex justify-center items-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                            <span className="ml-2">Loading staff...</span>
                         </div>
-                    ) : filteredData.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                            {searchQuery ? (
-                                <>
-                                    <p className="text-lg font-medium">No results found</p>
-                                    <p className="text-sm mt-1">Try adjusting your search query</p>
-                                </>
-                            ) : (
-                                <p className="text-lg">No staff members found.</p>
-                            )}
+                    ) : staff.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                            No staff members found.
+                        </div>
+                    ) : filteredStaff.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                            No staff match "{searchQuery}".
                         </div>
                     ) : (
-                        <Table
-                            columns={filteredColumns}
-                            data={paginatedData}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                            isEditing={false}
-                            searchable={false}
-                            pagination={{
-                                page: currentPage,
-                                pageSize: pageSize,
-                                total: filteredData.length,
-                                onPageChange: setCurrentPage,
-                                onPageSizeChange: (size) => { setPageSize(size); setCurrentPage(0); },
-                            }}
-                            permissions={{ resource: 'staff', canEdit: false, canDelete: false }}
-                        />
+                        <div className="grid gap-2">
+                            {filteredStaff.map((staffMember, index) => {
+                                const attendance = staffAttendances.get(staffMember.id);
+                                const status = attendance?.status || 'present';
+                                const statusStyles = {
+                                    present: 'bg-green-100 text-green-700 border-green-300',
+                                    absent: 'bg-red-100 text-red-700 border-red-300',
+                                    late: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+                                    half_day: 'bg-orange-100 text-orange-700 border-orange-300',
+                                }[status];
+                                const rowStyles = status === 'absent'
+                                    ? 'border-red-200'
+                                    : status === 'late'
+                                    ? 'border-yellow-200'
+                                    : status === 'half_day'
+                                    ? 'border-orange-200'
+                                    : 'border-border';
+                                const statusLabel = status === 'half_day' ? 'Half Day' : status.charAt(0).toUpperCase();
+                                return (
+                                    <div
+                                        key={staffMember.id}
+                                        className={`flex items-center justify-between p-4 border rounded-lg ${rowStyles}`}
+                                        style={{ height: '64px' }}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xs text-muted-foreground w-6 text-right shrink-0">{index + 1}</span>
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${statusStyles} capitalize min-w-[60px] justify-center`}>
+                                                {statusLabel}
+                                            </span>
+                                            <div>
+                                                <div className="font-medium">{getStaffName(staffMember)}</div>
+                                                <div className="text-sm text-muted-foreground">{staffMember.email || 'N/A'} · {staffMember.department || 'N/A'}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <QuickSendButton
+                                                templateName="Staff Attendance"
+                                                targetType="individual_staff"
+                                                targetRef={{ staff_id: staffMember.id }}
+                                                recipientLabel={getStaffName(staffMember)}
+                                                variables={{
+                                                    staff_name: getStaffName(staffMember),
+                                                    date: selectedDate,
+                                                }}
+                                                // Only meaningful for staff who aren't fully present today.
+                                                disabled={status === 'present'}
+                                                title={
+                                                    status === 'present'
+                                                        ? 'Staff is present — no notification needed'
+                                                        : 'Send Attendance Message'
+                                                }
+                                            />
+                                            {canWrite ? (
+                                                <Select
+                                                    value={status}
+                                                    onValueChange={(value) =>
+                                                        handleAttendanceChange(staffMember.id, value as 'present' | 'absent' | 'late' | 'half_day')
+                                                    }
+                                                >
+                                                    <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="present">Present</SelectItem>
+                                                        <SelectItem value="absent">Absent</SelectItem>
+                                                        <SelectItem value="late">Late</SelectItem>
+                                                        <SelectItem value="half_day">Half Day</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            ) : (
+                                                <span className="text-sm w-32 text-right">{statusLabel}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     )}
                 </div>
             </Card>

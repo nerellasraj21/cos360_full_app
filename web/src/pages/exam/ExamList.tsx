@@ -23,6 +23,7 @@ import { useExamList, useDeleteExam, useExamGradeSchemes, useUpdateExam, useExam
 import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
 import { useAcademicYearStore } from '@/lib/academicYearStore'
 import { useAuthStore } from '@/lib/authStore'
+import { isAdminRoleName } from '@/lib/roleUtils'
 import type { ExamListItem, ExamStatus, ExamNature, ExamBoard, ExamLevel } from '@/types/exam'
 
 // ---------------------------------------------------------------------------
@@ -188,10 +189,7 @@ export default function ExamList() {
   useEffect(() => {
     if (academicYears.length === 0) fetchAndSetAcademicYears()
   }, [academicYears.length, fetchAndSetAcademicYears])
-  const isAdmin = useAuthStore(s => {
-    const roleName = s.role?.name?.toLowerCase() ?? ''
-    return roleName === 'admin' || roleName === 'superadmin' || roleName === 'principal'
-  })
+  const isAdmin = useAuthStore(s => isAdminRoleName(s.role?.name))
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [natureFilter, setNatureFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')

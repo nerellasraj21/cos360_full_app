@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQueries, useQueryClient } from '@tanstack/react-query';
-import { Loader2, GraduationCap, Users as StaffIcon } from 'lucide-react';
-import { toast } from 'sonner';
+import { Loader2, Users, GraduationCap, Briefcase, School, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { usePermission } from '@/hooks/usePermission';
-import { useAcademicYearStore } from '@/lib/academicYearStore';
-import { AcademicYearsDropdown } from '@/components/dropdown-system/components/AcademicYearsDropdown';
-import { ClassSectionTreePicker, type ClassSectionSelection } from '@/components/communication/ClassSectionTreePicker';
-import { communicationApi } from '@/api/communication/communicationApi';
-import { communicationKeys, useTemplates } from '@/api/hooks/communication/communication';
-import type { Channel, Template } from '@/types/communication';
+import { ClassesDropdown } from '@/components/dropdown-system/components/ClassesDropdown';
+import { SectionsByClassDropdown } from '@/components/dropdown-system/components/SectionsByClassDropdown';
+import { useStudentsByClassSection } from '@/api/hooks/masters/classesandsections';
+import { MultiTargetPicker, type PickedOption } from './MultiTargetPicker';
+import { useTemplates, usePreviewCount, useSendNotification } from '@/api/hooks/communication/communication';
+import type { Channel, Template, TargetType, TargetRef, PreviewCountParams } from '@/types/communication';
 
 const SYSTEM_VARS = new Set([
   'name', 'parent_name', 'student_name', 'staff_name', 'class_name', 'section_name',
@@ -32,13 +32,72 @@ const CONTEXTS: { value: string; label: string; keywords: string[] }[] = [
   { value: 'homework', label: 'Homework', keywords: ['homework', 'diary'] },
 ];
 
-const NARROW_TO = ['All in selection', 'Absentees today', 'Late comers', 'Fee defaulters'];
+// ─── Target Type — exactly four, per product decision: Parents / Students /
+// Staff / Entire School. Everything else (individual pickers, role-based,
+// fee-defaulters, all_parents/all_students/all_staff) is intentionally not
+// exposed here.
+type TargetKind = 'parents' | 'students' | 'staff' | 'entire_school';
+
+const TARGET_KINDS: { value: TargetKind; label: string; icon: typeof Users }[] = [
+  { value: 'parents', label: 'Parents', icon: Users },
+  { value: 'students', label: 'Students', icon: GraduationCap },
+  { value: 'staff', label: 'Staff', icon: Briefcase },
+  { value: 'entire_school', label: 'Entire School', icon: School },
+];
+
+interface StudentRow {
+  id: string;
+  name: string;
+  admissionNumber: string;
+  parentIds: string[];
+}
 
 function buildPreviewText(body: string, extraVars: Record<string, string>): string {
   return body.replace(/\{\{(\w+)\}\}/g, (_, varName) => {
     if (SYSTEM_VARS.has(varName)) return `[${varName}]`;
     return extraVars[varName] ? extraVars[varName] : `[${varName}]`;
   });
+}
+
+// Resolve the local Parents/Students/Staff/Entire-School choice down to the
+// backend's target_type + target_ref shape. Returns null while the choice is
+// incomplete (e.g. no students checked yet).
+function resolveTarget(
+  targetKind: TargetKind,
+  selectedStudentIds: string[],
+  selectedParentIds: string[],
+  staffIds: string[],
+): { target_type: TargetType; target_ref: TargetRef } | null {
+  if (targetKind === 'entire_school') return { target_type: 'all_users', target_ref: {} };
+  if (targetKind === 'staff') {
+    if (staffIds.length === 0) return null;
+    return { target_type: 'multiple_staff', target_ref: { staff_ids: staffIds } };
+  }
+  if (targetKind === 'students') {
+    if (selectedStudentIds.length === 0) return null;
+    return { target_type: 'multiple_students', target_ref: { student_ids: selectedStudentIds } };
+  }
+  // parents
+  if (selectedParentIds.length === 0) return null;
+  return { target_type: 'multiple_parents', target_ref: { parent_ids: selectedParentIds } };
+}
+
+function buildPreviewParams(
+  target: { target_type: TargetType; target_ref: TargetRef } | null,
+): PreviewCountParams | null {
+  if (!target) return null;
+  const { target_type, target_ref } = target;
+  if (target_type === 'multiple_parents' && 'parent_ids' in target_ref) {
+    return { target_type, parent_ids: target_ref.parent_ids };
+  }
+  if (target_type === 'multiple_students' && 'student_ids' in target_ref) {
+    return { target_type, student_ids: target_ref.student_ids };
+  }
+  if (target_type === 'multiple_staff' && 'staff_ids' in target_ref) {
+    return { target_type, staff_ids: target_ref.staff_ids };
+  }
+  if (target_type === 'all_users') return { target_type };
+  return null;
 }
 
 interface SectionCardProps {
@@ -65,26 +124,24 @@ function SectionCard({ number, title, children }: SectionCardProps) {
 
 interface SendMessagePanelProps {
   onSendSuccess?: () => void;
-  showAcademicYear?: boolean;
 }
 
-export default function SendMessagePanel({ onSendSuccess, showAcademicYear = true }: SendMessagePanelProps) {
+export default function SendMessagePanel({ onSendSuccess }: SendMessagePanelProps) {
   const { checkPermission } = usePermission();
   const canCreate = checkPermission('communications', 'create');
-  const queryClient = useQueryClient();
-  const { selectedAcademicYearId } = useAcademicYearStore();
 
-  const [audience, setAudience] = useState<'students' | 'staff'>('students');
-  const [academicYearId, setAcademicYearId] = useState<string | null>(selectedAcademicYearId || null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [narrowTo, setNarrowTo] = useState(NARROW_TO[0]);
-  const [selection, setSelection] = useState<ClassSectionSelection[]>([]);
+  // ── Target Type + recipient selection ──────────────────────────────────
+  const [targetKind, setTargetKind] = useState<TargetKind>('parents');
+  const [classId, setClassId] = useState<string | null>(null);
+  const [sectionId, setSectionId] = useState<string | null>(null);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+  const [staffSelection, setStaffSelection] = useState<PickedOption[]>([]);
 
   const [channel, setChannel] = useState<Channel>('sms');
   const [context, setContext] = useState(CONTEXTS[0].value);
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [extraVars, setExtraVars] = useState<Record<string, string>>({});
-  const [sending, setSending] = useState(false);
 
   const { data: templatesData, isLoading: templatesLoading } = useTemplates({ channel, page_size: 100 });
   const allTemplates = useMemo(() => (templatesData?.items ?? []).filter((t) => t.is_active), [templatesData]);
@@ -109,28 +166,97 @@ export default function SendMessagePanel({ onSendSuccess, showAcademicYear = tru
     setExtraVars({});
   }, [templateId]);
 
-  // Recipient count — one preview-count call per selected class/section pair, summed.
-  const previewQueries = useQueries({
-    queries: selection.map(({ classId, sectionId }) => ({
-      queryKey: communicationKeys.previewCount({
-        target_type: 'class_section_parents',
-        class_id: classId,
-        section_id: sectionId,
+  // Reset recipient selection whenever the target type changes.
+  useEffect(() => {
+    setClassId(null);
+    setSectionId(null);
+    setStudentSearch('');
+    setSelectedStudentIds(new Set());
+    setStaffSelection([]);
+  }, [targetKind]);
+
+  // ── Class + Section → student checkbox list (Parents / Students) ───────
+  // NOTE: don't default `data` to `[]` here — that inline default creates a
+  // brand-new array reference on every render, which (via the useMemo/useEffect
+  // below) triggers a "Maximum update depth exceeded" infinite loop. Fall back
+  // to [] inside the memo instead, where it's only re-evaluated when the real
+  // `studentsData` reference actually changes.
+  const { data: studentsData, isLoading: studentsLoading } = useStudentsByClassSection(
+    classId ?? '',
+    sectionId ?? '',
+  );
+
+  const students = useMemo<StudentRow[]>(
+    () => (studentsData ?? [])
+      .filter((s) => !!s.student?.id)
+      .map((s) => {
+        const stu = s.student!;
+        const parentIds = new Set<string>();
+        if (stu.father?.id) parentIds.add(stu.father.id);
+        if (stu.mother?.id) parentIds.add(stu.mother.id);
+        if (stu.guardian?.id) parentIds.add(stu.guardian.id);
+        stu.parent_links?.forEach((link) => {
+          if (link.parent?.id) parentIds.add(link.parent.id);
+        });
+        return {
+          id: stu.id,
+          name: `${stu.first_name ?? ''} ${stu.last_name ?? ''}`.trim() || 'Unknown Student',
+          admissionNumber: s.admission_number ?? '',
+          parentIds: Array.from(parentIds),
+        };
       }),
-      queryFn: () =>
-        communicationApi.getPreviewCount({
-          target_type: 'class_section_parents',
-          class_id: classId,
-          section_id: sectionId,
-        }),
-      staleTime: 30_000,
-      enabled: audience === 'students',
-    })),
-  });
-  const recipientsLoading = previewQueries.some((q) => q.isLoading);
-  const recipientCount = audience === 'students'
-    ? previewQueries.reduce((sum, q) => sum + (q.data?.estimated_count ?? 0), 0)
-    : null;
+    [studentsData],
+  );
+
+  // Default to "everyone selected" whenever the student list changes.
+  useEffect(() => {
+    setSelectedStudentIds(new Set(students.map((s) => s.id)));
+  }, [students]);
+
+  const filteredStudents = useMemo(() => {
+    const q = studentSearch.trim().toLowerCase();
+    if (!q) return students;
+    return students.filter((s) => s.name.toLowerCase().includes(q) || s.admissionNumber.toLowerCase().includes(q));
+  }, [students, studentSearch]);
+
+  const allSelected = students.length > 0 && selectedStudentIds.size === students.length;
+  const toggleAll = (checked: boolean) => {
+    setSelectedStudentIds(checked ? new Set(students.map((s) => s.id)) : new Set());
+  };
+  const toggleStudent = (studentId: string, checked: boolean) => {
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(studentId);
+      else next.delete(studentId);
+      return next;
+    });
+  };
+
+  const selectedStudents = useMemo(
+    () => students.filter((s) => selectedStudentIds.has(s.id)),
+    [students, selectedStudentIds],
+  );
+  const selectedStudentIdList = useMemo(() => selectedStudents.map((s) => s.id), [selectedStudents]);
+  const selectedParentIdList = useMemo(() => {
+    const set = new Set<string>();
+    selectedStudents.forEach((s) => s.parentIds.forEach((id) => set.add(id)));
+    return Array.from(set);
+  }, [selectedStudents]);
+  const studentsWithoutParent = targetKind === 'parents'
+    ? selectedStudents.filter((s) => s.parentIds.length === 0)
+    : [];
+
+  const staffIds = useMemo(() => staffSelection.map((s) => s.value), [staffSelection]);
+
+  const resolvedTarget = useMemo(
+    () => resolveTarget(targetKind, selectedStudentIdList, selectedParentIdList, staffIds),
+    [targetKind, selectedStudentIdList, selectedParentIdList, staffIds],
+  );
+
+  // Recipient count preview — one call for whatever target is currently resolved.
+  const previewParams = buildPreviewParams(resolvedTarget);
+  const { data: previewData, isFetching: recipientsLoading } = usePreviewCount(previewParams);
+  const recipientCount = previewData?.estimated_count ?? null;
 
   const sampleMessage = selectedTemplate ? buildPreviewText(selectedTemplate.body, extraVars) : '';
   const smsCharCount = channel === 'sms' ? sampleMessage.length : 0;
@@ -138,77 +264,156 @@ export default function SendMessagePanel({ onSendSuccess, showAcademicYear = tru
 
   const isAllFilled =
     !!selectedTemplate &&
-    selection.length > 0 &&
+    !!resolvedTarget &&
     userVars.every((v) => !!extraVars[v]?.trim());
 
-  async function handleSend() {
-    if (!selectedTemplate || selection.length === 0) return;
-    setSending(true);
-    try {
-      let totalQueued = 0;
-      for (const { classId, sectionId } of selection) {
-        const res = await communicationApi.sendNotification({
-          channel,
-          target_type: 'class_section_parents',
-          target_ref: { class_id: classId, section_id: sectionId },
-          template_id: selectedTemplate.id,
-          extra_variables: userVars.length ? extraVars : undefined,
-        });
-        totalQueued += res.queued_count;
-      }
-      toast.success(`${channel.toUpperCase()} queued for ${totalQueued} recipient(s).`);
-      queryClient.invalidateQueries({ queryKey: communicationKeys.logs() });
-      setSelection([]);
-      setExtraVars({});
-      onSendSuccess?.();
-    } catch (error) {
-      const msg = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      toast.error(msg || 'Failed to send message');
-    } finally {
-      setSending(false);
-    }
+  const sendMutation = useSendNotification();
+
+  function handleSend() {
+    if (!selectedTemplate || !resolvedTarget) return;
+    sendMutation.mutate(
+      {
+        channel,
+        target_type: resolvedTarget.target_type,
+        target_ref: resolvedTarget.target_ref,
+        template_id: selectedTemplate.id,
+        extra_variables: userVars.length ? extraVars : undefined,
+      },
+      {
+        onSuccess: () => {
+          setSelectedStudentIds(new Set());
+          setStaffSelection([]);
+          setExtraVars({});
+          onSendSuccess?.();
+        },
+      },
+    );
   }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4">
-      {/* ── Audience sidebar ─────────────────────────────────────────────── */}
+      {/* ── Target Type sidebar ──────────────────────────────────────────── */}
       <div className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Audience
+          Target Type
         </h2>
-        <div className="flex gap-1 rounded-lg border p-1">
-          <button
-            type="button"
-            onClick={() => setAudience('students')}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-sm font-medium transition-colors ${
-              audience === 'students' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <GraduationCap className="h-4 w-4" />
-            Students
-          </button>
-          <button
-            type="button"
-            onClick={() => setAudience('staff')}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-sm font-medium transition-colors ${
-              audience === 'staff' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <StaffIcon className="h-4 w-4" />
-            Staff
-          </button>
+        <div className="grid grid-cols-2 gap-1 rounded-lg border p-1">
+          {TARGET_KINDS.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTargetKind(value)}
+              className={`flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors ${
+                targetKind === value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
         </div>
 
-        {audience === 'students' ? (
-          <ClassSectionTreePicker
-            academicYearId={academicYearId ?? undefined}
-            value={selection}
-            onChange={setSelection}
-            searchQuery={searchQuery}
-          />
-        ) : (
+        {(targetKind === 'parents' || targetKind === 'students') && (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-medium mb-1">Class</label>
+                <ClassesDropdown
+                  value={classId ?? undefined}
+                  onChange={(val) => {
+                    setClassId((val as string) ?? null);
+                    setSectionId(null);
+                  }}
+                  placeholder="Class"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">Section</label>
+                <SectionsByClassDropdown
+                  classId={classId ?? undefined}
+                  value={sectionId ?? undefined}
+                  onChange={(val) => setSectionId((val as string) ?? null)}
+                  placeholder="Section"
+                />
+              </div>
+            </div>
+
+            {classId && sectionId && (
+              <div className="flex flex-col overflow-hidden rounded-lg border">
+                <div className="flex items-center gap-2 border-b bg-muted/30 px-3 py-2">
+                  <span className="text-sm font-semibold">Students</span>
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {selectedStudentIds.size}/{students.length}
+                  </Badge>
+                </div>
+                <div className="border-b px-3 py-2">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={studentSearch}
+                      onChange={(e) => setStudentSearch(e.target.value)}
+                      placeholder="Search name or admission #"
+                      className="h-8 pl-8 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 border-b px-3 py-2">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={(checked) => toggleAll(checked === true)}
+                    disabled={students.length === 0}
+                  />
+                  <span className="text-xs font-medium text-muted-foreground">Select all</span>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {studentsLoading ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : filteredStudents.length === 0 ? (
+                    <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                      {studentSearch ? `No students match "${studentSearch}".` : 'No students in this class-section.'}
+                    </p>
+                  ) : (
+                    filteredStudents.map((s) => (
+                      <label
+                        key={s.id}
+                        className="flex cursor-pointer items-center gap-2 border-b px-3 py-2 last:border-0 hover:bg-muted/20"
+                      >
+                        <Checkbox
+                          checked={selectedStudentIds.has(s.id)}
+                          onCheckedChange={(checked) => toggleStudent(s.id, checked === true)}
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{s.name}</p>
+                          <p className="text-xs text-muted-foreground">{s.admissionNumber || '—'}</p>
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {targetKind === 'parents' && studentsWithoutParent.length > 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                {studentsWithoutParent.length} selected student{studentsWithoutParent.length !== 1 ? 's have' : ' has'} no
+                linked parent contact and will be skipped.
+              </p>
+            )}
+          </>
+        )}
+
+        {targetKind === 'staff' && (
+          <div>
+            <label className="block text-xs font-medium mb-1">Staff</label>
+            <MultiTargetPicker kind="staff" value={staffSelection} onChange={setStaffSelection} />
+          </div>
+        )}
+
+        {targetKind === 'entire_school' && (
           <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-            Staff audience selection isn&apos;t built yet — use the Communication compose flow for staff/role-based sends.
+            This will send to every parent, student, and staff member in the school.
           </p>
         )}
       </div>
@@ -230,53 +435,7 @@ export default function SendMessagePanel({ onSendSuccess, showAcademicYear = tru
           ))}
         </div>
 
-        <SectionCard number={1} title="Filters">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {showAcademicYear && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Academic year</label>
-                <AcademicYearsDropdown
-                  value={academicYearId ?? undefined}
-                  onChange={(val) => setAcademicYearId((val as string) ?? null)}
-                />
-              </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium mb-1">Search within selection</label>
-              <Input
-                placeholder="Class or section name…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1.5">Narrow to</label>
-            <div className="flex flex-wrap gap-2">
-              {NARROW_TO.map((label) => {
-                const isDefault = label === NARROW_TO[0];
-                const isActive = narrowTo === label;
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    disabled={!isDefault}
-                    onClick={() => isDefault && setNarrowTo(label)}
-                    title={isDefault ? undefined : 'Coming soon'}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                      isActive ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </SectionCard>
-
-        <SectionCard number={2} title="Context & template">
+        <SectionCard number={1} title="Context & template">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium mb-1">Context (what this {channel.toUpperCase()} is for)</label>
@@ -329,7 +488,7 @@ export default function SendMessagePanel({ onSendSuccess, showAcademicYear = tru
           )}
         </SectionCard>
 
-        <SectionCard number={3} title="Preview & send">
+        <SectionCard number={2} title="Preview & send">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4 items-start">
             <div className="rounded-md border bg-muted/30 p-3">
               {sampleMessage ? (
@@ -343,13 +502,13 @@ export default function SendMessagePanel({ onSendSuccess, showAcademicYear = tru
             <div className="space-y-2 text-right">
               <div>
                 <p className="text-2xl font-semibold">
-                  {audience === 'students' ? (recipientsLoading ? '…' : recipientCount) : '—'}
+                  {previewParams ? (recipientsLoading ? '…' : recipientCount ?? 0) : '—'}
                 </p>
                 <p className="text-xs text-muted-foreground">recipients</p>
               </div>
               {canCreate && (
-                <Button className="w-full" onClick={handleSend} disabled={!isAllFilled || sending}>
-                  {sending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                <Button className="w-full" onClick={handleSend} disabled={!isAllFilled || sendMutation.isPending}>
+                  {sendMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                   Send Now
                 </Button>
               )}

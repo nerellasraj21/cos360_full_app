@@ -46,6 +46,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { usePayFee, useFeeSummary, useTermsDue, useConcessionSummary } from '@/hooks/fee';
+import { usePermission } from '@/hooks/usePermission';
 import { formatCurrency } from './FeeSummaryTab';
 import type { FeePaymentResponse, CollectionPaymentMethod, FeePaymentRequest } from '@/types/fee';
 
@@ -115,6 +116,8 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
   const { selectedAcademicYearId } = useAcademicYearStore();
   const { data: summaryData } = useFeeSummary(studentId, selectedAcademicYearId);
   const payFeeMutation = usePayFee();
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('fee_transactions', 'create');
 
   // Fetch ALL this student's term installment dates using a far-future sentinel.
   // useTermsDue is student-scoped, so it returns only dates relevant to this student's fee types.
@@ -220,6 +223,10 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
   }, [totalReceived, setValue]);
 
   function onSubmitForm() {
+    if (!canCreate) {
+      toast.error("You don't have permission to collect fee payments.");
+      return;
+    }
     setShowConfirm(true);
   }
 
@@ -359,12 +366,25 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
                         <Input
                           type="number"
                           min={0}
+                          max={row.amount}
                           step="0.01"
                           className="h-8 w-32"
                           placeholder="Amount"
                           value={receivedAmounts[row.fee_type_id] ?? ''}
+                          readOnly={!canCreate}
+                          disabled={!canCreate}
                           onChange={(e) => {
-                            setReceivedAmounts((prev) => ({ ...prev, [row.fee_type_id]: e.target.value }));
+                            if (!canCreate) return;
+                            const raw = e.target.value;
+                            const num = parseFloat(raw);
+                            if (!isNaN(num) && num > row.amount) {
+                              toast.error(
+                                `Amount should not exceed ${formatCurrency(row.amount)} for ${row.fee_type_name}`
+                              );
+                              setReceivedAmounts((prev) => ({ ...prev, [row.fee_type_id]: String(row.amount) }));
+                              return;
+                            }
+                            setReceivedAmounts((prev) => ({ ...prev, [row.fee_type_id]: raw }));
                           }}
                         />
                       </TableCell>
@@ -392,6 +412,11 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
           <CardTitle className="text-base">Collect Payment</CardTitle>
         </CardHeader>
         <CardContent>
+          {!canCreate && (
+            <div className="mb-4 p-3 bg-muted border rounded-md text-sm text-muted-foreground">
+              You don't have permission to collect fee payments. Contact an administrator for access.
+            </div>
+          )}
           {payFeeMutation.isError && (
             <div className="mb-4 p-3 bg-destructive/10 border border-destructive text-destructive rounded-md text-sm">
               {payFeeMutation.error?.message || 'Failed to process payment. Please try again.'}
@@ -514,7 +539,7 @@ export default function FeePaymentTab({ studentId, studentName, onPaymentSuccess
             {/* Submit */}
             <Button
               type="submit"
-              disabled={payFeeMutation.isPending || totalReceived <= 0 || Object.keys(errors).length > 0}
+              disabled={!canCreate || payFeeMutation.isPending || totalReceived <= 0 || Object.keys(errors).length > 0}
               className="w-full md:w-auto"
             >
               {payFeeMutation.isPending ? (

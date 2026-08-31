@@ -92,6 +92,7 @@ export function useStudentAttendanceSummary(
     present_days: number;
     absent_days: number;
     late_days: number;
+    half_days: number;
     attendance_percentage: number;
   }>({
     queryKey: ['attendance', 'summary', studentId, academicYearId],
@@ -105,13 +106,16 @@ export function useStudentAttendanceSummary(
       const present_days = response.filter(a => a.status === 'present').length;
       const absent_days = response.filter(a => a.status === 'absent').length;
       const late_days = response.filter(a => a.status === 'late').length;
+      const half_days = response.filter(a => a.status === 'half_day').length;
 
       return {
         total_days,
         present_days,
         absent_days,
         late_days,
-        attendance_percentage: total_days > 0 ? (present_days / total_days) * 100 : 0,
+        half_days,
+        // half-day counts as 0.5 present, matching the backend stats formula
+        attendance_percentage: total_days > 0 ? ((present_days + half_days * 0.5) / total_days) * 100 : 0,
       };
     },
     enabled: !!studentId,

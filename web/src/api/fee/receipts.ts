@@ -13,9 +13,29 @@ import type {
 // Helper function to handle API errors
 const handleApiError = (error: unknown): Error => {
   if (axios.isAxiosError(error)) {
-    if (error.response?.data?.detail) {
-      return new Error(error.response.data.detail);
+    const detail = error.response?.data?.detail;
+
+    // Validation errors (422) - detail is an array of error objects
+    if (Array.isArray(detail)) {
+      const validationErrors = detail
+        .map((err: any) => {
+          const field = err.loc?.[err.loc.length - 1] || err.loc?.[0] || 'unknown';
+          return `${field}: ${err.msg}`;
+        })
+        .join('; ');
+      return new Error(validationErrors || 'Validation error');
     }
+
+    if (typeof detail === 'string') {
+      return new Error(detail);
+    }
+
+    // Object detail (e.g. FastAPI nested errors) — don't let it fall through
+    // to `new Error(detail)`, which stringifies an object to "[object Object]"
+    if (detail && typeof detail === 'object') {
+      return new Error(JSON.stringify(detail));
+    }
+
     return new Error(error.message || 'Network error');
   }
   if (error instanceof Error) {
@@ -65,7 +85,7 @@ export const feeReceiptsApi = {
     return response.data;
   },
 
-  // Search receipts
+  // Search receipts — requires fee_receipts:list (admin/staff only)
   searchReceipts: async (params?: FeeReceiptSearchParams): Promise<FeeReceiptListResponse> => {
     const queryParams = new URLSearchParams();
     if (params?.student_id) queryParams.append('student_id', params.student_id);
@@ -76,6 +96,32 @@ export const feeReceiptsApi = {
     if (params?.offset) queryParams.append('offset', params.offset.toString());
 
     const response = await CAxios.get(`/fee/receipts/?${queryParams.toString()}`);
+    return response.data;
+  },
+
+  // Student's own receipts — requires only fee_receipts:list_own (already
+  // granted to the Student role), unlike searchReceipts above which needs
+  // the bare :list permission students don't have.
+  getMyReceipts: async (params?: { limit?: number; offset?: number }): Promise<FeeReceipt[]> => {
+    const queryParams = new URLSearchParams();
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+    const response = await CAxios.get(`/fee/receipts/my-receipts?${queryParams.toString()}`);
+    return response.data;
+  },
+
+  // Parent's "related" scope — resolves server-side to every linked child's
+  // receipts in one list, under fee_receipts:list_related, same pattern as
+  // /fee/transactions/my-children-fees. A parent has no fee_receipts:list_own
+  // grant, so getMyReceipts() above 403s for that role — this is the endpoint
+  // to use instead.
+  getMyChildrenReceipts: async (params?: { limit?: number; offset?: number }): Promise<FeeReceipt[]> => {
+    const queryParams = new URLSearchParams();
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+    const response = await CAxios.get(`/fee/receipts/my-children-receipts?${queryParams.toString()}`);
     return response.data;
   },
 
@@ -119,6 +165,8 @@ export const {
   reprintReceipt,
   verifyReceipt,
   searchReceipts,
+  getMyReceipts,
+  getMyChildrenReceipts,
   downloadReceiptPdf,
   healthCheck,
 } = feeReceiptsApi;

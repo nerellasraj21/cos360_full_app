@@ -19,10 +19,17 @@ const HIDDEN_MENU_ITEMS = new Set([
 const isHiddenItem = (item: MenuItem): boolean =>
     HIDDEN_MENU_ITEMS.has(item.name.toLowerCase());
 
+// "My Fees" (/fee/my-fees) needs fee_collection:read, a permission the Student
+// role doesn't have and isn't getting — hide it for students even though the
+// backend still sends it in the menu tree. Scoped to student only (not a
+// blanket HIDDEN_MENU_ITEMS entry) since other roles may use the same label.
+const isMyFeesItem = (item: MenuItem): boolean =>
+    item.name.toLowerCase() === 'my fees';
+
 const isFeeItem = (item: MenuItem): boolean => {
     const url = item.url ?? '';
     const name = item.name.toLowerCase();
-    return url.startsWith('/fee') || name === 'fee management' || name === 'fees';
+    return url.startsWith('/fee') || name === 'fee management' || name === 'fees' || name === 'fee';
 };
 
 const filterMenuForRole = (items: MenuItem[], roleName: string): MenuItem[] => {
@@ -38,30 +45,66 @@ const filterMenuForRole = (items: MenuItem[], roleName: string): MenuItem[] => {
             }));
     }
 
-    // Students get a stripped-down Fee menu if the backend didn't include one
     if (roleName === 'student') {
-        const hasFeeInMenu = visible.some(item => isFeeItem(item));
-        if (!hasFeeInMenu) {
-            return [
-                ...visible,
-                {
-                    id: 99001,
-                    name: 'Fee',
-                    url: '/fee',
-                    level: 'L0' as const,
-                    children: [
-                        { id: 99002, name: 'My Fees',     url: '/fee/my-fees',     level: 'L1' as const, children: [] },
-                        { id: 99003, name: 'My Receipts', url: '/fee/my-receipts', level: 'L1' as const, children: [] },
-                    ],
-                },
-            ];
-        }
+        return visible
+            .filter(item => !isMyFeesItem(item))
+            .map(item => ({
+                ...item,
+                children: item.children ? filterMenuForRole(item.children, roleName) : [],
+            }));
     }
 
     return visible.map(item => ({
         ...item,
         children: item.children ? filterMenuForRole(item.children, roleName) : [],
     }));
+};
+
+// Students/parents get a stripped-down Fee menu if the backend didn't
+// include one. Must run ONCE against the top-level menu tree only — never
+// recursed into children, or it re-injects a duplicate "Fee" node under
+// every parent group.
+// Both roles get the same two entries: Student sees its own fee_receipts/
+// fee_transactions (read_own/list_own); Parent's "related" scope resolves
+// server-side to every linked child's records for the same two resources
+// (see UserContextService._get_related_entity_ids).
+const SELF_SERVICE_FEE_CHILDREN: MenuItem[] = [
+    { id: 99003, name: 'My Receipts',     url: '/fee/my-receipts',     level: 'L1' as const, children: [] },
+    { id: 99004, name: 'My Transactions', url: '/fee/my-transactions', level: 'L1' as const, children: [] },
+];
+
+const hasChildUrl = (item: MenuItem, url: string): boolean =>
+    (item.children ?? []).some(child => child.url === url);
+
+const ensureFeeMenu = (items: MenuItem[]): MenuItem[] => {
+    const feeIdx = items.findIndex(item => isFeeItem(item));
+
+    if (feeIdx === -1) {
+        // Backend sent no Fee node at all — inject a full self-service one.
+        return [
+            ...items,
+            {
+                id: 99001,
+                name: 'Fee',
+                url: '/fee',
+                level: 'L0' as const,
+                children: SELF_SERVICE_FEE_CHILDREN,
+            },
+        ];
+    }
+
+    // Backend already sent a Fee node (e.g. with "My Fees") — merge in
+    // whichever self-service children (My Receipts / My Transactions) it's
+    // missing, without touching whatever the backend already provided.
+    const existing = items[feeIdx];
+    const missing = SELF_SERVICE_FEE_CHILDREN.filter(child => !hasChildUrl(existing, child.url as string));
+    if (missing.length === 0) return items;
+
+    return items.map((item, i) =>
+        i === feeIdx
+            ? { ...item, children: [...(item.children ?? []), ...missing] }
+            : item
+    );
 };
 
 
@@ -179,7 +222,10 @@ export const useMenuData = () => {
 
             const transformedMenu = menuItems.map((item: any) => transformMenuItem(item, 0));
             const roleName = role?.name?.toLowerCase() ?? '';
-            const filteredMenu = filterMenuForRole(transformedMenu, roleName);
+            let filteredMenu = filterMenuForRole(transformedMenu, roleName);
+            if (roleName === 'student' || roleName === 'parent') {
+                filteredMenu = ensureFeeMenu(filteredMenu);
+            }
             const feeEnrichedMenu = injectFeeSubmenu(filteredMenu, roleName);
             const enrichedMenu = injectSchoolSettings(feeEnrichedMenu, roleName);
             const orderedMenu = reorderMenu(enrichedMenu);

@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { toast } from 'sonner';
-import { feeStudentMappingsApi } from '@/api/fee/studentMappings';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { useVehiclesDropdown, useVehicle } from '@/api/hooks/masters/vehicles';
 import { useRoutesDropdown } from '@/api/hooks/masters/routes';
@@ -18,7 +17,7 @@ import { useClassesDropdown, useSectionsByClassId } from '@/hooks/masters/useCla
 import { fetchStudentsDropdown } from '@/api/students/admissions';
 import { useStudentAdmissionDetail } from '@/api/hooks/students/admissions';
 import { useFeeTypes } from '@/hooks/fee/useFeeTypes';
-import { useFeeClassMappings } from '@/hooks/fee/useFeeMappings';
+import { useFeeClassMappings, useCreateFeeStudentMapping, useUpdateFeeStudentMapping } from '@/hooks/fee/useFeeMappings';
 import Select, { type SingleValue } from 'react-select';
 import type { FeeClassMapping, FeeStudentMapping, FeeStudentMappingCreateRequest, FeeStudentMappingUpdateRequest } from '@/types/fee/mapping';
 import type { StudentDropdownItem } from '@/types/admission';
@@ -48,6 +47,8 @@ type SelectOption = { value: string; label: string } | null;
 
 export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCancel }: StudentMappingFormProps) {
   const [loading, setLoading] = useState(false);
+  const createMutation = useCreateFeeStudentMapping();
+  const updateMutation = useUpdateFeeStudentMapping();
   const [selectedClass, setSelectedClass] = useState<SelectOption>(
     mapping?.class_id ? { value: mapping.class_id, label: `Class ${mapping.class_id}` } : null
   );
@@ -295,20 +296,17 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
       setLoading(true);
 
       if (mapping) {
-        // Update existing mapping
-        await feeStudentMappingsApi.updateMapping(mapping.id, data);
-        toast.success('Fee student mapping updated successfully');
+        // Update existing mapping — hook invalidates the mappings list on success
+        await updateMutation.mutateAsync({ id: mapping.id, data });
       } else {
-        // Create new mapping
-        await feeStudentMappingsApi.createMapping(data);
-        toast.success('Fee student mapping created successfully');
+        // Create new mapping — hook invalidates the mappings list on success
+        await createMutation.mutateAsync(data);
       }
 
       onSuccess();
-    } catch (error: any) {
+    } catch (error) {
+      // Mutation hooks already toast the failure; just log for debugging.
       console.error('Error saving mapping:', error);
-      const errorMessage = error.response?.data?.detail || 'Failed to save fee student mapping';
-      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

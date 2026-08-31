@@ -64,9 +64,27 @@ interface ConcessionRow {
   due_amount: number;
   due_date: string | null;
   is_settled: boolean;
+  // The amount for a NEW concession entry being added on top of whatever is
+  // already applied (0 unless the user is actively typing one in). This is
+  // never pre-filled from an existing record — concessions stack, they
+  // don't get silently resubmitted.
   concession_amount: number;
+  // The total concession already saved on the backend for this fee type
+  // (i.e. already baked into `due_amount`). Purely informational / used to
+  // cap the single-record edit in Concession History below.
+  original_concession_amount: number;
   reason: string;
   approved_by: string;
+}
+
+// Editing a single existing Concession History record: its due_amount
+// already has that record's amount applied (due_amount = assigned_fee -
+// concession_amount - paid_amount). So the most that one record can be set
+// to — without pushing the due amount negative, i.e. "refunding" money
+// already collected — is the current due plus what that record already
+// contributes.
+function maxConcessionFor(dueAmount: number, existingConcessionAmount: number): number {
+  return dueAmount + existingConcessionAmount;
 }
 
 interface ConcessionTabProps {
@@ -110,9 +128,10 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
           due_amount: item.due_amount,
           due_date: item.due_date,
           is_settled: item.is_settled,
-          concession_amount: item.concession_amount || 0,
-          reason: item.reason || '',
-          approved_by: item.approved_by || '',
+          concession_amount: 0,
+          original_concession_amount: item.concession_amount || 0,
+          reason: '',
+          approved_by: '',
         }))
       );
     }
@@ -121,14 +140,41 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
   function updateRow(index: number, field: keyof ConcessionRow, value: string | number) {
     setRows((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
+      const row = next[index];
+
+      // Never let the new concession amount push the due amount below zero.
+      // due_amount already nets out any concession(s) already applied, so
+      // the cap for an additional entry is simply what's still owed.
+      if (field === 'concession_amount') {
+        const numericValue = Number(value) || 0;
+        const max = row.due_amount;
+        if (numericValue > max) {
+          toast.error(
+            `Concession for ${row.fee_type_name} cannot exceed the due amount of ${formatCurrency(max)}.`
+          );
+          next[index] = { ...row, concession_amount: max };
+          return next;
+        }
+      }
+
+      next[index] = { ...row, [field]: value };
       return next;
     });
   }
 
   function handleSaveAll() {
+    // /fee/concessions/bulk is a CREATE endpoint — it always creates new
+    // concession records, it does not upsert. Concessions stack: a fee type
+    // that already has one can get another on top (each amount entered here
+    // is always a fresh, additive record — see `concession_amount` init in
+    // the effect above, which never pre-fills an existing amount so a save
+    // can't accidentally resubmit/duplicate one). Editing or removing a
+    // specific existing entry is still done via Concession History below.
     const isValidRow = (r: ConcessionRow) =>
-      r.concession_amount > 0 && r.reason.trim().length >= 5 && !!r.approved_by;
+      r.concession_amount > 0 &&
+      r.concession_amount <= r.due_amount &&
+      r.reason.trim().length >= 5 &&
+      !!r.approved_by;
     const isTouchedRow = (r: ConcessionRow) =>
       r.concession_amount > 0 || r.reason.trim().length > 0 || !!r.approved_by;
 
@@ -171,8 +217,32 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
     });
   }
 
+  // Concession history doesn't carry the fee type's due amount, so look it up
+  // from the current summary rows (matched by fee type name) to enforce the
+  // same "never push due amount negative" cap in the edit dialog.
+  const editMatchedRow = editItem
+    ? rows.find((r) => r.fee_type_name === editItem.fee_type_name)
+    : undefined;
+  const editMaxConcession = editMatchedRow
+    ? maxConcessionFor(editMatchedRow.due_amount, editMatchedRow.original_concession_amount)
+    : undefined;
+
+  function handleEditAmountChange(value: string) {
+    const numericValue = Number(value) || 0;
+    if (editMaxConcession !== undefined && numericValue > editMaxConcession) {
+      toast.error(`Concession cannot exceed the due amount of ${formatCurrency(editMaxConcession)}.`);
+      setEditData((d) => ({ ...d, concession_amount: editMaxConcession }));
+      return;
+    }
+    setEditData((d) => ({ ...d, concession_amount: numericValue }));
+  }
+
   function handleEditSave() {
     if (!editItem) return;
+    if (editMaxConcession !== undefined && (editData.concession_amount ?? 0) > editMaxConcession) {
+      toast.error(`Concession cannot exceed the due amount of ${formatCurrency(editMaxConcession)}.`);
+      return;
+    }
     updateMutation.mutate(
       { id: editItem.id, data: editData },
       { onSuccess: () => setEditItem(null) }
@@ -235,7 +305,12 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row, idx) => (
+                {rows.map((row, idx) => {
+                  // Already has a saved concession — still editable here,
+                  // but whatever is typed is a NEW additive entry on top of
+                  // it (see handleSaveAll), not a replacement.
+                  const isLocked = row.original_concession_amount > 0;
+                  return (
                   <TableRow key={row.fee_type_id} className="h-12">
                     <TableCell>{idx + 1}</TableCell>
                     <TableCell className="font-medium">{row.fee_type_name}</TableCell>
@@ -253,11 +328,13 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
                       <Input
                         type="number"
                         min={0}
-                        max={row.assigned_fee}
+                        max={row.due_amount}
                         step="0.01"
                         value={row.concession_amount || ''}
                         onChange={(e) => canCreate && updateRow(idx, 'concession_amount', Number(e.target.value))}
                         readOnly={!canCreate}
+                        placeholder={isLocked ? 'Add more...' : undefined}
+                        title={isLocked ? `${formatCurrency(row.original_concession_amount)} already applied — this adds a new entry on top` : undefined}
                         className="h-8 w-28"
                       />
                     </TableCell>
@@ -287,7 +364,8 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
                       </Select>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
 
                 {/* Totals */}
                 {summaryData && (
@@ -387,9 +465,10 @@ export default function ConcessionTab({ studentId }: ConcessionTabProps) {
               <Input
                 type="number"
                 min={0}
+                max={editMaxConcession}
                 step="0.01"
                 value={editData.concession_amount ?? ''}
-                onChange={(e) => setEditData((d) => ({ ...d, concession_amount: Number(e.target.value) }))}
+                onChange={(e) => handleEditAmountChange(e.target.value)}
               />
             </div>
             <div className="space-y-2">

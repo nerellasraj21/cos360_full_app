@@ -32,6 +32,7 @@ import { QuickSendButton } from '@/components/communication/QuickSendButton'
 import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections'
 import { useAuthStore } from '@/lib/authStore'
+import { isAdminRoleName } from '@/lib/roleUtils'
 import { useAcademicYearStore } from '@/lib/academicYearStore'
 import { useExamStore } from '@/lib/examStore'
 import { useSelectStyles } from '@/lib/useSelectStyles'
@@ -48,10 +49,7 @@ const STATUS_BADGE: Record<ExamStatus, string> = {
 export default function ExamDetail() {
   const { id } = useParams({ strict: false }) as { id: string }
   const navigate = useNavigate()
-  const isAdmin = useAuthStore(s => {
-    const roleName = s.role?.name?.toLowerCase() ?? ''
-    return roleName === 'admin' || roleName === 'superadmin' || roleName === 'principal'
-  })
+  const isAdmin = useAuthStore(s => isAdminRoleName(s.role?.name))
   const { setActiveExam } = useExamStore()
   const { academicYears } = useAcademicYearStore()
 

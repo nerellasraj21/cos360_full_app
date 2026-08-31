@@ -34,6 +34,7 @@ import type { FeeTransaction } from '@/types/fee/transaction';
 import { Plus, Search, Eye, CheckCircle, XCircle, RefreshCw, DollarSign, X, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { PermissionGuard } from '@/components/common';
+import { usePermission } from '@/hooks/usePermission';
 import { ShieldX } from 'lucide-react';
 
 export default function FeeRefunds() {
@@ -69,6 +70,9 @@ export default function FeeRefunds() {
 function FeeRefundsContent() {
   const { selectedAcademicYearId, academicYears, fetchAndSetAcademicYears } = useAcademicYearStore();
   const { user } = useAuthStore();
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('fee_refunds', 'create');
+  const canApprove = checkPermission('fee_refunds', 'approve');
   const [searchParams, setSearchParams] = useState<{
     limit: number;
     offset: number;
@@ -436,6 +440,10 @@ function FeeRefundsContent() {
   };
 
   const handleCreateRefund = () => {
+    if (!canCreate) {
+      toast.error("You don't have permission to create refund requests");
+      return;
+    }
     if (!user?.id) {
       toast.error('You must be logged in to create a refund request');
       return;
@@ -462,6 +470,10 @@ function FeeRefundsContent() {
 
   const handleApproveRejectSubmit = () => {
     if (!selectedRefund) return;
+    if (!canApprove) {
+      toast.error("You don't have permission to approve or reject refunds");
+      return;
+    }
     if (!user?.id) {
       toast.error('You must be logged in to approve or reject refunds');
       return;
@@ -567,10 +579,12 @@ function FeeRefundsContent() {
           <h1 className="text-3xl font-bold text-foreground">Fee Refunds</h1>
           <p className="text-muted-foreground mt-1">Manage fee refund requests and track their status</p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Refund Request
-        </Button>
+        {canCreate && (
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Refund Request
+          </Button>
+        )}
       </div>
 
       {/* Create Refund Dialog */}
@@ -981,7 +995,7 @@ function FeeRefundsContent() {
                             <Eye className="h-4 w-4 mr-2" />
                             View
                           </Button>
-                          {refund.status === 'pending' && (
+                          {refund.status === 'pending' && canApprove && (
                             <Button
                               variant="ghost"
                               size="sm"

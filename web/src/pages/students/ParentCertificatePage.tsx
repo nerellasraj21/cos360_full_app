@@ -1,33 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DownloadButton } from "@/components/common/TableActions";
 import { FileText, Loader2 } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMyChildCertificates, useDownloadCertificateDocument } from "@/api/hooks/students/certificates";
 import { useAuthStore } from "@/lib/authStore";
 import type { CertificateRead } from "@/types/certificates/types";
 
+// The active child is chosen via the header's student switcher
+// (authStore.selectedStudent) — there's no page-local selector here so every
+// module stays in sync with a single source of truth.
 export const ParentCertificatePage: React.FC = () => {
   const availableStudents = useAuthStore((s) => s.availableStudents);
   const selectedStudentFromStore = useAuthStore((s) => s.selectedStudent);
 
-  const [selectedChildId, setSelectedChildId] = useState<string>(
-    selectedStudentFromStore?.id ?? ""
-  );
-
-  // Always sync when the store's selected student changes (handles stale localStorage)
-  useEffect(() => {
-    if (selectedStudentFromStore?.id) {
-      setSelectedChildId(selectedStudentFromStore.id);
-    }
-  }, [selectedStudentFromStore?.id]);
-
-  const { data: certificatesData, isLoading } = useMyChildCertificates(selectedChildId);
+  const { data: certificatesData, isLoading } = useMyChildCertificates(selectedStudentFromStore?.id ?? "");
   const downloadCertificate = useDownloadCertificateDocument();
 
   const certificates = certificatesData?.items ?? [];
-  const selectedChild = availableStudents.find((s) => s.id === selectedChildId);
+  const selectedChild = selectedStudentFromStore;
 
   const handleDownload = async (certificateId: string) => {
     try {
@@ -53,34 +44,15 @@ export const ParentCertificatePage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-
-      {availableStudents.length > 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Select Child</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={selectedChildId} onValueChange={setSelectedChildId}>
-              <SelectTrigger className="max-w-xs">
-                <SelectValue placeholder="Select child" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableStudents.map((child) => (
-                  <SelectItem key={child.id} value={child.id}>
-                    {child.first_name} {child.last_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>
             {selectedChild
-              ? `Certificates — ${selectedChild.first_name} ${selectedChild.last_name}`
+              ? `Certificates — ${selectedChild.first_name} ${selectedChild.last_name}${
+                  selectedChild.class_name
+                    ? ` (${selectedChild.class_name}${selectedChild.section_name ? ` - ${selectedChild.section_name}` : ''})`
+                    : ''
+                }`
               : "Certificates"}
             {certificatesData && (
               <span className="ml-2 text-sm font-normal text-muted-foreground">

@@ -2,7 +2,7 @@
 import { useAuthStore } from '@/lib/authStore'
 
 // Admin-only sub-paths that students must not access directly
-const STUDENT_FEE_PATHS = ['/fee/my-fees', '/fee/my-receipts', '/fee'];
+const STUDENT_FEE_PATHS = ['/fee/my-receipts', '/fee/my-transactions', '/fee'];
 
 export const Route = createFileRoute('/_app/fee')({
     beforeLoad: ({ location }) => {

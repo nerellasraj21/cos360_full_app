@@ -8,7 +8,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ViewButton } from '@/components/common/TableActions';
-import { Eye, Loader2 } from 'lucide-react';
+import { PermissionGuard } from '@/components/common';
+import { Eye, Loader2, ShieldX } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { useLogs, useLogDetail } from '@/api/hooks/communication/communication';
 import type { Channel, NotificationStatus, NotificationLog, LogFilters } from '@/types/communication';
 
@@ -122,6 +124,36 @@ function LogDetailModal({ logId, onClose }: { logId: string; onClose: () => void
 
 // ─── Main Logs Tab ────────────────────────────────────────────────────────────
 export default function LogsTab() {
+  return (
+    <PermissionGuard
+      resource="communications"
+      action="list"
+      fallback={
+        <div className="p-6">
+          <div className="flex items-center justify-center min-h-[300px]">
+            <Card className="w-full max-w-md">
+              <CardContent className="pt-6">
+                <div className="text-center space-y-4">
+                  <ShieldX className="h-16 w-16 text-muted-foreground mx-auto" />
+                  <div>
+                    <h2 className="text-xl font-semibold text-foreground">Access Denied</h2>
+                    <p className="text-muted-foreground mt-2">
+                      You don't have permission to view communication logs.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      }
+    >
+      <LogsTabContent />
+    </PermissionGuard>
+  );
+}
+
+function LogsTabContent() {
   const [channelFilter, setChannelFilter] = useState<Channel | ''>('');
   const [statusFilter, setStatusFilter] = useState<NotificationStatus | ''>('');
   const [dateFrom, setDateFrom] = useState('');

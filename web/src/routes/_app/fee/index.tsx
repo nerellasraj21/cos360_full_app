@@ -3,7 +3,7 @@ import { useAuthStore } from '@/lib/authStore'
 import FeeDashboard from '@/pages/fee/FeeDashboard'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card, CardContent } from '@/components/ui/card'
-import { Banknote, IndianRupee, Receipt } from 'lucide-react'
+import { Banknote, Receipt, History } from 'lucide-react'
 
 export const Route = createFileRoute('/_app/fee/')({
     component: FeeIndexPage,
@@ -15,8 +15,8 @@ const cardColors = [
 ]
 
 const STUDENT_FEE_SECTIONS = [
-    { name: 'My Fees',     path: '/fee/my-fees',    icon: IndianRupee, description: 'View your fee summary and due amounts' },
-    { name: 'My Receipts', path: '/fee/my-receipts', icon: Receipt,     description: 'View your fee payment receipts' },
+    { name: 'My Receipts',     path: '/fee/my-receipts',     icon: Receipt,     description: 'View your fee payment receipts' },
+    { name: 'My Transactions', path: '/fee/my-transactions', icon: History,     description: 'View your fee payment history' },
 ]
 
 function FeeIndexPage() {

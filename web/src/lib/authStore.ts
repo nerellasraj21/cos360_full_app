@@ -2,6 +2,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { AuthState, LoginResponse, Student, User, Permission, PermissionMap } from '@/types/auth'
+import { getTeacherAllowedActions } from '@/lib/teacherPermissionMatrix'
+import { getStaffAllowedActions } from '@/lib/staffPermissionMatrix'
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -127,7 +129,30 @@ export const useAuthStore = create<AuthState>()(
       },
 
       hasPermission: (resource: string, action: string) => {
-        const { permissionsMap } = get()
+        const { permissionsMap, role } = get()
+
+        // Teacher role is capped by a frontend-only allowlist, independent
+        // of whatever the backend grants. Resources not in that allowlist
+        // fall through to the normal backend-driven check below.
+        // See src/lib/teacherPermissionMatrix.ts for the full table.
+        if ((role?.name ?? '').toLowerCase() === 'teacher') {
+          const teacherAllowedActions = getTeacherAllowedActions(resource)
+          if (teacherAllowedActions) {
+            return teacherAllowedActions.includes(action)
+          }
+        }
+
+        // Staff role is capped by a frontend-only allowlist, independent
+        // of whatever the backend grants. Resources not in that allowlist
+        // fall through to the normal backend-driven check below.
+        // See src/lib/staffPermissionMatrix.ts for the full table.
+        if ((role?.name ?? '').toLowerCase() === 'staff') {
+          const staffAllowedActions = getStaffAllowedActions(resource)
+          if (staffAllowedActions) {
+            return staffAllowedActions.includes(action)
+          }
+        }
+
         const hasPerm = permissionsMap[resource]?.includes(action) || false;
         console.log(`authStore.hasPermission: Checking ${resource}:${action}`, {
           permissionsMap,

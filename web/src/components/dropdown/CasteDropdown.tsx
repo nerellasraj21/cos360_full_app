@@ -35,7 +35,7 @@ export const CasteDropdown: React.FC<CasteDropdownProps> = ({
         data={options}
         value={value || ''}
         onChange={(val) => onChange((val as string) || null)}
-        placeholder="-- Select Caste --"
+        placeholder="Select"
         disabled={isLoading}
         required={required}
         clearable
