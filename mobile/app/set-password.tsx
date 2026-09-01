@@ -3,10 +3,11 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAuth } from '../contexts';
 import { authApi } from '../src/api/auth';
 import { getChangePasswordToken, clearChangePasswordToken } from '../services/authUtils';
+import { PrimaryButton, IconButton } from '@/components/buttons';
 
 const BRAND_COLOR = '#556ee6';
 const ACCENT_COLOR = '#556ee6';
@@ -112,9 +113,14 @@ const SetPasswordScreen: React.FC = () => {
                 autoCorrect={false}
                 editable={!isLoading}
               />
-              <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} style={styles.eyeButton} disabled={isLoading}>
-                <Ionicons name={showNewPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color='#9ca3af' />
-              </TouchableOpacity>
+              <IconButton
+                onPress={() => setShowNewPassword(!showNewPassword)}
+                disabled={isLoading}
+                icon={<Ionicons name={showNewPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color='#9ca3af' />}
+                accessibilityLabel={showNewPassword ? 'Hide password' : 'Show password'}
+                variant="ghost"
+                size="sm"
+              />
             </View>
           </View>
 
@@ -134,9 +140,14 @@ const SetPasswordScreen: React.FC = () => {
                 autoCorrect={false}
                 editable={!isLoading}
               />
-              <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeButton} disabled={isLoading}>
-                <Ionicons name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color='#9ca3af' />
-              </TouchableOpacity>
+              <IconButton
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                disabled={isLoading}
+                icon={<Ionicons name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color='#9ca3af' />}
+                accessibilityLabel={showConfirmPassword ? 'Hide password' : 'Show password'}
+                variant="ghost"
+                size="sm"
+              />
             </View>
           </View>
 
@@ -149,20 +160,16 @@ const SetPasswordScreen: React.FC = () => {
           ) : null}
 
           {/* Submit Button */}
-          <TouchableOpacity
-            style={[styles.primaryButton, { opacity: isLoading ? 0.75 : 1, marginTop: 8 }]}
+          <PrimaryButton
             onPress={handleSubmit}
             disabled={isLoading}
+            loading={isLoading}
+            fullWidth
+            style={{ marginTop: 8 }}
+            icon={!isLoading ? <Ionicons name='arrow-forward' size={18} color='white' /> : undefined}
           >
-            {isLoading ? (
-              <ActivityIndicator color='white' />
-            ) : (
-              <>
-                <Text style={styles.primaryButtonText}>Set Password</Text>
-                <Ionicons name='arrow-forward' size={18} color='white' />
-              </>
-            )}
-          </TouchableOpacity>
+            Set Password
+          </PrimaryButton>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

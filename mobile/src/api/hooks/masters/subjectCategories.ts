@@ -1,12 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastContext } from '../../../../components/ToastProvider';
-import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { useMastersQuery } from './useMastersQuery';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { subjectCategoriesApi, SubjectCategory, SubjectCategoryCreate, SubjectCategoryUpdate } from '../../index';
 
 // Get all subject categories - permission protected
 export function useSubjectCategories() {
-  return usePermissionProtectedQuery<SubjectCategory[]>({
+  return useMastersQuery<SubjectCategory[]>({
     queryKey: ['subjectCategories'],
     queryFn: () => subjectCategoriesApi.getSubjectCategories(),
     resource: PERMISSION_RESOURCES.SUBJECT_CATEGORIES,
@@ -17,7 +18,7 @@ export function useSubjectCategories() {
 
 // Get subject category by ID - permission protected
 export function useSubjectCategory(id: string) {
-  return usePermissionProtectedQuery<SubjectCategory>({
+  return useMastersQuery<SubjectCategory>({
     queryKey: ['subjectCategories', id],
     queryFn: () => subjectCategoriesApi.getSubjectCategory(id),
     resource: PERMISSION_RESOURCES.SUBJECT_CATEGORIES,

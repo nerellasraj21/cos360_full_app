@@ -4,18 +4,20 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView, Platform, ScrollView,
-  StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
+  StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import { DatePickerModal, TimePickerModal, formatTime12h } from '@/components/ui';
-import { CustomDropdown, DropdownOption } from '@/components/ui/dropdown';
-import { useAcademicYear, useTheme } from '@/contexts';
+import { CustomDropdown, CustomMultiSelect, DropdownOption } from '@/components/ui/dropdown';
+import { useAcademicYear, useAuth, useTheme } from '@/contexts';
+import { isAdminRole } from '@/src/lib/roles';
 import {
   ClassSectionPayload, ComponentPayload, EntryType, ExamBoard,
   ExamCreateFull, ExamDatePayload, ExamGradeScheme, ExamLevel,
-  ExamNature, SubjectConfigPayload, examsApi, gradeSchemeApi,
+  ExamNature, RemarkGradeSet, SubjectConfigPayload, SubjectGradeScheme,
+  examsApi, gradeSchemeApi, remarkGradesApi,
 } from '@/src/api/exam';
 import { ClassRead, classSectionsApi, classSubjectMappingsApi } from '@/src/api/masters';
 
@@ -80,7 +82,7 @@ function SectionHeader({
         open && { borderLeftWidth: 3, borderLeftColor: '#556ee6' },
       ]}
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={0.75}
     >
       <View style={[
         styles.stepBadge,
@@ -119,9 +121,18 @@ function FieldLabel({ text, required }: { text: string; required?: boolean }) {
 export default function CreateExamScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { role } = useAuth();
   const { activeAcademicYearId, academicYears } = useAcademicYear();
   const qc = useQueryClient();
   const { showSuccess, showError } = useToastContext();
+
+  // Web parity (_app/exam create flow): only admins may create exams.
+  const isAdmin = isAdminRole(role?.name);
+  useEffect(() => {
+    if (!isAdmin) {
+      router.replace('/exam/list');
+    }
+  }, [isAdmin, router]);
 
   const isDark = theme === 'dark';
   const cardBg = isDark ? '#1a1a2e' : '#ffffff';
@@ -154,8 +165,6 @@ export default function CreateExamScreen() {
   const [minAttendance,     setMinAttendance]     = useState('');
   const [attendanceFrom,    setAttendanceFrom]    = useState('');
   const [attendanceTo,      setAttendanceTo]      = useState('');
-  const [publishRank,       setPublishRank]       = useState(false);
-  const [isInternal,        setIsInternal]        = useState(true);
 
   useEffect(() => {
     if (activeAcademicYearId && !academicYearId) setAcademicYearId(activeAcademicYearId);
@@ -167,6 +176,9 @@ export default function CreateExamScreen() {
   // ── Step 3: Subject Configs ──
   const [subjectConfigs, setSubjectConfigs] = useState<SubjectConfigPayload[]>([]);
   const [subjectsByClass, setSubjectsByClass] = useState<Record<string, { id: string; name: string }[]>>({});
+  const [activeConfigTab, setActiveConfigTab] = useState<string | null>(null);
+  const [expandedConfigSubjects, setExpandedConfigSubjects] = useState<Set<string>>(new Set());
+  const [bulkMarksByTab, setBulkMarksByTab] = useState<Record<string, string>>({});
 
   // ── Step 4: Exam Dates ──
   const [examDates, setExamDates] = useState<ExamDatePayload[]>([]);
@@ -223,6 +235,16 @@ export default function CreateExamScreen() {
     queryFn: () => gradeSchemeApi.listExamSchemes(),
   });
 
+  const { data: subjectGradeSchemes = [] } = useQuery<SubjectGradeScheme[]>({
+    queryKey: ['grade-schemes-subject'],
+    queryFn: () => gradeSchemeApi.listSubjectSchemes(),
+  });
+
+  const { data: remarkSets = [] } = useQuery<RemarkGradeSet[]>({
+    queryKey: ['remark-grade-sets'],
+    queryFn: () => remarkGradesApi.list(),
+  });
+
   // Load subjects when class-sections change
   useEffect(() => {
     const classIds = [...new Set(classSections.map(cs => cs.class_id))];
@@ -242,7 +264,38 @@ export default function CreateExamScreen() {
     });
   }, [classSections]);
 
+  // Keep the active Subject Configuration tab valid as class-sections change
+  useEffect(() => {
+    const keys = classSections.map(cs => `${cs.class_id}|${cs.section_id ?? ''}`);
+    if (keys.length === 0) {
+      if (activeConfigTab !== null) setActiveConfigTab(null);
+      return;
+    }
+    if (!activeConfigTab || !keys.includes(activeConfigTab)) {
+      setActiveConfigTab(keys[0]);
+    }
+  }, [classSections]);
+
   // ── Derived ──
+  const classSectionOptions = useMemo(() => availableClasses.flatMap(cls => {
+    if (cls.sections.length === 0) {
+      return [{ label: cls.name, value: `${cls.id}|` }];
+    }
+    return cls.sections.map(s => ({
+      label: `${cls.name} – ${s.name}`,
+      value: `${cls.id}|${s.id}`,
+    }));
+  }), [availableClasses]);
+
+  const classSectionValues = classSections.map(cs => `${cs.class_id}|${cs.section_id ?? ''}`);
+
+  const handleClassSectionsChange = (values: (string | number)[]) => {
+    setClassSections(values.map(v => {
+      const [classId, sectionId] = String(v).split('|');
+      return { class_id: classId, section_id: sectionId || null };
+    }));
+  };
+
   const selectedCsKeys = new Set(classSections.map(cs => `${cs.class_id}|${cs.section_id ?? ''}`));
   const activeConfigs = subjectConfigs.filter(cfg => selectedCsKeys.has(`${cfg.class_id}|${cfg.section_id ?? ''}`));
 
@@ -270,19 +323,6 @@ export default function CreateExamScreen() {
   });
 
   // ── Helpers ──
-  const toggleClassSection = (classId: string, sectionId: string | null) => {
-    const key = `${classId}|${sectionId ?? ''}`;
-    const exists = classSections.some(cs => `${cs.class_id}|${cs.section_id ?? ''}` === key);
-    if (exists) {
-      setClassSections(prev => prev.filter(cs => `${cs.class_id}|${cs.section_id ?? ''}` !== key));
-    } else {
-      setClassSections(prev => [...prev, { class_id: classId, section_id: sectionId }]);
-    }
-  };
-
-  const isClassSectionSelected = (classId: string, sectionId: string | null) =>
-    classSections.some(cs => cs.class_id === classId && cs.section_id === sectionId);
-
   const getConfigForCs = (classId: string, sectionId: string | null): SubjectConfigPayload[] =>
     subjectConfigs.filter(cfg => cfg.class_id === classId && cfg.section_id === sectionId);
 
@@ -298,26 +338,54 @@ export default function CreateExamScreen() {
     });
   };
 
-  const addSubjectConfig = (classId: string, sectionId: string | null, subjectId: string) => {
-    const exists = subjectConfigs.some(c => c.class_id === classId && c.section_id === sectionId && c.subject_id === subjectId);
-    if (!exists) {
-      setSubjectConfigs(prev => [...prev, {
-        class_id: classId, section_id: sectionId, subject_id: subjectId,
-        components: [],
-      }]);
-    }
-  };
-
-  const removeSubjectConfig = (classId: string, sectionId: string | null, subjectId: string) => {
-    setSubjectConfigs(prev => prev.filter(c => !(c.class_id === classId && c.section_id === sectionId && c.subject_id === subjectId)));
-  };
-
   const addComponent = (classId: string, sectionId: string | null, subjectId: string) => {
-    setSubjectConfigs(prev => prev.map(cfg =>
-      cfg.class_id === classId && cfg.section_id === sectionId && cfg.subject_id === subjectId
-        ? { ...cfg, components: [...cfg.components, { ...EMPTY_COMPONENT }] }
-        : cfg
-    ));
+    const existing = getConfigForCs(classId, sectionId).find(c => c.subject_id === subjectId);
+    const comps = existing?.components ?? [];
+    upsertConfig(classId, sectionId, subjectId, {
+      components: [...comps, { ...EMPTY_COMPONENT, sort_order: comps.length }],
+    });
+  };
+
+  const toggleConfigSubject = (key: string) => {
+    setExpandedConfigSubjects(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  // "Set all max marks" — applies one value to every subject's first (marks) component in a tab
+  const applyBulkMarksForTab = (cs: ClassSectionPayload, subjects: { id: string; name: string }[]) => {
+    const key = `${cs.class_id}|${cs.section_id ?? ''}`;
+    const marks = parseFloat(bulkMarksByTab[key] ?? '');
+    if (!marks || marks <= 0) return;
+    subjects.forEach(subj => {
+      const existing = getConfigForCs(cs.class_id, cs.section_id).find(c => c.subject_id === subj.id);
+      if (existing && existing.components.length > 0) {
+        upsertConfig(cs.class_id, cs.section_id, subj.id, {
+          components: existing.components.map((comp, i) =>
+            i === 0 && comp.entry_type === 'marks' ? { ...comp, max_marks: marks } : comp
+          ),
+        });
+      } else {
+        upsertConfig(cs.class_id, cs.section_id, subj.id, {
+          components: [{ ...EMPTY_COMPONENT, max_marks: marks }],
+        });
+      }
+    });
+    setBulkMarksByTab(prev => ({ ...prev, [key]: '' }));
+  };
+
+  // "Apply same marks to all subjects in this class" — clones the first subject's components onto the rest
+  const applyFirstToAllForTab = (cs: ClassSectionPayload, subjects: { id: string; name: string }[]) => {
+    if (subjects.length <= 1) return;
+    const firstConfig = getConfigForCs(cs.class_id, cs.section_id).find(c => c.subject_id === subjects[0].id);
+    if (!firstConfig) return;
+    for (let i = 1; i < subjects.length; i++) {
+      upsertConfig(cs.class_id, cs.section_id, subjects[i].id, {
+        components: firstConfig.components.map(c => ({ ...c })),
+      });
+    }
   };
 
   const removeComponent = (classId: string, sectionId: string | null, subjectId: string, idx: number) => {
@@ -361,8 +429,8 @@ export default function CreateExamScreen() {
         level,
         exam_type: examType.trim(),
         nature,
-        is_internal: isInternal,
-        publish_rank: publishRank || undefined,
+        is_internal: true,
+        publish_rank: false,
         exam_grade_scheme_id: gradeSchemeId || null,
         mark_entry_deadline: markDeadline || undefined,
         hall_ticket_min_attendance: minAttendance ? Number(minAttendance) : null,
@@ -389,6 +457,9 @@ export default function CreateExamScreen() {
     (subjectsByClass[classId] ?? []).find(s => s.id === subjectId)?.name ?? subjectId;
 
   // ─────────────────────────────────────────────────────────────────────────────
+
+  // Non-admins are redirected by the effect above; render nothing meanwhile.
+  if (!isAdmin) return null;
 
   return (
     <AppLayout title="Create Exam">
@@ -488,7 +559,8 @@ export default function CreateExamScreen() {
                     {markDeadline || 'Tap to select date'}
                   </Text>
                   {!!markDeadline && (
-                    <TouchableOpacity onPress={() => setMarkDeadline('')}>
+                    <TouchableOpacity onPress={() => setMarkDeadline('')}
+              accessibilityLabel="Close">
                       <Ionicons name="close-circle" size={16} color={colors['muted-foreground'] as string} />
                     </TouchableOpacity>
                   )}
@@ -516,7 +588,8 @@ export default function CreateExamScreen() {
                         {attendanceFrom || 'Select'}
                       </Text>
                       {!!attendanceFrom && (
-                        <TouchableOpacity onPress={() => setAttendanceFrom('')}>
+                        <TouchableOpacity onPress={() => setAttendanceFrom('')}
+              accessibilityLabel="Close">
                           <Ionicons name="close-circle" size={16} color={colors['muted-foreground'] as string} />
                         </TouchableOpacity>
                       )}
@@ -534,7 +607,8 @@ export default function CreateExamScreen() {
                         {attendanceTo || 'Select'}
                       </Text>
                       {!!attendanceTo && (
-                        <TouchableOpacity onPress={() => setAttendanceTo('')}>
+                        <TouchableOpacity onPress={() => setAttendanceTo('')}
+              accessibilityLabel="Close">
                           <Ionicons name="close-circle" size={16} color={colors['muted-foreground'] as string} />
                         </TouchableOpacity>
                       )}
@@ -542,19 +616,9 @@ export default function CreateExamScreen() {
                   </View>
                 </View>
 
-                <View style={styles.switchRow}>
-                  <Text style={[styles.switchLabel, { color: colors.foreground as string }]}>Publish Rank</Text>
-                  <Switch value={publishRank} onValueChange={setPublishRank} trackColor={{ true: '#556ee6' }} thumbColor="white" />
-                </View>
-
-                <View style={styles.switchRow}>
-                  <Text style={[styles.switchLabel, { color: colors.foreground as string }]}>Internal Exam</Text>
-                  <Switch value={isInternal} onValueChange={setIsInternal} trackColor={{ true: '#556ee6' }} thumbColor="white" />
-                </View>
-
                 <View style={styles.nextRow}>
                   <TouchableOpacity
-                    style={[styles.nextBtn, { opacity: !examName.trim() || !academicYearId || !examType.trim() ? 0.4 : 1 }]}
+                    style={[styles.nextBtn, { opacity: !examName.trim() || !academicYearId || !examType.trim() ? 0.5 : 1 }]}
                     onPress={() => { if (examName.trim() && academicYearId && examType.trim()) advance(1, 2); }}
                     disabled={!examName.trim() || !academicYearId || !examType.trim()}
                   >
@@ -573,63 +637,19 @@ export default function CreateExamScreen() {
                   Select which class-section combinations this exam applies to
                 </Text>
 
-                {availableClasses.map(cls => {
-                  const hasAnySectionSelected = cls.sections.some(s => isClassSectionSelected(cls.id, s.id));
-                  const allSectionsSelected = cls.sections.length > 0 &&
-                    cls.sections.every(s => isClassSectionSelected(cls.id, s.id));
-
-                  return (
-                    <View key={cls.id} style={[styles.classCard, { borderColor: borderCol, backgroundColor: isDark ? '#0f0f23' : '#f8fafc' }]}>
-                      <View style={styles.classRow}>
-                        <TouchableOpacity
-                          style={[styles.checkbox, {
-                            backgroundColor: allSectionsSelected ? '#556ee6' : 'transparent',
-                            borderColor: allSectionsSelected ? '#556ee6' : (isDark ? 'rgba(255,255,255,0.3)' : '#CBD5E1'),
-                          }]}
-                          onPress={() => {
-                            if (allSectionsSelected) {
-                              cls.sections.forEach(s => {
-                                if (isClassSectionSelected(cls.id, s.id)) toggleClassSection(cls.id, s.id);
-                              });
-                            } else {
-                              cls.sections.forEach(s => {
-                                if (!isClassSectionSelected(cls.id, s.id)) toggleClassSection(cls.id, s.id);
-                              });
-                            }
-                          }}
-                        >
-                          {allSectionsSelected && <Ionicons name="checkmark" size={12} color="white" />}
-                        </TouchableOpacity>
-                        <Text style={[styles.className, { color: colors.foreground as string }]}>{cls.name}</Text>
-                        {hasAnySectionSelected && (
-                          <Text style={styles.selectedCount}>
-                            {cls.sections.filter(s => isClassSectionSelected(cls.id, s.id)).length} / {cls.sections.length} selected
-                          </Text>
-                        )}
-                      </View>
-
-                      <View style={styles.sectionChips}>
-                        {cls.sections.map(sec => {
-                          const sel = isClassSectionSelected(cls.id, sec.id);
-                          return (
-                            <TouchableOpacity
-                              key={sec.id}
-                              style={[styles.sectionChip, {
-                                backgroundColor: sel ? '#556ee6' : (isDark ? '#1a1a2e' : '#1e293b'),
-                                borderColor: sel ? '#556ee6' : 'transparent',
-                              }]}
-                              onPress={() => toggleClassSection(cls.id, sec.id)}
-                            >
-                              <Text style={[styles.sectionChipText, { color: sel ? 'white' : '#94a3b8' }]}>
-                                Section {sec.name}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  );
-                })}
+                {availableClasses.length === 0 ? (
+                  <Text style={[styles.hint, { color: colors['muted-foreground'] as string, textAlign: 'center', paddingVertical: 16 }]}>
+                    No classes available. Set up class-subject mappings first.
+                  </Text>
+                ) : (
+                  <CustomMultiSelect
+                    data={classSectionOptions}
+                    value={classSectionValues}
+                    onChange={handleClassSectionsChange}
+                    placeholder="Type to search and select class-sections..."
+                    containerStyle={styles.dropdownContainer}
+                  />
+                )}
 
                 {classSections.length > 0 && (
                   <Text style={[styles.hint, { color: colors['muted-foreground'] as string, marginTop: 8 }]}>
@@ -639,7 +659,7 @@ export default function CreateExamScreen() {
 
                 <View style={styles.nextRow}>
                   <TouchableOpacity
-                    style={[styles.nextBtn, { opacity: classSections.length === 0 ? 0.4 : 1 }]}
+                    style={[styles.nextBtn, { opacity: classSections.length === 0 ? 0.5 : 1 }]}
                     onPress={() => { if (classSections.length > 0) advance(2, 3); }}
                     disabled={classSections.length === 0}
                   >
@@ -657,183 +677,278 @@ export default function CreateExamScreen() {
                 {classSections.length === 0 ? (
                   <Text style={[styles.hint, { color: colors['muted-foreground'] as string }]}>Please select class-sections first.</Text>
                 ) : (
-                  classSections.map(cs => {
-                    const clsName = getClassName(cs.class_id);
-                    const secName = getSectionName(cs.class_id, cs.section_id);
-                    const label = secName ? `${clsName} — ${secName}` : clsName;
-                    const subjects = subjectsByClass[cs.class_id] ?? [];
-                    const configs = getConfigForCs(cs.class_id, cs.section_id);
+                  <>
+                    {/* Class-section tabs */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll}>
+                      {classSections.map(cs => {
+                        const key = `${cs.class_id}|${cs.section_id ?? ''}`;
+                        const clsName = getClassName(cs.class_id);
+                        const secName = getSectionName(cs.class_id, cs.section_id);
+                        const label = secName ? `${clsName} – ${secName}` : clsName;
+                        const active = activeConfigTab === key;
+                        return (
+                          <TouchableOpacity
+                            key={key}
+                            style={[styles.configTab, {
+                              backgroundColor: active ? '#556ee6' : inputBg,
+                              borderColor: active ? '#556ee6' : borderCol,
+                            }]}
+                            onPress={() => setActiveConfigTab(key)}
+                          >
+                            <Text style={[styles.configTabText, { color: active ? 'white' : colors.foreground as string }]}>
+                              {label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
 
-                    return (
-                      <View key={`${cs.class_id}|${cs.section_id}`} style={[styles.subjectGroup, { borderColor: borderCol, backgroundColor: isDark ? '#0f0f23' : '#f8fafc' }]}>
-                        <View style={styles.subjectGroupHeader}>
-                          <Text style={[styles.subjectGroupTitle, { color: colors.foreground as string }]}>{label}</Text>
-                          <Text style={[styles.subjectCount, { color: colors['muted-foreground'] as string }]}>
-                            {configs.length} subject{configs.length !== 1 ? 's' : ''}
-                          </Text>
-                        </View>
+                    {classSections
+                      .filter(cs => `${cs.class_id}|${cs.section_id ?? ''}` === activeConfigTab)
+                      .map(cs => {
+                        const csKey = `${cs.class_id}|${cs.section_id ?? ''}`;
+                        const clsName = getClassName(cs.class_id);
+                        const secName = getSectionName(cs.class_id, cs.section_id);
+                        const label = secName ? `${clsName} — ${secName}` : clsName;
+                        const subjects = subjectsByClass[cs.class_id] ?? [];
+                        const configs = getConfigForCs(cs.class_id, cs.section_id);
 
-                        {subjects.length === 0 ? (
-                          <Text style={[styles.hint, { color: colors['muted-foreground'] as string }]}>Loading subjects…</Text>
-                        ) : (
-                          subjects.map(subj => {
-                            const cfg = configs.find(c => c.subject_id === subj.id);
-                            const added = !!cfg;
-
-                            return (
-                              <View key={subj.id} style={[styles.subjectRow, { borderTopColor: borderCol }]}>
-                                <TouchableOpacity
-                                  style={[styles.checkbox, {
-                                    backgroundColor: added ? '#10B981' : 'transparent',
-                                    borderColor: added ? '#10B981' : (isDark ? 'rgba(255,255,255,0.3)' : '#CBD5E1'),
-                                  }]}
-                                  onPress={() => added ? removeSubjectConfig(cs.class_id, cs.section_id, subj.id) : addSubjectConfig(cs.class_id, cs.section_id, subj.id)}
-                                >
-                                  {added && <Ionicons name="checkmark" size={12} color="white" />}
-                                </TouchableOpacity>
-                                <View style={{ flex: 1 }}>
-                                  <Text style={[styles.subjectName, { color: colors.foreground as string }]}>{subj.name}</Text>
-
-                                  {added && cfg && (
-                                    <View style={styles.componentBlock}>
-                                      {/* Grade Scheme + Credit Hours */}
-                                      <View style={styles.twoCol}>
-                                        <View style={{ flex: 2 }}>
-                                          <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string, marginBottom: 4 }]}>Grade Scheme</Text>
-                                          <CustomDropdown
-                                            data={[
-                                              { label: 'Default', value: '' },
-                                              ...gradeSchemes.map(gs => ({ label: gs.name, value: gs.id })),
-                                            ]}
-                                            value={cfg.subject_grade_scheme_id ?? ''}
-                                            onChange={v => upsertConfig(cs.class_id, cs.section_id, subj.id, {
-                                              subject_grade_scheme_id: v && v !== '' ? String(v) : null,
-                                            })}
-                                            placeholder="Default"
-                                            search={false}
-                                            containerStyle={styles.dropdownContainerSm}
-                                            style={{ height: 30, paddingHorizontal: 8, paddingVertical: 0, borderRadius: 6, fontSize: 12 }}
-                                            selectedTextStyle={{ fontSize: 12 }}
-                                            placeholderStyle={{ fontSize: 12 }}
-                                          />
-                                        </View>
-                                        <View style={{ width: 8 }} />
-                                        <View style={{ flex: 1 }}>
-                                          <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string, marginBottom: 4 }]}>Credit Hours</Text>
-                                          <TextInput
-                                            style={[styles.compInput, { backgroundColor: inputBg, color: colors.foreground as string, borderColor: borderCol }]}
-                                            value={cfg.credit_hours != null ? String(cfg.credit_hours) : ''}
-                                            onChangeText={v => upsertConfig(cs.class_id, cs.section_id, subj.id, {
-                                              credit_hours: v ? Number(v) : null,
-                                            })}
-                                            keyboardType="numeric"
-                                            placeholder="—"
-                                            placeholderTextColor={colors['muted-foreground'] as string}
-                                          />
-                                        </View>
-                                      </View>
-
-                                      <Text style={[styles.compHeader, { color: colors['muted-foreground'] as string, marginTop: 8 }]}>Mark Components</Text>
-
-                                      {cfg.components.map((comp, ci) => (
-                                        <View key={ci} style={[styles.compRow, { borderColor: borderCol }]}>
-                                          <View style={styles.twoCol}>
-                                            <View style={{ flex: 2 }}>
-                                              <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string }]}>Component</Text>
-                                              <TextInput
-                                                style={[styles.compInput, { backgroundColor: inputBg, color: colors.foreground as string, borderColor: borderCol }]}
-                                                value={comp.component_name}
-                                                onChangeText={v => updateComponent(cs.class_id, cs.section_id, subj.id, ci, { component_name: v })}
-                                                placeholder="e.g. Written"
-                                                placeholderTextColor={colors['muted-foreground'] as string}
-                                              />
-                                            </View>
-                                            <View style={{ width: 8 }} />
-                                            <View style={{ flex: 1 }}>
-                                              <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string }]}>Type</Text>
-                                              <View style={styles.miniChips}>
-                                                {ENTRY_TYPES.map(et => (
-                                                  <TouchableOpacity
-                                                    key={et.value}
-                                                    style={[styles.miniChip, {
-                                                      backgroundColor: comp.entry_type === et.value ? '#556ee6' : inputBg,
-                                                      borderColor: comp.entry_type === et.value ? '#556ee6' : borderCol,
-                                                    }]}
-                                                    onPress={() => updateComponent(cs.class_id, cs.section_id, subj.id, ci, { entry_type: et.value })}
-                                                  >
-                                                    <Text style={[styles.miniChipText, { color: comp.entry_type === et.value ? 'white' : colors['muted-foreground'] as string }]}>
-                                                      {et.label}
-                                                    </Text>
-                                                  </TouchableOpacity>
-                                                ))}
-                                              </View>
-                                            </View>
-                                          </View>
-
-                                          {comp.entry_type === 'marks' && (
-                                            <View style={[styles.twoCol, { marginTop: 6 }]}>
-                                              <View style={{ flex: 1 }}>
-                                                <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string }]}>Max Marks</Text>
-                                                <TextInput
-                                                  style={[styles.compInput, { backgroundColor: inputBg, color: colors.foreground as string, borderColor: borderCol }]}
-                                                  value={comp.max_marks != null ? String(comp.max_marks) : ''}
-                                                  onChangeText={v => updateComponent(cs.class_id, cs.section_id, subj.id, ci, { max_marks: v ? Number(v) : null })}
-                                                  keyboardType="numeric"
-                                                  placeholder="—"
-                                                  placeholderTextColor={colors['muted-foreground'] as string}
-                                                />
-                                              </View>
-                                              <View style={{ width: 8 }} />
-                                              <View style={{ flex: 1 }}>
-                                                <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string }]}>Min Pass</Text>
-                                                <TextInput
-                                                  style={[styles.compInput, { backgroundColor: inputBg, color: colors.foreground as string, borderColor: borderCol }]}
-                                                  value={comp.min_pass_marks != null ? String(comp.min_pass_marks) : ''}
-                                                  onChangeText={v => updateComponent(cs.class_id, cs.section_id, subj.id, ci, { min_pass_marks: v ? Number(v) : null })}
-                                                  keyboardType="numeric"
-                                                  placeholder="—"
-                                                  placeholderTextColor={colors['muted-foreground'] as string}
-                                                />
-                                              </View>
-                                              <View style={{ width: 8 }} />
-                                              <TouchableOpacity
-                                                style={[styles.inTotalChip, { backgroundColor: comp.include_in_total ? '#10B981' : inputBg, borderColor: comp.include_in_total ? '#10B981' : borderCol, marginTop: 16 }]}
-                                                onPress={() => updateComponent(cs.class_id, cs.section_id, subj.id, ci, { include_in_total: !comp.include_in_total })}
-                                              >
-                                                <Text style={{ color: comp.include_in_total ? 'white' : colors['muted-foreground'] as string, fontSize: 10, fontWeight: '600' }}>
-                                                  In Total
-                                                </Text>
-                                              </TouchableOpacity>
-                                            </View>
-                                          )}
-
-                                          <TouchableOpacity
-                                            style={styles.removeCompBtn}
-                                            onPress={() => removeComponent(cs.class_id, cs.section_id, subj.id, ci)}
-                                          >
-                                            <Ionicons name="trash-outline" size={13} color="#EF4444" />
-                                            <Text style={{ color: '#EF4444', fontSize: 11 }}>Remove</Text>
-                                          </TouchableOpacity>
-                                        </View>
-                                      ))}
-
-                                      <TouchableOpacity
-                                        style={styles.addCompBtn}
-                                        onPress={() => addComponent(cs.class_id, cs.section_id, subj.id)}
-                                      >
-                                        <Ionicons name="add" size={14} color="#556ee6" />
-                                        <Text style={{ color: '#556ee6', fontSize: 12, fontWeight: '600' }}>Add Component</Text>
-                                      </TouchableOpacity>
-                                    </View>
-                                  )}
+                        return (
+                          <View key={csKey} style={[styles.subjectGroup, { borderColor: borderCol, backgroundColor: isDark ? '#0f0f23' : '#f8fafc' }]}>
+                            <View style={styles.subjectGroupHeader}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                <Text style={[styles.subjectGroupTitle, { color: colors.foreground as string }]}>{label}</Text>
+                                <View style={styles.countBadge}>
+                                  <Text style={styles.countBadgeText}>{subjects.length} subjects</Text>
                                 </View>
                               </View>
-                            );
-                          })
-                        )}
-                      </View>
-                    );
-                  })
+                            </View>
+
+                            <View style={[styles.bulkMarksRow, { borderColor: borderCol }]}>
+                              <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string }]}>Set all max marks:</Text>
+                              <TextInput
+                                style={[styles.bulkMarksInput, { backgroundColor: inputBg, color: colors.foreground as string, borderColor: borderCol }]}
+                                value={bulkMarksByTab[csKey] ?? ''}
+                                onChangeText={v => setBulkMarksByTab(prev => ({ ...prev, [csKey]: v }))}
+                                keyboardType="numeric"
+                                placeholder="100"
+                                placeholderTextColor={colors['muted-foreground'] as string}
+                              />
+                              <TouchableOpacity
+                                style={[styles.applyBulkBtn, { opacity: !bulkMarksByTab[csKey] || Number(bulkMarksByTab[csKey]) <= 0 ? 0.5 : 1 }]}
+                                disabled={!bulkMarksByTab[csKey] || Number(bulkMarksByTab[csKey]) <= 0}
+                                onPress={() => applyBulkMarksForTab(cs, subjects)}
+                              >
+                                <Ionicons name="flash" size={12} color="#556ee6" />
+                                <Text style={styles.applyBulkBtnText}>Apply</Text>
+                              </TouchableOpacity>
+                            </View>
+
+                            {subjects.length === 0 ? (
+                              <Text style={[styles.hint, { color: colors['muted-foreground'] as string }]}>Loading subjects…</Text>
+                            ) : (
+                              subjects.map(subj => {
+                                const cfg = configs.find(c => c.subject_id === subj.id);
+                                const subjKey = `${csKey}|${subj.id}`;
+                                const expanded = expandedConfigSubjects.has(subjKey);
+                                const includedTotal = (cfg?.components ?? [])
+                                  .filter(c => c.include_in_total && c.entry_type === 'marks')
+                                  .reduce((sum, c) => sum + (c.max_marks ?? 0), 0);
+
+                                return (
+                                  <View key={subj.id} style={[styles.subjectRow, { borderTopColor: borderCol }]}>
+                                    <TouchableOpacity
+                                      style={styles.subjectAccordionHeader}
+                                      onPress={() => toggleConfigSubject(subjKey)}
+                                    >
+                                      <Ionicons name={expanded ? 'chevron-down' : 'chevron-forward'} size={15} color={colors['muted-foreground'] as string} />
+                                      <Text style={[styles.subjectName, { color: colors.foreground as string, flex: 1 }]}>{subj.name}</Text>
+                                      {cfg && cfg.components.length > 0 && (
+                                        <View style={styles.countBadge}>
+                                          <Text style={styles.countBadgeText}>
+                                            {cfg.components.length} component{cfg.components.length !== 1 ? 's' : ''}
+                                            {includedTotal > 0 ? ` · ${includedTotal} marks` : ''}
+                                          </Text>
+                                        </View>
+                                      )}
+                                    </TouchableOpacity>
+
+                                    {expanded && (
+                                      <View style={styles.componentBlock}>
+                                        {/* Grade Scheme + Credit Hours */}
+                                        <View style={styles.twoCol}>
+                                          <View style={{ flex: 2 }}>
+                                            <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string, marginBottom: 4 }]}>Grade Scheme</Text>
+                                            <CustomDropdown
+                                              data={[
+                                                { label: 'Default', value: '' },
+                                                ...subjectGradeSchemes.map(gs => ({ label: gs.name, value: gs.id })),
+                                              ]}
+                                              value={cfg?.subject_grade_scheme_id ?? ''}
+                                              onChange={v => upsertConfig(cs.class_id, cs.section_id, subj.id, {
+                                                subject_grade_scheme_id: v && v !== '' ? String(v) : null,
+                                              })}
+                                              placeholder="Default"
+                                              search={false}
+                                              containerStyle={styles.dropdownContainerSm}
+                                              style={{ height: 30, paddingHorizontal: 8, paddingVertical: 0, borderRadius: 6, fontSize: 12 }}
+                                              selectedTextStyle={{ fontSize: 12 }}
+                                              placeholderStyle={{ fontSize: 12 }}
+                                            />
+                                          </View>
+                                          <View style={{ width: 8 }} />
+                                          <View style={{ flex: 1 }}>
+                                            <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string, marginBottom: 4 }]}>Credit Hours</Text>
+                                            <TextInput
+                                              style={[styles.compInput, { backgroundColor: inputBg, color: colors.foreground as string, borderColor: borderCol }]}
+                                              value={cfg?.credit_hours != null ? String(cfg.credit_hours) : ''}
+                                              onChangeText={v => upsertConfig(cs.class_id, cs.section_id, subj.id, {
+                                                credit_hours: v ? Number(v) : null,
+                                              })}
+                                              keyboardType="numeric"
+                                              placeholder="—"
+                                              placeholderTextColor={colors['muted-foreground'] as string}
+                                            />
+                                          </View>
+                                        </View>
+
+                                        <View style={styles.compHeaderRow}>
+                                          <Text style={[styles.compHeader, { color: colors.foreground as string }]}>Mark Components</Text>
+                                          <TouchableOpacity
+                                            style={styles.addCompBtn}
+                                            onPress={() => addComponent(cs.class_id, cs.section_id, subj.id)}
+                                          >
+                                            <Ionicons name="add" size={14} color="#556ee6" />
+                                            <Text style={{ color: '#556ee6', fontSize: 12, fontWeight: '600' }}>Add Component</Text>
+                                          </TouchableOpacity>
+                                        </View>
+
+                                        {(cfg?.components ?? []).map((comp, ci) => (
+                                          <View key={ci} style={[styles.compRow, { borderColor: borderCol }]}>
+                                            <View style={styles.twoCol}>
+                                              <View style={{ flex: 2 }}>
+                                                <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string }]}>Component</Text>
+                                                <TextInput
+                                                  style={[styles.compInput, { backgroundColor: inputBg, color: colors.foreground as string, borderColor: borderCol }]}
+                                                  value={comp.component_name}
+                                                  onChangeText={v => updateComponent(cs.class_id, cs.section_id, subj.id, ci, { component_name: v })}
+                                                  placeholder="e.g. Written"
+                                                  placeholderTextColor={colors['muted-foreground'] as string}
+                                                />
+                                              </View>
+                                              <View style={{ width: 8 }} />
+                                              <View style={{ flex: 1 }}>
+                                                <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string }]}>Type</Text>
+                                                <View style={styles.miniChips}>
+                                                  {ENTRY_TYPES.map(et => (
+                                                    <TouchableOpacity
+                                                      key={et.value}
+                                                      style={[styles.miniChip, {
+                                                        backgroundColor: comp.entry_type === et.value ? '#556ee6' : inputBg,
+                                                        borderColor: comp.entry_type === et.value ? '#556ee6' : borderCol,
+                                                      }]}
+                                                      onPress={() => updateComponent(cs.class_id, cs.section_id, subj.id, ci, { entry_type: et.value })}
+                                                    >
+                                                      <Text style={[styles.miniChipText, { color: comp.entry_type === et.value ? 'white' : colors['muted-foreground'] as string }]}>
+                                                        {et.label}
+                                                      </Text>
+                                                    </TouchableOpacity>
+                                                  ))}
+                                                </View>
+                                              </View>
+                                            </View>
+
+                                            {comp.entry_type === 'marks' ? (
+                                              <View style={[styles.twoCol, { marginTop: 6 }]}>
+                                                <View style={{ flex: 1 }}>
+                                                  <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string }]}>Max Marks</Text>
+                                                  <TextInput
+                                                    style={[styles.compInput, { backgroundColor: inputBg, color: colors.foreground as string, borderColor: borderCol }]}
+                                                    value={comp.max_marks != null ? String(comp.max_marks) : ''}
+                                                    onChangeText={v => updateComponent(cs.class_id, cs.section_id, subj.id, ci, { max_marks: v ? Number(v) : null })}
+                                                    keyboardType="numeric"
+                                                    placeholder="—"
+                                                    placeholderTextColor={colors['muted-foreground'] as string}
+                                                  />
+                                                </View>
+                                                <View style={{ width: 8 }} />
+                                                <View style={{ flex: 1 }}>
+                                                  <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string }]}>Min Pass</Text>
+                                                  <TextInput
+                                                    style={[styles.compInput, { backgroundColor: inputBg, color: colors.foreground as string, borderColor: borderCol }]}
+                                                    value={comp.min_pass_marks != null ? String(comp.min_pass_marks) : ''}
+                                                    onChangeText={v => updateComponent(cs.class_id, cs.section_id, subj.id, ci, { min_pass_marks: v ? Number(v) : null })}
+                                                    keyboardType="numeric"
+                                                    placeholder="—"
+                                                    placeholderTextColor={colors['muted-foreground'] as string}
+                                                  />
+                                                </View>
+                                                <View style={{ width: 8 }} />
+                                                <TouchableOpacity
+                                                  style={[styles.inTotalChip, { backgroundColor: comp.include_in_total ? '#10B981' : inputBg, borderColor: comp.include_in_total ? '#10B981' : borderCol, marginTop: 16 }]}
+                                                  onPress={() => updateComponent(cs.class_id, cs.section_id, subj.id, ci, { include_in_total: !comp.include_in_total })}
+                                                >
+                                                  <Text style={{ color: comp.include_in_total ? 'white' : colors['muted-foreground'] as string, fontSize: 10, fontWeight: '600' }}>
+                                                    In Total
+                                                  </Text>
+                                                </TouchableOpacity>
+                                              </View>
+                                            ) : (
+                                              <View style={{ marginTop: 6 }}>
+                                                <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string }]}>Remark Set</Text>
+                                                <CustomDropdown
+                                                  data={remarkSets.map(rs => ({ label: rs.name, value: rs.id }))}
+                                                  value={comp.remark_grade_set_id ?? ''}
+                                                  onChange={v => updateComponent(cs.class_id, cs.section_id, subj.id, ci, { remark_grade_set_id: v ? String(v) : null })}
+                                                  placeholder="Select set…"
+                                                  search={false}
+                                                  containerStyle={styles.dropdownContainerSm}
+                                                  style={{ height: 30, paddingHorizontal: 8, paddingVertical: 0, borderRadius: 6, fontSize: 12 }}
+                                                  selectedTextStyle={{ fontSize: 12 }}
+                                                  placeholderStyle={{ fontSize: 12 }}
+                                                />
+                                              </View>
+                                            )}
+
+                                            <TouchableOpacity
+                                              style={styles.removeCompBtn}
+                                              onPress={() => removeComponent(cs.class_id, cs.section_id, subj.id, ci)}
+                                            >
+                                              <Ionicons name="trash-outline" size={13} color="#EF4444" />
+                                              <Text style={{ color: '#EF4444', fontSize: 11 }}>Remove</Text>
+                                            </TouchableOpacity>
+                                          </View>
+                                        ))}
+
+                                        {(cfg?.components?.length ?? 0) > 0 && (
+                                          <View style={[styles.subjectTotalRow, { borderColor: borderCol }]}>
+                                            <Text style={[styles.compLabel, { color: colors['muted-foreground'] as string }]}>Subject Total (included)</Text>
+                                            <Text style={[styles.subjectTotalValue, { color: colors.foreground as string }]}>
+                                              {includedTotal > 0 ? includedTotal : '—'}
+                                            </Text>
+                                          </View>
+                                        )}
+                                      </View>
+                                    )}
+                                  </View>
+                                );
+                              })
+                            )}
+
+                            {subjects.length > 1 && (
+                              <TouchableOpacity
+                                style={[styles.applyAllBtn, { borderColor: borderCol }]}
+                                disabled={!configs.find(c => c.subject_id === subjects[0].id)}
+                                onPress={() => applyFirstToAllForTab(cs, subjects)}
+                              >
+                                <Ionicons name="copy-outline" size={13} color="#556ee6" />
+                                <Text style={styles.applyAllBtnText}>Apply same marks to all subjects in this class</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        );
+                      })}
+                  </>
                 )}
 
                 <View style={styles.nextRow}>
@@ -899,7 +1014,8 @@ export default function CreateExamScreen() {
                       {newDate.exam_date || 'Tap to select date'}
                     </Text>
                     {!!newDate.exam_date && (
-                      <TouchableOpacity onPress={() => setNewDate(p => ({ ...p, exam_date: '' }))}>
+                      <TouchableOpacity onPress={() => setNewDate(p => ({ ...p, exam_date: '' }))}
+              accessibilityLabel="Close">
                         <Ionicons name="close-circle" size={16} color={colors['muted-foreground'] as string} />
                       </TouchableOpacity>
                     )}
@@ -917,7 +1033,8 @@ export default function CreateExamScreen() {
                           {formatTime12h(newDate.start_time) || 'Tap to set'}
                         </Text>
                         {!!newDate.start_time && (
-                          <TouchableOpacity onPress={() => setNewDate(p => ({ ...p, start_time: '' }))}>
+                          <TouchableOpacity onPress={() => setNewDate(p => ({ ...p, start_time: '' }))}
+              accessibilityLabel="Close">
                             <Ionicons name="close-circle" size={16} color={colors['muted-foreground'] as string} />
                           </TouchableOpacity>
                         )}
@@ -935,7 +1052,8 @@ export default function CreateExamScreen() {
                           {formatTime12h(newDate.end_time) || 'Tap to set'}
                         </Text>
                         {!!newDate.end_time && (
-                          <TouchableOpacity onPress={() => setNewDate(p => ({ ...p, end_time: '' }))}>
+                          <TouchableOpacity onPress={() => setNewDate(p => ({ ...p, end_time: '' }))}
+              accessibilityLabel="Close">
                             <Ionicons name="close-circle" size={16} color={colors['muted-foreground'] as string} />
                           </TouchableOpacity>
                         )}
@@ -953,7 +1071,7 @@ export default function CreateExamScreen() {
                   />
 
                   <TouchableOpacity
-                    style={[styles.addDateBtn, { opacity: !newDate.class_id || !newDate.subject_id || !newDate.exam_date ? 0.4 : 1 }]}
+                    style={[styles.addDateBtn, { opacity: !newDate.class_id || !newDate.subject_id || !newDate.exam_date ? 0.5 : 1 }]}
                     onPress={addExamDate}
                     disabled={!newDate.class_id || !newDate.subject_id || !newDate.exam_date}
                   >
@@ -1044,13 +1162,6 @@ export default function CreateExamScreen() {
                         <Text style={[styles.reviewValue, { color: colors.foreground as string }]}>{val as string}</Text>
                       </View>
                     ))}
-                    <View style={styles.reviewField}>
-                      <Text style={[styles.reviewLabel, { color: colors['muted-foreground'] as string }]}>Options</Text>
-                      <View style={{ flexDirection: 'row', gap: 6 }}>
-                        {publishRank && <View style={styles.optionBadge}><Text style={styles.optionBadgeText}>Publish Rank</Text></View>}
-                        {isInternal  && <View style={styles.optionBadge}><Text style={styles.optionBadgeText}>Internal</Text></View>}
-                      </View>
-                    </View>
                   </View>
                 </View>
 
@@ -1149,7 +1260,7 @@ export default function CreateExamScreen() {
           )}
 
           <TouchableOpacity
-            style={[styles.createBtn, { opacity: createMutation.isPending ? 0.6 : 1 }]}
+            style={[styles.createBtn, { opacity: createMutation.isPending ? 0.5 : 1 }]}
             onPress={handleSubmit}
             disabled={createMutation.isPending}
           >
@@ -1191,33 +1302,29 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 4 },
   chip: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 18, borderWidth: 1 },
   chipText: { fontSize: 12, fontWeight: '500' },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
-  switchLabel: { fontSize: 14 },
   hint: { fontSize: 12, lineHeight: 18 },
   nextRow: { alignItems: 'flex-end', marginTop: 16 },
   nextBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#556ee6', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9 },
   nextBtnText: { color: 'white', fontWeight: '700', fontSize: 13 },
 
-  // Class selector
-  classCard: { borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 8 },
-  classRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  checkbox: { width: 22, height: 22, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  className: { fontSize: 14, fontWeight: '600', flex: 1 },
-  selectedCount: { fontSize: 11, color: '#556ee6', backgroundColor: '#556ee615', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, fontWeight: '600' },
-  sectionChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingLeft: 32 },
-  sectionChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
-  sectionChipText: { fontSize: 12, fontWeight: '500' },
-
   // Subject config
+  tabScroll: { marginBottom: 10 },
+  configTab: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, marginRight: 8 },
+  configTabText: { fontSize: 12, fontWeight: '600' },
   subjectGroup: { borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 10 },
   subjectGroupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   subjectGroupTitle: { fontSize: 13, fontWeight: '700' },
-  subjectCount: { fontSize: 11 },
-  subjectRow: { flexDirection: 'row', gap: 10, paddingTop: 10, borderTopWidth: 1, marginTop: 8 },
-  subjectName: { fontSize: 13, fontWeight: '600', marginTop: 2, marginBottom: 6 },
+  bulkMarksRow: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 8, padding: 8, marginBottom: 8 },
+  bulkMarksInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5, fontSize: 12, width: 60 },
+  applyBulkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#556ee6', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5 },
+  applyBulkBtnText: { color: '#556ee6', fontSize: 11, fontWeight: '600' },
+  subjectRow: { paddingTop: 10, borderTopWidth: 1, marginTop: 8 },
+  subjectAccordionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  subjectName: { fontSize: 13, fontWeight: '600' },
 
-  componentBlock: { marginTop: 4 },
-  compHeader: { fontSize: 11, fontWeight: '600', marginBottom: 6 },
+  componentBlock: { marginTop: 10 },
+  compHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 6 },
+  compHeader: { fontSize: 12, fontWeight: '600' },
   compRow: { borderWidth: 1, borderRadius: 8, padding: 8, marginBottom: 6 },
   compLabel: { fontSize: 10, marginBottom: 3, fontWeight: '500' },
   compInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6, fontSize: 12 },
@@ -1226,7 +1333,11 @@ const styles = StyleSheet.create({
   miniChipText: { fontSize: 10, fontWeight: '600' },
   inTotalChip: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, borderWidth: 1 },
   removeCompBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  addCompBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  addCompBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  subjectTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, paddingTop: 6, marginTop: 2 },
+  subjectTotalValue: { fontSize: 12, fontWeight: '700' },
+  applyAllBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 8, paddingVertical: 8, marginTop: 10 },
+  applyAllBtnText: { color: '#556ee6', fontSize: 12, fontWeight: '600' },
 
   // Time picker button
   timeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, marginBottom: 2 },
@@ -1259,8 +1370,6 @@ const styles = StyleSheet.create({
   reviewTagText: { color: '#556ee6', fontSize: 12, fontWeight: '600' },
   countBadge: { backgroundColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   countBadgeText: { fontSize: 11, fontWeight: '600', color: '#475569' },
-  optionBadge: { backgroundColor: '#556ee615', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  optionBadgeText: { fontSize: 11, color: '#556ee6', fontWeight: '600' },
 
   // Bottom bar
   bottomBar: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderTopWidth: 1 },

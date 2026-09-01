@@ -39,6 +39,13 @@ interface DatePickerModalProps {
   onCancel: () => void;
   minimumDate?: Date;
   maximumDate?: Date;
+  /**
+   * Which quick-select chips to show below the picker. Defaults to
+   * Today/Tomorrow/+1 Week. Screens where only past/current dates make sense
+   * (e.g. attendance) should pass `['today']` — the web app's date input only
+   * offers "Today" there, so "Tomorrow"/"+1 Week" would be a mobile-only extra.
+   */
+  presets?: Array<'today' | 'tomorrow' | 'nextWeek'>;
 }
 
 export function DatePickerModal({
@@ -48,6 +55,7 @@ export function DatePickerModal({
   onCancel,
   minimumDate,
   maximumDate,
+  presets: presetKeys = ['today', 'tomorrow', 'nextWeek'],
 }: DatePickerModalProps) {
   const { colors } = useTheme();
 
@@ -81,11 +89,12 @@ export function DatePickerModal({
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
   const nextWeek = new Date(today); nextWeek.setDate(today.getDate() + 7);
 
-  const presets = [
-    { label: 'Today',    date: today },
-    { label: 'Tomorrow', date: tomorrow },
-    { label: '+1 Week',  date: nextWeek },
-  ];
+  const presetDefs: Record<'today' | 'tomorrow' | 'nextWeek', { label: string; date: Date }> = {
+    today:    { label: 'Today',    date: today },
+    tomorrow: { label: 'Tomorrow', date: tomorrow },
+    nextWeek: { label: '+1 Week',  date: nextWeek },
+  };
+  const presets = presetKeys.map(k => presetDefs[k]);
 
   const primary    = colors.primary    as string;
   const foreground = colors.foreground as string;

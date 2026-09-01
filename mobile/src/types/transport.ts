@@ -65,7 +65,7 @@ export interface RouteStopCreate {
   reaching_time: string;
   pickup_time?: string;
   drop_time?: string;
-  fees: number;
+  fees?: number;
   is_active?: boolean;
 }
 
@@ -85,6 +85,18 @@ export interface Vehicle {
   name: string;
   registration_number: string;
   vehicle_type: 'Bus' | 'Van' | 'Auto';
+  fees?: number;
+  fee_category_id?: string | null;
+  fee_type_id?: string | null;
+  is_ac?: boolean | null;
+  driver_name?: string | null;
+  co_driver_name?: string | null;
+  driving_licence_no?: string | null;
+  driving_licence_exp_date?: string | null;
+  bus_insurance_vendor?: string | null;
+  insurance_expiry_date?: string | null;
+  trip_count?: number;
+  number_of_trips?: number | null;
   last_inspected_date: string; // Date in YYYY-MM-DD format
   pollution_renewal_date: string; // Date in YYYY-MM-DD format
   is_active: boolean;
@@ -96,6 +108,17 @@ export interface VehicleCreate {
   name: string;
   registration_number: string;
   vehicle_type: 'Bus' | 'Van' | 'Auto';
+  fees?: number;
+  fee_category_id?: string | null;
+  fee_type_id?: string | null;
+  is_ac?: boolean | null;
+  driver_name?: string | null;
+  co_driver_name?: string | null;
+  driving_licence_no?: string | null;
+  driving_licence_exp_date?: string | null;
+  bus_insurance_vendor?: string | null;
+  insurance_expiry_date?: string | null;
+  number_of_trips?: number | null;
   last_inspected_date: string;
   pollution_renewal_date: string;
   is_active?: boolean;
@@ -105,6 +128,17 @@ export interface VehicleUpdate {
   name?: string;
   registration_number?: string;
   vehicle_type?: 'Bus' | 'Van' | 'Auto';
+  fees?: number;
+  fee_category_id?: string | null;
+  fee_type_id?: string | null;
+  is_ac?: boolean | null;
+  driver_name?: string | null;
+  co_driver_name?: string | null;
+  driving_licence_no?: string | null;
+  driving_licence_exp_date?: string | null;
+  bus_insurance_vendor?: string | null;
+  insurance_expiry_date?: string | null;
+  number_of_trips?: number | null;
   last_inspected_date?: string;
   pollution_renewal_date?: string;
   is_active?: boolean;
@@ -255,7 +289,7 @@ export interface VehicleTypeOption {
 }
 
 // API Response types
-export interface PaginatedResponse<T> {
+export interface TransportPaginatedResponse<T> {
   items: T[];
   total: number;
   skip: number;

@@ -241,13 +241,14 @@ export default function TransportPricingScreen() {
     BILLING_CYCLE_OPTIONS.find((o) => o.value === cycle)?.label ?? cycle;
 
   // ── Card renderer ────────────────────────────────────────────────────────
-  const renderItem = ({ item }: { item: TransportPricing }) => {
+  const renderItem = ({ item, index }: { item: TransportPricing; index: number }) => {
     const vehicleName = item.vehicle_name || getVehicleName(item.vehicle_id);
     const routeName = item.route_name || getRouteName(item.route_id);
 
     return (
       <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
         <View style={{ flex: 1 }}>
+          <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
           <View style={styles.cardTitleRow}>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>
               {vehicleName}
@@ -278,6 +279,7 @@ export default function TransportPricingScreen() {
             <TouchableOpacity
               style={[styles.iconBtn, { backgroundColor: '#556ee618' }]}
               onPress={() => openEdit(item)}
+              accessibilityLabel="Edit"
             >
               <Ionicons name="create-outline" size={16} color="#556ee6" />
             </TouchableOpacity>
@@ -286,6 +288,7 @@ export default function TransportPricingScreen() {
             <TouchableOpacity
               style={[styles.iconBtn, { backgroundColor: '#EF444418' }]}
               onPress={() => handleDelete(item)}
+              accessibilityLabel="Delete"
             >
               <Ionicons name="trash-outline" size={16} color="#EF4444" />
             </TouchableOpacity>
@@ -358,7 +361,8 @@ export default function TransportPricingScreen() {
                   <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                     {editing ? 'Edit Pricing' : 'Add Pricing'}
                   </Text>
-                  <TouchableOpacity onPress={() => setShowModal(false)}>
+                  <TouchableOpacity onPress={() => setShowModal(false)}
+              accessibilityLabel="Close">
                     <Ionicons name="close" size={22} color={colors.foreground} />
                   </TouchableOpacity>
                 </View>
@@ -459,7 +463,7 @@ export default function TransportPricingScreen() {
                     <Text style={{ color: colors.foreground }}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.submitBtn, { backgroundColor: '#556ee6', opacity: isSaving ? 0.6 : 1 }]}
+                    style={[styles.submitBtn, { backgroundColor: '#556ee6', opacity: isSaving ? 0.5 : 1 }]}
                     onPress={handleSubmit}
                     disabled={isSaving}
                   >
@@ -506,6 +510,7 @@ export default function TransportPricingScreen() {
 }
 
 const styles = StyleSheet.create({
+  serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   container: { flex: 1, padding: 16 },
   centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48 },
   addBtn: {

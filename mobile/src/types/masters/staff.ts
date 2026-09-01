@@ -7,12 +7,17 @@ export interface WorkExperienceEntry {
   description?: string;
 }
 
-// Qualification entry (dynamic array)
+// Qualification entry (dynamic array) — mirrors the backend's StaffQualification
+// contract (level/name/passed_out_year/percentage/university). Numeric-ish fields
+// are kept as strings while editing to match the plain TextInput form fields;
+// they're parsed to numbers only when sent to the API.
 export interface QualificationEntry {
-  degree_name: string;
-  institution: string;
-  year_of_passing?: number;
-  result?: string;
+  id?: string;
+  level: QualificationLevel | '';
+  name: string;
+  passed_out_year: string;
+  percentage: string;
+  university: string;
 }
 
 // Staff Types
@@ -61,6 +66,7 @@ export interface Staff {
   // Dynamic arrays (from StaffEnrollmentOut)
   work_experience?: WorkExperienceEntry[];
   qualifications?: any[];
+  photo_url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -98,7 +104,7 @@ export interface StaffInput {
 export interface Designation {
   id: string;
   title: string;
-  staff_members?: Staff[];
+  staff_count?: number; // matches backend field, used for the staff-members count
   created_at: string;
   updated_at: string;
 }
@@ -111,7 +117,7 @@ export interface StaffAttendance {
   id: string;
   staff_id: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'half_day';
   remarks?: string;
   staff?: Staff;
   created_at: string;
@@ -121,7 +127,7 @@ export interface StaffAttendance {
 export interface StaffAttendanceInput {
   staff_id: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'half_day';
   remarks?: string;
 }
 
@@ -214,30 +220,30 @@ export interface StaffAssignmentInput {
 }
 
 // Staff Qualification Types
+export type QualificationLevel = 'Below Graduation' | 'Graduation' | 'Post Graduation' | 'PhD';
+
 export interface StaffQualification {
   id: string;
   staff_id: string;
-  degree: string;
-  institution: string;
-  year_of_passing?: number;
-  specialization?: string;
-  grade?: string;
-  created_at: string;
-  updated_at: string;
+  level: QualificationLevel;
+  name: string;
+  passed_out_year?: number;
+  percentage?: string;
+  university?: string;
 }
 
 export interface StaffQualificationInput {
-  degree: string;
-  institution: string;
-  year_of_passing?: number;
-  specialization?: string;
-  grade?: string;
+  level: QualificationLevel;
+  name: string;
+  passed_out_year?: number;
+  percentage?: number;
+  university?: string;
 }
 
 export interface StaffQualificationUpdate {
-  degree?: string;
-  institution?: string;
-  year_of_passing?: number;
-  specialization?: string;
-  grade?: string;
+  level?: QualificationLevel;
+  name?: string;
+  passed_out_year?: number;
+  percentage?: number;
+  university?: string;
 }

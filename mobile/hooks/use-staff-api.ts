@@ -14,14 +14,17 @@ import {
   staffProfileApi 
 } from '@/src/api/staff';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
-import type { 
-  Staff, 
-  StaffInput, 
-  StaffAttendance, 
-  StaffAttendanceInput, 
-  Designation, 
+import type {
+  Staff,
+  StaffInput,
+  StaffAttendance,
+  StaffAttendanceInput,
+  Designation,
   DesignationInput,
-  StaffProfile 
+  StaffProfile,
+  StaffQualification,
+  StaffQualificationInput,
+  StaffQualificationUpdate,
 } from '@/src/types/masters/staff';
 
 // Staff Enrollment Hooks
@@ -279,4 +282,41 @@ export const useStaffAttendanceManagement = (params?: {
     isUpdating: updateMutation.isLoading,
     isBulkUpdating: bulkUpdateMutation.isLoading,
   };
+};
+
+// Staff Qualification Hooks
+export const useStaffQualifications = (staffId: string, enabled = true) => {
+  return usePermissionProtectedReadQuery(
+    PERMISSION_RESOURCES.STAFF,
+    ['staff-qualifications', staffId],
+    () => staffApi.getQualifications(staffId),
+    { enabled: enabled && !!staffId }
+  );
+};
+
+export const useAddQualification = (options?: any) => {
+  return usePermissionProtectedCreateMutation(
+    PERMISSION_RESOURCES.STAFF,
+    ({ staffId, data }: { staffId: string; data: StaffQualificationInput }) =>
+      staffApi.addQualification(staffId, data),
+    options
+  );
+};
+
+export const useUpdateQualification = (options?: any) => {
+  return usePermissionProtectedUpdateMutation(
+    PERMISSION_RESOURCES.STAFF,
+    ({ staffId, qualificationId, data }: { staffId: string; qualificationId: string; data: StaffQualificationUpdate }) =>
+      staffApi.updateQualification(staffId, qualificationId, data),
+    options
+  );
+};
+
+export const useDeleteQualification = (options?: any) => {
+  return usePermissionProtectedDeleteMutation(
+    PERMISSION_RESOURCES.STAFF,
+    ({ staffId, qualificationId }: { staffId: string; qualificationId: string }) =>
+      staffApi.deleteQualification(staffId, qualificationId),
+    options
+  );
 };

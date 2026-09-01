@@ -1,4 +1,5 @@
-import { 
+import { useQuery } from '@tanstack/react-query';
+import {
   usePermissionProtectedQuery,
   usePermissionProtectedMutation,
   usePermissionProtectedListQuery,
@@ -61,6 +62,17 @@ export const useDeleteFeeCategory = () => {
     PERMISSION_RESOURCES.FEE_CATEGORIES,
     feeCategoriesApi.deleteFeeCategory
   );
+};
+
+export const useFeeCategoryTypes = (categoryId: string, enabled = true) => {
+  return useQuery<FeeTypeResponse[]>({
+    queryKey: ['feeTypes', 'by-category', categoryId],
+    queryFn: async () => {
+      const all = await feeTypesApi.getFeeTypes();
+      return all.filter((t) => t.fee_category_id === categoryId);
+    },
+    enabled: !!categoryId && enabled,
+  });
 };
 
 // Fee Types Hooks

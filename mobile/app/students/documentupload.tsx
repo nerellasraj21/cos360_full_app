@@ -11,6 +11,7 @@ import { useTheme } from '@/contexts';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUploadMyDocument } from '@/src/api/hooks/students/documents';
 import { useToastContext } from '@/components/ToastProvider';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 interface DocumentForm {
   documentName: string;
@@ -33,7 +34,7 @@ const documentTypes = [
   'Other'
 ];
 
-export default function DocumentUploadPage() {
+function DocumentUploadPageContent() {
   const { colors } = useTheme();
   const { showError } = useToastContext();
   const { studentId, selectedStudent, role } = useAuth();
@@ -170,7 +171,8 @@ export default function DocumentUploadPage() {
                   {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                 </ThemedText>
               </View>
-              <TouchableOpacity onPress={() => setSelectedFile(null)}>
+              <TouchableOpacity onPress={() => setSelectedFile(null)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={20} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </View>
@@ -349,3 +351,16 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function DocumentUploadPage() {
+  return (
+    <ScreenAccessGate
+      title="Upload Document"
+      permissions={[['student_documents', 'create'], ['student_documents', 'update']]}
+    >
+      <DocumentUploadPageContent />
+    </ScreenAccessGate>
+  );
+}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { PrimaryButton, SecondaryButton, IconButton } from '@/components/buttons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -129,6 +130,7 @@ export default function StudentProfile() {
                 <TouchableOpacity
                   style={[styles.editProfileButton, { backgroundColor: colors.primary }]}
                   onPress={handleOpenEdit}
+              accessibilityLabel="Edit"
                 >
                   <Ionicons name="create" size={20} color="white" />
                 </TouchableOpacity>
@@ -209,7 +211,8 @@ export default function StudentProfile() {
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="subtitle" style={styles.modalTitle}>Edit Profile</ThemedText>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={24} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </View>

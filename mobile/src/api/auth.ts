@@ -152,7 +152,10 @@ export const refreshToken = async (): Promise<string | null> => {
     const refreshTokenValue = await getRefreshToken();
     if (!refreshTokenValue) return null;
 
-    const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://www.cos360.app/api/v1';
+    // Match the fallback used by the shared apiClient (src/api/client.ts) so a
+    // missing EXPO_PUBLIC_API_URL doesn't send refresh requests to production
+    // while every other request goes to the local dev server (or vice versa).
+    const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
     const schema = await AsyncStorage.getItem('@auth/client_schema').catch(() => null);
     const response = await fetch(`${apiUrl}/auth/refresh`, {
       method: 'POST',

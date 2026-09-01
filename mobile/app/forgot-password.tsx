@@ -9,10 +9,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PrimaryButton, SecondaryButton, IconButton } from '@/components/buttons';
 
 const BRAND = '#556ee6';
 
@@ -46,10 +46,14 @@ export default function ForgotPasswordScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Back button */}
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={20} color="#374151" />
-          <Text style={styles.backText}>Back to Login</Text>
-        </TouchableOpacity>
+        <SecondaryButton
+          onPress={() => router.back()}
+          icon={<Ionicons name="arrow-back" size={20} color="#374151" />}
+          style={{ backgroundColor: 'transparent', borderWidth: 0, alignSelf: 'flex-start', paddingHorizontal: 0 }}
+          textStyle={styles.backText}
+        >
+          Back to Login
+        </SecondaryButton>
 
         {/* Logo area */}
         <View style={styles.logoRow}>
@@ -83,10 +87,14 @@ export default function ForgotPasswordScreen() {
             />
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85}>
-              <Ionicons name="mail-outline" size={18} color="white" />
-              <Text style={styles.submitBtnText}>Send Reset Request</Text>
-            </TouchableOpacity>
+            <PrimaryButton
+              onPress={handleSubmit}
+              fullWidth
+              icon={<Ionicons name="mail-outline" size={18} color="white" />}
+              style={{ marginTop: 16 }}
+            >
+              Send Reset Request
+            </PrimaryButton>
           </View>
         ) : (
           <View style={styles.card}>
@@ -106,16 +114,21 @@ export default function ForgotPasswordScreen() {
               </Text>
             </View>
 
-            <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: '#374151' }]}
+            <PrimaryButton
               onPress={() => { setUsername(''); setSubmitted(false); }}
+              fullWidth
+              style={{ backgroundColor: '#374151', marginTop: 16 }}
             >
-              <Text style={styles.submitBtnText}>Try a Different Account</Text>
-            </TouchableOpacity>
+              Try a Different Account
+            </PrimaryButton>
 
-            <TouchableOpacity style={styles.loginLink} onPress={() => router.replace('/login')}>
-              <Text style={styles.loginLinkText}>Back to Login</Text>
-            </TouchableOpacity>
+            <SecondaryButton
+              onPress={() => router.replace('/login')}
+              style={{ backgroundColor: 'transparent', borderWidth: 0, marginTop: 16 }}
+              textStyle={styles.loginLinkText}
+            >
+              Back to Login
+            </SecondaryButton>
           </View>
         )}
       </ScrollView>

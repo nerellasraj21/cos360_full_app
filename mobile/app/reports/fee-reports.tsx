@@ -14,6 +14,8 @@ import {
 import { ScreenLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { feeReportsApi, type FeeCollectionStats, type FeePendingStats, type FeeStructureStats } from '@/src/api/fees';
+import { exportToCsv } from '@/src/utils/exportCsv';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const COLOR = '#10B981';
 type Tab = 'collection' | 'pending' | 'structure';
@@ -36,7 +38,7 @@ function getCollectionDates(filter: CollectionFilter): { date_from?: string; dat
   };
 }
 
-export default function FeeReportsScreen() {
+function FeeReportsScreenContent() {
   const { colors, theme } = useTheme();
   const [activeTab, setActiveTab] = useState<Tab>('collection');
   const [collectionFilter, setCollectionFilter] = useState<CollectionFilter>('all');
@@ -178,6 +180,39 @@ export default function FeeReportsScreen() {
     (activeTab === 'pending' && (pendingStatsLoading || pendingLoading)) ||
     (activeTab === 'structure' && (structureStatsLoading || structureLoading));
 
+  const handleExport = async () => {
+    if (activeTab === 'collection') {
+      await exportToCsv(
+        'fee_collection_report.csv',
+        ['#', 'Transaction No', 'Student', 'Class/Section', 'Fee Category', 'Fee Type', 'Amount Paid', 'Payment Method', 'Date', 'Collected By'],
+        collectionItems.map((r: any, i) => [
+          i + 1, r.transaction_number, r.student_name, r.class_section,
+          r.fee_category, r.fee_type, r.amount_paid, r.payment_method,
+          r.transaction_date, r.collected_by,
+        ]),
+      );
+    } else if (activeTab === 'pending') {
+      await exportToCsv(
+        'fee_pending_report.csv',
+        ['#', 'Student', 'Admission No', 'Class/Section', 'Fee Category', 'Fee Type', 'Amount Due', 'Amount Paid', 'Balance', 'Due Date', 'Days Overdue'],
+        pendingItems.map((r: any, i) => [
+          i + 1, r.student_name, r.student_admission_no, r.class_section,
+          r.fee_category, r.fee_type, r.amount_due, r.amount_paid,
+          r.balance_amount, r.due_date, r.days_overdue,
+        ]),
+      );
+    } else {
+      await exportToCsv(
+        'fee_structure_report.csv',
+        ['#', 'Fee Category', 'Fee Type', 'Fee Term', 'Class', 'Section', 'Fee Amount', 'Academic Year', 'Status'],
+        structureItems.map((r: any, i) => [
+          i + 1, r.fee_category, r.fee_type, r.fee_term,
+          r.class_name, r.section_name, r.fee_amount, r.academic_year, r.status,
+        ]),
+      );
+    }
+  };
+
   return (
     <ScreenLayout title="Fee Reports">
       {/* Banner */}
@@ -187,6 +222,11 @@ export default function FeeReportsScreen() {
           <Ionicons name="card" size={24} color="white" />
         </View>
         <Text style={styles.bannerTitle}>Fee Reports</Text>
+        <View style={{ flex: 1 }} />
+        <TouchableOpacity style={styles.exportBtn} onPress={handleExport}>
+          <Ionicons name="share-outline" size={16} color="white" />
+          <Text style={styles.exportBtnText}>Export</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Tabs */}
@@ -329,7 +369,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center',
   },
-  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700' },
+  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700', flex: 1 },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  exportBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
   tabBar: { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: 8 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 12 },
   tabText: { fontSize: 13, fontWeight: '600' },
@@ -367,3 +409,17 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', gap: 8, paddingTop: 40 },
   emptyText: { fontSize: 14 },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function FeeReportsScreen() {
+  return (
+    <ScreenAccessGate
+      title="Fee Reports"
+      resources={['fee_reports', 'fee_transactions']}
+      blockRoles={['teacher']}
+    >
+      <FeeReportsScreenContent />
+    </ScreenAccessGate>
+  );
+}

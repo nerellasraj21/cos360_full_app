@@ -15,6 +15,8 @@ import { AppLayout } from '@/components';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useTheme } from '@/contexts';
 import { expenseCategoriesApi, expenseReportsApi, expenseTypesApi } from '@/src/api/expense';
+import { academicYearsApi } from '@/src/api/masters';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const ORANGE = '#F97316';
 
@@ -38,17 +40,7 @@ type TypeRow = {
   entry_count: number;
 };
 
-// Generate last 5 financial years (Indian FY: Apr–Mar)
-const CURRENT_YEAR = new Date().getFullYear();
-const YEAR_OPTIONS = [
-  { label: 'All Years', value: '' },
-  ...Array.from({ length: 5 }, (_, i) => {
-    const yr = CURRENT_YEAR - i;
-    return { label: `FY ${yr}–${String(yr + 1).slice(2)}`, value: String(yr) };
-  }),
-];
-
-export default function ExpenseSummaryScreen() {
+function ExpenseSummaryScreenContent() {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const [selectedYear, setSelectedYear] = useState('');
@@ -57,6 +49,34 @@ export default function ExpenseSummaryScreen() {
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const sectionBg = theme === 'dark' ? '#13132b' : '#f8fafc';
+
+  // Academic years (same source as web: masters academic years)
+  const { data: academicYears = [] } = useQuery({
+    queryKey: ['summary-academic-years'],
+    queryFn: () => academicYearsApi.getAcademicYears({ active_only: false }),
+  });
+
+  const yearOptions = useMemo(
+    () => [
+      { label: 'All Years', value: '' },
+      ...(academicYears as any[]).map((y: any) => ({ label: y.title, value: y.id })),
+    ],
+    [academicYears],
+  );
+
+  const selectedYearObj = useMemo(
+    () => (academicYears as any[]).find((y: any) => y.id === selectedYear),
+    [academicYears, selectedYear],
+  );
+
+  // Reports are filtered by the academic year's date range (they take start/end dates, not a year id)
+  const reportFilters = useMemo(
+    () =>
+      selectedYearObj
+        ? { start_date: selectedYearObj.start_date, end_date: selectedYearObj.end_date }
+        : {},
+    [selectedYearObj],
+  );
 
   // Fetch categories
   const { data: categoriesData, isLoading: catsLoading } = useQuery({
@@ -72,26 +92,42 @@ export default function ExpenseSummaryScreen() {
 
   // Fetch category report for amounts
   const { data: catReport = [] } = useQuery({
-    queryKey: ['summary-cat-report', selectedYear],
-    queryFn: () => expenseReportsApi.getCategoryReport(selectedYear ? { start_date: `${selectedYear}-04-01`, end_date: `${selectedYear}-03-31` } : {}),
+    queryKey: ['summary-cat-report', selectedYear, reportFilters],
+    queryFn: () => expenseReportsApi.getCategoryReport(reportFilters),
   });
 
   // Fetch type report for amounts
   const { data: typeReport = [] } = useQuery({
-    queryKey: ['summary-type-report', selectedYear],
-    queryFn: () => expenseReportsApi.getTypeReport(selectedYear ? { start_date: `${selectedYear}-04-01`, end_date: `${selectedYear}-03-31` } : {}),
+    queryKey: ['summary-type-report', selectedYear, reportFilters],
+    queryFn: () => expenseReportsApi.getTypeReport(reportFilters),
   });
 
-  const categories = useMemo(() => (categoriesData as any)?.items ?? [], [categoriesData]);
-  const types = useMemo(() => (typesData as any)?.items ?? [], [typesData]);
+  // Endpoint may return a bare array OR a { items } page — handle both (the Types screen does the same)
+  const categories = useMemo(() => {
+    const d: any = categoriesData;
+    return Array.isArray(d) ? d : (d?.items ?? []);
+  }, [categoriesData]);
+  const types = useMemo(() => {
+    const d: any = typesData;
+    return Array.isArray(d) ? d : (d?.items ?? []);
+  }, [typesData]);
 
   // Build hierarchical summary
   const summary: CategoryRow[] = useMemo(() => {
+    // These report endpoints may be unimplemented (the web stubs them to {}), so the
+    // response can be an object rather than an array — coerce defensively before forEach.
+    const catReportArr: any[] = Array.isArray(catReport)
+      ? catReport
+      : ((catReport as any)?.categories ?? (catReport as any)?.items ?? []);
+    const typeReportArr: any[] = Array.isArray(typeReport)
+      ? typeReport
+      : ((typeReport as any)?.types ?? (typeReport as any)?.items ?? []);
+
     const catReportMap: Record<string, any> = {};
-    (catReport as any[]).forEach(r => { catReportMap[r.category_id] = r; });
+    catReportArr.forEach(r => { catReportMap[r.category_id] = r; });
 
     const typeReportMap: Record<string, any> = {};
-    (typeReport as any[]).forEach(r => { typeReportMap[r.type_id] = r; });
+    typeReportArr.forEach(r => { typeReportMap[r.type_id] = r; });
 
     return categories.map((cat: any) => {
       const catTypes: TypeRow[] = types
@@ -143,13 +179,15 @@ export default function ExpenseSummaryScreen() {
               Category-wise breakdown of all expenses with type-level details and totals
             </Text>
           </View>
-          <View style={{ width: 150 }}>
-            <CustomDropdown
-              data={YEAR_OPTIONS}
-              value={selectedYear}
-              onChange={(v: any) => setSelectedYear(v?.toString() ?? '')}
-              placeholder="All Years"
-            />
+          <View style={styles.headerRight}>
+            <View style={{ width: 140 }}>
+              <CustomDropdown
+                data={yearOptions}
+                value={selectedYear}
+                onChange={(v: any) => setSelectedYear(v?.toString() ?? '')}
+                placeholder="All Years"
+              />
+            </View>
           </View>
         </View>
 
@@ -200,7 +238,7 @@ export default function ExpenseSummaryScreen() {
                 <TouchableOpacity
                   style={styles.catHeader}
                   onPress={() => toggleExpand(cat.id)}
-                  activeOpacity={0.7}
+                  activeOpacity={0.75}
                 >
                   <View style={[styles.catIconBox, { backgroundColor: borderColor + '20' }]}>
                     <Ionicons name="folder-outline" size={18} color={borderColor} />
@@ -273,6 +311,29 @@ export default function ExpenseSummaryScreen() {
           })
         )}
 
+        {/* Grand Total footer */}
+        {!isLoading && summary.length > 0 && (
+          <View style={[styles.grandTotalCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <View style={styles.grandTotalLeft}>
+              <Ionicons name="cash-outline" size={22} color="#556ee6" />
+              <View>
+                <Text style={[styles.grandTotalLabel, { color: colors.foreground }]}>Grand Total</Text>
+                {selectedYearObj ? (
+                  <Text style={[styles.grandTotalSub, { color: colors['muted-foreground'] }]}>
+                    {selectedYearObj.title}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <View style={{ alignItems: 'flex-end', flex: 1 }}>
+              <Text style={[styles.grandTotalAmount, { color: '#556ee6' }]}>{fmt(grandTotal)}</Text>
+              <Text style={[styles.grandTotalSub, { color: colors['muted-foreground'] }]} numberOfLines={2}>
+                {totalEntries} total entries across {summary.length} categories
+              </Text>
+            </View>
+          </View>
+        )}
+
         <View style={{ height: 32 }} />
       </ScrollView>
     </AppLayout>
@@ -286,7 +347,16 @@ const styles = StyleSheet.create({
   },
   pageTitle: { fontSize: 18, fontWeight: '700', marginBottom: 2 },
   pageSub: { fontSize: 12, lineHeight: 17 },
+  headerRight: { gap: 8, alignItems: 'flex-end' },
   statsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 16 },
+  grandTotalCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+    marginHorizontal: 16, marginTop: 8, padding: 16, borderRadius: 12, borderWidth: 2,
+  },
+  grandTotalLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  grandTotalLabel: { fontSize: 16, fontWeight: '700' },
+  grandTotalSub: { fontSize: 12, textAlign: 'right' },
+  grandTotalAmount: { fontSize: 24, fontWeight: '700' },
   statCard: {
     flex: 1, borderRadius: 12, borderWidth: 1, padding: 12, gap: 6,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
@@ -328,3 +398,16 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48 },
   emptyBox: { marginHorizontal: 16, borderRadius: 12, borderWidth: 1, padding: 40, alignItems: 'center' },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function ExpenseSummaryScreen() {
+  return (
+    <ScreenAccessGate
+      title="Expense Summary"
+      resources={['expense_transactions']}
+    >
+      <ExpenseSummaryScreenContent />
+    </ScreenAccessGate>
+  );
+}

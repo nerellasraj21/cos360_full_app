@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import {
@@ -29,21 +30,28 @@ import {
   FeeConcessionCreate,
   FeeSearchStudentResult,
 } from '@/src/api/fees';
+import { classSectionsApi } from '@/src/api/masters';
+import CustomDropdown from '@/components/ui/dropdown';
 import { useToastContext } from '@/components/ToastProvider';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 // M-1: INR currency formatter
 const formatINR = (amount: number | string | null | undefined) =>
   '₹' + Number(amount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export default function FeeCollectionScreen() {
+function FeeCollectionScreenContent() {
   const { role, selectedStudent } = useAuth();
   const { colors, theme } = useTheme();
   const { activeAcademicYearId } = useAcademicYear();
+  const router = useRouter();
 
   const roleName = role?.name?.toLowerCase() ?? '';
   const isStudent = roleName === 'student';
   const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedSectionId, setSelectedSectionId] = useState('');
+  const [searchTriggered, setSearchTriggered] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
 
   const [selectedStudentInfo, setSelectedStudentInfo] = useState(null as any);
@@ -98,10 +106,24 @@ export default function FeeCollectionScreen() {
   });
 
   // ── Admin: search + summary ───────────────────────────────────────────────
+  // Classes for filter dropdown
+  const { data: classes = [] } = useQuery({
+    queryKey: ['classSections'],
+    queryFn: () => classSectionsApi.getClassSections({ active_only: true }),
+    enabled: !isStudent && !isParent,
+  });
+
+  const selectedClass = (classes as any[]).find((c: any) => c.id === selectedClassId);
+  const sectionOptions = selectedClass?.sections || [];
+
   const { data: searchResults, isLoading: searchLoading } = useQuery({
-    queryKey: ['fee-search-student', searchQuery],
-    queryFn: () => feeCollectionApi.searchStudent({ q: searchQuery }),
-    enabled: !isStudent && !isParent && searchQuery.length >= 2,
+    queryKey: ['fee-search-student', searchQuery, selectedClassId, selectedSectionId],
+    queryFn: () => feeCollectionApi.searchStudent({
+      q: searchQuery || undefined,
+      class_id: selectedClassId || undefined,
+      section_id: selectedSectionId || undefined,
+    }),
+    enabled: !isStudent && !isParent && searchTriggered,
   });
 
   const { data: adminFeeSummary, isLoading: adminLoading } = useQuery({
@@ -243,6 +265,11 @@ export default function FeeCollectionScreen() {
               <View style={styles.feeAmounts}>
                 <Text style={[styles.feeAmountChip, { color: colors['muted-foreground'] }]}>
                   Assigned: {formatINR(item.assigned_fee)}
+                </Text>
+                {/* Web parity (ParentFeeSummaryPage / FeeSummaryTab): show the
+                    post-concession amount, not just the raw assigned fee. */}
+                <Text style={[styles.feeAmountChip, { color: '#8B5CF6' }]}>
+                  After Concession: {formatINR(item.fee_after_concession)}
                 </Text>
                 <Text style={[styles.feeAmountChip, { color: '#10B981' }]}>
                   Paid: {formatINR(item.paid_amount)}
@@ -418,7 +445,7 @@ export default function FeeCollectionScreen() {
       />
 
       <TouchableOpacity
-        style={[styles.submitBtn, { backgroundColor: '#10B981', opacity: payMutation.isPending ? 0.6 : 1 }]}
+        style={[styles.submitBtn, { backgroundColor: '#10B981', opacity: payMutation.isPending ? 0.5 : 1 }]}
         onPress={() => payMutation.mutate(selectedStudentId)}
         disabled={
           payMutation.isPending || !paymentForm.amount || !!amountError
@@ -504,7 +531,7 @@ export default function FeeCollectionScreen() {
       />
 
       <TouchableOpacity
-        style={[styles.submitBtn, { backgroundColor: '#8B5CF6', opacity: concessionMutation.isPending ? 0.6 : 1 }]}
+        style={[styles.submitBtn, { backgroundColor: '#8B5CF6', opacity: concessionMutation.isPending ? 0.5 : 1 }]}
         onPress={() => concessionMutation.mutate(selectedStudentId)}
         disabled={concessionMutation.isPending || !concessionForm.fee_type_id || !concessionForm.amount}
       >
@@ -582,186 +609,148 @@ export default function FeeCollectionScreen() {
             Search students and manage fee payments
           </Text>
         </View>
-        {/* Search bar */}
-        <View style={[styles.searchBar, { backgroundColor: cardBg, borderColor: borderCol }]}>
-          <Ionicons name="search" size={18} color={colors['muted-foreground']} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Search student by name or admission no..."
-            placeholderTextColor={colors['muted-foreground']}
-            value={searchQuery}
-            onChangeText={(t) => {
-              setSearchQuery(t);
-              setSelectedStudentId('');
-              setSelectedStudentInfo(null);
-              setAdminTab('summary');
-            }}
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => { setSearchQuery(''); setSelectedStudentId(''); setSelectedStudentInfo(null); setAdminTab('summary'); }}>
-              <Ionicons name="close" size={18} color={colors['muted-foreground']} />
+        {/* Filters row — matches web layout */}
+        <View style={styles.filtersSection}>
+          {/* Search text input */}
+          <View style={[styles.searchBar, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <Ionicons name="search" size={16} color={colors['muted-foreground']} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.foreground }]}
+              placeholder="Search by name, admission no, mobile..."
+              placeholderTextColor={colors['muted-foreground']}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={() => setSearchTriggered(true)}
+            />
+          </View>
+
+          {/* Class + Section dropdowns — styled to match the search bar above */}
+          <View style={styles.filterDropdowns}>
+            <View style={{ flex: 1 }}>
+              <CustomDropdown
+                data={[{ label: 'All Classes', value: '' }, ...(classes as any[]).map((c: any) => ({ label: c.name, value: c.id }))]}
+                value={selectedClassId}
+                onChange={(v) => { setSelectedClassId(v as string); setSelectedSectionId(''); }}
+                placeholder="All Classes"
+                search={false}
+                containerStyle={styles.filterDropdownContainer}
+                style={{ ...styles.filterDropdownBox, backgroundColor: cardBg, borderColor: borderCol }}
+                placeholderStyle={styles.filterDropdownText}
+                selectedTextStyle={styles.filterDropdownText}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <CustomDropdown
+                data={[{ label: 'All Sections', value: '' }, ...sectionOptions.map((s: any) => ({ label: s.name, value: s.id }))]}
+                value={selectedSectionId}
+                onChange={(v) => setSelectedSectionId(v as string)}
+                placeholder="All Sections"
+                search={false}
+                disabled={!selectedClassId}
+                containerStyle={styles.filterDropdownContainer}
+                style={{ ...styles.filterDropdownBox, backgroundColor: cardBg, borderColor: borderCol }}
+                placeholderStyle={styles.filterDropdownText}
+                selectedTextStyle={styles.filterDropdownText}
+              />
+            </View>
+          </View>
+
+          {/* Search + Clear buttons */}
+          <View style={styles.filterActions}>
+            <TouchableOpacity
+              style={[styles.searchBtn, { backgroundColor: colors.primary }]}
+              onPress={() => { setSelectedStudentId(''); setSelectedStudentInfo(null); setSearchTriggered(true); }}
+            >
+              <Ionicons name="search" size={15} color="white" />
+              <Text style={styles.searchBtnText}>Search</Text>
             </TouchableOpacity>
-          ) : null}
+            <TouchableOpacity
+              style={[styles.clearBtn, { borderColor: borderCol }]}
+              onPress={() => {
+                setSearchQuery(''); setSelectedClassId(''); setSelectedSectionId('');
+                setSearchTriggered(false); setSelectedStudentId(''); setSelectedStudentInfo(null);
+              }}
+            >
+              <Text style={[styles.clearBtnText, { color: colors['muted-foreground'] }]}>Clear</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Search dropdown */}
-        {searchQuery.length >= 2 && !selectedStudentId && (
-          <View style={[styles.searchDropdown, { backgroundColor: cardBg, borderColor: borderCol }]}>
+        {/* Student results grid */}
+        {searchTriggered && !selectedStudentId && (
+          <View style={{ flex: 1 }}>
             {searchLoading ? (
-              <View style={styles.dropdownItem}>
-                <ActivityIndicator size="small" color={colors.primary} />
+              <View style={styles.emptyState}>
+                <ActivityIndicator size="large" color={colors.primary} />
               </View>
             ) : (searchResults ?? []).length === 0 ? (
-              <View style={styles.dropdownItem}>
-                <Text style={{ color: colors['muted-foreground'], fontSize: 14 }}>No students found</Text>
+              <View style={styles.emptyState}>
+                <Ionicons name="search-outline" size={48} color={colors['muted-foreground']} />
+                <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>No students found</Text>
               </View>
             ) : (
-              (searchResults ?? []).map((s) => (
-                <TouchableOpacity
-                  key={s.student_id}
-                  style={[styles.dropdownItem, { borderBottomColor: borderCol }]}
-                  onPress={() => {
-                    setSelectedStudentId(s.student_id); setSelectedStudentInfo(s);
-                    setSearchQuery(s.student_name);
-                  }}
-                >
-                  <Text style={[styles.dropdownName, { color: colors.foreground }]}>{s.student_name}</Text>
-                  <Text style={[styles.dropdownSub, { color: colors['muted-foreground'] }]}>
-                    {s.admission_number} • {s.class_name}
-                    {Number(s.outstanding_amount) > 0
-                      ? (' • Due: ' + formatINR(s.outstanding_amount))
-                      : ''}
-                  </Text>
-                </TouchableOpacity>
-              ))
+              <ScrollView showsVerticalScrollIndicator={true} persistentScrollbar={true} contentContainerStyle={styles.studentGrid}>
+                {(searchResults ?? []).map((s: any) => {
+                  // Backend may use different field names — check all variants
+                  const name = s.student_name || s.name || s.full_name || s.studentName || '—';
+                  const admNo = s.admission_number || s.admission_num || s.admissionNumber || '';
+                  const cls = s.class_name || s.className || '';
+                  const sec = s.section_name || s.sectionName || '';
+                  const parentNames = s.parent_names || s.parents || s.father_name || s.father_phone || null;
+                  const due = Number(s.outstanding_amount || s.balance || 0);
+                  const sid = s.student_id || s.id || s.studentId || '';
+                  return (
+                    <TouchableOpacity
+                      key={sid}
+                      style={[styles.studentCard, { backgroundColor: cardBg, borderColor: borderCol }]}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/fees/collection/[studentId]',
+                          params: { studentId: sid, name, admission: admNo, className: cls, section: sec },
+                        } as any)
+                      }
+                    >
+                      <View style={[styles.studentAvatar2, { backgroundColor: colors.primary + '18' }]}>
+                        <Ionicons name="person" size={24} color={colors.primary} />
+                      </View>
+                      <Text style={[styles.studentCardName, { color: colors.foreground }]} numberOfLines={2}>
+                        {name}
+                      </Text>
+                      <View style={styles.studentCardBadges}>
+                        <View style={[styles.admBadge, { backgroundColor: colors.primary + '22' }]}>
+                          <Text style={[styles.admBadgeText, { color: colors.primary }]}>{admNo}</Text>
+                        </View>
+                        <Text style={[styles.classBadge, { color: colors['muted-foreground'] }]}>
+                          {cls}{sec ? ' ' + sec : ''}
+                        </Text>
+                      </View>
+                      {parentNames ? (
+                        <Text style={[styles.studentCardParent, { color: colors['muted-foreground'] }]} numberOfLines={1}>
+                          Parent: {parentNames}
+                        </Text>
+                      ) : null}
+                      {due > 0 && (
+                        <Text style={styles.studentCardDue}>Due: {formatINR(due)}</Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             )}
           </View>
         )}
 
-        {/* C-5: Student info card after selection */}
-        {selectedStudentId && selectedStudentInfo && (
-          <View style={[styles.studentInfoCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
-            <View style={styles.studentAvatar}>
-              <Ionicons name='person' size={28} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.studentInfoName, { color: colors.foreground }]}>
-                {selectedStudentInfo.student_name}
-              </Text>
-              <View style={styles.studentInfoRow}>
-                <View style={[styles.admissionBadge, { backgroundColor: colors.primary+'22' }]}>
-                  <Text style={[styles.admissionBadgeText, { color: colors.primary }]}>
-                    {selectedStudentInfo.admission_number}
-                  </Text>
-                </View>
-                <Text style={[styles.studentInfoSub, { color: colors['muted-foreground'] }]}>
-                  {selectedStudentInfo.class_name}{selectedStudentInfo.section_name ? '  ' + selectedStudentInfo.section_name : ''}
-                </Text>
-              </View>
-              {selectedStudentInfo.father_phone ? (
-                <Text style={[styles.studentInfoSub, { color: colors['muted-foreground'] }]}>
-                  Ph: {selectedStudentInfo.father_phone}
-                </Text>
-              ) : null}
-            </View>
+        {/* Initial empty state — before search */}
+        {!searchTriggered && !selectedStudentId && (
+          <View style={styles.emptyState}>
+            <Ionicons name="search-circle-outline" size={64} color={colors['muted-foreground']} />
+            <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>Search and select a student</Text>
+            <Text style={[styles.emptySubText, { color: colors['muted-foreground'] }]}>to view their fee details</Text>
           </View>
         )}
-        {/* Tab bar — visible once a student is selected */}
-        {selectedStudentId && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.adminTabBar}>
-            {ADMIN_TABS.map(tab => (
-              <TouchableOpacity
-                key={tab.key}
-                style={[styles.adminTab, adminTab === tab.key && { backgroundColor: colors.primary, borderRadius: 8 }]}
-                onPress={() => setAdminTab(tab.key)}
-              >
-                <Text style={{ color: adminTab === tab.key ? 'white' : colors['muted-foreground'], fontWeight: '600', fontSize: 13 }}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-      </View>
 
-      {/* Tab content */}
-      {adminLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : adminFeeSummary ? (
-        <>
-          {adminTab === 'summary' && <SummaryView data={adminFeeSummary} />}
-          {adminTab === 'payment' && <PaymentTabContent />}
-          {adminTab === 'concessions' && <ConcessionTabContent />}
-          {adminTab === 'old-fees' && <OldFeesTabContent />}
-        </>
-      ) : !selectedStudentId ? (
-        <EmptyState
-          icon="search-outline"
-          message={'Search and select a student\nto view their fee details'}
-        />
-      ) : null}
       </View>
-
-      {/* Payment success modal */}
-      <Modal
-        visible={!!paymentSuccess}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setPaymentSuccess(null)}
-      >
-        <View style={styles.successOverlay}>
-          <View style={[styles.successModal, { backgroundColor: cardBg }]}>
-            <Ionicons name="checkmark-circle" size={60} color="#10B981" style={{ marginBottom: 12 }} />
-            <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment Successful!</Text>
-            <Text style={[styles.successAmount, { color: '#10B981' }]}>
-              {formatINR(paymentSuccess?.amount_paid ?? 0)}
-            </Text>
-            {paymentSuccess?.receipt_number ? (
-              <Text style={[styles.successDetail, { color: colors['muted-foreground'] }]}>
-                Receipt: {paymentSuccess.receipt_number}
-              </Text>
-            ) : null}
-            {paymentSuccess?.transaction_number ? (
-              <Text style={[styles.successDetail, { color: colors['muted-foreground'] }]}>
-                Transaction: {paymentSuccess.transaction_number}
-              </Text>
-            ) : null}
-            {paymentSuccess?.receipt_id ? (
-              <TouchableOpacity
-                style={[styles.downloadBtn, { borderColor: colors.primary }]}
-                onPress={async () => {
-                  try {
-                    // Fix #3: Build authenticated request — Linking.openURL/Blob can't send auth headers
-                    const token = await getValidAccessToken(false);
-                    const schema = await getClientSchema();
-                    const headers: Record<string, string> = {};
-                    if (token) headers.Authorization = `Bearer ${token}`;
-                    if (schema) headers.cschema = schema;
-                    const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
-                    const url = `${baseUrl}/fee/collection/receipts/${paymentSuccess.receipt_id!}/pdf`;
-                    const localUri = FileSystem.documentDirectory + `receipt_${paymentSuccess.receipt_id}.pdf`;
-                    const result = await FileSystem.downloadAsync(url, localUri, { headers });
-                    await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf' });
-                  } catch {
-                    showError('Error', 'Unable to download receipt');
-                  }
-                }}
-              >
-                <Ionicons name='download-outline' size={16} color={colors.primary} />
-                <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>Download Receipt</Text>
-              </TouchableOpacity>
-) : null}
-            <TouchableOpacity
-              style={[styles.successBtn, { backgroundColor: '#10B981' }]}
-              onPress={() => setPaymentSuccess(null)}
-            >
-              <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      </View>
     </AppLayout>
   );
 }
@@ -773,11 +762,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 12,
     padding: 24,
-  },
-  emptyText: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 22,
   },
   summaryHeader: {
     backgroundColor: '#556ee6',
@@ -885,8 +869,50 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   adminContainer: {
+    flex: 1,
     padding: 16,
   },
+  // Filter section
+  filtersSection: { marginBottom: 8 },
+  filterDropdowns: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  filterDropdownContainer: { marginBottom: 0 },
+  filterDropdownBox: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  filterDropdownText: { fontSize: 14 },
+  filterActions: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  searchBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 10, borderRadius: 8, gap: 6,
+  },
+  searchBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
+  clearBtn: {
+    paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  clearBtnText: { fontWeight: '600', fontSize: 14 },
+  // Student grid
+  studentGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, padding: 2 },
+  studentCard: {
+    width: '47%', borderRadius: 12, padding: 14, borderWidth: 1,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2,
+  },
+  studentAvatar2: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  studentCardName: { fontSize: 14, fontWeight: '700', marginBottom: 6 },
+  studentCardBadges: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginBottom: 4 },
+  admBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
+  admBadgeText: { fontSize: 10, fontWeight: '600' },
+  classBadge: { fontSize: 11 },
+  studentCardParent: { fontSize: 11, marginTop: 2 },
+  studentCardDue: { fontSize: 11, color: '#EF4444', fontWeight: '600', marginTop: 2 },
+  // Empty state
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 8 },
+  emptyText: { fontSize: 15, fontWeight: '600', textAlign: 'center' },
+  emptySubText: { fontSize: 13, textAlign: 'center' },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1018,3 +1044,23 @@ const styles = StyleSheet.create({
   divider: { height: 1, marginVertical: 12 },
   downloadBtn: { marginTop: 10, paddingVertical: 11, paddingHorizontal: 32, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function FeeCollectionScreen() {
+  return (
+    <ScreenAccessGate
+      title="Fee Collection"
+      resources={['fee_collection', 'fee_transactions']}
+      permissions={[
+        ['fee_collection', 'read_own'],
+        ['fee_transactions', 'read_own'],
+        ['fee_collection', 'read_related'],
+        ['fee_transactions', 'read_related'],
+      ]}
+      blockRoles={['teacher']}
+    >
+      <FeeCollectionScreenContent />
+    </ScreenAccessGate>
+  );
+}

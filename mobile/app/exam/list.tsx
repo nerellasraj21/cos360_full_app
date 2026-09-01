@@ -3,14 +3,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState, useMemo } from 'react';
 import {
-  FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
-import { useAuth, useTheme } from '@/contexts';
+import { DatePickerModal } from '@/components/ui';
+import CustomDropdown from '@/components/ui/dropdown';
+import { useAuth, useTheme, useAcademicYear } from '@/contexts';
 import { examsApi, ExamListItem, ExamStatus, ExamNature, ExamUpdateRequest } from '@/src/api/exam';
+import { getApiErrorMessage } from '@/src/utils/apiError';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
+import { isAdminRole } from '../../src/lib/roles';
 import { useToastContext } from '@/components/ToastProvider';
 
 const STATUS_COLORS: Record<ExamStatus, { bg: string; text: string }> = {
@@ -22,12 +26,12 @@ const STATUS_COLORS: Record<ExamStatus, { bg: string; text: string }> = {
 };
 
 const STATUSES: { label: string; value: ExamStatus | '' }[] = [
-  { label: 'All',       value: '' },
-  { label: 'Draft',     value: 'draft' },
-  { label: 'Active',    value: 'active' },
-  { label: 'Locked',    value: 'locked' },
-  { label: 'Published', value: 'published' },
-  { label: 'Finalized', value: 'finalized' },
+  { label: 'All Status', value: '' },
+  { label: 'Draft',      value: 'draft' },
+  { label: 'Active',     value: 'active' },
+  { label: 'Locked',     value: 'locked' },
+  { label: 'Published',  value: 'published' },
+  { label: 'Finalized',  value: 'finalized' },
 ];
 
 const NATURES: { label: string; value: ExamNature | '' }[] = [
@@ -42,7 +46,16 @@ export default function ExamListScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const { role } = useAuth();
+  const { academicYears, activeAcademicYearId } = useAcademicYear();
   const { hasPermission } = useMobilePermission();
+
+  // The /exams endpoint doesn't populate academic_year_title, so resolve the
+  // academic_year_id to a readable title (e.g. "2025-26(2)") client-side.
+  const yearTitleById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const y of academicYears) map[y.id] = y.title;
+    return map;
+  }, [academicYears]);
   const qc = useQueryClient();
   const { showSuccess, showError } = useToastContext();
   const { confirm, modalProps: confirmProps } = useConfirmModal();
@@ -55,6 +68,8 @@ export default function ExamListScreen() {
   const isStudent = roleName === 'student';
   const isParent = roleName === 'parent' || roleName === 'guardian';
   const isStudentOrParent = isStudent || isParent;
+  // Web parity (ExamList.tsx): create/edit/delete are gated by the admin role.
+  const isAdmin = isAdminRole(roleName);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ExamStatus | ''>('');
@@ -70,21 +85,26 @@ export default function ExamListScreen() {
     term: string;
     publish_rank: boolean;
   }>({ exam_name: '', mark_entry_deadline: '', attendance_from_date: '', attendance_to_date: '', term: '', publish_rank: false });
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+  const [activeEditDateField, setActiveEditDateField] = useState<'deadline' | 'from' | 'to'>('deadline');
+  const confirmEditDate = (date: string) => {
+    if (activeEditDateField === 'deadline') setEditForm(f => ({ ...f, mark_entry_deadline: date }));
+    if (activeEditDateField === 'from') setEditForm(f => ({ ...f, attendance_from_date: date }));
+    if (activeEditDateField === 'to') setEditForm(f => ({ ...f, attendance_to_date: date }));
+    setShowEditDatePicker(false);
+  };
 
-  // Clone modal state
-  const [cloneTarget, setCloneTarget] = useState<ExamListItem | null>(null);
-  const [cloneName, setCloneName] = useState('');
-
-  const canCreate = hasPermission?.('exams', 'create');
-  const canUpdate = hasPermission?.('exams', 'update');
-  const canDelete = hasPermission?.('exams', 'delete');
-
+  // Endpoint mapping: scope the list to the active academic year, same as
+  // the web app's ExamList (`selectedAcademicYearId` param on GET /exams).
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['exams', statusFilter, natureFilter],
+    queryKey: ['exams', activeAcademicYearId, statusFilter, natureFilter],
     queryFn: () => examsApi.list({
-      exam_status: isStudentOrParent
-        ? (statusFilter as ExamStatus || 'published')
-        : (statusFilter as ExamStatus || undefined),
+      academic_year_id: activeAcademicYearId ?? undefined,
+      // Web parity (ExamList.tsx): no role-based status filter — students and
+      // parents see the same exams as everyone else, filtered only by the
+      // status dropdown. Previously forced to 'published', which hid the
+      // active exams the web dashboard shows them.
+      exam_status: (statusFilter as ExamStatus) || undefined,
       nature: natureFilter as ExamNature || undefined,
       size: 50,
     }),
@@ -99,7 +119,7 @@ export default function ExamListScreen() {
       setEditTarget(null);
       showSuccess('Updated', 'Exam updated successfully.');
     },
-    onError: () => showError('Error', 'Failed to update exam.'),
+    onError: (err: any) => showError('Error', getApiErrorMessage(err, 'Failed to update exam.')),
   });
 
   const deleteMutation = useMutation({
@@ -108,19 +128,7 @@ export default function ExamListScreen() {
       qc.invalidateQueries({ queryKey: ['exams'] });
       showSuccess('Deleted', 'Exam deleted.');
     },
-    onError: () => showError('Error', 'Failed to delete exam.'),
-  });
-
-  const cloneMutation = useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      examsApi.clone(id, { new_name: name }),
-    onSuccess: (newExam) => {
-      qc.invalidateQueries({ queryKey: ['exams'] });
-      setCloneTarget(null);
-      showSuccess('Cloned', 'Exam cloned successfully.');
-      router.push(`/exam/${newExam.id}` as any);
-    },
-    onError: () => showError('Error', 'Failed to clone exam.'),
+    onError: (err: any) => showError('Error', getApiErrorMessage(err, 'Failed to delete exam.')),
   });
 
   const openEdit = (exam: ExamListItem) => {
@@ -150,19 +158,14 @@ export default function ExamListScreen() {
     });
   };
 
-  const handleDelete = async (exam: ExamListItem) => {
-    const ok = await confirm({
+  const handleDelete = (exam: ExamListItem) => {
+    confirm({
       title: 'Delete Exam?',
       message: `This will permanently delete "${exam.exam_name}" and all its dates. This cannot be undone.`,
-      confirmText: 'Delete',
-      confirmDestructive: true,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(exam.id),
     });
-    if (ok) deleteMutation.mutate(exam.id);
-  };
-
-  const handleClone = () => {
-    if (!cloneTarget) return;
-    cloneMutation.mutate({ id: cloneTarget.id, name: cloneName.trim() });
   };
 
   const filtered = useMemo(() => {
@@ -175,8 +178,9 @@ export default function ExamListScreen() {
     );
   }, [data, search]);
 
-  const renderItem = ({ item }: { item: ExamListItem }) => {
+  const renderItem = ({ item, index }: { item: ExamListItem; index: number }) => {
     const sc = STATUS_COLORS[item.status] ?? STATUS_COLORS.draft;
+    const yearLabel = item.academic_year_title ?? yearTitleById[item.academic_year_id];
     return (
       <TouchableOpacity
         style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}
@@ -188,75 +192,115 @@ export default function ExamListScreen() {
         activeOpacity={0.75}
       >
         <View style={styles.cardHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>{item.exam_name}</Text>
-            <Text style={[styles.cardMeta, { color: colors['muted-foreground'] }]}>
-              {item.exam_type} · {item.nature} · {item.academic_year_title ?? item.academic_year_id}
-            </Text>
+          <View style={[styles.serialBadge, { backgroundColor: inputBg }]}>
+            <Text style={[styles.serialBadgeText, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
           </View>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>
+            {item.exam_name}
+          </Text>
           <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
             <Text style={[styles.statusText, { color: sc.text }]}>{item.status.toUpperCase()}</Text>
           </View>
         </View>
 
-        <View style={styles.cardFooter}>
-          <View style={styles.dateRow}>
-            <Ionicons name="layers-outline" size={13} color={colors['muted-foreground']} />
-            <Text style={[styles.dateText, { color: colors['muted-foreground'] }]}>
-              {item.board} · {item.level.replace(/_/g, ' ')}
-              {item.mark_entry_deadline ? ` · Due ${item.mark_entry_deadline}` : ''}
-              {(item.subject_config_count ?? 0) > 0 ? ` · ${item.subject_config_count} subj.` : ''}
+        <View style={styles.metaGrid}>
+          <View style={styles.metaItem}>
+            <Text style={[styles.metaLabel, { color: colors['muted-foreground'] }]}>Board</Text>
+            <Text style={[styles.metaValue, { color: colors.foreground }]} numberOfLines={1}>{item.board}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={[styles.metaLabel, { color: colors['muted-foreground'] }]}>Type</Text>
+            <Text style={[styles.metaValue, { color: colors.foreground }]} numberOfLines={1}>{item.exam_type}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={[styles.metaLabel, { color: colors['muted-foreground'] }]}>Level</Text>
+            <Text style={[styles.metaValue, { color: colors.foreground }]} numberOfLines={1}>{item.level.replace(/_/g, ' ')}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={[styles.metaLabel, { color: colors['muted-foreground'] }]}>Subjects</Text>
+            <Text style={[styles.metaValue, { color: colors.foreground }]} numberOfLines={1}>
+              {(item.subject_config_count ?? 0) > 0 ? `${item.subject_config_count} subj.` : '—'}
             </Text>
           </View>
-
-          {/* Actions menu (admin only) */}
-          {!isStudentOrParent && (canUpdate || canDelete) && (
-            <View style={styles.actions}>
-              {canUpdate && (
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  onPress={(e) => { e.stopPropagation?.(); openEdit(item); }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="pencil-outline" size={15} color="#556ee6" />
-                </TouchableOpacity>
-              )}
-              {canUpdate && (
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  onPress={(e) => {
-                    e.stopPropagation?.();
-                    setCloneName(`${item.exam_name} (Copy)`);
-                    setCloneTarget(item);
-                  }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="copy-outline" size={15} color="#10B981" />
-                </TouchableOpacity>
-              )}
-              {canDelete && item.status === 'draft' && (
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  onPress={(e) => { e.stopPropagation?.(); handleDelete(item); }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
-                </TouchableOpacity>
-              )}
+          <View style={styles.metaItem}>
+            <Text style={[styles.metaLabel, { color: colors['muted-foreground'] }]}>Nature</Text>
+            <View style={[styles.natureBadge, { borderColor: borderCol }]}>
+              <Text style={[styles.natureBadgeText, { color: colors.foreground }]} numberOfLines={1}>{item.nature}</Text>
             </View>
-          )}
-
-          {isStudentOrParent && (
-            <Ionicons name="chevron-forward" size={16} color={colors['muted-foreground']} />
-          )}
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={[styles.metaLabel, { color: colors['muted-foreground'] }]}>Deadline</Text>
+            <Text style={[styles.metaValue, { color: colors.foreground }]} numberOfLines={1}>{item.mark_entry_deadline ?? '—'}</Text>
+          </View>
         </View>
+
+        {!!yearLabel && (
+          <Text style={[styles.yearLabel, { color: colors['muted-foreground'] }]}>{yearLabel}</Text>
+        )}
+
+        {/* Actions (admin only — no clone, matches web ExamList) */}
+        {!isStudentOrParent && isAdmin && (
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={(e) => { e.stopPropagation?.(); openEdit(item); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Edit"
+            >
+              <Ionicons name="pencil-outline" size={14} color="#556ee6" />
+              <Text style={[styles.actionBtnText, { color: '#556ee6' }]}>Edit</Text>
+            </TouchableOpacity>
+            {item.status === 'draft' && (
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={(e) => { e.stopPropagation?.(); handleDelete(item); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Delete"
+              >
+                <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>Delete</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {isStudentOrParent && (
+          <View style={styles.studentFooter}>
+            <Ionicons name="chevron-forward" size={16} color={colors['muted-foreground']} />
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
 
   return (
-    <AppLayout title={isStudentOrParent ? 'My Exams' : 'All Exams'}>
+    <AppLayout title={isStudentOrParent ? 'My Exams' : 'Exam Management'}>
       <View style={styles.container}>
+
+        {/* Page header — title + tagline + Create Exam button (web parity) */}
+        {!isStudentOrParent && (
+          <View style={styles.pageHeader}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.pageTitleRow}>
+                <Ionicons name="clipboard-outline" size={18} color={colors.primary} />
+                <Text style={[styles.pageTitle, { color: colors.foreground }]}>Exam Management</Text>
+              </View>
+              <Text style={[styles.pageSubtitle, { color: colors['muted-foreground'] }]}>
+                Manage all examinations for the academic year
+              </Text>
+            </View>
+            {isAdmin && (
+              <TouchableOpacity
+                style={[styles.createHeaderBtn, { backgroundColor: colors.primary }]}
+                onPress={() => router.push('/exam/create' as any)}
+                accessibilityLabel="Create Exam"
+              >
+                <Ionicons name="add" size={16} color="white" />
+                <Text style={styles.createHeaderBtnText}>Create Exam</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Search */}
         <View style={[styles.searchBar, { backgroundColor: cardBg, borderColor: borderCol }]}>
@@ -269,54 +313,47 @@ export default function ExamListScreen() {
             onChangeText={setSearch}
           />
           {!!search && (
-            <TouchableOpacity onPress={() => setSearch('')}>
+            <TouchableOpacity onPress={() => setSearch('')}
+              accessibilityLabel="Close">
               <Ionicons name="close-circle" size={18} color={colors['muted-foreground']} />
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Status filter chips */}
-        <View style={styles.filterRow}>
-          {STATUSES.map(s => (
-            <TouchableOpacity
-              key={s.value}
-              style={[
-                styles.filterChip,
-                { backgroundColor: statusFilter === s.value ? colors.primary : cardBg, borderColor: borderCol },
-              ]}
-              onPress={() => setStatusFilter(s.value)}
-            >
-              <Text style={[styles.filterChipText, { color: statusFilter === s.value ? 'white' : colors['muted-foreground'] as string }]}>
-                {s.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        {/* Filters */}
+        <View style={styles.filterSectionHeader}>
+          <Ionicons name="filter-outline" size={14} color={colors['muted-foreground']} />
+          <Text style={[styles.filterSectionText, { color: colors['muted-foreground'] }]}>Filters</Text>
         </View>
-
-        {/* Nature filter chips */}
-        {!isStudentOrParent && (
-          <View style={[styles.filterRow, { paddingTop: 0 }]}>
-            {NATURES.map(n => (
-              <TouchableOpacity
-                key={n.value}
-                style={[
-                  styles.filterChip,
-                  { backgroundColor: natureFilter === n.value ? '#8B5CF6' : cardBg, borderColor: borderCol },
-                ]}
-                onPress={() => setNatureFilter(n.value)}
-              >
-                <Text style={[styles.filterChipText, { color: natureFilter === n.value ? 'white' : colors['muted-foreground'] as string }]}>
-                  {n.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        <View style={styles.filterDropdownRow}>
+          <View style={{ flex: 1 }}>
+            <CustomDropdown
+              data={STATUSES}
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(((v ?? '') as ExamStatus | ''))}
+              placeholder="All Status"
+              search={false}
+              containerStyle={styles.filterDropdownContainer}
+            />
           </View>
-        )}
+          {!isStudentOrParent && (
+            <View style={{ flex: 1 }}>
+              <CustomDropdown
+                data={NATURES}
+                value={natureFilter}
+                onChange={(v) => setNatureFilter(((v ?? '') as ExamNature | ''))}
+                placeholder="All Nature"
+                search={false}
+                containerStyle={styles.filterDropdownContainer}
+              />
+            </View>
+          )}
+        </View>
 
         {/* List */}
         {isLoading ? (
           <View style={styles.centered}>
-            <Text style={{ color: colors['muted-foreground'] }}>Loading exams…</Text>
+            <ActivityIndicator size="large" color="#556ee6" />
           </View>
         ) : filtered.length === 0 ? (
           <View style={styles.centered}>
@@ -324,7 +361,7 @@ export default function ExamListScreen() {
             <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
               {search ? 'No matching exams' : 'No exams found'}
             </Text>
-            {canCreate && !search && (
+            {isAdmin && !search && (
               <TouchableOpacity
                 style={[styles.createBtn, { backgroundColor: colors.primary }]}
                 onPress={() => router.push('/exam/create' as any)}
@@ -349,16 +386,6 @@ export default function ExamListScreen() {
             }
           />
         )}
-
-        {/* FAB */}
-        {canCreate && (
-          <TouchableOpacity
-            style={[styles.fab, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/exam/create' as any)}
-          >
-            <Ionicons name="add" size={28} color="white" />
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Edit Modal */}
@@ -379,37 +406,42 @@ export default function ExamListScreen() {
               placeholderTextColor={colors['muted-foreground']}
             />
 
-            <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Mark Entry Deadline (YYYY-MM-DD)</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-              value={editForm.mark_entry_deadline}
-              onChangeText={v => setEditForm(f => ({ ...f, mark_entry_deadline: v }))}
-              placeholder="e.g. 2025-06-30"
-              placeholderTextColor={colors['muted-foreground']}
-              keyboardType="numeric"
-            />
+            <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Mark Entry Deadline</Text>
+            <TouchableOpacity
+              style={[styles.input, { backgroundColor: inputBg, borderColor: borderCol, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+              onPress={() => { setActiveEditDateField('deadline'); setShowEditDatePicker(true); }}
+            >
+              <Text style={{ color: editForm.mark_entry_deadline ? colors.foreground : colors['muted-foreground'], fontSize: 14 }}>
+                {editForm.mark_entry_deadline || 'Tap to select date'}
+              </Text>
+              <Ionicons name="calendar-outline" size={16} color={colors['muted-foreground']} />
+            </TouchableOpacity>
 
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Attendance From</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-                  value={editForm.attendance_from_date}
-                  onChangeText={v => setEditForm(f => ({ ...f, attendance_from_date: v }))}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors['muted-foreground']}
-                />
+                <TouchableOpacity
+                  style={[styles.input, { backgroundColor: inputBg, borderColor: borderCol, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                  onPress={() => { setActiveEditDateField('from'); setShowEditDatePicker(true); }}
+                >
+                  <Text style={{ color: editForm.attendance_from_date ? colors.foreground : colors['muted-foreground'], fontSize: 14 }}>
+                    {editForm.attendance_from_date || 'Select'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={14} color={colors['muted-foreground']} />
+                </TouchableOpacity>
               </View>
               <View style={{ width: 10 }} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Attendance To</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-                  value={editForm.attendance_to_date}
-                  onChangeText={v => setEditForm(f => ({ ...f, attendance_to_date: v }))}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors['muted-foreground']}
-                />
+                <TouchableOpacity
+                  style={[styles.input, { backgroundColor: inputBg, borderColor: borderCol, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                  onPress={() => { setActiveEditDateField('to'); setShowEditDatePicker(true); }}
+                >
+                  <Text style={{ color: editForm.attendance_to_date ? colors.foreground : colors['muted-foreground'], fontSize: 14 }}>
+                    {editForm.attendance_to_date || 'Select'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={14} color={colors['muted-foreground']} />
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -451,45 +483,16 @@ export default function ExamListScreen() {
             </View>
           </View>
         </View>
-      </Modal>
-
-      {/* Clone Modal */}
-      <Modal visible={!!cloneTarget} animationType="slide" transparent onRequestClose={() => setCloneTarget(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
-            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Clone Exam</Text>
-            <Text style={[styles.modalHint, { color: colors['muted-foreground'] }]}>
-              A copy of "{cloneTarget?.exam_name}" will be created without marks.
-            </Text>
-
-            <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>New Exam Name</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-              value={cloneName}
-              onChangeText={setCloneName}
-              placeholder="New exam name"
-              placeholderTextColor={colors['muted-foreground']}
-            />
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: inputBg, borderColor: borderCol }]}
-                onPress={() => setCloneTarget(null)}
-              >
-                <Text style={[styles.modalBtnText, { color: colors['muted-foreground'] }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: '#10B981', borderColor: '#10B981', opacity: cloneMutation.isPending || !cloneName.trim() ? 0.5 : 1 }]}
-                onPress={handleClone}
-                disabled={cloneMutation.isPending || !cloneName.trim()}
-              >
-                <Text style={[styles.modalBtnText, { color: 'white' }]}>
-                  {cloneMutation.isPending ? 'Cloning…' : 'Clone'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+        <DatePickerModal
+          visible={showEditDatePicker}
+          initialDate={
+            activeEditDateField === 'deadline' ? editForm.mark_entry_deadline
+              : activeEditDateField === 'from' ? editForm.attendance_from_date
+              : editForm.attendance_to_date
+          }
+          onConfirm={confirmEditDate}
+          onCancel={() => setShowEditDatePicker(false)}
+        />
       </Modal>
 
       <ConfirmModal {...confirmProps} />
@@ -499,6 +502,18 @@ export default function ExamListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  pageHeader: {
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
+    gap: 10, paddingHorizontal: 16, paddingTop: 16,
+  },
+  pageTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pageTitle: { fontSize: 18, fontWeight: '700' },
+  pageSubtitle: { fontSize: 12, marginTop: 2 },
+  createHeaderBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
+  },
+  createHeaderBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     margin: 16, marginBottom: 8, borderRadius: 12, borderWidth: 1,
@@ -506,24 +521,32 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
   },
   searchInput: { flex: 1, fontSize: 15 },
-  filterRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingBottom: 8, flexWrap: 'wrap' },
-  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
-  filterChipText: { fontSize: 12, fontWeight: '500' },
+  filterSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 16, marginBottom: 6 },
+  filterSectionText: { fontSize: 12, fontWeight: '600' },
+  filterDropdownRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 4 },
+  filterDropdownContainer: { marginBottom: 0 },
   count: { fontSize: 12, marginBottom: 10 },
   card: {
-    borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 8,
+    borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 8,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
-  cardTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
-  cardMeta: { fontSize: 12 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  serialBadge: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  serialBadgeText: { fontSize: 11, fontWeight: '700' },
+  cardTitle: { flex: 1, fontSize: 14, fontWeight: '600' },
   statusPill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
   statusText: { fontSize: 10, fontWeight: '700' },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
-  dateText: { fontSize: 12, flexShrink: 1 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  actionBtn: { padding: 6 },
+  metaGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  metaItem: { width: '33.33%', marginBottom: 8, paddingRight: 6 },
+  metaLabel: { fontSize: 10, fontWeight: '500', textTransform: 'uppercase', marginBottom: 2 },
+  metaValue: { fontSize: 12, fontWeight: '500', textTransform: 'capitalize' },
+  natureBadge: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+  natureBadgeText: { fontSize: 11, fontWeight: '500', textTransform: 'capitalize' },
+  yearLabel: { fontSize: 11, marginBottom: 6 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.15)', paddingTop: 8, marginTop: 2 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
+  actionBtnText: { fontSize: 12, fontWeight: '600' },
+  studentFooter: { alignItems: 'flex-end' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { marginTop: 12, fontSize: 14 },
   createBtn: {
@@ -531,11 +554,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, marginTop: 16,
   },
   createBtnText: { color: 'white', fontWeight: '600' },
-  fab: {
-    position: 'absolute', bottom: 24, right: 24, width: 56, height: 56,
-    borderRadius: 28, alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 8,
-  },
   // Modal styles
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',

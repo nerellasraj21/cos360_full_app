@@ -47,13 +47,33 @@ export interface TripTypeDropdown {
 const ROUTE_TYPES_BASE = '/masters/route-types';
 
 export const routeTypesApi = {
+  getAll: async (): Promise<RouteType[]> => {
+    const response = await apiClient.get(ROUTE_TYPES_BASE);
+    return response.data.items || response.data;
+  },
+
   getDropdown: async (): Promise<RouteTypeDropdown[]> => {
     const response = await apiClient.get(`${ROUTE_TYPES_BASE}/dropdown`);
     return response.data;
   },
 
+  getById: async (id: string): Promise<RouteType> => {
+    const response = await apiClient.get(`${ROUTE_TYPES_BASE}/${id}`);
+    return response.data;
+  },
+
   create: async (data: RouteTypeCreate): Promise<RouteType> => {
     const response = await apiClient.post(ROUTE_TYPES_BASE, data);
+    return response.data;
+  },
+
+  update: async (id: string, data: Partial<RouteTypeCreate>): Promise<RouteType> => {
+    const response = await apiClient.put(`${ROUTE_TYPES_BASE}/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<{ message: string }> => {
+    const response = await apiClient.delete(`${ROUTE_TYPES_BASE}/${id}`);
     return response.data;
   },
 };
@@ -63,13 +83,33 @@ export const routeTypesApi = {
 const TRIP_TYPES_BASE = '/masters/trip-types';
 
 export const tripTypesApi = {
+  getAll: async (): Promise<TripType[]> => {
+    const response = await apiClient.get(TRIP_TYPES_BASE);
+    return response.data.items || response.data;
+  },
+
   getDropdown: async (): Promise<TripTypeDropdown[]> => {
     const response = await apiClient.get(`${TRIP_TYPES_BASE}/dropdown`);
     return response.data;
   },
 
+  getById: async (id: string): Promise<TripType> => {
+    const response = await apiClient.get(`${TRIP_TYPES_BASE}/${id}`);
+    return response.data;
+  },
+
   create: async (data: TripTypeCreate): Promise<TripType> => {
     const response = await apiClient.post(TRIP_TYPES_BASE, data);
+    return response.data;
+  },
+
+  update: async (id: string, data: Partial<TripTypeCreate>): Promise<TripType> => {
+    const response = await apiClient.put(`${TRIP_TYPES_BASE}/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<{ message: string }> => {
+    const response = await apiClient.delete(`${TRIP_TYPES_BASE}/${id}`);
     return response.data;
   },
 };

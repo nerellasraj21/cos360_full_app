@@ -1,13 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastContext } from '../../../../components/ToastProvider';
-import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { useMastersQuery } from './useMastersQuery';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { classSubjectMappingsApi } from '../../index';
 import type { ClassSubjectMapping, ClassSubjectMappingCreate, ClassSubjectMappingBulkCreate } from '../../masters';
 
 // Get all class-subject mappings - permission protected
 export function useClassSubjectMappings(academicYearId?: string) {
-  return usePermissionProtectedQuery<ClassSubjectMapping[]>({
+  return useMastersQuery<ClassSubjectMapping[]>({
     queryKey: ['classSubjectMappings', academicYearId],
     queryFn: () => classSubjectMappingsApi.getClassSubjectMappings(academicYearId),
     resource: PERMISSION_RESOURCES.CLASS_SUBJECT_MAPPINGS,
@@ -16,10 +17,10 @@ export function useClassSubjectMappings(academicYearId?: string) {
 }
 
 // Get mappings by class - permission protected
-export function useClassSubjectMappingsByClass(classId: string) {
-  return usePermissionProtectedQuery<ClassSubjectMapping[]>({
-    queryKey: ['classSubjectMappings', 'byClass', classId],
-    queryFn: () => classSubjectMappingsApi.getMappingsByClass(classId),
+export function useClassSubjectMappingsByClass(classId: string, academicYearId?: string) {
+  return useMastersQuery<ClassSubjectMapping[]>({
+    queryKey: ['classSubjectMappings', 'byClass', classId, academicYearId],
+    queryFn: () => classSubjectMappingsApi.getMappingsByClass(classId, academicYearId),
     resource: PERMISSION_RESOURCES.CLASS_SUBJECT_MAPPINGS,
     action: 'list',
     enabled: !!classId,

@@ -3,8 +3,9 @@ import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
-export default function ExpenseDepartmentsScreen() {
+function ExpenseDepartmentsScreenContent() {
   const { colors } = useTheme();
 
   return (
@@ -39,3 +40,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function ExpenseDepartmentsScreen() {
+  return (
+    <ScreenAccessGate
+      title="Expense Departments"
+      resources={['expense_departments', 'expense_categories']}
+    >
+      <ExpenseDepartmentsScreenContent />
+    </ScreenAccessGate>
+  );
+}

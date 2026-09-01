@@ -21,6 +21,9 @@ import {
   FeePendingStats,
   FeeStructureStats,
 } from '@/src/api/fees';
+import { classSectionsApi } from '@/src/api/masters';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
+import CustomDropdown from '@/components/ui/dropdown';
 
 type Tab = 'collection' | 'pending' | 'structure';
 
@@ -45,7 +48,7 @@ const PAYMENT_METHODS = [
 const formatINR = (val: string | number | null | undefined) =>
   '₹' + Number(val ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function FeeReportsScreen() {
+function FeeReportsScreenContent() {
   const { colors, theme } = useTheme();
   const { activeAcademicYearId } = useAcademicYear();
   const { showError } = useToastContext();
@@ -71,6 +74,15 @@ export default function FeeReportsScreen() {
 
   const cardBg   = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
+
+  // ── Classes/sections for dropdowns (replaces raw UUID text inputs) ──────────
+  const { data: classesForFilter = [] } = useQuery({
+    queryKey: ['classSections', 'feeReportsFilter'],
+    queryFn: () => classSectionsApi.getClassSections({ active_only: true }),
+  });
+  const classOptions = classesForFilter.map(c => ({ label: c.name, value: c.id }));
+  const pendSectionOptions = (classesForFilter.find(c => c.id === pendClassId)?.sections ?? [])
+    .map(s => ({ label: s.name, value: s.id }));
 
   // ── Collection queries ────────────────────────────────────────────────────
   const colParams = colApplied ? {
@@ -344,23 +356,23 @@ export default function FeeReportsScreen() {
               <Text style={[styles.filterTitle, { color: colors.foreground }]}>Filters</Text>
               <View style={styles.filterRow}>
                 <View style={styles.filterField}>
-                  <Text style={[styles.filterLabel, { color: colors['muted-foreground'] }]}>Class ID</Text>
-                  <TextInput
-                    style={[styles.filterInput, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
-                    value={pendClassId}
-                    onChangeText={setPendClassId}
-                    placeholder="e.g. class UUID"
-                    placeholderTextColor={colors['muted-foreground']}
+                  <Text style={[styles.filterLabel, { color: colors['muted-foreground'] }]}>Class</Text>
+                  <CustomDropdown
+                    data={[{ label: 'All Classes', value: '' }, ...classOptions]}
+                    value={pendClassId || null}
+                    onChange={(v) => { setPendClassId(v ? String(v) : ''); setPendSection(''); }}
+                    placeholder="All Classes"
+                    search={false}
                   />
                 </View>
                 <View style={styles.filterField}>
-                  <Text style={[styles.filterLabel, { color: colors['muted-foreground'] }]}>Section ID</Text>
-                  <TextInput
-                    style={[styles.filterInput, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
-                    value={pendSection}
-                    onChangeText={setPendSection}
-                    placeholder="e.g. section UUID"
-                    placeholderTextColor={colors['muted-foreground']}
+                  <Text style={[styles.filterLabel, { color: colors['muted-foreground'] }]}>Section</Text>
+                  <CustomDropdown
+                    data={[{ label: 'All Sections', value: '' }, ...pendSectionOptions]}
+                    value={pendSection || null}
+                    onChange={(v) => setPendSection(v ? String(v) : '')}
+                    placeholder="All Sections"
+                    search={false}
                   />
                 </View>
               </View>
@@ -437,13 +449,13 @@ export default function FeeReportsScreen() {
             {/* Filters */}
             <View style={[styles.filterBox, { backgroundColor: cardBg, borderColor: borderCol }]}>
               <Text style={[styles.filterTitle, { color: colors.foreground }]}>Filters</Text>
-              <Text style={[styles.filterLabel, { color: colors['muted-foreground'] }]}>Class ID</Text>
-              <TextInput
-                style={[styles.filterInput, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
-                value={strucClassId}
-                onChangeText={setStrucClassId}
-                placeholder="Filter by class (optional)"
-                placeholderTextColor={colors['muted-foreground']}
+              <Text style={[styles.filterLabel, { color: colors['muted-foreground'] }]}>Class</Text>
+              <CustomDropdown
+                data={[{ label: 'All Classes', value: '' }, ...classOptions]}
+                value={strucClassId || null}
+                onChange={(v) => setStrucClassId(v ? String(v) : '')}
+                placeholder="All Classes"
+                search={false}
               />
               <TouchableOpacity style={[styles.applyBtn,{marginTop:4,backgroundColor:colors.primary}]} onPress={() => setStrucApplied(true)}>
                 <Ionicons name="search" size={14} color="white" />
@@ -635,3 +647,17 @@ const styles = StyleSheet.create({
   },
   exportBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function FeeReportsScreen() {
+  return (
+    <ScreenAccessGate
+      title="Fee Reports"
+      resources={['fee_reports', 'fee_transactions']}
+      blockRoles={['teacher']}
+    >
+      <FeeReportsScreenContent />
+    </ScreenAccessGate>
+  );
+}

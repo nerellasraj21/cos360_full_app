@@ -6,7 +6,12 @@ import CustomDropdown from '@/components/ui/dropdown';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAcademicYear } from '@/contexts/AcademicYearContext';
-import { FeeStudentMappingResponse, FeeStudentMappingRequest, FeeStudentMappingBulkRequest, FeeStudentMappingBulkResponse } from '@/src/types/fees';
+import type {
+  FeeStudentMappingResponse,
+  FeeStudentMappingCreateRequest as FeeStudentMappingRequest,
+  FeeStudentMappingBulkRequest,
+  FeeStudentMappingBulkResponse,
+} from '@/src/types/fee';
 import { feeStudentMappingsApi, feeTypesApi } from '@/src/api/fees';
 import { academicYearsApi, classSectionsApi } from '@/src/api/masters';
 import { studentAdmissionsApi } from '@/src/api/students';
@@ -20,7 +25,10 @@ import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import React, { useState, useEffect } from 'react';
+import { useRouter } from 'expo-router';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '@/contexts';
+import { roleBlocksFees } from '@/src/lib/menuUtils';
 import {
   FlatList,
   Modal,
@@ -32,13 +40,10 @@ import {
 } from 'react-native';
 
 
-export default function FeeStudentMappingsScreen() {
+export function StudentMappingsContent() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isBulkModalVisible, setIsBulkModalVisible] = useState(false);
-  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [editingMapping, setEditingMapping] = useState<FeeStudentMappingResponse | null>(null);
-  const [selectedMappings, setSelectedMappings] = useState<string[]>([]);
-  const [detailMapping, setDetailMapping] = useState<FeeStudentMappingResponse | null>(null);
   const { activeAcademicYearId } = useAcademicYear();
   const [formData, setFormData] = useState({
     student_id: '',
@@ -59,19 +64,27 @@ export default function FeeStudentMappingsScreen() {
     academic_year_id: activeAcademicYearId || '',
   });
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   const [filters, setFilters] = useState({
     student_id: '',
     class_id: '',
     section_id: '',
     fee_type_id: '',
-    academic_year_id: '',
+    academic_year_id: activeAcademicYearId || '',
   });
+
+  const [sortKey, setSortKey] = useState<'student' | 'class' | 'feeType' | 'totalFee' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
 
   // Update form data when active academic year changes
   useEffect(() => {
     if (activeAcademicYearId) {
       setFormData(prev => ({ ...prev, academic_year_id: activeAcademicYearId }));
       setBulkFormData(prev => ({ ...prev, academic_year_id: activeAcademicYearId }));
+      setFilters(prev => ({ ...prev, academic_year_id: activeAcademicYearId }));
     }
   }, [activeAcademicYearId]);
 
@@ -82,7 +95,7 @@ export default function FeeStudentMappingsScreen() {
   const { showSuccess, showError } = useToastContext();
   const { confirm: confirmModal, modalProps } = useConfirmModal();
 
-  const { data: mappings = [], isLoading, error } = useQuery({
+  const { data: mappingsRaw = [], isLoading, error } = useQuery({
     queryKey: ['feeStudentMappings', filters],
     queryFn: () => feeStudentMappingsApi.getFeeStudentMappings(filters),
   });
@@ -107,11 +120,88 @@ export default function FeeStudentMappingsScreen() {
     queryFn: () => academicYearsApi.getAcademicYearsDropdown(),
   });
 
-  const { data: detailData } = useQuery({
-    queryKey: ['feeStudentMapping', detailMapping?.id],
-    queryFn: () => detailMapping ? feeStudentMappingsApi.getFeeStudentMapping(detailMapping.id) : null,
-    enabled: !!detailMapping,
-  });
+
+  // ── Shared lookups (used by search, sorting and the card renderer) ───────
+  const getAdmissionNum = (item: FeeStudentMappingResponse) =>
+    (item as any).student_admission_num || item.student_details?.admission_num || 'Unknown';
+
+  const getStudentName = (item: FeeStudentMappingResponse) => {
+    const lookup = students.find(s => s.id === (item as any).student_id);
+    return lookup?.display_name || item.student_details?.name || `Student ${getAdmissionNum(item)}`;
+  };
+
+  const getClassName = (item: FeeStudentMappingResponse) =>
+    classSections.find(c => c.id === (item as any).class_id)?.name
+    || item.student_details?.class_name
+    || 'Unknown Class';
+
+  const getSectionName = (item: FeeStudentMappingResponse) => {
+    const cls = classSections.find(c => c.id === (item as any).class_id);
+    return cls?.sections.find(sec => sec.id === (item as any).section_id)?.name
+      || item.student_details?.section_name
+      || 'Unknown Section';
+  };
+
+  const getFeeTypeName = (item: FeeStudentMappingResponse) =>
+    types.find(t => t.id === (item as any).fee_type_id)?.type_name
+    || item.fee_type_name
+    || 'Unknown Fee Type';
+
+  const getAcademicYearName = (item: FeeStudentMappingResponse) =>
+    academicYears.find(y => y.id === (item as any).academic_year_id)?.title
+    || item.academic_year_name
+    || 'Unknown Academic Year';
+
+  const getTotalFee = (item: FeeStudentMappingResponse) => {
+    const parsed = item.total_fee ? parseFloat(item.total_fee) : NaN;
+    return !isNaN(parsed)
+      ? parsed
+      : item.student_fee_mapping_terms.reduce((sum, term) => sum + term.amount, 0);
+  };
+
+  // ── Search → sort → paginate ─────────────────────────────────────────────
+  const mappings = useMemo(() => {
+    const list = mappingsRaw as FeeStudentMappingResponse[];
+    const searched = !searchQuery.trim() ? list : list.filter((item) => {
+      const q = searchQuery.toLowerCase();
+      return getAdmissionNum(item).toLowerCase().includes(q)
+        || getStudentName(item).toLowerCase().includes(q)
+        || getClassName(item).toLowerCase().includes(q)
+        || getFeeTypeName(item).toLowerCase().includes(q);
+    });
+
+    if (!sortKey) return searched;
+
+    return [...searched].sort((a, b) => {
+      if (sortKey === 'totalFee') {
+        const diff = getTotalFee(a) - getTotalFee(b);
+        return sortDir === 'asc' ? diff : -diff;
+      }
+      let av = '', bv = '';
+      if (sortKey === 'student') { av = getStudentName(a); bv = getStudentName(b); }
+      else if (sortKey === 'class') { av = getClassName(a); bv = getClassName(b); }
+      else { av = getFeeTypeName(a); bv = getFeeTypeName(b); }
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mappingsRaw, searchQuery, sortKey, sortDir, students, classSections, types]);
+
+  const totalPages = Math.max(1, Math.ceil(mappings.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedMappings = useMemo(
+    () => mappings.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [mappings, currentPage]
+  );
+
+  // Back to page 1 whenever the result set changes
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, filters, sortKey, sortDir]);
+
+  const handleSort = (key: 'student' | 'class' | 'feeType' | 'totalFee') => {
+    if (sortKey === key) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir('asc'); }
+  };
 
   const createMutation = useMutation({
     mutationFn: (data: FeeStudentMappingRequest) => feeStudentMappingsApi.createFeeStudentMapping(data),
@@ -351,58 +441,24 @@ export default function FeeStudentMappingsScreen() {
     bulkCreateMutation.mutate(submitData);
   };
 
-  const toggleSelection = (id: string) => {
-    setSelectedMappings(prev =>
-      prev.includes(id)
-        ? prev.filter(item => item !== id)
-        : [...prev, id]
-    );
-  };
-
-  const renderMappingItem = ({ item }: { item: FeeStudentMappingResponse }) => {
-    const parsedTotalFee = item.total_fee ? parseFloat(item.total_fee) : NaN;
-    const totalFee = !isNaN(parsedTotalFee) ? parsedTotalFee : item.student_fee_mapping_terms.reduce((sum, term) => sum + term.amount, 0);
-
-    // Primary admission number from item
-    const admissionNum = (item as any).student_admission_num || item.student_details?.admission_num || 'Unknown';
-
-    // Look up student details from fetched data
-    const studentLookup = students.find(s => s.id === (item as any).student_id);
-    const studentName = studentLookup?.display_name || item.student_details?.name || `Student ${admissionNum}`;
-
-    // Look up class and section details
-    const classLookup = classSections.find(c => c.id === (item as any).class_id);
-    const sectionLookup = classLookup?.sections.find(s => s.id === (item as any).section_id);
-    const className = classLookup?.name || item.student_details?.class_name || 'Unknown Class';
-    const sectionName = sectionLookup?.name || item.student_details?.section_name || 'Unknown Section';
-
-    // Look up fee type name with fallback to item field
-    const feeTypeLookup = types.find(t => t.id === (item as any).fee_type_id);
-    const feeTypeName = feeTypeLookup?.type_name || item.fee_type_name || 'Unknown Fee Type';
-
-    // Look up academic year name with fallback to item field
-    const academicYearLookup = academicYears.find(y => y.id === (item as any).academic_year_id);
-    const academicYearName = academicYearLookup?.title || item.academic_year_name || 'Unknown Academic Year';
+  const renderMappingItem = ({ item, index }: { item: FeeStudentMappingResponse; index: number }) => {
+    const totalFee = getTotalFee(item);
+    const studentName = getStudentName(item);
+    const className = getClassName(item);
+    const sectionName = getSectionName(item);
+    const feeTypeName = getFeeTypeName(item);
+    const academicYearName = getAcademicYearName(item);
+    const serialNo = (currentPage - 1) * PAGE_SIZE + index + 1;
 
     return (
-      <TouchableOpacity
-        style={[styles.mappingCard, { backgroundColor: colors.card }]}
-        onPress={() => toggleSelection(item.id)}
-      >
-        <View style={styles.selectionIndicator}>
-          <Ionicons
-            name={selectedMappings.includes(item.id) ? "checkbox" : "square-outline"}
-            size={20}
-            color={selectedMappings.includes(item.id) ? colors.primary : colors['muted-foreground']}
-          />
+      <View style={[styles.mappingCard, { backgroundColor: colors.card }]}>
+        <View style={[styles.serialBadge, { backgroundColor: colors.secondary }]}>
+          <ThemedText style={[styles.serialText, { color: colors.primary }]}>{serialNo}</ThemedText>
         </View>
 
         <View style={styles.mappingInfo}>
           <ThemedText type="subtitle" style={styles.mappingTitle}>
             {studentName}
-          </ThemedText>
-          <ThemedText style={[styles.mappingDetails, { color: colors['muted-foreground'] }]}>
-            Admission: {admissionNum}
           </ThemedText>
           <ThemedText style={[styles.mappingDetails, { color: colors['muted-foreground'] }]}>
             Class: {className} - {sectionName}
@@ -419,20 +475,11 @@ export default function FeeStudentMappingsScreen() {
         </View>
 
         <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.secondary }]}
-            onPress={() => {
-              setDetailMapping(item);
-              setIsDetailModalVisible(true);
-            }}
-          >
-            <Ionicons name="eye" size={16} color={colors.primary} />
-          </TouchableOpacity>
-
           <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS}>
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: colors.primary }]}
               onPress={() => handleEdit(item)}
+              accessibilityLabel="Edit"
             >
               <Ionicons name="pencil" size={16} color="white" />
             </TouchableOpacity>
@@ -442,12 +489,13 @@ export default function FeeStudentMappingsScreen() {
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: colors.destructive }]}
               onPress={() => handleDelete(item)}
+              accessibilityLabel="Delete"
             >
               <Ionicons name="trash" size={16} color="white" />
             </TouchableOpacity>
           </DeletePermissionGuard>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -473,13 +521,17 @@ export default function FeeStudentMappingsScreen() {
   const sectionOptions = formData.class_id ? getFilteredSectionOptions(formData.class_id) : [];
   const bulkSectionOptions = bulkFormData.class_id ? getFilteredSectionOptions(bulkFormData.class_id) : [];
 
-  // For filters, show all sections with class names for clarity
+  // For filters: sections of the chosen class, else every section labelled with its class
   const allSectionOptions = classSections.flatMap(cls =>
     cls.sections.map(section => ({
       label: `${cls.name} - ${section.name}`,
       value: section.id,
     }))
   );
+
+  const filterSectionOptions = filters.class_id
+    ? getFilteredSectionOptions(filters.class_id)
+    : allSectionOptions;
 
   const typeOptions = types.map(type => ({
     label: type.type_name,
@@ -505,10 +557,9 @@ export default function FeeStudentMappingsScreen() {
     );
   }
 
-  return (
-    <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS}>
-      <AppLayout title="Student Mappings">
-      <ThemedView style={styles.container}>
+  // Filters scroll with the list so the rows are never pushed off screen
+  const listHeader = (
+    <View>
         <View style={styles.header}>
           <View style={styles.headerButtons}>
             <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS}>
@@ -518,7 +569,7 @@ export default function FeeStudentMappingsScreen() {
               >
                 <Ionicons name="add-circle" size={16} color={colors.primary} />
                 <ThemedText style={[styles.bulkButtonText, { color: colors.primary }]}>
-                  Bulk Add
+                  Bulk Create
                 </ThemedText>
               </TouchableOpacity>
             </CreatePermissionGuard>
@@ -527,8 +578,12 @@ export default function FeeStudentMappingsScreen() {
               <TouchableOpacity
                 style={[styles.addButton, { backgroundColor: colors.primary }]}
                 onPress={handleCreate}
+                accessibilityLabel="Create Mapping"
               >
-                <Ionicons name="add" size={20} color="white" />
+                <Ionicons name="add" size={16} color="white" />
+                <ThemedText style={styles.addButtonText}>
+                  Create Mapping
+                </ThemedText>
               </TouchableOpacity>
             </CreatePermissionGuard>
           </View>
@@ -537,6 +592,25 @@ export default function FeeStudentMappingsScreen() {
         {/* Filters */}
         <View style={[styles.filtersContainer, { backgroundColor: colors.card }]}>
           <ThemedText type="subtitle" style={styles.filtersTitle}>Filters</ThemedText>
+
+          {/* Search bar */}
+          <View style={[styles.searchBar, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <Ionicons name="search-outline" size={15} color={colors['muted-foreground']} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.foreground }]}
+              placeholder="Search by student, class or fee type..."
+              placeholderTextColor={colors['muted-foreground']}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityLabel="Close">
+                <Ionicons name="close-circle" size={15} color={colors['muted-foreground']} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
           <View style={styles.filtersRow}>
             <View style={styles.filterItem}>
               <ThemedText style={styles.filterLabel}>Student</ThemedText>
@@ -545,6 +619,10 @@ export default function FeeStudentMappingsScreen() {
                 value={filters.student_id}
                 onChange={(value) => setFilters(prev => ({ ...prev, student_id: value as string }))}
                 placeholder="All students"
+                containerStyle={styles.compactDropdownContainer}
+                style={styles.compactDropdown}
+                placeholderStyle={styles.compactDropdownText}
+                selectedTextStyle={styles.compactDropdownText}
               />
             </View>
             <View style={styles.filterItem}>
@@ -552,12 +630,33 @@ export default function FeeStudentMappingsScreen() {
               <CustomDropdown
                 data={[{ label: 'All Classes', value: '' }, ...classOptions]}
                 value={filters.class_id}
-                onChange={(value) => setFilters(prev => ({ ...prev, class_id: value as string }))}
+                onChange={(value) => setFilters(prev => ({
+                  ...prev,
+                  class_id: value as string,
+                  section_id: '', // the section list depends on the class
+                }))}
                 placeholder="All classes"
+                containerStyle={styles.compactDropdownContainer}
+                style={styles.compactDropdown}
+                placeholderStyle={styles.compactDropdownText}
+                selectedTextStyle={styles.compactDropdownText}
               />
             </View>
           </View>
           <View style={styles.filtersRow}>
+            <View style={styles.filterItem}>
+              <ThemedText style={styles.filterLabel}>Section</ThemedText>
+              <CustomDropdown
+                data={[{ label: 'All Sections', value: '' }, ...filterSectionOptions]}
+                value={filters.section_id}
+                onChange={(value) => setFilters(prev => ({ ...prev, section_id: value as string }))}
+                placeholder="All sections"
+                containerStyle={styles.compactDropdownContainer}
+                style={styles.compactDropdown}
+                placeholderStyle={styles.compactDropdownText}
+                selectedTextStyle={styles.compactDropdownText}
+              />
+            </View>
             <View style={styles.filterItem}>
               <ThemedText style={styles.filterLabel}>Fee Type</ThemedText>
               <CustomDropdown
@@ -565,45 +664,84 @@ export default function FeeStudentMappingsScreen() {
                 value={filters.fee_type_id}
                 onChange={(value) => setFilters(prev => ({ ...prev, fee_type_id: value as string }))}
                 placeholder="All fee types"
+                containerStyle={styles.compactDropdownContainer}
+                style={styles.compactDropdown}
+                placeholderStyle={styles.compactDropdownText}
+                selectedTextStyle={styles.compactDropdownText}
               />
             </View>
-            <View style={styles.filterItem}>
-              <TouchableOpacity
-                style={[styles.clearFiltersButton, { backgroundColor: colors.secondary }]}
-                onPress={() => setFilters({
-                  student_id: '',
-                  class_id: '',
-                  section_id: '',
-                  fee_type_id: '',
-                  academic_year_id: '',
-                })}
-              >
-                <ThemedText style={[styles.clearFiltersText, { color: colors.primary }]}>Clear Filters</ThemedText>
-              </TouchableOpacity>
-            </View>
           </View>
+
+          {/* Sort */}
+          <ThemedText style={[styles.filterLabel, { marginTop: 4 }]}>Sort by</ThemedText>
+          <View style={styles.sortRow}>
+            {([
+              { key: 'student', label: 'Student' },
+              { key: 'class', label: 'Class' },
+              { key: 'feeType', label: 'Fee Type' },
+              { key: 'totalFee', label: 'Total Fee' },
+            ] as const).map(opt => {
+              const active = sortKey === opt.key;
+              return (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[
+                    styles.sortChip,
+                    { borderColor: colors.border },
+                    active && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  ]}
+                  onPress={() => handleSort(opt.key)}
+                >
+                  <ThemedText
+                    style={[styles.sortChipText, { color: active ? 'white' : colors['muted-foreground'] }]}
+                  >
+                    {opt.label}
+                  </ThemedText>
+                  {active && (
+                    <Ionicons
+                      name={sortDir === 'asc' ? 'arrow-up' : 'arrow-down'}
+                      size={12}
+                      color="white"
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <TouchableOpacity
+            style={[styles.clearFiltersButton, { backgroundColor: colors.secondary }]}
+            onPress={() => {
+              setSearchQuery('');
+              setSortKey(null);
+              setSortDir('asc');
+              setFilters({
+                student_id: '',
+                class_id: '',
+                section_id: '',
+                fee_type_id: '',
+                academic_year_id: activeAcademicYearId || '',
+              });
+            }}
+          >
+            <ThemedText style={[styles.clearFiltersText, { color: colors.primary }]}>Clear Filters</ThemedText>
+          </TouchableOpacity>
         </View>
 
-        {selectedMappings.length > 0 && (
-          <View style={[styles.selectionBar, { backgroundColor: colors.accent }]}>
-            <ThemedText style={styles.selectionText}>
-              {selectedMappings.length} selected
-            </ThemedText>
-            <TouchableOpacity
-              style={[styles.clearButton, { backgroundColor: colors.destructive }]}
-              onPress={() => setSelectedMappings([])}
-            >
-              <ThemedText style={styles.clearButtonText}>Clear</ThemedText>
-            </TouchableOpacity>
-          </View>
-        )}
+    </View>
+  );
 
+  return (
+    <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS}>
+      <ThemedView style={styles.container}>
         <FlatList
-          data={mappings}
+          data={paginatedMappings}
           keyExtractor={(item) => item.id}
           renderItem={renderMappingItem}
+          ListHeaderComponent={listHeader}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <ThemedView style={styles.emptyContainer}>
               <Ionicons name="people-outline" size={48} color={colors['muted-foreground']} />
@@ -613,6 +751,41 @@ export default function FeeStudentMappingsScreen() {
             </ThemedView>
           }
         />
+
+        {/* Pagination */}
+        {mappings.length > 0 && (
+          <View style={[styles.paginationBar, { borderTopColor: colors.border }]}>
+            <View style={styles.paginationButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.pageButton,
+                  { borderColor: colors.border },
+                  currentPage <= 1 && styles.pageButtonDisabled,
+                ]}
+                onPress={() => setPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage <= 1}
+              >
+                <Ionicons name="chevron-back" size={14} color={colors.foreground} />
+                <ThemedText style={styles.pageButtonText}>Previous</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.pageButton,
+                  { borderColor: colors.border },
+                  currentPage >= totalPages && styles.pageButtonDisabled,
+                ]}
+                onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                <ThemedText style={styles.pageButtonText}>Next</ThemedText>
+                <Ionicons name="chevron-forward" size={14} color={colors.foreground} />
+              </TouchableOpacity>
+            </View>
+            <ThemedText style={[styles.paginationText, { color: colors['muted-foreground'] }]}>
+              Page {currentPage} of {totalPages} ({mappings.length} {mappings.length === 1 ? 'mapping' : 'mappings'})
+            </ThemedText>
+          </View>
+        )}
 
         {/* Single Mapping Modal */}
         <Modal
@@ -627,7 +800,8 @@ export default function FeeStudentMappingsScreen() {
                 <ThemedText type="subtitle">
                   {editingMapping ? 'Edit Student Mapping' : 'Add Student Mapping'}
                 </ThemedText>
-                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
@@ -724,7 +898,8 @@ export default function FeeStudentMappingsScreen() {
             <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle">Bulk Add Student Mappings</ThemedText>
-                <TouchableOpacity onPress={() => setIsBulkModalVisible(false)}>
+                <TouchableOpacity onPress={() => setIsBulkModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
@@ -760,6 +935,7 @@ export default function FeeStudentMappingsScreen() {
                                 ...prev,
                                 student_ids: prev.student_ids.filter(sid => sid !== id)
                               }))}
+              accessibilityLabel="Close"
                             >
                               <Ionicons name="close" size={16} color={colors.destructive} />
                             </TouchableOpacity>
@@ -832,77 +1008,29 @@ export default function FeeStudentMappingsScreen() {
           </View>
         </Modal>
 
-        {/* Detail Modal */}
-        <Modal
-          visible={isDetailModalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setIsDetailModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
-              <View style={styles.modalHeader}>
-                <ThemedText type="subtitle">Student Mapping Details</ThemedText>
-                <TouchableOpacity onPress={() => setIsDetailModalVisible(false)}>
-                  <Ionicons name="close" size={24} color={colors['muted-foreground']} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={styles.formScroll}>
-                {detailData && (
-                  <View style={styles.form}>
-                    <ThemedText style={styles.detailLabel}>Student Name:</ThemedText>
-                    <ThemedText style={styles.detailValue}>{detailData.student_details?.name || 'Unknown Student'}</ThemedText>
-
-                    <ThemedText style={styles.detailLabel}>Admission Number:</ThemedText>
-                    <ThemedText style={styles.detailValue}>{detailData.student_details?.admission_num || 'N/A'}</ThemedText>
-
-                    <ThemedText style={styles.detailLabel}>Class:</ThemedText>
-                    <ThemedText style={styles.detailValue}>{detailData.student_details?.class_name || 'Unknown Class'} - {detailData.student_details?.section_name || 'Unknown Section'}</ThemedText>
-
-                    <ThemedText style={styles.detailLabel}>Fee Type:</ThemedText>
-                    <ThemedText style={styles.detailValue}>{detailData.fee_type_name || 'Unknown Fee Type'}</ThemedText>
-
-                    <ThemedText style={styles.detailLabel}>Academic Year:</ThemedText>
-                    <ThemedText style={styles.detailValue}>{detailData.academic_year_name || 'Unknown Academic Year'}</ThemedText>
-
-                    {(() => {
-                      const detailTotalFee = detailData.total_fee && !isNaN(parseFloat(detailData.total_fee)) ? parseFloat(detailData.total_fee) : detailData.student_fee_mapping_terms.reduce((sum, term) => sum + term.amount, 0);
-                      return (
-                        <>
-                          <ThemedText style={styles.detailLabel}>Total Fee:</ThemedText>
-                          <ThemedText style={styles.detailValue}>₹{detailTotalFee}</ThemedText>
-                        </>
-                      );
-                    })()}
-
-                    <ThemedText style={styles.detailLabel}>Fee Terms:</ThemedText>
-                    {detailData.student_fee_mapping_terms.map((term, index) => (
-                      <View key={index} style={styles.termItem}>
-                        <ThemedText style={styles.termText}>
-                          Term {index + 1}: ₹{term.amount}
-                        </ThemedText>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </ScrollView>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={[styles.cancelButton, { borderColor: colors.border }]}
-                  onPress={() => setIsDetailModalVisible(false)}
-                >
-                  <ThemedText style={{ color: colors.foreground }}>Close</ThemedText>
-                </TouchableOpacity>
-              </View>
-            </ThemedView>
-          </View>
-        </Modal>
       </ThemedView>
       <ConfirmModal {...modalProps} />
-      </AppLayout>
     </ReadOrListPermissionGuard>
+  );
+}
+
+// Web parity (_app/fee.tsx beforeLoad): teachers cannot access the Fee
+// module, even via a deep link into a specific fee sub-screen.
+export default function FeeStudentMappingsScreen() {
+  const router = useRouter();
+  const { role } = useAuth();
+  const isFeeBlocked = roleBlocksFees(role?.name);
+
+  useEffect(() => {
+    if (isFeeBlocked) router.replace('/(tabs)');
+  }, [isFeeBlocked, router]);
+
+  if (isFeeBlocked) return null;
+
+  return (
+    <AppLayout title="Student Mappings">
+      <StudentMappingsContent />
+    </AppLayout>
   );
 }
 
@@ -940,31 +1068,79 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   addButton: {
-    padding: 8,
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  selectionBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  selectionText: {
-    fontWeight: '600',
-  },
-  clearButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  clearButtonText: {
-    color: 'white',
+  addButtonText: {
+    marginLeft: 4,
     fontSize: 14,
     fontWeight: '600',
+    color: 'white',
+  },
+  serialBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  serialText: {
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  sortChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  sortChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  paginationBar: {
+    borderTopWidth: 1,
+    paddingTop: 10,
+    paddingBottom: 4,
+    gap: 8,
+  },
+  paginationButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  pageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  pageButtonDisabled: {
+    opacity: 0.4,
+  },
+  pageButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  paginationText: {
+    fontSize: 11,
   },
   listContainer: {
     paddingBottom: 20,
@@ -980,9 +1156,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  selectionIndicator: {
-    marginRight: 12,
   },
   mappingInfo: {
     flex: 1,
@@ -1108,6 +1281,21 @@ const styles = StyleSheet.create({
   filtersTitle: {
     marginBottom: 12,
   },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 12,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    padding: 0,
+  },
   filtersRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1122,6 +1310,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 4,
+  },
+  compactDropdownContainer: {
+    marginBottom: 0,
+  },
+  compactDropdown: {
+    height: 38,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  compactDropdownText: {
+    fontSize: 13,
   },
   clearFiltersButton: {
     paddingHorizontal: 12,

@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
-import { useTheme } from '@/contexts';
+import { useAuth, useAcademicYear, useTheme } from '@/contexts';
 import { examsApi, ExamListItem, ExamStatus } from '@/src/api/exam';
-import { useMobilePermission } from '../../src/hooks/useMobilePermission';
+import { isAdminRole } from '@/src/lib/roles';
 
 const STATUS_COLORS: Record<ExamStatus, { bg: string; text: string }> = {
   draft:     { bg: '#6B728018', text: '#6B7280' },
@@ -20,17 +20,29 @@ const STATUS_COLORS: Record<ExamStatus, { bg: string; text: string }> = {
 export default function ExamAuditScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
-  const { hasPermission } = useMobilePermission();
+  const { role } = useAuth();
+  const { academicYears } = useAcademicYear();
+
+  // Web parity (ExamAuditLog / ExamDetail audit tab): audit log access is
+  // admin-only, not permission-based — matches exam/create.tsx and exam/[id].tsx.
+  const isAdmin = isAdminRole(role?.name);
+  useEffect(() => {
+    if (!isAdmin) {
+      router.replace('/exam/list');
+    }
+  }, [isAdmin, router]);
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
   const [search, setSearch] = useState('');
 
+  // Not gated by `enabled: hasPermission(...)` — a resource-name mismatch or
+  // stale permission cache would silently block the fetch with no error.
+  // Let the backend return 403 if the role truly lacks "exams:read".
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['exams-for-audit'],
     queryFn: () => examsApi.list({ size: 100 }),
-    enabled: !!(hasPermission?.('exam_audit_logs', 'list')),
   });
 
   const filtered = useMemo(() => {
@@ -46,13 +58,19 @@ export default function ExamAuditScreen() {
 
   const renderItem = ({ item }: { item: ExamListItem }) => {
     const sc = STATUS_COLORS[item.status] ?? STATUS_COLORS.draft;
+    // Never fall back to the raw academic_year_id (a UUID) — resolve it against
+    // the loaded academic years list so a readable name always shows instead.
+    const yearLabel =
+      item.academic_year_title ??
+      academicYears.find(y => y.id === item.academic_year_id)?.title ??
+      '—';
     return (
       <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
         <View style={styles.cardHeader}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>{item.exam_name}</Text>
             <Text style={[styles.cardMeta, { color: colors['muted-foreground'] }]}>
-              {item.board} · {item.exam_type} · {item.academic_year_title ?? item.academic_year_id}
+              {item.board} · {item.exam_type} · {yearLabel}
             </Text>
           </View>
           <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
@@ -62,16 +80,19 @@ export default function ExamAuditScreen() {
 
         <TouchableOpacity
           style={[styles.viewBtn, { borderColor: '#7C3AED30', backgroundColor: '#7C3AED10' }]}
-          onPress={() => router.push(`/exam/${item.id}` as any)}
-          activeOpacity={0.7}
+          onPress={() => router.push(`/exam/audit-log?examId=${item.id}&examName=${encodeURIComponent(item.exam_name)}` as any)}
+          activeOpacity={0.75}
         >
           <Ionicons name="document-text-outline" size={14} color="#7C3AED" />
-          <Text style={[styles.viewBtnText, { color: '#7C3AED' }]}>View Audit Log</Text>
+          <Text style={[styles.viewBtnText, { color: '#7C3AED' }]}>View Log</Text>
           <Ionicons name="chevron-forward" size={14} color="#7C3AED" />
         </TouchableOpacity>
       </View>
     );
   };
+
+  // Non-admins are redirected by the effect above; render nothing meanwhile.
+  if (!isAdmin) return null;
 
   return (
     <AppLayout title="Exam Audit Logs">
@@ -88,7 +109,8 @@ export default function ExamAuditScreen() {
             onChangeText={setSearch}
           />
           {search ? (
-            <TouchableOpacity onPress={() => setSearch('')}>
+            <TouchableOpacity onPress={() => setSearch('')}
+              accessibilityLabel="Close">
               <Ionicons name="close-circle" size={18} color={colors['muted-foreground']} />
             </TouchableOpacity>
           ) : null}

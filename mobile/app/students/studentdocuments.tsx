@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, FlatList, Linking } from 'react-native';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppLayout } from '@/components';
@@ -11,10 +10,14 @@ import { useTheme } from '@/contexts';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAllDocuments, useMyDocuments } from '@/src/api/hooks/students/documents';
 import { studentDocumentsApi, studentAdmissionsApi } from '@/src/api/students';
-import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
-const getDocIcon = (type: string) => {
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const getDocIcon = (type: string, source?: string) => {
+  if (source === 'receipt') return 'receipt-outline';
+  if (source === 'certificate') return 'ribbon-outline';
   const t = (type || '').toLowerCase();
   if (t.includes('birth')) return 'document-text-outline';
   if (t.includes('id')) return 'card-outline';
@@ -25,10 +28,24 @@ const getDocIcon = (type: string) => {
   return 'document-outline';
 };
 
+const SOURCE_COLORS: Record<string, string> = {
+  document: '#3B82F6',
+  certificate: '#8B5CF6',
+  receipt: '#F59E0B',
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  document: 'Document',
+  certificate: 'Certificate',
+  receipt: 'Receipt',
+};
+
 // ─── Document item ─────────────────────────────────────────────────────────
 
 function DocumentItem({ item, colors }: { item: any; colors: any }) {
   const { showError, showInfo } = useToastContext();
+  const isDocument = !item.source || item.source === 'document';
+
   const downloadMutation = useMutation({
     mutationFn: () => studentDocumentsApi.downloadDocument(item.id),
   });
@@ -51,42 +68,63 @@ function DocumentItem({ item, colors }: { item: any; colors: any }) {
     }
   };
 
+  const source: string = item.source || 'document';
+  const sourceColor = SOURCE_COLORS[source] ?? colors.primary;
+  const sourceLabel = SOURCE_LABELS[source] ?? 'Document';
+
+  const displayName =
+    source === 'certificate'
+      ? (item.type_name ?? item.certificate_category ?? 'Certificate')
+      : source === 'receipt'
+      ? (item.receipt_number ?? 'Receipt')
+      : (item.document_type || 'Document');
+
   return (
     <View style={[styles.docCard, { backgroundColor: colors.card }]}>
+      {/* Source badge */}
+      <View style={[styles.sourceBadge, { backgroundColor: `${sourceColor}20` }]}>
+        <ThemedText style={[styles.sourceBadgeText, { color: sourceColor }]}>
+          {sourceLabel}
+        </ThemedText>
+      </View>
+
       <View style={styles.docHeader}>
-        <View style={[styles.docIconBox, { backgroundColor: `${colors.primary}15` }]}>
-          <Ionicons name={getDocIcon(item.document_type) as any} size={22} color={colors.primary} />
+        <View style={[styles.docIconBox, { backgroundColor: `${sourceColor}15` }]}>
+          <Ionicons name={getDocIcon(displayName, source) as any} size={22} color={sourceColor} />
         </View>
         <View style={styles.docInfo}>
-          <ThemedText style={styles.docType}>{item.document_type || 'Document'}</ThemedText>
+          <ThemedText style={styles.docType}>{displayName}</ThemedText>
           <ThemedText style={styles.docDate}>
             {item.upload_date
-              ? `Uploaded: ${new Date(item.upload_date).toLocaleDateString()}`
+              ? `Date: ${new Date(item.upload_date).toLocaleDateString()}`
               : ''}
           </ThemedText>
         </View>
       </View>
 
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.primary, opacity: downloadMutation.isPending ? 0.6 : 1 }]}
-          onPress={handleDownload}
-          disabled={downloadMutation.isPending}
-        >
-          <Ionicons name="eye-outline" size={15} color="white" />
-          <ThemedText style={styles.actionText}>View</ThemedText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: '#10B981', opacity: downloadMutation.isPending ? 0.6 : 1 }]}
-          onPress={handleDownload}
-          disabled={downloadMutation.isPending}
-        >
-          <Ionicons name="download-outline" size={15} color="white" />
-          <ThemedText style={styles.actionText}>
-            {downloadMutation.isPending ? 'Loading...' : 'Download'}
-          </ThemedText>
-        </TouchableOpacity>
-      </View>
+      {/* Download buttons only for uploaded documents */}
+      {isDocument && (
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: colors.primary, opacity: downloadMutation.isPending ? 0.5 : 1 }]}
+            onPress={handleDownload}
+            disabled={downloadMutation.isPending}
+          >
+            <Ionicons name="eye-outline" size={15} color="white" />
+            <ThemedText style={styles.actionText}>View</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#10B981', opacity: downloadMutation.isPending ? 0.5 : 1 }]}
+            onPress={handleDownload}
+            disabled={downloadMutation.isPending}
+          >
+            <Ionicons name="download-outline" size={15} color="white" />
+            <ThemedText style={styles.actionText}>
+              {downloadMutation.isPending ? 'Loading...' : 'Download'}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -167,9 +205,10 @@ function AdminDocumentsList() {
   const { colors } = useTheme();
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
+  // Use the full dropdown endpoint (same as web app) to get all students with display_name
   const { data: studentOptions = [] } = useQuery({
-    queryKey: ['students-active-simple'],
-    queryFn: () => studentAdmissionsApi.getActiveStudentsDropdownSimple(),
+    queryKey: ['students-dropdown-all'],
+    queryFn: () => studentAdmissionsApi.studentsDropdown({ active_only: true }),
   });
 
   const { data: docs = [], isLoading } = useAllDocuments(
@@ -177,7 +216,7 @@ function AdminDocumentsList() {
   );
 
   const dropdownData = (studentOptions as any[]).map((s) => ({
-    label: s.name || '',
+    label: s.display_name || s.name || '',
     value: s.id,
   }));
 
@@ -231,7 +270,7 @@ function AdminDocumentsList() {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function StudentDocumentsPage() {
+function StudentDocumentsPageContent() {
   const { role } = useAuth();
   const roleName = role?.name?.toLowerCase();
   const isStudent = roleName === 'student';
@@ -318,6 +357,19 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
+  sourceBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
+  sourceBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   docCard: {
     borderRadius: 12,
     padding: 14,
@@ -383,3 +435,16 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function StudentDocumentsPage() {
+  return (
+    <ScreenAccessGate
+      title="Student Documents"
+      resources={['student_documents']}
+    >
+      <StudentDocumentsPageContent />
+    </ScreenAccessGate>
+  );
+}

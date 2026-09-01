@@ -15,7 +15,10 @@ import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts';
+import { roleBlocksFees } from '@/src/lib/menuUtils';
 import { useAcademicYear } from '@/contexts/AcademicYearContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IOSDatePickerModal } from '@/components/ui';
@@ -36,6 +39,22 @@ const formatToDisplay = (iso: string): string => {
   return `${dd}/${mm}/${yyyy}`;
 };
 
+const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/** Matches web: "Jul 31" */
+const formatMonthDay = (value: string): string => {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '';
+  return `${MONTH_LABELS[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** Matches web: "Jul 31, 2026" */
+const formatLongDate = (value: string): string => {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '';
+  return `${MONTH_LABELS[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}, ${d.getFullYear()}`;
+};
+
 const parseDdMmYyyy = (display: string): string | null => {
   const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (!match) return null;
@@ -54,7 +73,23 @@ const autoFormatDateInput = (text: string): string => {
 };
 
 
+// Web parity (_app/fee.tsx beforeLoad): teachers cannot access the Fee module,
+// even via a deep link into a specific fee sub-screen.
 export default function FeeTermsScreen() {
+  const router = useRouter();
+  const { role } = useAuth();
+  const isFeeBlocked = roleBlocksFees(role?.name);
+
+  useEffect(() => {
+    if (isFeeBlocked) router.replace('/(tabs)');
+  }, [isFeeBlocked, router]);
+
+  if (isFeeBlocked) return null;
+
+  return <FeeTermsScreenContent />;
+}
+
+function FeeTermsScreenContent() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingTerm, setEditingTerm] = useState<FeeTermResponse | null>(null);
   const [formData, setFormData] = useState({
@@ -65,6 +100,9 @@ export default function FeeTermsScreen() {
     fee_term_dates: [] as { fee_term_date: string }[],
   });
 
+  const [viewingDatesTerm, setViewingDatesTerm] = useState<FeeTermResponse | null>(null);
+
+  const [editingDateIndex, setEditingDateIndex] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [dateDisplayValue, setDateDisplayValue] = useState('');
   const [showPicker, setShowPicker] = useState(false);
@@ -73,7 +111,7 @@ export default function FeeTermsScreen() {
   const theme = colorScheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
   const queryClient = useQueryClient();
-  const { activeAcademicYearId } = useAcademicYear();
+  const { activeAcademicYearId, activeAcademicYear } = useAcademicYear();
   const { showSuccess, showError } = useToastContext();
   const { confirm: confirmModal, modalProps } = useConfirmModal();
 
@@ -134,6 +172,7 @@ export default function FeeTermsScreen() {
     setSelectedDate('');
     setDateDisplayValue('');
     setShowPicker(false);
+    setEditingDateIndex(null);
     setEditingTerm(null);
   };
 
@@ -155,6 +194,7 @@ export default function FeeTermsScreen() {
     setSelectedDate('');
     setDateDisplayValue('');
     setShowPicker(false);
+    setEditingDateIndex(null);
     setIsModalVisible(true);
   };
 
@@ -207,17 +247,68 @@ export default function FeeTermsScreen() {
     }
   };
 
-  const getDateRange = (term: FeeTermResponse): string => {
-    const dates = term.fee_term_dates
-      .map(d => new Date(d.fee_term_date))
-      .filter(d => !isNaN(d.getTime()))
-      .sort((a, b) => a.getTime() - b.getTime());
-    if (dates.length === 0) return '—';
-    const toIso = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    const earliest = formatToDisplay(toIso(dates[0]));
-    const latest = formatToDisplay(toIso(dates[dates.length - 1]));
-    return earliest === latest ? earliest : `${earliest} – ${latest}`;
+  // ── Payment date editing (mirrors web FeeTermForm) ────────────────────────
+  const addTermDate = () => {
+    if (!selectedDate) return;
+    setFormData(prev => ({
+      ...prev,
+      fee_term_dates: [...prev.fee_term_dates, { fee_term_date: selectedDate }],
+    }));
+    setSelectedDate('');
+    setDateDisplayValue('');
+  };
+
+  const startEditDate = (index: number) => {
+    const iso = formData.fee_term_dates[index]?.fee_term_date || '';
+    setEditingDateIndex(index);
+    setSelectedDate(iso);
+    setDateDisplayValue(formatToDisplay(iso));
+  };
+
+  const cancelEditDate = () => {
+    setEditingDateIndex(null);
+    setSelectedDate('');
+    setDateDisplayValue('');
+  };
+
+  const saveEditDate = () => {
+    if (editingDateIndex === null || !selectedDate) return;
+    setFormData(prev => ({
+      ...prev,
+      fee_term_dates: prev.fee_term_dates.map((d, i) =>
+        i === editingDateIndex ? { fee_term_date: selectedDate } : d
+      ),
+    }));
+    cancelEditDate();
+  };
+
+  const deleteTermDate = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      fee_term_dates: prev.fee_term_dates.filter((_, i) => i !== index),
+    }));
+    if (editingDateIndex !== null) cancelEditDate();
+  };
+
+  /** Mirrors web getPaymentDatesSummary in FeeTermsList.tsx */
+  const getPaymentSummary = (term: FeeTermResponse): { text: string; status: 'success' | 'warning' | 'error' } => {
+    const dates = term.fee_term_dates || [];
+
+    if (dates.length === 0) {
+      return { text: 'No payment dates', status: 'error' };
+    }
+
+    if (dates.length !== term.number_of_terms) {
+      return { text: `${dates.length}/${term.number_of_terms} dates configured`, status: 'warning' };
+    }
+
+    const sorted = [...dates].sort(
+      (a, b) => new Date(a.fee_term_date).getTime() - new Date(b.fee_term_date).getTime()
+    );
+    const first = formatMonthDay(sorted[0].fee_term_date);
+    const last = formatMonthDay(sorted[sorted.length - 1].fee_term_date);
+
+    return { text: `${first} - ${last} (${dates.length} dates)`, status: 'success' };
   };
 
   if (isLoading) {
@@ -244,18 +335,38 @@ export default function FeeTermsScreen() {
     <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS}>
       <AppLayout title="Fee Terms">
         <ThemedView style={styles.container}>
+          {/* Academic Year Info */}
+          {activeAcademicYear && (
+            <View style={[styles.yearCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={styles.yearTitle}>Academic Year: {activeAcademicYear.title}</ThemedText>
+                <ThemedText style={[styles.yearDates, { color: colors['muted-foreground'] }]}>
+                  {new Date(activeAcademicYear.start_date).toLocaleDateString()} - {new Date(activeAcademicYear.end_date).toLocaleDateString()}
+                </ThemedText>
+              </View>
+              {activeAcademicYear.is_active && (
+                <View style={[styles.activeBadge, { backgroundColor: colors.accent }]}>
+                  <ThemedText style={[styles.activeBadgeText, { color: colors['accent-foreground'] }]}>Active Year</ThemedText>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Toolbar */}
           <View style={styles.toolbar}>
-            <ThemedText style={[styles.recordCount, { color: colors['muted-foreground'] }]}>
-              {terms.length} record{terms.length !== 1 ? 's' : ''}
-            </ThemedText>
+            <View style={{ flex: 1 }}>
+              <ThemedText style={styles.listSectionTitle}>Fee Terms & Payment Schedules</ThemedText>
+              <ThemedText style={[styles.recordCount, { color: colors['muted-foreground'] }]}>
+                {terms.length} record{terms.length !== 1 ? 's' : ''}
+              </ThemedText>
+            </View>
             <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS}>
               <TouchableOpacity
                 style={[styles.addButton, { backgroundColor: colors.primary }]}
                 onPress={handleCreate}
               >
                 <Ionicons name="add" size={18} color="#fff" />
-                <ThemedText style={styles.addButtonText}>Add Term</ThemedText>
+                <ThemedText style={styles.addButtonText}>Add Fee Term</ThemedText>
               </TouchableOpacity>
             </CreatePermissionGuard>
           </View>
@@ -285,14 +396,28 @@ export default function FeeTermsScreen() {
                       <ThemedText style={[styles.cardMetaText, { color: colors['muted-foreground'] }]}>
                         {item.number_of_terms} term{item.number_of_terms !== 1 ? 's' : ''}
                       </ThemedText>
-                      {getDateRange(item) !== '—' ? (
-                        <>
-                          <Ionicons name="calendar-outline" size={13} color={colors['muted-foreground']} />
-                          <ThemedText style={[styles.cardMetaText, { color: colors['muted-foreground'] }]}>{getDateRange(item)}</ThemedText>
-                        </>
-                      ) : null}
+                      {(() => {
+                        const summary = getPaymentSummary(item);
+                        const summaryColor =
+                          summary.status === 'error' ? colors.destructive
+                            : summary.status === 'warning' ? '#D97706'
+                              : colors['muted-foreground'];
+                        return (
+                          <>
+                            <Ionicons name="calendar-outline" size={13} color={summaryColor} />
+                            <ThemedText style={[styles.cardMetaText, { color: summaryColor }]}>{summary.text}</ThemedText>
+                            {summary.status !== 'success' ? (
+                              <Ionicons name="warning-outline" size={13} color="#EAB308" />
+                            ) : null}
+                          </>
+                        );
+                      })()}
                     </View>
                     <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
+                      <TouchableOpacity style={styles.cardAction} onPress={() => setViewingDatesTerm(item)}>
+                        <Ionicons name="calendar-outline" size={15} color={colors.primary} />
+                        <ThemedText style={[styles.cardActionText, { color: colors.primary }]}>Payment Dates</ThemedText>
+                      </TouchableOpacity>
                       <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS}>
                         <TouchableOpacity style={styles.cardAction} onPress={() => handleEdit(item)}>
                           <Ionicons name="pencil" size={15} color={colors.primary} />
@@ -327,14 +452,15 @@ export default function FeeTermsScreen() {
                 <ThemedText type="subtitle">
                   {editingTerm ? 'Edit Fee Term' : 'Add Fee Term'}
                 </ThemedText>
-                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
                 <View style={styles.form}>
-                  <ThemedText style={styles.label}>Term Name *</ThemedText>
+                  <ThemedText style={styles.label}>Term Name</ThemedText>
                   <TextInput
                     style={[styles.input, {
                       backgroundColor: colors.background,
@@ -343,104 +469,183 @@ export default function FeeTermsScreen() {
                     }]}
                     value={formData.term_name}
                     onChangeText={(text) => setFormData(prev => ({ ...prev, term_name: text }))}
-                    placeholder="Enter term name"
+                    placeholder="e.g., Quarterly, Monthly, Annual"
                     placeholderTextColor={colors['muted-foreground']}
                   />
 
-                  <View style={styles.row}>
-                    <View style={styles.numberInputContainer}>
-                      <ThemedText style={styles.label}>Number of Terms *</ThemedText>
-                      <TextInput
-                        style={[styles.input, {
-                          backgroundColor: colors.background,
-                          color: colors.foreground,
-                          borderColor: colors.border,
-                        }]}
-                        value={formData.number_of_terms.toString()}
-                        onChangeText={(text) => {
-                          const num = parseInt(text) || 1;
-                          setFormData(prev => ({ ...prev, number_of_terms: num }));
-                        }}
-                        placeholder="Enter number of terms"
-                        placeholderTextColor={colors['muted-foreground']}
-                        keyboardType="numeric"
-                      />
-                    </View>
-                    <View style={styles.switchContainer}>
-                      <ThemedText style={styles.label}>Active</ThemedText>
-                      <Switch
-                        value={formData.term_status === 'active'}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, term_status: value ? 'active' : 'inactive' }))}
-                      />
-                    </View>
-                  </View>
-
-                  <ThemedText style={styles.label}>Add Term Date</ThemedText>
-                  <View style={styles.row}>
-                    <View style={[styles.dateInput, {
+                  <ThemedText style={styles.label}>Number of Terms</ThemedText>
+                  <TextInput
+                    style={[styles.input, {
                       backgroundColor: colors.background,
+                      color: colors.foreground,
                       borderColor: colors.border,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                    }]}>
-                      <TextInput
-                        style={{ color: colors.foreground, flex: 1, fontSize: 16 }}
-                        placeholder="DD/MM/YYYY"
-                        placeholderTextColor={colors['muted-foreground']}
-                        value={dateDisplayValue}
-                        onChangeText={(text) => {
-                          const formatted = autoFormatDateInput(text);
-                          setDateDisplayValue(formatted);
-                          const parsed = parseDdMmYyyy(formatted);
-                          if (parsed) setSelectedDate(parsed);
-                          else if (!text) setSelectedDate('');
-                        }}
-                        keyboardType="numeric"
-                        maxLength={10}
-                      />
-                      <TouchableOpacity onPress={() => setShowPicker(true)} style={{ paddingLeft: 8 }}>
-                        <Ionicons name="calendar-outline" size={18} color={colors['muted-foreground']} />
-                      </TouchableOpacity>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.addDateButton, { backgroundColor: colors.primary }]}
-                      onPress={() => {
-                        if (selectedDate && formData.fee_term_dates.length < formData.number_of_terms) {
-                          setFormData(prev => ({
-                            ...prev,
-                            fee_term_dates: [...prev.fee_term_dates, { fee_term_date: selectedDate }]
-                          }));
-                          setSelectedDate('');
-                          setDateDisplayValue('');
-                        }
-                      }}
-                      disabled={!selectedDate || formData.fee_term_dates.length >= formData.number_of_terms}
-                    >
-                      <ThemedText style={styles.addDateButtonText}>Add</ThemedText>
-                    </TouchableOpacity>
+                      marginBottom: 6,
+                    }]}
+                    value={formData.number_of_terms.toString()}
+                    onChangeText={(text) => {
+                      const num = parseInt(text) || 1;
+                      setFormData(prev => ({ ...prev, number_of_terms: num }));
+                    }}
+                    placeholder="Enter number of terms"
+                    placeholderTextColor={colors['muted-foreground']}
+                    keyboardType="numeric"
+                  />
+                  <ThemedText style={[styles.helperText, { color: colors['muted-foreground'] }]}>
+                    This determines how many payment dates will be required for this term.
+                  </ThemedText>
+
+                  <View style={styles.switchRow}>
+                    <Switch
+                      value={formData.term_status === 'active'}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, term_status: value ? 'active' : 'inactive' }))}
+                    />
+                    <ThemedText style={[styles.label, { marginBottom: 0 }]}>Active</ThemedText>
                   </View>
 
-                  <ThemedText style={[styles.label, { marginTop: 12 }]}>
-                    Term Dates ({formData.fee_term_dates.length}/{formData.number_of_terms})
-                  </ThemedText>
-                  {formData.fee_term_dates.map((item, index) => (
-                    <View key={index} style={[styles.dateItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                      <ThemedText style={{ color: colors.foreground, flex: 1 }}>
-                        Term {index + 1}: {formatToDisplay(item.fee_term_date) || item.fee_term_date}
-                      </ThemedText>
-                      <TouchableOpacity
-                        style={[styles.removeButton, { backgroundColor: colors.destructive }]}
-                        onPress={() => {
-                          setFormData(prev => ({
-                            ...prev,
-                            fee_term_dates: prev.fee_term_dates.filter((_, i) => i !== index)
-                          }));
-                        }}
-                      >
-                        <Ionicons name="trash" size={14} color="white" />
-                      </TouchableOpacity>
+                  {/* Payment Dates (mirrors web FeeTermForm card) */}
+                  <View style={[styles.tableCard, { borderColor: colors.border }]}>
+                    <ThemedText style={[styles.tableCardTitle, { color: colors.foreground }]}>
+                      Payment Dates
+                    </ThemedText>
+
+                    <View style={styles.dateEntryRow}>
+                      <View style={[styles.dateInput, {
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                      }]}>
+                        {Platform.OS === 'web' ? (
+                          // Expo Web: raw HTML date input — opens the browser's native calendar
+                          // @ts-ignore
+                          <input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e: any) => {
+                              const val: string = e.target.value; // YYYY-MM-DD
+                              setSelectedDate(val);
+                              setDateDisplayValue(val ? formatToDisplay(val) : '');
+                            }}
+                            style={{
+                              flex: 1,
+                              fontSize: 15,
+                              border: 'none',
+                              background: 'transparent',
+                              color: colors.foreground,
+                              outline: 'none',
+                              cursor: 'pointer',
+                              minHeight: 40,
+                              width: '100%',
+                            } as any}
+                          />
+                        ) : (
+                          <>
+                            <TextInput
+                              style={{ color: colors.foreground, flex: 1, fontSize: 16 }}
+                              placeholder="DD/MM/YYYY"
+                              placeholderTextColor={colors['muted-foreground']}
+                              value={dateDisplayValue}
+                              onChangeText={(text) => {
+                                const formatted = autoFormatDateInput(text);
+                                setDateDisplayValue(formatted);
+                                const parsed = parseDdMmYyyy(formatted);
+                                if (parsed) setSelectedDate(parsed);
+                                else if (!text) setSelectedDate('');
+                              }}
+                              keyboardType="numeric"
+                              maxLength={10}
+                            />
+                            <TouchableOpacity onPress={() => setShowPicker(true)} style={{ paddingLeft: 8 }}
+                              accessibilityLabel="Select date">
+                              <Ionicons name="calendar-outline" size={18} color={colors['muted-foreground']} />
+                            </TouchableOpacity>
+                          </>
+                        )}
+                      </View>
+
+                      {editingDateIndex !== null ? (
+                        <>
+                          <TouchableOpacity
+                            style={[styles.addDateButton, { backgroundColor: colors.primary, opacity: !selectedDate ? 0.5 : 1 }]}
+                            onPress={saveEditDate}
+                            disabled={!selectedDate}
+                          >
+                            <ThemedText style={styles.addDateButtonText}>Save</ThemedText>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.outlineButton, { borderColor: colors.border }]}
+                            onPress={cancelEditDate}
+                          >
+                            <ThemedText style={[styles.outlineButtonText, { color: colors.foreground }]}>Cancel</ThemedText>
+                          </TouchableOpacity>
+                        </>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.addDateButton, { backgroundColor: colors.primary, opacity: !selectedDate ? 0.5 : 1 }]}
+                          onPress={addTermDate}
+                          disabled={!selectedDate}
+                        >
+                          <Ionicons name="add" size={16} color="#fff" />
+                          <ThemedText style={styles.addDateButtonText}>Add Date</ThemedText>
+                        </TouchableOpacity>
+                      )}
                     </View>
-                  ))}
+
+                    {formData.fee_term_dates.length === 0 ? (
+                      <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'], paddingVertical: 16 }]}>
+                        No payment dates added yet. Add dates above.
+                      </ThemedText>
+                    ) : (
+                      <>
+                        <View style={[styles.tableHeaderRow, { borderBottomColor: colors.border }]}>
+                          <ThemedText style={[styles.tableHeaderText, styles.colInstallment, { color: colors['muted-foreground'] }]}>
+                            Installment
+                          </ThemedText>
+                          <ThemedText style={[styles.tableHeaderText, styles.colDueDate, { color: colors['muted-foreground'] }]}>
+                            Due Date
+                          </ThemedText>
+                          <ThemedText style={[styles.tableHeaderText, styles.colActions, { color: colors['muted-foreground'] }]}>
+                            Actions
+                          </ThemedText>
+                        </View>
+
+                        {formData.fee_term_dates.map((item, index) => (
+                          <View key={index} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
+                            <View style={styles.colInstallment}>
+                              <View style={[styles.outlineBadge, { borderColor: colors.border }]}>
+                                <ThemedText style={[styles.outlineBadgeText, { color: colors.foreground }]}>
+                                  Installment {index + 1}
+                                </ThemedText>
+                              </View>
+                            </View>
+                            <ThemedText style={[styles.tableCellText, styles.colDueDate, { color: colors.foreground }]}>
+                              {formatLongDate(item.fee_term_date) || item.fee_term_date}
+                            </ThemedText>
+                            <View style={[styles.colActions, styles.rowActions]}>
+                              <TouchableOpacity
+                                style={[styles.iconButton, {
+                                  borderColor: colors.border,
+                                  opacity: editingDateIndex !== null ? 0.5 : 1,
+                                }]}
+                                onPress={() => startEditDate(index)}
+                                disabled={editingDateIndex !== null}
+                                accessibilityLabel="Edit date"
+                              >
+                                <Ionicons name="pencil" size={14} color={colors.primary} />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.iconButton, { borderColor: colors.border }]}
+                                onPress={() => deleteTermDate(index)}
+                                accessibilityLabel="Delete date"
+                              >
+                                <Ionicons name="trash-outline" size={14} color={colors.destructive} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ))}
+                      </>
+                    )}
+                  </View>
                 </View>
               </ScrollView>
 
@@ -462,6 +667,138 @@ export default function FeeTermsScreen() {
                   </ThemedText>
                 </TouchableOpacity>
               </View>
+            </ThemedView>
+          </View>
+        </Modal>
+
+        {/* Payment Dates viewer (mirrors web PaymentDateManager) */}
+        <Modal
+          visible={!!viewingDatesTerm}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setViewingDatesTerm(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <ThemedText type="subtitle" style={{ flex: 1, marginRight: 8 }} numberOfLines={2}>
+                  Manage Payment Dates - {viewingDatesTerm?.term_name}
+                </ThemedText>
+                <TouchableOpacity onPress={() => setViewingDatesTerm(null)} accessibilityLabel="Close">
+                  <Ionicons name="close" size={22} color={colors['muted-foreground']} />
+                </TouchableOpacity>
+              </View>
+
+              {viewingDatesTerm ? (() => {
+                const dates = [...(viewingDatesTerm.fee_term_dates || [])].sort(
+                  (a, b) => new Date(a.fee_term_date).getTime() - new Date(b.fee_term_date).getTime()
+                );
+                const isComplete = dates.length === viewingDatesTerm.number_of_terms;
+
+                return (
+                  <>
+                    <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
+                      {/* Heading + configured badge */}
+                      <View style={styles.scheduleHeader}>
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <ThemedText style={[styles.sectionTitle, { color: colors.foreground }]}>
+                            Payment Schedule Configuration
+                          </ThemedText>
+                          <ThemedText style={[styles.sectionSubtitle, { color: colors['muted-foreground'] }]}>
+                            Payment dates for {'"'}{viewingDatesTerm.term_name}{'"'}
+                          </ThemedText>
+                        </View>
+                        <View style={styles.scheduleBadgeRow}>
+                          <View style={[styles.solidBadge, { backgroundColor: isComplete ? colors.primary : colors.border }]}>
+                            <ThemedText style={[styles.solidBadgeText, { color: isComplete ? '#fff' : colors.foreground }]}>
+                              {dates.length}/{viewingDatesTerm.number_of_terms} configured
+                            </ThemedText>
+                          </View>
+                          {!isComplete ? <Ionicons name="warning-outline" size={14} color="#EAB308" /> : null}
+                        </View>
+                      </View>
+
+                      {/* Info alert */}
+                      <View style={[styles.alertBox, { borderColor: colors.border }]}>
+                        <Ionicons name="information-circle-outline" size={16} color={colors['muted-foreground']} />
+                        <ThemedText style={[styles.alertText, { color: colors['muted-foreground'] }]}>
+                          Payment dates are configured when creating or editing the fee term. Use the {'"Edit"'} button in
+                          the fee terms list to modify dates.
+                        </ThemedText>
+                      </View>
+
+                      {/* Incomplete-schedule alert */}
+                      {!isComplete ? (
+                        <View style={[styles.alertBox, { borderColor: colors.border }]}>
+                          <Ionicons name="warning-outline" size={16} color="#EAB308" />
+                          <ThemedText style={[styles.alertText, { color: colors['muted-foreground'] }]}>
+                            This term requires {viewingDatesTerm.number_of_terms} payment dates but only has {dates.length} configured.
+                          </ThemedText>
+                        </View>
+                      ) : null}
+
+                      {/* Configured dates table */}
+                      <View style={[styles.tableCard, { borderColor: colors.border }]}>
+                        <ThemedText style={[styles.tableCardTitle, { color: colors.foreground }]}>
+                          Configured Payment Dates
+                        </ThemedText>
+
+                        {dates.length === 0 ? (
+                          <ThemedText style={[styles.emptyText, { color: colors['muted-foreground'], paddingVertical: 24 }]}>
+                            No payment dates configured yet.
+                          </ThemedText>
+                        ) : (
+                          <>
+                            <View style={[styles.tableHeaderRow, { borderBottomColor: colors.border }]}>
+                              <ThemedText style={[styles.tableHeaderText, styles.colInstallment, { color: colors['muted-foreground'] }]}>
+                                Installment
+                              </ThemedText>
+                              <ThemedText style={[styles.tableHeaderText, styles.colDueDate, { color: colors['muted-foreground'] }]}>
+                                Due Date
+                              </ThemedText>
+                              <ThemedText style={[styles.tableHeaderText, styles.colStatus, { color: colors['muted-foreground'] }]}>
+                                Status
+                              </ThemedText>
+                            </View>
+
+                            {dates.map((d, index) => (
+                              <View
+                                key={d.id ?? `${d.fee_term_date}-${index}`}
+                                style={[styles.tableRow, { borderBottomColor: colors.border }]}
+                              >
+                                <View style={styles.colInstallment}>
+                                  <View style={[styles.outlineBadge, { borderColor: colors.border }]}>
+                                    <ThemedText style={[styles.outlineBadgeText, { color: colors.foreground }]}>
+                                      Installment {index + 1}
+                                    </ThemedText>
+                                  </View>
+                                </View>
+                                <ThemedText style={[styles.tableCellText, styles.colDueDate, { color: colors.foreground }]}>
+                                  {formatLongDate(d.fee_term_date)}
+                                </ThemedText>
+                                <View style={styles.colStatus}>
+                                  <View style={[styles.solidBadge, { backgroundColor: colors.primary }]}>
+                                    <ThemedText style={[styles.solidBadgeText, { color: '#fff' }]}>Configured</ThemedText>
+                                  </View>
+                                </View>
+                              </View>
+                            ))}
+                          </>
+                        )}
+                      </View>
+                    </ScrollView>
+
+                    <View style={styles.scheduleFooter}>
+                      <TouchableOpacity
+                        style={[styles.closeButton, { backgroundColor: colors.primary }]}
+                        onPress={() => setViewingDatesTerm(null)}
+                      >
+                        <ThemedText style={styles.submitButtonText}>Close</ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                );
+              })() : null}
             </ThemedView>
           </View>
         </Modal>
@@ -508,14 +845,47 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  yearCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  yearTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  yearDates: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  activeBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  activeBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
   toolbar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    gap: 8,
+  },
+  listSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
   },
   recordCount: {
     fontSize: 13,
+    marginTop: 2,
   },
   addButton: {
     flexDirection: 'row',
@@ -538,7 +908,37 @@ const styles = StyleSheet.create({
   cardName: { fontSize: 15, fontWeight: '700', flex: 1, marginRight: 8 },
   cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 },
   cardMetaText: { fontSize: 12 },
-  cardFooter: { flexDirection: 'row', gap: 4, paddingTop: 8, borderTopWidth: 1, marginTop: 4 },
+  cardFooter: { flexDirection: 'row', gap: 4, paddingTop: 8, borderTopWidth: 1, marginTop: 4, flexWrap: 'wrap' },
+  helperText: { fontSize: 11, lineHeight: 16, marginBottom: 14 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  dateEntryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 },
+  outlineButton: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12, alignItems: 'center' },
+  outlineButtonText: { fontSize: 14, fontWeight: '600' },
+  rowActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
+  iconButton: { borderWidth: 1, borderRadius: 6, padding: 6 },
+  colActions: { flex: 0.9, alignItems: 'flex-end' },
+  // -- Payment dates viewer -------------------------------------------------
+  scheduleHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 },
+  scheduleBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionTitle: { fontSize: 15, fontWeight: '700' },
+  sectionSubtitle: { fontSize: 12, marginTop: 2 },
+  alertBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
+  alertText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  tableCard: { borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 4 },
+  tableCardTitle: { fontSize: 14, fontWeight: '700', marginBottom: 10 },
+  tableHeaderRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, paddingBottom: 8 },
+  tableHeaderText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  tableRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, paddingVertical: 10 },
+  tableCellText: { fontSize: 13 },
+  colInstallment: { flex: 1.2 },
+  colDueDate: { flex: 1.1 },
+  colStatus: { flex: 0.9, alignItems: 'flex-start' },
+  outlineBadge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' },
+  outlineBadgeText: { fontSize: 11, fontWeight: '600' },
+  solidBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' },
+  solidBadgeText: { fontSize: 11, fontWeight: '700' },
+  scheduleFooter: { flexDirection: 'row', justifyContent: 'flex-end', paddingTop: 12 },
+  closeButton: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
   cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   cardActionText: { fontSize: 13, fontWeight: '600' },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
@@ -586,20 +986,20 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     gap: 12,
     paddingTop: 8,
   },
   cancelButton: {
-    flex: 1,
-    padding: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
   },
   submitButton: {
-    flex: 1,
-    padding: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
@@ -626,10 +1026,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addDateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
-    alignItems: 'center',
   },
   addDateButtonText: {
     color: 'white',

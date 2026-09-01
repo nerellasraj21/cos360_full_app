@@ -13,6 +13,8 @@ import {
 import { ScreenLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { staffAttendanceReportsApi } from '@/src/api/staff';
+import { exportToCsv } from '@/src/utils/exportCsv';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const COLOR = '#8B5CF6';
 
@@ -39,7 +41,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   'half-day': { bg: '#ede9fe', text: '#5b21b6' },
 };
 
-export default function StaffReportsScreen() {
+function StaffReportsScreenContent() {
   const { colors, theme } = useTheme();
   const [rangeDays, setRangeDays] = useState(30);
 
@@ -60,6 +62,13 @@ export default function StaffReportsScreen() {
 
   const isLoading = statsLoading || recordsLoading;
 
+  const handleExport = () =>
+    exportToCsv(
+      'staff_attendance_report.csv',
+      ['#', 'Staff Name', 'Date', 'Status', 'Designation'],
+      (records as any[]).map((r, i) => [i + 1, r.staff_name ?? r.name, r.date, r.status, r.designation]),
+    );
+
   return (
     <ScreenLayout title="Staff Reports">
       {/* Banner */}
@@ -69,6 +78,10 @@ export default function StaffReportsScreen() {
           <Ionicons name="person" size={24} color="white" />
         </View>
         <Text style={styles.bannerTitle}>Staff Attendance Report</Text>
+        <TouchableOpacity style={styles.exportBtn} onPress={handleExport}>
+          <Ionicons name="share-outline" size={16} color="white" />
+          <Text style={styles.exportBtnText}>Export</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Date Range Filter */}
@@ -172,7 +185,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center',
   },
-  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700' },
+  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700', flex: 1 },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  exportBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
   filterBar: {
     flexDirection: 'row', gap: 8, padding: 12,
     borderBottomWidth: 1,
@@ -202,3 +217,17 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', gap: 8, paddingTop: 40 },
   emptyText: { fontSize: 14 },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function StaffReportsScreen() {
+  return (
+    <ScreenAccessGate
+      title="Staff Reports"
+      resources={['staff', 'staff_attendance']}
+      blockRoles={['student']}
+    >
+      <StaffReportsScreenContent />
+    </ScreenAccessGate>
+  );
+}

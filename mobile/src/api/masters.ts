@@ -91,6 +91,8 @@ export interface ClassUpdate {
 }
 
 export interface SectionUpdate {
+  /** Sent in the body by the direct-update endpoint, matching the web app. */
+  id?: string;
   name?: string;
   description?: string;
   is_active?: boolean;
@@ -155,13 +157,16 @@ export interface SubjectCategoryUpdate {
 export interface ClassSubjectMapping {
   id: string;
   class_id: string;
+  section_id?: string;
   subject_id: string;
   academic_year_id: string;
   exclude_marks: boolean;
   order?: number;
   is_active: boolean;
   class_name?: string;
+  section_name?: string;
   subject_name?: string;
+  academic_year_name?: string;
 }
 
 export interface ClassSubjectMappingCreate {
@@ -330,7 +335,7 @@ export interface RouteStopCreate {
   name: string;
   number: number;
   reaching_time: string;
-  fees: number;
+  fees?: number;
   is_active?: boolean;
   pickup_time?: string;
   drop_time?: string;
@@ -352,6 +357,18 @@ export interface Vehicle {
   name: string;
   registration_number: string;
   vehicle_type: 'Bus' | 'Van' | 'Auto';
+  fees?: number;
+  fee_category_id?: string | null;
+  fee_type_id?: string | null;
+  is_ac?: boolean | null;
+  driver_name?: string | null;
+  co_driver_name?: string | null;
+  driving_licence_no?: string | null;
+  driving_licence_exp_date?: string | null;
+  bus_insurance_vendor?: string | null;
+  insurance_expiry_date?: string | null;
+  trip_count?: number;
+  number_of_trips?: number | null;
   last_inspected_date: string; // Date in YYYY-MM-DD format
   pollution_renewal_date: string; // Date in YYYY-MM-DD format
   is_active: boolean;
@@ -363,6 +380,17 @@ export interface VehicleCreate {
   name: string;
   registration_number: string;
   vehicle_type: 'Bus' | 'Van' | 'Auto';
+  fees?: number;
+  fee_category_id?: string | null;
+  fee_type_id?: string | null;
+  is_ac?: boolean | null;
+  driver_name?: string | null;
+  co_driver_name?: string | null;
+  driving_licence_no?: string | null;
+  driving_licence_exp_date?: string | null;
+  bus_insurance_vendor?: string | null;
+  insurance_expiry_date?: string | null;
+  number_of_trips?: number | null;
   last_inspected_date: string;
   pollution_renewal_date: string;
   is_active?: boolean;
@@ -372,6 +400,17 @@ export interface VehicleUpdate {
   name?: string;
   registration_number?: string;
   vehicle_type?: 'Bus' | 'Van' | 'Auto';
+  fees?: number;
+  fee_category_id?: string | null;
+  fee_type_id?: string | null;
+  is_ac?: boolean | null;
+  driver_name?: string | null;
+  co_driver_name?: string | null;
+  driving_licence_no?: string | null;
+  driving_licence_exp_date?: string | null;
+  bus_insurance_vendor?: string | null;
+  insurance_expiry_date?: string | null;
+  number_of_trips?: number | null;
   last_inspected_date?: string;
   pollution_renewal_date?: string;
   is_active?: boolean;
@@ -600,7 +639,7 @@ export interface BulkPermissionRequest {
 // Academic Years API
 export const academicYearsApi = {
   getAcademicYears: async (params?: { skip?: number; limit?: number; active_only?: boolean }): Promise<AcademicYear[]> => {
-    const response = await apiClient.get('/masters/academic_years/', { params });
+    const response = await apiClient.get('/masters/academic_years/', { params: { active_only: false, ...params } });
     return response.data.items || response.data;
   },
 
@@ -631,8 +670,10 @@ export const academicYearsApi = {
 
 // Class Sections API
 export const classSectionsApi = {
-  getClassSections: async (params?: { active_only?: boolean }): Promise<ClassRead[]> => {
-    const response = await apiClient.get('/masters/class_sections/read_all', { params });
+  getClassSections: async (params?: { active_only?: boolean; academic_year_id?: string }): Promise<ClassRead[]> => {
+    const response = await apiClient.get('/masters/class_sections/read_all', {
+      params: { active_only: false, ...params },
+    });
     return response.data.items || response.data;
   },
 
@@ -707,12 +748,19 @@ export const classSectionsApi = {
   deleteSectionDirect: async (sectionId: string): Promise<void> => {
     await apiClient.delete(`/masters/class_sections/sections/${sectionId}`);
   },
+
+  getStudentsByClassSection: async (classId: string, sectionId?: string): Promise<any[]> => {
+    const params: Record<string, string> = { class_id: classId, active_only: 'true' };
+    if (sectionId) params.section_id = sectionId;
+    const response = await apiClient.get('/students/admission/', { params });
+    return response.data.items || response.data;
+  },
 };
 
 // Subjects API
 export const subjectsApi = {
   getSubjects: async (params?: { academic_year_id?: string; active_only?: boolean; skip?: number; limit?: number }): Promise<Subject[]> => {
-    const response = await apiClient.get('/masters/subjects/', { params });
+    const response = await apiClient.get('/masters/subjects/', { params: { active_only: false, limit: 1000, ...params } });
     return response.data.items || response.data;
   },
 
@@ -749,7 +797,7 @@ export const subjectsApi = {
 // Subject Categories API
 export const subjectCategoriesApi = {
   getSubjectCategories: async (): Promise<SubjectCategory[]> => {
-    const response = await apiClient.get('/masters/subject_categories/categories');
+    const response = await apiClient.get('/masters/subject_categories/categories', { params: { limit: 1000 } });
     return response.data.items || response.data;
   },
 
@@ -782,7 +830,7 @@ export const subjectCategoriesApi = {
 export const classSubjectMappingsApi = {
   getClassSubjectMappings: async (academicYearId?: string): Promise<ClassSubjectMapping[]> => {
     const params = academicYearId ? { academic_year_id: academicYearId } : {};
-    const response = await apiClient.get('/masters/class-subject-mappings/', { params });
+    const response = await apiClient.get('/masters/class-subject-mappings/', { params: { active_only: false, limit: 1000, ...params } });
     return response.data.items || response.data;
   },
 
@@ -810,8 +858,10 @@ export const classSubjectMappingsApi = {
     return response.data;
   },
 
-  getMappingsByClass: async (classId: string): Promise<ClassSubjectMapping[]> => {
-    const response = await apiClient.get(`/masters/class-subject-mappings/by-class/${classId}`);
+  getMappingsByClass: async (classId: string, academicYearId?: string): Promise<ClassSubjectMapping[]> => {
+    const response = await apiClient.get(`/masters/class-subject-mappings/by-class/${classId}`, {
+      params: { active_only: false, limit: 1000, ...(academicYearId ? { academic_year_id: academicYearId } : {}) },
+    });
     return response.data.items || response.data;
   },
 
@@ -913,6 +963,8 @@ export const routeStopsApi = {
     limit?: number;
     route_id?: string;
     is_active?: boolean;
+    /** Web passes active_only=false when listing stops for fee assignment */
+    active_only?: boolean;
   }): Promise<RouteStop[]> => {
     const response = await apiClient.get('/masters/route-stops/', { params });
     return response.data.items || response.data;
@@ -1028,6 +1080,18 @@ export const tripsApi = {
   }): Promise<Trip[]> => {
     const response = await apiClient.get('/masters/trips/', { params });
     return response.data.items || response.data;
+  },
+
+  /**
+   * Trips for one vehicle. Uses the dedicated per-vehicle endpoint rather than
+   * filtering an unscoped trips list, which the backend does not narrow.
+   */
+  getTripsByVehicle: async (vehicleId: string): Promise<Trip[]> => {
+    const response = await apiClient.get(`/masters/vehicles/${vehicleId}/trips`, {
+      params: { limit: 100 },
+    });
+    const data = response.data;
+    return Array.isArray(data) ? data : (data.items || data.results || []);
   },
 
   getTrip: async (id: string): Promise<Trip> => {
@@ -1285,7 +1349,7 @@ export const transportPricingApi = {
   /** GET /masters/transport-pricing/dropdown */
   getDropdown: async (params?: { vehicle_id?: string }): Promise<Array<{ id: string; cycle_name: string; amount: number }>> => {
     const response = await apiClient.get('/masters/transport-pricing/dropdown', { params });
-    return response.data;
+    return Array.isArray(response.data) ? response.data : response.data?.items ?? [];
   },
 
   /** POST /masters/transport-pricing/ */
@@ -1364,3 +1428,47 @@ export const locationsApi = {
   },
 };
 
+// ─── Location Cascade (States → Districts → Mandals) ─────────────────────────
+
+export interface StateDropdownOption {
+  id: string;
+  name: string;
+  code?: string;
+}
+
+export interface DistrictDropdownOption {
+  id: string;
+  state_id: string;
+  name: string;
+  code?: string;
+}
+
+export interface MandalDropdownOption {
+  id: string;
+  district_id: string;
+  name: string;
+}
+
+export const locationCascadeApi = {
+  /** GET /masters/locations/states/dropdown */
+  getStatesDropdown: async (): Promise<StateDropdownOption[]> => {
+    const response = await apiClient.get('/masters/locations/states/dropdown?active_only=true');
+    return Array.isArray(response.data) ? response.data : response.data.items ?? [];
+  },
+
+  /** GET /masters/locations/states/{stateId}/districts/dropdown */
+  getDistrictsByState: async (stateId: string): Promise<DistrictDropdownOption[]> => {
+    const response = await apiClient.get(
+      `/masters/locations/states/${stateId}/districts/dropdown?active_only=true`,
+    );
+    return Array.isArray(response.data) ? response.data : response.data.items ?? [];
+  },
+
+  /** GET /masters/locations/districts/{districtId}/mandals/dropdown */
+  getMandalsByDistrict: async (districtId: string): Promise<MandalDropdownOption[]> => {
+    const response = await apiClient.get(
+      `/masters/locations/districts/${districtId}/mandals/dropdown?active_only=true`,
+    );
+    return Array.isArray(response.data) ? response.data : response.data.items ?? [];
+  },
+};

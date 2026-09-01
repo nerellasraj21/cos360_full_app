@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import React, { useState } from 'react';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   ScrollView,
   StyleSheet,
@@ -14,16 +16,19 @@ import {
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
-import { useTheme } from '@/contexts';
+import { useAuth, useTheme } from '@/contexts';
 import {
   ExamGradeScheme,
   ExamGradeSchemeCreate,
   GradeBand,
   gradeSchemeApi,
 } from '@/src/api/exam';
+import { getApiErrorMessage } from '@/src/utils/apiError';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
+import { isAdminRole } from '@/src/lib/roles';
 
-type TabKey = 'exam' | 'subject';
+// Web parity: mirrors src/pages/exam/ExamGradeSchemes.tsx. Subject Grade
+// Schemes now live on their own screen — see app/exam/subject-grade-schemes.tsx.
 
 const EMPTY_BAND: GradeBand = {
   from_percent: 0,
@@ -40,76 +45,73 @@ const EMPTY_FORM: ExamGradeSchemeCreate = {
 };
 
 export default function GradeSchemesScreen() {
+  const router = useRouter();
   const { colors, theme } = useTheme();
+  const { role } = useAuth();
+  // Web parity: grade scheme authorization is granted under the "exams"
+  // resource — see mobile backend files/grading_endpoints.py.
   const { hasPermission } = useMobilePermission();
   const { showSuccess, showError } = useToastContext();
   const qc = useQueryClient();
 
+  // Web parity (GradingSchemeManager): grade scheme management is admin-only.
+  const isAdmin = isAdminRole(role?.name);
+  useEffect(() => {
+    if (!isAdmin) {
+      router.replace('/exam/list');
+    }
+  }, [isAdmin, router]);
+
   const { confirm, modalProps } = useConfirmModal();
-  const [activeTab, setActiveTab] = useState<TabKey>('exam');
   const [modalVisible, setModalVisible] = useState(false);
   const [editItem, setEditItem] = useState<ExamGradeScheme | null>(null);
   const [form, setForm] = useState<ExamGradeSchemeCreate>({ ...EMPTY_FORM });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
-  const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
-  const inputBg = theme === 'dark' ? '#0f0f23' : '#f8fafc';
+  const isDark = theme === 'dark';
+  const cardBg = isDark ? '#1a1a2e' : '#ffffff';
+  const borderCol = isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
+  const inputBg = isDark ? '#0f0f23' : '#f8fafc';
+  const altRowBg = isDark ? 'rgba(255,255,255,0.03)' : '#f9fafb';
 
-  const canCreate = hasPermission?.('grade_schemes', 'create');
-  const canUpdate = hasPermission?.('grade_schemes', 'update');
-  const canDelete = hasPermission?.('grade_schemes', 'delete');
+  const canCreate = hasPermission?.('exams', 'create');
+  const canUpdate = hasPermission?.('exams', 'update');
+  const canDelete = hasPermission?.('exams', 'delete');
 
-  // ── Queries ──────────────────────────────────────────────────────────────
+  // ── Query ────────────────────────────────────────────────────────────────
 
-  const { data: examSchemes = [], isLoading: loadingExam } = useQuery({
+  const { data: schemes = [], isLoading } = useQuery({
     queryKey: ['grade-schemes', 'exam'],
     queryFn: () => gradeSchemeApi.listExamSchemes(),
   });
 
-  const { data: subjectSchemes = [], isLoading: loadingSubject } = useQuery({
-    queryKey: ['grade-schemes', 'subject'],
-    queryFn: () => gradeSchemeApi.listSubjectSchemes(),
-  });
-
-  const schemes = activeTab === 'exam' ? examSchemes : subjectSchemes;
-  const isLoading = activeTab === 'exam' ? loadingExam : loadingSubject;
+  const filteredSchemes = useMemo(() => {
+    if (!searchQuery.trim()) return schemes;
+    const q = searchQuery.toLowerCase();
+    return schemes.filter(
+      (s) => s.name.toLowerCase().includes(q) || (s.description ?? '').toLowerCase().includes(q)
+    );
+  }, [schemes, searchQuery]);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
 
-  const createExamMutation = useMutation({
+  const createMutation = useMutation({
     mutationFn: (data: ExamGradeSchemeCreate) => gradeSchemeApi.createExamScheme(data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['grade-schemes', 'exam'] }); closeModal(); showSuccess('Created', 'Exam grade scheme created.'); },
-    onError: () => showError('Error', 'Failed to create scheme.'),
+    onError: (err: any) => showError('Error', getApiErrorMessage(err, 'Failed to create scheme.')),
   });
 
-  const updateExamMutation = useMutation({
+  const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ExamGradeSchemeCreate }) => gradeSchemeApi.updateExamScheme(id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['grade-schemes', 'exam'] }); closeModal(); showSuccess('Updated', 'Scheme updated.'); },
-    onError: () => showError('Error', 'Failed to update scheme.'),
+    onError: (err: any) => showError('Error', getApiErrorMessage(err, 'Failed to update scheme.')),
   });
 
-  const deleteExamMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: (id: string) => gradeSchemeApi.deleteExamScheme(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['grade-schemes', 'exam'] }); showSuccess('Deleted', 'Scheme deleted.'); },
-    onError: () => showError('Error', 'Failed to delete scheme.'),
-  });
-
-  const createSubjectMutation = useMutation({
-    mutationFn: (data: ExamGradeSchemeCreate) => gradeSchemeApi.createSubjectScheme(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['grade-schemes', 'subject'] }); closeModal(); showSuccess('Created', 'Subject grade scheme created.'); },
-    onError: () => showError('Error', 'Failed to create scheme.'),
-  });
-
-  const updateSubjectMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: ExamGradeSchemeCreate }) => gradeSchemeApi.updateSubjectScheme(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['grade-schemes', 'subject'] }); closeModal(); showSuccess('Updated', 'Scheme updated.'); },
-    onError: () => showError('Error', 'Failed to update scheme.'),
-  });
-
-  const deleteSubjectMutation = useMutation({
-    mutationFn: (id: string) => gradeSchemeApi.deleteSubjectScheme(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['grade-schemes', 'subject'] }); showSuccess('Deleted', 'Scheme deleted.'); },
-    onError: () => showError('Error', 'Failed to delete scheme.'),
+    onError: (err: any) => showError('Error', getApiErrorMessage(err, 'Failed to delete scheme.')),
   });
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -138,11 +140,9 @@ export default function GradeSchemesScreen() {
     };
 
     if (editItem) {
-      if (activeTab === 'exam') updateExamMutation.mutate({ id: editItem.id, data: payload });
-      else updateSubjectMutation.mutate({ id: editItem.id, data: payload });
+      updateMutation.mutate({ id: editItem.id, data: payload });
     } else {
-      if (activeTab === 'exam') createExamMutation.mutate(payload);
-      else createSubjectMutation.mutate(payload);
+      createMutation.mutate(payload);
     }
   };
 
@@ -152,10 +152,7 @@ export default function GradeSchemesScreen() {
       message: `Delete "${item.name}"?`,
       confirmLabel: 'Delete',
       destructive: true,
-      onConfirm: () => {
-        if (activeTab === 'exam') deleteExamMutation.mutate(item.id);
-        else deleteSubjectMutation.mutate(item.id);
-      },
+      onConfirm: () => deleteMutation.mutate(item.id),
     });
   };
 
@@ -168,98 +165,175 @@ export default function GradeSchemesScreen() {
   const addBand = () => setForm(f => ({ ...f, bands: [...f.bands, { ...EMPTY_BAND }] }));
   const removeBand = (idx: number) => setForm(f => ({ ...f, bands: f.bands.filter((_, i) => i !== idx) }));
 
-  const isPending = createExamMutation.isPending || updateExamMutation.isPending ||
-    createSubjectMutation.isPending || updateSubjectMutation.isPending;
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  // Non-admins are redirected by the effect above; render nothing meanwhile.
+  if (!isAdmin) return null;
+
   return (
-    <AppLayout title="Grade Schemes">
-      {/* Tab bar */}
-      <View style={styles.tabBar}>
-        {(['exam', 'subject'] as TabKey[]).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && { backgroundColor: '#556ee6', borderRadius: 8 }]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[styles.tabText, { color: activeTab === tab ? 'white' : colors['muted-foreground'] }]}>
-              {tab === 'exam' ? 'Exam Schemes' : 'Subject Schemes'}
+    <AppLayout title="Exam Grade Schemes">
+      <View style={styles.container}>
+        {/* Page header */}
+        <View style={styles.pageHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.pageTitle, { color: colors.foreground }]}>Exam Grade Schemes</Text>
+            <Text style={[styles.pageSubtitle, { color: colors['muted-foreground'] }]}>
+              Map total percentage ranges to grades (A+, A, B...) with GPA and pass/fail
             </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Add button */}
-      {canCreate && (
-        <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
-          <Ionicons name="add-circle" size={18} color="white" />
-          <Text style={styles.addBtnText}>Add Scheme</Text>
-        </TouchableOpacity>
-      )}
-
-      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-        {isLoading ? (
-          <Text style={[styles.empty, { color: colors['muted-foreground'] }]}>Loading…</Text>
-        ) : schemes.length === 0 ? (
-          <View style={styles.emptyView}>
-            <Ionicons name="layers-outline" size={48} color={colors['muted-foreground']} />
-            <Text style={[styles.empty, { color: colors['muted-foreground'] }]}>No grade schemes yet</Text>
           </View>
-        ) : (
-          schemes.map(item => (
-            <View key={item.id} style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
-              <View style={styles.cardHeader}>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.cardTitleRow}>
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>{item.name}</Text>
-                    {item.is_default && (
-                      <View style={styles.defaultBadge}>
-                        <Text style={styles.defaultBadgeText}>DEFAULT</Text>
-                      </View>
-                    )}
-                  </View>
-                  {item.description ? (
-                    <Text style={[styles.cardDesc, { color: colors['muted-foreground'] }]}>{item.description}</Text>
-                  ) : null}
-                  <Text style={[styles.cardMeta, { color: colors['muted-foreground'] }]}>
-                    {item.bands.length} grade band{item.bands.length !== 1 ? 's' : ''}
-                  </Text>
-                </View>
-                <View style={styles.cardActions}>
-                  {canUpdate && (
-                    <TouchableOpacity onPress={() => openEdit(item)} style={styles.iconBtn}>
-                      <Ionicons name="create-outline" size={18} color="#556ee6" />
-                    </TouchableOpacity>
-                  )}
-                  {canDelete && (
-                    <TouchableOpacity onPress={() => handleDelete(item)} style={styles.iconBtn}>
-                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
+          {canCreate && (
+            <TouchableOpacity style={styles.addButton} onPress={openCreate}>
+              <Ionicons name="add" size={16} color="white" />
+              <Text style={styles.addButtonText}>New Scheme</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-              {/* Bands preview */}
-              {item.bands.length > 0 && (
-                <View style={styles.bandsRow}>
-                  {item.bands.slice(0, 6).map((b, i) => (
-                    <View key={i} style={[styles.bandChip, { backgroundColor: b.is_pass ? '#10B98120' : '#EF444420' }]}>
-                      <Text style={[styles.bandChipText, { color: b.is_pass ? '#10B981' : '#EF4444' }]}>
-                        {b.grade_label} ({b.from_percent}–{b.to_percent}%)
-                      </Text>
+        {/* Filters */}
+        <View style={styles.filtersLabelRow}>
+          <Ionicons name="filter-outline" size={14} color={colors['muted-foreground']} />
+          <Text style={[styles.filtersLabelText, { color: colors['muted-foreground'] }]}>Filters</Text>
+        </View>
+        <View style={[styles.searchBar, { backgroundColor: inputBg, borderColor: borderCol }]}>
+          <Ionicons name="search-outline" size={16} color={colors['muted-foreground']} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.foreground }]}
+            placeholder="Search schemes..."
+            placeholderTextColor={colors['muted-foreground']}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityLabel="Clear search">
+              <Ionicons name="close-circle" size={16} color={colors['muted-foreground']} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
+          {isLoading ? (
+            <View style={styles.emptyView}>
+              <ActivityIndicator size="large" color="#556ee6" />
+            </View>
+          ) : filteredSchemes.length === 0 ? (
+            <View style={styles.emptyView}>
+              <Ionicons name="trophy-outline" size={48} color={colors['muted-foreground']} />
+              <Text style={[styles.empty, { color: colors['muted-foreground'] }]}>
+                {searchQuery ? 'No schemes match your search' : 'No grade schemes yet'}
+              </Text>
+            </View>
+          ) : (
+            filteredSchemes.map((item, idx) => {
+              const expanded = expandedId === item.id;
+              return (
+                <View key={item.id} style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
+                  <TouchableOpacity
+                    style={styles.cardHeader}
+                    activeOpacity={0.75}
+                    onPress={() => setExpandedId(expanded ? null : item.id)}
+                  >
+                    <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{idx + 1}</Text>
+                    <Ionicons
+                      name={expanded ? 'chevron-down' : 'chevron-forward'}
+                      size={15}
+                      color={colors['muted-foreground']}
+                      style={{ marginRight: 8 }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.cardTitleRow}>
+                        <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>{item.name}</Text>
+                        {item.is_default && (
+                          <View style={styles.defaultBadge}>
+                            <Text style={styles.defaultBadgeText}>Default</Text>
+                          </View>
+                        )}
+                      </View>
+                      {item.description ? (
+                        <Text style={[styles.cardDesc, { color: colors['muted-foreground'] }]} numberOfLines={1}>{item.description}</Text>
+                      ) : null}
+                      <View style={[styles.bandsBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9' }]}>
+                        <Text style={[styles.bandsBadgeText, { color: colors.foreground }]}>
+                          {item.bands.length} band{item.bands.length !== 1 ? 's' : ''}
+                        </Text>
+                      </View>
                     </View>
-                  ))}
-                  {item.bands.length > 6 && (
-                    <Text style={[styles.moreBands, { color: colors['muted-foreground'] }]}>+{item.bands.length - 6} more</Text>
+                    <View style={styles.cardActions}>
+                      {canUpdate && (
+                        <TouchableOpacity
+                          onPress={(e) => { e.stopPropagation?.(); openEdit(item); }}
+                          style={styles.iconBtn}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          accessibilityLabel="Edit"
+                        >
+                          <Ionicons name="create-outline" size={18} color="#556ee6" />
+                        </TouchableOpacity>
+                      )}
+                      {canDelete && (
+                        <TouchableOpacity
+                          onPress={(e) => { e.stopPropagation?.(); handleDelete(item); }}
+                          style={styles.iconBtn}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          accessibilityLabel="Delete"
+                        >
+                          <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Expanded band breakdown — mirrors web GradeBandEditor (readOnly) */}
+                  {expanded && (
+                    <View style={[styles.expandedPanel, { borderTopColor: borderCol }]}>
+                      {item.bands.length === 0 ? (
+                        <Text style={[styles.noBandsText, { color: colors['muted-foreground'] }]}>No grade bands defined.</Text>
+                      ) : (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                          <View>
+                            <View style={[styles.bandTableHeader, { borderBottomColor: borderCol }]}>
+                              <Text style={[styles.bandHeaderCell, styles.bandColPercent]}>From %</Text>
+                              <Text style={[styles.bandHeaderCell, styles.bandColPercent]}>To %</Text>
+                              <Text style={[styles.bandHeaderCell, styles.bandColGrade]}>Grade</Text>
+                              <Text style={[styles.bandHeaderCell, styles.bandColGpa]}>GPA</Text>
+                              <Text style={[styles.bandHeaderCell, styles.bandColRemarks]}>Remarks</Text>
+                              <Text style={[styles.bandHeaderCell, styles.bandColPass]}>Pass?</Text>
+                            </View>
+                            {item.bands.map((b, i) => (
+                              <View key={i} style={[styles.bandTableRow, { borderTopColor: borderCol }]}>
+                                <Text style={[styles.bandCell, styles.bandColPercent, { color: colors.foreground }]}>{b.from_percent}</Text>
+                                <Text style={[styles.bandCell, styles.bandColPercent, { color: colors.foreground }]}>{b.to_percent}</Text>
+                                <View style={styles.bandColGrade}>
+                                  <View style={styles.gradeBadge}>
+                                    <Text style={styles.gradeBadgeText}>{b.grade_label}</Text>
+                                  </View>
+                                </View>
+                                <Text style={[styles.bandCell, styles.bandColGpa, { color: colors.foreground }]}>
+                                  {b.gpa != null ? Number(b.gpa).toFixed(1) : '—'}
+                                </Text>
+                                <Text style={[styles.bandCell, styles.bandColRemarks, { color: colors['muted-foreground'] }]} numberOfLines={1}>
+                                  {b.remarks || '—'}
+                                </Text>
+                                <View style={styles.bandColPass}>
+                                  <View style={[styles.passBadge, { backgroundColor: b.is_pass ? '#10B98120' : '#EF444420' }]}>
+                                    <Text style={{ color: b.is_pass ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: '700' }}>
+                                      {b.is_pass ? 'Pass' : 'Fail'}
+                                    </Text>
+                                  </View>
+                                </View>
+                              </View>
+                            ))}
+                          </View>
+                        </ScrollView>
+                      )}
+                    </View>
                   )}
                 </View>
-              )}
-            </View>
-          ))
-        )}
-        <View style={{ height: 48 }} />
-      </ScrollView>
+              );
+            })
+          )}
+        </ScrollView>
+      </View>
 
       {/* Create / Edit Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={closeModal}>
@@ -267,9 +341,10 @@ export default function GradeSchemesScreen() {
           <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-                {editItem ? 'Edit Scheme' : `New ${activeTab === 'exam' ? 'Exam' : 'Subject'} Grade Scheme`}
+                {editItem ? 'Edit Scheme' : 'New Exam Grade Scheme'}
               </Text>
-              <TouchableOpacity onPress={closeModal}>
+              <TouchableOpacity onPress={closeModal}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </View>
@@ -317,7 +392,8 @@ export default function GradeSchemesScreen() {
                 <View key={idx} style={[styles.bandRow, { backgroundColor: inputBg, borderColor: borderCol }]}>
                   <View style={styles.bandRowTop}>
                     <Text style={[styles.bandIdx, { color: colors['muted-foreground'] }]}>Band {idx + 1}</Text>
-                    <TouchableOpacity onPress={() => removeBand(idx)}>
+                    <TouchableOpacity onPress={() => removeBand(idx)}
+              accessibilityLabel="Delete">
                       <Ionicons name="trash-outline" size={16} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
@@ -390,7 +466,7 @@ export default function GradeSchemesScreen() {
               ))}
 
               <TouchableOpacity
-                style={[styles.saveBtn, { opacity: isPending ? 0.6 : 1 }]}
+                style={[styles.saveBtn, { opacity: isPending ? 0.5 : 1 }]}
                 onPress={handleSave}
                 disabled={isPending}
               >
@@ -406,35 +482,64 @@ export default function GradeSchemesScreen() {
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
-    flexDirection: 'row', padding: 6, marginHorizontal: 16, marginTop: 12, marginBottom: 8,
-    backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 12,
+  container: { flex: 1, padding: 16 },
+
+  // Page header
+  pageHeader: {
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
+    gap: 10, marginBottom: 14,
   },
-  tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
-  tabText: { fontSize: 13, fontWeight: '600' },
-  addBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#556ee6', marginHorizontal: 16, marginBottom: 8,
-    borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10,
+  pageTitle: { fontSize: 19, fontWeight: '700' },
+  pageSubtitle: { fontSize: 12, marginTop: 3, lineHeight: 16 },
+  addButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#556ee6', borderRadius: 8,
+    paddingHorizontal: 12, height: 36,
   },
-  addBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
-  list: { padding: 16 },
+  addButtonText: { color: 'white', fontWeight: '600', fontSize: 13 },
+
+  // Filters
+  filtersLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  filtersLabelText: { fontSize: 13, fontWeight: '500' },
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', height: 36,
+    paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, marginBottom: 14, gap: 8,
+  },
+  searchInput: { flex: 1, fontSize: 14, padding: 0 },
+
+  list: { paddingBottom: 48 },
   empty: { textAlign: 'center', fontSize: 14, marginTop: 16 },
   emptyView: { alignItems: 'center', paddingVertical: 48, gap: 12 },
-  card: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 10 },
-  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 },
+
+  card: { borderRadius: 14, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
+  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', padding: 14 },
+  serialNo: { fontSize: 12, fontWeight: '600', width: 20, marginTop: 1 },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   cardTitle: { fontSize: 15, fontWeight: '700' },
   defaultBadge: { backgroundColor: '#556ee620', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   defaultBadgeText: { color: '#556ee6', fontSize: 10, fontWeight: '700' },
   cardDesc: { fontSize: 13, marginTop: 3 },
-  cardMeta: { fontSize: 12, marginTop: 4 },
-  cardActions: { flexDirection: 'row', gap: 4 },
+  bandsBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, marginTop: 6 },
+  bandsBadgeText: { fontSize: 11, fontWeight: '600' },
+  cardActions: { flexDirection: 'row', gap: 4, marginLeft: 8 },
   iconBtn: { padding: 6 },
-  bandsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  bandChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  bandChipText: { fontSize: 11, fontWeight: '600' },
-  moreBands: { fontSize: 11, alignSelf: 'center' },
+
+  // Expanded band table
+  expandedPanel: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12 },
+  noBandsText: { fontSize: 13, textAlign: 'center', paddingVertical: 8 },
+  bandTableHeader: { flexDirection: 'row', borderBottomWidth: 1, paddingBottom: 8, marginBottom: 4 },
+  bandHeaderCell: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, opacity: 0.6, color: '#94a3b8' },
+  bandTableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  bandCell: { fontSize: 13 },
+  bandColPercent: { width: 64 },
+  bandColGrade: { width: 72 },
+  bandColGpa: { width: 56 },
+  bandColRemarks: { width: 130 },
+  bandColPass: { width: 70 },
+  gradeBadge: { alignSelf: 'flex-start', borderWidth: 1, borderColor: '#556ee650', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  gradeBadgeText: { fontSize: 12, fontWeight: '700', color: '#556ee6' },
+  passBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
+
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%' },

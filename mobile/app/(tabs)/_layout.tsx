@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
+import { roleBlocksFees } from '../../src/lib/menuUtils';
 import { ThemedView } from '../../components/themed-view';
 import { ThemedText } from '../../components/themed-text';
 
@@ -13,6 +14,7 @@ interface TabConfig {
   moduleResources: string[];
   requireAll?: boolean;
   alwaysShow?: boolean; // For tabs that should always be visible (like index, settings)
+  hideForRoles?: string[]; // Role names (lowercase) that must never see this tab
 }
 
 const TAB_CONFIGS: TabConfig[] = [
@@ -25,6 +27,7 @@ const TAB_CONFIGS: TabConfig[] = [
     name: 'masters',
     moduleResources: ['academic_years', 'classes', 'subjects', 'holidays', 'timetables'],
     requireAll: false,
+    hideForRoles: ['student', 'parent', 'guardian', 'father', 'mother'], // Web parity: student/parent have no Masters module
   },
   {
     name: 'students',
@@ -40,20 +43,23 @@ const TAB_CONFIGS: TabConfig[] = [
     name: 'fees',
     moduleResources: [],
     alwaysShow: true,
+    hideForRoles: ['teacher'], // Web parity: teachers are blocked from the Fee module
   },
   {
     name: 'transport',
     moduleResources: [],
     alwaysShow: true,
+    hideForRoles: ['student', 'parent', 'guardian', 'father', 'mother'], // Web parity: student/parent have no Transport module
   },
   {
     name: 'reports',
     moduleResources: [],
     alwaysShow: true,
+    hideForRoles: ['student', 'parent', 'guardian', 'father', 'mother'], // Web parity: student/parent have no Reports module
   },
   {
     name: 'admin',
-    moduleResources: ['users', 'roles', 'permissions', 'menu'],
+    moduleResources: ['users', 'roles', 'permissions', 'menu', 'school_settings', 'announcements'],
     requireAll: false,
   },
   {
@@ -65,6 +71,11 @@ const TAB_CONFIGS: TabConfig[] = [
     name: 'communication',
     moduleResources: [],
     alwaysShow: true,
+    // Web parity: student/parent have no Communication module (backend never sends
+    // it in their menu). Aliases match the isStudentOrParent check inside the
+    // screen itself — without this, parents saw a tab that dead-ended on an
+    // "Access Restricted" screen.
+    hideForRoles: ['student', 'parent', 'guardian', 'father', 'mother'],
   },
   {
     name: 'expense',
@@ -84,10 +95,12 @@ const TAB_CONFIGS: TabConfig[] = [
 ];
 
 export default function TabLayout() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, role } = useAuth();
   const router = useRouter();
   const isInitialCheck = useRef(true);
   const { hasModuleAccess, isUserAuthenticated } = useMobilePermission();
+
+  const roleName = role?.name?.toLowerCase() ?? '';
 
   // Calculate accessible tabs based on permissions
   const accessibleTabs = useMemo(() => {
@@ -96,6 +109,11 @@ export default function TabLayout() {
     }
 
     return TAB_CONFIGS.filter(tab => {
+      // Web parity: hide tabs explicitly blocked for this role (e.g. teacher → fees)
+      if (tab.hideForRoles?.includes(roleName)) {
+        return false;
+      }
+
       // Always show tabs that don't require permissions
       if (tab.alwaysShow) {
         return true;
@@ -104,7 +122,7 @@ export default function TabLayout() {
       // Check module access for permission-based tabs
       return hasModuleAccess(tab.moduleResources);
     });
-  }, [isLoading, isAuthenticated, hasModuleAccess]);
+  }, [isLoading, isAuthenticated, hasModuleAccess, roleName]);
 
   // Handle authentication redirect
   useEffect(() => {
@@ -114,9 +132,13 @@ export default function TabLayout() {
     isInitialCheck.current = false;
   }, [isAuthenticated, router]);
 
-  // Handle case where user has no accessible tabs (except always-show tabs)
+  // Handle case where user has no accessible tabs at all. Previously this only
+  // counted permission-gated tabs (masters/staff/admin/expense), which wrongly
+  // showed "Limited Access" for roles like parent/student/teacher that have no
+  // grants for those four but still have legitimate always-show tabs (fees,
+  // students, exam, profile, settings, ...).
   const hasAnyModuleAccess = useMemo(() => {
-    return accessibleTabs.some(tab => !tab.alwaysShow);
+    return accessibleTabs.length > 0;
   }, [accessibleTabs]);
 
   // While unauthenticated, render nothing — the useEffect above will redirect to /login

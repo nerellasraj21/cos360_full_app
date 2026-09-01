@@ -184,6 +184,7 @@ export default function ParentsScreen() {
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: themeColors.primary }]}
               onPress={() => {}}
+              accessibilityLabel="Add"
             >
               <Ionicons name="add" size={24} color="white" />
             </TouchableOpacity>
@@ -201,7 +202,8 @@ export default function ParentsScreen() {
           onChangeText={setSearchQuery}
         />
         {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityLabel="Close">
             <Ionicons name="close" size={20} color={themeColors['muted-foreground']} />
           </TouchableOpacity>
         ) : null}

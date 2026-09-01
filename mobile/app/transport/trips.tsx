@@ -2,13 +2,11 @@ import { ThemedText } from '@/components/themed-text';
 import { AppLayout } from '@/components';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { useToastContext } from '@/components/ToastProvider';
-import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import CustomDropdown from '@/components/ui/dropdown';
 import { useTheme } from '@/contexts';
 import { useVehiclesDropdown, useRoutesDropdown, useDrivers } from '@/hooks';
 import { Trip } from '../../src/api';
 import { useTrips, useCreateTrip, useUpdateTrip, useDeleteTrip } from '../../hooks/use-transport';
-import { PERMISSION_RESOURCES } from '../../src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
@@ -21,8 +19,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
-export default function TripsScreen() {
+function TripsScreenContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
@@ -154,38 +153,35 @@ export default function TripsScreen() {
     }
   };
 
-  const renderTripItem = useCallback(({ item }: { item: Trip }) => {
+  const renderTripItem = useCallback(({ item, index }: { item: Trip; index: number }) => {
     const vehicle = vehicles.find(v => v.id === item.vehicle_id);
     const route = routes.find(r => r.id === item.route_id);
-    const driver = drivers.find(d => d.id === item.driver_id);
+    const driver = drivers.find(d => d.id === item.driver_id || d.staffId === item.driver_id);
 
     return (
       <View style={[styles.tripCard, { backgroundColor: colors.card }]}>
         <View style={styles.tripHeader}>
           <View style={styles.tripInfo}>
+            <ThemedText style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</ThemedText>
             <ThemedText type="subtitle" style={styles.tripNumber}>
               Trip #{item.trip_number}
             </ThemedText>
           </View>
           <View style={styles.actionButtons}>
-            <UpdatePermissionGuard 
-              resource={PERMISSION_RESOURCES.TRANSPORT_TRIPS}>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                onPress={() => handleEdit(item)}
-              >
-                <Ionicons name="create" size={16} color="white" />
-              </TouchableOpacity>
-            </UpdatePermissionGuard>
-            <DeletePermissionGuard 
-              resource={PERMISSION_RESOURCES.TRANSPORT_TRIPS}>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
-                onPress={() => handleDelete(item)}
-              >
-                <Ionicons name="trash" size={16} color="white" />
-              </TouchableOpacity>
-            </DeletePermissionGuard>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              onPress={() => handleEdit(item)}
+              accessibilityLabel="Edit"
+            >
+              <Ionicons name="create" size={16} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
+              onPress={() => handleDelete(item)}
+              accessibilityLabel="Delete"
+            >
+              <Ionicons name="trash" size={16} color="white" />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -208,6 +204,14 @@ export default function TripsScreen() {
               Driver: {driver?.name || 'Unknown Driver'}
             </ThemedText>
           </View>
+          {item.created_at ? (
+            <View style={styles.detailRow}>
+              <Ionicons name="calendar" size={16} color={colors['muted-foreground']} />
+              <ThemedText style={styles.detailText}>
+                Created: {new Date(item.created_at).toLocaleDateString()}
+              </ThemedText>
+            </View>
+          ) : null}
         </View>
       </View>
     );
@@ -233,36 +237,21 @@ export default function TripsScreen() {
 
   return (
     <AppLayout title="Trips">
-      <ReadOrListPermissionGuard 
-        resource={PERMISSION_RESOURCES.TRANSPORT_TRIPS}
-        fallback={
-          <View style={styles.centerContainer}>
-            <Ionicons name="lock-closed" size={64} color={colors['muted-foreground']} />
-            <ThemedText type="subtitle" style={styles.emptyTitle}>
-              Access Denied
-            </ThemedText>
-            <ThemedText style={styles.emptyText}>
-              You don't have permission to view transport trips
-            </ThemedText>
-          </View>
-        }
-      >
+        {/* Trips list is intentionally not permission-gated, matching the web app.
+            The backend still enforces access. */}
         <View style={styles.container}>
           {/* Header with Add Button */}
           <View style={styles.header}>
-            <CreatePermissionGuard 
-              resource={PERMISSION_RESOURCES.TRANSPORT_TRIPS}>
-              <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: colors.primary }]}
-                onPress={() => {
-                  resetForm();
-                  setIsModalVisible(true);
-                }}
-              >
-                <Ionicons name="add" size={20} color="white" />
-                <ThemedText style={styles.addButtonText}>Add Trip</ThemedText>
-              </TouchableOpacity>
-            </CreatePermissionGuard>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                resetForm();
+                setIsModalVisible(true);
+              }}
+            >
+              <Ionicons name="add" size={20} color="white" />
+              <ThemedText style={styles.addButtonText}>Add Trip</ThemedText>
+            </TouchableOpacity>
           </View>
 
         {/* Search Bar */}
@@ -276,7 +265,8 @@ export default function TripsScreen() {
             onChangeText={setSearchQuery}
           />
           {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityLabel="Close">
               <Ionicons name="close" size={20} color={colors['muted-foreground']} />
             </TouchableOpacity>
           ) : null}
@@ -324,7 +314,8 @@ export default function TripsScreen() {
                 <ThemedText type="title" style={styles.modalTitle}>
                   {editingTrip ? 'Edit Trip' : 'Add Trip'}
                 </ThemedText>
-                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors.foreground} />
                 </TouchableOpacity>
               </View>
@@ -406,12 +397,12 @@ export default function TripsScreen() {
           onCancel={() => setPendingDeleteTrip(null)}
         />
         </View>
-      </ReadOrListPermissionGuard>
     </AppLayout>
   );
 }
 
 const styles = StyleSheet.create({
+  serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   container: {
     flex: 1,
     padding: 16,
@@ -580,3 +571,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function TripsScreen() {
+  return (
+    <ScreenAccessGate
+      title="Trips"
+      resources={['transport_trips']}
+    >
+      <TripsScreenContent />
+    </ScreenAccessGate>
+  );
+}

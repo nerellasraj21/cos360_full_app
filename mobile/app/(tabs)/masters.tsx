@@ -1,31 +1,75 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
-import { useTheme } from '@/contexts';
-import { useMobilePermission } from '@/src/hooks/useMobilePermission';
-import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { getModuleStyle, mapPath } from '@/components/navigation/menuMap';
+import { useAuth, useTheme } from '@/contexts';
 
-const sections = [
-  { title: 'Academic Years',        description: 'Configure and manage academic year cycles',         icon: 'calendar' as const,         color: '#06B6D4', route: '/masters/academicyears',        resource: PERMISSION_RESOURCES.ACADEMIC_YEARS },
-  { title: 'Classes & Sections',    description: 'Manage classes, sections and their configurations', icon: 'business' as const,         color: '#0891B2', route: '/masters/classesandsections',   resource: PERMISSION_RESOURCES.CLASSES },
-  { title: 'Staff Management',      description: 'Manage staff enrollment and designations',          icon: 'people' as const,           color: '#06B6D4', route: '/masters/staffmanagement',      resource: PERMISSION_RESOURCES.STAFF },
-  { title: 'Subject Categories',    description: 'Organize subjects into categories',                 icon: 'folder' as const,           color: '#0E7490', route: '/masters/subjectcategories',    resource: PERMISSION_RESOURCES.SUBJECT_CATEGORIES },
-  { title: 'Subjects',              description: 'Define subjects and subject details',               icon: 'book' as const,             color: '#06B6D4', route: '/masters/subjects',             resource: PERMISSION_RESOURCES.SUBJECTS },
-  { title: 'Class Subject Mappings',description: 'Map subjects to classes and sections',              icon: 'git-branch' as const,       color: '#0891B2', route: '/masters/classsubjectmappings', resource: PERMISSION_RESOURCES.CLASS_SUBJECT_MAPPINGS },
-  { title: 'Holidays',              description: 'Configure school holidays and calendar events',     icon: 'sunny' as const,            color: '#06B6D4', route: '/masters/holidays',             resource: PERMISSION_RESOURCES.HOLIDAYS },
-  { title: 'Timetable Management',  description: 'Manage class timetables and schedules',             icon: 'time' as const,             color: '#0E7490', route: '/masters/timetable',            resource: PERMISSION_RESOURCES.TIMETABLES },
+// Descriptions for known submodules — mirrors the web Masters dashboard's
+// `descriptionMap`. Anything not listed falls back to "Manage <name>".
+const DESCRIPTIONS: Record<string, string> = {
+  'Academic Years': 'Configure and manage academic year cycles',
+  'Classes & Sections': 'Manage classes, sections and their configurations',
+  'Staff Management': 'Manage staff enrollment and designations',
+  'Subject Categories': 'Organize subjects into categories',
+  'Subjects': 'Define subjects and subject details',
+  'Class Subject Mappings': 'Map subjects to classes and sections',
+  'Parents': 'Manage parent and guardian information',
+  'Holidays': 'Configure school holidays and calendar events',
+  'Timetable Management': 'Manage class timetables and schedules',
+  'Routes & Stops': 'Manage transport routes and route stops',
+  'Vehicles & Trips': 'Manage fleet vehicles and trip schedules',
+  'Roles & Permissions': 'Configure roles and access permissions',
+  'Locations': 'Manage locations used across the school',
+};
+
+/** Shape shared by backend menu children and the offline fallback list. */
+type MastersSection = { id?: string; name?: string | null; path?: string | null };
+
+// Used only when the backend menu has not loaded yet (offline / cold start).
+// Kept in sync with the screens that exist under app/masters. Each entry names
+// the resource that gates it, so the fallback list can never expose a section
+// the user's role has no permission for (the backend menu is already scoped).
+const FALLBACK_SECTIONS: (MastersSection & { resource: string })[] = [
+  { id: 'academicyears', name: 'Academic Years', path: '/masters/academicyears', resource: 'academic_years' },
+  { id: 'classesandsections', name: 'Classes & Sections', path: '/masters/classesandsections', resource: 'classes' },
+  { id: 'staffmanagement', name: 'Staff Management', path: '/masters/staffmanagement', resource: 'staff' },
+  { id: 'subjectcategories', name: 'Subject Categories', path: '/masters/subjectcategories', resource: 'subject_categories' },
+  { id: 'subjects', name: 'Subjects', path: '/masters/subjects', resource: 'subjects' },
+  { id: 'classsubjectmappings', name: 'Class Subject Mappings', path: '/masters/classsubjectmappings', resource: 'class_subject_mappings' },
+  { id: 'parents', name: 'Parents', path: '/masters/parents', resource: 'parents' },
+  { id: 'holidays', name: 'Holidays', path: '/masters/holidays', resource: 'holidays' },
+  { id: 'timetable', name: 'Timetable Management', path: '/masters/timetable', resource: 'timetables' },
+  { id: 'locations', name: 'Locations', path: '/masters/locations', resource: 'locations' },
+  { id: 'rolespermissions', name: 'Roles & Permissions', path: '/masters/rolespermissions', resource: 'roles_permissions' },
 ];
 
 export default function MastersScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
-  const { hasPermission } = useMobilePermission();
+  const { menu, hasPermission } = useAuth();
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const comingSoonBorderCol = theme === 'dark' ? 'rgba(255,255,255,0.15)' : '#cbd5e1';
+
+  // Sections come from the backend menu (same source as the web dashboard),
+  // so a user only sees what their role's menu actually grants.
+  const sections = useMemo<MastersSection[]>(() => {
+    const masters = ((menu ?? []) as MastersSection[]).find(
+      (item) => item.name?.toLowerCase() === 'masters'
+    ) as (MastersSection & { children?: MastersSection[] }) | undefined;
+    const children = masters?.children ?? [];
+    if (children.length > 0) return children;
+
+    // Cold start: the menu has not arrived yet, so gate the fallback list by
+    // permission instead of showing every masters screen to every role.
+    return FALLBACK_SECTIONS.filter(
+      section => hasPermission(section.resource, 'read') || hasPermission(section.resource, 'list')
+    );
+  }, [menu, hasPermission]);
 
   return (
     <AppLayout title="Masters">
@@ -60,36 +104,35 @@ export default function MastersScreen() {
 
         {/* Grid */}
         <View style={styles.grid}>
-          {sections.map((section, i) => {
-            const hasAccess = hasPermission ? hasPermission(section.resource, 'list') : false;
+          {sections.map((section) => {
+            const { icon, color } = getModuleStyle(section.name ?? '');
+            const description = DESCRIPTIONS[section.name ?? ''] || `Manage ${(section.name ?? '').toLowerCase()}`;
+            const hasPath = !!section.path;
+
             return (
               <TouchableOpacity
-                key={i}
+                key={section.id ?? section.path ?? section.name}
                 style={[
                   styles.sectionCard,
                   { backgroundColor: cardBg, borderColor: borderCol },
-                  !hasAccess && { opacity: 0.5 },
+                  !hasPath && { opacity: 0.7 },
                 ]}
-                onPress={() => hasAccess && router.push(section.route as any)}
-                disabled={!hasAccess}
+                onPress={() => hasPath && router.push(mapPath(section.path!) as any)}
+                disabled={!hasPath}
                 activeOpacity={0.75}
               >
-                <View style={[styles.sectionIconBox, { backgroundColor: section.color + '18' }]}>
-                  <Ionicons
-                    name={hasAccess ? section.icon : 'lock-closed'}
-                    size={24}
-                    color={hasAccess ? section.color : '#9ca3af'}
-                  />
+                <View style={[styles.sectionIconBox, { backgroundColor: color + '18' }]}>
+                  <Ionicons name={icon} size={24} color={color} />
                 </View>
                 <Text style={[styles.sectionTitle, { color: colors.foreground }]} numberOfLines={2}>
-                  {section.title}
+                  {section.name}
                 </Text>
                 <Text style={[styles.sectionDesc, { color: colors['muted-foreground'] }]} numberOfLines={2}>
-                  {hasAccess ? section.description : 'No access — contact admin'}
+                  {description}
                 </Text>
-                {hasAccess && (
-                  <View style={[styles.sectionArrow, { backgroundColor: section.color + '18' }]}>
-                    <Ionicons name="arrow-forward" size={12} color={section.color} />
+                {hasPath && (
+                  <View style={[styles.sectionArrow, { backgroundColor: color + '18' }]}>
+                    <Ionicons name="arrow-forward" size={12} color={color} />
                   </View>
                 )}
               </TouchableOpacity>

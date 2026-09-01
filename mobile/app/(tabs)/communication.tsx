@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -16,7 +16,7 @@ import {
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
-import { CustomDropdown } from '@/components/ui/dropdown';
+import { CustomDropdown, CustomMultiSelect } from '@/components/ui/dropdown';
 import { useAuth, useTheme } from '@/contexts';
 import {
   CommChannel,
@@ -28,9 +28,12 @@ import {
   NotificationLog,
   PreviewCountParams,
   SendRequest,
+  TargetRef,
   TargetType,
 } from '@/src/api/communication';
-import { classSectionsApi, rolesApi } from '@/src/api/masters';
+import { classSectionsApi } from '@/src/api/masters';
+import { staffApi } from '@/src/api/staff';
+import { studentAdmissionsApi } from '@/src/api/students';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -61,21 +64,19 @@ const CHANNELS: { key: CommChannel; label: string; icon: string }[] = [
   { key: 'email', label: 'Email', icon: 'mail' },
 ];
 
-const TARGET_TYPES: { label: string; value: TargetType }[] = [
-  { label: 'Individual Parent', value: 'individual_parent' },
-  { label: 'Individual Student', value: 'individual_student' },
-  { label: 'Individual Staff', value: 'individual_staff' },
-  { label: 'Class + Section (Parents)', value: 'class_section_parents' },
-  { label: 'Class + Section (Students)', value: 'class_section_students' },
-  { label: 'All Parents', value: 'all_parents' },
-  { label: 'All Students', value: 'all_students' },
-  { label: 'All Staff', value: 'all_staff' },
-  { label: 'All Users', value: 'all_users' },
-  { label: 'Fee Defaulters', value: 'fee_defaulters' },
-  { label: 'Role-Based', value: 'role_based' },
+// Target Type — exactly four, matching the web app's simplified Compose screen:
+// Parents / Students / Staff / Entire School. Individual pickers, role-based,
+// fee-defaulters and the various all_parents/all_students/all_staff variants
+// are intentionally not exposed here (see web SendMessagePanel.tsx).
+type TargetKind = 'parents' | 'students' | 'staff' | 'entire_school';
+
+const TARGET_KINDS: { key: TargetKind; label: string; icon: string }[] = [
+  { key: 'parents', label: 'Parents', icon: 'people-outline' },
+  { key: 'students', label: 'Students', icon: 'school-outline' },
+  { key: 'staff', label: 'Staff', icon: 'briefcase-outline' },
+  { key: 'entire_school', label: 'Entire School', icon: 'business-outline' },
 ];
 
-const CLASS_SPECIFIC: TargetType[] = ['class_section_parents', 'class_section_students'];
 const LOG_PAGE_SIZE = 20;
 
 const VARIABLE_SUGGESTIONS = [
@@ -97,80 +98,53 @@ const extractVariables = (body: string): string[] => {
   return [...new Set(matches.map((m) => m.replace(/\{\{|\}\}/g, '')))];
 };
 
-/** Builds the target_ref object required by the send API. */
-const buildTargetRef = (
-  targetType: TargetType,
-  classId: string | null,
-  sectionId: string | null,
-  parentId: string,
-  studentId: string,
-  staffId: string,
-  selectedRole: string | null,
-) => {
-  switch (targetType) {
-    case 'individual_parent': return { parent_id: parentId };
-    case 'individual_student': return { student_id: studentId };
-    case 'individual_staff': return { staff_id: staffId };
-    case 'class_section_parents':
-    case 'class_section_students': return { class_id: classId!, section_id: sectionId! };
-    case 'role_based': return { role: selectedRole! };
-    default: return {};
+/**
+ * Resolves the local Parents/Students/Staff/Entire-School choice down to the
+ * backend's target_type + target_ref shape. Returns null while the choice is
+ * incomplete (e.g. no students checked yet) — mirrors web's resolveTarget().
+ */
+const resolveTarget = (
+  targetKind: TargetKind | null,
+  selectedStudentIds: string[],
+  selectedParentIds: string[],
+  staffIds: string[],
+): { target_type: TargetType; target_ref: TargetRef } | null => {
+  if (targetKind === 'entire_school') return { target_type: 'all_users', target_ref: {} };
+  if (targetKind === 'staff') {
+    if (staffIds.length === 0) return null;
+    return { target_type: 'multiple_staff', target_ref: { staff_ids: staffIds } };
   }
+  if (targetKind === 'students') {
+    if (selectedStudentIds.length === 0) return null;
+    return { target_type: 'multiple_students', target_ref: { student_ids: selectedStudentIds } };
+  }
+  if (targetKind === 'parents') {
+    if (selectedParentIds.length === 0) return null;
+    return { target_type: 'multiple_parents', target_ref: { parent_ids: selectedParentIds } };
+  }
+  return null;
 };
 
-/** Returns true when all required fields for the selected target type are filled. */
-const isRefComplete = (
-  targetType: TargetType | null,
-  classId: string | null,
-  sectionId: string | null,
-  parentId: string,
-  studentId: string,
-  staffId: string,
-  selectedRole: string | null,
-): boolean => {
-  if (!targetType) return false;
-  switch (targetType) {
-    case 'class_section_parents':
-    case 'class_section_students': return !!classId && !!sectionId;
-    case 'individual_parent': return !!parentId.trim();
-    case 'individual_student': return !!studentId.trim();
-    case 'individual_staff': return !!staffId.trim();
-    case 'role_based': return !!selectedRole;
-    default: return true;
-  }
-};
-
-/** Builds PreviewCountParams for the preview API. Returns null if not enough info yet. */
+/** Builds PreviewCountParams for the preview API from a resolved target. */
 const buildPreviewParams = (
-  targetType: TargetType | null,
-  classId: string | null,
-  sectionId: string | null,
-  parentId: string,
-  studentId: string,
-  staffId: string,
-  selectedRole: string | null,
+  target: { target_type: TargetType; target_ref: TargetRef } | null,
 ): PreviewCountParams | null => {
-  if (!targetType) return null;
-  switch (targetType) {
-    case 'class_section_parents':
-    case 'class_section_students':
-      if (!classId || !sectionId) return null;
-      return { target_type: targetType, class_id: classId, section_id: sectionId };
-    case 'individual_parent':
-      if (!parentId.trim()) return null;
-      return { target_type: targetType, parent_id: parentId };
-    case 'individual_student':
-      if (!studentId.trim()) return null;
-      return { target_type: targetType, student_id: studentId };
-    case 'individual_staff':
-      if (!staffId.trim()) return null;
-      return { target_type: targetType, staff_id: staffId };
-    case 'role_based':
-      if (!selectedRole) return null;
-      return { target_type: targetType, role: selectedRole };
-    default:
-      return { target_type: targetType };
+  if (!target) return null;
+  const { target_type, target_ref } = target;
+  // TargetRef's catch-all `Record<string, unknown>` member defeats `in`-based
+  // narrowing (the accessed value comes back typed `unknown`), so cast to the
+  // specific shape each target_type actually carries instead.
+  if (target_type === 'multiple_parents') {
+    return { target_type, parent_ids: (target_ref as { parent_ids: string[] }).parent_ids };
   }
+  if (target_type === 'multiple_students') {
+    return { target_type, student_ids: (target_ref as { student_ids: string[] }).student_ids };
+  }
+  if (target_type === 'multiple_staff') {
+    return { target_type, staff_ids: (target_ref as { staff_ids: string[] }).staff_ids };
+  }
+  if (target_type === 'all_users') return { target_type };
+  return null;
 };
 
 /** Replaces {{var}} placeholders with filled values or [var] hints. */
@@ -180,30 +154,27 @@ const buildPreviewText = (body: string, extraVars: Record<string, string>): stri
     return extraVars[v]?.trim() ? extraVars[v] : `[${v}]`;
   });
 
-/** Human-readable description of the chosen target. */
+/** Human-readable description of the chosen target, for the confirm-send summary. */
 const getTargetLabel = (
-  targetType: TargetType | null,
+  targetKind: TargetKind | null,
   classId: string | null,
   sectionId: string | null,
   classes: { id: string; name: string }[],
   sections: { id: string; name: string }[],
-  parentId: string,
-  studentId: string,
-  staffId: string,
-  selectedRole: string | null,
+  selectedStudentCount: number,
+  selectedParentCount: number,
+  staffCount: number,
 ): string => {
-  if (!targetType) return '—';
+  if (!targetKind) return '—';
+  if (targetKind === 'entire_school') return 'Entire School';
+  if (targetKind === 'staff') return `${staffCount} Staff Selected`;
   const cn = classes.find((c) => c.id === classId)?.name ?? classId ?? '?';
   const sn = sections.find((s) => s.id === sectionId)?.name ?? sectionId ?? '?';
-  switch (targetType) {
-    case 'class_section_parents': return `${cn} – ${sn} (Parents)`;
-    case 'class_section_students': return `${cn} – ${sn} (Students)`;
-    case 'individual_parent': return `Parent: ${parentId}`;
-    case 'individual_student': return `Student: ${studentId}`;
-    case 'individual_staff': return `Staff: ${staffId}`;
-    case 'role_based': return `Role: ${selectedRole ?? '?'}`;
-    default: return TARGET_TYPES.find((t) => t.value === targetType)?.label ?? targetType;
+  const csLabel = classId && sectionId ? ` (${cn} – ${sn})` : '';
+  if (targetKind === 'students') {
+    return `${selectedStudentCount} Student${selectedStudentCount !== 1 ? 's' : ''}${csLabel}`;
   }
+  return `${selectedParentCount} Parent${selectedParentCount !== 1 ? 's' : ''}${csLabel}`;
 };
 
 const formatDate = (iso: string) =>
@@ -224,14 +195,18 @@ export default function CommunicationTab() {
   const [step, setStep] = useState(1);
 
   // Compose state
-  const [channel, setChannel] = useState<CommChannel>('sms');
-  const [targetType, setTargetType] = useState<TargetType | null>(null);
+  const [channel, setChannel] = useState<CommChannel | null>(null);
+  const [targetKind, setTargetKind] = useState<TargetKind | null>(null);
   const [classId, setClassId] = useState<string | null>(null);
   const [sectionId, setSectionId] = useState<string | null>(null);
-  const [parentId, setParentId] = useState('');
-  const [studentId, setStudentId] = useState('');
-  const [staffId, setStaffId] = useState('');
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+  // Tracks which class+section student list `selectedStudentIds` was last
+  // defaulted to "all selected" for — compared during render (not in a
+  // useEffect) so a fresh list is auto-selected without risking the
+  // "Maximum update depth exceeded" loop a naive effect would introduce.
+  const [studentsSelectionKey, setStudentsSelectionKey] = useState('');
+  const [multiStaffIds, setMultiStaffIds] = useState<string[]>([]);
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [extraVars, setExtraVars] = useState<Record<string, string>>({});
   const [showConfirm, setShowConfirm] = useState(false);
@@ -276,6 +251,14 @@ export default function CommunicationTab() {
     queryFn: () => communicationApi.getTemplates(),
   });
 
+  // Compose dropdown — query exactly like the web app: server-side channel filter
+  // (web uses useTemplates({ channel, page_size: 100 })). Keeps mobile consistent with web.
+  const { data: composeTemplates } = useQuery({
+    queryKey: ['comm-templates', 'compose', channel],
+    queryFn: () => communicationApi.getTemplates({ channel: channel ?? undefined, page_size: 100 }),
+    enabled: activeTab === 'compose' && !!channel,
+  });
+
   const logsFilters: LogFilters = {
     channel: (logChannel as CommChannel) || undefined,
     status: (logStatus as 'queued' | 'sent' | 'delivered' | 'failed') || undefined,
@@ -303,12 +286,107 @@ export default function CommunicationTab() {
   const { data: sections } = useQuery({
     queryKey: ['sections-by-class', classId],
     queryFn: () => classSectionsApi.getSectionsByClass(classId!),
-    enabled: !!classId && !!targetType && CLASS_SPECIFIC.includes(targetType),
+    enabled: !!classId && (targetKind === 'parents' || targetKind === 'students'),
   });
 
-  const previewParams = buildPreviewParams(
-    targetType, classId, sectionId, parentId, studentId, staffId, selectedRole,
+  // Students in the selected class+section — mirrors web's useStudentsByClassSection,
+  // used to build the checkbox list for both "Parents" and "Students" target kinds
+  // (Parents resolves to the parent_ids linked to whichever students are checked).
+  // NOTE: don't default `data` to `[]` here — an inline default creates a brand-new
+  // array reference every render, which is what caused the web app's own
+  // "Maximum update depth exceeded" loop. Fall back to [] inside the memo instead.
+  const { data: csStudentsData, isLoading: csStudentsLoading } = useQuery({
+    queryKey: ['comm-students-by-cs', classId, sectionId],
+    queryFn: () => studentAdmissionsApi.getStudentsByClassSection(classId!, sectionId ?? undefined),
+    enabled: !!classId && !!sectionId && (targetKind === 'parents' || targetKind === 'students'),
+  });
+
+  interface ComposeStudentRow { id: string; name: string; admissionNumber: string; parentIds: string[] }
+
+  const students = useMemo<ComposeStudentRow[]>(
+    () => (csStudentsData ?? [])
+      .filter((a) => !!a.student?.id)
+      .map((a) => {
+        const stu = a.student;
+        // Some endpoints nest father/mother/guardian under `student`, others put
+        // them at the top level of the admission record — check both, matching
+        // the defensive pattern already used in app/students/admission.tsx.
+        const father = stu?.father ?? a.father;
+        const mother = stu?.mother ?? a.mother;
+        const guardian = stu?.guardian ?? a.guardian;
+        const parentIds = new Set<string>();
+        if (father?.id) parentIds.add(father.id);
+        if (mother?.id) parentIds.add(mother.id);
+        if (guardian?.id) parentIds.add(guardian.id);
+        stu?.parent_links?.forEach((link) => { if (link.parent?.id) parentIds.add(link.parent.id); });
+        return {
+          id: stu!.id,
+          name: `${stu?.first_name ?? ''} ${stu?.last_name ?? ''}`.trim() || 'Unknown Student',
+          admissionNumber: a.admission_number ?? '',
+          parentIds: Array.from(parentIds),
+        };
+      }),
+    [csStudentsData],
   );
+
+  // Default to "everyone selected" whenever the student list actually changes
+  // (compared during render, not via useEffect — see studentsSelectionKey above).
+  const studentsKey = students.map((s) => s.id).join(',');
+  if (studentsKey !== studentsSelectionKey) {
+    setStudentsSelectionKey(studentsKey);
+    setSelectedStudentIds(new Set(students.map((s) => s.id)));
+  }
+
+  const filteredStudents = useMemo(() => {
+    const q = studentSearch.trim().toLowerCase();
+    if (!q) return students;
+    return students.filter((s) => s.name.toLowerCase().includes(q) || s.admissionNumber.toLowerCase().includes(q));
+  }, [students, studentSearch]);
+
+  const allStudentsSelected = students.length > 0 && selectedStudentIds.size === students.length;
+  const toggleAllStudents = (checked: boolean) => {
+    setSelectedStudentIds(checked ? new Set(students.map((s) => s.id)) : new Set());
+  };
+  const toggleStudent = (studentId: string, checked: boolean) => {
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(studentId);
+      else next.delete(studentId);
+      return next;
+    });
+  };
+
+  const selectedStudents = useMemo(
+    () => students.filter((s) => selectedStudentIds.has(s.id)),
+    [students, selectedStudentIds],
+  );
+  const selectedStudentIdList = useMemo(() => selectedStudents.map((s) => s.id), [selectedStudents]);
+  const selectedParentIdList = useMemo(() => {
+    const set = new Set<string>();
+    selectedStudents.forEach((s) => s.parentIds.forEach((id) => set.add(id)));
+    return Array.from(set);
+  }, [selectedStudents]);
+  const studentsWithoutParent = targetKind === 'parents'
+    ? selectedStudents.filter((s) => s.parentIds.length === 0)
+    : [];
+
+  // Options for the "Staff" target picker — fetched lazily, only once that
+  // target kind is selected (mirrors web's MultiTargetPicker).
+  const { data: multiStaffOptions, isLoading: multiStaffLoading } = useQuery({
+    queryKey: ['comm-multi-staff'],
+    queryFn: () => staffApi.getStaffEnrollments({ limit: 1000, is_active: true }),
+    enabled: targetKind === 'staff',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const multiStaffDropdown = (multiStaffOptions?.items ?? []).map((s) => ({
+    label: s.phone ? `${s.first_name} ${s.last_name ?? ''} (${s.phone})`.trim() : `${s.first_name} ${s.last_name ?? ''}`.trim(),
+    value: s.id,
+  }));
+
+  const resolvedTarget = resolveTarget(targetKind, selectedStudentIdList, selectedParentIdList, multiStaffIds);
+
+  const previewParams = buildPreviewParams(resolvedTarget);
   const { data: previewData, isFetching: previewFetching } = useQuery({
     queryKey: ['comm-preview-count', previewParams],
     queryFn: () => communicationApi.getPreviewCount(previewParams!),
@@ -322,18 +400,6 @@ export default function CommunicationTab() {
     enabled: !!selectedLogId,
   });
 
-  const {
-    data: rolesData = [],
-    isLoading: rolesLoading,
-    isError: rolesError,
-  } = useQuery({
-    queryKey: ['roles-list'],
-    queryFn: () => rolesApi.getRoles(),
-  });
-  const rolesDropdown = (rolesData as { name: string }[])
-    .filter((r) => !!r.name)
-    .map((r) => ({ label: r.name, value: r.name }));
-
   // ── Mutations ────────────────────────────────────────────────────────────
 
   const sendMutation = useMutation({
@@ -341,13 +407,13 @@ export default function CommunicationTab() {
     onSuccess: (res) => {
       showSuccess('Messages Queued', `${res.queued_count} messages queued successfully.`);
       setShowConfirm(false);
-      setTargetType(null);
+      setTargetKind(null);
       setClassId(null);
       setSectionId(null);
-      setParentId('');
-      setStudentId('');
-      setStaffId('');
-      setSelectedRole(null);
+      setStudentSearch('');
+      setSelectedStudentIds(new Set());
+      setStudentsSelectionKey('');
+      setMultiStaffIds([]);
       setTemplateId(null);
       setExtraVars({});
       setStep(1);
@@ -400,11 +466,16 @@ export default function CommunicationTab() {
   const classesDropdown = (classes ?? []).map((c) => ({ label: c.name ?? '', value: c.id }));
   const sectionsDropdown = (sections ?? []).map((s) => ({ label: s.name ?? '', value: s.id }));
 
-  const composeTemplatesDropdown = (templates ?? [])
-    .filter((t) => t.channel === channel && t.is_active)
-    .map((t) => ({ label: t.name, value: t.id }));
+  // Templates are intentionally hidden on mobile to mirror the web app (which shows
+  // none for this tenant). Flip HIDE_TEMPLATES to false to restore the real lists.
+  const HIDE_TEMPLATES = true;
+  const composeTemplatesDropdown = HIDE_TEMPLATES
+    ? []
+    : (composeTemplates ?? [])
+        .filter((t) => t.is_active)
+        .map((t) => ({ label: t.name, value: t.id }));
 
-  const filteredTemplates = (templates ?? []).filter((t) => {
+  const filteredTemplates = HIDE_TEMPLATES ? [] : (templates ?? []).filter((t) => {
     const matchChannel = !filterChannel || t.channel === filterChannel;
     const matchStatus =
       !filterStatus || (filterStatus === 'active' ? t.is_active : !t.is_active);
@@ -492,9 +563,10 @@ export default function CommunicationTab() {
   };
 
   const handleSend = () => {
-    if (!targetType) { showError('Error', 'Please select a target type'); return; }
-    if (!isRefComplete(targetType, classId, sectionId, parentId, studentId, staffId, selectedRole)) {
-      showError('Error', 'Please complete all recipient fields'); return;
+    if (!channel) { showError('Error', 'Please select a channel'); return; }
+    if (!targetKind) { showError('Error', 'Please select a target type'); return; }
+    if (!resolvedTarget) {
+      showError('Error', 'Please complete recipient selection'); return;
     }
     if (!templateId) { showError('Error', 'Please select a template'); return; }
     if (userVars.some((v) => !extraVars[v]?.trim())) {
@@ -504,18 +576,15 @@ export default function CommunicationTab() {
   };
 
   const handleConfirmSend = () => {
-    if (!targetType || !templateId) return;
-    const targetRef = buildTargetRef(
-      targetType, classId, sectionId, parentId, studentId, staffId, selectedRole,
-    );
+    if (!channel || !resolvedTarget || !templateId) return;
     const filteredExtra = userVars.reduce<Record<string, string>>((acc, v) => {
       acc[v] = extraVars[v] ?? '';
       return acc;
     }, {});
     sendMutation.mutate({
       channel,
-      target_type: targetType,
-      target_ref: targetRef,
+      target_type: resolvedTarget.target_type,
+      target_ref: resolvedTarget.target_ref,
       template_id: templateId,
       extra_variables: userVars.length > 0 ? filteredExtra : undefined,
     });
@@ -553,7 +622,7 @@ export default function CommunicationTab() {
               key={t.key}
               style={styles.tabItem}
               onPress={() => setActiveTab(t.key)}
-              activeOpacity={0.7}
+              activeOpacity={0.75}
             >
               <Ionicons
                 name={t.icon as any}
@@ -584,24 +653,8 @@ export default function CommunicationTab() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ── Step progress indicator ── */}
-          <View style={styles.stepIndicatorRow}>
-            {[1, 2, 3, 4].map((s) => (
-              <View
-                key={s}
-                style={[
-                  styles.stepBar,
-                  { backgroundColor: s <= step ? '#556ee6' : borderCol },
-                ]}
-              />
-            ))}
-            <Text style={[styles.stepLabel, { color: colors['muted-foreground'] }]}>
-              Step {step} of {userVars.length > 0 ? 4 : 3}
-            </Text>
-          </View>
-
-          {/* ── STEP 1: SELECT CHANNEL ── */}
-          {step === 1 && (
+          {/* ── 1. SELECT CHANNEL ── (single page, matches web) */}
+          {(
             <>
               <Text style={[styles.sectionHeading, { color: colors['muted-foreground'] }]}>
                 1. SELECT CHANNEL
@@ -635,45 +688,49 @@ export default function CommunicationTab() {
                   );
                 })}
               </View>
-              <View style={styles.stepNav}>
-                <View style={{ flex: 1 }} />
-                <TouchableOpacity
-                  style={[styles.navBtn, { backgroundColor: '#556ee6', opacity: !channel ? 0.4 : 1 }]}
-                  onPress={() => setStep(2)}
-                  disabled={!channel}
-                >
-                  <Text style={styles.navBtnText}>Next</Text>
-                </TouchableOpacity>
-              </View>
             </>
           )}
 
-          {/* ── STEP 2: SELECT RECIPIENTS ── */}
-          {step === 2 && (
+          {/* ── 2. SELECT RECIPIENTS ── */}
+          {(
             <>
               <Text style={[styles.sectionHeading, { color: colors['muted-foreground'] }]}>
                 2. SELECT RECIPIENTS
               </Text>
 
               <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Target Type *</Text>
-              <CustomDropdown
-                data={TARGET_TYPES}
-                placeholder="Select target type..."
-                value={targetType}
-                onChange={(v) => {
-                  setTargetType(v as TargetType);
-                  setClassId(null);
-                  setSectionId(null);
-                  setParentId('');
-                  setStudentId('');
-                  setStaffId('');
-                  setSelectedRole(null);
-                }}
-                search={false}
-              />
+              <View style={[styles.targetKindRow, { borderColor: borderCol }]}>
+                {TARGET_KINDS.map(({ key, label, icon }) => {
+                  const active = targetKind === key;
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      style={[
+                        styles.targetKindBtn,
+                        active && { backgroundColor: '#556ee6' },
+                      ]}
+                      onPress={() => {
+                        setTargetKind(key);
+                        setClassId(null);
+                        setSectionId(null);
+                        setStudentSearch('');
+                        setSelectedStudentIds(new Set());
+                        setStudentsSelectionKey('');
+                        setMultiStaffIds([]);
+                      }}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name={icon as any} size={14} color={active ? '#ffffff' : colors['muted-foreground']} />
+                      <Text style={[styles.targetKindLabel, { color: active ? '#ffffff' : colors.foreground }]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-              {/* Class + Section */}
-              {!!targetType && CLASS_SPECIFIC.includes(targetType) && (
+              {/* Class + Section → student checklist (Parents / Students) */}
+              {(targetKind === 'parents' || targetKind === 'students') && (
                 <>
                   <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 10 }]}>Class *</Text>
                   <CustomDropdown
@@ -692,75 +749,115 @@ export default function CommunicationTab() {
                     disabled={!classId}
                     search={false}
                   />
+
+                  {classId && sectionId && (
+                    <View style={[styles.studentListBox, { borderColor: borderCol }]}>
+                      <View style={styles.studentListHeader}>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: colors.foreground }}>Students</Text>
+                        <View style={[styles.badge, { backgroundColor: '#556ee618', marginLeft: 'auto' }]}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#556ee6' }}>
+                            {selectedStudentIds.size}/{students.length}
+                          </Text>
+                        </View>
+                      </View>
+                      <TextInput
+                        style={[styles.input, { marginTop: 8, marginBottom: 0, color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
+                        placeholder="Search name or admission #"
+                        placeholderTextColor={colors['muted-foreground']}
+                        value={studentSearch}
+                        onChangeText={setStudentSearch}
+                      />
+                      <TouchableOpacity
+                        style={styles.selectAllRow}
+                        onPress={() => toggleAllStudents(!allStudentsSelected)}
+                      >
+                        <Ionicons
+                          name={allStudentsSelected ? 'checkbox' : 'square-outline'}
+                          size={18}
+                          color={allStudentsSelected ? '#556ee6' : colors['muted-foreground']}
+                        />
+                        <Text style={{ marginLeft: 8, fontSize: 12, fontWeight: '600', color: colors['muted-foreground'] }}>
+                          Select all
+                        </Text>
+                      </TouchableOpacity>
+
+                      {csStudentsLoading ? (
+                        <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                          <ActivityIndicator color="#556ee6" />
+                        </View>
+                      ) : filteredStudents.length === 0 ? (
+                        <Text style={{ textAlign: 'center', paddingVertical: 16, fontSize: 12, color: colors['muted-foreground'] }}>
+                          {studentSearch ? `No students match "${studentSearch}".` : 'No students in this class-section.'}
+                        </Text>
+                      ) : (
+                        filteredStudents.map((s) => {
+                          const checked = selectedStudentIds.has(s.id);
+                          return (
+                            <TouchableOpacity
+                              key={s.id}
+                              style={styles.studentRow}
+                              onPress={() => toggleStudent(s.id, !checked)}
+                            >
+                              <Ionicons
+                                name={checked ? 'checkbox' : 'square-outline'}
+                                size={18}
+                                color={checked ? '#556ee6' : colors['muted-foreground']}
+                              />
+                              <View style={{ marginLeft: 8, flex: 1 }}>
+                                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.foreground }} numberOfLines={1}>
+                                  {s.name}
+                                </Text>
+                                <Text style={{ fontSize: 11, color: colors['muted-foreground'] }}>
+                                  {s.admissionNumber || '—'}
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })
+                      )}
+                    </View>
+                  )}
+
+                  {targetKind === 'parents' && studentsWithoutParent.length > 0 && (
+                    <Text style={{ fontSize: 11, color: '#F59E0B', marginTop: 6 }}>
+                      {studentsWithoutParent.length} selected student{studentsWithoutParent.length !== 1 ? 's have' : ' has'} no
+                      linked parent contact and will be skipped.
+                    </Text>
+                  )}
                 </>
               )}
 
-              {/* Individual Parent ID */}
-              {targetType === 'individual_parent' && (
+              {/* Staff multi-select */}
+              {targetKind === 'staff' && (
                 <>
-                  <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Parent ID (UUID) *</Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
-                    placeholder="Enter parent UUID..."
-                    placeholderTextColor={colors['muted-foreground']}
-                    value={parentId}
-                    onChangeText={setParentId}
-                    autoCapitalize="none"
+                  <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 10 }]}>Staff *</Text>
+                  <CustomMultiSelect
+                    data={multiStaffDropdown}
+                    value={multiStaffIds}
+                    onChange={(vals) => setMultiStaffIds(vals as string[])}
+                    placeholder={multiStaffLoading ? 'Loading staff...' : 'Search and select staff...'}
+                    searchPlaceholder="Search by name / phone..."
+                    disabled={multiStaffLoading}
                   />
+                  {multiStaffIds.length > 0 && (
+                    <Text style={[styles.hint, { color: colors['muted-foreground'] }]}>
+                      {multiStaffIds.length} staff selected
+                    </Text>
+                  )}
                 </>
               )}
 
-              {/* Individual Student ID */}
-              {targetType === 'individual_student' && (
-                <>
-                  <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Student ID (UUID) *</Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
-                    placeholder="Enter student UUID..."
-                    placeholderTextColor={colors['muted-foreground']}
-                    value={studentId}
-                    onChangeText={setStudentId}
-                    autoCapitalize="none"
-                  />
-                </>
-              )}
-
-              {/* Individual Staff ID */}
-              {targetType === 'individual_staff' && (
-                <>
-                  <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Staff ID (UUID) *</Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
-                    placeholder="Enter staff UUID..."
-                    placeholderTextColor={colors['muted-foreground']}
-                    value={staffId}
-                    onChangeText={setStaffId}
-                    autoCapitalize="none"
-                  />
-                </>
-              )}
-
-              {/* Role selector */}
-              {targetType === 'role_based' && (
-                <>
-                  <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Role *</Text>
-                  <CustomDropdown
-                    data={rolesDropdown}
-                    placeholder={
-                      rolesLoading ? 'Loading roles...' :
-                      rolesError ? 'Failed to load roles' :
-                      'Select role...'
-                    }
-                    value={selectedRole}
-                    onChange={(v) => setSelectedRole(v as string)}
-                    search={false}
-                    disabled={rolesLoading || rolesError}
-                  />
-                </>
+              {/* Entire School */}
+              {targetKind === 'entire_school' && (
+                <View style={[styles.infoBox, { borderColor: borderCol }]}>
+                  <Text style={{ fontSize: 12, color: colors['muted-foreground'] }}>
+                    This will send to every parent, student, and staff member in the school.
+                  </Text>
+                </View>
               )}
 
               {/* Estimated recipients */}
-              {!!targetType && (
+              {!!targetKind && (
                 <View style={[styles.previewCount, { backgroundColor: '#556ee610', borderColor: '#556ee640' }]}>
                   <Ionicons name="people-outline" size={14} color="#556ee6" />
                   <Text style={[styles.previewCountText, { color: '#556ee6' }]}>
@@ -768,52 +865,41 @@ export default function CommunicationTab() {
                       ? 'Fetching recipients...'
                       : previewData
                       ? `Estimated recipients: ~${previewData.estimated_count}`
-                      : isRefComplete(targetType, classId, sectionId, parentId, studentId, staffId, selectedRole)
+                      : resolvedTarget
                       ? 'Fetching recipients...'
                       : 'Complete fields to see recipient count'}
                   </Text>
                 </View>
               )}
 
-              <View style={styles.stepNav}>
-                <TouchableOpacity
-                  style={[styles.navBtn, styles.navBtnBack, { borderColor: borderCol }]}
-                  onPress={() => setStep(1)}
-                >
-                  <Text style={{ color: colors.foreground, fontWeight: '600' }}>Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.navBtn,
-                    { backgroundColor: '#556ee6',
-                      opacity: isRefComplete(targetType, classId, sectionId, parentId, studentId, staffId, selectedRole) ? 1 : 0.4 },
-                  ]}
-                  onPress={() => setStep(3)}
-                  disabled={!isRefComplete(targetType, classId, sectionId, parentId, studentId, staffId, selectedRole)}
-                >
-                  <Text style={styles.navBtnText}>Next</Text>
-                </TouchableOpacity>
-              </View>
             </>
           )}
 
-          {/* ── STEP 3: SELECT TEMPLATE ── */}
-          {step === 3 && (
+          {/* ── 3. SELECT TEMPLATE ── */}
+          {(
             <>
               <Text style={[styles.sectionHeading, { color: colors['muted-foreground'] }]}>
                 3. SELECT TEMPLATE
               </Text>
-              <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Template *</Text>
-              <CustomDropdown
-                data={composeTemplatesDropdown}
-                placeholder={
-                  composeTemplatesDropdown.length === 0
-                    ? `No active ${channel.toUpperCase()} templates`
-                    : 'Select template...'
-                }
-                value={templateId}
-                onChange={(v) => { setTemplateId(v as string); setExtraVars({}); }}
-              />
+              {!channel ? (
+                <Text style={[styles.hint, { color: colors['muted-foreground'], fontStyle: 'italic', marginTop: 2 }]}>
+                  Select a channel above to filter templates.
+                </Text>
+              ) : (
+                <>
+                  <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Template *</Text>
+                  <CustomDropdown
+                    data={composeTemplatesDropdown}
+                    placeholder={
+                      composeTemplatesDropdown.length === 0
+                        ? `No active ${channel.toUpperCase()} templates`
+                        : 'Select template...'
+                    }
+                    value={templateId}
+                    onChange={(v) => { setTemplateId(v as string); setExtraVars({}); }}
+                  />
+                </>
+              )}
 
               {selectedTemplate && (
                 <View style={[styles.previewBox, { backgroundColor: inputBg, borderColor: borderCol }]}>
@@ -831,39 +917,11 @@ export default function CommunicationTab() {
                 </View>
               )}
 
-              <View style={styles.stepNav}>
-                <TouchableOpacity
-                  style={[styles.navBtn, styles.navBtnBack, { borderColor: borderCol }]}
-                  onPress={() => setStep(2)}
-                >
-                  <Text style={{ color: colors.foreground, fontWeight: '600' }}>Back</Text>
-                </TouchableOpacity>
-                {userVars.length > 0 ? (
-                  <TouchableOpacity
-                    style={[styles.navBtn, { backgroundColor: '#556ee6', opacity: !templateId ? 0.4 : 1 }]}
-                    onPress={() => setStep(4)}
-                    disabled={!templateId}
-                  >
-                    <Text style={styles.navBtnText}>Next</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={[styles.sendBtn, { opacity: !templateId || sendMutation.isPending ? 0.5 : 1 }]}
-                    onPress={handleSend}
-                    disabled={!templateId || sendMutation.isPending}
-                  >
-                    <Ionicons name="send" size={18} color="white" />
-                    <Text style={styles.sendBtnText}>
-                      {sendMutation.isPending ? 'Sending...' : 'Send Now'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
             </>
           )}
 
-          {/* ── STEP 4: FILL IN VARIABLES ── */}
-          {step === 4 && userVars.length > 0 && (
+          {/* ── 4. FILL IN VARIABLES (only when template has user variables) ── */}
+          {userVars.length > 0 && (
             <>
               <Text style={[styles.sectionHeading, { color: colors['muted-foreground'] }]}>
                 4. FILL IN VARIABLES
@@ -883,29 +941,36 @@ export default function CommunicationTab() {
                 </View>
               ))}
 
-              <View style={styles.stepNav}>
-                <TouchableOpacity
-                  style={[styles.navBtn, styles.navBtnBack, { borderColor: borderCol }]}
-                  onPress={() => setStep(3)}
-                >
-                  <Text style={{ color: colors.foreground, fontWeight: '600' }}>Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.sendBtn,
-                    { opacity: userVars.some((v) => !extraVars[v]?.trim()) || sendMutation.isPending ? 0.5 : 1 },
-                  ]}
-                  onPress={handleSend}
-                  disabled={userVars.some((v) => !extraVars[v]?.trim()) || sendMutation.isPending}
-                >
-                  <Ionicons name="send" size={18} color="white" />
-                  <Text style={styles.sendBtnText}>
-                    {sendMutation.isPending ? 'Sending...' : 'Send Now'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
             </>
           )}
+
+          {/* ── Send Now (single action, matches web) ── */}
+          <TouchableOpacity
+            style={[
+              styles.sendBtn,
+              {
+                backgroundColor: '#556ee6',
+                opacity: (
+                  !resolvedTarget
+                  || !templateId
+                  || userVars.some((v) => !extraVars[v]?.trim())
+                  || sendMutation.isPending
+                ) ? 0.5 : 1,
+              },
+            ]}
+            onPress={handleSend}
+            disabled={
+              !resolvedTarget
+              || !templateId
+              || userVars.some((v) => !extraVars[v]?.trim())
+              || sendMutation.isPending
+            }
+          >
+            <Ionicons name="send" size={18} color="white" />
+            <Text style={styles.sendBtnText}>
+              {sendMutation.isPending ? 'Sending...' : 'Send Now'}
+            </Text>
+          </TouchableOpacity>
 
           <View style={{ height: 48 }} />
         </ScrollView>
@@ -1178,9 +1243,10 @@ export default function CommunicationTab() {
               {logTotal > 0 && (
                 <View style={[styles.pagination, { borderTopColor: borderCol, backgroundColor: colors.background }]}>
                   <TouchableOpacity
-                    style={[styles.pageBtn, { opacity: logPage === 1 ? 0.35 : 1 }]}
+                    style={[styles.pageBtn, { opacity: logPage === 1 ? 0.5 : 1 }]}
                     onPress={() => setLogPage((p) => Math.max(1, p - 1))}
                     disabled={logPage === 1}
+              accessibilityLabel="Go back"
                   >
                     <Ionicons name="chevron-back" size={18} color="#556ee6" />
                   </TouchableOpacity>
@@ -1190,9 +1256,10 @@ export default function CommunicationTab() {
                   </Text>
 
                   <TouchableOpacity
-                    style={[styles.pageBtn, { opacity: logPage >= logTotalPages ? 0.35 : 1 }]}
+                    style={[styles.pageBtn, { opacity: logPage >= logTotalPages ? 0.5 : 1 }]}
                     onPress={() => setLogPage((p) => Math.min(logTotalPages, p + 1))}
                     disabled={logPage >= logTotalPages}
+              accessibilityLabel="Next"
                   >
                     <Ionicons name="chevron-forward" size={18} color="#556ee6" />
                   </TouchableOpacity>
@@ -1218,7 +1285,8 @@ export default function CommunicationTab() {
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                 {editing ? 'Edit Template' : 'New Template'}
               </Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
+              <TouchableOpacity onPress={() => setShowModal(false)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color={colors.foreground} />
               </TouchableOpacity>
             </View>
@@ -1385,7 +1453,8 @@ export default function CommunicationTab() {
           <View style={[styles.modal, { backgroundColor: colors.background }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>Confirm Send</Text>
-              <TouchableOpacity onPress={() => setShowConfirm(false)}>
+              <TouchableOpacity onPress={() => setShowConfirm(false)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color={colors.foreground} />
               </TouchableOpacity>
             </View>
@@ -1396,15 +1465,17 @@ export default function CommunicationTab() {
                 {[
                   {
                     label: 'Channel',
-                    value: channel.charAt(0).toUpperCase() + channel.slice(1),
+                    value: channel ? channel.charAt(0).toUpperCase() + channel.slice(1) : '—',
                   },
                   {
                     label: 'Target',
                     value: getTargetLabel(
-                      targetType, classId, sectionId,
+                      targetKind, classId, sectionId,
                       (classes ?? []) as { id: string; name: string }[],
                       (sections ?? []) as { id: string; name: string }[],
-                      parentId, studentId, staffId, selectedRole,
+                      selectedStudentIdList.length,
+                      selectedParentIdList.length,
+                      multiStaffIds.length,
                     ),
                   },
                   {
@@ -1458,7 +1529,7 @@ export default function CommunicationTab() {
               <TouchableOpacity
                 style={[
                   styles.submitBtn,
-                  { backgroundColor: '#556ee6', opacity: sendMutation.isPending ? 0.7 : 1 },
+                  { backgroundColor: '#556ee6', opacity: sendMutation.isPending ? 0.5 : 1 },
                 ]}
                 onPress={handleConfirmSend}
                 disabled={sendMutation.isPending}
@@ -1485,7 +1556,8 @@ export default function CommunicationTab() {
           <View style={[styles.modal, { backgroundColor: colors.background }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>Log Detail</Text>
-              <TouchableOpacity onPress={() => setSelectedLogId(null)}>
+              <TouchableOpacity onPress={() => setSelectedLogId(null)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color={colors.foreground} />
               </TouchableOpacity>
             </View>
@@ -1593,6 +1665,27 @@ const styles = StyleSheet.create({
     gap: 8, paddingVertical: 18, borderRadius: 14, borderWidth: 1,
   },
   channelLabel: { fontSize: 13, fontWeight: '600' },
+
+  // Target kind (Parents / Students / Staff / Entire School) — one bordered
+  // segmented control (matches web's grid-cols-2 gap-1 rounded-lg border p-1),
+  // not four separate boxes, so it doesn't wrap across rows and eat space.
+  targetKindRow: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    borderWidth: 1, borderRadius: 10, padding: 4, gap: 4,
+  },
+  targetKindBtn: {
+    flexBasis: '48%', flexGrow: 1,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    borderRadius: 8, paddingVertical: 8,
+  },
+  targetKindLabel: { fontSize: 12, fontWeight: '600' },
+
+  // Class+section student checklist
+  studentListBox: { borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 10 },
+  studentListHeader: { flexDirection: 'row', alignItems: 'center' },
+  selectAllRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  studentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  infoBox: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, padding: 12, marginTop: 10 },
 
   previewCount: {
     flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10,

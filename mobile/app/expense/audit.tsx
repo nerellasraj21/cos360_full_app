@@ -14,6 +14,7 @@ import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { useExpenseGlobalAuditLogsProtected } from '@/hooks/use-expense-protected';
 import type { ExpenseAuditLog } from '@/src/types/expense';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const ORANGE = '#F97316';
 
@@ -77,10 +78,13 @@ function AuditLogItem({ item, colors, theme }: { item: ExpenseAuditLog; colors: 
   );
 }
 
-export default function ExpenseAuditScreen() {
+function ExpenseAuditScreenContent() {
   const { colors, theme } = useTheme();
   const [actionFilter, setActionFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [showDateFilter, setShowDateFilter] = useState(false);
 
   const inputBg = theme === 'dark' ? '#0f0f23' : '#f8fafc';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -92,23 +96,40 @@ export default function ExpenseAuditScreen() {
     action_category: categoryParam,
   });
 
+  const hasDateFilter = !!(dateFrom.trim() || dateTo.trim());
+
   const logs: ExpenseAuditLog[] = useMemo(() => {
     const all: ExpenseAuditLog[] = Array.isArray(raw)
       ? raw
       : (raw as any)?.items ?? [];
-    if (!search.trim()) return all;
-    const q = search.toLowerCase();
-    return all.filter(l =>
-      l.action?.toLowerCase().includes(q) ||
-      (l.actor_username || l.user_id || '').toLowerCase().includes(q) ||
-      l.transaction_id?.toLowerCase().includes(q) ||
-      (l.action_notes || l.notes || '').toLowerCase().includes(q)
-    );
-  }, [raw, search]);
+
+    return all.filter(l => {
+      // Text search
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const matchesSearch =
+          l.action?.toLowerCase().includes(q) ||
+          (l.actor_username || l.user_id || '').toLowerCase().includes(q) ||
+          l.transaction_id?.toLowerCase().includes(q) ||
+          (l.action_notes || l.notes || '').toLowerCase().includes(q);
+        if (!matchesSearch) return false;
+      }
+
+      // Date range filter (client-side)
+      const ts = l.created_at || l.timestamp;
+      if (ts) {
+        const logDate = ts.slice(0, 10); // "YYYY-MM-DD"
+        if (dateFrom.trim() && logDate < dateFrom.trim()) return false;
+        if (dateTo.trim() && logDate > dateTo.trim()) return false;
+      }
+
+      return true;
+    });
+  }, [raw, search, dateFrom, dateTo]);
 
   return (
     <AppLayout title="Expense Audit Trail">
-      {/* Search */}
+      {/* Search + date-filter toggle */}
       <View style={[styles.searchRow, { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 }]}>
         <View style={[styles.searchBox, { backgroundColor: inputBg, borderColor: borderCol }]}>
           <Ionicons name="search-outline" size={14} color={colors['muted-foreground']} />
@@ -119,8 +140,67 @@ export default function ExpenseAuditScreen() {
             value={search}
             onChangeText={setSearch}
           />
+          {search ? (
+            <TouchableOpacity onPress={() => setSearch('')}
+              accessibilityLabel="Close">
+              <Ionicons name="close-circle" size={16} color={colors['muted-foreground']} />
+            </TouchableOpacity>
+          ) : null}
         </View>
+        <TouchableOpacity
+          style={[
+            styles.dateToggleBtn,
+            { backgroundColor: hasDateFilter ? ORANGE : chipBg, borderColor: hasDateFilter ? ORANGE : borderCol },
+          ]}
+          onPress={() => setShowDateFilter(v => !v)}
+              accessibilityLabel="Select date"
+        >
+          <Ionicons name="calendar-outline" size={16} color={hasDateFilter ? 'white' : colors['muted-foreground']} />
+        </TouchableOpacity>
       </View>
+
+      {/* Date range filter panel */}
+      {showDateFilter && (
+        <View style={[styles.datePanel, { backgroundColor: inputBg, borderColor: borderCol }]}>
+          <View style={styles.datePanelRow}>
+            <View style={styles.dateField}>
+              <Text style={[styles.dateLabel, { color: colors['muted-foreground'] }]}>From</Text>
+              <TextInput
+                style={[styles.dateInput, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors['muted-foreground']}
+                value={dateFrom}
+                onChangeText={setDateFrom}
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={styles.dateField}>
+              <Text style={[styles.dateLabel, { color: colors['muted-foreground'] }]}>To</Text>
+              <TextInput
+                style={[styles.dateInput, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors['muted-foreground']}
+                value={dateTo}
+                onChangeText={setDateTo}
+                keyboardType="numeric"
+              />
+            </View>
+            {hasDateFilter && (
+              <TouchableOpacity
+                style={[styles.clearDateBtn, { borderColor: borderCol }]}
+                onPress={() => { setDateFrom(''); setDateTo(''); }}
+              >
+                <Text style={{ color: ORANGE, fontSize: 12, fontWeight: '600' }}>Clear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {hasDateFilter && (
+            <Text style={[styles.filterSummary, { color: ORANGE }]}>
+              {logs.length} result{logs.length !== 1 ? 's' : ''} in date range
+            </Text>
+          )}
+        </View>
+      )}
 
       {/* Category chips */}
       <ScrollView
@@ -166,12 +246,32 @@ export default function ExpenseAuditScreen() {
 }
 
 const styles = StyleSheet.create({
-  searchRow: { flexDirection: 'row' },
+  searchRow: { flexDirection: 'row', gap: 8 },
   searchBox: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
     borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 38,
   },
   searchInput: { flex: 1, fontSize: 13, padding: 0 },
+  dateToggleBtn: {
+    width: 38, height: 38, borderRadius: 10, borderWidth: 1,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  datePanel: {
+    marginHorizontal: 16, marginBottom: 8, borderRadius: 10,
+    borderWidth: 1, padding: 12,
+  },
+  datePanelRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  dateField: { flex: 1 },
+  dateLabel: { fontSize: 11, fontWeight: '600', marginBottom: 4 },
+  dateInput: {
+    borderWidth: 1, borderRadius: 8, paddingHorizontal: 10,
+    paddingVertical: 8, fontSize: 13,
+  },
+  clearDateBtn: {
+    height: 36, paddingHorizontal: 12, borderWidth: 1,
+    borderRadius: 8, justifyContent: 'center', alignItems: 'center',
+  },
+  filterSummary: { fontSize: 11, fontWeight: '600', marginTop: 6 },
   chipsRow: { paddingHorizontal: 16, gap: 8, paddingBottom: 10 },
   chip: {
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1,
@@ -197,3 +297,16 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyText: { marginTop: 12, fontSize: 14 },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function ExpenseAuditScreen() {
+  return (
+    <ScreenAccessGate
+      title="Expense Audit"
+      resources={['expense_audit']}
+    >
+      <ExpenseAuditScreenContent />
+    </ScreenAccessGate>
+  );
+}

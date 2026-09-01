@@ -62,6 +62,7 @@ function DocumentCard({ doc, colors }: { doc: any; colors: any }) {
       <TouchableOpacity
         style={[styles.docAction, { backgroundColor: `${colors.primary}18` }]}
         onPress={() => showInfo('View', 'Document viewer coming soon')}
+              accessibilityLabel="View"
       >
         <Ionicons name="eye-outline" size={16} color={colors.primary} />
       </TouchableOpacity>

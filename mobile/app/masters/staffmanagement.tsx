@@ -93,7 +93,7 @@ export default function StaffManagementScreen() {
                   ]}
                   onPress={() => hasAccess && router.push(s.route as any)}
                   disabled={!hasAccess}
-                  activeOpacity={0.8}
+                  activeOpacity={0.75}
                 >
                   <ThemedText style={styles.cardBtnText}>{s.btnLabel}</ThemedText>
                   <Ionicons name="arrow-forward" size={15} color="#fff" />

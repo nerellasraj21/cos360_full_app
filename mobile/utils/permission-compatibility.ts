@@ -112,6 +112,37 @@ export const generateFallbackPatterns = (resource: string, action: string): stri
     patterns.push(`fee${baseName}:${action}`);
   }
 
+  // list ↔ read interchangeability: some backends grant only one of the two.
+  // Without this fallback, a user with `resource:read` (but not `resource:list`)
+  // would pass the ReadOrListPermissionGuard yet get an empty result from any hook
+  // that requires `action: 'list'`, because the query stays disabled.
+  if (action === 'list') {
+    patterns.push(`${resource}:read`);
+  } else if (action === 'read') {
+    patterns.push(`${resource}:list`);
+  }
+
+  // Scoped view permissions satisfy an unscoped view check.
+  //
+  // Student and Parent roles are never granted plain `read`/`list`; they hold
+  // the scoped variants (`read_own`/`list_own` for a student's own records,
+  // `read_related`/`list_related` for a parent's linked children). A screen
+  // guarded by `ReadOrListPermissionGuard` therefore denied them outright —
+  // e.g. a parent opening Student Attendance saw "You don't have permission
+  // to access attendance" despite holding `student_attendance:read_related`.
+  //
+  // This only widens the *UI* gate: which records come back is still decided
+  // server-side by the scope on the grant, so a student still sees only their
+  // own data. Screens themselves branch on role to render the right view.
+  if (action === 'read' || action === 'list') {
+    patterns.push(
+      `${resource}:read_own`,
+      `${resource}:read_related`,
+      `${resource}:list_own`,
+      `${resource}:list_related`,
+    );
+  }
+
   return patterns;
 };
 

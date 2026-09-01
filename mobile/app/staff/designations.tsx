@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+﻿import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
@@ -40,7 +40,7 @@ function StaffDesignationsScreenContent() {
   const { confirm, modalProps } = useConfirmModal();
 
   // Fetch designations data
-  const { data: designationsData, isLoading, error, refetch } = useDesignations({ skip: 0, limit: 100 });
+  const { data: designationsData, isLoading, error, refetch } = useDesignations();
 
   // Mutations
   const createMutation = useCreateDesignation({
@@ -125,15 +125,15 @@ function StaffDesignationsScreenContent() {
     });
   }, [designationsData, searchQuery]);
 
-  const renderDesignationItem = ({ item }: { item: Designation }) => (
+  const renderDesignationItem = ({ item, index }: { item: Designation; index: number }) => (
     <View style={[styles.designationCard, { backgroundColor: themeColors.card }]}>
       <View style={styles.designationHeader}>
         <View style={styles.designationInfo}>
+          <ThemedText style={[styles.serialNo, { color: themeColors['muted-foreground'] }]}>
+            {index + 1}
+          </ThemedText>
           <ThemedText type="subtitle" style={styles.designationName}>
             {item.title}
-          </ThemedText>
-          <ThemedText style={styles.designationId}>
-            ID: {item.id}
           </ThemedText>
         </View>
         <View style={styles.actionButtons}>
@@ -141,6 +141,7 @@ function StaffDesignationsScreenContent() {
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: themeColors.primary }]}
               onPress={() => handleEdit(item)}
+              accessibilityLabel="Edit"
             >
               <Ionicons name="pencil" size={16} color="white" />
             </TouchableOpacity>
@@ -149,6 +150,7 @@ function StaffDesignationsScreenContent() {
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
               onPress={() => handleDelete(item)}
+              accessibilityLabel="Delete"
             >
               <Ionicons name="trash" size={16} color="white" />
             </TouchableOpacity>
@@ -167,7 +169,7 @@ function StaffDesignationsScreenContent() {
         <View style={styles.statItem}>
           <Ionicons name="people" size={16} color={themeColors.primary} />
           <ThemedText style={styles.statText}>
-            {item.staff_members?.length || 0} staff members
+            {item.staff_count || 0} staff member{item.staff_count !== 1 ? 's' : ''}
           </ThemedText>
         </View>
       </View>
@@ -193,23 +195,13 @@ function StaffDesignationsScreenContent() {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
+              accessibilityLabel="Go back"
         >
           <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
         </TouchableOpacity>
         <ThemedText type="title" style={styles.headerTitle}>
           Staff Designations
         </ThemedText>
-        <CreatePermissionGuard resource={PERMISSION_RESOURCES.STAFF_DESIGNATIONS}>
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: themeColors.primary }]}
-            onPress={() => {
-              resetForm();
-              setIsModalVisible(true);
-            }}
-          >
-            <Ionicons name="add" size={24} color="white" />
-          </TouchableOpacity>
-        </CreatePermissionGuard>
       </View>
 
       {/* Search Bar */}
@@ -223,17 +215,31 @@ function StaffDesignationsScreenContent() {
           onChangeText={setSearchQuery}
         />
         {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityLabel="Close">
             <Ionicons name="close" size={20} color={themeColors['muted-foreground']} />
           </TouchableOpacity>
         ) : null}
       </View>
 
-      {/* Designations Count */}
+      {/* Designations Count + Add button */}
       <View style={styles.countContainer}>
         <ThemedText style={styles.countText}>
           {filteredDesignations.length} designation{filteredDesignations.length !== 1 ? 's' : ''}
         </ThemedText>
+        <CreatePermissionGuard resource={PERMISSION_RESOURCES.STAFF_DESIGNATIONS}>
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: themeColors.primary }]}
+            onPress={() => {
+              resetForm();
+              setIsModalVisible(true);
+            }}
+            accessibilityLabel="Add Designation"
+          >
+            <Ionicons name="add" size={18} color="white" />
+            <ThemedText style={styles.addButtonText}>Add Designation</ThemedText>
+          </TouchableOpacity>
+        </CreatePermissionGuard>
       </View>
 
 
@@ -279,7 +285,8 @@ function StaffDesignationsScreenContent() {
               <ThemedText type="title" style={styles.modalTitle}>
                 {editingDesignation ? 'Edit Designation' : 'Add Designation'}
               </ThemedText>
-              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+              <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
               </TouchableOpacity>
             </View>
@@ -310,7 +317,7 @@ function StaffDesignationsScreenContent() {
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
                 <ThemedText style={styles.submitButtonText}>
-                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingDesignation ? 'Update' : 'Create')}
+                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save'}
                 </ThemedText>
               </TouchableOpacity>
             </View>
@@ -342,13 +349,22 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
   },
   addButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    height: 40,
+    borderRadius: 8,
+    gap: 6,
+  },
+  addButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -364,6 +380,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   countContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 16,
   },
   countText: {
@@ -395,9 +414,10 @@ const styles = StyleSheet.create({
   designationName: {
     marginBottom: 4,
   },
-  designationId: {
-    fontSize: 14,
-    opacity: 0.7,
+  serialNo: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 2,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -536,6 +556,7 @@ export default function StaffDesignationsScreen() {
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => router.back()}
+              accessibilityLabel="Go back"
             >
               <Ionicons name="arrow-back" size={24} color="#000" />
             </TouchableOpacity>

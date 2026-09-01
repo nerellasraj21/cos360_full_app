@@ -8,11 +8,35 @@ import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { useMyCertificates, useDownloadCertificateDocument } from '@/src/api/hooks/students/certificates';
 import { useAuth } from '@/contexts/AuthContext';
-import { ReadOrListPermissionGuard } from '@/components/PermissionGuards';
-import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 import { useToastContext } from '@/components/ToastProvider';
 
+// Screen-level access control — mirrors the web's CertificatePage guard
+// (`student_certificates` list / list_own / list_related), so a student holding
+// only own-scoped permissions is not denied.
 export default function MyCertificatesPage() {
+  const { role } = useAuth();
+  const roleName = role?.name?.toLowerCase() ?? '';
+  const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
+
+  return (
+    <ScreenAccessGate
+      title={isParent ? 'Child Certificates' : 'My Certificates'}
+      resources={['student_certificates']}
+      permissions={[
+        ['student_certificates', 'read_own'],
+        ['student_certificates', 'list_own'],
+        ['student_certificates', 'read_related'],
+        ['student_certificates', 'list_related'],
+      ]}
+      message="You don't have permission to view Certificates."
+    >
+      <MyCertificatesContent />
+    </ScreenAccessGate>
+  );
+}
+
+function MyCertificatesContent() {
   const { colors } = useTheme();
   const { showError } = useToastContext();
   const { studentId, role, selectedStudent } = useAuth();
@@ -22,6 +46,8 @@ export default function MyCertificatesPage() {
   const { data: certificates, isLoading, error } = useMyCertificates();
   const downloadMutation = useDownloadCertificateDocument();
 
+  const items = certificates ?? [];
+
   const handleDownload = async (certificateId: string) => {
     try {
       const result = await downloadMutation.mutateAsync(certificateId);
@@ -30,41 +56,56 @@ export default function MyCertificatesPage() {
       } else {
         showError('Error', 'No download link available for this certificate');
       }
-    } catch (error) {
+    } catch {
       showError('Error', 'Failed to download certificate');
     }
   };
 
-  const renderCertificate = ({ item }: { item: any }) => (
+  const renderCertificate = ({ item, index }: { item: any; index: number }) => (
     <ThemedView style={[styles.certificateCard, { backgroundColor: colors.card }]}>
       <View style={styles.certificateHeader}>
         <View style={styles.certificateIcon}>
           <Ionicons name="document" size={24} color={colors.primary} />
         </View>
         <View style={styles.certificateInfo}>
+          <ThemedText style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</ThemedText>
           <ThemedText type="subtitle" style={styles.certificateName}>
-            {item.certificate_type_name || 'Certificate'}
+            {item.type_name || 'Certificate'}
           </ThemedText>
           <ThemedText style={styles.certificateType}>
-            {item.description || 'No description'}
+            {item.remarks || 'No remarks'}
           </ThemedText>
         </View>
       </View>
 
       <View style={styles.certificateFooter}>
-        <ThemedText style={styles.issueDate}>
-          Issued: {item.issue_date ? new Date(item.issue_date).toLocaleDateString() : 'N/A'}
-        </ThemedText>
-        <TouchableOpacity
-          style={[styles.downloadButton, { backgroundColor: colors.primary }]}
-          onPress={() => handleDownload(item.id)}
-          disabled={downloadMutation.isPending}
-        >
-          <Ionicons name="download" size={16} color="white" />
-          <ThemedText style={styles.downloadText}>
-            {downloadMutation.isPending ? 'Downloading...' : 'Download'}
+        <View style={styles.footerMeta}>
+          <ThemedText style={styles.issueDate}>
+            Issued: {item.issue_date ? new Date(item.issue_date).toLocaleDateString() : 'N/A'}
           </ThemedText>
-        </TouchableOpacity>
+          {item.file_path ? (
+            <View style={[styles.fileBadge, { backgroundColor: `${colors.primary}18` }]}>
+              <Ionicons name="document-text-outline" size={11} color={colors.primary} />
+              <ThemedText style={[styles.fileBadgeText, { color: colors.primary }]}>Uploaded</ThemedText>
+            </View>
+          ) : (
+            <View style={[styles.fileBadge, { backgroundColor: `${colors['muted-foreground']}18` }]}>
+              <ThemedText style={[styles.fileBadgeText, { color: colors['muted-foreground'] }]}>No file</ThemedText>
+            </View>
+          )}
+        </View>
+        {item.file_path ? (
+          <TouchableOpacity
+            style={[styles.downloadButton, { backgroundColor: colors.primary }]}
+            onPress={() => handleDownload(item.id)}
+            disabled={downloadMutation.isPending}
+          >
+            <Ionicons name="download" size={16} color="white" />
+            <ThemedText style={styles.downloadText}>
+              {downloadMutation.isPending ? 'Downloading...' : 'Download'}
+            </ThemedText>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </ThemedView>
   );
@@ -73,7 +114,7 @@ export default function MyCertificatesPage() {
     return (
       <AppLayout title={pageTitle}>
         <View style={styles.loadingContainer}>
-          <ThemedText>Loading certificates...</ThemedText>
+          <ThemedText>Loading your certificates...</ThemedText>
         </View>
       </AppLayout>
     );
@@ -95,53 +136,62 @@ export default function MyCertificatesPage() {
   }
 
   return (
-    <ReadOrListPermissionGuard
-      resource={PERMISSION_RESOURCES.STUDENT_CERTIFICATES}
-      fallback={
-        <AppLayout title={pageTitle}>
-          <View style={styles.accessDeniedContainer}>
-            <Ionicons name="lock-closed" size={48} color={colors['muted-foreground']} />
-            <ThemedText style={styles.accessDeniedText}>
-              You don't have permission to access certificates
-            </ThemedText>
-          </View>
-        </AppLayout>
-      }
-    >
-      <AppLayout title={pageTitle}>
-        <View style={styles.container}>
+    <AppLayout title={pageTitle}>
+      <View style={styles.container}>
         <FlatList
-          data={certificates || []}
+          data={items}
           renderItem={renderCertificate}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <View style={styles.listHeader}>
+              <ThemedText type="subtitle" style={styles.listHeaderTitle}>
+                Certificates
+              </ThemedText>
+              <ThemedText style={[styles.listHeaderCount, { color: colors['muted-foreground'] }]}>
+                ({items.length} total)
+              </ThemedText>
+            </View>
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="document" size={64} color={colors['muted-foreground']} />
               <ThemedText type="subtitle" style={styles.emptyTitle}>
-                No Certificates Found
+                No certificates found.
               </ThemedText>
               <ThemedText style={styles.emptyText}>
                 {isParent && !selectedStudent
                   ? 'Select a student from the header'
                   : isParent
-                  ? `${selectedStudent!.first_name} doesn't have any certificates yet`
-                  : "You don't have any certificates yet"}
+                  ? `Certificates issued to ${selectedStudent!.first_name} will appear here.`
+                  : 'Certificates issued to you will appear here.'}
               </ThemedText>
             </View>
           }
         />
-        </View>
-      </AppLayout>
-    </ReadOrListPermissionGuard>
+      </View>
+    </AppLayout>
   );
 }
 
 const styles = StyleSheet.create({
+  serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   container: {
     flex: 1,
     padding: 16,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginBottom: 12,
+  },
+  listHeaderTitle: {
+    fontSize: 16,
+  },
+  listHeaderCount: {
+    fontSize: 13,
   },
   loadingContainer: {
     flex: 1,
@@ -206,9 +256,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  footerMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    flexWrap: 'wrap',
+  },
   issueDate: {
     fontSize: 12,
     opacity: 0.6,
+  },
+  fileBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  fileBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   downloadButton: {
     flexDirection: 'row',
@@ -216,6 +285,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
+    marginLeft: 8,
   },
   downloadText: {
     color: 'white',
@@ -234,18 +304,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
-    opacity: 0.7,
-  },
-  accessDeniedContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  accessDeniedText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 16,
     opacity: 0.7,
   },
 });

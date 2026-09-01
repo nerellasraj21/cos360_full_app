@@ -1,18 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useAuth, useTheme } from '@/contexts';
-import { examsApi, examResultsApi, StudentExamResult } from '@/src/api/exam';
+import { examsApi, examResultsApi, ExamStatus, StudentExamResult } from '@/src/api/exam';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
 import { useToastContext } from '@/components/ToastProvider';
 
 const PASS_COLOR = '#10B981';
 const FAIL_COLOR = '#EF4444';
+
+// Web parity (ResultsExamList.tsx): student/parent get a list of exams whose
+// results can be viewed (active/locked/published/finalized), each opening
+// `/exam/results/[examId]` — the computed-result self-service view. Distinct
+// from `/exam/my-marks`, which shows raw entered marks regardless of publish state.
+const RESULT_ALLOWED: ExamStatus[] = ['active', 'locked', 'published', 'finalized'];
 
 export default function ResultsScreen() {
   const { examId } = useLocalSearchParams<{ examId?: string }>();
@@ -28,12 +34,40 @@ export default function ResultsScreen() {
     roleName === 'student' ||
     ['parent', 'guardian', 'father', 'mother'].includes(roleName);
 
-  // Redirect student/parent immediately if examId was passed as a param
+  // Redirect student/parent straight to the self-service result detail when
+  // an examId was passed as a param (e.g. from an exam's detail screen).
   useEffect(() => {
     if (isStudentOrParent && examId) {
-      router.replace(`/exam/my-marks/${examId}` as any);
+      router.replace(`/exam/results/${examId}` as any);
     }
   }, [isStudentOrParent, examId]);
+
+  const [studentSearch, setStudentSearch] = useState('');
+  const cardBgSP = theme === 'dark' ? '#1a1a2e' : '#ffffff';
+  const borderColSP = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
+  const inputBgSP = theme === 'dark' ? '#0f0f23' : '#f8fafc';
+
+  const { data: studentExamsData, isLoading: studentExamsLoading } = useQuery({
+    queryKey: ['exams', 'student-results-list'],
+    queryFn: () => examsApi.list({ size: 100 }),
+    enabled: isStudentOrParent && !examId,
+  });
+
+  const studentAllExams = Array.isArray(studentExamsData) ? studentExamsData : [];
+  const studentResultExams = useMemo(
+    () => studentAllExams.filter((e) => RESULT_ALLOWED.includes(e.status)),
+    [studentAllExams],
+  );
+  const studentFilteredExams = useMemo(() => {
+    const q = studentSearch.trim().toLowerCase();
+    if (!q) return studentResultExams;
+    return studentResultExams.filter(
+      (e) =>
+        e.exam_name.toLowerCase().includes(q) ||
+        e.board.toLowerCase().includes(q) ||
+        e.status.toLowerCase().includes(q),
+    );
+  }, [studentResultExams, studentSearch]);
 
   const { confirm, modalProps } = useConfirmModal();
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
@@ -42,8 +76,12 @@ export default function ResultsScreen() {
   const [selectedExamId, setSelectedExamId] = useState<string>(examId ?? '');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
-  const canCompute = hasPermission?.('exam_results', 'approve');
-  const canPublish = hasPermission?.('exam_results', 'approve');
+  // Web parity: results compute/publish are admin state-changing actions,
+  // authorized under "exams":"update" like hall-ticket compute/publish —
+  // see mobile backend files/hall_ticket_endpoints.py for the equivalent
+  // pattern (there is no separate "exam_results" resource or "approve" action).
+  const canCompute = hasPermission?.('exams', 'update');
+  const canPublish = hasPermission?.('exams', 'update');
 
   const { data: examsData } = useQuery({
     queryKey: ['exams', 'results-list'],
@@ -81,6 +119,82 @@ export default function ResultsScreen() {
     onError: () => showError('Error', 'Failed to publish results.'),
   });
 
+  // Student/Parent: exam picker → `/exam/results/[examId]` self-service detail
+  // (web parity: ResultsExamList.tsx). Rendered instead of the admin grid below.
+  if (isStudentOrParent) {
+    const renderExamRow = ({ item, index }: { item: (typeof studentResultExams)[number]; index: number }) => (
+      <TouchableOpacity
+        style={[styles.resultRow, { backgroundColor: cardBgSP, borderColor: borderColSP }]}
+        onPress={() => router.push(`/exam/results/${item.id}` as any)}
+        activeOpacity={0.75}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
+          <Text style={[styles.studentName, { color: colors.foreground }]}>{item.exam_name}</Text>
+          <Text style={[styles.admNo, { color: colors['muted-foreground'] }]}>
+            {item.board} · {item.exam_type} · {item.nature}
+          </Text>
+        </View>
+        <Text style={[styles.rank, { color: colors['muted-foreground'], textTransform: 'capitalize' }]}>{item.status}</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors['muted-foreground']} style={{ marginLeft: 6 }} />
+      </TouchableOpacity>
+    );
+
+    return (
+      <AppLayout title="Results">
+        <View style={styles.container}>
+          <View style={styles.filterSection}>
+            <Text style={[styles.filterLabel, { color: colors['muted-foreground'] }]}>Filters</Text>
+          </View>
+          <View style={[styles.searchBoxSP, { backgroundColor: inputBgSP, borderColor: borderColSP }]}>
+            <Ionicons name="search" size={16} color={colors['muted-foreground']} />
+            <TextInput
+              style={[styles.searchInputSP, { color: colors.foreground }]}
+              placeholder="Search exam, board, status..."
+              placeholderTextColor={colors['muted-foreground']}
+              value={studentSearch}
+              onChangeText={setStudentSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {studentSearch.length > 0 && (
+              <TouchableOpacity onPress={() => setStudentSearch('')}>
+                <Ionicons name="close-circle" size={16} color={colors['muted-foreground']} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {studentExamsLoading ? (
+            <View style={styles.centered}>
+              <Text style={{ color: colors['muted-foreground'] }}>Loading exams…</Text>
+            </View>
+          ) : studentResultExams.length === 0 ? (
+            <View style={styles.centered}>
+              <Ionicons name="trophy-outline" size={48} color={colors['muted-foreground']} />
+              <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
+                {studentAllExams.length === 0
+                  ? 'No exams found for this academic year.'
+                  : 'No active or published exams found.'}
+              </Text>
+            </View>
+          ) : studentFilteredExams.length === 0 ? (
+            <View style={styles.centered}>
+              <Ionicons name="search" size={48} color={colors['muted-foreground']} />
+              <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>No exams match your search.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={studentFilteredExams}
+              keyExtractor={(item) => item.id}
+              renderItem={renderExamRow}
+              contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+            />
+          )}
+        </View>
+      </AppLayout>
+    );
+  }
+
   // Student detail view
   if (selectedStudentId && studentResult) {
     return (
@@ -101,11 +215,11 @@ export default function ResultsScreen() {
 
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={[styles.statBig, { color: '#556ee6' }]}>{(studentResult.percentage ?? 0).toFixed(1)}%</Text>
+                <Text style={[styles.statBig, { color: '#556ee6' }]}>{Number(studentResult.percentage ?? 0).toFixed(1)}%</Text>
                 <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Percentage</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={[styles.statBig, { color: '#8B5CF6' }]}>{studentResult.grade_label ?? studentResult.gpa?.toFixed(1) ?? '–'}</Text>
+                <Text style={[styles.statBig, { color: '#8B5CF6' }]}>{studentResult.grade_label ?? (studentResult.gpa != null ? Number(studentResult.gpa).toFixed(1) : '–')}</Text>
                 <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Grade</Text>
               </View>
               <View style={styles.statItem}>
@@ -153,13 +267,14 @@ export default function ResultsScreen() {
     );
   }
 
-  const renderResultRow = ({ item }: { item: StudentExamResult }) => (
+  const renderResultRow = ({ item, index }: { item: StudentExamResult; index: number }) => (
     <TouchableOpacity
       style={[styles.resultRow, { backgroundColor: cardBg, borderColor: borderCol }]}
       onPress={() => setSelectedStudentId(item.student_id)}
       activeOpacity={0.75}
     >
       <View style={{ flex: 1 }}>
+        <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
         <Text style={[styles.studentName, { color: colors.foreground }]}>
           {item.student_name ?? item.student_id}
         </Text>
@@ -172,7 +287,7 @@ export default function ResultsScreen() {
 
       <View style={styles.resultMeta}>
         <Text style={[styles.percentage, { color: item.is_passed ? PASS_COLOR : FAIL_COLOR }]}>
-          {(item.percentage ?? 0).toFixed(1)}%
+          {Number(item.percentage ?? 0).toFixed(1)}%
         </Text>
         {item.rank && <Text style={[styles.rank, { color: colors['muted-foreground'] }]}>#{item.rank}</Text>}
       </View>
@@ -306,9 +421,16 @@ export default function ResultsScreen() {
 }
 
 const styles = StyleSheet.create({
+  serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   container: { flex: 1 },
   filterSection: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   filterLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
+  searchBoxSP: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 10, borderWidth: 1, marginHorizontal: 16, marginBottom: 12,
+    paddingHorizontal: 10, height: 40,
+  },
+  searchInputSP: { flex: 1, fontSize: 14, padding: 0 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
   chipText: { fontSize: 12, fontWeight: '500' },

@@ -20,6 +20,8 @@ import {
 } from '../services/authUtils';
 // import { logPermissionDebugInfo, checkPermissionPatterns } from '../utils/permission-debug';
 import { hasPermissionWithFallbacks } from '../utils/permission-compatibility';
+import { getTeacherAllowedActions } from '../src/lib/teacherPermissionMatrix';
+import { getStaffAllowedActions } from '../src/lib/staffPermissionMatrix';
 
 // Auth state interface
 interface AuthState {
@@ -395,6 +397,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Check permission with fallback support
   const hasPermission = (resource: string, action: string): boolean => {
+    // Teacher role is capped by a frontend-only allowlist, independent of
+    // whatever the backend grants. Resources not in that allowlist fall
+    // through to the normal backend-driven check below.
+    // See src/lib/teacherPermissionMatrix.ts for the full table.
+    if ((state.role?.name ?? '').toLowerCase() === 'teacher') {
+      const teacherAllowedActions = getTeacherAllowedActions(resource);
+      if (teacherAllowedActions) {
+        return teacherAllowedActions.includes(action);
+      }
+    }
+
+    // Staff role is capped by a frontend-only allowlist, independent of
+    // whatever the backend grants. Resources not in that allowlist fall
+    // through to the normal backend-driven check below.
+    // See src/lib/staffPermissionMatrix.ts for the full table.
+    if ((state.role?.name ?? '').toLowerCase() === 'staff') {
+      const staffAllowedActions = getStaffAllowedActions(resource);
+      if (staffAllowedActions) {
+        return staffAllowedActions.includes(action);
+      }
+    }
+
     // Use the compatibility layer for enhanced permission checking
     const hasPermissionResult = hasPermissionWithFallbacks(
       state.permissionsMap,

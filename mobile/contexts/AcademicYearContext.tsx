@@ -1,4 +1,4 @@
-import React, { createContext, ReactNode, useContext, useState, useEffect } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { academicYearsApi, AcademicYear } from '@/src/api';
@@ -7,8 +7,8 @@ import { useAuth } from './AuthContext';
 interface AcademicYearContextType {
   activeAcademicYear: AcademicYear | null;
   activeAcademicYearId: string | null;
-  setActiveAcademicYear: (academicYear: AcademicYear | null) => void;
-  setActiveAcademicYearById: (id: string | null) => void;
+  setActiveAcademicYear: (academicYear: AcademicYear | null) => Promise<void>;
+  setActiveAcademicYearById: (id: string | null) => Promise<void>;
   academicYears: AcademicYear[];
   isLoading: boolean;
   refetchAcademicYears: () => void;
@@ -16,75 +16,77 @@ interface AcademicYearContextType {
 
 const AcademicYearContext = createContext<AcademicYearContextType | undefined>(undefined);
 
-const ACTIVE_ACADEMIC_YEAR_KEY = '@active_academic_year';
+const STORAGE_KEY = '@active_academic_year';
 
 export function AcademicYearProvider({ children }: { children: ReactNode }) {
   const [activeAcademicYearId, setActiveAcademicYearId] = useState<string | null>(null);
+  const [storageLoaded, setStorageLoaded] = useState(false);
+  // Ref keeps the current ID accessible in effects without adding it to dependency arrays,
+  // preventing auto-select from overriding a user's manual selection on refetch.
+  const activeIdRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuth();
 
-  // Fetch all academic years only when authenticated
   const { data: academicYears = [], isLoading, refetch } = useQuery({
     queryKey: ['academicYears'],
     queryFn: () => academicYearsApi.getAcademicYears(),
-    enabled: isAuthenticated, // Only fetch when authenticated
+    enabled: isAuthenticated,
   });
 
-  // Load active academic year from storage on mount
+  // Keep ref in sync with state
   useEffect(() => {
-    const loadActiveAcademicYear = async () => {
-      try {
-        const storedId = await AsyncStorage.getItem(ACTIVE_ACADEMIC_YEAR_KEY);
-        if (storedId) {
-          setActiveAcademicYearId(storedId);
-        } else {
-          // Set default to the active academic year from API
-          const activeYear = academicYears.find(year => year.is_active);
-          if (activeYear) {
-            setActiveAcademicYearId(activeYear.id);
-            await AsyncStorage.setItem(ACTIVE_ACADEMIC_YEAR_KEY, activeYear.id);
-          }
-        }
-      } catch (error) {
-        console.error('Error loading active academic year:', error);
+    activeIdRef.current = activeAcademicYearId;
+  }, [activeAcademicYearId]);
+
+  // Load persisted ID from AsyncStorage immediately on mount — before the API call completes.
+  // This prevents a null flash for components that read activeAcademicYearId on first render.
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then(id => { if (id) setActiveAcademicYearId(id); })
+      .catch(e => console.error('AcademicYearContext: storage read failed', e))
+      .finally(() => setStorageLoaded(true));
+  }, []);
+
+  // Once both storage read and API fetch are ready: validate the stored ID or auto-select.
+  // Runs again if academicYears refetches — if the stored year was deleted, auto-select a new one.
+  useEffect(() => {
+    if (!storageLoaded || academicYears.length === 0) return;
+
+    const currentId = activeIdRef.current;
+    const isValid = !!currentId && academicYears.some(y => y.id === currentId);
+
+    if (!isValid) {
+      const best = academicYears.find(y => y.is_active) ?? academicYears[0];
+      if (best) {
+        setActiveAcademicYearId(best.id);
+        AsyncStorage.setItem(STORAGE_KEY, best.id).catch(console.error);
       }
-    };
-
-    if (academicYears.length > 0) {
-      loadActiveAcademicYear();
     }
-  }, [academicYears]);
+  }, [storageLoaded, academicYears]);
 
-  // Get the active academic year object
   const activeAcademicYear = activeAcademicYearId
-    ? academicYears.find(year => year.id === activeAcademicYearId) || null
+    ? academicYears.find(y => y.id === activeAcademicYearId) ?? null
     : null;
 
-  const setActiveAcademicYear = async (academicYear: AcademicYear | null) => {
-    const id = academicYear?.id || null;
+  const setActiveAcademicYear = async (academicYear: AcademicYear | null): Promise<void> => {
+    const id = academicYear?.id ?? null;
     setActiveAcademicYearId(id);
-
     try {
       if (id) {
-        await AsyncStorage.setItem(ACTIVE_ACADEMIC_YEAR_KEY, id);
+        await AsyncStorage.setItem(STORAGE_KEY, id);
       } else {
-        await AsyncStorage.removeItem(ACTIVE_ACADEMIC_YEAR_KEY);
+        await AsyncStorage.removeItem(STORAGE_KEY);
       }
-
-      // Invalidate all queries to trigger refetch with new academic year
+      // Invalidate all queries so every screen refetches for the new academic year
       queryClient.invalidateQueries();
-    } catch (error) {
-      console.error('Error saving active academic year:', error);
+    } catch (e) {
+      console.error('AcademicYearContext: storage write failed', e);
     }
   };
 
-  const setActiveAcademicYearById = async (id: string | null) => {
-    const academicYear = id ? academicYears.find(year => year.id === id) || null : null;
-    await setActiveAcademicYear(academicYear);
-  };
-
-  const refetchAcademicYears = () => {
-    refetch();
+  const setActiveAcademicYearById = async (id: string | null): Promise<void> => {
+    const year = id ? academicYears.find(y => y.id === id) ?? null : null;
+    await setActiveAcademicYear(year);
   };
 
   const value: AcademicYearContextType = {
@@ -94,7 +96,7 @@ export function AcademicYearProvider({ children }: { children: ReactNode }) {
     setActiveAcademicYearById,
     academicYears,
     isLoading,
-    refetchAcademicYears,
+    refetchAcademicYears: () => refetch(),
   };
 
   return (

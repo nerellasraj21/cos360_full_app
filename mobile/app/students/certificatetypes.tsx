@@ -16,8 +16,9 @@ import {
 import { CertificateTypeRead } from '@/src/api/students';
 import { useToastContext } from '@/components/ToastProvider';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
-export default function CertificateTypesPage() {
+function CertificateTypesPageContent() {
   const { colors } = useTheme();
   const { showError } = useToastContext();
   const { confirm, modalProps } = useConfirmModal();
@@ -31,12 +32,16 @@ export default function CertificateTypesPage() {
   const [editDescription, setEditDescription] = useState('');
 
   // API hooks
-  const { data: certificateTypesData, isLoading } = useCertificateTypes();
+  const { data: certificateTypesData, isLoading, isError, error } = useCertificateTypes({ limit: 100 });
   const createCertificateType = useCreateCertificateType();
   const updateCertificateType = useUpdateCertificateType();
   const deleteCertificateType = useDeleteCertificateType();
 
-  const certificateTypes = certificateTypesData?.items || [];
+  // Normalize: backend may return a plain array OR a paginated { items: [] } envelope
+  const rawData = certificateTypesData as any;
+  const certificateTypes: CertificateTypeRead[] = Array.isArray(rawData)
+    ? rawData
+    : rawData?.items ?? [];
 
   const handleAddType = () => {
     if (!newTypeName.trim()) {
@@ -83,10 +88,11 @@ export default function CertificateTypesPage() {
     });
   };
 
-  const renderCertificateType = ({ item }: { item: CertificateTypeRead }) => (
+  const renderCertificateType = ({ item, index }: { item: CertificateTypeRead; index: number }) => (
     <ThemedView style={[styles.typeCard, { backgroundColor: colors.card }]}>
       <View style={styles.typeHeader}>
         <View style={styles.typeInfo}>
+          <ThemedText style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</ThemedText>
           <ThemedText type="subtitle" style={styles.typeName}>
             {item.name}
           </ThemedText>
@@ -185,13 +191,21 @@ export default function CertificateTypesPage() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="document" size={64} color={colors['muted-foreground']} />
-              <ThemedText type="subtitle" style={styles.emptyTitle}>
-                No Certificate Types Found
+              <Ionicons
+                name={isError ? 'alert-circle-outline' : 'document'}
+                size={64}
+                color={isError ? '#EF4444' : colors['muted-foreground']}
+              />
+              <ThemedText type="subtitle" style={[styles.emptyTitle, isError && { color: '#EF4444' }]}>
+                {isLoading ? 'Loading...' : isError ? 'Failed to load' : 'No Certificate Types Found'}
               </ThemedText>
-              <ThemedText style={styles.emptyText}>
-                Add your first certificate type to get started
-              </ThemedText>
+              {!isLoading && (
+                <ThemedText style={styles.emptyText}>
+                  {isError
+                    ? ((error as any)?.message ?? 'Could not fetch certificate types. Check your connection.')
+                    : 'Add your first certificate type to get started'}
+                </ThemedText>
+              )}
             </View>
           }
         />
@@ -208,7 +222,8 @@ export default function CertificateTypesPage() {
           <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border ?? '#E5E7EB' }]}>
               <ThemedText style={styles.modalTitle}>Edit Certificate Type</ThemedText>
-              <TouchableOpacity onPress={() => setEditingType(null)}>
+              <TouchableOpacity onPress={() => setEditingType(null)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </View>
@@ -258,6 +273,7 @@ export default function CertificateTypesPage() {
 }
 
 const styles = StyleSheet.create({
+  serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   container: {
     flex: 1,
     padding: 16,
@@ -429,3 +445,16 @@ const styles = StyleSheet.create({
     padding: 16,
   },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function CertificateTypesPage() {
+  return (
+    <ScreenAccessGate
+      title="Certificate Types"
+      resources={['certificate_types', 'student_certificates']}
+    >
+      <CertificateTypesPageContent />
+    </ScreenAccessGate>
+  );
+}

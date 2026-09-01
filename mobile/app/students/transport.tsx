@@ -417,7 +417,8 @@ function AdminTransportView() {
               onChangeText={setSearchQuery}
             />
             {searchQuery ? (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityLabel="Close">
                 <Ionicons name="close-circle" size={15} color={colors['muted-foreground']} />
               </TouchableOpacity>
             ) : null}
@@ -521,7 +522,8 @@ function AdminTransportView() {
                 <ThemedText style={styles.modalTitle}>
                   {editingItem ? 'Edit Transport' : 'Assign Transport'}
                 </ThemedText>
-                <TouchableOpacity onPress={() => { setShowAssignModal(false); resetForm(); }} style={styles.modalCloseBtn}>
+                <TouchableOpacity onPress={() => { setShowAssignModal(false); resetForm(); }} style={styles.modalCloseBtn}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={20} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
@@ -598,7 +600,7 @@ function AdminTransportView() {
                   <ThemedText style={{ fontSize: 15, fontWeight: '600', color: colors.foreground }}>Cancel</ThemedText>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.assignBtn2, { backgroundColor: colors.primary, opacity: (createMutation.isPending || updateMutation.isPending) ? 0.6 : 1 }]}
+                  style={[styles.assignBtn2, { backgroundColor: colors.primary, opacity: (createMutation.isPending || updateMutation.isPending) ? 0.5 : 1 }]}
                   onPress={handleSubmit}
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >

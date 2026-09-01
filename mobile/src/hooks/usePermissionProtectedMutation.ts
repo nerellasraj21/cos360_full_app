@@ -48,6 +48,14 @@ export const usePermissionProtectedMutation = <TData = unknown, TError = unknown
     hasPermission = checkPermissionByConstant(options.resource, options.action)
   }
 
+  // Rules of Hooks: useMutation must run on EVERY render in the same order. It
+  // used to sit after the early return below, so when permissions finished
+  // loading and hasPermission flipped false -> true, React saw an extra hook
+  // appear and threw "Rendered more hooks than during the previous render".
+  // Nothing is sent until .mutate() is called, so calling it here is inert; the
+  // no-permission path below still returns the blocking no-op result.
+  const mutationResult = useMutation(options)
+
   // If no permission, return disabled mutation result
   if (!hasPermission) {
     return {
@@ -74,9 +82,6 @@ export const usePermissionProtectedMutation = <TData = unknown, TError = unknown
       variables: undefined,
     } as PermissionProtectedMutationResult<TData, TError, TVariables>
   }
-
-  // Execute mutation if permission granted
-  const mutationResult = useMutation(options)
 
   return {
     ...mutationResult,

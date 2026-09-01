@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { useMyDocuments, useUploadMyDocument, useDownloadDocument } from '@/src/api/hooks/students/documents';
+import { useStudentProfile } from '@/src/api/hooks/profile/useStudentProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReadOrListPermissionGuard, CreatePermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
@@ -23,6 +24,20 @@ export default function MyDocumentsPage() {
   const { data: documentsData, isLoading, error } = useMyDocuments();
   const downloadMutation = useDownloadDocument();
   const uploadMutation = useUploadMyDocument();
+
+  // Own name/admission number/class, same as the web app's Student Documents
+  // header (GET /profile/student/me) — students never see a student picker.
+  const { data: profile } = useStudentProfile({ enabled: !isParent && !!studentId });
+  const fullName = profile ? `${profile.first_name} ${profile.last_name ?? ''}`.trim() : '';
+  const classLabel = profile?.class_name
+    ? `${profile.class_name}${profile.section_name ? ` - ${profile.section_name}` : ''}`
+    : '';
+  const meta = [profile?.admission_number, classLabel].filter(Boolean).join(' · ');
+  const studentHeaderTitle = !isParent && fullName
+    ? `Documents — ${fullName}${meta ? ` (${meta})` : ''}`
+    : isParent && selectedStudent
+    ? `${selectedStudent.first_name}'s Documents`
+    : undefined;
 
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadType, setUploadType] = useState('');
@@ -111,6 +126,7 @@ export default function MyDocumentsPage() {
             style={[styles.actionButton, { backgroundColor: colors.primary }]}
             onPress={() => handleDownload(item.id)}
             disabled={downloadMutation.isPending}
+              accessibilityLabel="View"
           >
             <Ionicons name="eye" size={16} color="white" />
           </TouchableOpacity>
@@ -118,6 +134,7 @@ export default function MyDocumentsPage() {
             style={[styles.actionButton, { backgroundColor: '#10B981' }]}
             onPress={() => handleDownload(item.id)}
             disabled={downloadMutation.isPending}
+              accessibilityLabel="Download"
           >
             <Ionicons name="download" size={16} color="white" />
           </TouchableOpacity>
@@ -180,28 +197,33 @@ export default function MyDocumentsPage() {
             </CreatePermissionGuard>
           )}
 
-        <FlatList
-          data={documents}
-          renderItem={renderDocument}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="folder" size={64} color={colors['muted-foreground']} />
-              <ThemedText type="subtitle" style={styles.emptyTitle}>
-                No Documents Found
-              </ThemedText>
-              <ThemedText style={styles.emptyText}>
-                {isParent && !selectedStudent
-                  ? 'Select a student from the header'
-                  : isParent
-                  ? `${selectedStudent!.first_name} doesn't have any documents yet`
-                  : "You don't have any documents yet"}
-              </ThemedText>
-            </View>
-          }
-        />
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
+          {studentHeaderTitle && (
+            <ThemedText type="subtitle" style={styles.cardTitle}>{studentHeaderTitle}</ThemedText>
+          )}
+          <FlatList
+            data={documents}
+            renderItem={renderDocument}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="folder" size={64} color={colors['muted-foreground']} />
+                <ThemedText type="subtitle" style={styles.emptyTitle}>
+                  No Documents Found
+                </ThemedText>
+                <ThemedText style={styles.emptyText}>
+                  {isParent && !selectedStudent
+                    ? 'Select a student from the header'
+                    : isParent
+                    ? `${selectedStudent!.first_name} doesn't have any documents yet`
+                    : 'Documents issued to you will appear here.'}
+                </ThemedText>
+              </View>
+            }
+          />
+        </View>
         </View>
       </AppLayout>
 
@@ -211,7 +233,8 @@ export default function MyDocumentsPage() {
           <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
               <ThemedText style={styles.modalTitle}>Upload Document</ThemedText>
-              <TouchableOpacity onPress={() => { setShowUploadModal(false); setUploadType(''); setUploadFile(null); }}>
+              <TouchableOpacity onPress={() => { setShowUploadModal(false); setUploadType(''); setUploadFile(null); }}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </View>
@@ -256,6 +279,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+  },
+  card: {
+    flex: 1,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardTitle: {
+    marginBottom: 12,
   },
   loadingContainer: {
     flex: 1,

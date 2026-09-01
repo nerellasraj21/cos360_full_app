@@ -103,6 +103,16 @@ export const SCREEN_PERMISSIONS: Record<string, ScreenPermissionConfig> = {
         requireAll: false,
         description: 'View fee student mappings',
     },
+    '/fees/assign-student-fees': {
+        requiredPermissions: [['fee_student_mappings', 'list'], ['fee_student_mappings', 'read']],
+        requireAll: false,
+        description: 'Assign fees to individual students',
+    },
+    '/fees/mappings': {
+        requiredPermissions: [['fee_student_mappings', 'list'], ['fee_class_mappings', 'list']],
+        requireAll: false,
+        description: 'View fee mappings management',
+    },
 
     // Staff Module Screens
     '/staff': {

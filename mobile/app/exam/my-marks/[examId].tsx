@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -12,23 +12,19 @@ import {
 
 import { AppLayout } from '@/components';
 import { useAuth, useTheme } from '@/contexts';
-import { examResultsApi } from '@/src/api/exam';
+import { examResultsApi, examsApi, ComponentMarkView } from '@/src/api/exam';
 
-interface MarksComponentView {
-  component_id: string;
-  component_name: string;
-  max_marks: number;
-  marks_obtained: number | null;
-  is_absent: boolean;
-}
-
-interface MarksSubjectView {
-  subject_id: string;
+// Derived, render-friendly view of a subject's marks. The raw API shape
+// (`MarksSubjectView` in src/api/exam.ts) only carries `subject_config_id`,
+// `subject_name` and a `components` list — there is no subject-level total or
+// absence flag, so those are computed here from the components.
+interface SubjectMarksView {
+  subject_config_id: string;
   subject_name: string;
   total_max_marks: number;
   total_obtained: number | null;
   is_absent: boolean;
-  components: MarksComponentView[];
+  components: ComponentMarkView[];
 }
 
 export default function MyMarksScreen() {
@@ -41,6 +37,12 @@ export default function MyMarksScreen() {
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
+
+  const { data: exam } = useQuery({
+    queryKey: ['exam', examId],
+    queryFn: () => examsApi.getById(examId),
+    enabled: !!examId,
+  });
 
   // ── Student: own marks ────────────────────────────────────────────────────
   const { data: myMarks, isLoading: myLoading } = useQuery({
@@ -60,38 +62,58 @@ export default function MyMarksScreen() {
   const marks = isParent ? childMarks : myMarks;
   const isLoading = isParent ? childLoading : myLoading;
 
+  // Derive subject-level totals/absence from each subject's components — the
+  // API doesn't send those directly (see SubjectMarksView above).
+  const subjects: SubjectMarksView[] = useMemo(() => {
+    if (!marks?.subjects) return [];
+    return marks.subjects.map((s: { subject_config_id: string; subject_name?: string; components: ComponentMarkView[] }) => {
+      const components = s.components ?? [];
+      const totalMax = components.reduce((sum, c) => sum + (c.max_marks ?? 0), 0);
+      const hasAnyMarks = components.some(c => c.marks_obtained !== null);
+      const isAbsent = components.length > 0 && components.every(c => c.is_absent);
+      const totalObtained = hasAnyMarks
+        ? components.reduce((sum, c) => sum + (c.marks_obtained ?? 0), 0)
+        : null;
+      return {
+        subject_config_id: s.subject_config_id,
+        subject_name: s.subject_name ?? 'Subject',
+        total_max_marks: totalMax,
+        total_obtained: totalObtained,
+        is_absent: isAbsent,
+        components,
+      };
+    });
+  }, [marks]);
+
   const getMarksColor = (obtained: number | null, max: number) => {
-    if (obtained === null) return colors['muted-foreground'];
+    if (obtained === null || !max) return colors['muted-foreground'];
     const pct = (obtained / max) * 100;
     if (pct >= 75) return '#10B981';
     if (pct >= 50) return '#F59E0B';
     return '#EF4444';
   };
 
-  const getOverallPct = () => {
-    if (!marks?.subjects) return null;
+  const overallPct = useMemo(() => {
     let totalMax = 0;
     let totalObtained = 0;
     let hasAny = false;
-    for (const s of marks.subjects) {
-      if (s.total_max_marks) totalMax += s.total_max_marks;
+    for (const s of subjects) {
+      if (s.is_absent) continue;
+      totalMax += s.total_max_marks;
       if (s.total_obtained !== null) {
         totalObtained += s.total_obtained;
         hasAny = true;
       }
     }
     return hasAny && totalMax > 0 ? ((totalObtained / totalMax) * 100).toFixed(1) : null;
-  };
+  }, [subjects]);
 
-  const SubjectCard = ({ subject }: { subject: MarksSubjectView }) => {
+  const SubjectCard = ({ subject }: { subject: SubjectMarksView }) => {
     const pct =
       subject.total_max_marks && subject.total_obtained !== null
         ? ((subject.total_obtained / subject.total_max_marks) * 100).toFixed(0)
         : null;
-    const marksColor =
-      subject.total_obtained !== null
-        ? getMarksColor(subject.total_obtained, subject.total_max_marks)
-        : colors['muted-foreground'];
+    const marksColor = getMarksColor(subject.total_obtained, subject.total_max_marks);
 
     return (
       <View style={[styles.subjectCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
@@ -123,8 +145,8 @@ export default function MyMarksScreen() {
 
         {subject.components.length > 0 && (
           <View style={[styles.components, { borderTopColor: borderCol }]}>
-            {subject.components.map((comp) => (
-              <View key={comp.component_id} style={styles.componentRow}>
+            {subject.components.map((comp, idx) => (
+              <View key={`${subject.subject_config_id}-${idx}`} style={styles.componentRow}>
                 <Text style={[styles.componentName, { color: colors['muted-foreground'] }]}>
                   {comp.component_name}
                 </Text>
@@ -135,7 +157,7 @@ export default function MyMarksScreen() {
                       color: comp.is_absent
                         ? '#EF4444'
                         : comp.marks_obtained !== null
-                        ? getMarksColor(comp.marks_obtained, comp.max_marks)
+                        ? getMarksColor(comp.marks_obtained, comp.max_marks ?? 0)
                         : colors['muted-foreground'],
                     },
                   ]}
@@ -143,7 +165,7 @@ export default function MyMarksScreen() {
                   {comp.is_absent
                     ? 'Absent'
                     : comp.marks_obtained !== null
-                    ? `${comp.marks_obtained}/${comp.max_marks}`
+                    ? `${comp.marks_obtained}/${comp.max_marks ?? '—'}`
                     : '—'}
                 </Text>
               </View>
@@ -177,7 +199,7 @@ export default function MyMarksScreen() {
     );
   }
 
-  if (!marks) {
+  if (!marks || subjects.length === 0) {
     return (
       <AppLayout title="My Marks">
         <View style={styles.centered}>
@@ -190,14 +212,12 @@ export default function MyMarksScreen() {
     );
   }
 
-  const overallPct = getOverallPct();
-
   return (
     <AppLayout title="My Marks">
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.headerCard}>
-          <Text style={styles.headerExamName}>{marks.exam_name}</Text>
-          <Text style={styles.headerStudentName}>{marks.student_name}</Text>
+          <Text style={styles.headerExamName}>{exam?.exam_name ?? ''}</Text>
+          <Text style={styles.headerStudentName}>{marks.student_name ?? selectedStudent?.name ?? ''}</Text>
           {overallPct && (
             <View style={styles.overallRow}>
               <Text style={styles.overallLabel}>Overall</Text>
@@ -207,8 +227,8 @@ export default function MyMarksScreen() {
         </View>
 
         <View style={styles.subjectList}>
-          {marks.subjects.map((subject: MarksSubjectView) => (
-            <SubjectCard key={subject.subject_id} subject={subject} />
+          {subjects.map((subject) => (
+            <SubjectCard key={subject.subject_config_id} subject={subject} />
           ))}
         </View>
 

@@ -105,6 +105,7 @@ function CertificateCard({
           <TouchableOpacity
             style={[styles.iconBtn, { backgroundColor: colors.primary }]}
             onPress={handleDownload}
+              accessibilityLabel="Download"
           >
             <Ionicons name="download-outline" size={15} color="white" />
           </TouchableOpacity>
@@ -117,6 +118,7 @@ function CertificateCard({
           <TouchableOpacity
             style={[styles.iconBtn, { backgroundColor: '#FEE2E2' }]}
             onPress={confirmDelete}
+              accessibilityLabel="Delete"
           >
             <Ionicons name="trash-outline" size={15} color="#EF4444" />
           </TouchableOpacity>
@@ -136,8 +138,8 @@ function MyCertificatesView({ studentId, title }: { studentId?: string; title?: 
     queryKey: ['my-certificates', studentId],
     queryFn: () =>
       studentId
-        ? studentCertificatesApi.myChildCertificates(studentId)
-        : studentCertificatesApi.myCertificates(),
+        ? studentCertificatesApi.myChildCertificates(studentId, { limit: 100 })
+        : studentCertificatesApi.myCertificates({ limit: 100 }),
   });
 
   return (
@@ -227,7 +229,7 @@ function AdminCertificatesView() {
   // ── Certificate types ──
   const { data: certTypesData } = useQuery({
     queryKey: ['cert-types-dropdown'],
-    queryFn: () => certificateTypesApi.listCertificateTypes({ limit: 200 }),
+    queryFn: () => certificateTypesApi.listCertificateTypes({ limit: 100 }),
   });
   const certTypes = (certTypesData?.items ?? []).map((t) => ({
     label: t.name,
@@ -237,7 +239,7 @@ function AdminCertificatesView() {
   // ── Certificates for selected student ──
   const { data: certs = [], isLoading: certsLoading } = useQuery({
     queryKey: ['student-certificates', selectedStudentId],
-    queryFn: () => studentCertificatesApi.getCertificatesByStudent(selectedStudentId),
+    queryFn: () => studentCertificatesApi.getCertificatesByStudent(selectedStudentId, { limit: 100 }),
     enabled: !!selectedStudentId,
   });
 
@@ -512,7 +514,7 @@ function AdminCertificatesView() {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function StudentCertificatesScreen() {
-  const { role, studentId, selectedStudent } = useAuth();
+  const { role, selectedStudent } = useAuth();
   const { colors } = useTheme();
 
   const roleName = role?.name?.toLowerCase();

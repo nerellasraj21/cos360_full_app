@@ -19,15 +19,16 @@ import { TimePickerModal, formatTime12h } from '@/components/ui';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { CustomDropdown, DropdownOption } from '@/components/ui/dropdown';
+import { CreatableDropdown, CreatableOption } from '@/components/ui/creatable-dropdown';
 import { useTheme } from '@/contexts';
 import { useAcademicYear } from '@/contexts/AcademicYearContext';
-import { timetableApi, classSectionsApi, subjectsApi } from '@/src/api';
+import { timetableApi, classSectionsApi, subjectsApi, classSubjectMappingsApi } from '@/src/api';
 import type { FrontendTimetableCreate, TimetableDataItem } from '@/src/api';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
 
-const SPECIAL_LABELS: DropdownOption[] = [
+const DEFAULT_SPECIAL_LABELS: CreatableOption[] = [
   { value: 'SNACKS', label: 'Snacks' },
   { value: 'LUNCH', label: 'Lunch' },
   { value: 'DISPERSAL', label: 'Dispersal' },
@@ -57,6 +58,25 @@ export default function TimeTableEditor() {
   const [repeatModalVisible, setRepeatModalVisible] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'all' | 'one' | null>(null);
   const [repeatSelectedRow, setRepeatSelectedRow] = useState<string | null>(null);
+  const [customEvents, setCustomEvents] = useState<CreatableOption[]>([]);
+
+  const allSpecialLabels = useMemo(
+    () => [...DEFAULT_SPECIAL_LABELS, ...customEvents],
+    [customEvents]
+  );
+
+  const addCustomEvent = useCallback((inputValue: string): CreatableOption | null => {
+    const trimmed = inputValue.trim();
+    if (!trimmed || !/^[a-zA-Z0-9 ]+$/.test(trimmed) || trimmed.length > 50) return null;
+    const value = trimmed.toUpperCase().replace(/\s+/g, '_');
+    const label = trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+    const newOption: CreatableOption = { value, label };
+    setCustomEvents(prev => {
+      if (prev.some(e => e.value === value)) return prev;
+      return [...prev, newOption];
+    });
+    return newOption;
+  }, []);
 
   const rowCounter = useRef(0);
 
@@ -81,28 +101,36 @@ export default function TimeTableEditor() {
     enabled: !!selectedClass,
   });
 
-  // Fetch subjects for dropdown
+  // Fetch all subjects
   const { data: subjectsData } = useQuery({
     queryKey: ['subjects', activeAcademicYearId],
-    queryFn: () => subjectsApi.getSubjects({
-      academic_year_id: activeAcademicYearId || '',
-      active_only: true,
-      limit: 1000
-    }),
+    queryFn: () => subjectsApi.getSubjects({ active_only: true, limit: 1000 }),
     enabled: !!activeAcademicYearId,
   });
 
-  // Format subjects for dropdown
+  // Fetch class-subject mappings for the selected class (same as web app)
+  const { data: classMappings } = useQuery({
+    queryKey: ['classSubjectMappings', 'byClass', selectedClass?.id, activeAcademicYearId],
+    queryFn: () => classSubjectMappingsApi.getMappingsByClass(selectedClass!.id, activeAcademicYearId || undefined),
+    enabled: !!selectedClass,
+  });
+
+  // Build set of subject IDs mapped to this class/section — mirrors web app logic
+  const classSubjectIds = useMemo(() => {
+    if (!classMappings || !selectedClass) return null;
+    const filtered = classMappings.filter(
+      (m: any) => !m.section_id || !selectedSection || m.section_id === selectedSection.id
+    );
+    return new Set(filtered.map((m: any) => m.subject_id));
+  }, [classMappings, selectedClass, selectedSection]);
+
+  // Only show subjects mapped to the selected class/section (like web app)
   const subjectOptions: DropdownOption[] = useMemo(() => {
     if (!subjectsData) return [];
-    return [
-      { label: 'Select Subject', value: '' },
-      ...subjectsData.map(subject => ({
-        label: subject.name,
-        value: subject.id
-      }))
-    ];
-  }, [subjectsData]);
+    const all = subjectsData.map(subject => ({ label: subject.name, value: subject.id }));
+    const filtered = classSubjectIds ? all.filter(s => classSubjectIds.has(s.value)) : all;
+    return [{ label: 'Select Subject', value: '' }, ...filtered];
+  }, [subjectsData, classSubjectIds]);
 
   // Fetch existing timetable
   const { data: timetableData, isLoading, refetch } = useQuery({
@@ -579,19 +607,17 @@ export default function TimeTableEditor() {
         </View>
       ) : (
         <View style={styles.specialContainer}>
-          <CustomDropdown
-            data={SPECIAL_LABELS}
-            value={item.label || ''}
-            onChange={(value: string | number | null) => updateRow(item.id, { label: String(value || '') })}
+          <CreatableDropdown
+            options={allSpecialLabels}
+            value={item.label || null}
+            onChange={(val) => updateRow(item.id, { label: val })}
+            onCreateOption={addCustomEvent}
             placeholder="Select Special Activity"
+            formatCreateLabel={(v) => `Create "${v}"`}
             disabled={!isEditing}
             style={{
               height: 36,
               paddingHorizontal: 8,
-              paddingVertical: 4,
-            }}
-            containerStyle={{
-              marginBottom: 0,
             }}
           />
         </View>
@@ -602,12 +628,13 @@ export default function TimeTableEditor() {
         <TouchableOpacity
           style={[styles.deleteButton, { backgroundColor: themeColors.destructive }]}
           onPress={() => deleteRow(item.id)}
+              accessibilityLabel="Delete"
         >
           <Ionicons name="trash" size={16} color="white" />
         </TouchableOpacity>
       )}
     </View>
-  ), [themeColors, isEditing, days, subjectOptions]);
+  ), [themeColors, isEditing, days, subjectOptions, allSpecialLabels, addCustomEvent]);
 
   if (!selectedClass) {
     return (
@@ -624,11 +651,12 @@ export default function TimeTableEditor() {
       >
         <ThemedView style={styles.container}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}
+              accessibilityLabel="Go back">
               <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
             </TouchableOpacity>
             <View style={styles.headerContent}>
-              <ThemedText type="title">Timetable</ThemedText>
+              <ThemedText type="title" style={styles.headerTitle}>Timetable</ThemedText>
             </View>
           </View>
 
@@ -643,7 +671,7 @@ export default function TimeTableEditor() {
                   style={[styles.classSectionCard, { backgroundColor: themeColors.card }]}
                   onPress={() => handleClassSelect(item)}
                 >
-                  <ThemedText type="subtitle">{item.name}</ThemedText>
+                  <ThemedText type="subtitle" style={styles.cardTitle}>{item.name}</ThemedText>
                 </TouchableOpacity>
               )}
               keyExtractor={(item) => item.id}
@@ -660,11 +688,12 @@ export default function TimeTableEditor() {
     return (
       <ThemedView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setSelectedClass(null)} style={styles.backButton}>
+          <TouchableOpacity onPress={() => setSelectedClass(null)} style={styles.backButton}
+              accessibilityLabel="Go back">
             <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
           </TouchableOpacity>
           <View style={styles.headerContent}>
-            <ThemedText type="title">{selectedClass.name}</ThemedText>
+            <ThemedText type="title" style={styles.headerTitle}>{selectedClass.name}</ThemedText>
             <ThemedText style={styles.subtitle}>Select Section</ThemedText>
           </View>
         </View>
@@ -680,7 +709,7 @@ export default function TimeTableEditor() {
                 style={[styles.classSectionCard, { backgroundColor: themeColors.card }]}
                 onPress={() => handleSectionSelect(item)}
               >
-                <ThemedText type="subtitle">{item.name}</ThemedText>
+                <ThemedText type="subtitle" style={styles.cardTitle}>{item.name}</ThemedText>
               </TouchableOpacity>
             )}
             keyExtractor={(item) => item.id}
@@ -696,22 +725,28 @@ export default function TimeTableEditor() {
     <>
     <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSelectedSection(null)} style={styles.backButton}>
+        <TouchableOpacity onPress={() => setSelectedSection(null)} style={styles.backButton}
+              accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <ThemedText type="title">
+          <ThemedText type="title" style={styles.headerTitleCombined}>
             {selectedClass.name} - {selectedSection.name}
           </ThemedText>
           <ThemedText style={styles.subtitle}>Timetable</ThemedText>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={[styles.exportButton, { backgroundColor: themeColors.secondary }]}
-            onPress={() => setShowExportOptions(!showExportOptions)}
-          >
-            <Ionicons name="download" size={16} color="white" />
-          </TouchableOpacity>
+          {!isEditing && rows.length > 0 && (
+            <TouchableOpacity
+              style={[styles.exportButton, { borderColor: themeColors.primary, backgroundColor: themeColors.card }]}
+              onPress={() => setShowExportOptions(!showExportOptions)}
+              accessibilityLabel="Export"
+            >
+              <Ionicons name="download-outline" size={16} color={themeColors.primary} />
+              <ThemedText style={[styles.exportButtonText, { color: themeColors.primary }]}>Export</ThemedText>
+              <Ionicons name="chevron-down" size={14} color={themeColors.primary} />
+            </TouchableOpacity>
+          )}
           <PermissionGuard resourceConstant={PERMISSION_RESOURCES.TIMETABLES} actionConstant={isEditing ? "update" : "read"}>
             <TouchableOpacity
               style={[styles.editButton, { backgroundColor: themeColors.primary }]}
@@ -1058,16 +1093,30 @@ const styles = StyleSheet.create({
   headerContent: {
     flex: 1,
   },
+  headerTitle: {
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  headerTitleCombined: {
+    fontSize: 18,
+    lineHeight: 22,
+  },
   headerActions: {
     flexDirection: 'row',
     gap: 8,
   },
   exportButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  exportButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   exportOverlay: {
     flex: 1,
@@ -1130,6 +1179,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   selectionTitle: {
+    fontSize: 15,
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -1145,6 +1195,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  cardTitle: {
+    fontSize: 15,
   },
   saturdayToggle: {
     flexDirection: 'row',

@@ -1,13 +1,15 @@
-import { ThemedText } from '@/components/themed-text';
+﻿import { ThemedText } from '@/components/themed-text';
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import CustomDropdown from '@/components/ui/dropdown';
+import { DatePickerModal } from '@/components/ui';
 import { useTheme } from '@/contexts';
 import { useExpenseTypeDropdownProtected, useExpenseDepartmentDropdownProtected, useCreateExpenseTransactionProtected } from '@/hooks/use-expense-protected';
 import { CreatePermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import type { TransactionItem } from '@/src/types/expense';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -58,6 +60,9 @@ export default function CreateExpenseTransactionScreen() {
     department_id: '',
   });
 
+  const [attachments, setAttachments] = useState<{ uri: string; name: string; type: string; size?: number }[]>([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
   const [transactionItems, setTransactionItems] = useState<TransactionItem[]>([]);
   const hasItems = transactionItems.length > 0;
 
@@ -104,6 +109,31 @@ export default function CreateExpenseTransactionScreen() {
   };
 
   // ─── Submit ───────────────────────────────────────────────────────────────────
+
+  // ─── Attachments ──────────────────────────────────────────────────────────────
+
+  const handlePickFiles = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', multiple: true, copyToCacheDirectory: true });
+      if (!result.canceled && result.assets?.length) {
+        setAttachments(prev => [
+          ...prev,
+          ...result.assets.map(asset => ({
+            uri: asset.uri,
+            name: asset.name,
+            type: asset.mimeType || 'application/octet-stream',
+            size: asset.size,
+          })),
+        ]);
+      }
+    } catch {
+      showError('Error', 'Failed to pick file');
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = () => {
     if (!formData.expense_type_id) {
@@ -159,7 +189,7 @@ export default function CreateExpenseTransactionScreen() {
 
   return (
     <CreatePermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS}>
-      <AppLayout title="Create Transaction">
+      <AppLayout title="Create New Transaction">
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.form}>
           {/* Expense Type */}
@@ -211,7 +241,8 @@ export default function CreateExpenseTransactionScreen() {
             <View key={index} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.itemHeaderRow}>
                 <ThemedText style={styles.itemLabel}>Item #{index + 1}</ThemedText>
-                <TouchableOpacity onPress={() => removeItem(index)}>
+                <TouchableOpacity onPress={() => removeItem(index)}
+              accessibilityLabel="Delete">
                   <Ionicons name="trash" size={18} color="#EF4444" />
                 </TouchableOpacity>
               </View>
@@ -291,17 +322,17 @@ export default function CreateExpenseTransactionScreen() {
 
           {/* Transaction Date */}
           <ThemedText style={styles.label}>Transaction Date *</ThemedText>
-          <TextInput
-            style={[styles.input, {
-              backgroundColor: colors.background,
-              color: colors.foreground,
-              borderColor: colors.border,
-            }]}
-            value={formData.transaction_date}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, transaction_date: text }))}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors['muted-foreground']}
-          />
+          <TouchableOpacity
+            style={[styles.input, styles.dateField, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => setShowDatePicker(true)}
+            activeOpacity={0.75}
+            accessibilityLabel="Select transaction date"
+          >
+            <ThemedText style={{ color: formData.transaction_date ? colors.foreground : colors['muted-foreground'], fontSize: 14 }}>
+              {formData.transaction_date || 'YYYY-MM-DD'}
+            </ThemedText>
+            <Ionicons name="calendar-outline" size={18} color={colors['muted-foreground']} />
+          </TouchableOpacity>
 
           {/* Description */}
           <ThemedText style={styles.label}>Description *</ThemedText>
@@ -368,6 +399,35 @@ export default function CreateExpenseTransactionScreen() {
             onChange={(value) => setFormData(prev => ({ ...prev, department_id: value?.toString() || '' }))}
             placeholder="Select department"
           />
+
+          {/* ─── Attachments ──────────────────────────────────── */}
+          <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
+            <ThemedText style={styles.sectionTitle}>Attachments</ThemedText>
+            <TouchableOpacity
+              style={[styles.addItemButton, { backgroundColor: colors.primary }]}
+              onPress={handlePickFiles}
+            >
+              <Ionicons name="cloud-upload-outline" size={16} color="white" />
+              <ThemedText style={styles.addItemText}>Upload Files</ThemedText>
+            </TouchableOpacity>
+          </View>
+
+          {attachments.map((file, index) => (
+            <View key={index} style={[styles.attachmentRow, { borderColor: colors.border }]}>
+              <View style={styles.attachmentInfo}>
+                <Ionicons name="document-text-outline" size={16} color={colors['muted-foreground']} />
+                <ThemedText style={styles.attachmentName} numberOfLines={1}>{file.name}</ThemedText>
+                {file.size ? (
+                  <ThemedText style={[styles.attachmentSize, { color: colors['muted-foreground'] }]}>
+                    ({(file.size / 1024).toFixed(1)} KB)
+                  </ThemedText>
+                ) : null}
+              </View>
+              <TouchableOpacity onPress={() => removeAttachment(index)} accessibilityLabel="Remove attachment">
+                <Ionicons name="trash" size={18} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          ))}
         </View>
 
         {/* Action Buttons */}
@@ -385,10 +445,17 @@ export default function CreateExpenseTransactionScreen() {
             disabled={createMutation.isPending}
           >
             <ThemedText style={styles.submitButtonText}>
-              {createMutation.isPending ? 'Creating...' : 'Create Transaction'}
+              {createMutation.isPending ? 'Saving...' : 'Save Transaction'}
             </ThemedText>
           </TouchableOpacity>
         </View>
+
+        <DatePickerModal
+          visible={showDatePicker}
+          initialDate={formData.transaction_date}
+          onConfirm={(date) => { setFormData(prev => ({ ...prev, transaction_date: date })); setShowDatePicker(false); }}
+          onCancel={() => setShowDatePicker(false)}
+        />
         </ScrollView>
       </AppLayout>
     </CreatePermissionGuard>
@@ -408,6 +475,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
+  dateField: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   input: {
     borderWidth: 1,
     borderRadius: 8,
@@ -520,5 +588,28 @@ const styles = StyleSheet.create({
   itemFinalAmount: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  attachmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 10,
+    marginBottom: 8,
+    gap: 8,
+  },
+  attachmentInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 6,
+  },
+  attachmentName: {
+    fontSize: 14,
+    flexShrink: 1,
+  },
+  attachmentSize: {
+    fontSize: 12,
   },
 });

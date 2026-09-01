@@ -14,11 +14,12 @@ import {
 } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
-import { FeeRefundWithStatus, CreateRefundFormState, RefundReason } from '@/src/types/fees';
+import type { FeeRefundWithStatus, CreateRefundFormState, RefundReason } from '@/src/types/fee';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState, useEffect } from 'react';
+import { roleBlocksFees } from '@/src/lib/menuUtils';
 import {
   ActivityIndicator,
   FlatList,
@@ -39,8 +40,9 @@ const formatINR = (amount: number | string | undefined | null): string => {
 };
 
 export default function FeeRefundsScreen() {
-   const { isAuthenticated, isLoading: authLoading } = useAuth();
+   const { isAuthenticated, isLoading: authLoading, role } = useAuth();
    const router = useRouter();
+   const isFeeBlocked = roleBlocksFees(role?.name);
 
    const [isModalVisible, setIsModalVisible] = useState(false);
    const [editingRefund, setEditingRefund] = useState<FeeRefundWithStatus | null>(null);
@@ -58,6 +60,13 @@ export default function FeeRefundsScreen() {
      refund: FeeRefundWithStatus | null;
    }>({ visible: false, refund: null });
    const [processReferenceNumber, setProcessReferenceNumber] = useState('');
+
+  // Cancel refund modal with mandatory reason (matches web's cancel workflow)
+  const [cancelModal, setCancelModal] = useState<{
+    visible: boolean;
+    refund: FeeRefundWithStatus | null;
+  }>({ visible: false, refund: null });
+  const [cancelReason, setCancelReason] = useState('');
 
   const [filters, setFilters] = useState({
     status: '',
@@ -107,6 +116,12 @@ export default function FeeRefundsScreen() {
     }
   }, [isAuthenticated, authLoading, router]);
 
+  // Web parity (_app/fee.tsx beforeLoad): teachers cannot access the Fee
+  // module, even via a deep link into a specific fee sub-screen.
+  useEffect(() => {
+    if (isFeeBlocked) router.replace('/(tabs)');
+  }, [isFeeBlocked, router]);
+
   // Queries
   const { data: refunds = [], isLoading, error } = useQuery({
     queryKey: ['feeRefunds', activeAcademicYearId],
@@ -135,7 +150,7 @@ export default function FeeRefundsScreen() {
   });
 
   // C-4: Fetch real staff list from API using the existing hook
-  const { data: staffQueryData } = useStaffEnrollments({ limit: 200 });
+  const { data: staffQueryData } = useStaffEnrollments({ limit: 100 });
   const staffList = staffQueryData?.items || [];
 
   // Summary query
@@ -181,8 +196,12 @@ export default function FeeRefundsScreen() {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: feeRefundsApi.deleteFeeRefund,
+  // Proper cancel workflow (POST .../cancel with a reason) — matches web app.
+  // Replaces the old hard-DELETE call, which discarded the refund record instead
+  // of preserving an audit trail.
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      feeRefundsApi.cancelFeeRefund(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feeRefunds'] });
       showSuccess('Refund cancelled successfully');
@@ -275,16 +294,20 @@ export default function FeeRefundsScreen() {
     setProcessModal({ visible: false, refund: null });
   };
 
-  // C-3: dismiss = 'Keep', destructive = 'Confirm Cancellation'
+  // Opens the reason-collecting cancel modal (web requires cancellation_reason)
   const handleCancel = (refund: FeeRefundWithStatus) => {
-    const refNum = (refund as any).refund_number ?? refund.id?.slice(-8) ?? 'N/A';
-    confirmModal({
-      title: 'Cancel Refund',
-      message: `Are you sure you want to cancel refund ${refNum}?`,
-      confirmLabel: 'Confirm Cancellation',
-      destructive: true,
-      onConfirm: () => deleteMutation.mutate(refund.id),
-    });
+    setCancelReason('');
+    setCancelModal({ visible: true, refund });
+  };
+
+  const submitCancelModal = () => {
+    if (!cancelModal.refund) return;
+    if (!cancelReason.trim()) {
+      showError('Required', 'Please enter a cancellation reason.');
+      return;
+    }
+    cancelMutation.mutate({ id: cancelModal.refund.id, reason: cancelReason.trim() });
+    setCancelModal({ visible: false, refund: null });
   };
 
   const handleViewSummary = (transactionId: string) => {
@@ -319,10 +342,13 @@ export default function FeeRefundsScreen() {
       return;
     }
 
-    const data: FeeRefundRequest = {
+    // processed_by is not part of FeeRefundCreateRequest but the backend accepts it,
+    // so it stays on the payload behind a widened local type.
+    const data: FeeRefundRequest & { processed_by?: string } = {
       transaction_id: formData.fee_transaction_id,
       refund_amount: formData.refund_amount,
       refund_reason: formData.refund_reason,
+      detailed_reason: formData.detailed_reason,
       refund_date: new Date().toISOString().split('T')[0],
       processed_by: formData.requested_by_user_id,
       refund_method: 'cash',
@@ -344,7 +370,7 @@ export default function FeeRefundsScreen() {
     return true;
   });
 
-  const renderRefundItem = ({ item }: { item: FeeRefundWithStatus }) => {
+  const renderRefundItem = ({ item, index }: { item: FeeRefundWithStatus; index: number }) => {
     const transaction = transactions.find(t => t.id === item.transaction_id);
     const student = students.find(s => s.id === transaction?.student_id);
     const staffMember = staffList.find((s: any) => s.id === item.processed_by);
@@ -364,6 +390,7 @@ export default function FeeRefundsScreen() {
     return (
       <View style={[styles.refundCard, { backgroundColor: colors.card }]}>
         <View style={styles.refundInfo}>
+          <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
           <Text style={[styles.refundIdText, { color: colors.foreground }]}>
             Refund #{refundRef}
           </Text>
@@ -408,6 +435,7 @@ export default function FeeRefundsScreen() {
                 <TouchableOpacity
                   style={[styles.actionButton, { backgroundColor: '#10b981' }]}
                   onPress={() => handleApprove(item)}
+              accessibilityLabel="Confirm"
                 >
                   <Ionicons name="checkmark" size={16} color="white" />
                 </TouchableOpacity>
@@ -415,6 +443,7 @@ export default function FeeRefundsScreen() {
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.destructive }]}
                 onPress={() => handleCancel(item)}
+              accessibilityLabel="Close"
               >
                 <Ionicons name="close" size={16} color="white" />
               </TouchableOpacity>
@@ -447,6 +476,10 @@ export default function FeeRefundsScreen() {
 
   // Don't render content if not authenticated (will redirect)
   if (!isAuthenticated) {
+    return null;
+  }
+
+  if (isFeeBlocked) {
     return null;
   }
 
@@ -599,7 +632,8 @@ export default function FeeRefundsScreen() {
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.foreground }]}>Create Refund</Text>
-                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
@@ -728,7 +762,8 @@ export default function FeeRefundsScreen() {
                 <Text>
                   Refund Summary - Transaction {summaryModal.transactionId?.slice(-8) || 'N/A'}
                 </Text>
-                <TouchableOpacity onPress={() => setSummaryModal(prev => ({ ...prev, visible: false }))}>
+                <TouchableOpacity onPress={() => setSummaryModal(prev => ({ ...prev, visible: false }))}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
@@ -786,7 +821,8 @@ export default function FeeRefundsScreen() {
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.foreground }]}>Process Refund Action</Text>
-                <TouchableOpacity onPress={() => setActionModal({ visible: false, refund: null, action: 'approve' })}>
+                <TouchableOpacity onPress={() => setActionModal({ visible: false, refund: null, action: 'approve' })}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
@@ -858,7 +894,8 @@ export default function FeeRefundsScreen() {
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.foreground }]}>Process Refund</Text>
-                <TouchableOpacity onPress={() => setProcessModal({ visible: false, refund: null })}>
+                <TouchableOpacity onPress={() => setProcessModal({ visible: false, refund: null })}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
@@ -897,6 +934,66 @@ export default function FeeRefundsScreen() {
                 >
                   <Text style={{ color: 'white', fontWeight: '600' }}>
                     {processMutation.isPending ? 'Processing...' : 'Process'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Cancel Refund Modal — collects a mandatory reason, matches web's cancel workflow */}
+        <Modal
+          visible={cancelModal.visible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setCancelModal({ visible: false, refund: null })}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>Cancel Refund</Text>
+                <TouchableOpacity onPress={() => setCancelModal({ visible: false, refund: null })}
+              accessibilityLabel="Close">
+                  <Ionicons name="close" size={24} color={colors['muted-foreground']} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.form}>
+                {cancelModal.refund && (
+                  <Text style={[styles.refundDetails, { color: colors['muted-foreground'], marginBottom: 12 }]}>
+                    Cancelling refund {(cancelModal.refund as any).refund_number ?? cancelModal.refund.id?.slice(-8) ?? 'N/A'} for {formatINR(cancelModal.refund.refund_amount)}
+                  </Text>
+                )}
+                <Text style={[styles.label, { color: colors.foreground }]}>Cancellation Reason *</Text>
+                <TextInput
+                  value={cancelReason}
+                  onChangeText={setCancelReason}
+                  placeholder="Enter reason for cancellation..."
+                  placeholderTextColor={colors['muted-foreground']}
+                  multiline
+                  numberOfLines={3}
+                  style={[styles.textInput, {
+                    borderColor: colors.border,
+                    color: colors.foreground,
+                    backgroundColor: colors.background,
+                  }]}
+                />
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.cancelButton, { borderColor: colors.border }]}
+                  onPress={() => setCancelModal({ visible: false, refund: null })}
+                >
+                  <Text style={{ color: colors.foreground }}>Keep Refund</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.submitButton, { backgroundColor: '#EF4444' }]}
+                  onPress={submitCancelModal}
+                  disabled={cancelMutation.isPending}
+                >
+                  <Text style={{ color: 'white', fontWeight: '600' }}>
+                    {cancelMutation.isPending ? 'Cancelling...' : 'Confirm Cancellation'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -989,6 +1086,7 @@ const styles = StyleSheet.create({
   refundId: {
     marginBottom: 4,
   },
+  serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   refundIdText: {
     fontSize: 16,
     fontWeight: '600',

@@ -78,12 +78,13 @@ export default function ExpenseApprovalsScreen() {
     );
   };
 
-  const renderTransactionItem = ({ item }: { item: any }) => (
+  const renderTransactionItem = ({ item, index }: { item: any; index: number }) => (
     <TouchableOpacity
       onPress={() => router.push(`/expense/transactions/${item.id}` as any)}
-      activeOpacity={0.8}
+      activeOpacity={0.75}
     >
       <ThemedView style={[styles.transactionCard, { backgroundColor: colors.card }]}>
+        <ThemedText style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</ThemedText>
         <View style={styles.transactionHeader}>
           <ThemedText type="subtitle" style={styles.vendorName}>
             {item.vendor_name}
@@ -210,7 +211,8 @@ export default function ExpenseApprovalsScreen() {
                 <ThemedText type="subtitle">
                   {approvalAction === 'approve' ? 'Approve Transaction' : 'Reject Transaction'}
                 </ThemedText>
-                <TouchableOpacity onPress={() => setApprovalModalVisible(false)}>
+                <TouchableOpacity onPress={() => setApprovalModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
@@ -266,6 +268,7 @@ export default function ExpenseApprovalsScreen() {
 }
 
 const styles = StyleSheet.create({
+  serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   container: {
     flex: 1,
     padding: 16,

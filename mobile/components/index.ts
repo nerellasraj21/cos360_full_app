@@ -7,6 +7,9 @@ export * from './themed-view';
 // Theme Components
 export * from './ThemeToggle';
 
+// Button Components (Standardized)
+export * from './buttons';
+
 // UI Components
 export * from './ui/index';
 
@@ -26,6 +29,7 @@ export * from './LoadingIndicator';
 export * from './parallax-scroll-view';
 export * from './PermissionGuard';
 export * from './PermissionGuards';
+export { ScreenAccessGate } from './ScreenAccessGate';
 export * from './ToastProvider';
 
 // Navigation protection components

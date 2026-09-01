@@ -18,7 +18,7 @@ const sections = [
   {
     title: 'User Management',
     description: 'Manage user accounts and access across the organization',
-    icon: 'people' as const,
+    icon: 'person-circle' as const,
     color: '#6366F1',
     route: '/admin/users',
     resource: PERMISSION_RESOURCES.ADMIN_USERS,
@@ -46,6 +46,27 @@ const sections = [
     color: '#EF4444',
     route: '/admin/menu',
     resource: PERMISSION_RESOURCES.ADMIN_MENU,
+  },
+  {
+    title: 'School Settings',
+    description: 'School profile, address, logo, and principal signature',
+    icon: 'business' as const,
+    color: '#0EA5E9',
+    route: '/admin/school-settings',
+    resource: PERMISSION_RESOURCES.SCHOOL_SETTINGS,
+    // Backend only checks "read"/"update" on this resource — it has no "list" action,
+    // so gating on the default 'list' below would hide this for every role, admins included.
+    action: 'read' as const,
+  },
+  {
+    title: 'Announcements',
+    description: 'Send holiday notices via SMS to all parents',
+    icon: 'megaphone' as const,
+    color: '#F97316',
+    route: '/admin/announcements',
+    resource: PERMISSION_RESOURCES.ANNOUNCEMENTS,
+    // Backend only checks "send_sms" on this resource — same reasoning as above.
+    action: 'send_sms' as const,
   },
 ];
 
@@ -129,7 +150,7 @@ export default function AdminScreen() {
         {/* Grid */}
         <View style={styles.grid}>
           {sections.map((section, i) => {
-            const hasAccess = hasPermission ? hasPermission(section.resource, 'list') : false;
+            const hasAccess = hasPermission ? hasPermission(section.resource, (section as any).action ?? 'list') : false;
             return (
               <TouchableOpacity
                 key={i}

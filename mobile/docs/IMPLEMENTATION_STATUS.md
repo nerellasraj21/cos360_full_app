@@ -1,7 +1,72 @@
 # COS360 Mobile App — Implementation Status
 
-**As of:** April 2026
-**Version:** 2.5.0 (Exam Module — Full Web Parity + Shared Date/Time Pickers)
+**As of:** 2026-05-22
+**Version:** 3.0.0 (Full Web-to-Mobile Port — All Modules Complete)
+
+---
+
+## Changelog
+
+### v3.0.0 — 2026-05-22 — Full Web-to-Mobile Port
+
+**M16 — API Layer Integration**
+- Created `src/api/certificates.ts` — issuable certificate template CRUD + generate + list-generated
+- Enhanced `src/api/transportTypes.ts` — added `getAll`, `getById`, `update`, `delete` to `routeTypesApi` and `tripTypesApi`
+- Created `src/api/hooks/fee/` — `useCollection`, `useReceipts`, `useRefunds`, `useReports` React Query hooks
+- Created 7 new master hooks: `routes`, `vehicles`, `routeStops`, `trips`, `locations`, `transportPricing`, `parents`
+- Updated all hook barrel exports (`src/api/hooks/masters/index.ts`, `src/api/hooks/index.ts`, `src/api/index.ts`)
+
+**New Screens (14 added)**
+- `app/staff/index.tsx` — staff hub with nav cards
+- `app/staff/[id].tsx` — individual staff detail viewer
+- `app/parents/select-child.tsx` — parent child switcher
+- `app/parents/fees.tsx` — parent view of child fee summary
+- `app/parents/attendance.tsx` — parent view of child 30-day attendance
+- `app/parents/documents.tsx` — parent view of child certificates/documents
+- `app/fees/my-fees.tsx` — student own fee portal with progress bar
+- `app/exam/subject-schemes.tsx` — per-subject grade band config per exam
+- `app/exam/hall-ticket-download.tsx` — generate + bulk/individual hall ticket download
+- `app/students/index.tsx` — admin paginated student list with search
+- `app/transport/index.tsx` — transport overview with live stats + nav hub
+- `app/reports/index.tsx` — reports hub grid linking all 5 report screens
+- `app/admin/profile.tsx` — admin own account details
+- `app/profile/change-password.tsx` — secure password change form
+
+**Existing Screen Enhancements**
+- `app/reports/fee-reports.tsx` — Export CSV button (exports by active tab: collection/pending/structure)
+- `app/reports/student-reports.tsx` — Export CSV button
+- `app/reports/academic-reports.tsx` — Export CSV button
+- `app/reports/staff-reports.tsx` — Export CSV button
+- `app/reports/transport-reports.tsx` — Export CSV button
+- `app/expense/audit.tsx` — Date-range filter panel (From/To date inputs, client-side filtering, result count)
+- `app/expense/summary.tsx` — Export CSV button (category + type hierarchy)
+- `app/transport/route-stops.tsx` — Reorder mode (up/down chevrons swap stop sequence numbers via parallel API calls)
+- `app/admin/users.tsx` — System user list with search, role filter chips, edit modal (username/email/active), password reset modal
+- `app/calendar.tsx` — Grid view toggle: mini monthly calendar with colored holiday dot markers, day tooltip
+
+**Shared Utilities**
+- `src/utils/exportCsv.ts` — CSV export via React Native `Share` API (cross-platform, no expo-file-system needed)
+
+---
+
+### v2.6.0 — May 2026 — Type System Sync
+
+**Fee Types — Full Frontend Parity**
+- Updated `src/types/fee/collection.ts` to match frontend: correct payment methods (`upi`, `cheque`, `dd`), amount-based concessions, full field names (`admission_number`, `s_no`, `assigned_fee`, etc.)
+- Confirmed `src/types/fee/category.ts`, `term.ts`, `type.ts`, `mapping.ts`, `receipt.ts`, `refund.ts`, `report.ts` all in sync with frontend — no changes needed
+
+**Type File Restructure — Fixed Expo Router Warnings**
+- Removed 8 type-only `.ts` files from `app/` folder that were causing Expo Router "missing default export" warnings
+- Created `src/types/admission.ts` — student admission & parent types
+- Created `src/types/attendance.ts` — student & staff attendance types
+- Created `src/types/auth.ts` — auth state, login request/response, user/role types
+- Created `src/types/documents.ts` — student document & certificate types
+- Created `src/types/users.ts` — user management types
+- Updated `src/types/exam.ts` — replaced with complete frontend version (added `ExamSettings`, `ExamCreateFull`, `ExamListItem`, `Exam`, `ExamClassSection`, `ExamSubjectConfig`, `ExamDate`, `MarkEntryItem`, `TemplateCreate`, `TemplateRead`, `CopyPatternRequest`, `ApplyTemplateRequest`, etc.)
+- Created `src/lib/students.ts` — student API endpoint constants
+
+**Permissions**
+- Added `getResourcePermissions()` and `getPermission()` helper functions to `src/constants/permissions.ts` matching the frontend API
 
 ---
 
@@ -81,6 +146,7 @@
 | Protected mutation hook | ✅ Complete | `src/hooks/usePermissionProtectedMutation.ts` |
 | Screen permission hook | ✅ Complete | `src/hooks/useScreenPermissions.ts` |
 | Admin permission resources | ✅ Complete | `ADMIN_USERS`, `ADMIN_ROLES`, `ADMIN_PERMISSIONS`, `ADMIN_MENU` in `src/types/permissions.ts` |
+| Permission helper functions (web parity) | ✅ Complete | `getResourcePermissions()` + `getPermission()` added to `src/constants/permissions.ts` — matches frontend API (v2.6.0) |
 
 ---
 
@@ -161,6 +227,14 @@
 | Fee refunds | ✅ Complete | `app/fees/refunds.tsx` |
 | Fees API | ✅ Complete | `src/api/fees.ts` |
 | Fee type definitions | ✅ Complete | `src/types/fees.ts` |
+| Fee collection types (synced) | ✅ Complete | `src/types/fee/collection.ts` — synced with frontend: payment methods (`cash/upi/cheque/bank_transfer/dd`), amount-based concessions, full field parity (v2.6.0) |
+| Fee category types | ✅ Complete | `src/types/fee/category.ts` — synced with frontend (v2.6.0) |
+| Fee term types | ✅ Complete | `src/types/fee/term.ts` — synced with frontend (v2.6.0) |
+| Fee type types | ✅ Complete | `src/types/fee/type.ts` — synced with frontend (v2.6.0) |
+| Fee mapping types | ✅ Complete | `src/types/fee/mapping.ts` — synced with frontend (v2.6.0) |
+| Fee receipt types | ✅ Complete | `src/types/fee/receipt.ts` — synced with frontend (v2.6.0) |
+| Fee refund types | ✅ Complete | `src/types/fee/refund.ts` — synced with frontend (v2.6.0) |
+| Fee report types | ✅ Complete | `src/types/fee/report.ts` — synced with frontend (v2.6.0) |
 | Fee permission hook | ✅ Complete | `hooks/use-fee-permissions.ts` |
 
 ---

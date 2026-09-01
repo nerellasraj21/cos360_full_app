@@ -1,12 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastContext } from '../../../../components/ToastProvider';
-import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { useMastersQuery } from './useMastersQuery';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { rolesApi, permissionsApi, Role, RoleCreate, RoleUpdate, Permission, PermissionCreate, PermissionUpdate } from '../../index';
 
 // Get all roles - permission protected
 export function useRoles() {
-  return usePermissionProtectedQuery<Role[]>({
+  return useMastersQuery<Role[]>({
     queryKey: ['roles'],
     queryFn: () => rolesApi.getRoles(),
     resource: PERMISSION_RESOURCES.ROLES_PERMISSIONS,
@@ -16,7 +17,7 @@ export function useRoles() {
 
 // Get role by ID - permission protected
 export function useRole(id: string) {
-  return usePermissionProtectedQuery<Role>({
+  return useMastersQuery<Role>({
     queryKey: ['roles', id],
     queryFn: () => rolesApi.getRole(id),
     resource: PERMISSION_RESOURCES.ROLES_PERMISSIONS,
@@ -87,7 +88,7 @@ export function useDeleteRole() {
 
 // Get permissions with pagination - permission protected
 export function usePermissions(params?: { skip?: number; limit?: number; role_id?: string }) {
-  return usePermissionProtectedQuery<any>({
+  return useMastersQuery<any>({
     queryKey: ['resource-permissions', 'paginated', params?.skip, params?.limit, params?.role_id],
     queryFn: () => permissionsApi.getPermissions(params),
     resource: PERMISSION_RESOURCES.ROLES_PERMISSIONS,
@@ -97,7 +98,7 @@ export function usePermissions(params?: { skip?: number; limit?: number; role_id
 
 // Get permission matrix - permission protected
 export function usePermissionMatrix() {
-  return usePermissionProtectedQuery<any[]>({
+  return useMastersQuery<any[]>({
     queryKey: ['permissionMatrix'],
     queryFn: () => permissionsApi.getPermissionMatrix(),
     resource: PERMISSION_RESOURCES.ROLES_PERMISSIONS,
@@ -107,7 +108,7 @@ export function usePermissionMatrix() {
 
 // Get available resources - permission protected
 export function useAvailableResources() {
-  return usePermissionProtectedQuery<any>({
+  return useMastersQuery<any>({
     queryKey: ['availableResources'],
     queryFn: () => permissionsApi.getAvailableResources(),
     resource: PERMISSION_RESOURCES.ROLES_PERMISSIONS,
@@ -118,7 +119,7 @@ export function useAvailableResources() {
 
 // Get available actions - permission protected
 export function useAvailableActions() {
-  return usePermissionProtectedQuery<any>({
+  return useMastersQuery<any>({
     queryKey: ['availableActions'],
     queryFn: () => permissionsApi.getAvailableActions(),
     resource: PERMISSION_RESOURCES.ROLES_PERMISSIONS,

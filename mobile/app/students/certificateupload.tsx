@@ -12,6 +12,7 @@ import { useTheme } from '@/contexts';
 import { studentAdmissionsApi, certificateTypesApi, studentCertificatesApi } from '@/src/api/students';
 import StudentSelector from '@/components/StudentSelector';
 import { useToastContext } from '@/components/ToastProvider';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 interface CertificateForm {
   certificateName: string;
@@ -42,7 +43,7 @@ const certificateTypes = [
   'Other'
 ];
 
-export default function CertificateUploadPage() {
+function CertificateUploadPageContent() {
   const { colors } = useTheme();
   const { showSuccess, showError } = useToastContext();
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
@@ -204,7 +205,8 @@ export default function CertificateUploadPage() {
                   {(selectedFile.size! / 1024 / 1024).toFixed(2)} MB
                 </ThemedText>
               </View>
-              <TouchableOpacity onPress={() => setSelectedFile(null)}>
+              <TouchableOpacity onPress={() => setSelectedFile(null)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={20} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </View>
@@ -260,6 +262,7 @@ export default function CertificateUploadPage() {
             <TouchableOpacity
               style={[styles.studentSelector, { borderColor: colors.primary }]}
               onPress={() => setShowStudentModal(true)}
+              accessibilityLabel="Select student"
             >
               <ThemedText style={selectedStudent ? styles.selectedStudentText : styles.placeholderText}>
                 {selectedStudent ? selectedStudent.name : 'Select a student'}
@@ -314,7 +317,8 @@ export default function CertificateUploadPage() {
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle" style={styles.modalTitle}>Select Student</ThemedText>
-                <TouchableOpacity onPress={() => setShowStudentModal(false)}>
+                <TouchableOpacity onPress={() => setShowStudentModal(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
@@ -535,3 +539,16 @@ const styles = StyleSheet.create({
     padding: 16,
   },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function CertificateUploadPage() {
+  return (
+    <ScreenAccessGate
+      title="Upload Certificate"
+      permissions={[['student_certificates', 'create'], ['student_certificates', 'update']]}
+    >
+      <CertificateUploadPageContent />
+    </ScreenAccessGate>
+  );
+}

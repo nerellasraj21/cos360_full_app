@@ -42,8 +42,8 @@ apiClient.interceptors.request.use(
     // Note: Permission checks are handled at the component level using MobilePermissionGuard
     // This ensures unauthorized API calls are prevented by UI-level permission enforcement
 
-    // Skip token handling for login and refresh endpoints
-    const isAuthEndpoint = config.url?.includes('/auth/login') || config.url?.includes('/auth/refresh');
+    // Skip token handling for login, refresh and public pre-login endpoints
+    const isAuthEndpoint = config.url?.includes('/auth/login') || config.url?.includes('/auth/refresh') || config.url?.includes('/auth/academic-years');
 
     if (!isAuthEndpoint) {
       // Only try to get token for non-auth endpoints, and don't allow refresh during request
@@ -55,11 +55,15 @@ apiClient.interceptors.request.use(
       }
     }
 
+    // Always send a tenant header. Mirror the web app, which defaults to
+    // `test_tenant` (VITE_DEFAULT_TENANT) whenever a schema can't be resolved.
+    // Without this fallback, a missing stored schema means NO cschema header is
+    // sent and the backend serves an empty/default schema (e.g. no trips).
     const clientSchema = await getClientSchema();
-    if (clientSchema) {
-      config.headers.cschema = clientSchema;
-    } else if (__DEV__) {
-      console.warn('API Request: No client schema available');
+    const tenant = clientSchema || process.env.EXPO_PUBLIC_DEFAULT_TENANT || 'test_tenant';
+    config.headers.cschema = tenant;
+    if (!clientSchema && __DEV__) {
+      console.warn(`API Request: No stored client schema — defaulting cschema to "${tenant}"`);
     }
 
     // Add student context headers for parent users — guard each value to avoid "undefined" strings
@@ -89,8 +93,8 @@ apiClient.interceptors.response.use(
       console.error('API Error:', error.response?.status, originalRequest?.method?.toUpperCase(), originalRequest?.url, error.message);
     }
 
-    // Skip token refresh for auth endpoints
-    const isAuthEndpoint = originalRequest?.url?.includes('/auth/login') || originalRequest?.url?.includes('/auth/refresh');
+    // Skip token refresh for auth endpoints and public pre-login endpoints
+    const isAuthEndpoint = originalRequest?.url?.includes('/auth/login') || originalRequest?.url?.includes('/auth/refresh') || originalRequest?.url?.includes('/auth/academic-years');
 
     // Handle token refresh for 401 errors (but not for auth endpoints)
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {

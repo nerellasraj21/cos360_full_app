@@ -36,7 +36,8 @@ export default function PermissionTestScreen() {
     <ThemedView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}
+              accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
         </TouchableOpacity>
         <ThemedText type="title">Permission Test</ThemedText>

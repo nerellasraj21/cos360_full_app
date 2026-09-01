@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -13,6 +12,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppLayout } from '@/components';
 import { PermissionGuard, OwnResourcePermissionGuard } from '@/components';
+import { PrimaryButton, SecondaryButton, DestructiveButton } from '@/components/buttons';
 import {
   StudentProfileView,
   StudentProfileForm,
@@ -130,13 +130,15 @@ export default function ProfileTabScreen() {
               <>
                 <FallbackProfileView user={user} role={role} />
                 <View style={styles.actionsContainer}>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.logoutButton, { backgroundColor: colors.destructive }]}
+                  <DestructiveButton
                     onPress={handleLogout}
+                    fullWidth
+                    style={[styles.actionButton, { backgroundColor: colors.destructive }]}
+                    textStyle={styles.logoutButtonText}
+                    icon={<IconSymbol name="arrow.right.square" size={20} color="white" />}
                   >
-                    <IconSymbol name="arrow.right.square" size={20} color="white" />
-                    <ThemedText style={styles.logoutButtonText}>Logout</ThemedText>
-                  </TouchableOpacity>
+                    Logout
+                  </DestructiveButton>
                 </View>
               </>
             ) : (
@@ -149,18 +151,20 @@ export default function ProfileTabScreen() {
                   {profileQuery.error.message || 'Please try again later'}
                 </ThemedText>
                 <View style={styles.buttonRow}>
-                  <TouchableOpacity
-                    style={[styles.retryButton, { backgroundColor: colors.primary }]}
+                  <PrimaryButton
                     onPress={() => profileQuery.refetch?.()}
+                    style={[styles.retryButton, { backgroundColor: colors.primary }]}
+                    textStyle={styles.retryButtonText}
                   >
-                    <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.retryButton, { backgroundColor: colors.secondary, marginLeft: 12 }]}
+                    Retry
+                  </PrimaryButton>
+                  <SecondaryButton
                     onPress={() => setShowFallback(true)}
+                    style={[styles.retryButton, { backgroundColor: colors.secondary, marginLeft: 12 }]}
+                    textStyle={styles.retryButtonText}
                   >
-                    <ThemedText style={styles.retryButtonText}>Basic Profile</ThemedText>
-                  </TouchableOpacity>
+                    Basic Profile
+                  </SecondaryButton>
                 </View>
               </View>
             )
@@ -192,23 +196,27 @@ export default function ProfileTabScreen() {
                     resource={profileResource as any}
                     action="update_own"
                   >
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.editButton, { backgroundColor: colors.primary }]}
+                    <PrimaryButton
                       onPress={() => setIsEditing(true)}
+                      fullWidth
+                      style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                      textStyle={styles.editButtonText}
+                      icon={<IconSymbol name="pencil" size={20} color="white" />}
                     >
-                      <IconSymbol name="pencil" size={20} color="white" />
-                      <ThemedText style={styles.editButtonText}>Edit Profile</ThemedText>
-                    </TouchableOpacity>
+                      Edit Profile
+                    </PrimaryButton>
                   </OwnResourcePermissionGuard>
                 )}
 
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.logoutButton, { backgroundColor: colors.destructive }]}
+                <DestructiveButton
                   onPress={handleLogout}
+                  fullWidth
+                  style={[styles.actionButton, { backgroundColor: colors.destructive }]}
+                  textStyle={styles.logoutButtonText}
+                  icon={<IconSymbol name="arrow.right.square" size={20} color="white" />}
                 >
-                  <IconSymbol name="arrow.right.square" size={20} color="white" />
-                  <ThemedText style={styles.logoutButtonText}>Logout</ThemedText>
-                </TouchableOpacity>
+                  Logout
+                </DestructiveButton>
               </View>
             </>
           )}

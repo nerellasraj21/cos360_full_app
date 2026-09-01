@@ -24,7 +24,7 @@ import type {
   ExpenseReportExportResponse,
   ExpenseReportFilter,
   ExpenseApprovalRequest,
-  PaginatedResponse,
+  ExpensePaginatedResponse,
 } from '../types/expense';
 
 // Categories API
@@ -33,7 +33,7 @@ export const expenseCategoriesApi = {
     skip?: number;
     limit?: number;
     active_only?: boolean;
-  }): Promise<PaginatedResponse<ExpenseCategory>> => {
+  }): Promise<ExpensePaginatedResponse<ExpenseCategory>> => {
     const response = await apiClient.get('/expense/categories', { params });
     return response.data;
   },
@@ -70,7 +70,7 @@ export const expenseTypesApi = {
     skip?: number;
     limit?: number;
     active_only?: boolean;
-  }): Promise<PaginatedResponse<ExpenseType>> => {
+  }): Promise<ExpensePaginatedResponse<ExpenseType>> => {
     const response = await apiClient.get('/expense/types', { params });
     return response.data;
   },
@@ -210,7 +210,7 @@ export const expenseAuditApi = {
   getAuditLogs: async (
     transactionId: string,
     params?: { skip?: number; limit?: number }
-  ): Promise<PaginatedResponse<ExpenseAuditLog>> => {
+  ): Promise<ExpensePaginatedResponse<ExpenseAuditLog>> => {
     const response = await apiClient.get(`/expense/audit/transactions/${transactionId}/logs`, { params });
     return response.data;
   },
@@ -230,7 +230,7 @@ export const expenseAuditApi = {
     actor_user_id?: string;
     date_from?: string;
     date_to?: string;
-  }): Promise<PaginatedResponse<ExpenseAuditLog>> => {
+  }): Promise<ExpensePaginatedResponse<ExpenseAuditLog>> => {
     const response = await apiClient.get('/expense/audit', { params });
     return response.data;
   },
@@ -277,7 +277,7 @@ export const expenseDepartmentsApi = {
     skip?: number;
     limit?: number;
     active_only?: boolean;
-  }): Promise<PaginatedResponse<ExpenseDepartment>> => {
+  }): Promise<ExpensePaginatedResponse<ExpenseDepartment>> => {
     const response = await apiClient.get('/expense/departments', { params });
     return response.data;
   },

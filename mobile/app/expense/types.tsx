@@ -25,10 +25,11 @@ import {
   useUpdateExpenseTypeProtected,
 } from '@/hooks/use-expense-protected';
 import type { ExpenseType } from '@/src/types/expense';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const ORANGE = '#F97316';
 
-export default function ExpenseTypesScreen() {
+function ExpenseTypesScreenContent() {
   const { colors, theme } = useTheme();
   const { showSuccess, showError } = useToastContext();
   const [search, setSearch] = useState('');
@@ -41,8 +42,10 @@ export default function ExpenseTypesScreen() {
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const inputBg = theme === 'dark' ? '#0f0f23' : '#f8fafc';
+  const filterBg = theme === 'dark' ? '#13132b' : '#f8fafc';
 
-  const { data: raw, isLoading } = useExpenseTypesProtected();
+  // Filter by category server-side (matches the web app), so it refetches per category
+  const { data: raw, isLoading } = useExpenseTypesProtected({ category_id: categoryFilter || undefined });
   const { data: categoriesDropdown = [] } = useExpenseCategoryDropdownProtected();
   const createMutation = useCreateExpenseTypeProtected();
   const updateMutation = useUpdateExpenseTypeProtected();
@@ -62,14 +65,14 @@ export default function ExpenseTypesScreen() {
 
   const types: ExpenseType[] = useMemo(() => {
     const all: ExpenseType[] = Array.isArray(raw) ? raw : (raw as any)?.items ?? [];
+    // Category filtering is done server-side; only the text search runs here.
     return all.filter(t => {
-      const matchesCat = !categoryFilter || t.category_id === categoryFilter;
       const matchesSearch = !search.trim() ||
         t.name.toLowerCase().includes(search.toLowerCase()) ||
         (t.description ?? '').toLowerCase().includes(search.toLowerCase());
-      return matchesCat && matchesSearch;
+      return matchesSearch;
     });
-  }, [raw, search, categoryFilter]);
+  }, [raw, search]);
 
   const resetForm = () => { setForm({ name: '', category_id: '', description: '', is_active: true }); setEditing(null); };
 
@@ -111,8 +114,8 @@ export default function ExpenseTypesScreen() {
 
   return (
     <AppLayout title="Expense Types">
-      {/* Top bar: search + category filter + new button */}
-      <View style={styles.topBar}>
+      {/* Filters: search + category, stacked full-width so nothing wraps/overlaps on narrow screens */}
+      <View style={[styles.filtersSection, { backgroundColor: filterBg, borderColor: borderCol }]}>
         <View style={[styles.searchBox, { backgroundColor: inputBg, borderColor: borderCol }]}>
           <Ionicons name="search-outline" size={14} color={colors['muted-foreground']} />
           <TextInput
@@ -123,14 +126,28 @@ export default function ExpenseTypesScreen() {
             onChangeText={setSearch}
           />
         </View>
-        <View style={styles.filterDropdown}>
-          <CustomDropdown
-            data={categoryOptions}
-            value={categoryFilter}
-            onChange={(v: any) => setCategoryFilter(v?.toString() ?? '')}
-            placeholder="Filter by category"
-          />
-        </View>
+        <CustomDropdown
+          data={categoryOptions}
+          value={categoryFilter}
+          onChange={(v: any) => setCategoryFilter(v?.toString() ?? '')}
+          placeholder="All Categories"
+          containerStyle={{ marginBottom: 0 }}
+          style={{
+            height: 38,
+            paddingHorizontal: 10,
+            paddingVertical: 0,
+            borderRadius: 10,
+            backgroundColor: inputBg,
+            borderColor: borderCol,
+          }}
+          placeholderStyle={{ fontSize: 13 }}
+          selectedTextStyle={{ fontSize: 13 }}
+          iconStyle={{ width: 16, height: 16 }}
+        />
+      </View>
+
+      {/* New Type button, right-aligned in its own row */}
+      <View style={styles.newBtnRow}>
         <TouchableOpacity
           style={[styles.newBtn, { backgroundColor: '#556ee6' }]}
           onPress={() => { resetForm(); setShowModal(true); }}
@@ -193,12 +210,16 @@ export default function ExpenseTypesScreen() {
           <View style={[styles.modal, { backgroundColor: colors.background }]}>
             <View style={styles.modalTop}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-                {editing ? 'Edit Type' : 'New Type'}
+                {editing ? 'Edit Expense Type' : 'Create Expense Type'}
               </Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
+              <TouchableOpacity onPress={() => setShowModal(false)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color={colors.foreground} />
               </TouchableOpacity>
             </View>
+            <Text style={[styles.modalSubtitle, { color: colors['muted-foreground'] }]}>
+              Expense types must be linked to categories for proper classification
+            </Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={[styles.label, { color: colors.foreground }]}>Name *</Text>
               <TextInput
@@ -251,7 +272,7 @@ export default function ExpenseTypesScreen() {
                 <Text style={{ color: 'white', fontWeight: '600' }}>
                   {createMutation.isPending || updateMutation.isPending
                     ? 'Saving...'
-                    : editing ? 'Update' : 'Create'}
+                    : 'Save'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -264,16 +285,16 @@ export default function ExpenseTypesScreen() {
 }
 
 const styles = StyleSheet.create({
-  topBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10,
+  filtersSection: {
+    marginHorizontal: 16, marginTop: 12, marginBottom: 4,
+    borderRadius: 12, borderWidth: 1, padding: 14, gap: 10,
   },
   searchBox: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
     borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 38,
   },
   searchInput: { flex: 1, fontSize: 13, padding: 0 },
-  filterDropdown: { width: 140 },
+  newBtnRow: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, alignItems: 'flex-end' },
   newBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8,
@@ -296,8 +317,9 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
-  modalTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   modalTitle: { fontSize: 17, fontWeight: '700' },
+  modalSubtitle: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
   label: { fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 14 },
   input: { borderWidth: 1, borderRadius: 10, padding: 11, fontSize: 14 },
   textarea: { height: 80, textAlignVertical: 'top' },
@@ -306,3 +328,16 @@ const styles = StyleSheet.create({
   cancelBtn: { flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
   submitBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function ExpenseTypesScreen() {
+  return (
+    <ScreenAccessGate
+      title="Expense Types"
+      resources={['expense_types']}
+    >
+      <ExpenseTypesScreenContent />
+    </ScreenAccessGate>
+  );
+}

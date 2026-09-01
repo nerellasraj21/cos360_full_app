@@ -1,24 +1,26 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useTheme } from '@/contexts';
+import { expenseCategoriesApi, expenseTypesApi, expenseTransactionsApi } from '@/src/api/expense';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
 const ORANGE = '#F97316';
 
-const sections = [
-  { title: 'Categories',        description: 'Manage top-level expense categories such as Infrastructure, Utilities, and Operations', icon: 'folder' as const,               color: '#EA580C', route: '/expense/categories',   resource: PERMISSION_RESOURCES.EXPENSE_CATEGORIES,   action: 'list'    },
-  { title: 'Types',             description: 'Define specific expense types within each category with budget limits and controls',     icon: 'pricetag' as const,             color: ORANGE,    route: '/expense/types',        resource: PERMISSION_RESOURCES.EXPENSE_TYPES,        action: 'list'    },
-  { title: 'Departments',       description: 'Manage departments for expense tracking and allocation',                                 icon: 'business' as const,             color: '#EA580C', route: '/expense/departments',  resource: PERMISSION_RESOURCES.EXPENSE_DEPARTMENTS,  action: 'list'    },
-  { title: 'Transactions',      description: 'Create, view, and track all expense transactions with full approval workflow',           icon: 'swap-horizontal' as const,      color: '#C2410C', route: '/expense/transactions', resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS, action: 'list'    },
-  { title: 'Pending Approvals', description: 'Review and approve or reject expense transactions awaiting authorization',               icon: 'checkmark-done-circle' as const,color: ORANGE,    route: '/expense/approvals',    resource: PERMISSION_RESOURCES.EXPENSE_APPROVALS,    action: 'approve' },
-  { title: 'Summary',           description: 'Category-wise breakdown with type totals and grand total — filterable by academic year', icon: 'bar-chart' as const,            color: '#EA580C', route: '/expense/summary',      resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS, action: 'list'    },
-  { title: 'Reports',           description: 'Detailed expense reports with filters and export options',                               icon: 'document-text' as const,        color: '#C2410C', route: '/expense/reports',      resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS, action: 'list'    },
-  { title: 'Audit Trail',       description: 'Complete audit log of all expense actions including status changes and approvals',       icon: 'time' as const,                 color: '#C2410C', route: '/expense/audit',        resource: PERMISSION_RESOURCES.EXPENSE_AUDIT,        action: 'list'    },
-  { title: 'Settings',          description: 'Configure expense module settings and approval thresholds',                              icon: 'settings' as const,             color: ORANGE,    route: '/expense/settings',     resource: PERMISSION_RESOURCES.EXPENSE_CATEGORIES,   action: 'list'    },
+// Mirrors the web sidebar's Expense submenu: Overview, Categories, Types, Transactions, Summary.
+const sections: {
+  title: string; description: string; icon: any; color: string;
+  route: string; resource?: string; action?: string; alwaysShow?: boolean;
+}[] = [
+  { title: 'Overview',     description: 'Track, manage and approve expenses',                                                     icon: 'grid' as const,            color: '#9A3412', route: '/(tabs)/expense',       alwaysShow: true },
+  { title: 'Categories',   description: 'Manage top-level expense categories such as Infrastructure, Utilities, and Operations', icon: 'pricetag' as const,        color: '#EA580C', route: '/expense/categories',   resource: PERMISSION_RESOURCES.EXPENSE_CATEGORIES,   action: 'list' },
+  { title: 'Types',        description: 'Define specific expense types within each category with budget limits and controls',     icon: 'pricetags' as const,       color: ORANGE,    route: '/expense/types',        resource: PERMISSION_RESOURCES.EXPENSE_TYPES,        action: 'list' },
+  { title: 'Transactions', description: 'Create, view, and track all expense transactions with full approval workflow',           icon: 'swap-horizontal' as const, color: '#C2410C', route: '/expense/transactions', resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS, action: 'list' },
+  { title: 'Summary',      description: 'Category-wise breakdown with type totals and grand total — filterable by academic year', icon: 'list' as const,            color: '#EA580C', route: '/expense/summary',      resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS, action: 'list' },
 ];
 
 export default function ExpenseScreen() {
@@ -28,6 +30,23 @@ export default function ExpenseScreen() {
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
+
+  // Stat-card counts — mirrors the web Expense landing (Categories / Types / Transactions)
+  const { data: categoriesData } = useQuery({
+    queryKey: ['expense-categories-count'],
+    queryFn: () => expenseCategoriesApi.getCategories({ limit: 1 }),
+  });
+  const { data: typesData } = useQuery({
+    queryKey: ['expense-types-count'],
+    queryFn: () => expenseTypesApi.getTypes({ limit: 1 }),
+  });
+  const { data: transactionsData } = useQuery({
+    queryKey: ['expense-transactions-count'],
+    queryFn: () => expenseTransactionsApi.getTransactions({ limit: 1 }),
+  });
+  const categoryCount = categoriesData?.total ?? 0;
+  const typeCount = typesData?.total ?? 0;
+  const transactionCount = transactionsData?.total ?? 0;
 
   return (
     <AppLayout title="Expense Management">
@@ -46,13 +65,33 @@ export default function ExpenseScreen() {
           </View>
         </View>
 
+        {/* Stat cards — match the web Expense landing */}
+        <View style={styles.statsGrid}>
+          <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{categoryCount}</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Expense Categories</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{typeCount}</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Expense Types</Text>
+          </View>
+          <View style={[styles.statCard, styles.statCardWide, { backgroundColor: cardBg, borderColor: borderCol }]}>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{transactionCount}</Text>
+            <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Total Transactions</Text>
+          </View>
+        </View>
+
         {/* Section label */}
         <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>EXPENSE SECTIONS</Text>
 
         {/* Grid */}
         <View style={styles.grid}>
           {sections.map((section, i) => {
-            const hasAccess = hasPermission ? hasPermission(section.resource, section.action) : false;
+            const hasAccess = section.alwaysShow
+              ? true
+              : (section.resource && section.action
+                  ? hasPermission(section.resource, section.action)
+                  : false);
             return (
               <TouchableOpacity
                 key={i}
@@ -117,6 +156,16 @@ const styles = StyleSheet.create({
   },
   bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 2 },
   bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 16 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  statCard: {
+    width: '48%', borderRadius: 14, borderWidth: 1, padding: 16, minHeight: 88,
+    justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+  },
+  statCardWide: { width: '100%' },
+  statValue: { fontSize: 26, fontWeight: '800', marginBottom: 4 },
+  statLabel: { fontSize: 12, fontWeight: '600' },
   sectionLabel: {
     fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12,
   },

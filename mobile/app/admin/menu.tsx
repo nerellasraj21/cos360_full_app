@@ -18,10 +18,11 @@ import { useToastContext } from '@/components/ToastProvider';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts';
 import { authApi, type AuthMenu, type AuthMenuCreate, type AuthMenuUpdate } from '@/src/api/auth';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const COLOR = '#6366F1';
 
-export default function AdminMenuScreen() {
+function AdminMenuScreenContent() {
   const { colors, theme } = useTheme();
   const { showError } = useToastContext();
   const { confirm, modalProps } = useConfirmModal();
@@ -134,7 +135,8 @@ export default function AdminMenuScreen() {
           <Text style={styles.bannerTitle}>Menu Management</Text>
           <Text style={styles.bannerSub}>Configure sidebar navigation items</Text>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
+        <TouchableOpacity style={styles.addBtn} onPress={openCreate}
+              accessibilityLabel="Add">
           <Ionicons name="add" size={20} color="white" />
         </TouchableOpacity>
       </View>
@@ -188,6 +190,7 @@ export default function AdminMenuScreen() {
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: '#dbeafe' }]}
                   onPress={() => openEdit(menu)}
+              accessibilityLabel="Edit"
                 >
                   <Ionicons name="create-outline" size={16} color="#3b82f6" />
                 </TouchableOpacity>
@@ -196,6 +199,7 @@ export default function AdminMenuScreen() {
                   style={[styles.actionBtn, { backgroundColor: '#fee2e2', marginLeft: 6 }]}
                   onPress={() => handleDelete(menu)}
                   disabled={deleteMutation.isPending}
+              accessibilityLabel="Delete"
                 >
                   <Ionicons name="trash-outline" size={16} color="#ef4444" />
                 </TouchableOpacity>
@@ -213,7 +217,8 @@ export default function AdminMenuScreen() {
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                 {editingMenu ? 'Edit Menu Item' : 'Add Menu Item'}
               </Text>
-              <TouchableOpacity onPress={closeModal}>
+              <TouchableOpacity onPress={closeModal}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </View>
@@ -274,7 +279,7 @@ export default function AdminMenuScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: COLOR, opacity: isPending ? 0.7 : 1 }]}
+              style={[styles.submitBtn, { backgroundColor: COLOR, opacity: isPending ? 0.5 : 1 }]}
               onPress={handleSubmit}
               disabled={isPending}
             >
@@ -323,3 +328,16 @@ const styles = StyleSheet.create({
   submitBtn: { borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   submitBtnText: { color: 'white', fontSize: 15, fontWeight: '700' },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function AdminMenuScreen() {
+  return (
+    <ScreenAccessGate
+      title="Menu Management"
+      resources={['menu']}
+    >
+      <AdminMenuScreenContent />
+    </ScreenAccessGate>
+  );
+}

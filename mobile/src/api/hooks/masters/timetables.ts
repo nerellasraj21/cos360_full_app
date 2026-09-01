@@ -1,12 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastContext } from '../../../../components/ToastProvider';
-import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { useMastersQuery } from './useMastersQuery';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { timetableApi, FrontendTimetableCreate } from '../../index';
 
 // Get frontend timetable - permission protected
 export function useFrontendTimetable(sectionId: string) {
-  return usePermissionProtectedQuery<any>({
+  return useMastersQuery<any>({
     queryKey: ['timetable', sectionId],
     queryFn: () => timetableApi.getFrontendTimetable(sectionId),
     resource: PERMISSION_RESOURCES.TIMETABLES,

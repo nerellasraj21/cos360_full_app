@@ -1,21 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
 import {
-  FlatList, Modal, ScrollView, StyleSheet,
+  ActivityIndicator, FlatList, Modal, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
-import { useTheme } from '@/contexts';
+import { CustomDropdown } from '@/components/ui/dropdown';
+import { useAuth, useTheme } from '@/contexts';
 import {
   examsApi, markPermissionsApi,
-  ExamListItem, MarkPermission, MarkPermissionCreate,
+  ExamClassSection, ExamListItem, ExamSubjectConfig, MarkPermission, MarkPermissionCreate,
 } from '@/src/api/exam';
+import { staffApi } from '@/src/api/staff';
+import { getApiErrorMessage } from '@/src/utils/apiError';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
+import { isAdminRole } from '../../src/lib/roles';
 
 const EMPTY_FORM: MarkPermissionCreate = {
   user_id: '',
@@ -28,10 +32,21 @@ const EMPTY_FORM: MarkPermissionCreate = {
 
 export default function MarkPermissionsScreen() {
   const { examId } = useLocalSearchParams<{ examId?: string }>();
+  const router = useRouter();
   const { colors, theme } = useTheme();
+  const { role } = useAuth();
   const { hasPermission } = useMobilePermission();
   const qc = useQueryClient();
   const { showSuccess, showError } = useToastContext();
+
+  // Web parity (ExamDetail "Mark Permissions" tab): granting mark-entry
+  // permissions is admin-only.
+  const isAdmin = isAdminRole(role?.name);
+  useEffect(() => {
+    if (!isAdmin) {
+      router.replace('/exam/list');
+    }
+  }, [isAdmin, router]);
 
   const isDark = theme === 'dark';
   const cardBg = isDark ? '#1a1a2e' : '#ffffff';
@@ -43,9 +58,12 @@ export default function MarkPermissionsScreen() {
   const [grantModalVisible, setGrantModalVisible] = useState(false);
   const [form, setForm] = useState<MarkPermissionCreate>({ ...EMPTY_FORM });
 
-  const canGrant  = hasPermission?.('mark_permissions', 'create');
-  const canToggle = hasPermission?.('mark_permissions', 'update');
-  const canRevoke = hasPermission?.('mark_permissions', 'delete');
+  // Web parity: mark-permission authorization is granted under the "exams"
+  // resource — see mobile backend files/mark_permission_endpoints.py. Grant
+  // maps to the "update" action there (there is no separate "create" check).
+  const canGrant  = hasPermission?.('exams', 'update');
+  const canToggle = hasPermission?.('exams', 'update');
+  const canRevoke = hasPermission?.('exams', 'delete');
 
   const { data: examsData } = useQuery({
     queryKey: ['exams'],
@@ -59,6 +77,41 @@ export default function MarkPermissionsScreen() {
     enabled: !!selectedExamId,
   });
 
+  // Teacher picker — mirrors web's staff-search dropdown instead of a raw
+  // "paste teacher UUID" field.
+  const { data: staffData } = useQuery({
+    queryKey: ['staff-active-list'],
+    queryFn: () => staffApi.getStaffEnrollments({ is_active: true, limit: 200 }),
+  });
+  const teacherOptions = (staffData?.items ?? []).map(s => ({
+    label: `${s.first_name} ${s.last_name ?? ''}`.trim(),
+    value: s.user_id || s.id,
+  }));
+
+  // Optional scope — narrow the grant to one of the exam's own configured
+  // subjects instead of a raw class/section/subject-config UUID triplet.
+  const { data: subjectConfigs = [] } = useQuery<ExamSubjectConfig[]>({
+    queryKey: ['exam-subject-configs', selectedExamId],
+    queryFn: () => examsApi.getSubjectConfigs(selectedExamId),
+    enabled: !!selectedExamId,
+  });
+  const { data: classSections = [] } = useQuery<ExamClassSection[]>({
+    queryKey: ['exam-class-sections', selectedExamId],
+    queryFn: () => examsApi.getClassSections(selectedExamId),
+    enabled: !!selectedExamId,
+  });
+  const classSectionLabel = (classId: string, sectionId?: string | null) => {
+    const cs = classSections.find(c => c.class_id === classId && (c.section_id ?? '') === (sectionId ?? ''));
+    return cs ? (cs.section_name ? `${cs.class_name ?? classId} – ${cs.section_name}` : (cs.class_name ?? classId)) : classId;
+  };
+  const scopeOptions = [
+    { label: 'All subjects (full exam access)', value: '' },
+    ...subjectConfigs.map(sc => ({
+      label: `${classSectionLabel(sc.class_id, sc.section_id)} · ${sc.subject_name ?? sc.subject_id}`,
+      value: sc.id,
+    })),
+  ];
+
   const grantMutation = useMutation({
     mutationFn: (data: MarkPermissionCreate) => markPermissionsApi.grant(selectedExamId, data),
     onSuccess: () => {
@@ -67,7 +120,7 @@ export default function MarkPermissionsScreen() {
       setForm({ ...EMPTY_FORM });
       showSuccess('Permission Granted', 'Mark entry permission granted successfully.');
     },
-    onError: () => showError('Error', 'Failed to grant permission.'),
+    onError: (err: any) => showError('Error', getApiErrorMessage(err, 'Failed to grant permission.')),
   });
 
   const toggleMutation = useMutation({
@@ -77,7 +130,7 @@ export default function MarkPermissionsScreen() {
       qc.invalidateQueries({ queryKey: ['mark-permissions', selectedExamId] });
       showSuccess('Updated', 'Permission status updated.');
     },
-    onError: () => showError('Error', 'Failed to update permission.'),
+    onError: (err: any) => showError('Error', getApiErrorMessage(err, 'Failed to update permission.')),
   });
 
   const revokeMutation = useMutation({
@@ -86,17 +139,18 @@ export default function MarkPermissionsScreen() {
       qc.invalidateQueries({ queryKey: ['mark-permissions', selectedExamId] });
       showSuccess('Revoked', 'Mark entry permission revoked.');
     },
-    onError: () => showError('Error', 'Failed to revoke permission.'),
+    onError: (err: any) => showError('Error', getApiErrorMessage(err, 'Failed to revoke permission.')),
   });
 
   const handleGrant = () => {
-    if (!form.user_id.trim()) { showError('Validation', 'Teacher / User ID is required.'); return; }
+    if (!form.user_id.trim()) { showError('Validation', 'Select a teacher.'); return; }
+    const scopedConfig = subjectConfigs.find(sc => sc.id === form.subject_config_id);
     grantMutation.mutate({
       ...form,
       teacher_id: form.user_id,
       subject_config_id: form.subject_config_id || undefined,
-      class_id: form.class_id || undefined,
-      section_id: form.section_id || undefined,
+      class_id: scopedConfig?.class_id || undefined,
+      section_id: scopedConfig?.section_id || undefined,
       scope_note: form.scope_note || undefined,
     });
   };
@@ -104,30 +158,28 @@ export default function MarkPermissionsScreen() {
   const handleRevoke = (perm: MarkPermission) => {
     confirm({
       title: 'Revoke Permission',
-      message: `Remove mark entry access for teacher ${perm.teacher_id}?`,
+      message: `Remove mark entry access for ${perm.user_display_name ?? perm.user_id ?? perm.teacher_id}?`,
       confirmLabel: 'Revoke',
       destructive: true,
       onConfirm: () => revokeMutation.mutate(perm.id),
     });
   };
 
-  const renderPermission = ({ item }: { item: MarkPermission }) => (
+  const renderPermission = ({ item, index }: { item: MarkPermission; index: number }) => (
     <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
       <View style={[styles.iconBox, { backgroundColor: item.is_active ? '#3B82F618' : '#6B728018' }]}>
         <Ionicons name="person" size={20} color={item.is_active ? '#3B82F6' : '#6B7280'} />
       </View>
       <View style={{ flex: 1 }}>
+        <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
         <Text style={[styles.teacherText, { color: colors.foreground }]}>
-          {item.teacher_id}
+          {item.user_display_name ?? item.user_id ?? item.teacher_id}
         </Text>
-        <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
-          Class: {item.class_id}{item.section_id ? ` · Section: ${item.section_id}` : ''}
-        </Text>
-        {item.subject_config_id && (
+        {item.granted_by ? (
           <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
-            Subject Config: {item.subject_config_id}
+            Granted by: {item.granted_by}
           </Text>
-        )}
+        ) : null}
         <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
           Granted: {new Date(item.created_at).toLocaleDateString()}
         </Text>
@@ -151,13 +203,17 @@ export default function MarkPermissionsScreen() {
           </TouchableOpacity>
         )}
         {canRevoke && (
-          <TouchableOpacity style={styles.iconBtn} onPress={() => handleRevoke(item)}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => handleRevoke(item)}
+              accessibilityLabel="Close">
             <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
           </TouchableOpacity>
         )}
       </View>
     </View>
   );
+
+  // Non-admins are redirected by the effect above; render nothing meanwhile.
+  if (!isAdmin) return null;
 
   return (
     <AppLayout title="Mark Permissions">
@@ -190,7 +246,7 @@ export default function MarkPermissionsScreen() {
           </View>
         ) : isLoading ? (
           <View style={styles.centered}>
-            <Text style={{ color: colors['muted-foreground'] }}>Loading permissions…</Text>
+            <ActivityIndicator size="large" color="#556ee6" />
           </View>
         ) : (
           <FlatList
@@ -226,7 +282,8 @@ export default function MarkPermissionsScreen() {
 
         {/* FAB */}
         {canGrant && !!selectedExamId && (
-          <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={() => setGrantModalVisible(true)}>
+          <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={() => setGrantModalVisible(true)}
+              accessibilityLabel="Add">
             <Ionicons name="add" size={28} color="white" />
           </TouchableOpacity>
         )}
@@ -239,49 +296,29 @@ export default function MarkPermissionsScreen() {
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.foreground }]}>Grant Mark Permission</Text>
-                <TouchableOpacity onPress={() => setGrantModalVisible(false)}>
+                <TouchableOpacity onPress={() => setGrantModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={22} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
 
-              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Teacher / User ID *</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-                value={form.user_id}
-                onChangeText={v => setForm(f => ({ ...f, user_id: v, teacher_id: v }))}
-                placeholder="Paste teacher UUID"
-                placeholderTextColor={colors['muted-foreground']}
-                autoCapitalize="none"
+              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Teacher *</Text>
+              <CustomDropdown
+                data={teacherOptions}
+                value={form.user_id || null}
+                onChange={v => setForm(f => ({ ...f, user_id: v ? String(v) : '', teacher_id: v ? String(v) : '' }))}
+                placeholder="Select teacher"
+                containerStyle={{ marginBottom: 4 }}
               />
 
-              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Subject Config ID (optional)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
+              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Scope (optional)</Text>
+              <CustomDropdown
+                data={scopeOptions}
                 value={form.subject_config_id ?? ''}
-                onChangeText={v => setForm(f => ({ ...f, subject_config_id: v }))}
-                placeholder="Leave blank for all subjects"
-                placeholderTextColor={colors['muted-foreground']}
-                autoCapitalize="none"
-              />
-
-              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Class ID (optional)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-                value={form.class_id ?? ''}
-                onChangeText={v => setForm(f => ({ ...f, class_id: v }))}
-                placeholder="Leave blank for all classes"
-                placeholderTextColor={colors['muted-foreground']}
-                autoCapitalize="none"
-              />
-
-              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Section ID (optional)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-                value={form.section_id ?? ''}
-                onChangeText={v => setForm(f => ({ ...f, section_id: v }))}
-                placeholder="Leave blank for all sections"
-                placeholderTextColor={colors['muted-foreground']}
-                autoCapitalize="none"
+                onChange={v => setForm(f => ({ ...f, subject_config_id: v ? String(v) : '' }))}
+                placeholder="All subjects (full exam access)"
+                search={false}
+                containerStyle={{ marginBottom: 4 }}
               />
 
               <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Scope Note (optional)</Text>
@@ -315,6 +352,7 @@ export default function MarkPermissionsScreen() {
 }
 
 const styles = StyleSheet.create({
+  serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   container: { flex: 1 },
   filterRow: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
   filterLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6 },

@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 
@@ -13,10 +14,12 @@ import { ScreenLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { vehiclesApi, tripsApi } from '@/src/api/masters';
 import { routesApi } from '@/src/api/transport';
+import { exportToCsv } from '@/src/utils/exportCsv';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const COLOR = '#F59E0B';
 
-export default function TransportReportsScreen() {
+function TransportReportsScreenContent() {
   const { colors, theme } = useTheme();
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -39,6 +42,17 @@ export default function TransportReportsScreen() {
   const activeRoutes = (routes as any[]).filter(r => r.is_active).length;
   const activeVehicles = (vehicles as any[]).filter(v => v.is_active).length;
 
+  const handleExport = () =>
+    exportToCsv(
+      'transport_report.csv',
+      ['Type', 'Name', 'Details', 'Status'],
+      [
+        ...(routes as any[]).map(r => ['Route', r.route_name, `${r.starting_stop} → ${r.ending_stop}`, r.is_active ? 'Active' : 'Inactive']),
+        ...(vehicles as any[]).map(v => ['Vehicle', v.name, v.registration_number, v.is_active ? 'Active' : 'Inactive']),
+        ...(trips as any[]).map(t => ['Trip', `Trip #${t.trip_number}`, t.id, '']),
+      ],
+    );
+
   return (
     <ScreenLayout title="Transport Reports">
       <View style={[styles.banner, { backgroundColor: COLOR }]}>
@@ -47,6 +61,10 @@ export default function TransportReportsScreen() {
           <Ionicons name="bus" size={24} color="white" />
         </View>
         <Text style={styles.bannerTitle}>Transport Overview</Text>
+        <TouchableOpacity style={styles.exportBtn} onPress={handleExport}>
+          <Ionicons name="share-outline" size={16} color="white" />
+          <Text style={styles.exportBtnText}>Export</Text>
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (
@@ -144,7 +162,9 @@ const styles = StyleSheet.create({
   banner: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, overflow: 'hidden' },
   bannerDecor: { position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.12)' },
   bannerIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700' },
+  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700', flex: 1 },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  exportBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingText: { fontSize: 14 },
   content: { padding: 16, paddingBottom: 32 },
@@ -164,3 +184,17 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', gap: 8, paddingTop: 32 },
   emptyText: { fontSize: 14 },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function TransportReportsScreen() {
+  return (
+    <ScreenAccessGate
+      title="Transport Reports"
+      resources={['transport_routes', 'transport_vehicles', 'transport_trips']}
+      blockRoles={['student']}
+    >
+      <TransportReportsScreenContent />
+    </ScreenAccessGate>
+  );
+}

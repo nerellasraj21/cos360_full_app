@@ -21,3 +21,7 @@ export * from '../src/hooks/useScreenPermissions';
 // Staff API hooks
 export * from './use-staff-api';
 
+// Form dirty-state / unsaved-changes guard
+export * from './use-dirty-tracking';
+export * from './use-form-dirty-guard';
+

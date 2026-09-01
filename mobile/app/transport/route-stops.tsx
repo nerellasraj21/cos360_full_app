@@ -6,11 +6,12 @@ import CustomDropdown from '@/components/ui/dropdown';
 import { TimePickerModal, formatTime12h } from '@/components/ui';
 import { useTheme } from '@/contexts';
 import { useRoutesDropdown } from '@/hooks';
-import { RouteStop } from '../../src/api';
+import { RouteStop, RouteStopCreate } from '../../src/api';
 import { useRouteStops, useCreateRouteStop, useUpdateRouteStop, useDeleteRouteStop } from '../../hooks/use-transport';
 import { PERMISSION_RESOURCES } from '../../src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -28,8 +29,12 @@ type TimeField = 'reaching_time' | 'pickup_time' | 'drop_time';
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function RouteStopsScreen() {
+  // Opened from the Routes screen: ?routeId preselects the route, ?add=1 also
+  // opens the add-stop form straight away.
+  const { routeId, add } = useLocalSearchParams<{ routeId?: string; add?: string }>();
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRouteId, setSelectedRouteId] = useState('');
+  const [selectedRouteId, setSelectedRouteId] = useState(routeId ?? '');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingStop, setEditingStop] = useState<RouteStop | null>(null);
   const [formData, setFormData] = useState({
@@ -78,7 +83,9 @@ export default function RouteStopsScreen() {
   const { data: routesData } = useRoutesDropdown();
   const routes = routesData || [];
 
-  // Handle mutation success/error states
+  // The transport hooks don't toast, so the screen owns all user feedback.
+  // Error toasts surface the real backend message (the API client sets
+  // error.message to the FastAPI `detail`), not a generic string.
   React.useEffect(() => {
     if (createMutation.isSuccess) {
       setIsModalVisible(false);
@@ -87,7 +94,7 @@ export default function RouteStopsScreen() {
       createMutation.reset();
     }
     if (createMutation.isError) {
-      showError('Error', 'Failed to create route stop');
+      showError('Error', createMutation.error?.message || 'Failed to create route stop');
     }
   }, [createMutation.isSuccess, createMutation.isError]);
 
@@ -99,7 +106,7 @@ export default function RouteStopsScreen() {
       updateMutation.reset();
     }
     if (updateMutation.isError) {
-      showError('Error', 'Failed to update route stop');
+      showError('Error', updateMutation.error?.message || 'Failed to update route stop');
     }
   }, [updateMutation.isSuccess, updateMutation.isError]);
 
@@ -109,30 +116,33 @@ export default function RouteStopsScreen() {
       deleteMutation.reset();
     }
     if (deleteMutation.isError) {
-      showError('Error', 'Failed to delete route stop');
+      showError('Error', deleteMutation.error?.message || 'Failed to delete route stop');
     }
   }, [deleteMutation.isSuccess, deleteMutation.isError]);
 
-  // Filter route stops based on search
+  // Filter route stops by the selected route and the search box. The route_id
+  // filter is also applied client-side so a backend that ignores the query
+  // param can't leak other routes' stops into the list. Stops are ordered by
+  // their stop number, matching the web page.
   const filteredRouteStops = useMemo(() => {
     if (!routeStopsData || !Array.isArray(routeStopsData)) return [];
 
-    return routeStopsData.filter((stop: RouteStop) => {
-      const matchesSearch = stop.name.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
-    });
-  }, [routeStopsData, searchQuery]);
+    return routeStopsData
+      .filter((stop: RouteStop) => {
+        const matchesRoute = !selectedRouteId || stop.route_id === selectedRouteId;
+        const matchesSearch = stop.name.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesRoute && matchesSearch;
+      })
+      .sort((a: RouteStop, b: RouteStop) => a.number - b.number);
+  }, [routeStopsData, searchQuery, selectedRouteId]);
 
-  const routeOptions = [
-    { label: 'All Routes', value: '' },
-    ...routes.map(route => ({ label: route.route_name, value: route.id })),
-  ];
+  const routeOptions = routes.map(route => ({ label: route.route_name, value: route.id }));
 
   const resetForm = () => {
     setFormData({
       route_id: selectedRouteId,
       name: '',
-      number: 1,
+      number: sortedStops.length + 1,
       reaching_time: '07:00:00',
       pickup_time: '',
       drop_time: '',
@@ -141,6 +151,17 @@ export default function RouteStopsScreen() {
     });
     setEditingStop(null);
   };
+
+  const autoAddHandled = React.useRef(false);
+  useEffect(() => {
+    if (add === '1' && !autoAddHandled.current) {
+      autoAddHandled.current = true;
+      resetForm();
+      setIsModalVisible(true);
+    }
+    // resetForm is stable enough here; this runs once per navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [add]);
 
   const handleEdit = (stop: RouteStop) => {
     setEditingStop(stop);
@@ -173,33 +194,54 @@ export default function RouteStopsScreen() {
       return;
     }
 
-    if (!formData.route_id) {
+    const routeId = formData.route_id || selectedRouteId;
+    if (!routeId) {
       showError('Error', 'Route is required');
       return;
     }
 
+    // `reaching_time` is derived from the up journey time, the way the web
+    // dialog does it, so the form only asks for the fields the web form has.
+    // Empty pickup/drop times are omitted — an empty string '' is NOT a valid
+    // time and the backend rejects it with a 422.
+    const payload: RouteStopCreate = {
+      route_id: routeId,
+      name: formData.name.trim(),
+      number: formData.number,
+      reaching_time: formData.pickup_time || formData.reaching_time || '00:00:00',
+      fees: formData.fees || 0,
+      is_active: formData.is_active,
+    };
+    if (formData.pickup_time) payload.pickup_time = formData.pickup_time;
+    if (formData.drop_time) payload.drop_time = formData.drop_time;
+
     if (editingStop) {
-      updateMutation.mutate({ id: editingStop.id, data: formData });
+      updateMutation.mutate({ id: editingStop.id, data: payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload);
     }
   };
 
+  // Stops sorted by sequence number, matching the web table's row order.
+  const sortedStops = useMemo(
+    () => [...filteredRouteStops].sort((a, b) => a.number - b.number),
+    [filteredRouteStops],
+  );
+
   const renderRouteStopItem = useCallback(({ item }: { item: RouteStop }) => {
-    const route = routes.find(r => r.id === item.route_id);
+    const sorted = [...filteredRouteStops].sort((a, b) => a.number - b.number);
+    const idx = sorted.findIndex(s => s.id === item.id);
 
     return (
       <View style={[styles.stopCard, { backgroundColor: colors.card }]}>
         <View style={styles.stopHeader}>
           <View style={styles.stopInfo}>
+            <ThemedText style={[styles.stopSerial, { color: colors['muted-foreground'] }]}>
+              {idx + 1}
+            </ThemedText>
             <ThemedText type="subtitle" style={styles.stopName}>
               {item.name}
             </ThemedText>
-            <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#10B981' : '#EF4444' }]}>
-              <ThemedText style={styles.statusText}>
-                {item.is_active ? 'Active' : 'Inactive'}
-              </ThemedText>
-            </View>
           </View>
           <View style={styles.actionButtons}>
             <UpdatePermissionGuard
@@ -207,6 +249,7 @@ export default function RouteStopsScreen() {
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.primary }]}
                 onPress={() => handleEdit(item)}
+              accessibilityLabel="Edit"
               >
                 <Ionicons name="create" size={16} color="white" />
               </TouchableOpacity>
@@ -216,6 +259,7 @@ export default function RouteStopsScreen() {
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
                 onPress={() => handleDelete(item)}
+              accessibilityLabel="Delete"
               >
                 <Ionicons name="trash" size={16} color="white" />
               </TouchableOpacity>
@@ -225,43 +269,27 @@ export default function RouteStopsScreen() {
 
         <View style={styles.stopDetails}>
           <View style={styles.detailRow}>
-            <Ionicons name="bus" size={16} color={colors['muted-foreground']} />
-            <ThemedText style={styles.detailText}>
-              Route: {route?.route_name || 'Unknown Route'}
-            </ThemedText>
-          </View>
-          <View style={styles.detailRow}>
-            <Ionicons name="time" size={16} color={colors['muted-foreground']} />
-            <ThemedText style={styles.detailText}>
-              Stop #{item.number} • {formatTime12h(item.reaching_time)}
-            </ThemedText>
-          </View>
-          {item.pickup_time ? (
-            <View style={styles.detailRow}>
-              <Ionicons name="arrow-up-circle" size={16} color={colors['muted-foreground']} />
-              <ThemedText style={styles.detailText}>
-                Pickup: {formatTime12h(item.pickup_time)}
-              </ThemedText>
-            </View>
-          ) : null}
-          {item.drop_time ? (
-            <View style={styles.detailRow}>
-              <Ionicons name="arrow-down-circle" size={16} color={colors['muted-foreground']} />
-              <ThemedText style={styles.detailText}>
-                Drop: {formatTime12h(item.drop_time)}
-              </ThemedText>
-            </View>
-          ) : null}
-          <View style={styles.detailRow}>
             <Ionicons name="cash" size={16} color={colors['muted-foreground']} />
             <ThemedText style={styles.detailText}>
-              Fees: ₹{item.fees}
+              Amount (₹/yr): ₹{(item.fees ?? 0).toLocaleString('en-IN')}
+            </ThemedText>
+          </View>
+          <View style={styles.detailRow}>
+            <Ionicons name="arrow-up-circle" size={16} color={colors['muted-foreground']} />
+            <ThemedText style={styles.detailText}>
+              Up Journey Time: {item.pickup_time ? item.pickup_time.substring(0, 5) : '—'}
+            </ThemedText>
+          </View>
+          <View style={styles.detailRow}>
+            <Ionicons name="arrow-down-circle" size={16} color={colors['muted-foreground']} />
+            <ThemedText style={styles.detailText}>
+              Down Journey Time: {item.drop_time ? item.drop_time.substring(0, 5) : '—'}
             </ThemedText>
           </View>
         </View>
       </View>
     );
-  }, [colors, routes]);
+  }, [colors, filteredRouteStops]);
 
   if (error) {
     return (
@@ -292,18 +320,24 @@ export default function RouteStopsScreen() {
               Access Denied
             </ThemedText>
             <ThemedText style={styles.emptyText}>
-              You don't have permission to view route stops
+              You don&apos;t have permission to view route stops
             </ThemedText>
           </View>
         }
       >
         <View style={styles.container}>
-          {/* Header with Add Button */}
+          {/* Header with Add Stop button. Stop reordering was removed — the web
+              page has no such feature; stop order is fixed by Stop Number at
+              creation time, same as here now. */}
           <View style={styles.header}>
             <CreatePermissionGuard
               resource={PERMISSION_RESOURCES.TRANSPORT_ROUTE_STOPS}>
               <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: colors.primary }]}
+                style={[
+                  styles.addButton,
+                  { backgroundColor: colors.primary, opacity: selectedRouteId ? 1 : 0.5 },
+                ]}
+                disabled={!selectedRouteId}
                 onPress={() => {
                   resetForm();
                   setIsModalVisible(true);
@@ -322,7 +356,7 @@ export default function RouteStopsScreen() {
             data={routeOptions}
             value={selectedRouteId}
             onChange={(value) => setSelectedRouteId(value?.toString() || '')}
-            placeholder="Select route"
+            placeholder="Select a route to view stops..."
           />
         </View>
 
@@ -337,7 +371,8 @@ export default function RouteStopsScreen() {
             onChangeText={setSearchQuery}
           />
           {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityLabel="Close">
               <Ionicons name="close" size={20} color={colors['muted-foreground']} />
             </TouchableOpacity>
           ) : null}
@@ -345,7 +380,7 @@ export default function RouteStopsScreen() {
 
         {/* Route Stops List */}
         <FlatList
-          data={filteredRouteStops}
+          data={selectedRouteId ? sortedStops : []}
           renderItem={renderRouteStopItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
@@ -366,7 +401,7 @@ export default function RouteStopsScreen() {
               <ThemedText style={styles.emptyText}>
                 {selectedRouteId
                   ? 'No stops found for selected route'
-                  : 'Select a route to view stops or add your first stop'}
+                  : 'Select a route to view its stops.'}
               </ThemedText>
             </View>
           }
@@ -385,24 +420,18 @@ export default function RouteStopsScreen() {
                 <ThemedText type="title" style={styles.modalTitle}>
                   {editingStop ? 'Edit Route Stop' : 'Add Route Stop'}
                 </ThemedText>
-                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors.foreground} />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.modalBody}>
-                <View style={styles.formGroup}>
-                  <ThemedText style={styles.label}>Route *</ThemedText>
-                  <CustomDropdown
-                    data={routes.map(route => ({ label: route.route_name, value: route.id }))}
-                    value={formData.route_id}
-                    onChange={(value) => setFormData(prev => ({ ...prev, route_id: value?.toString() || '' }))}
-                    placeholder="Select route"
-                  />
-                </View>
-
-                <View style={styles.formRow}>
-                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                {/* Stop Number is only asked for when creating a stop, matching the
+                    web page — its inline row edit never lets you change the number,
+                    only the Add Stop dialog does. */}
+                {editingStop ? (
+                  <View style={styles.formGroup}>
                     <ThemedText style={styles.label}>Stop Name *</ThemedText>
                     <TextInput
                       style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
@@ -412,48 +441,47 @@ export default function RouteStopsScreen() {
                       onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
                     />
                   </View>
-                  <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                    <ThemedText style={styles.label}>Stop Number *</ThemedText>
-                    <TextInput
-                      style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
-                      placeholder="1"
-                      placeholderTextColor={colors['muted-foreground']}
-                      value={formData.number.toString()}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, number: parseInt(text) || 1 }))}
-                      keyboardType="numeric"
-                    />
+                ) : (
+                  <View style={styles.formRow}>
+                    <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                      <ThemedText style={styles.label}>Stop Name *</ThemedText>
+                      <TextInput
+                        style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+                        placeholder="Enter stop name"
+                        placeholderTextColor={colors['muted-foreground']}
+                        value={formData.name}
+                        onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+                      />
+                    </View>
+                    <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                      <ThemedText style={styles.label}>Stop Number *</ThemedText>
+                      <TextInput
+                        style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+                        placeholder="1"
+                        placeholderTextColor={colors['muted-foreground']}
+                        value={formData.number.toString()}
+                        onChangeText={(text) => setFormData(prev => ({ ...prev, number: parseInt(text) || 1 }))}
+                        keyboardType="numeric"
+                      />
+                    </View>
                   </View>
+                )}
+
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.label}>Amount (₹/yr)</ThemedText>
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+                    placeholder="0"
+                    placeholderTextColor={colors['muted-foreground']}
+                    value={formData.fees ? formData.fees.toString() : ''}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, fees: parseFloat(text) || 0 }))}
+                    keyboardType="numeric"
+                  />
                 </View>
 
                 <View style={styles.formRow}>
                   <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <ThemedText style={styles.label}>Reaching Time *</ThemedText>
-                    <TouchableOpacity
-                      style={[styles.input, styles.timeButton, { borderColor: colors.border }]}
-                      onPress={() => openTimePicker('reaching_time')}
-                    >
-                      <Ionicons name="time-outline" size={16} color={colors['muted-foreground']} />
-                      <ThemedText style={[styles.timeButtonText, { color: colors.foreground, flex: 1 }]}>
-                        {formatTime12h(formData.reaching_time) || '7:00 AM'}
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                    <ThemedText style={styles.label}>Fees *</ThemedText>
-                    <TextInput
-                      style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
-                      placeholder="0"
-                      placeholderTextColor={colors['muted-foreground']}
-                      value={formData.fees.toString()}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, fees: parseFloat(text) || 0 }))}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.formRow}>
-                  <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                    <ThemedText style={styles.label}>Pickup Time</ThemedText>
+                    <ThemedText style={styles.label}>Up Journey Time *</ThemedText>
                     <View style={styles.timeRow}>
                       <TouchableOpacity
                         style={[styles.input, styles.timeButton, styles.timeButtonFlex, { borderColor: colors.border }]}
@@ -468,6 +496,7 @@ export default function RouteStopsScreen() {
                         <TouchableOpacity
                           style={styles.clearTimeBtn}
                           onPress={() => clearTime('pickup_time')}
+              accessibilityLabel="Close"
                         >
                           <Ionicons name="close-circle" size={20} color={colors['muted-foreground']} />
                         </TouchableOpacity>
@@ -475,7 +504,7 @@ export default function RouteStopsScreen() {
                     </View>
                   </View>
                   <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                    <ThemedText style={styles.label}>Drop Time</ThemedText>
+                    <ThemedText style={styles.label}>Down Journey Time</ThemedText>
                     <View style={styles.timeRow}>
                       <TouchableOpacity
                         style={[styles.input, styles.timeButton, styles.timeButtonFlex, { borderColor: colors.border }]}
@@ -490,6 +519,7 @@ export default function RouteStopsScreen() {
                         <TouchableOpacity
                           style={styles.clearTimeBtn}
                           onPress={() => clearTime('drop_time')}
+              accessibilityLabel="Close"
                         >
                           <Ionicons name="close-circle" size={20} color={colors['muted-foreground']} />
                         </TouchableOpacity>
@@ -566,6 +596,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     marginBottom: 16,
+    gap: 10,
   },
   addButton: {
     flexDirection: 'row',
@@ -623,9 +654,16 @@ const styles = StyleSheet.create({
   },
   stopInfo: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  stopSerial: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   stopName: {
-    marginBottom: 8,
+    flexShrink: 1,
   },
   statusBadge: {
     paddingHorizontal: 8,

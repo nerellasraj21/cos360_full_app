@@ -1,22 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToastContext as useToast } from '../../../../components/ToastProvider';
 import { useAuth } from '../../../../contexts/AuthContext';
-import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import {
   studentDocumentsApi,
+  StudentAllDocumentItem,
   DocumentResponse,
   DocumentCreate,
   DocumentUpdate
 } from '../../students';
 
 
-export function useAllDocuments(params?: { student_id?: string; document_type?: string }) {
-  return usePermissionProtectedQuery<DocumentResponse[]>({
-    resource: PERMISSION_RESOURCES.STUDENT_DOCUMENTS,
-    action: 'list',
+export function useAllDocuments(params?: { student_id?: string }) {
+  return useQuery<StudentAllDocumentItem[]>({
     queryKey: ['documents', 'all', params],
-    queryFn: () => studentDocumentsApi.listDocuments(params),
+    queryFn: () => studentDocumentsApi.getAllDocuments(params),
     enabled: !!params?.student_id,
   });
 }

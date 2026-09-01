@@ -1,14 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastContext } from '../../../../components/ToastProvider';
-import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { useMastersQuery } from './useMastersQuery';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { academicYearsApi, AcademicYear } from '../../index';
 
 // Get all academic years - permission protected
 export function useAcademicYears() {
-  return usePermissionProtectedQuery<AcademicYear[]>({
+  return useMastersQuery<AcademicYear[]>({
     queryKey: ['academicYears'],
-    queryFn: () => academicYearsApi.getAcademicYears(),
+    queryFn: () => academicYearsApi.getAcademicYears({ limit: 100 }),
     resource: PERMISSION_RESOURCES.ACADEMIC_YEARS,
     action: 'list',
   });
@@ -16,7 +17,7 @@ export function useAcademicYears() {
 
 // Get academic years dropdown - permission protected
 export function useAcademicYearsDropdown() {
-  return usePermissionProtectedQuery<any[]>({
+  return useMastersQuery<any[]>({
     queryKey: ['academicYearsDropdown'],
     queryFn: () => academicYearsApi.getAcademicYearsDropdown(),
     resource: PERMISSION_RESOURCES.ACADEMIC_YEARS,
@@ -66,12 +67,15 @@ export function useUpdateAcademicYear() {
 export function useDeleteAcademicYear() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToastContext();
-  
+
   return usePermissionProtectedMutation<void, Error, string>({
     mutationFn: (id) => academicYearsApi.deleteAcademicYear(id),
     resource: PERMISSION_RESOURCES.ACADEMIC_YEARS,
     action: 'delete',
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData<AcademicYear[]>(['academicYears'], (old) =>
+        old ? old.filter((y) => y.id !== id) : []
+      );
       queryClient.invalidateQueries({ queryKey: ['academicYears'] });
       showSuccess('Academic year deleted successfully');
     },

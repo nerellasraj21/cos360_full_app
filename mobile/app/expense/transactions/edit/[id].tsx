@@ -1,6 +1,7 @@
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import CustomDropdown from '@/components/ui/dropdown';
+import { DatePickerModal } from '@/components/ui';
 import { useTheme } from '@/contexts';
 import {
   useExpenseDepartmentDropdownProtected,
@@ -20,6 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const PAYMENT_METHOD_OPTIONS = [
   { label: 'Cash', value: 'cash' },
@@ -28,7 +30,7 @@ const PAYMENT_METHOD_OPTIONS = [
   { label: 'UPI', value: 'upi' },
 ];
 
-export default function EditExpenseTransactionScreen() {
+function EditExpenseTransactionScreenContent() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { colors, theme } = useTheme();
@@ -56,6 +58,7 @@ export default function EditExpenseTransactionScreen() {
   });
 
   const [initialized, setInitialized] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     if (transaction && !initialized) {
@@ -184,7 +187,23 @@ export default function EditExpenseTransactionScreen() {
         </View>
 
         {field('Amount', 'amount', 'e.g. 1500.00', { keyboardType: 'decimal-pad' })}
-        {field('Transaction Date', 'transaction_date', 'YYYY-MM-DD')}
+
+        {/* Transaction Date — tappable calendar picker */}
+        <View style={styles.fieldWrap}>
+          <Text style={[styles.label, { color: colors['muted-foreground'] }]}>Transaction Date *</Text>
+          <TouchableOpacity
+            style={[styles.input, styles.dateField, { backgroundColor: inputBg, borderColor: borderCol }]}
+            onPress={() => setShowDatePicker(true)}
+            activeOpacity={0.75}
+            accessibilityLabel="Select transaction date"
+          >
+            <Text style={{ color: formData.transaction_date ? colors.foreground : colors['muted-foreground'], fontSize: 14 }}>
+              {formData.transaction_date || 'YYYY-MM-DD'}
+            </Text>
+            <Ionicons name="calendar-outline" size={18} color={colors['muted-foreground']} />
+          </TouchableOpacity>
+        </View>
+
         {field('Description', 'description', 'Enter description', { multiline: true })}
 
         {/* Payment Method */}
@@ -221,7 +240,7 @@ export default function EditExpenseTransactionScreen() {
             <Text style={[styles.cancelBtnText, { color: colors.foreground }]}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.saveBtn, { backgroundColor: '#556ee6', opacity: updateMutation.isPending ? 0.7 : 1 }]}
+            style={[styles.saveBtn, { backgroundColor: '#556ee6', opacity: updateMutation.isPending ? 0.5 : 1 }]}
             onPress={handleSubmit}
             disabled={updateMutation.isPending}
           >
@@ -238,6 +257,13 @@ export default function EditExpenseTransactionScreen() {
 
         <View style={{ height: 32 }} />
       </ScrollView>
+
+      <DatePickerModal
+        visible={showDatePicker}
+        initialDate={formData.transaction_date}
+        onConfirm={(date) => { setFormData(p => ({ ...p, transaction_date: date })); setShowDatePicker(false); }}
+        onCancel={() => setShowDatePicker(false)}
+      />
     </AppLayout>
   );
 }
@@ -246,6 +272,7 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16 },
   fieldWrap: { marginBottom: 16 },
+  dateField: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   label: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
   input: {
     borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14,
@@ -265,3 +292,16 @@ const styles = StyleSheet.create({
   },
   saveBtnText: { color: 'white', fontWeight: '700', fontSize: 15 },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function EditExpenseTransactionScreen() {
+  return (
+    <ScreenAccessGate
+      title="Edit Expense"
+      permissions={[['expense_transactions', 'update']]}
+    >
+      <EditExpenseTransactionScreenContent />
+    </ScreenAccessGate>
+  );
+}

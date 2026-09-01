@@ -278,7 +278,7 @@ export default function StudentTransportScreen() {
   }
 
   // ── ADMIN / TRANSPORT MANAGER: full CRUD ──────────────────────────────────
-  const renderItem = ({ item }: { item: StudentTransportOut }) => {
+  const renderItem = ({ item, index }: { item: StudentTransportOut; index: number }) => {
     const studentName = item.student
       ? `${item.student.first_name} ${item.student.last_name}`
       : item.student_id;
@@ -289,6 +289,7 @@ export default function StudentTransportScreen() {
             <Ionicons name="person" size={18} color={AMBER} />
           </View>
           <View style={{ flex: 1 }}>
+            <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
             <Text style={[styles.cardName, { color: colors.foreground }]}>{studentName}</Text>
             <Text style={[styles.cardSub, { color: colors['muted-foreground'] }]}>
               {item.trip?.route?.route_name ?? '—'} · Trip #{item.trip?.trip_number ?? '—'}
@@ -296,12 +297,14 @@ export default function StudentTransportScreen() {
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
-              <TouchableOpacity onPress={() => openEdit(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity onPress={() => openEdit(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Edit">
                 <Ionicons name="create-outline" size={18} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </UpdatePermissionGuard>
             <DeletePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
-              <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Delete">
                 <Ionicons name="trash-outline" size={18} color="#EF4444" />
               </TouchableOpacity>
             </DeletePermissionGuard>
@@ -361,7 +364,8 @@ export default function StudentTransportScreen() {
                 <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                   {editing ? 'Edit Assignment' : 'New Assignment'}
                 </Text>
-                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={22} color={colors.foreground} />
                 </TouchableOpacity>
               </View>
@@ -435,6 +439,7 @@ function InfoRow({ icon, label, colors, small }: {
 }
 
 const styles = StyleSheet.create({
+  serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   topBar: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, alignItems: 'flex-end' },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9 },
   addBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },

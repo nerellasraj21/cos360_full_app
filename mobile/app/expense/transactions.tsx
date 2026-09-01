@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+﻿import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
@@ -18,6 +18,7 @@ import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import CustomDropdown from '@/components/ui/dropdown';
+import { DatePickerModal } from '@/components/ui';
 import { useTheme } from '@/contexts';
 import {
   useDeleteExpenseTransactionProtected,
@@ -25,6 +26,7 @@ import {
   useExpenseTypeDropdownProtected,
 } from '@/hooks/use-expense-protected';
 import type { ExpenseTransaction } from '@/src/types/expense';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const ORANGE = '#F97316';
 
@@ -45,7 +47,7 @@ const PAYMENT_METHODS: Record<string, string> = {
   upi: 'UPI',
 };
 
-export default function ExpenseTransactionsScreen() {
+function ExpenseTransactionsScreenContent() {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const { showSuccess, showError } = useToastContext();
@@ -57,6 +59,7 @@ export default function ExpenseTransactionsScreen() {
   const [vendorFilter, setVendorFilter] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [datePicker, setDatePicker] = useState<null | 'from' | 'to'>(null);
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -120,16 +123,17 @@ export default function ExpenseTransactionsScreen() {
     { key: 'cancelled', label: 'Cancelled' },
   ];
 
-  const renderItem = ({ item }: { item: ExpenseTransaction }) => {
+  const renderItem = ({ item, index }: { item: ExpenseTransaction; index: number }) => {
     const statusColor = STATUS_COLORS[item.status] ?? '#6b7280';
     return (
       <TouchableOpacity
         style={[styles.txCard, { backgroundColor: cardBg, borderColor: borderCol }]}
         onPress={() => router.push(`/expense/transactions/${item.id}` as any)}
-        activeOpacity={0.8}
+        activeOpacity={0.75}
       >
         <View style={styles.txTop}>
           <View style={{ flex: 1 }}>
+            <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
             <Text style={[styles.txDesc, { color: colors.foreground }]} numberOfLines={1}>
               {item.description}
             </Text>
@@ -163,12 +167,14 @@ export default function ExpenseTransactionsScreen() {
             <TouchableOpacity
               onPress={() => router.push(`/expense/transactions/edit/${item.id}` as any)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Edit"
             >
               <Ionicons name="create-outline" size={15} color="#556ee6" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleDelete(item)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Delete"
             >
               <Ionicons name="trash-outline" size={15} color="#EF4444" />
             </TouchableOpacity>
@@ -200,6 +206,10 @@ export default function ExpenseTransactionsScreen() {
                 value={statusFilter}
                 onChange={(v: any) => setStatusFilter(v?.toString() ?? '')}
                 placeholder="All Status"
+                containerStyle={styles.filterDropdownContainer}
+                style={styles.filterDropdown}
+                placeholderStyle={styles.filterDropdownText}
+                selectedTextStyle={styles.filterDropdownText}
               />
             </View>
             <View style={styles.filterHalf}>
@@ -208,32 +218,48 @@ export default function ExpenseTransactionsScreen() {
                 value={typeFilter}
                 onChange={(v: any) => setTypeFilter(v?.toString() ?? '')}
                 placeholder="All Types"
+                containerStyle={styles.filterDropdownContainer}
+                style={styles.filterDropdown}
+                placeholderStyle={styles.filterDropdownText}
+                selectedTextStyle={styles.filterDropdownText}
               />
             </View>
           </View>
 
           {/* Row 2: From date + To date */}
           <View style={styles.filterRow}>
-            <View style={[styles.dateInput, { borderColor: borderCol, backgroundColor: inputBg }]}>
+            <TouchableOpacity
+              style={[styles.dateInput, { borderColor: borderCol, backgroundColor: inputBg }]}
+              onPress={() => setDatePicker('from')}
+              activeOpacity={0.75}
+            >
               <Ionicons name="calendar-outline" size={14} color={colors['muted-foreground']} />
-              <TextInput
-                style={[styles.dateInputText, { color: colors.foreground }]}
-                placeholder="From date (YYYY-MM-DD)"
-                placeholderTextColor={colors['muted-foreground']}
-                value={fromDate}
-                onChangeText={setFromDate}
-              />
-            </View>
-            <View style={[styles.dateInput, { borderColor: borderCol, backgroundColor: inputBg }]}>
+              <Text style={[styles.dateInputText, { color: fromDate ? colors.foreground : colors['muted-foreground'] }]} numberOfLines={1}>
+                {fromDate || 'From date (YYYY-MM-DD)'}
+              </Text>
+              {!!fromDate && (
+                <TouchableOpacity onPress={() => setFromDate('')} hitSlop={8}
+              accessibilityLabel="Close">
+                  <Ionicons name="close-circle" size={15} color={colors['muted-foreground']} />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dateInput, { borderColor: borderCol, backgroundColor: inputBg }]}
+              onPress={() => setDatePicker('to')}
+              activeOpacity={0.75}
+            >
               <Ionicons name="calendar-outline" size={14} color={colors['muted-foreground']} />
-              <TextInput
-                style={[styles.dateInputText, { color: colors.foreground }]}
-                placeholder="To date (YYYY-MM-DD)"
-                placeholderTextColor={colors['muted-foreground']}
-                value={toDate}
-                onChangeText={setToDate}
-              />
-            </View>
+              <Text style={[styles.dateInputText, { color: toDate ? colors.foreground : colors['muted-foreground'] }]} numberOfLines={1}>
+                {toDate || 'To date (YYYY-MM-DD)'}
+              </Text>
+              {!!toDate && (
+                <TouchableOpacity onPress={() => setToDate('')} hitSlop={8}
+              accessibilityLabel="Close">
+                  <Ionicons name="close-circle" size={15} color={colors['muted-foreground']} />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
           </View>
 
           {/* Row 3: Vendor name */}
@@ -304,6 +330,16 @@ export default function ExpenseTransactionsScreen() {
         <View style={{ height: 32 }} />
       </ScrollView>
       <ConfirmModal {...modalProps} />
+      <DatePickerModal
+        visible={datePicker !== null}
+        initialDate={datePicker === 'from' ? fromDate : toDate}
+        onConfirm={(date) => {
+          if (datePicker === 'from') setFromDate(date);
+          else if (datePicker === 'to') setToDate(date);
+          setDatePicker(null);
+        }}
+        onCancel={() => setDatePicker(null)}
+      />
     </AppLayout>
   );
 }
@@ -316,6 +352,9 @@ const styles = StyleSheet.create({
   filtersTitle: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
   filterRow: { flexDirection: 'row', gap: 10 },
   filterHalf: { flex: 1 },
+  filterDropdownContainer: { marginBottom: 0 },
+  filterDropdown: { height: 40, paddingHorizontal: 12, paddingVertical: 0 },
+  filterDropdownText: { fontSize: 12 },
   dateInput: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
     borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 40,
@@ -335,6 +374,7 @@ const styles = StyleSheet.create({
   list: { padding: 16, gap: 10 },
   txCard: { borderRadius: 12, borderWidth: 1, padding: 14, gap: 8 },
   txTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   txDesc: { fontSize: 14, fontWeight: '600', marginBottom: 3 },
   txMeta: { fontSize: 12 },
   txAmount: { fontSize: 15, fontWeight: '700' },
@@ -351,3 +391,16 @@ const styles = StyleSheet.create({
   },
   emptyText: { fontSize: 14 },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function ExpenseTransactionsScreen() {
+  return (
+    <ScreenAccessGate
+      title="Expense Transactions"
+      resources={['expense_transactions']}
+    >
+      <ExpenseTransactionsScreenContent />
+    </ScreenAccessGate>
+  );
+}

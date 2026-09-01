@@ -12,14 +12,14 @@ import {
   View,
 } from 'react-native';
 
-import { AppLayout } from '@/components';
+import { AppLayout, ScreenAccessGate } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
 import { useTheme } from '@/contexts';
 import { expenseSettingsApi } from '@/src/api/expense';
 import { ExpenseSettings } from '@/src/types/expense';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 
-export default function ExpenseSettingsScreen() {
+function ExpenseSettingsScreenContent() {
   const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
   const { showSuccess, showError } = useToastContext();
@@ -143,7 +143,8 @@ export default function ExpenseSettingsScreen() {
                 <View style={styles.rowRight}>
                   <View style={[styles.activeDot, { backgroundColor: item.is_active ? '#10B981' : '#EF4444' }]} />
                   {canUpdate && (
-                    <TouchableOpacity onPress={() => openEdit(item)} style={styles.editBtn}>
+                    <TouchableOpacity onPress={() => openEdit(item)} style={styles.editBtn}
+              accessibilityLabel="Edit">
                       <Ionicons name="create-outline" size={18} color="#556ee6" />
                     </TouchableOpacity>
                   )}
@@ -171,7 +172,8 @@ export default function ExpenseSettingsScreen() {
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                 Edit: {editItem?.key.replace(/_/g, ' ')}
               </Text>
-              <TouchableOpacity onPress={closeModal}>
+              <TouchableOpacity onPress={closeModal}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </View>
@@ -195,7 +197,7 @@ export default function ExpenseSettingsScreen() {
             />
 
             <TouchableOpacity
-              style={[styles.saveBtn, { opacity: updateMutation.isPending ? 0.6 : 1 }]}
+              style={[styles.saveBtn, { opacity: updateMutation.isPending ? 0.5 : 1 }]}
               onPress={handleSave}
               disabled={updateMutation.isPending}
             >
@@ -205,6 +207,20 @@ export default function ExpenseSettingsScreen() {
         </View>
       </Modal>
     </AppLayout>
+  );
+}
+
+// Screen-level access control — matches sibling expense/categories.tsx.
+// Web parity: the entire Expense module is off-limits to the student role.
+export default function ExpenseSettingsScreen() {
+  return (
+    <ScreenAccessGate
+      title="Expense Settings"
+      resources={['expense_settings']}
+      blockRoles={['student']}
+    >
+      <ExpenseSettingsScreenContent />
+    </ScreenAccessGate>
   );
 }
 

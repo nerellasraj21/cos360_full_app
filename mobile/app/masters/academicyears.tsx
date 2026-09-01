@@ -4,6 +4,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
     FlatList,
     Modal,
+    Platform,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -11,6 +12,9 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { escapeCsv } from '@/src/utils/exportCsv';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppLayout } from '@/components';
@@ -26,6 +30,7 @@ import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 export default function AcademicYearsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [showExportOptions, setShowExportOptions] = useState(false);
   const [editingYear, setEditingYear] = useState<AcademicYear | null>(null);
   const [formData, setFormData] = useState({
     title: '',
@@ -77,6 +82,76 @@ export default function AcademicYearsScreen() {
       year.end_date.includes(searchQuery)
     );
   }, [academicYearsData, searchQuery]);
+
+  // ── Export (mirrors the web app's Academic Years Export menu: CSV / Excel / JSON) ────
+  const EXPORT_HEADERS = ['Title', 'Start Date', 'End Date', 'Active'];
+
+  const buildExportRows = () =>
+    filteredYears.map((y) => [
+      y.title,
+      y.start_date,
+      y.end_date,
+      y.is_active ? 'Yes' : 'No',
+    ]);
+
+  // Web: real blob download, identical to the web app. Native: write the file
+  // locally and hand it to the OS share sheet so it can be saved/shared.
+  const shareOrDownload = async (filename: string, content: string, mimeType: string) => {
+    if (Platform.OS === 'web') {
+      const w = globalThis as any;
+      const blob = new w.Blob([content], { type: `${mimeType};charset=utf-8;` });
+      const url = w.URL.createObjectURL(blob);
+      const link = w.document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      w.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      w.URL.revokeObjectURL(url);
+      return;
+    }
+    const fileUri = FileSystem.documentDirectory + filename;
+    await FileSystem.writeAsStringAsync(fileUri, content);
+    await Sharing.shareAsync(fileUri, { mimeType });
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const lines = [EXPORT_HEADERS, ...buildExportRows()].map((row) => row.map(escapeCsv).join(','));
+      await shareOrDownload('academic_years_data.csv', lines.join('\n'), 'text/csv');
+    } catch {
+      showError('Error', 'Failed to export CSV');
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const rows = [EXPORT_HEADERS, ...buildExportRows()];
+      const html = `<table>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')}</table>`;
+      await shareOrDownload('academic_years_data.xls', html, 'application/vnd.ms-excel');
+    } catch {
+      showError('Error', 'Failed to export Excel');
+    }
+  };
+
+  const handleDownloadData = async () => {
+    try {
+      const jsonData = {
+        title: 'Academic Years',
+        columns: EXPORT_HEADERS,
+        data: filteredYears.map((y) => ({
+          title: y.title,
+          start_date: y.start_date,
+          end_date: y.end_date,
+          is_active: y.is_active ? 'Yes' : 'No',
+        })),
+        exportedAt: new Date().toISOString(),
+      };
+      await shareOrDownload('academic_years_data.json', JSON.stringify(jsonData, null, 2), 'application/json');
+    } catch {
+      showError('Error', 'Failed to export data');
+    }
+  };
 
   const resetForm = () => {
     setFormData({ title: '', start_date: '', end_date: '', is_active: true });
@@ -163,12 +238,14 @@ export default function AcademicYearsScreen() {
       {/* Actions */}
       <View style={styles.colActions}>
         <PermissionGuard resourceConstant={PERMISSION_RESOURCES.ACADEMIC_YEARS} actionConstant="update">
-          <TouchableOpacity style={styles.iconBtn} onPress={() => handleEdit(item)}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => handleEdit(item)}
+              accessibilityLabel="Edit">
             <Ionicons name="create-outline" size={18} color={themeColors.primary} />
           </TouchableOpacity>
         </PermissionGuard>
         <PermissionGuard resourceConstant={PERMISSION_RESOURCES.ACADEMIC_YEARS} actionConstant="delete">
-          <TouchableOpacity style={styles.iconBtn} onPress={() => handleDelete(item)}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => handleDelete(item)}
+              accessibilityLabel="Delete">
             <Ionicons name="trash-outline" size={18} color="#EF4444" />
           </TouchableOpacity>
         </PermissionGuard>
@@ -213,15 +290,73 @@ export default function AcademicYearsScreen() {
                 {filteredYears.length} record{filteredYears.length !== 1 ? 's' : ''} found
               </ThemedText>
             </View>
-            <PermissionGuard resourceConstant={PERMISSION_RESOURCES.ACADEMIC_YEARS} actionConstant="create">
+            <View style={styles.pageHeaderButtons}>
               <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: themeColors.primary }]}
-                onPress={() => { resetForm(); setIsModalVisible(true); }}
+                style={[styles.exportButton, { borderColor, backgroundColor: themeColors.card }]}
+                onPress={() => setShowExportOptions(true)}
+                accessibilityLabel="Export"
               >
-                <Ionicons name="add" size={16} color="white" />
-                <ThemedText style={styles.addButtonText}>Add Academic Year</ThemedText>
+                <Ionicons name="download-outline" size={16} color={themeColors['card-foreground']} />
+                <ThemedText style={[styles.exportButtonText, { color: themeColors['card-foreground'] }]}>Export</ThemedText>
               </TouchableOpacity>
-            </PermissionGuard>
+              <PermissionGuard resourceConstant={PERMISSION_RESOURCES.ACADEMIC_YEARS} actionConstant="create">
+                <TouchableOpacity
+                  style={[styles.addButton, { backgroundColor: themeColors.primary }]}
+                  onPress={() => { resetForm(); setIsModalVisible(true); }}
+                >
+                  <Ionicons name="add" size={16} color="white" />
+                  <ThemedText style={styles.addButtonText}>Add Academic Year</ThemedText>
+                </TouchableOpacity>
+              </PermissionGuard>
+            </View>
+          </View>
+
+          {/* Export Options Modal */}
+          <Modal
+            visible={showExportOptions}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowExportOptions(false)}
+          >
+            <TouchableOpacity
+              style={styles.exportOverlay}
+              activeOpacity={1}
+              onPress={() => setShowExportOptions(false)}
+            >
+              <TouchableOpacity
+                activeOpacity={1}
+                style={[styles.exportOptions, { backgroundColor: themeColors.card, borderColor }]}
+              >
+                <ThemedText style={[styles.exportOptionTitle, { color: themeColors['muted-foreground'] }]}>Export As</ThemedText>
+                <TouchableOpacity
+                  style={styles.exportOption}
+                  onPress={() => { setShowExportOptions(false); handleExportCSV(); }}
+                >
+                  <Ionicons name="document-text" size={18} color={themeColors['card-foreground']} />
+                  <ThemedText style={styles.exportOptionText}>Export to CSV</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.exportOption}
+                  onPress={() => { setShowExportOptions(false); handleExportExcel(); }}
+                >
+                  <Ionicons name="grid" size={18} color={themeColors['card-foreground']} />
+                  <ThemedText style={styles.exportOptionText}>Export to Excel</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.exportOption}
+                  onPress={() => { setShowExportOptions(false); handleDownloadData(); }}
+                >
+                  <Ionicons name="download" size={18} color={themeColors['card-foreground']} />
+                  <ThemedText style={styles.exportOptionText}>Download Data</ThemedText>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Modal>
+
+          {/* Filters label */}
+          <View style={styles.filtersLabelRow}>
+            <Ionicons name="filter-outline" size={14} color={themeColors['muted-foreground']} />
+            <ThemedText style={[styles.filtersLabelText, { color: themeColors['muted-foreground'] }]}>Filters</ThemedText>
           </View>
 
           {/* Search Bar */}
@@ -235,7 +370,8 @@ export default function AcademicYearsScreen() {
               onChangeText={setSearchQuery}
             />
             {searchQuery ? (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityLabel="Close">
                 <Ionicons name="close-circle" size={18} color={themeColors['muted-foreground']} />
               </TouchableOpacity>
             ) : null}
@@ -294,7 +430,8 @@ export default function AcademicYearsScreen() {
                 <ThemedText style={styles.modalTitle}>
                   {editingYear ? 'Edit Academic Year' : 'Add Academic Year'}
                 </ThemedText>
-                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={22} color={themeColors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
@@ -337,7 +474,7 @@ export default function AcademicYearsScreen() {
                 <TouchableOpacity
                   style={styles.toggleRow}
                   onPress={() => setFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
-                  activeOpacity={0.7}
+                  activeOpacity={0.75}
                 >
                   <ThemedText style={styles.label}>Active</ThemedText>
                   <View style={[
@@ -389,10 +526,19 @@ const styles = StyleSheet.create({
 
   // Page header
   pageHeader: {
+    flexWrap: 'wrap',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    rowGap: 10,
     marginBottom: 14,
+  },
+  pageHeaderButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    flexGrow: 1,
   },
   pageTitle: {
     fontSize: 20,
@@ -405,9 +551,10 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
+    height: 36,
     paddingHorizontal: 12,
-    paddingVertical: 8,
     borderRadius: 8,
   },
   addButtonText: {
@@ -416,12 +563,77 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  // Export
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  exportButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  exportOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  exportOptions: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  exportOptionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  exportOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  exportOptionText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+
+  // Filters label
+  filtersLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  filtersLabelText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+
   // Search
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 36,
     paddingHorizontal: 12,
-    paddingVertical: 9,
     borderRadius: 8,
     borderWidth: 1,
     marginBottom: 14,

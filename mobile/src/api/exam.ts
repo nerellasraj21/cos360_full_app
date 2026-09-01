@@ -68,6 +68,11 @@ export interface Exam extends ExamListItem {
   cloned_from_exam_id?: string;
   created_by: string;
   updated_at: string;
+  hall_ticket_min_attendance?: number;
+  attendance_from_date?: string;
+  attendance_to_date?: string;
+  publish_rank?: boolean;
+  is_internal?: boolean;
   class_sections?: ExamClassSection[];
   subject_configs?: ExamSubjectConfig[];
 }
@@ -88,7 +93,7 @@ export interface ExamCreateRequest {
   exam_type: string;
   nature?: ExamNature;
   mark_entry_deadline?: string;
-  hall_ticket_min_attendance?: number;
+  hall_ticket_min_attendance?: number | null;
   attendance_from_date?: string;
   attendance_to_date?: string;
   publish_rank?: boolean;
@@ -122,6 +127,9 @@ export interface MarksGrid {
 
 /** Request body for POST /exams/{examId}/marks */
 export interface SaveMarksRequest {
+  // Required by the backend even though examId is already in the URL — omitting
+  // it produces a 422 "Field required" (matches web's batchSaveMarks payload).
+  exam_id: string;
   subject_config_id: string;
   marks: {
     student_id: string;
@@ -270,27 +278,54 @@ export interface AuditLog {
   old_value?: unknown;
   new_value?: unknown;
   performed_at: string;
+  // Optional enriched fields — web's AuditLog page (AuditLog.tsx) resolves these
+  // server-side; declared optional here for backward compatibility with any
+  // response that only sends the raw performed_by/performed_at/reason fields.
+  actor_name?: string;
+  actor_role?: string;
+  description?: string;
+  created_at?: string;
 }
 
 // ─── Types: Board Patterns ────────────────────────────────────────────────────
 
+export interface BoardPatternExamType {
+  id: string;
+  pattern_id: string;
+  exam_type_name: string;
+  nature: ExamNature;
+  weightage_percent: number | null;
+  count_per_year: number | null;
+  sort_order: number;
+}
+
 export interface BoardPattern {
   id: string;
-  name: string;
-  description?: string;
+  board: ExamBoard;
+  custom_board_name: string | null;
+  level: ExamLevel;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  exam_types: BoardPatternExamType[];
+}
+
+export interface BoardPatternExamTypeCreate {
+  exam_type_name: string;
+  nature: ExamNature;
+  weightage_percent?: number | null;
+  count_per_year?: number | null;
+  sort_order: number;
 }
 
 export interface BoardPatternCreate {
-  name: string;
-  description?: string;
+  board: ExamBoard;
+  custom_board_name?: string;
+  level: ExamLevel;
+  exam_types: BoardPatternExamTypeCreate[];
 }
 
-export interface BoardPatternUpdate {
-  name?: string;
-  description?: string;
+export interface BoardPatternUpdate extends Partial<BoardPatternCreate> {
   is_active?: boolean;
 }
 
@@ -347,6 +382,34 @@ export interface ApplyTemplateRequest {
   section_id?: string;
 }
 
+export interface SubjectComparisonItem {
+  subject_id: string;
+  subject_name?: string;
+}
+
+export interface SubjectMismatchResponse {
+  common_subjects: SubjectComparisonItem[];
+  source_only_subjects: SubjectComparisonItem[];
+  target_only_subjects: SubjectComparisonItem[];
+  can_copy_all: boolean;
+  copyable_count: number;
+}
+
+export interface PatternSuggestion {
+  source_class_id: string;
+  source_section_id?: string;
+  source_class_name?: string;
+  overlap_subject_count: number;
+  total_source_configs: number;
+  total_target_subjects: number;
+  mismatch: SubjectMismatchResponse;
+}
+
+export interface AutoDetectResponse {
+  suggestions: PatternSuggestion[];
+  has_suggestions: boolean;
+}
+
 // ─── Types: Create Exam Full (wizard) ────────────────────────────────────────
 
 export interface ClassSectionPayload {
@@ -360,6 +423,7 @@ export interface ComponentPayload {
   max_marks: number | null;
   min_pass_marks?: number | null;
   include_in_total: boolean;
+  remark_grade_set_id?: string | null;
   sort_order?: number;
 }
 
@@ -410,6 +474,7 @@ export interface ExamSettings {
   default_board?: string;
   custom_board_name?: string;
   hall_ticket_min_attendance?: number;
+  hall_ticket_min_fee_paid_pct?: number;
   grace_max_per_subject?: number;
   grace_max_subjects?: number;
   grace_auto_apply?: boolean;
@@ -467,6 +532,9 @@ export interface MarkPermission {
   is_active: boolean;
   granted_by: string;
   created_at: string;
+  // Display name resolved by the backend (mirrors the web's permission record)
+  user_display_name?: string;
+  user_id?: string;
 }
 
 export interface MarkPermissionCreate {
@@ -500,31 +568,39 @@ export interface NotificationResponse {
 }
 
 // ─── Types: Remark Grades ─────────────────────────────────────────────────────
+// Backend: /remark-grades — a set is a name + an ordered list of (grade_letter,
+// label) options, NOT free-text "items" with min/max marks. Matches web's
+// RemarkGradeSet contract.
 
-export interface RemarkGradeItem {
-  min_marks?: number;
-  max_marks?: number;
-  remark: string;
-  description?: string;
+export interface RemarkGradeOption {
+  id: string;
+  set_id: string;
+  grade_letter: string;
+  label: string;
+  sort_order: number;
+}
+
+export interface RemarkGradeOptionCreate {
+  grade_letter: string;
+  label: string;
+  sort_order: number;
 }
 
 export interface RemarkGradeSet {
   id: string;
   name: string;
-  description?: string;
-  items: RemarkGradeItem[];
-  is_active: boolean;
   created_at: string;
+  options: RemarkGradeOption[];
 }
 
 export interface RemarkGradeSetCreate {
   name: string;
-  description?: string;
-  items: RemarkGradeItem[];
+  options: RemarkGradeOptionCreate[];
 }
 
-export interface RemarkGradeSetUpdate extends Partial<RemarkGradeSetCreate> {
-  is_active?: boolean;
+export interface RemarkGradeSetUpdate {
+  name?: string;
+  options?: RemarkGradeOptionCreate[];
 }
 
 // ─── API: Exams CRUD ──────────────────────────────────────────────────────────
@@ -554,6 +630,12 @@ export const examsApi = {
   unlock: (examId: string, reason?: string) =>
     apiClient.post<Exam>(`/exams/${examId}/unlock`, { reason }).then(r => r.data),
 
+  activate: (examId: string) =>
+    apiClient.post<Exam>(`/exams/${examId}/activate`).then(r => r.data),
+
+  deactivate: (examId: string) =>
+    apiClient.post<Exam>(`/exams/${examId}/deactivate`).then(r => r.data),
+
   // Class sections
   getClassSections: (examId: string) =>
     apiClient.get<ExamClassSection[]>(`/exams/${examId}/class-sections`).then(r => r.data),
@@ -575,8 +657,60 @@ export const examsApi = {
 // ─── API: Mark Entry ──────────────────────────────────────────────────────────
 
 export const examMarksApi = {
-  getMarksGrid: (examId: string, params?: { class_id?: string; section_id?: string; subject_config_id?: string; page?: number; page_size?: number }) =>
-    apiClient.get<MarksGrid>(`/exams/${examId}/marks`, { params }).then(r => r.data),
+  getMarksGrid: async (
+    examId: string,
+    params?: { class_id?: string; section_id?: string; subject_config_id?: string; page?: number; page_size?: number },
+  ): Promise<MarksGrid> => {
+    const { data } = await apiClient.get(`/exams/${examId}/marks`, { params });
+
+    // The backend (same endpoint the web app uses) returns a FLAT ARRAY of
+    // students, each with a nested `marks` map keyed by component_id —
+    // i.e. row.marks[componentId] = { marks_obtained, is_absent, ... }.
+    // It may also come wrapped as { students: [...] }. Normalize both into the
+    // flat per-(student, component) MarkEntryItem[] shape this screen consumes.
+    const rawList: any[] = Array.isArray(data) ? data : (data?.students ?? []);
+    const students: MarkEntryItem[] = [];
+
+    for (const s of rawList) {
+      const marksMap = s?.marks;
+      if (marksMap && typeof marksMap === 'object' && !Array.isArray(marksMap)) {
+        const studentBase = {
+          student_id: s.student_id,
+          student_name: s.student_name ?? s.name,
+          admission_number: s.admission_number ?? s.admission_no,
+          subject_config_id: params?.subject_config_id ?? s.subject_config_id ?? '',
+        };
+        const entries = Object.entries(marksMap);
+        if (entries.length === 0) {
+          // Surface the student even when no components are recorded yet.
+          students.push({ ...studentBase, component_id: '', marks_obtained: null, is_absent: false });
+        } else {
+          for (const [componentId, m] of entries) {
+            const mm = (m ?? {}) as any;
+            students.push({
+              ...studentBase,
+              component_id: componentId,
+              component_name: mm.component_name,
+              marks_obtained: mm.marks_obtained ?? null,
+              remark_grade: mm.remark_grade ?? null,
+              is_absent: mm.is_absent ?? false,
+            });
+          }
+        }
+      } else {
+        // Already a flat per-component row.
+        students.push(s as MarkEntryItem);
+      }
+    }
+
+    return {
+      exam_id: (Array.isArray(data) ? examId : data?.exam_id) ?? examId,
+      students,
+      total: (Array.isArray(data) ? students.length : data?.total) ?? students.length,
+      page: (Array.isArray(data) ? (params?.page ?? 1) : data?.page) ?? 1,
+      page_size: (Array.isArray(data) ? (params?.page_size ?? students.length) : data?.page_size) ?? students.length,
+    };
+  },
 
   saveMarks: (examId: string, data: SaveMarksRequest) =>
     apiClient.post(`/exams/${examId}/marks`, data).then(r => r.data),
@@ -609,6 +743,10 @@ export const examResultsApi = {
 
   getStudentResult: (examId: string, studentId: string) =>
     apiClient.get<StudentExamResult>(`/exams/${examId}/results/${studentId}`).then(r => r.data),
+
+  /** Student: list all own results across all exams */
+  getMyResults: () =>
+    apiClient.get<StudentExamResult[]>('/exams/my-results').then(r => r.data),
 
   /** Student: computed result (only after exam is published/finalized) */
   getMyResult: (examId: string) =>
@@ -745,6 +883,17 @@ export const examPatternsApi = {
 
   applyTemplate: (examId: string, data: ApplyTemplateRequest) =>
     apiClient.post(`/exam-patterns/${examId}/apply-template`, data).then(r => r.data),
+
+  compareSubjects: (examId: string, params: {
+    source_class_id: string;
+    source_section_id?: string;
+    target_class_id: string;
+    target_section_id?: string;
+  }) =>
+    apiClient.get<SubjectMismatchResponse>(`/exam-patterns/${examId}/compare`, { params }).then(r => r.data),
+
+  autoDetect: (examId: string, params: { target_class_id: string; target_section_id?: string }) =>
+    apiClient.get<AutoDetectResponse>(`/exam-patterns/${examId}/auto-detect`, { params }).then(r => r.data),
 };
 
 // ─── API: Exam Settings ───────────────────────────────────────────────────────

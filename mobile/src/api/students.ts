@@ -9,6 +9,18 @@ export interface ReactNativeFile {
   name: string;
 }
 
+export interface BulkUploadCreatedRow {
+  row: number;
+  [key: string]: unknown;
+}
+
+export interface BulkUploadResult {
+  created: BulkUploadCreatedRow[];
+  /** Each entry is a human-readable "Row N: ..." message, not a structured object. */
+  errors: string[];
+  total_rows: number;
+}
+
 /** Parent create payload (used inside StudentAdmissionCreate) */
 export interface ParentCreate {
   name: string;
@@ -41,6 +53,15 @@ export interface StudentOut {
   nationality?: string | null;
   mother_tongue?: string | null;
   identification_marks?: string | null;
+  // Photo
+  photo_url?: string | null;
+  // Some endpoints (e.g. class-section student lists) nest parent relations
+  // here instead of top-level on StudentAdmissionResponse — mirrors web's
+  // StudentOut type so Communication can resolve parent ids either way.
+  father?: { id?: string; name?: string } | null;
+  mother?: { id?: string; name?: string } | null;
+  guardian?: { id?: string; name?: string } | null;
+  parent_links?: Array<{ parent: { id: string; name?: string; email?: string; phone?: string } }>;
 }
 
 /** Backward compat alias used by masters.ts and other modules */
@@ -48,18 +69,23 @@ export interface Student extends StudentOut {}
 
 /** POST /students/admission/ */
 export interface StudentAdmissionCreate {
+  admission_number?: string;
   admission_date: string;                         // "YYYY-MM-DD"
-  admission_type?: 'primary' | 'non_primary';
+  admission_type?: 'pre_primary' | 'regular';
   academic_year_id: string;
   admitted_academic_year_id?: string;
   admitted_class_id: string;
-  admitted_section_id: string;
+  admitted_section_id?: string;
   current_class_id?: string;
   current_section_id?: string;
   address_line1: string;
   address_line2?: string;
   city: string;
-  state: string;
+  /** State name OR state UUID — backend accepts both; send UUID when using cascade dropdowns */
+  state?: string;
+  state_id?: string;
+  district_id?: string;
+  mandal_id?: string;
   is_previous_school?: boolean;
   previous_school_name?: string;
   previous_class?: string;
@@ -80,6 +106,8 @@ export interface StudentAdmissionCreate {
     identification_marks?: string;
     father: ParentCreate;
     mother: ParentCreate;
+    /** Only sent when guardian name is provided */
+    guardian?: ParentCreate;
   };
 }
 
@@ -88,7 +116,7 @@ export interface StudentAdmissionResponse {
   id: string;
   admission_number: string | null;
   admission_date: string;
-  admission_type: 'primary' | 'non_primary' | null;
+  admission_type: 'pre_primary' | 'regular' | null;
   academic_year_id: string | null;
   admitted_academic_year_id: string | null;
   admitted_class_id: string | null;
@@ -99,6 +127,9 @@ export interface StudentAdmissionResponse {
   address_line2: string | null;
   city: string | null;
   state: string | null;
+  state_id?: string | null;
+  district_id?: string | null;
+  mandal_id?: string | null;
   is_previous_school: boolean;
   previous_school_name: string | null;
   previous_class: string | null;
@@ -108,6 +139,7 @@ export interface StudentAdmissionResponse {
   student: StudentOut;
   // Parent info returned by some endpoints
   father?: {
+    id?: string;
     name: string;
     email?: string | null;
     phone?: string | null;
@@ -117,6 +149,7 @@ export interface StudentAdmissionResponse {
     relation_to_student?: string;
   } | null;
   mother?: {
+    id?: string;
     name: string;
     email?: string | null;
     phone?: string | null;
@@ -125,6 +158,17 @@ export interface StudentAdmissionResponse {
     gender?: string | null;
     relation_to_student?: string;
   } | null;
+  guardian?: {
+    id?: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    occupation?: string | null;
+    aadhar_number?: string | null;
+    gender?: string | null;
+    relation_to_student?: string;
+    salary_range?: string | null;
+  } | null;
 }
 
 /** Alias for backward compatibility */
@@ -132,8 +176,9 @@ export interface StudentAdmission extends StudentAdmissionResponse {}
 
 /** PATCH /students/admission/{student_id} — all fields optional */
 export interface StudentAdmissionUpdate {
+  admission_number?: string;
   admission_date?: string;
-  admission_type?: 'primary' | 'non_primary';
+  admission_type?: 'pre_primary' | 'regular';
   academic_year_id?: string;
   admitted_academic_year_id?: string;
   admitted_class_id?: string;
@@ -144,6 +189,9 @@ export interface StudentAdmissionUpdate {
   address_line2?: string;
   city?: string;
   state?: string;
+  state_id?: string;
+  district_id?: string;
+  mandal_id?: string;
   is_previous_school?: boolean;
   previous_school_name?: string;
   previous_class?: string;
@@ -178,6 +226,14 @@ export interface StudentAdmissionUpdate {
   mother_aadhar_number?: string;
   mother_gender?: string;
   mother_salary_range?: string;
+  // Guardian fields (all optional; only sent when guardian name is provided)
+  guardian_name?: string;
+  guardian_email?: string;
+  guardian_phone?: string;
+  guardian_occupation?: string;
+  guardian_aadhar_number?: string;
+  guardian_gender?: string;
+  guardian_salary_range?: string;
 }
 
 export interface StudentDropdownItem {
@@ -193,7 +249,7 @@ export interface StudentDropdownSimpleItem {
 
 // ─── Attendance ───────────────────────────────────────────────────────────────
 
-export type AttendanceStatus = 'present' | 'absent' | 'late';
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'leave';
 
 /** POST /student/attendance/ */
 export interface StudentAttendanceCreate {
@@ -363,6 +419,21 @@ export interface DocumentResponse extends DocumentOut {
   verified_by?: string;
   /** @deprecated Not in backend */
   verified_at?: string;
+}
+
+/** Unified item returned by GET /students/documents/all */
+export interface StudentAllDocumentItem {
+  id: string;
+  student_id: string;
+  source: 'document' | 'certificate' | 'receipt';
+  document_type?: string;
+  file_path?: string;
+  upload_date?: string;
+  // certificate-specific
+  certificate_category?: string;
+  type_name?: string;
+  // receipt-specific
+  receipt_number?: string;
 }
 
 /** POST /students/documents/ */
@@ -557,15 +628,33 @@ export const studentAdmissionsApi = {
     return response.data;
   },
 
-  /** Alias for listAdmissions */
+  /** Alias for listAdmissions — supports server-side class/section filtering */
   getStudentAdmissions: async (params?: {
     skip?: number;
     limit?: number;
     sort_by?: string;
     sort_order?: 'asc' | 'desc';
+    class_id?: string;
+    section_id?: string;
+    active_only?: boolean;
   }): Promise<{ items: StudentAdmissionResponse[]; total_count: number; has_next: boolean }> => {
     const response = await apiClient.get('/students/admission/', { params });
     return response.data;
+  },
+
+  /**
+   * Get students by class and section — mirrors web app's getStudentsByClassSection exactly.
+   * Builds the URL as a string (like the web app) to avoid axios param serialization differences.
+   */
+  getStudentsByClassSection: async (
+    classId: string,
+    sectionId?: string,
+  ): Promise<StudentAdmissionResponse[]> => {
+    let url = `/students/admission/?class_id=${encodeURIComponent(classId)}&active_only=true`;
+    if (sectionId) url += `&section_id=${encodeURIComponent(sectionId)}`;
+    const response = await apiClient.get(url);
+    const data = response.data;
+    return data.items ?? data ?? [];
   },
 
   /** POST /students/admission/ */
@@ -661,12 +750,67 @@ export const studentAdmissionsApi = {
     return response.data;
   },
 
-  /** GET /students/admission/next-admission-number?type=primary|non_primary */
+  /** GET /students/admission/next-admission-number?type=pre_primary|regular */
   getNextAdmissionNumber: async (
-    type: 'primary' | 'non_primary',
+    type: 'pre_primary' | 'regular',
   ): Promise<{ next_number: string }> => {
     const response = await apiClient.get('/students/admission/next-admission-number', {
       params: { type },
+    });
+    return response.data;
+  },
+
+  /** POST /students/admission/id/{studentId}/photo — multipart */
+  uploadStudentPhoto: async (
+    studentId: string,
+    uri: string,
+    mimeType: string,
+  ): Promise<StudentAdmissionResponse> => {
+    const formData = new FormData();
+    if (uri.startsWith('data:') || uri.startsWith('blob:')) {
+      const res = await fetch(uri);
+      const blob = await res.blob();
+      formData.append('photo', blob, 'photo.jpg');
+    } else {
+      formData.append('photo', { uri, type: mimeType, name: 'photo.jpg' } as any);
+    }
+    const response = await apiClient.post(
+      `/students/admission/id/${studentId}/photo`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  },
+
+  // ── Bulk Upload ────────────────────────────────────────────────────────────
+
+  // Bulk-create student admissions from an Excel file — POST /students/admission/bulk-upload
+  // Rows are validated independently; valid rows are created even if others fail.
+  bulkUploadAdmissions: async (
+    uri: string,
+    mimeType: string,
+    fileName: string,
+  ): Promise<BulkUploadResult> => {
+    const formData = new FormData();
+    if (uri.startsWith('data:') || uri.startsWith('blob:')) {
+      const res = await fetch(uri);
+      const blob = await res.blob();
+      formData.append('file', blob, fileName);
+    } else {
+      formData.append('file', { uri, type: mimeType, name: fileName } as any);
+    }
+    const response = await apiClient.post('/students/admission/bulk-upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // Download the bulk-upload Excel template — GET /students/admission/bulk-upload/template
+  // includeData=true pre-fills the template with existing admissions (for review/re-upload).
+  getBulkUploadTemplate: async (includeData = false): Promise<Blob> => {
+    const response = await apiClient.get('/students/admission/bulk-upload/template', {
+      params: { include_data: includeData },
+      responseType: 'blob',
     });
     return response.data;
   },
@@ -799,7 +943,8 @@ export const studentCertificatesApi = {
     limit?: number;
   }): Promise<CertificateRead[]> => {
     const response = await apiClient.get('/certificates/received', { params });
-    return response.data;
+    const d = response.data;
+    return Array.isArray(d) ? d : d?.items ?? [];
   },
 
   /** GET /certificates/issued — admin: issued certificates */
@@ -810,7 +955,8 @@ export const studentCertificatesApi = {
     limit?: number;
   }): Promise<CertificateRead[]> => {
     const response = await apiClient.get('/certificates/issued', { params });
-    return response.data;
+    const d = response.data;
+    return Array.isArray(d) ? d : d?.items ?? [];
   },
 
   /** GET /certificates/by-student/{student_id} */
@@ -819,7 +965,8 @@ export const studentCertificatesApi = {
     params?: { skip?: number; limit?: number },
   ): Promise<CertificateRead[]> => {
     const response = await apiClient.get(`/certificates/by-student/${studentId}`, { params });
-    return response.data;
+    const d = response.data;
+    return Array.isArray(d) ? d : d?.items ?? [];
   },
 
   /** GET /certificates/my — student: own certificates */
@@ -828,7 +975,8 @@ export const studentCertificatesApi = {
     limit?: number;
   }): Promise<CertificateRead[]> => {
     const response = await apiClient.get('/certificates/my', { params });
-    return response.data;
+    const d = response.data;
+    return Array.isArray(d) ? d : d?.items ?? [];
   },
 
   /** GET /certificates/my-child/{student_id} — parent role */
@@ -837,7 +985,8 @@ export const studentCertificatesApi = {
     params?: { skip?: number; limit?: number },
   ): Promise<CertificateRead[]> => {
     const response = await apiClient.get(`/certificates/my-child/${studentId}`, { params });
-    return response.data;
+    const d = response.data;
+    return Array.isArray(d) ? d : d?.items ?? [];
   },
 
   /** GET /certificates/selector/classes */
@@ -1064,6 +1213,118 @@ export const studentDocumentsApi = {
   /** DELETE /students/documents/{id} */
   deleteDocument: async (id: string): Promise<void> => {
     await apiClient.delete(`/students/documents/${id}`);
+  },
+
+  /** GET /students/documents/all — unified documents + certificates + receipts */
+  getAllDocuments: async (params?: { student_id?: string }): Promise<StudentAllDocumentItem[]> => {
+    const response = await apiClient.get('/students/documents/all', { params });
+    return response.data;
+  },
+};
+
+// ─── Issuable Certificate Templates API ──────────────────────────────────────
+
+export interface IssuableCertificateTemplate {
+  id: string;
+  name: string;
+  html_template: string;
+  color_theme?: string;
+  variables_used?: string | null;
+  is_active: string | boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IssuedCertificateRecord {
+  id: string;
+  student_id: string;
+  template_id: string;
+  html_content: string;
+  issued_date: string;
+  issued_by: string;
+  remarks?: string;
+  is_active: string | boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GenerateCertificateRequest {
+  student_id: string;
+  template_id: string;
+  edited_html: string;
+  remarks?: string;
+}
+
+export interface GenerateCertificateResponse {
+  id: string;
+  status: string;
+  message: string;
+  download_url?: string | null;
+}
+
+export interface IssuableCertificateTemplateCreate {
+  name: string;
+  html_template: string;
+  color_theme: 'blue' | 'green' | 'red' | 'orange';
+}
+
+export interface IssuableCertificateTemplateUpdate {
+  name?: string;
+  html_template?: string;
+  color_theme?: 'blue' | 'green' | 'red' | 'orange';
+  is_active?: string;
+}
+
+export const issuableCertificatesApi = {
+  /** GET /issuable-certificates/templates/ — list all templates */
+  listTemplates: async (): Promise<IssuableCertificateTemplate[]> => {
+    const response = await apiClient.get('/issuable-certificates/templates/');
+    return Array.isArray(response.data) ? response.data : response.data?.items ?? [];
+  },
+
+  /** GET /issuable-certificates/templates/{id}/ — get a single template */
+  getTemplate: async (id: string): Promise<IssuableCertificateTemplate> => {
+    const response = await apiClient.get(`/issuable-certificates/templates/${id}/`);
+    return response.data;
+  },
+
+  /** POST /issuable-certificates/templates/ — create a template */
+  createTemplate: async (
+    data: IssuableCertificateTemplateCreate,
+  ): Promise<IssuableCertificateTemplate> => {
+    const response = await apiClient.post('/issuable-certificates/templates/', data);
+    return response.data;
+  },
+
+  /** PUT /issuable-certificates/templates/{id}/ — update a template */
+  updateTemplate: async (
+    id: string,
+    data: IssuableCertificateTemplateUpdate,
+  ): Promise<IssuableCertificateTemplate> => {
+    const response = await apiClient.put(`/issuable-certificates/templates/${id}/`, data);
+    return response.data;
+  },
+
+  /** DELETE /issuable-certificates/templates/{id}/ — delete a template */
+  deleteTemplate: async (id: string): Promise<void> => {
+    await apiClient.delete(`/issuable-certificates/templates/${id}/`);
+  },
+
+  /** POST /issuable-certificates/generate/ — generate and save certificate */
+  generateCertificate: async (data: GenerateCertificateRequest): Promise<GenerateCertificateResponse> => {
+    const response = await apiClient.post('/issuable-certificates/generate/', data);
+    return response.data;
+  },
+
+  /** GET /issuable-certificates/issued/ — list issued certificates, optionally by student */
+  listIssuedCertificates: async (params?: { student_id?: string }): Promise<IssuedCertificateRecord[]> => {
+    const response = await apiClient.get('/issuable-certificates/issued/', { params });
+    return Array.isArray(response.data) ? response.data : response.data?.items ?? [];
+  },
+
+  /** DELETE /issuable-certificates/issued/{id}/ — delete an issued certificate */
+  deleteIssuedCertificate: async (id: string): Promise<void> => {
+    await apiClient.delete(`/issuable-certificates/issued/${id}/`);
   },
 };
 

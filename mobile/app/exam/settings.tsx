@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -14,15 +14,37 @@ import {
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
-import { useTheme } from '@/contexts';
+import { CustomDropdown, DropdownOption } from '@/components/ui/dropdown';
+import { useAuth, useTheme } from '@/contexts';
 import { ExamSettings, examSettingsApi } from '@/src/api/exam';
+import { getApiErrorMessage } from '@/src/utils/apiError';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
+import { isAdminRole } from '@/src/lib/roles';
+
+// Web parity (ExamSettingsPage): CBSE / ICSE / State / BTech / Custom.
+const BOARD_OPTIONS: DropdownOption[] = [
+  { value: 'CBSE', label: 'CBSE' },
+  { value: 'ICSE', label: 'ICSE' },
+  { value: 'State', label: 'State Board' },
+  { value: 'BTech', label: 'BTech' },
+  { value: 'Custom', label: 'Custom' },
+];
 
 export default function ExamSettingsScreen() {
+  const router = useRouter();
   const { colors, theme } = useTheme();
+  const { role } = useAuth();
   const { hasPermission } = useMobilePermission();
   const { showSuccess, showError } = useToastContext();
   const qc = useQueryClient();
+
+  // Web parity (ExamSettingsPage): exam settings are admin-only.
+  const isAdmin = isAdminRole(role?.name);
+  useEffect(() => {
+    if (!isAdmin) {
+      router.replace('/exam/list');
+    }
+  }, [isAdmin, router]);
 
   const [form, setForm] = useState<ExamSettings>({});
   const [dirty, setDirty] = useState(false);
@@ -31,7 +53,9 @@ export default function ExamSettingsScreen() {
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const inputBg = theme === 'dark' ? '#0f0f23' : '#f8fafc';
 
-  const canUpdate = hasPermission?.('exam_settings', 'update');
+  // Web parity: exam settings authorization is granted under the "exams"
+  // resource — see mobile backend files/exam_settings_endpoints.py.
+  const canUpdate = hasPermission?.('exams', 'update');
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['exam-settings'],
@@ -44,10 +68,7 @@ export default function ExamSettingsScreen() {
         default_board: settings.default_board ?? '',
         custom_board_name: settings.custom_board_name ?? '',
         hall_ticket_min_attendance: settings.hall_ticket_min_attendance ?? 75,
-        grace_max_per_subject: settings.grace_max_per_subject ?? 0,
-        grace_max_subjects: settings.grace_max_subjects ?? 0,
-        grace_auto_apply: settings.grace_auto_apply ?? false,
-        reconduct_max_failed_subjects: settings.reconduct_max_failed_subjects ?? 2,
+        hall_ticket_min_fee_paid_pct: settings.hall_ticket_min_fee_paid_pct,
       });
       setDirty(false);
     }
@@ -60,13 +81,16 @@ export default function ExamSettingsScreen() {
       setDirty(false);
       showSuccess('Saved', 'Exam settings updated.');
     },
-    onError: () => showError('Error', 'Failed to save settings.'),
+    onError: (err: any) => showError('Error', getApiErrorMessage(err, 'Failed to save settings.')),
   });
 
   const setField = <K extends keyof ExamSettings>(key: K, value: ExamSettings[K]) => {
     setForm(f => ({ ...f, [key]: value }));
     setDirty(true);
   };
+
+  // Non-admins are redirected by the effect above; render nothing meanwhile.
+  if (!isAdmin) return null;
 
   if (isLoading) {
     return (
@@ -82,37 +106,28 @@ export default function ExamSettingsScreen() {
     <AppLayout title="Exam Settings">
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* General */}
+        {/* Board Configuration */}
         <View style={[styles.section, { backgroundColor: cardBg, borderColor: borderCol }]}>
           <View style={styles.sectionHeader}>
             <Ionicons name="settings-outline" size={18} color="#556ee6" />
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Board Configuration</Text>
           </View>
+          <Text style={[styles.sectionSubtitle, { color: colors['muted-foreground'] }]}>
+            Default examination board settings
+          </Text>
 
           <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Default Board</Text>
-          <View style={styles.chipRow}>
-            {(['CBSE', 'ICSE', 'State', 'BTech', 'Custom'] as const).map(b => (
-              <TouchableOpacity
-                key={b}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: form.default_board === b ? '#556ee6' : inputBg,
-                    borderColor: form.default_board === b ? '#556ee6' : borderCol,
-                  },
-                ]}
-                onPress={() => {
-                  setField('default_board', b);
-                  if (b !== 'Custom') setField('custom_board_name', '');
-                }}
-                disabled={!canUpdate}
-              >
-                <Text style={[styles.chipText, { color: form.default_board === b ? 'white' : colors['muted-foreground'] as string }]}>
-                  {b}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <CustomDropdown
+            data={BOARD_OPTIONS}
+            value={form.default_board || null}
+            onChange={v => {
+              setField('default_board', (v as string) ?? '');
+              if (v !== 'Custom') setField('custom_board_name', '');
+            }}
+            placeholder="Select default board"
+            search={false}
+            disabled={!canUpdate}
+          />
 
           {form.default_board === 'Custom' && (
             <>
@@ -129,14 +144,17 @@ export default function ExamSettingsScreen() {
           )}
         </View>
 
-        {/* Hall Ticket */}
+        {/* Hall Ticket Settings */}
         <View style={[styles.section, { backgroundColor: cardBg, borderColor: borderCol }]}>
           <View style={styles.sectionHeader}>
             <Ionicons name="card-outline" size={18} color="#F59E0B" />
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Hall Ticket</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Hall Ticket Settings</Text>
           </View>
+          <Text style={[styles.sectionSubtitle, { color: colors['muted-foreground'] }]}>
+            Attendance threshold for hall ticket eligibility
+          </Text>
 
-          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Minimum Attendance % for Hall Ticket</Text>
+          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Minimum Attendance %</Text>
           <TextInput
             style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
             value={String(form.hall_ticket_min_attendance ?? '')}
@@ -147,81 +165,32 @@ export default function ExamSettingsScreen() {
             editable={!!canUpdate}
           />
           <Text style={[styles.hint, { color: colors['muted-foreground'] }]}>
-            Students below this attendance threshold will be flagged as ineligible.
+            Students below this threshold are ineligible
           </Text>
         </View>
 
-        {/* Grace Marks */}
+        {/* Fee Payment Policy */}
         <View style={[styles.section, { backgroundColor: cardBg, borderColor: borderCol }]}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="star-outline" size={18} color="#10B981" />
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Grace Marks</Text>
+            <Ionicons name="cash-outline" size={18} color="#10B981" />
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Fee Payment Policy</Text>
           </View>
+          <Text style={[styles.sectionSubtitle, { color: colors['muted-foreground'] }]}>
+            Minimum fee payment required as of exam date
+          </Text>
 
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Max Grace per Subject</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-                value={String(form.grace_max_per_subject ?? '')}
-                onChangeText={v => setField('grace_max_per_subject', Number(v) || 0)}
-                keyboardType="numeric"
-                placeholder="0"
-                placeholderTextColor={colors['muted-foreground']}
-                editable={!!canUpdate}
-              />
-            </View>
-            <View style={{ width: 12 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Max Subjects with Grace</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-                value={String(form.grace_max_subjects ?? '')}
-                onChangeText={v => setField('grace_max_subjects', Number(v) || 0)}
-                keyboardType="numeric"
-                placeholder="0"
-                placeholderTextColor={colors['muted-foreground']}
-                editable={!!canUpdate}
-              />
-            </View>
-          </View>
-
-          <View style={styles.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Auto-apply grace marks</Text>
-              <Text style={[styles.hint, { color: colors['muted-foreground'] }]}>
-                Automatically add grace when a student is close to passing
-              </Text>
-            </View>
-            <Switch
-              value={form.grace_auto_apply ?? false}
-              onValueChange={v => setField('grace_auto_apply', v)}
-              disabled={!canUpdate}
-              trackColor={{ false: borderCol, true: '#556ee6' }}
-              thumbColor="white"
-            />
-          </View>
-        </View>
-
-        {/* Reconduct Policy */}
-        <View style={[styles.section, { backgroundColor: cardBg, borderColor: borderCol }]}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="refresh-circle-outline" size={18} color="#8B5CF6" />
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reconduct Policy</Text>
-          </View>
-
-          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Max Failed Subjects for Reconduct</Text>
+          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Minimum Fee Paid %</Text>
           <TextInput
             style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
-            value={String(form.reconduct_max_failed_subjects ?? '')}
-            onChangeText={v => setField('reconduct_max_failed_subjects', Number(v) || 0)}
+            value={String(form.hall_ticket_min_fee_paid_pct ?? '')}
+            onChangeText={v => setField('hall_ticket_min_fee_paid_pct', v ? Number(v) : undefined)}
             keyboardType="numeric"
-            placeholder="2"
+            placeholder="60"
             placeholderTextColor={colors['muted-foreground']}
             editable={!!canUpdate}
           />
           <Text style={[styles.hint, { color: colors['muted-foreground'] }]}>
-            Students with more failed subjects than this cannot appear for re-examination.
+            Students below this fee payment % cannot appear for exam
           </Text>
         </View>
 
@@ -256,19 +225,15 @@ const styles = StyleSheet.create({
     borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 14,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
   sectionTitle: { fontSize: 15, fontWeight: '700' },
+  sectionSubtitle: { fontSize: 12, marginBottom: 14, lineHeight: 16 },
   fieldLabel: { fontSize: 13, fontWeight: '500', marginBottom: 6, marginTop: 4 },
   input: {
     borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10,
     fontSize: 14, marginBottom: 4,
   },
   hint: { fontSize: 12, marginTop: 4, lineHeight: 17 },
-  row: { flexDirection: 'row' },
-  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
-  chipText: { fontSize: 13, fontWeight: '500' },
   updatedAt: { fontSize: 12, textAlign: 'center', marginBottom: 16 },
   saveBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

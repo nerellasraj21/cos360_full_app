@@ -31,11 +31,15 @@ export function useAdmissions(params?: {
   });
 }
 
-// Get admission by student ID - permission protected
+// Get admission by student ID.
+// Plain useQuery, not usePermissionProtectedQuery — this is called both by
+// staff/admin (who hold the bare `read`) and by a parent viewing their own
+// child (who holds `read_related` instead). Gating on a single hardcoded
+// action would make `enabled` false — and the query silently never fire —
+// for whichever caller doesn't hold that exact action. The backend already
+// enforces the real permission and returns 403 if truly unauthorized.
 export function useAdmissionByStudentId(studentId: string) {
-  return usePermissionProtectedQuery<StudentAdmission>({
-    resource: PERMISSION_RESOURCES.STUDENT_ADMISSIONS,
-    action: 'read',
+  return useQuery<StudentAdmission>({
     queryKey: ['admission', 'student', studentId],
     queryFn: () => studentAdmissionsApi.getAdmissionByStudentId(studentId),
     enabled: !!studentId,

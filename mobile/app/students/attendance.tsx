@@ -7,12 +7,14 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppLayout } from '@/components';
+import { DatePickerModal, formatDate } from '@/components/ui';
 import { CustomDropdown } from '@/components/ui/dropdown';
 import { studentAttendanceApi, studentAdmissionsApi, classSectionsApi } from '@/src/api';
 import { useTheme } from '@/contexts';
@@ -31,6 +33,8 @@ const getStatusColor = (status: string) => {
     case 'present': return '#10B981';
     case 'absent': return '#EF4444';
     case 'late': return '#F59E0B';
+    case 'half_day': return '#F97316';
+    case 'leave': return '#3B82F6';
     default: return '#6B7280';
   }
 };
@@ -40,8 +44,42 @@ const getStatusIcon = (status: string) => {
     case 'present': return 'checkmark-circle';
     case 'absent': return 'close-circle';
     case 'late': return 'time';
+    case 'half_day': return 'contrast';
+    case 'leave': return 'briefcase';
     default: return 'help-circle';
   }
+};
+
+// Badge text for the read-only history rows — 'half_day' must read as
+// "Half Day", not the raw enum value.
+const getStatusText = (status: string) =>
+  status === 'half_day' ? 'Half Day' : status;
+
+// Compact badge label — avoids the single-initial collision between
+// Late ("L") and Leave ("L") in the staff mark-attendance row badge.
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case 'present': return 'P';
+    case 'absent': return 'A';
+    case 'late': return 'Lt';
+    case 'leave': return 'Lv';
+    default: return status.charAt(0).toUpperCase();
+  }
+};
+
+// Matches web app's status Select options and badge colors exactly (AttendancePage.tsx)
+const STATUS_OPTIONS = [
+  { label: 'Present', value: 'present' },
+  { label: 'Absent', value: 'absent' },
+  { label: 'Late', value: 'late' },
+  { label: 'Leave', value: 'leave' },
+];
+
+const STATUS_BADGE: Record<string, { bg: string; text: string; border: string }> = {
+  present: { bg: '#DCFCE7', text: '#16A34A', border: '#86EFAC' },
+  absent: { bg: '#FEE2E2', text: '#DC2626', border: '#FCA5A5' },
+  late: { bg: '#FEF9C3', text: '#CA8A04', border: '#FDE68A' },
+  leave: { bg: '#DBEAFE', text: '#2563EB', border: '#93C5FD' },
 };
 
 // ─── Attendance history view (student + parent) ────────────────────────────
@@ -80,13 +118,15 @@ function AttendanceHistoryView({
   }, [records]);
 
   const stats = useMemo(() => {
-    if (!sorted.length) return { present: 0, absent: 0, late: 0, total: 0, pct: 0 };
+    if (!sorted.length) return { present: 0, absent: 0, late: 0, leave: 0, total: 0, pct: 0 };
     const present = sorted.filter((r) => r.status === 'present').length;
     const absent = sorted.filter((r) => r.status === 'absent').length;
     const late = sorted.filter((r) => r.status === 'late').length;
+    const leave = sorted.filter((r) => r.status === 'leave').length;
     const total = sorted.length;
+    // Leave, like absent, does not contribute to the attendance percentage.
     const pct = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
-    return { present, absent, late, total, pct };
+    return { present, absent, late, leave, total, pct };
   }, [sorted]);
 
   return (
@@ -108,6 +148,7 @@ function AttendanceHistoryView({
           value={String(selectedMonth)}
           onChange={(val) => setSelectedMonth(Number(val))}
           style={{ backgroundColor: colors.background }}
+          mode="default"
         />
       </View>
 
@@ -133,6 +174,10 @@ function AttendanceHistoryView({
             <View style={styles.statItem}>
               <ThemedText style={[styles.statNumber, { color: '#F59E0B' }]}>{stats.late}</ThemedText>
               <ThemedText style={styles.statLabel}>Late</ThemedText>
+            </View>
+            <View style={styles.statItem}>
+              <ThemedText style={[styles.statNumber, { color: '#3B82F6' }]}>{stats.leave}</ThemedText>
+              <ThemedText style={styles.statLabel}>Leave</ThemedText>
             </View>
           </View>
           <View style={styles.percentageBarBg}>
@@ -203,6 +248,173 @@ function AttendanceHistoryView({
   );
 }
 
+// ─── Student own-attendance view ──────────────────────────────────────────────
+// Mirrors the web app's StudentOwnView (src/pages/students/AttendancePage.tsx):
+// a From/To date-range filter, six summary tiles and a numbered record list.
+
+/** { start, end } defaulting to 1st of current month → today (matches web). */
+function currentMonthRange() {
+  const today = new Date();
+  return {
+    start: formatDate(new Date(today.getFullYear(), today.getMonth(), 1)),
+    end: formatDate(today),
+  };
+}
+
+function StudentOwnView({ studentId }: { studentId: string }) {
+  const { colors } = useTheme();
+  const [dateFrom, setDateFrom] = useState(() => currentMonthRange().start);
+  const [dateTo, setDateTo] = useState(() => currentMonthRange().end);
+  const [activePicker, setActivePicker] = useState<'from' | 'to' | null>(null);
+
+  const { data: records, isLoading } = useQuery({
+    queryKey: ['attendance-range', studentId, dateFrom, dateTo],
+    queryFn: () =>
+      studentAttendanceApi.getStudentAttendanceFilter(studentId, {
+        start_date: dateFrom,
+        end_date: dateTo,
+      }),
+    enabled: !!studentId && !!dateFrom && !!dateTo,
+  });
+
+  const sorted = useMemo(
+    () => [...(records ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
+    [records],
+  );
+
+  const summary = useMemo(() => {
+    // Compared as strings: the shared AttendanceStatus union has no 'half_day'
+    // member, but the backend does return it (the web app renders it).
+    const count = (status: string) =>
+      sorted.filter((r) => (r.status as string) === status).length;
+    return {
+      total: sorted.length,
+      present: count('present'),
+      absent: count('absent'),
+      late: count('late'),
+      halfDay: count('half_day'),
+      leave: count('leave'),
+    };
+  }, [sorted]);
+
+  const tiles: { value: number; label: string; color?: string }[] = [
+    { value: summary.total, label: 'Total Days' },
+    { value: summary.present, label: 'Present', color: '#16A34A' },
+    { value: summary.absent, label: 'Absent', color: '#DC2626' },
+    { value: summary.late, label: 'Late', color: '#CA8A04' },
+    { value: summary.halfDay, label: 'Half Day', color: '#EA580C' },
+    { value: summary.leave, label: 'Leave', color: '#2563EB' },
+  ];
+
+  const renderDateField = (label: string, value: string, which: 'from' | 'to') => (
+    <View style={rStyles.dateCol}>
+      <ThemedText style={rStyles.dateLabel}>{label}</ThemedText>
+      <TouchableOpacity
+        style={[rStyles.dateField, { backgroundColor: colors.background, borderColor: colors.border }]}
+        onPress={() => setActivePicker(which)}
+      >
+        <ThemedText style={rStyles.dateFieldText} numberOfLines={1}>
+          {value.split('-').reverse().join('-')}
+        </ThemedText>
+        <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <>
+      <DatePickerModal
+        visible={activePicker !== null}
+        initialDate={activePicker === 'to' ? dateTo : dateFrom}
+        presets={['today']}
+        onConfirm={(date) => {
+          if (activePicker === 'to') setDateTo(date);
+          else setDateFrom(date);
+          setActivePicker(null);
+        }}
+        onCancel={() => setActivePicker(null)}
+      />
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Filter by Date */}
+        <View style={[styles.filtersCard, { backgroundColor: colors.card }]}>
+          <ThemedText type="subtitle" style={styles.filtersTitle}>
+            Filter by Date
+          </ThemedText>
+          <View style={rStyles.dateRow}>
+            {renderDateField('From', dateFrom, 'from')}
+            {renderDateField('To', dateTo, 'to')}
+          </View>
+        </View>
+
+        {/* Summary tiles */}
+        {!isLoading && sorted.length > 0 && (
+          <View style={rStyles.tileGrid}>
+            {tiles.map((tile) => (
+              <View
+                key={tile.label}
+                style={[rStyles.tile, { backgroundColor: colors.card, borderColor: colors.border }]}
+              >
+                <ThemedText style={[rStyles.tileValue, tile.color ? { color: tile.color } : null]}>
+                  {tile.value}
+                </ThemedText>
+                <ThemedText style={rStyles.tileLabel}>{tile.label}</ThemedText>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Attendance Records */}
+        <View style={[styles.studentsCard, { backgroundColor: colors.card }]}>
+          <ThemedText type="subtitle" style={styles.studentsTitle}>
+            Attendance Records
+          </ThemedText>
+
+          {isLoading ? (
+            <ThemedText style={styles.emptyText}>Loading attendance...</ThemedText>
+          ) : sorted.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={48} color={colors['muted-foreground']} />
+              <ThemedText style={styles.emptyText}>
+                No attendance records found for the selected period.
+              </ThemedText>
+            </View>
+          ) : (
+            sorted.map((record, index) => (
+              <View
+                key={record.id}
+                style={[rStyles.recordRow, { borderColor: colors.border }]}
+              >
+                <ThemedText style={[rStyles.recordIndex, { color: colors['muted-foreground'] }]}>
+                  {index + 1}
+                </ThemedText>
+                <View style={styles.recordDateWrapper}>
+                  <ThemedText style={styles.recordDateText}>
+                    {new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </ThemedText>
+                  {record.remarks ? (
+                    <ThemedText style={styles.remarksText} numberOfLines={1}>
+                      {record.remarks}
+                    </ThemedText>
+                  ) : null}
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(record.status) }]}>
+                  <Ionicons name={getStatusIcon(record.status) as any} size={13} color="white" />
+                  <ThemedText style={styles.statusText}>{getStatusText(record.status)}</ThemedText>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </>
+  );
+}
+
 // ─── Staff view (mark attendance) ─────────────────────────────────────────────
 
 function StaffAttendanceView() {
@@ -214,8 +426,9 @@ function StaffAttendanceView() {
   const [pendingDate, setPendingDate] = useState(new Date());
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedSection, setSelectedSection] = useState<string>('');
-  const [statusMap, setStatusMap] = useState<Record<string, 'present' | 'absent' | 'late'>>({});
+  const [statusMap, setStatusMap] = useState<Record<string, 'present' | 'absent' | 'late' | 'leave'>>({});
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const dateStr = selectedDate.toISOString().split('T')[0];
 
@@ -236,16 +449,13 @@ function StaffAttendanceView() {
     return (cls?.sections || []).map((s: any) => ({ label: s.name || '', value: s.id }));
   }, [classesData, selectedClass]);
 
-  // Students for selected class/section
+  // Students for selected class/section — mirrors web app's getStudentsByClassSection exactly
   const { data: studentsData = [], isLoading: studentsLoading, refetch: refetchStudents } = useQuery({
     queryKey: ['students-att', selectedClass, selectedSection],
-    queryFn: async () => {
-      const response = await studentAdmissionsApi.getStudentAdmissions();
-      let items: any[] = (response as any).items ?? response;
-      if (selectedClass) items = items.filter((s: any) => s.current_class_id === selectedClass);
-      if (selectedSection) items = items.filter((s: any) => s.current_section_id === selectedSection);
-      return items;
-    },
+    queryFn: () => studentAdmissionsApi.getStudentsByClassSection(
+      selectedClass,
+      selectedSection || undefined,
+    ),
     enabled: !!selectedClass,
   });
 
@@ -255,25 +465,48 @@ function StaffAttendanceView() {
     queryFn: () => studentAttendanceApi.getAttendanceByDate(dateStr),
   });
 
-  // Sync statusMap when records load
+  // Build statusMap: default all students to 'present', then override with saved records.
+  // Matches web app behaviour: students without an attendance record default to Present.
   useEffect(() => {
-    const map: Record<string, 'present' | 'absent' | 'late'> = {};
+    if ((studentsData as any[]).length === 0) return;
+    const map: Record<string, 'present' | 'absent' | 'late' | 'leave'> = {};
+    // Step 1 — pre-fill every student with 'present' (web app default)
+    (studentsData as any[]).forEach((s: any) => {
+      if (s.student?.id) map[s.student.id] = 'present';
+    });
+    // Step 2 — override with whatever the backend has saved for this date
     (attendanceRecords as any[]).forEach((r: any) => {
-      map[r.student_id] = r.status;
+      if (r.student_id) map[r.student_id] = r.status;
     });
     setStatusMap(map);
-  }, [attendanceRecords]);
+  }, [studentsData, attendanceRecords]);
 
   const stats = useMemo(() => {
-    let present = 0, absent = 0, late = 0;
+    let present = 0, absent = 0, late = 0, leave = 0;
     (studentsData as any[]).forEach((s: any) => {
       const status = statusMap[s.student?.id];
       if (status === 'present') present++;
       else if (status === 'absent') absent++;
       else if (status === 'late') late++;
+      else if (status === 'leave') leave++;
     });
-    return { present, absent, late };
+    const total = (studentsData as any[]).length;
+    // Leave, like absent, does not count towards the % Present figure.
+    const pct = total > 0 ? Math.round((present / total) * 100) : 0;
+    return { present, absent, late, leave, total, pct };
   }, [studentsData, statusMap]);
+
+  // Search by name or roll number — matches web app's Filter Students box
+  const filteredStudents = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const students = studentsData as any[];
+    if (!q) return students;
+    return students.filter((s: any) => {
+      const name = `${s.student?.first_name ?? ''} ${s.student?.last_name ?? ''}`.toLowerCase();
+      const roll = (s.admission_number || '').toLowerCase();
+      return name.includes(q) || roll.includes(q);
+    });
+  }, [studentsData, searchQuery]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -305,16 +538,8 @@ function StaffAttendanceView() {
     refetchAttendance();
   };
 
-  const handleMark = (studentId: string, status: 'present' | 'absent' | 'late') => {
+  const handleMark = (studentId: string, status: 'present' | 'absent' | 'late' | 'leave') => {
     setStatusMap((prev) => ({ ...prev, [studentId]: status }));
-  };
-
-  const handleMarkAll = (status: 'present' | 'absent' | 'late') => {
-    const map = { ...statusMap };
-    (studentsData as any[]).forEach((s: any) => {
-      if (s.student?.id) map[s.student.id] = status;
-    });
-    setStatusMap(map);
   };
 
   return (
@@ -376,6 +601,9 @@ function StaffAttendanceView() {
                   setSelectedSection('');
                 }}
                 style={sStyles.filterDropdown}
+                containerStyle={sStyles.filterDropdownContainer}
+                dropdownContainerStyle={sStyles.filterDropdownPopup}
+                mode="modal"
               />
             </View>
             <View style={sStyles.filterCol}>
@@ -386,22 +614,46 @@ function StaffAttendanceView() {
                 value={selectedSection}
                 onChange={(v) => setSelectedSection(v as string)}
                 style={sStyles.filterDropdown}
+                containerStyle={sStyles.filterDropdownContainer}
+                dropdownContainerStyle={sStyles.filterDropdownPopup}
+                mode="modal"
               />
             </View>
             <View style={sStyles.filterCol}>
               <ThemedText style={sStyles.filterLabel}>Date</ThemedText>
-              <TouchableOpacity
-                style={[sStyles.dateBtn, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => {
-                  setPendingDate(selectedDate);
-                  setShowDatePicker(true);
-                }}
-              >
-                <Ionicons name="calendar-outline" size={14} color={colors.primary} />
-                <ThemedText style={sStyles.dateBtnText} numberOfLines={1}>
-                  {selectedDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
-                </ThemedText>
-              </TouchableOpacity>
+              {Platform.OS === 'web' ? (
+                /* Web: native HTML date input — browser provides its own calendar icon */
+                <View style={[sStyles.dateBtn, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  {/* @ts-ignore — native HTML input, valid in Expo web */}
+                  <input
+                    type="date"
+                    value={dateStr}
+                    onChange={(e: any) => {
+                      const iso: string = e.target.value;
+                      if (iso) setSelectedDate(new Date(iso + 'T00:00:00'));
+                    }}
+                    style={{
+                      flex: 1, border: 'none', background: 'transparent',
+                      color: colors['card-foreground'], fontSize: 13,
+                      outline: 'none', padding: '0 4px', cursor: 'pointer', width: '100%',
+                    }}
+                  />
+                </View>
+              ) : (
+                /* iOS / Android: native picker triggered by button press */
+                <TouchableOpacity
+                  style={[sStyles.dateBtn, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  onPress={() => {
+                    setPendingDate(selectedDate);
+                    setShowDatePicker(true);
+                  }}
+                >
+                  <Ionicons name="calendar-outline" size={14} color={colors.primary} />
+                  <ThemedText style={sStyles.dateBtnText} numberOfLines={1}>
+                    {selectedDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -445,6 +697,30 @@ function StaffAttendanceView() {
               <ThemedText style={[sStyles.statNum, { color: '#CA8A04' }]}>{stats.late}</ThemedText>
               <ThemedText style={[sStyles.statLbl, { color: '#CA8A04' }]}>Late</ThemedText>
             </View>
+            <View style={[sStyles.statCard, { backgroundColor: '#DBEAFE' }]}>
+              <ThemedText style={[sStyles.statNum, { color: '#2563EB' }]}>{stats.leave}</ThemedText>
+              <ThemedText style={[sStyles.statLbl, { color: '#2563EB' }]}>Leave</ThemedText>
+            </View>
+          </View>
+        )}
+
+        {/* Total students summary bar */}
+        {selectedClass && stats.total > 0 && (
+          <View style={sStyles.totalRow}>
+            <View style={sStyles.progressBar}>
+              <View style={[sStyles.progressSegment, { flex: stats.present, backgroundColor: '#22C55E' }]} />
+              <View style={[sStyles.progressSegment, { flex: stats.late, backgroundColor: '#FACC15' }]} />
+              <View style={[sStyles.progressSegment, { flex: stats.leave, backgroundColor: '#60A5FA' }]} />
+              <View style={[sStyles.progressSegment, { flex: stats.absent, backgroundColor: '#F87171' }]} />
+            </View>
+            <View style={sStyles.totalRowText}>
+              <ThemedText style={[sStyles.totalRowLabel, { color: colors['muted-foreground'] }]}>
+                {stats.total} students total
+              </ThemedText>
+              <ThemedText style={[sStyles.totalRowLabel, { color: colors['muted-foreground'] }]}>
+                {stats.pct}% Present
+              </ThemedText>
+            </View>
           </View>
         )}
 
@@ -465,76 +741,103 @@ function StaffAttendanceView() {
           </View>
         ) : (
           <View style={[sStyles.studentsList, { backgroundColor: colors.card }]}>
-            {/* Mark All quick actions */}
-            <View style={[sStyles.markAllRow, { borderBottomColor: colors.border }]}>
-              <ThemedText style={sStyles.markAllLabel}>Mark All:</ThemedText>
-              {(['present', 'absent', 'late'] as const).map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[sStyles.markAllBtn, { backgroundColor: getStatusColor(s) }]}
-                  onPress={() => handleMarkAll(s)}
-                >
-                  <ThemedText style={sStyles.markAllBtnText}>{s[0].toUpperCase()}</ThemedText>
-                </TouchableOpacity>
-              ))}
+            {/* Filter Students */}
+            <View style={[sStyles.filterStudentsWrap, { borderBottomColor: colors.border }]}>
+              <View style={sStyles.filterStudentsHeader}>
+                <Ionicons name="filter-outline" size={15} color={colors['muted-foreground']} />
+                <ThemedText style={[sStyles.filterStudentsLabel, { color: colors['muted-foreground'] }]}>
+                  Filter Students
+                </ThemedText>
+                {searchQuery ? (
+                  <ThemedText style={[sStyles.filterStudentsCount, { color: colors['muted-foreground'] }]}>
+                    {filteredStudents.length} of {(studentsData as any[]).length}
+                  </ThemedText>
+                ) : null}
+              </View>
+              <View style={[sStyles.searchWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Ionicons name="search" size={15} color={colors['muted-foreground']} />
+                <TextInput
+                  style={[sStyles.searchInput, { color: colors['card-foreground'] }]}
+                  placeholder="Search by name or roll no..."
+                  placeholderTextColor={colors['muted-foreground']}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery ? (
+                  <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityLabel="Clear search">
+                    <Ionicons name="close-circle" size={15} color={colors['muted-foreground']} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             </View>
 
-            {(studentsData as any[]).map((student: any, idx: number) => {
-              const sid = student.student?.id;
-              const status = sid ? statusMap[sid] : undefined;
-              return (
-                <View
-                  key={student.id}
-                  style={[
-                    sStyles.studentRow,
-                    { borderBottomColor: colors.border },
-                    idx % 2 !== 0 && { backgroundColor: `${colors.primary}08` },
-                  ]}
-                >
-                  {/* Status indicator dot */}
-                  <View style={[sStyles.statusDot, { backgroundColor: status ? getStatusColor(status) : '#D1D5DB' }]}>
-                    <ThemedText style={sStyles.statusDotText}>
-                      {status ? status[0].toUpperCase() : '?'}
+            {filteredStudents.length === 0 ? (
+              <View style={styles.emptyState}>
+                <ThemedText style={styles.emptyText}>
+                  {searchQuery ? `No students match "${searchQuery}".` : 'No students found'}
+                </ThemedText>
+              </View>
+            ) : (
+              filteredStudents.map((student: any, idx: number) => {
+                const sid = student.student?.id;
+                const status = (sid ? statusMap[sid] : undefined) || 'present';
+                const badge = STATUS_BADGE[status];
+                // Highlight absent/late rows with a colored box, matching the web app's
+                // per-row border (border-red-200 / border-yellow-200) treatment.
+                const highlightStyle =
+                  status === 'absent'
+                    ? sStyles.rowAbsentHighlight
+                    : status === 'late'
+                    ? sStyles.rowLateHighlight
+                    : status === 'leave'
+                    ? sStyles.rowLeaveHighlight
+                    : null;
+                return (
+                  <View
+                    key={student.id}
+                    style={[
+                      sStyles.studentRow,
+                      { borderBottomColor: colors.border },
+                      idx % 2 !== 0 && { backgroundColor: `${colors.primary}08` },
+                      highlightStyle,
+                    ]}
+                  >
+                    <ThemedText style={[sStyles.serialNo, { color: colors['muted-foreground'] }]}>
+                      {idx + 1}
                     </ThemedText>
-                  </View>
 
-                  {/* Student info */}
-                  <View style={sStyles.studentInfo}>
-                    <ThemedText style={sStyles.studentName} numberOfLines={1}>
-                      {student.student?.first_name} {student.student?.last_name}
-                    </ThemedText>
-                    <ThemedText style={sStyles.admNo}>{student.admission_number}</ThemedText>
-                  </View>
-
-                  {/* P / A / L buttons */}
-                  {sid ? (
-                    <View style={sStyles.palRow}>
-                      {(['present', 'absent', 'late'] as const).map((s) => (
-                        <TouchableOpacity
-                          key={s}
-                          style={[
-                            sStyles.palBtn,
-                            status === s
-                              ? { backgroundColor: getStatusColor(s) }
-                              : { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
-                          ]}
-                          onPress={() => handleMark(sid, s)}
-                        >
-                          <ThemedText
-                            style={[
-                              sStyles.palBtnText,
-                              { color: status === s ? 'white' : colors['muted-foreground'] },
-                            ]}
-                          >
-                            {s[0].toUpperCase()}
-                          </ThemedText>
-                        </TouchableOpacity>
-                      ))}
+                    {/* Status badge (Present / Absent / Late / Leave) */}
+                    <View style={[sStyles.statusBadge, { backgroundColor: badge.bg, borderColor: badge.border }]}>
+                      <ThemedText style={[sStyles.statusBadgeText, { color: badge.text }]}>
+                        {getStatusLabel(status)}
+                      </ThemedText>
                     </View>
-                  ) : null}
-                </View>
-              );
-            })}
+
+                    {/* Student info */}
+                    <View style={sStyles.studentInfo}>
+                      <ThemedText style={sStyles.studentName} numberOfLines={1}>
+                        {student.student?.first_name} {student.student?.last_name}
+                      </ThemedText>
+                      <ThemedText style={sStyles.admNo}>Roll No: {student.admission_number || 'N/A'}</ThemedText>
+                    </View>
+
+                    {/* Status dropdown — same options as web app's Select */}
+                    {sid ? (
+                      <CustomDropdown
+                        data={STATUS_OPTIONS}
+                        value={status}
+                        onChange={(v) => handleMark(sid, v as 'present' | 'absent' | 'late' | 'leave')}
+                        search={false}
+                        mode="default"
+                        style={sStyles.statusDropdown}
+                        containerStyle={sStyles.statusDropdownContainer}
+                        selectedTextStyle={sStyles.statusDropdownText}
+                      />
+                    ) : null}
+                  </View>
+                );
+              })
+            )}
           </View>
         )}
       </ScrollView>
@@ -555,7 +858,7 @@ export default function StudentAttendanceScreen() {
   let content: React.ReactNode;
 
   if (isStudent && studentId) {
-    content = <AttendanceHistoryView studentId={studentId} />;
+    content = <StudentOwnView studentId={studentId} />;
   } else if (isParent && selectedStudent) {
     content = (
       <AttendanceHistoryView
@@ -629,11 +932,14 @@ const styles = StyleSheet.create({
   },
   summaryStats: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-around',
+    rowGap: 12,
     marginBottom: 16,
   },
   statItem: {
     alignItems: 'center',
+    minWidth: 56,
   },
   statNumber: {
     fontSize: 24,
@@ -731,6 +1037,82 @@ const styles = StyleSheet.create({
   },
 });
 
+// ─── Student own-attendance (date range) styles ───────────────────────────────
+
+const rStyles = StyleSheet.create({
+  dateRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dateCol: {
+    flex: 1,
+  },
+  dateLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.7,
+    marginBottom: 6,
+  },
+  dateField: {
+    height: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    gap: 6,
+  },
+  dateFieldText: {
+    fontSize: 13,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+
+  // Six summary tiles, three per row
+  tileGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 10,
+    marginBottom: 16,
+  },
+  tile: {
+    width: '31.5%',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  tileValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    lineHeight: 30,
+  },
+  tileLabel: {
+    fontSize: 11,
+    opacity: 0.6,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+
+  recordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+    gap: 10,
+  },
+  recordIndex: {
+    fontSize: 11,
+    width: 16,
+    textAlign: 'right',
+  },
+});
+
 // ─── Staff view styles ─────────────────────────────────────────────────────────
 
 const sStyles = StyleSheet.create({
@@ -765,6 +1147,23 @@ const sStyles = StyleSheet.create({
   },
   filterDropdown: {
     height: 40,
+  },
+  // CustomDropdown's own container bakes in a marginBottom (meant for stacked
+  // form fields); zero it here so the dropdown's box bottom-aligns flush with
+  // the Date column's box instead of sitting above an invisible gap.
+  filterDropdownContainer: {
+    marginBottom: 0,
+  },
+  // The dropdown's popup panel (list + search box) is width-measured from
+  // its trigger field by default, which in this 3-up compact row leaves it
+  // only ~1/3 of the screen wide — too narrow for the search input, causing
+  // it to render squeezed/misaligned. Give it a fixed, legible width and pair
+  // it with mode="modal" so it centers on screen instead of anchoring to the
+  // (narrow) trigger.
+  filterDropdownPopup: {
+    width: 280,
+    maxWidth: '85%',
+    alignSelf: 'center',
   },
   dateBtn: {
     height: 40,
@@ -834,6 +1233,31 @@ const sStyles = StyleSheet.create({
     marginTop: 1,
   },
 
+  // Total students summary bar
+  totalRow: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  progressBar: {
+    flexDirection: 'row',
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    backgroundColor: '#E5E7EB',
+    marginBottom: 6,
+  },
+  progressSegment: {
+    height: '100%',
+  },
+  totalRowText: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  totalRowLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
   // Student list
   studentsList: {
     borderRadius: 12,
@@ -846,31 +1270,39 @@ const sStyles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 3,
   },
-  markAllRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  // Filter Students (search bar above the list — matches web app)
+  filterStudentsWrap: {
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 8,
   },
-  markAllLabel: {
+  filterStudentsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  filterStudentsLabel: {
     fontSize: 12,
     fontWeight: '600',
-    opacity: 0.6,
-    flex: 1,
   },
-  markAllBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
+  filterStudentsCount: {
+    fontSize: 11,
+    marginLeft: 'auto',
+  },
+  searchWrap: {
+    flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 36,
+    gap: 6,
   },
-  markAllBtnText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '700',
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    height: '100%',
   },
   studentRow: {
     flexDirection: 'row',
@@ -880,16 +1312,47 @@ const sStyles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 10,
   },
-  statusDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
+  // Absent/late rows get a colored bordered box, matching the web app's
+  // border-red-200 / border-yellow-200 row highlighting.
+  rowAbsentHighlight: {
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+    borderBottomColor: '#FCA5A5',
+    borderRadius: 10,
+    marginHorizontal: 6,
+    marginVertical: 2,
+  },
+  rowLateHighlight: {
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    borderBottomColor: '#FDE68A',
+    borderRadius: 10,
+    marginHorizontal: 6,
+    marginVertical: 2,
+  },
+  rowLeaveHighlight: {
+    borderWidth: 1.5,
+    borderColor: '#93C5FD',
+    borderBottomColor: '#93C5FD',
+    borderRadius: 10,
+    marginHorizontal: 6,
+    marginVertical: 2,
+  },
+  serialNo: {
+    fontSize: 11,
+    width: 16,
+    textAlign: 'right',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    minWidth: 58,
     alignItems: 'center',
   },
-  statusDotText: {
-    color: 'white',
-    fontSize: 12,
+  statusBadgeText: {
+    fontSize: 11,
     fontWeight: '700',
   },
   studentInfo: {
@@ -904,20 +1367,17 @@ const sStyles = StyleSheet.create({
     opacity: 0.55,
     marginTop: 1,
   },
-  palRow: {
-    flexDirection: 'row',
-    gap: 5,
+  statusDropdown: {
+    height: 36,
+    minWidth: 108,
+    paddingHorizontal: 10,
+    paddingVertical: 0,
   },
-  palBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
+  statusDropdownContainer: {
+    marginBottom: 0,
   },
-  palBtnText: {
+  statusDropdownText: {
     fontSize: 12,
-    fontWeight: '700',
   },
 
   // iOS date picker modal

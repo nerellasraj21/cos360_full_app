@@ -200,6 +200,8 @@ export {
   FeePaymentResponse,
   FeeConcession,
   FeeConcessionCreate,
+  ConcessionHistoryItem,
+  ConcessionUpdatePayload,
   FeeCategoryRequest,
   FeeCategoryResponse,
   FeeTypeRequest,
@@ -216,5 +218,40 @@ export {
   OldFeeManualCreate,
   OldFeeCarryForwardRequest,
   OldFeeUpdate,
+  FeeTermDateResponse,
+  FeeReceiptRequest,
+  FeeRefundApproveRequest,
+  FeeRefundApproveResponse,
+  FeeRefundProcessRequest,
+  FeeRefundProcessResponse,
+  FeeRefundTransactionSummaryResponse,
+  FeeCollectionStats,
+  FeeCollectionItem,
+  FeePendingItem,
+  FeeStructureItem,
+  OutstandingFeeSummary,
+  OutstandingFeeItem,
 } from './fees';
 export * from './communication';
+export * from './announcements';
+export * from './schoolSettings';
+export {
+  issuableCertificatesApi,
+  IssuableCertificateTemplate,
+  IssuableCertificateTemplateCreate,
+  IssuableCertificateTemplateUpdate,
+  IssuedCertificateRecord,
+  GenerateCertificateRequest,
+  GenerateCertificateResponse,
+  TemplatePreviewData,
+} from './certificates';
+export {
+  routeTypesApi,
+  tripTypesApi,
+  RouteType,
+  RouteTypeCreate,
+  RouteTypeDropdown,
+  TripType,
+  TripTypeCreate,
+  TripTypeDropdown,
+} from './transportTypes';

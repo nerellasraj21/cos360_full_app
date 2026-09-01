@@ -6,6 +6,9 @@ export type TargetType =
   | 'individual_parent'
   | 'individual_student'
   | 'individual_staff'
+  | 'multiple_parents'
+  | 'multiple_students'
+  | 'multiple_staff'
   | 'class_section_parents'
   | 'class_section_students'
   | 'all_parents'
@@ -21,6 +24,9 @@ export type TargetRef =
   | { parent_id: string }
   | { student_id: string }
   | { staff_id: string }
+  | { parent_ids: string[] }
+  | { student_ids: string[] }
+  | { staff_ids: string[] }
   | { class_id: string; section_id: string }
   | { role: string }
   | Record<string, unknown>;
@@ -76,6 +82,9 @@ export interface PreviewCountParams {
   parent_id?: string;
   student_id?: string;
   staff_id?: string;
+  parent_ids?: string[];
+  student_ids?: string[];
+  staff_ids?: string[];
 }
 
 export interface PreviewCountResponse {

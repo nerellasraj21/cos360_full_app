@@ -2,7 +2,7 @@ import { Colors, ComponentStyles, Radius } from '@/constants/theme';
 import { useTheme } from '@/contexts';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Dropdown } from 'react-native-element-dropdown';
+import { Dropdown, MultiSelect } from 'react-native-element-dropdown';
 
 export interface DropdownOption {
   label: string;
@@ -22,6 +22,13 @@ export interface DropdownProps {
   required?: boolean;
   style?: any;
   containerStyle?: any;
+  // Style for the dropdown's *popup* box (the floating list/search panel),
+  // as opposed to `containerStyle` which styles the field's own wrapper.
+  // Needed because the popup's width is measured from the trigger field
+  // itself — in a narrow flex column (e.g. a 3-up filter row) that leaves
+  // too little room for the search input, so it renders squeezed/overflowing.
+  // Pass an explicit width here (paired with mode="modal") to override it.
+  dropdownContainerStyle?: any;
   placeholderStyle?: any;
   selectedTextStyle?: any;
   inputSearchStyle?: any;
@@ -30,6 +37,7 @@ export interface DropdownProps {
   valueField?: string;
   searchPlaceholder?: string;
   maxHeight?: number;
+  mode?: 'default' | 'modal' | 'auto';
   renderLeftIcon?: (visible?: boolean) => React.ReactElement | null;
   renderRightIcon?: (visible?: boolean) => React.ReactElement | null;
   renderItem?: (item: any, selected?: boolean) => React.ReactElement | null;
@@ -47,6 +55,7 @@ export const CustomDropdown: React.FC<DropdownProps> = React.memo(({
   required = false,
   style,
   containerStyle,
+  dropdownContainerStyle,
   placeholderStyle,
   selectedTextStyle,
   inputSearchStyle,
@@ -55,6 +64,7 @@ export const CustomDropdown: React.FC<DropdownProps> = React.memo(({
   valueField = 'value',
   searchPlaceholder = 'Search...',
   maxHeight = 300,
+  mode = 'modal',
   renderLeftIcon,
   renderRightIcon,
   renderItem,
@@ -155,6 +165,7 @@ export const CustomDropdown: React.FC<DropdownProps> = React.memo(({
         value={value}
         onChange={handleChange}
         onChangeText={handleChangeText}
+        mode={mode}
         renderLeftIcon={renderLeftIcon}
         renderRightIcon={renderRightIcon}
         renderItem={renderItem || ((item, selected) => {
@@ -177,10 +188,14 @@ export const CustomDropdown: React.FC<DropdownProps> = React.memo(({
           borderRadius: Radius.default,
           elevation: 20,
           zIndex: 9999,
+          ...dropdownContainerStyle,
         }}
         flatListProps={{
           showsVerticalScrollIndicator: true,
+          persistentScrollbar: true,
+          indicatorStyle: 'black',
           nestedScrollEnabled: true,
+          style: { borderRadius: Radius.default },
         }}
       />
 
@@ -193,6 +208,133 @@ export const CustomDropdown: React.FC<DropdownProps> = React.memo(({
       {required && !value && (
         <Text style={[styles.requiredText, { color: themeColors.destructive }]}>
           This field is required
+        </Text>
+      )}
+    </View>
+  );
+});
+
+export interface MultiSelectDropdownProps {
+  data: DropdownOption[];
+  value: (string | number)[];
+  onChange: (values: (string | number)[]) => void;
+  placeholder?: string;
+  search?: boolean;
+  searchPlaceholder?: string;
+  disabled?: boolean;
+  error?: string;
+  containerStyle?: any;
+  maxHeight?: number;
+  labelField?: string;
+  valueField?: string;
+}
+
+export const CustomMultiSelect: React.FC<MultiSelectDropdownProps> = React.memo(({
+  data,
+  value,
+  onChange,
+  placeholder = 'Select options...',
+  search = true,
+  searchPlaceholder = 'Search...',
+  disabled = false,
+  error,
+  containerStyle,
+  maxHeight = 300,
+  labelField = 'label',
+  valueField = 'value',
+}) => {
+  const { theme, colors } = useTheme();
+  const themeColors = colors;
+  const themeStyles = ComponentStyles[theme];
+
+  const dropdownStyle = useMemo(() => ({
+    ...styles.dropdown,
+    backgroundColor: themeStyles.picker.backgroundColor,
+    borderColor: error ? themeColors.destructive : themeStyles.picker.borderColor,
+    borderWidth: themeStyles.picker.borderWidth,
+    borderRadius: themeStyles.picker.borderRadius,
+  }), [themeStyles, themeColors, error]);
+
+  const containerStyles = useMemo(() => ({
+    ...styles.container,
+    ...containerStyle,
+    zIndex: 9999,
+    elevation: 10,
+  }), [containerStyle]);
+
+  const itemContainerStyle = useMemo(() => ({
+    backgroundColor: themeColors.card,
+    borderBottomColor: themeColors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  }), [themeColors]);
+
+  const itemTextStyle = useMemo(() => ({
+    color: themeColors['card-foreground'],
+    fontSize: 16,
+  }), [themeColors]);
+
+  const selectedItemTextStyle = useMemo(() => ({
+    color: themeColors.primary,
+    fontSize: 16,
+    fontWeight: '600' as const,
+  }), [themeColors]);
+
+  return (
+    <View style={containerStyles}>
+      <MultiSelect
+        style={dropdownStyle}
+        placeholderStyle={{ ...styles.placeholder, color: themeColors['muted-foreground'] }}
+        selectedTextStyle={{ ...styles.selectedText, color: themeColors['card-foreground'] }}
+        inputSearchStyle={{
+          ...styles.inputSearch,
+          color: themeColors['card-foreground'],
+          backgroundColor: themeStyles.textInput.backgroundColor,
+          borderColor: themeStyles.textInput.borderColor,
+          borderWidth: themeStyles.textInput.borderWidth,
+          borderRadius: themeStyles.textInput.borderRadius,
+        }}
+        iconStyle={styles.icon}
+        data={data}
+        search={search}
+        maxHeight={maxHeight}
+        labelField={labelField}
+        valueField={valueField}
+        placeholder={placeholder}
+        searchPlaceholder={searchPlaceholder}
+        value={value as string[]}
+        onChange={(vals: (string | number)[]) => onChange(vals)}
+        disable={disabled}
+        activeColor={themeColors.accent}
+        selectedStyle={styles.selectedStyle}
+        renderItem={(item: any, selected?: boolean) => (
+          <View style={[styles.itemContainer, itemContainerStyle]}>
+            <Text style={selected ? selectedItemTextStyle : itemTextStyle}>
+              {item.label}
+            </Text>
+          </View>
+        )}
+        itemContainerStyle={itemContainerStyle}
+        itemTextStyle={itemTextStyle}
+        containerStyle={{
+          backgroundColor: themeColors.card,
+          borderColor: themeColors.border,
+          borderWidth: 1,
+          borderRadius: Radius.default,
+          elevation: 20,
+          zIndex: 9999,
+        }}
+        flatListProps={{
+          showsVerticalScrollIndicator: true,
+          persistentScrollbar: true,
+          indicatorStyle: 'black',
+          nestedScrollEnabled: true,
+          style: { borderRadius: Radius.default },
+        }}
+      />
+
+      {error && (
+        <Text style={[styles.errorText, { color: themeColors.destructive }]}>
+          {error}
         </Text>
       )}
     </View>

@@ -1,19 +1,48 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
 
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
+import { getModuleStyle, mapPath } from '@/components/navigation/menuMap';
 import { useAuth, useTheme } from '@/contexts';
 import { studentAdmissionsApi, StudentAdmission } from '@/src/api/students';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
+import { menuChildrenFor } from '@/src/lib/menuUtils';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
 type Student = StudentAdmission;
 
 const BLUE = '#3B82F6';
 
+/** A card in the admin sections grid, from the menu or the cold-start fallback. */
+type StudentSection = {
+  key: string; title: string; description: string; icon: any; color: string;
+  route: string; hasAccess: boolean;
+};
+
+// Descriptions for known submodules — mirrors the web Students dashboard's
+// `descriptionMap` (src/routes/_app/students/index.tsx).
+const DESCRIPTIONS: Record<string, string> = {
+  'Admission': 'Manage student admissions and enrollment records',
+  'Student Admission': 'Manage student admissions and enrollment records',
+  'Student Admissions': 'Manage student admissions and enrollment records',
+  'Attendance': 'Track and manage daily student attendance',
+  'Student Attendance': 'Track and manage daily student attendance',
+  'Documents': 'Upload and manage student documents',
+  'Student Documents': 'Upload and manage student documents',
+  'Certificates': 'Issue and manage student certificates',
+  'Student Certificates': 'Issue and manage student certificates',
+  'Certificate Types': 'Manage certificate types',
+  'My Certificates': 'View your certificates',
+  'My Documents': 'View your documents',
+  'Profile': 'View and update student profile details',
+  'Reports': 'Generate and export student reports',
+};
+
+// Cold-start fallback only, used before the backend menu has loaded.
 const sections = [
   {
     title: 'Student Admissions',
@@ -45,7 +74,7 @@ const sections = [
   {
     title: 'Student Certificates',
     description: 'Issue and manage student certificates',
-    icon: 'ribbon' as const,
+    icon: 'document-text' as const,
     color: '#8B5CF6',
     route: '/students/studentcertificates',
     resource: PERMISSION_RESOURCES.STUDENT_CERTIFICATES,
@@ -60,48 +89,76 @@ const sections = [
     resource: PERMISSION_RESOURCES.STUDENT_CERTIFICATES,
     action: 'list',
   },
-  {
-    title: 'Student Transport',
-    description: 'View student transport assignments',
-    icon: 'bus' as const,
-    color: '#EF4444',
-    route: '/students/transport',
-    resource: PERMISSION_RESOURCES.STUDENT_TRANSPORT,
-    action: 'list',
-  },
 ];
 
+// Web parity: web's Students hub is exactly four sections — Admissions,
+// Attendance, Documents, Certificates (see AdmissionTable.tsx /
+// AttendancePage.tsx / StudentDocumentsPage.tsx / CertificatePage.tsx) — with
+// no Profile/Fees/Calendar/Transport/Timetable entries in that hub at all
+// (Fees and Profile already have their own tabs here; Transport has no
+// working parent/student view on web — admin-only, hidden from every menu;
+// Timetable is admin-only under Masters, no student/parent view exists).
 const STUDENT_QUICK_LINKS = [
-  { title: 'My Attendance',   icon: 'checkmark-circle' as const,  color: '#10B981', route: '/students/attendance',    desc: 'View attendance history'           },
-  { title: 'My Certificates', icon: 'ribbon' as const,            color: '#8B5CF6', route: '/students/mycertificates', desc: 'Download your certificates'        },
+  { title: 'My Admission',    icon: 'person-add' as const,        color: '#3B82F6', route: '/students/myadmission',    desc: 'View your admission details'       },
+  { title: 'My Attendance',   icon: 'checkmark-circle' as const,  color: '#10B981', route: '/students/attendance',     desc: 'View attendance history'           },
   { title: 'My Documents',    icon: 'folder-open' as const,       color: '#F97316', route: '/students/mydocuments',    desc: 'View & upload your documents'      },
-  { title: 'My Profile',      icon: 'person-circle' as const,     color: '#3B82F6', route: '/students/profile',        desc: 'View your profile & details'       },
-  { title: 'My Transport',    icon: 'bus' as const,               color: '#EF4444', route: '/students/transport',      desc: 'View your transport assignment'    },
-  { title: 'My Fees',         icon: 'wallet' as const,            color: '#10B981', route: '/fees/collection',         desc: 'View your fee summary & payments'  },
-  { title: 'My Timetable',    icon: 'calendar' as const,          color: '#556ee6', route: '/timetable',               desc: 'View your class timetable'         },
-  { title: 'School Calendar', icon: 'calendar-number' as const,   color: '#F59E0B', route: '/calendar',                desc: 'View holidays & school events'     },
+  { title: 'My Certificates', icon: 'document-text' as const,     color: '#8B5CF6', route: '/students/mycertificates', desc: 'Download your certificates'        },
 ];
 
 const PARENT_QUICK_LINKS = [
+  { title: 'Child Admissions',   icon: 'person-add' as const,        color: '#3B82F6', route: '/students/myadmission',      desc: 'View child admission details'      },
   { title: 'Child Attendance',   icon: 'checkmark-circle' as const,  color: '#10B981', route: '/students/attendance',       desc: 'View child attendance history'     },
-  { title: 'Child Certificates', icon: 'ribbon' as const,            color: '#8B5CF6', route: '/students/mycertificates',   desc: 'Download child certificates'       },
   { title: 'Child Documents',    icon: 'folder-open' as const,       color: '#F97316', route: '/students/mydocuments',      desc: 'View child documents'              },
-  { title: 'Child Profile',      icon: 'person-circle' as const,     color: '#3B82F6', route: '/students/profile',          desc: 'View child profile & details'      },
-  { title: 'Child Transport',    icon: 'bus' as const,               color: '#EF4444', route: '/students/transport',        desc: 'View child transport assignment'   },
-  { title: 'Child Fees',         icon: 'wallet' as const,            color: '#10B981', route: '/fees/collection',           desc: 'View child fee summary & payments' },
-  { title: 'Timetable',          icon: 'calendar' as const,          color: '#556ee6', route: '/timetable',                 desc: 'View child class timetable'        },
-  { title: 'School Calendar',    icon: 'calendar-number' as const,   color: '#F59E0B', route: '/calendar',                  desc: 'View holidays & school events'     },
+  { title: 'Child Certificates', icon: 'document-text' as const,     color: '#8B5CF6', route: '/students/mycertificates',   desc: 'Download child certificates'       },
 ];
 
 export default function StudentsScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
-  const { role } = useAuth();
+  const { role, menu } = useAuth();
   const { hasPermission } = useMobilePermission();
 
   const roleName = role?.name?.toLowerCase() ?? '';
   const isStudent = roleName === 'student';
   const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
+
+  // Admin sections are the UNION of the static list (kept, with its locked-card
+  // treatment, so nothing disappears) and any extra section the Students node of
+  // the backend menu grants.
+  const adminSections = useMemo<StudentSection[]>(() => {
+    const merged: StudentSection[] = sections.map(section => ({
+      key: section.route,
+      title: section.title,
+      description: section.description,
+      icon: section.icon,
+      color: section.color,
+      route: section.route,
+      hasAccess: hasPermission ? hasPermission(section.resource, section.action) : false,
+    }));
+    const seenRoutes = new Set(merged.map(s => s.route));
+
+    for (const child of menuChildrenFor((menu ?? []) as any, roleName, ['students', 'student'])) {
+      if (!child.path) continue;
+      const route = mapPath(child.path);
+      // The hub itself is not one of its own sections.
+      if (route === '/(tabs)/students' || seenRoutes.has(route)) continue;
+      seenRoutes.add(route);
+      const title = child.name ?? '';
+      const { icon, color } = getModuleStyle(title);
+      merged.push({
+        key: child.id ?? child.path,
+        title,
+        description: DESCRIPTIONS[title] ?? `Manage ${title.toLowerCase()}`,
+        icon,
+        color,
+        route,
+        // The backend menu is already permission-scoped, so anything it sends is open.
+        hasAccess: true,
+      });
+    }
+
+    return merged;
+  }, [menu, roleName, hasPermission]);
 
   const hasListPermission = hasPermission ? hasPermission(PERMISSION_RESOURCES.STUDENTS, 'list') : false;
   const { data: studentsResponse } = useQuery({
@@ -212,11 +269,11 @@ export default function StudentsScreen() {
 
         {/* Section cards grid */}
         <View style={styles.grid}>
-          {sections.map((section, i) => {
-            const hasAccess = hasPermission ? hasPermission(section.resource, section.action) : false;
+          {adminSections.map((section) => {
+            const hasAccess = section.hasAccess;
             return (
               <TouchableOpacity
-                key={i}
+                key={section.key}
                 style={[
                   styles.sectionCard,
                   { backgroundColor: cardBg, borderColor: borderCol },

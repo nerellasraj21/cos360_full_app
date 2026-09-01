@@ -10,10 +10,9 @@ import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 const PURPLE = '#8B5CF6';
 
 const sections = [
-  { title: 'Staff Enrollment',   description: 'View and manage staff enrollments',  icon: 'people' as const,        color: PURPLE,    route: '/staff/enrollment',   resource: PERMISSION_RESOURCES.STAFF,               action: 'list' },
-  { title: 'Staff Attendance',   description: 'Track and manage staff attendance',  icon: 'calendar' as const,      color: '#A855F7', route: '/staff/attendance',   resource: PERMISSION_RESOURCES.STAFF_ATTENDANCE,    action: 'list' },
-  { title: 'Staff Designations', description: 'Manage staff roles and positions',   icon: 'ribbon' as const,        color: '#7C3AED', route: '/staff/designations', resource: PERMISSION_RESOURCES.STAFF_DESIGNATIONS,  action: 'list' },
-  { title: 'Staff Profile',      description: 'View and edit your staff profile',   icon: 'person-circle' as const, color: '#6D28D9', route: '/staff/profile',      resource: PERMISSION_RESOURCES.STAFF,               action: 'read' },
+  { title: 'Staff Enrollment',   description: 'View and manage staff enrollments',  icon: 'person-add' as const,        color: PURPLE,    route: '/staff/enrollment',   resource: PERMISSION_RESOURCES.STAFF,               action: 'list' },
+  { title: 'Staff Attendance',   description: 'Track and manage staff attendance',  icon: 'clipboard' as const,         color: '#A855F7', route: '/staff/attendance',   resource: PERMISSION_RESOURCES.STAFF_ATTENDANCE,    action: 'list' },
+  { title: 'Staff Designations', description: 'Manage staff roles and positions',   icon: 'checkmark-circle' as const,  color: '#7C3AED', route: '/staff/designations', resource: PERMISSION_RESOURCES.STAFF_DESIGNATIONS,  action: 'list' },
 ];
 
 export default function StaffScreen() {

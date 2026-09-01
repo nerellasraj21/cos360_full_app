@@ -6,12 +6,15 @@ import {
   FlatList,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 
 import { ScreenLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { examsApi } from '@/src/api/exam';
+import { exportToCsv } from '@/src/utils/exportCsv';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const COLOR = '#EF4444';
 
@@ -23,7 +26,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   finalized: { bg: '#ede9fe', text: '#5b21b6' },
 };
 
-export default function AcademicReportsScreen() {
+function AcademicReportsScreenContent() {
   const { colors, theme } = useTheme();
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -37,6 +40,13 @@ export default function AcademicReportsScreen() {
   const active = (exams as any[]).filter(e => e.status === 'active').length;
   const draft = (exams as any[]).filter(e => e.status === 'draft').length;
 
+  const handleExport = () =>
+    exportToCsv(
+      'academic_exams_report.csv',
+      ['#', 'Exam Name', 'Type', 'Board', 'Academic Year', 'Status'],
+      (exams as any[]).map((e, i) => [i + 1, e.exam_name, e.exam_type, e.board, e.academic_year_title, e.status]),
+    );
+
   return (
     <ScreenLayout title="Academic Reports">
       <View style={[styles.banner, { backgroundColor: COLOR }]}>
@@ -45,6 +55,10 @@ export default function AcademicReportsScreen() {
           <Ionicons name="school" size={24} color="white" />
         </View>
         <Text style={styles.bannerTitle}>Academic / Exam Overview</Text>
+        <TouchableOpacity style={styles.exportBtn} onPress={handleExport}>
+          <Ionicons name="share-outline" size={16} color="white" />
+          <Text style={styles.exportBtnText}>Export</Text>
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (
@@ -109,7 +123,9 @@ const styles = StyleSheet.create({
   banner: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, overflow: 'hidden' },
   bannerDecor: { position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.12)' },
   bannerIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700' },
+  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700', flex: 1 },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  exportBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingText: { fontSize: 14 },
   listContent: { padding: 16, paddingBottom: 32 },
@@ -127,3 +143,17 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', gap: 8, paddingTop: 40 },
   emptyText: { fontSize: 14 },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function AcademicReportsScreen() {
+  return (
+    <ScreenAccessGate
+      title="Academic Reports"
+      resources={['exams', 'exam_results']}
+      blockRoles={['student']}
+    >
+      <AcademicReportsScreenContent />
+    </ScreenAccessGate>
+  );
+}

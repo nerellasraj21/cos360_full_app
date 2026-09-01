@@ -20,6 +20,7 @@ import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts';
 import { parentsApi, type Parent } from '@/src/api/masters';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const COLOR = '#f59e0b';
 
@@ -43,7 +44,7 @@ const emptyForm: ParentFormData = {
   is_active: true,
 };
 
-export default function ParentsScreen() {
+function ParentsScreenContent() {
   const { colors, theme } = useTheme();
   const { showError } = useToastContext();
   const { confirm, modalProps } = useConfirmModal();
@@ -160,7 +161,8 @@ export default function ParentsScreen() {
       {/* Banner */}
       <View style={[styles.banner, { backgroundColor: COLOR }]}>
         <View style={styles.bannerDecor} />
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}
+              accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={20} color="white" />
         </TouchableOpacity>
         <View style={styles.bannerIcon}>
@@ -170,7 +172,8 @@ export default function ParentsScreen() {
           <Text style={styles.bannerTitle}>Parents</Text>
           <Text style={styles.bannerSub}>{(parents as Parent[]).length} registered parents</Text>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
+        <TouchableOpacity style={styles.addBtn} onPress={openCreate}
+              accessibilityLabel="Add">
           <Ionicons name="add" size={20} color="white" />
         </TouchableOpacity>
       </View>
@@ -186,7 +189,8 @@ export default function ParentsScreen() {
           onChangeText={setSearchQuery}
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityLabel="Close">
             <Ionicons name="close-circle" size={16} color={colors['muted-foreground']} />
           </TouchableOpacity>
         )}
@@ -210,7 +214,7 @@ export default function ParentsScreen() {
             )}
           </View>
         }
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const p = item as Parent;
           const isActive = p.is_active !== false;
           return (
@@ -221,6 +225,7 @@ export default function ParentsScreen() {
                 </Text>
               </View>
               <View style={{ flex: 1 }}>
+                <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
                 <Text style={[styles.cardName, { color: colors.foreground }]}>
                   {p.first_name} {p.last_name}
                 </Text>
@@ -246,6 +251,7 @@ export default function ParentsScreen() {
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: '#dbeafe' }]}
                   onPress={() => openEdit(p)}
+              accessibilityLabel="Edit"
                 >
                   <Ionicons name="create-outline" size={15} color="#3b82f6" />
                 </TouchableOpacity>
@@ -253,6 +259,7 @@ export default function ParentsScreen() {
                   style={[styles.actionBtn, { backgroundColor: '#fee2e2', marginTop: 6 }]}
                   onPress={() => handleDelete(p)}
                   disabled={deleteMutation.isPending}
+              accessibilityLabel="Delete"
                 >
                   <Ionicons name="trash-outline" size={15} color="#ef4444" />
                 </TouchableOpacity>
@@ -270,7 +277,8 @@ export default function ParentsScreen() {
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                 {editingParent ? 'Edit Parent' : 'Add Parent'}
               </Text>
-              <TouchableOpacity onPress={closeModal}>
+              <TouchableOpacity onPress={closeModal}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </View>
@@ -359,7 +367,7 @@ export default function ParentsScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.submitBtn, { backgroundColor: COLOR, opacity: isPending ? 0.7 : 1, marginTop: 8 }]}
+                style={[styles.submitBtn, { backgroundColor: COLOR, opacity: isPending ? 0.5 : 1, marginTop: 8 }]}
                 onPress={handleSubmit}
                 disabled={isPending}
               >
@@ -377,6 +385,7 @@ export default function ParentsScreen() {
 }
 
 const styles = StyleSheet.create({
+  serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 12, overflow: 'hidden' },
   bannerDecor: { position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.12)' },
   backBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 4 },
@@ -415,3 +424,16 @@ const styles = StyleSheet.create({
   submitBtn: { borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   submitBtnText: { color: 'white', fontSize: 15, fontWeight: '700' },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function ParentsScreen() {
+  return (
+    <ScreenAccessGate
+      title="Parents"
+      resources={['parents']}
+    >
+      <ParentsScreenContent />
+    </ScreenAccessGate>
+  );
+}

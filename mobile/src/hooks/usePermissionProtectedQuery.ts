@@ -55,6 +55,16 @@ export const usePermissionProtectedQuery = <TData = unknown, TError = unknown>(
     hasPermission = checkPermissionByConstant(options.resource, options.action)
   }
 
+  // Rules of Hooks: useQuery must run on EVERY render in the same order. It used
+  // to sit after the early return below, so when permissions finished loading and
+  // hasPermission flipped false -> true, React saw an extra hook appear and threw
+  // "Rendered more hooks than during the previous render". Fetching is gated with
+  // `enabled` instead, which keeps the no-permission behaviour (no network call).
+  const queryResult = useQuery({
+    ...options,
+    enabled: hasPermission ? (options.enabled ?? true) : false,
+  })
+
   // If no permission, return disabled query result
   if (!hasPermission) {
     return {
@@ -82,9 +92,6 @@ export const usePermissionProtectedQuery = <TData = unknown, TError = unknown>(
       promise: Promise.resolve({ data: options.fallbackData } as any),
     } as PermissionProtectedQueryResult<TData, TError>
   }
-
-  // Execute query if permission granted
-  const queryResult = useQuery(options)
 
   return {
     ...queryResult,

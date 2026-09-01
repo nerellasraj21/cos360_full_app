@@ -23,10 +23,11 @@ import {
   useUpdateExpenseCategoryProtected,
 } from '@/hooks/use-expense-protected';
 import type { ExpenseCategory } from '@/src/types/expense';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const ORANGE = '#F97316';
 
-export default function ExpenseCategoriesScreen() {
+function ExpenseCategoriesScreenContent() {
   const { colors, theme } = useTheme();
   const { showSuccess, showError } = useToastContext();
   const [search, setSearch] = useState('');
@@ -165,7 +166,8 @@ export default function ExpenseCategoriesScreen() {
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                 {editing ? 'Edit Category' : 'New Category'}
               </Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
+              <TouchableOpacity onPress={() => setShowModal(false)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color={colors.foreground} />
               </TouchableOpacity>
             </View>
@@ -214,7 +216,7 @@ export default function ExpenseCategoriesScreen() {
                 <Text style={{ color: 'white', fontWeight: '600' }}>
                   {createMutation.isPending || updateMutation.isPending
                     ? 'Saving...'
-                    : editing ? 'Update' : 'Create'}
+                    : 'Save'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -266,3 +268,16 @@ const styles = StyleSheet.create({
   cancelBtn: { flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
   submitBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function ExpenseCategoriesScreen() {
+  return (
+    <ScreenAccessGate
+      title="Expense Categories"
+      resources={['expense_categories']}
+    >
+      <ExpenseCategoriesScreenContent />
+    </ScreenAccessGate>
+  );
+}

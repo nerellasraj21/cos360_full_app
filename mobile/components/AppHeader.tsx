@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,8 +25,14 @@ export default function AppHeader({
 }: AppHeaderProps) {
   const { role, selectedStudent, availableStudents, selectStudent, user, menu } = useAuth();
   const schoolName = getSchoolName();
+  const router = useRouter();
   const [showStudentSelector, setShowStudentSelector] = React.useState(false);
   const [showDrawer, setShowDrawer] = React.useState(false);
+
+  // Screens that suppress the native stack header (e.g. app/exam/_layout.tsx)
+  // have no other way back on web, where there's no swipe/hardware back —
+  // show one here whenever there's stack history to go back to.
+  const canGoBack = router.canGoBack();
 
   const isParent =
     role?.name?.toLowerCase() === 'parent' ||
@@ -38,8 +45,18 @@ export default function AppHeader({
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
-        {/* Left: Logo + school name */}
+        {/* Left: Back (when there's somewhere to go back to) + Logo + school name */}
         <View style={styles.leftSection}>
+          {canGoBack && (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Go back"
+            >
+              <Ionicons name="chevron-back" size={22} color="white" />
+            </TouchableOpacity>
+          )}
           <View style={styles.logoCircle}>
             <Text style={styles.logoInitial}>{initial}</Text>
           </View>
@@ -72,15 +89,6 @@ export default function AppHeader({
         {/* Right: action buttons */}
         <View style={styles.rightSection}>
           {headerRight}
-          {showSearch && (
-            <TouchableOpacity
-              style={[styles.iconButton, { opacity: 0.4 }]}
-              disabled={true}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="search-outline" size={22} color="rgba(255,255,255,0.9)" />
-            </TouchableOpacity>
-          )}
           {showMenu && (
             <TouchableOpacity
               style={[styles.iconButton, styles.menuButton]}
@@ -135,6 +143,13 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  backButton: {
+    width: 30,
+    height: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
   },
   logoCircle: {
     width: 38,

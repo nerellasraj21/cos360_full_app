@@ -1,12 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastContext } from '../../../../components/ToastProvider';
-import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { useMastersQuery } from './useMastersQuery';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { holidaysApi, HolidayRead, HolidayCreate, HolidayUpdate } from '../../index';
 
 // Get all holidays - permission protected
 export function useHolidays() {
-  return usePermissionProtectedQuery<HolidayRead[]>({
+  return useMastersQuery<HolidayRead[]>({
     queryKey: ['holidays'],
     queryFn: () => holidaysApi.getHolidays(),
     resource: PERMISSION_RESOURCES.HOLIDAYS,
@@ -16,7 +17,7 @@ export function useHolidays() {
 
 // Get holidays dropdown - permission protected
 export function useHolidaysDropdown() {
-  return usePermissionProtectedQuery<any[]>({
+  return useMastersQuery<any[]>({
     queryKey: ['holidaysDropdown'],
     queryFn: () => holidaysApi.getHolidaysDropdown(),
     resource: PERMISSION_RESOURCES.HOLIDAYS,
@@ -26,7 +27,7 @@ export function useHolidaysDropdown() {
 
 // Get holiday by ID - permission protected
 export function useHoliday(id: string) {
-  return usePermissionProtectedQuery<HolidayRead>({
+  return useMastersQuery<HolidayRead>({
     queryKey: ['holidays', id],
     queryFn: () => holidaysApi.getHoliday(id),
     resource: PERMISSION_RESOURCES.HOLIDAYS,

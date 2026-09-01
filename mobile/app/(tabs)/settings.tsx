@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { DestructiveButton } from '@/components/buttons';
 import { useRouter } from 'expo-router';
 import { ConfirmModal } from '@/components/ui';
 import { useQuery } from '@tanstack/react-query';
@@ -239,14 +240,15 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── Logout ── */}
-        <TouchableOpacity
-          style={[styles.logoutBtn, { borderColor: '#fee2e2' }]}
+        <DestructiveButton
           onPress={handleLogout}
-          activeOpacity={0.8}
+          fullWidth
+          style={[styles.logoutBtn, { borderColor: '#fee2e2', backgroundColor: '#fff1f2' }]}
+          textStyle={styles.logoutText}
+          icon={<Ionicons name="log-out-outline" size={20} color="#ef4444" />}
         >
-          <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-          <Text style={styles.logoutText}>Sign Out</Text>
-        </TouchableOpacity>
+          Sign Out
+        </DestructiveButton>
 
       </ScrollView>
     </AppLayout>

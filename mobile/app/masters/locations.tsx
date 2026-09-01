@@ -146,6 +146,7 @@ export default function LocationsScreen() {
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: ACCENT + '20' }]}
               onPress={() => handleEdit(item)}
+              accessibilityLabel="Edit"
             >
               <Ionicons name="create" size={15} color={ACCENT} />
             </TouchableOpacity>
@@ -154,6 +155,7 @@ export default function LocationsScreen() {
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: '#EF444420' }]}
               onPress={() => handleDelete(item)}
+              accessibilityLabel="Delete"
             >
               <Ionicons name="trash" size={15} color="#EF4444" />
             </TouchableOpacity>
@@ -178,7 +180,8 @@ export default function LocationsScreen() {
       <ThemedView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}
+              accessibilityLabel="Go back">
             <Ionicons name="arrow-back" size={24} color={colors.foreground} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
@@ -191,6 +194,7 @@ export default function LocationsScreen() {
             <TouchableOpacity
               style={[styles.addBtn, { backgroundColor: ACCENT }]}
               onPress={() => { resetForm(); setIsModalVisible(true); }}
+              accessibilityLabel="Add"
             >
               <Ionicons name="add" size={24} color="white" />
             </TouchableOpacity>
@@ -208,7 +212,8 @@ export default function LocationsScreen() {
             onChangeText={setSearchQuery}
           />
           {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityLabel="Close">
               <Ionicons name="close" size={18} color={colors['muted-foreground']} />
             </TouchableOpacity>
           ) : null}
@@ -246,7 +251,8 @@ export default function LocationsScreen() {
                 <ThemedText type="title" style={styles.modalTitle}>
                   {editingItem ? 'Edit Location' : 'Add Location'}
                 </ThemedText>
-                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors.foreground} />
                 </TouchableOpacity>
               </View>

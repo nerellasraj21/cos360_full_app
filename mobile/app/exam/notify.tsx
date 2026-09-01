@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -18,6 +19,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/contexts';
 import { examsApi, examNotificationsApi } from '@/src/api/exam';
 import type { NotificationRequest } from '@/src/api/exam';
+import { getApiErrorMessage } from '@/src/utils/apiError';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
 type TargetAudience = 'students' | 'parents' | 'both';
@@ -34,8 +36,9 @@ export default function ExamNotifyScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const { showSuccess, showError } = useToastContext();
+  const { examId } = useLocalSearchParams<{ examId?: string }>();
 
-  const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
+  const [selectedExamId, setSelectedExamId] = useState<string | null>(examId ?? null);
   const [notificationType, setNotificationType] = useState('');
   const [message, setMessage] = useState('');
   const [targetAudience, setTargetAudience] = useState<TargetAudience>('students');
@@ -65,7 +68,7 @@ export default function ExamNotifyScreen() {
       setMessage('');
     },
     onError: (error: any) => {
-      showError('Send Failed', error.message || 'Failed to send notifications');
+      showError('Send Failed', getApiErrorMessage(error, 'Failed to send notifications'));
     },
   });
 
@@ -102,9 +105,11 @@ export default function ExamNotifyScreen() {
   const selectedExam = exams.find(e => e.id === selectedExamId);
 
   return (
+    // Web parity: POST /exams/{id}/notify checks "exams":"update" — see
+    // mobile backend files/notification_endpoints.py.
     <PermissionGuard
       resourceConstant={PERMISSION_RESOURCES.EXAMS}
-      actionConstant="create"
+      actionConstant="update"
       fallback={
         <AppLayout title="Exam Notifications">
           <View style={styles.centered}>
@@ -132,11 +137,13 @@ export default function ExamNotifyScreen() {
             </View>
           </View>
 
-          {/* Exam Selector */}
+          {/* Exam Selector — hidden when navigated here already scoped to one exam */}
           <ThemedView style={[styles.section, { backgroundColor: cardBg, borderColor: borderCol }]}>
             <ThemedText style={styles.sectionTitle}>Select Exam *</ThemedText>
-            {examsLoading ? (
-              <ThemedText style={[styles.loadingText, { color: colors['muted-foreground'] }]}>Loading exams...</ThemedText>
+            {examId ? null : examsLoading ? (
+              <View style={{ paddingVertical: 8 }}>
+                <ActivityIndicator size="small" color={ACCENT} />
+              </View>
             ) : exams.length === 0 ? (
               <ThemedText style={[styles.loadingText, { color: colors['muted-foreground'] }]}>No exams available</ThemedText>
             ) : (
@@ -150,7 +157,7 @@ export default function ExamNotifyScreen() {
                       selectedExamId === exam.id && { backgroundColor: ACCENT + '18' },
                     ]}
                     onPress={() => setSelectedExamId(exam.id)}
-                    activeOpacity={0.7}
+                    activeOpacity={0.75}
                   >
                     <ThemedText
                       style={[styles.chipText, selectedExamId === exam.id && { color: ACCENT, fontWeight: '600' }]}
@@ -216,7 +223,7 @@ export default function ExamNotifyScreen() {
                     targetAudience === opt.value && { backgroundColor: ACCENT + '18' },
                   ]}
                   onPress={() => setTargetAudience(opt.value)}
-                  activeOpacity={0.7}
+                  activeOpacity={0.75}
                 >
                   <Ionicons
                     name={opt.icon as any}
@@ -245,7 +252,7 @@ export default function ExamNotifyScreen() {
                 key={channel.label}
                 style={styles.channelRow}
                 onPress={() => channel.setter(!channel.value)}
-                activeOpacity={0.7}
+                activeOpacity={0.75}
               >
                 <Ionicons
                   name={channel.value ? 'checkbox' : 'square-outline'}
@@ -266,11 +273,11 @@ export default function ExamNotifyScreen() {
             ]}
             onPress={handleSend}
             disabled={notifyMutation.isPending}
-            activeOpacity={0.85}
+            activeOpacity={0.75}
           >
             <Ionicons name="send" size={20} color="white" />
             <ThemedText style={styles.sendBtnText}>
-              {notifyMutation.isPending ? 'Sending...' : 'Send Notification'}
+              {notifyMutation.isPending ? 'Sending…' : 'Send Notification'}
             </ThemedText>
           </TouchableOpacity>
 

@@ -271,7 +271,7 @@ export interface ExpenseApprovalRequest {
 }
 
 // API Response types
-export interface PaginatedResponse<T> {
+export interface ExpensePaginatedResponse<T> {
   items: T[];
   total: number;
   skip: number;

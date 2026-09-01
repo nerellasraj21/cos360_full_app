@@ -1,4 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { parentStudentsApi } from '@/src/api/students';
+import type { ParentStudent } from '@/src/api/students';
 import { 
   usePermissionProtectedQuery,
   usePermissionProtectedMutation,
@@ -150,6 +152,24 @@ export const useBulkParentOperations = () => {
     bulkDelete: bulkDeleteMutation,
   };
 };
+
+// Parent children hooks (for parent-role users viewing their own children)
+export function useMyChildren() {
+  return useQuery<ParentStudent[]>({
+    queryKey: ['my-children'],
+    queryFn: () => parentStudentsApi.getParentStudents(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useParentChildren(parentEntityId: string | null) {
+  return useQuery<ParentStudent[]>({
+    queryKey: ['parent-children', parentEntityId],
+    queryFn: () => parentStudentsApi.getChildrenByParentEntityId(parentEntityId!),
+    enabled: !!parentEntityId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 // Export all hooks
 export {

@@ -56,10 +56,35 @@ function holidayColor(holiday: HolidayRead): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
+function buildMonthGrid(year: number, month: number): (Date | null)[][] {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const rows: (Date | null)[][] = [];
+  let day = 1 - firstDay;
+  for (let row = 0; row < 6; row++) {
+    const week: (Date | null)[] = [];
+    for (let col = 0; col < 7; col++) {
+      week.push(day > 0 && day <= daysInMonth ? new Date(year, month, day) : null);
+      day++;
+    }
+    rows.push(week);
+    if (day > daysInMonth) break;
+  }
+  return rows;
+}
+
+function getHolidaysForDate(dateStr: string, allHolidays: HolidayRead[]): HolidayRead[] {
+  return allHolidays.filter(h => h.start_date <= dateStr && dateStr <= h.end_date);
+}
+
 export default function CalendarScreen() {
   const { colors, theme } = useTheme();
   const { activeAcademicYearId } = useAcademicYear();
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [calYear, setCalYear]   = useState(TODAY.getFullYear());
+  const [calMonth, setCalMonth] = useState(TODAY.getMonth());
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const cardBg   = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -69,7 +94,7 @@ export default function CalendarScreen() {
     queryFn: () => holidaysApi.getHolidays({
       academic_year_id: activeAcademicYearId ?? undefined,
       active_only: true,
-      limit: 200,
+      limit: 100,
     }),
   });
 
@@ -138,20 +163,131 @@ export default function CalendarScreen() {
           </View>
         )}
 
-        {/* Filter chips */}
+        {/* Filter chips + view toggle */}
         <View style={styles.filterRow}>
-          {(['upcoming', 'all', 'past'] as const).map(f => (
-            <TouchableOpacity
-              key={f}
-              style={[styles.filterChip, filter === f && { backgroundColor: '#556ee6' }]}
-              onPress={() => setFilter(f)}
-            >
-              <Text style={{ color: filter === f ? 'white' : colors['muted-foreground'], fontSize: 13, fontWeight: '600' }}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <View style={{ flexDirection: 'row', gap: 8, flex: 1, flexWrap: 'wrap' }}>
+            {(['upcoming', 'all', 'past'] as const).map(f => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.filterChip, filter === f && { backgroundColor: '#556ee6' }]}
+                onPress={() => setFilter(f)}
+              >
+                <Text style={{ color: filter === f ? 'white' : colors['muted-foreground'], fontSize: 13, fontWeight: '600' }}>
+                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.viewToggle}>
+            {(['list', 'grid'] as const).map(v => (
+              <TouchableOpacity
+                key={v}
+                style={[styles.viewBtn, viewMode === v && { backgroundColor: '#556ee6' }]}
+                onPress={() => setViewMode(v)}
+              >
+                <Ionicons
+                  name={v === 'list' ? 'list' : 'grid'}
+                  size={16}
+                  color={viewMode === v ? 'white' : colors['muted-foreground']}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
+
+        {/* ── GRID VIEW ─────────────────────────────────────────────────── */}
+        {viewMode === 'grid' && !isLoading && (
+          <View style={[styles.gridContainer, { backgroundColor: theme === 'dark' ? '#1a1a2e' : '#fff', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9' }]}>
+            {/* Month navigation */}
+            <View style={styles.gridNav}>
+              <TouchableOpacity
+                style={styles.gridNavBtn}
+                onPress={() => {
+                  if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
+                  else setCalMonth(m => m - 1);
+                  setSelectedDay(null);
+                }}
+              accessibilityLabel="Go back"
+              >
+                <Ionicons name="chevron-back" size={20} color="#556ee6" />
+              </TouchableOpacity>
+              <Text style={[styles.gridMonthLabel, { color: colors.foreground }]}>
+                {MONTH_NAMES[calMonth]} {calYear}
+              </Text>
+              <TouchableOpacity
+                style={styles.gridNavBtn}
+                onPress={() => {
+                  if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); }
+                  else setCalMonth(m => m + 1);
+                  setSelectedDay(null);
+                }}
+              accessibilityLabel="Next"
+              >
+                <Ionicons name="chevron-forward" size={20} color="#556ee6" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Day-of-week headers */}
+            <View style={styles.gridDayHeaders}>
+              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
+                <Text key={d} style={[styles.gridDayHeader, { color: colors['muted-foreground'] }]}>{d}</Text>
+              ))}
+            </View>
+
+            {/* Calendar cells */}
+            {buildMonthGrid(calYear, calMonth).map((week, wi) => (
+              <View key={wi} style={styles.gridWeek}>
+                {week.map((date, di) => {
+                  if (!date) return <View key={di} style={styles.gridCell} />;
+                  const ds = date.toISOString().slice(0, 10);
+                  const dayHols = getHolidaysForDate(ds, holidays);
+                  const isToday = ds === TODAY.toISOString().slice(0, 10);
+                  const isSel   = ds === selectedDay;
+                  return (
+                    <TouchableOpacity
+                      key={di}
+                      style={[
+                        styles.gridCell,
+                        isToday && { backgroundColor: '#556ee6', borderRadius: 8 },
+                        isSel && !isToday && { backgroundColor: '#556ee620', borderRadius: 8 },
+                      ]}
+                      onPress={() => setSelectedDay(dayHols.length > 0 ? (isSel ? null : ds) : null)}
+                      activeOpacity={dayHols.length > 0 ? 0.5 : 1}
+                    >
+                      <Text style={[styles.gridDayNum, { color: isToday ? 'white' : colors.foreground }]}>
+                        {date.getDate()}
+                      </Text>
+                      <View style={styles.gridDots}>
+                        {dayHols.slice(0, 3).map((h, hi) => (
+                          <View key={hi} style={[styles.gridDot, { backgroundColor: holidayColor(h) }]} />
+                        ))}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+
+            {/* Tooltip for selected day */}
+            {selectedDay && (() => {
+              const dayHols = getHolidaysForDate(selectedDay, holidays);
+              if (!dayHols.length) return null;
+              return (
+                <View style={[styles.gridTooltip, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9' }]}>
+                  <Text style={[styles.gridTooltipDate, { color: colors['muted-foreground'] }]}>
+                    {new Date(selectedDay).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </Text>
+                  {dayHols.map(h => (
+                    <View key={h.id} style={styles.gridTooltipRow}>
+                      <View style={[styles.gridTooltipDot, { backgroundColor: holidayColor(h) }]} />
+                      <Text style={[styles.gridTooltipName, { color: colors.foreground }]} numberOfLines={1}>{h.name}</Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
+          </View>
+        )}
 
         {isLoading ? (
           <View style={styles.centered}>
@@ -165,7 +301,7 @@ export default function CalendarScreen() {
               <Text style={{ color: 'white', fontWeight: '600' }}>Retry</Text>
             </TouchableOpacity>
           </View>
-        ) : grouped.length === 0 ? (
+        ) : viewMode === 'grid' ? null : grouped.length === 0 ? (
           <View style={styles.centered}>
             <Ionicons name="calendar-outline" size={48} color={colors['muted-foreground']} />
             <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
@@ -344,4 +480,42 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginTop: 5,
   },
+
+  // View toggle
+  viewToggle: { flexDirection: 'row', gap: 4, alignSelf: 'flex-start' },
+  viewBtn: {
+    width: 32, height: 32, borderRadius: 8,
+    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+
+  // Grid calendar
+  gridContainer: {
+    borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 16,
+  },
+  gridNav: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  gridNavBtn: {
+    width: 32, height: 32, borderRadius: 8,
+    backgroundColor: '#556ee618', justifyContent: 'center', alignItems: 'center',
+  },
+  gridMonthLabel: { fontSize: 15, fontWeight: '700' },
+  gridDayHeaders: { flexDirection: 'row', marginBottom: 4 },
+  gridDayHeader: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600' },
+  gridWeek: { flexDirection: 'row', marginBottom: 2 },
+  gridCell: { flex: 1, minHeight: 42, alignItems: 'center', paddingVertical: 4 },
+  gridDayNum: { fontSize: 13, fontWeight: '600', marginBottom: 2 },
+  gridDots: { flexDirection: 'row', gap: 2, flexWrap: 'wrap', justifyContent: 'center' },
+  gridDot: { width: 5, height: 5, borderRadius: 3 },
+
+  // Tooltip
+  gridTooltip: {
+    borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 8, gap: 4,
+  },
+  gridTooltipDate: { fontSize: 11, fontWeight: '600', marginBottom: 2 },
+  gridTooltipRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  gridTooltipDot: { width: 8, height: 8, borderRadius: 4 },
+  gridTooltipName: { fontSize: 13, fontWeight: '600', flex: 1 },
 });

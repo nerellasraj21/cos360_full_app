@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -20,9 +20,42 @@ import {
 import { useAuth } from '../contexts';
 import apiClient from '../src/api/client';
 import { getClientSchema, setClientSchema } from '../services/authUtils';
+import { PrimaryButton, SecondaryButton, IconButton } from '@/components/buttons';
 
 const BRAND_COLOR = '#556ee6';
 const ACCENT_COLOR = '#556ee6';
+
+// Hardcoded list of known dev/test organizations. There is no public,
+// pre-login endpoint that lists tenants (the only /organizations list
+// endpoint requires an authenticated super-admin token), so this screen
+// can't be backed by a live API call yet. `value` must match the tenant's
+// `client_name` in the backend exactly (see public.tenants table).
+const ORGANIZATIONS: { label: string; value: string }[] = [
+  { label: 'Test Tenant', value: 'test_tenant' },
+  { label: 'Little Bunny', value: 'little bunny' },
+];
+
+// Loose comparison key for the organization typeahead: tenant names are written
+// inconsistently across the label ("Little Bunny") and the backend `client_name`
+// ("little bunny", "test_tenant"), so spaces, underscores and hyphens must not
+// affect matching — typing "little" or "test tenant" has to find both forms.
+const orgKey = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, '');
+
+const filterOrganizations = (query: string) => {
+  const q = orgKey(query.trim());
+  if (!q) return ORGANIZATIONS;
+  return ORGANIZATIONS.filter(o => orgKey(o.label).includes(q) || orgKey(o.value).includes(q));
+};
+
+// Map whatever the user typed onto a known tenant's `client_name` when it matches
+// one (by label or value), otherwise fall back to the raw text so organizations
+// missing from this list can still be entered by hand.
+const resolveOrgValue = (text: string) => {
+  const q = orgKey(text.trim());
+  if (!q) return '';
+  const exact = ORGANIZATIONS.find(o => orgKey(o.label) === q || orgKey(o.value) === q);
+  return exact ? exact.value : text.trim();
+};
 
 interface AcademicYear {
   id: string;
@@ -66,6 +99,31 @@ const LoginScreen: React.FC = () => {
   const [academicYearLoading, setAcademicYearLoading] = useState(false);
   const [academicYearError, setAcademicYearError] = useState<string>('');
   const [showAcademicYearPicker, setShowAcademicYearPicker] = useState(false);
+  // Text typed into the organization combobox. Kept separate from `clientSchema`
+  // (the resolved tenant `client_name`) so the field can show a friendly label
+  // while still submitting the exact backend name.
+  const [orgQuery, setOrgQuery] = useState<string>('');
+  const [showOrgSuggestions, setShowOrgSuggestions] = useState(false);
+
+  const orgSuggestions = useMemo(() => filterOrganizations(orgQuery), [orgQuery]);
+
+  const selectOrganization = (option: { label: string; value: string }) => {
+    setOrgQuery(option.label);
+    setClientSchemaState(option.value);
+    setShowOrgSuggestions(false);
+  };
+
+  const handleOrgQueryChange = (text: string) => {
+    setOrgQuery(text);
+    setClientSchemaState(resolveOrgValue(text));
+    setShowOrgSuggestions(true);
+  };
+
+  const openOrgSelection = () => {
+    setOrgQuery(ORGANIZATIONS.find(o => o.value === clientSchema)?.label || clientSchema);
+    setShowOrgSuggestions(false);
+    setShowClientSelection(true);
+  };
 
   useEffect(() => {
     const checkClientSchema = async () => {
@@ -74,6 +132,7 @@ const LoginScreen: React.FC = () => {
         const storedSchema = await getClientSchema();
         if (storedSchema) {
           setClientSchemaState(storedSchema);
+          setOrgQuery(ORGANIZATIONS.find(o => o.value === storedSchema)?.label || storedSchema);
           setFormData(prev => ({ ...prev, clientName: storedSchema }));
           setShowClientSelection(false);
         } else {
@@ -108,9 +167,14 @@ const LoginScreen: React.FC = () => {
     setAcademicYearLoading(true);
     setAcademicYearError('');
     try {
-      const response = await apiClient.get('/auth/academic-years');
-      const raw = response.data;
-      // Handle both plain array and paginated { items: [...] } / { results: [...] }
+      // Use the shared apiClient (same as the web app's CAxios) instead of a raw
+      // fetch. Its interceptor treats `/auth/academic-years` as a public pre-login
+      // endpoint (no token/refresh) and always sends the tenant `cschema` header
+      // with a fallback. The previous raw fetch added a redundant
+      // `Content-Type: application/json` header on a GET, which triggered a CORS
+      // preflight the backend rejected in the browser ("Failed to fetch").
+      const res = await apiClient.get('/auth/academic-years');
+      const raw = res.data;
       const years: AcademicYear[] = Array.isArray(raw)
         ? raw
         : Array.isArray(raw?.items)
@@ -125,11 +189,9 @@ const LoginScreen: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to fetch academic years:', err);
       if (showErrors) {
-        const detail = err?.response?.data?.detail || err?.response?.statusText || err?.message || 'Unknown error';
-        const status = err?.response?.status ? ` (${err.response.status})` : '';
-        setAcademicYearError(`Could not load academic years${status}: ${detail}`);
+        setAcademicYearError(err?.message || 'Could not load academic years');
       }
-      // Silently ignore errors on initial load — user can still login without selecting a year
+      // Silently ignore on initial load — user can still login without selecting a year
     } finally {
       setAcademicYearLoading(false);
     }
@@ -171,8 +233,15 @@ const LoginScreen: React.FC = () => {
   const handleClientSchemaSubmit = async () => {
     if (!clientSchema.trim() || isLoading) return;
     try {
-      await setClientSchema(clientSchema);
-      setFormData(prev => ({ ...prev, clientName: clientSchema }));
+      // Normalize before storing — the backend does an exact, case-sensitive
+      // match against the registered tenant name, so a stray leading/trailing
+      // space or unintended capitalization here would silently break every
+      // request that follows (surfacing later as a confusing "Invalid
+      // connection" on sign-in, with the field still *looking* correct).
+      const normalizedClientName = clientSchema.trim().toLowerCase();
+      await setClientSchema(normalizedClientName);
+      setClientSchemaState(normalizedClientName);
+      setFormData(prev => ({ ...prev, clientName: normalizedClientName }));
       setShowClientSelection(false);
     } catch (err) {
       console.error('Error saving client schema:', err);
@@ -182,7 +251,14 @@ const LoginScreen: React.FC = () => {
   const handleLogin = async () => {
     if (!validateForm()) return;
     try {
-      await login(formData.username, formData.password, formData.clientName, selectedAcademicYearId);
+      // Keep the stored client schema (used for the `cschema` header on every
+      // request) in sync with whatever Organization Name is actually being
+      // submitted here — the field is editable on this screen without going
+      // through "Change Organization", so without this the header could still
+      // carry a stale/previous tenant while the login body used the new one.
+      const normalizedClientName = formData.clientName.trim().toLowerCase();
+      await setClientSchema(normalizedClientName);
+      await login(formData.username, formData.password, normalizedClientName, selectedAcademicYearId);
     } catch (err) {
       console.error('Login failed:', err);
     }
@@ -228,40 +304,88 @@ const LoginScreen: React.FC = () => {
           <View style={styles.formCard}>
             <View style={styles.formCardHandle} />
             <Text style={styles.cardTitle}>Select Organization</Text>
-            <Text style={styles.cardSubtitle}>Enter your organization code to get started</Text>
+            <Text style={styles.cardSubtitle}>Choose your organization to get started</Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Organization Code</Text>
-              <View style={[styles.inputContainer, clientSchema ? { borderColor: ACCENT_COLOR } : {}]}>
+              <Text style={styles.inputLabel}>Organization</Text>
+              <View style={[styles.inputContainer, clientSchema ? styles.inputFocused : {}]}>
                 <Ionicons name="business-outline" size={20} color={clientSchema ? ACCENT_COLOR : '#9ca3af'} style={styles.inputIcon} />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g. school_name"
+                  placeholder="Type or select organization"
                   placeholderTextColor="#9ca3af"
-                  value={clientSchema}
-                  onChangeText={setClientSchemaState}
+                  value={orgQuery}
+                  onChangeText={handleOrgQueryChange}
+                  onFocus={() => setShowOrgSuggestions(true)}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  onSubmitEditing={handleClientSchemaSubmit}
+                  editable={!isLoading}
                   returnKeyType="done"
+                  onSubmitEditing={() => setShowOrgSuggestions(false)}
+                />
+                {orgQuery.length > 0 && (
+                  <IconButton
+                    onPress={() => { setOrgQuery(''); setClientSchemaState(''); setShowOrgSuggestions(true); }}
+                    icon={<Ionicons name="close-circle" size={18} color="#9ca3af" />}
+                    accessibilityLabel="Clear organization"
+                    variant="ghost"
+                    size="sm"
+                  />
+                )}
+                <IconButton
+                  onPress={() => setShowOrgSuggestions(prev => !prev)}
+                  icon={<Ionicons name={showOrgSuggestions ? 'chevron-up' : 'chevron-down'} size={18} color="#9ca3af" />}
+                  accessibilityLabel={showOrgSuggestions ? 'Hide organizations' : 'Show organizations'}
+                  variant="ghost"
+                  size="sm"
                 />
               </View>
+
+              {showOrgSuggestions && (
+                <View style={styles.suggestionBox}>
+                  {orgSuggestions.length > 0 ? (
+                    <ScrollView
+                      style={styles.suggestionList}
+                      keyboardShouldPersistTaps="handled"
+                      nestedScrollEnabled
+                    >
+                      {orgSuggestions.map(item => {
+                        const selected = clientSchema === item.value;
+                        return (
+                          <TouchableOpacity
+                            key={item.value}
+                            style={[styles.suggestionItem, selected && styles.modalItemActive]}
+                            onPress={() => selectOrganization(item)}
+                          >
+                            <Text style={[styles.modalItemText, selected && styles.modalItemTextActive]}>
+                              {item.label}
+                            </Text>
+                            {selected && <Ionicons name="checkmark-circle" size={20} color={ACCENT_COLOR} />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  ) : (
+                    <View style={styles.suggestionEmpty}>
+                      <Ionicons name="search-outline" size={16} color="#9ca3af" />
+                      <Text style={styles.suggestionEmptyText} numberOfLines={2}>
+                        No match — “{orgQuery.trim()}” will be used as typed.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
             </View>
 
-            <TouchableOpacity
-              style={[styles.primaryButton, { opacity: clientSchema.trim() ? 1 : 0.5 }]}
+            <PrimaryButton
               onPress={handleClientSchemaSubmit}
               disabled={!clientSchema.trim() || isLoading}
+              loading={isLoading}
+              fullWidth
+              icon={!isLoading ? <Ionicons name="arrow-forward" size={18} color="white" /> : undefined}
             >
-              {isLoading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <>
-                  <Text style={styles.primaryButtonText}>Continue</Text>
-                  <Ionicons name="arrow-forward" size={18} color="white" />
-                </>
-              )}
-            </TouchableOpacity>
+              Continue
+            </PrimaryButton>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -336,9 +460,13 @@ const LoginScreen: React.FC = () => {
                 autoCorrect={false}
                 editable={!isLoading}
               />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton} disabled={isLoading}>
-                <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#9ca3af" />
-              </TouchableOpacity>
+              <IconButton
+                onPress={() => setShowPassword(!showPassword)}
+                icon={<Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#9ca3af" />}
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                variant="ghost"
+                size="sm"
+              />
             </View>
             {errors.password && (
               <View style={styles.fieldErrorRow}>
@@ -418,38 +546,40 @@ const LoginScreen: React.FC = () => {
           )}
 
           {/* Sign In Button */}
-          <TouchableOpacity
-            style={[styles.primaryButton, { opacity: (isLoading || academicYearLoading) ? 0.75 : 1, marginTop: 8 }]}
+          <PrimaryButton
             onPress={handleLogin}
             disabled={isLoading || academicYearLoading}
+            loading={isLoading || academicYearLoading}
+            fullWidth
+            style={{ marginTop: 8 }}
+            icon={!(isLoading || academicYearLoading) ? <Ionicons name="arrow-forward" size={18} color="white" /> : undefined}
           >
-            {isLoading || academicYearLoading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <>
-                <Text style={styles.primaryButtonText}>Sign In</Text>
-                <Ionicons name="arrow-forward" size={18} color="white" />
-              </>
-            )}
-          </TouchableOpacity>
+            Sign In
+          </PrimaryButton>
 
           {/* Forgot Password Link */}
-          <TouchableOpacity
-            style={styles.linkButton}
+          <SecondaryButton
             onPress={() => router.push('/forgot-password' as any)}
+            fullWidth
+            size="sm"
+            icon={<Ionicons name="lock-open-outline" size={15} color="#556ee6" />}
+            style={{ marginTop: 12, backgroundColor: 'transparent', borderWidth: 0 }}
+            textStyle={{ color: ACCENT_COLOR, fontSize: 14 }}
           >
-            <Ionicons name="lock-open-outline" size={15} color={ACCENT_COLOR} />
-            <Text style={styles.linkButtonText}>Forgot Password?</Text>
-          </TouchableOpacity>
+            Forgot Password?
+          </SecondaryButton>
 
           {/* Change Org Link */}
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => setShowClientSelection(true)}
+          <SecondaryButton
+            onPress={openOrgSelection}
+            fullWidth
+            size="sm"
+            icon={<Ionicons name="swap-horizontal-outline" size={15} color="#556ee6" />}
+            style={{ marginTop: 8, backgroundColor: 'transparent', borderWidth: 0 }}
+            textStyle={{ color: ACCENT_COLOR, fontSize: 14 }}
           >
-            <Ionicons name="swap-horizontal-outline" size={15} color={ACCENT_COLOR} />
-            <Text style={styles.linkButtonText}>Change Organization</Text>
-          </TouchableOpacity>
+            Change Organization
+          </SecondaryButton>
         </View>
       </ScrollView>
 
@@ -474,19 +604,19 @@ const LoginScreen: React.FC = () => {
                 <Ionicons name="alert-circle-outline" size={40} color="#ef4444" />
                 <Text style={[styles.modalCenterText, { color: '#ef4444', marginTop: 8 }]}>{academicYearError}</Text>
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-                  <TouchableOpacity
-                    style={styles.retryButton}
+                  <PrimaryButton
                     onPress={() => { fetchAcademicYears(true); }}
+                    size="sm"
+                    icon={<Ionicons name="refresh" size={16} color="white" />}
                   >
-                    <Ionicons name="refresh" size={16} color="white" />
-                    <Text style={styles.retryButtonText}>Retry</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.retryButton, { backgroundColor: '#6b7280' }]}
+                    Retry
+                  </PrimaryButton>
+                  <SecondaryButton
                     onPress={() => setShowAcademicYearPicker(false)}
+                    size="sm"
                   >
-                    <Text style={styles.retryButtonText}>Skip</Text>
-                  </TouchableOpacity>
+                    Skip
+                  </SecondaryButton>
                 </View>
               </View>
             ) : (
@@ -517,13 +647,14 @@ const LoginScreen: React.FC = () => {
                   <View style={styles.modalCenter}>
                     <Ionicons name="calendar-outline" size={40} color="#9ca3af" />
                     <Text style={styles.modalCenterText}>No academic years available</Text>
-                    <TouchableOpacity
-                      style={styles.retryButton}
+                    <PrimaryButton
                       onPress={() => fetchAcademicYears(true)}
+                      size="sm"
+                      icon={<Ionicons name="refresh" size={16} color="white" />}
+                      style={{ marginTop: 12 }}
                     >
-                      <Ionicons name="refresh" size={16} color="white" />
-                      <Text style={styles.retryButtonText}>Retry</Text>
-                    </TouchableOpacity>
+                      Retry
+                    </PrimaryButton>
                   </View>
                 }
               />
@@ -684,6 +815,38 @@ const styles = StyleSheet.create({
   eyeButton: {
     padding: 12,
     marginRight: 2,
+  },
+  suggestionBox: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 14,
+    backgroundColor: 'white',
+    overflow: 'hidden',
+  },
+  suggestionList: {
+    maxHeight: 200,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  suggestionEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  suggestionEmptyText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#6b7280',
   },
   fieldErrorRow: {
     flexDirection: 'row',

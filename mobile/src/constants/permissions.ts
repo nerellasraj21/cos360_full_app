@@ -46,6 +46,7 @@ export type PermissionResource =
   | 'vehicles'
   | 'transport_vehicles'
   | 'transport_trips'
+  | 'transport_pricing'
 
   // Timetable Module
   | 'timetables'
@@ -93,6 +94,15 @@ export type PermissionResource =
   | 'exam_dates'
   | 'grade_schemes'
 
+  // Mobile-only resources (not in web app's permissions.ts)
+  | 'classes_sections'
+  | 'locations'
+  | 'roles_permissions'
+  | 'expense_audit'
+  | 'fee_collection'
+  | 'student_profile'
+  | 'staff_profile'
+
 export type PermissionAction<T extends PermissionResource = PermissionResource> =
   // Common actions
   | 'create'
@@ -109,6 +119,9 @@ export type PermissionAction<T extends PermissionResource = PermissionResource> 
   | 'read_related'
   | 'read_own'
   | 'update_own'
+  | 'list_own'
+  | 'list_related'
+  | 'delete_own'
 
 // Permission string type
 export type PermissionString = `${PermissionResource}:${PermissionAction}`
@@ -190,6 +203,10 @@ export const PERMISSIONS = {
     update: 'student_certificates:update' as PermissionString,
     delete: 'student_certificates:delete' as PermissionString,
     list: 'student_certificates:list' as PermissionString,
+    list_own: 'student_certificates:list_own' as PermissionString,
+    list_related: 'student_certificates:list_related' as PermissionString,
+    read_own: 'student_certificates:read_own' as PermissionString,
+    read_related: 'student_certificates:read_related' as PermissionString,
   },
   certificate_types: {
     create: 'certificate_types:create' as PermissionString,
@@ -299,16 +316,20 @@ export const PERMISSIONS = {
   fee_transactions: {
     create: 'fee_transactions:create' as PermissionString,
     read: 'fee_transactions:read' as PermissionString,
+    read_own: 'fee_transactions:read_own' as PermissionString,
     update: 'fee_transactions:update' as PermissionString,
     delete: 'fee_transactions:delete' as PermissionString,
     list: 'fee_transactions:list' as PermissionString,
+    list_own: 'fee_transactions:list_own' as PermissionString,
   },
   fee_receipts: {
     create: 'fee_receipts:create' as PermissionString,
     read: 'fee_receipts:read' as PermissionString,
+    read_own: 'fee_receipts:read_own' as PermissionString,
     update: 'fee_receipts:update' as PermissionString,
     delete: 'fee_receipts:delete' as PermissionString,
     list: 'fee_receipts:list' as PermissionString,
+    list_own: 'fee_receipts:list_own' as PermissionString,
   },
   fee_refunds: {
     create: 'fee_refunds:create' as PermissionString,
@@ -362,6 +383,13 @@ export const PERMISSIONS = {
     update: 'transport_trips:update' as PermissionString,
     delete: 'transport_trips:delete' as PermissionString,
     list: 'transport_trips:list' as PermissionString,
+  },
+  transport_pricing: {
+    create: 'transport_pricing:create' as PermissionString,
+    read: 'transport_pricing:read' as PermissionString,
+    update: 'transport_pricing:update' as PermissionString,
+    delete: 'transport_pricing:delete' as PermissionString,
+    list: 'transport_pricing:list' as PermissionString,
   },
 
   // Timetable Module
@@ -563,7 +591,52 @@ export const PERMISSIONS = {
     delete: 'grade_schemes:delete' as PermissionString,
     list: 'grade_schemes:list' as PermissionString,
   },
+
+  // Mobile-only resources — backfilled from real usage in screens/screenPermissions.ts.
+  // Not present in the web app's permissions.ts (mobile-specific screens).
+  classes_sections: {
+    read: 'classes_sections:read' as PermissionString,
+    list: 'classes_sections:list' as PermissionString,
+  },
+  locations: {
+    create: 'locations:create' as PermissionString,
+    read: 'locations:read' as PermissionString,
+    update: 'locations:update' as PermissionString,
+    delete: 'locations:delete' as PermissionString,
+    list: 'locations:list' as PermissionString,
+  },
+  roles_permissions: {
+    create: 'roles_permissions:create' as PermissionString,
+    read: 'roles_permissions:read' as PermissionString,
+    update: 'roles_permissions:update' as PermissionString,
+    delete: 'roles_permissions:delete' as PermissionString,
+    list: 'roles_permissions:list' as PermissionString,
+  },
+  expense_audit: {
+    read: 'expense_audit:read' as PermissionString,
+    list: 'expense_audit:list' as PermissionString,
+  },
+  fee_collection: {
+    read_own: 'fee_collection:read_own' as PermissionString,
+  },
+  student_profile: {
+    read_own: 'student_profile:read_own' as PermissionString,
+  },
+  staff_profile: {
+    read_own: 'staff_profile:read_own' as PermissionString,
+  },
 } as const
+
+// Helper function to get all permissions for a resource (from web app)
+export const getResourcePermissions = (resource: PermissionResource) => {
+  return Object.values(PERMISSIONS[resource])
+}
+
+// Helper function to get permission string (from web app)
+export const getPermission = (resource: PermissionResource, action: string): string => {
+  const resourcePerms = PERMISSIONS[resource]
+  return (resourcePerms as any)[action] || ''
+}
 
 // Helper functions for permission checking
 export const buildPermissionString = (resource: PermissionResource, action: PermissionAction): PermissionString => {

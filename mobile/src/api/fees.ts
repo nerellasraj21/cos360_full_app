@@ -1,11 +1,26 @@
 import apiClient from './client';
-import { FeeRefundCreateRequest, FeeRefundResponse, FeeClassMappingTermAmount, FeeStudentMappingRequestLegacy as FeeStudentMappingRequest, FeeStudentMappingResponseLegacy as FeeStudentMappingResponse, FeeStudentMappingBulkRequestLegacy as FeeStudentMappingBulkRequest, FeeStudentMappingBulkResponseLegacy as FeeStudentMappingBulkResponse, FeeStudentMappingRequest as NewFeeStudentMappingRequest, FeeStudentMappingResponse as NewFeeStudentMappingResponse, FeeStudentMappingBulkRequest as NewFeeStudentMappingBulkRequest, FeeStudentMappingBulkResponse as NewFeeStudentMappingBulkResponse, FeeStudentMappingUpdateRequest } from '../types/fees';
+import type {
+  FeeRefundCreateRequest,
+  FeeRefundWithDetails as FeeRefundResponse,
+  FeeClassMappingTermAmount,
+  FeeStudentMappingCreateRequest as NewFeeStudentMappingRequest,
+  FeeStudentMappingResponse as NewFeeStudentMappingResponse,
+  FeeStudentMappingBulkRequest as NewFeeStudentMappingBulkRequest,
+  FeeStudentMappingBulkResponse as NewFeeStudentMappingBulkResponse,
+  FeeStudentMappingUpdateRequest,
+} from '../types/fee';
 
 // Type alias for backward compatibility
 export type FeeRefundRequest = FeeRefundCreateRequest;
 
 // Re-export types for backward compatibility
-export type { FeeRefundCreateRequest, FeeRefundResponse, FeeClassMappingTermAmount, FeeStudentMappingRequest, FeeStudentMappingResponse, FeeStudentMappingBulkRequest, FeeStudentMappingBulkResponse };
+export type { FeeRefundCreateRequest, FeeRefundResponse, FeeClassMappingTermAmount };
+export type {
+  NewFeeStudentMappingRequest as FeeStudentMappingRequest,
+  NewFeeStudentMappingResponse as FeeStudentMappingResponse,
+  NewFeeStudentMappingBulkRequest as FeeStudentMappingBulkRequest,
+  NewFeeStudentMappingBulkResponse as FeeStudentMappingBulkResponse,
+};
 
 
 // Fee Categories
@@ -36,9 +51,11 @@ export interface FeeTypeResponse {
   id: string;
   type_name: string;
   fee_category_id: string;
+  fee_category_name?: string;
   academic_year_id: string;
   fee_status: string;
   fee_term_id: string;
+  fee_term_name?: string;
   fee_term_dates: FeeTermDateResponse[];
   created_at?: string;
   updated_at?: string;
@@ -156,6 +173,11 @@ export interface FeeTransactionResponse {
   transaction_items: FeeTransactionItemResponse[];
   total_amount: number;
   transaction_date?: string;
+  // Web parity (`src/types/fee/transaction.ts`): backend-computed fields used
+  // by My Transactions instead of deriving status client-side.
+  transaction_number?: string;
+  status?: string;
+  receipt_generated?: boolean;
   remarks?: string;
   collected_by?: string;
   upi_reference?: string;
@@ -170,6 +192,25 @@ export interface FeeTransactionResponse {
 
 export interface FeeTransactionHealthResponse {
   status: string;
+}
+
+// Self-service outstanding-fee breakdown (GET /fee/transactions/my-outstanding-fees)
+export interface OutstandingFeeItem {
+  fee_type_id: string;
+  fee_type_name: string;
+  fee_term_id: string;
+  fee_term_name: string;
+  amount_due: number;
+  amount_paid: number;
+  outstanding_amount: number;
+}
+
+export interface OutstandingFeeSummary {
+  student_id: string;
+  student_admission_num: string;
+  academic_year_id: string;
+  total_outstanding: number;
+  outstanding_items: OutstandingFeeItem[];
 }
 
 // Fee Receipts
@@ -189,6 +230,17 @@ export interface FeeReceiptResponse {
   issued_by: string;
   notes?: string;
   created_at: string;
+  // Rich fields returned by the backend list endpoint (used by the management UI)
+  fee_transaction_id?: string;
+  student_name?: string;
+  student_admission_num?: string;
+  class_section?: string;
+  academic_year?: string;
+  is_reprinted?: boolean;
+  reprint_count?: number;
+  generated_at?: string;
+  remarks?: string;
+  content_hash?: string;
 }
 
 export interface FeeReceiptHealthResponse {
@@ -201,10 +253,15 @@ export interface FeeReceiptContentResponse {
 }
 
 export interface FeeReceiptVerifyResponse {
-  verified: boolean;
+  verified?: boolean;
   receipt_id: string;
   receipt_number: string;
-  transaction_id: string;
+  transaction_id?: string;
+  // Backend integrity-check fields
+  is_valid?: boolean;
+  stored_hash?: string;
+  current_hash?: string;
+  verification_date?: string;
 }
 
 // Fee Refunds (types imported from ../types/fees)
@@ -280,11 +337,20 @@ export interface FeeCollectionSummary {
   old_fee_pending_amount: string;
 }
 
+export interface FeePaymentItemRequest {
+  fee_type_id: string;
+  amount: number;
+}
+
 export interface FeePaymentRequest {
   student_id: string;
   academic_year_id: string;
   amount_to_pay: number;
+  // Explicit per-fee-type breakdown. When provided, the backend allocates strictly to
+  // these fee types instead of auto-distributing top-down across whatever has dues.
+  fee_items?: FeePaymentItemRequest[];
   payment_method: 'cash' | 'cheque' | 'bank_transfer' | 'upi' | 'dd' | 'card';
+  receipt_number?: string;
   upi_reference?: string;
   bank_reference?: string;
   cheque_number?: string;
@@ -326,6 +392,101 @@ export interface FeeConcessionCreate {
   remarks?: string;
 }
 
+/** Backend /fee/concessions/bulk contract (matches the web app). */
+export interface ConcessionItemCreate {
+  fee_type_id: string;
+  concession_amount: number;
+  reason: string;
+  approved_by: 'owner' | 'principal' | 'management' | 'correspondent';
+}
+
+export interface BulkConcessionRequest {
+  student_id: string;
+  academic_year_id: string;
+  concessions: ConcessionItemCreate[];
+}
+
+/** GET /fee/concessions/history/{student_id} item shape (matches the web app). */
+export interface ConcessionHistoryItem {
+  id: string;
+  date_applied: string;
+  fee_type_id?: string;
+  fee_type_name: string;
+  amount: number;
+  reason: string;
+  approver: string;
+  recorded_by_staff_name: string | null;
+}
+
+/**
+ * PUT /fee/concessions/{id} payload — the same field names as the
+ * /fee/concessions/bulk contract (concession_amount/reason/approved_by),
+ * NOT the legacy FeeConcessionCreate shape used by the flat bulkCreate() call.
+ */
+export interface ConcessionUpdatePayload {
+  concession_amount?: number;
+  reason?: string;
+  approved_by?: string;
+}
+
+export interface TermsDueItem {
+  fee_type_id: string;
+  fee_type_name: string;
+  term_id: string;
+  term_name: string;
+  term_date_id: string;
+  due_date: string;
+  term_amount: number;
+  paid_amount: number;
+  pending_amount: number;
+}
+
+export interface TermsDueResponse {
+  student_id: string;
+  student_name: string;
+  admission_number: string;
+  as_of_date: string;
+  selected_month: string;
+  current_month_terms: TermsDueItem[];
+  overdue_terms: TermsDueItem[];
+  total_current_month_pending: number;
+  total_overdue_pending: number;
+  grand_total_pending: number;
+}
+
+export interface SmsSummaryPreview {
+  parent_name: string;
+  parent_phone: string;
+  student_name: string;
+  admission_number: string;
+  academic_year: string;
+  due_amount: number;
+  message: string;
+  can_send: boolean;
+}
+
+export interface FeeHistoryFeeType {
+  fee_type_id: string;
+  fee_type_name: string;
+  amount_paid: number;
+}
+
+export interface FeeHistoryItem {
+  receipt_id: string;
+  transaction_date: string;
+  receipt_number: string;
+  amount_paid: number;
+  payment_method: string;
+  fee_types_paid: FeeHistoryFeeType[];
+}
+
+export interface FeeHistoryResponse {
+  student_id: string;
+  academic_year_id: string;
+  items: FeeHistoryItem[];
+  total_paid: number;
+}
+
 export const feeCollectionApi = {
   /** GET /fee/collection/search-student — backend uses hyphenated path, not /search */
   searchStudent: async (params: {
@@ -335,7 +496,24 @@ export const feeCollectionApi = {
     academic_year_id?: string;
   }): Promise<FeeSearchStudentResult[]> => {
     const response = await apiClient.get('/fee/collection/search-student', { params });
-    return response.data;
+    const raw = response.data;
+    const items = Array.isArray(raw) ? raw : raw?.items ?? raw?.results ?? raw?.data ?? [];
+    // Normalize — backend returns first_name/last_name separately, not student_name
+    return items.map((s: any) => {
+      const fullName = s.student_name || s.full_name || s.name ||
+        [s.first_name, s.last_name].filter(Boolean).join(' ').trim() ||
+        s.studentName || '';
+      return {
+        ...s,
+        student_name: fullName,
+        admission_number: s.admission_number || s.admission_num || s.admissionNumber || '',
+        class_name: s.class_name || s.className || '',
+        section_name: s.section_name || s.sectionName || '',
+        student_id: s.student_id || s.id || s.studentId || '',
+        // expose parent contact for the card
+        father_phone: s.parent_name || s.mobile_number || s.father_phone || null,
+      };
+    });
   },
 
   /** GET /fee/collection/summary/{student_id} */
@@ -378,13 +556,50 @@ export const feeCollectionApi = {
     });
     return response.data;
   },
+
+  /** GET /fee/collection/history/{student_id} — paid-receipt history for the year */
+  getFeeHistory: async (
+    studentId: string,
+    params?: { academic_year_id?: string },
+  ): Promise<FeeHistoryResponse> => {
+    const response = await apiClient.get(`/fee/collection/history/${studentId}`, { params });
+    return response.data;
+  },
+
+  /** GET /fee/collection/terms-due/{student_id} — term-wise installment dates (matches web) */
+  getTermsDue: async (
+    studentId: string,
+    params?: { academic_year_id?: string; as_of_date?: string },
+  ): Promise<TermsDueResponse> => {
+    const response = await apiClient.get(`/fee/collection/terms-due/${studentId}`, { params });
+    const raw = response.data;
+    const parseItem = (item: any): TermsDueItem => ({
+      ...item,
+      term_amount: Number(item.term_amount),
+      paid_amount: Number(item.paid_amount),
+      pending_amount: Number(item.pending_amount),
+    });
+    return {
+      ...raw,
+      current_month_terms: (raw.current_month_terms ?? []).map(parseItem),
+      overdue_terms: (raw.overdue_terms ?? []).map(parseItem),
+      total_current_month_pending: Number(raw.total_current_month_pending),
+      total_overdue_pending: Number(raw.total_overdue_pending),
+      grand_total_pending: Number(raw.grand_total_pending),
+    };
+  },
 };
 
 export const feeConcessionsApi = {
-  /** POST /fee/concessions/bulk */
+  /** POST /fee/concessions/bulk — legacy flat-array shape (kept for back-compat) */
   bulkCreate: async (data: FeeConcessionCreate[]): Promise<FeeConcession[]> => {
     const response = await apiClient.post('/fee/concessions/bulk', data);
     return response.data;
+  },
+
+  /** POST /fee/concessions/bulk — correct wrapped payload the backend expects */
+  bulkCreateConcessions: async (data: BulkConcessionRequest): Promise<void> => {
+    await apiClient.post('/fee/concessions/bulk', data);
   },
 
   /** GET /fee/concessions/student/{student_id} */
@@ -400,7 +615,7 @@ export const feeConcessionsApi = {
   getHistory: async (
     studentId: string,
     params?: { academic_year_id?: string },
-  ): Promise<FeeConcession[]> => {
+  ): Promise<ConcessionHistoryItem[]> => {
     const response = await apiClient.get(`/fee/concessions/history/${studentId}`, { params });
     return response.data.items || response.data;
   },
@@ -411,13 +626,9 @@ export const feeConcessionsApi = {
     return response.data;
   },
 
-  /** PUT /fee/concessions/{concession_id} */
-  update: async (
-    concessionId: string,
-    data: Partial<FeeConcessionCreate>,
-  ): Promise<FeeConcession> => {
-    const response = await apiClient.put(`/fee/concessions/${concessionId}`, data);
-    return response.data;
+  /** PUT /fee/concessions/{concession_id} — see ConcessionUpdatePayload for the field names this endpoint actually expects. */
+  update: async (concessionId: string, data: ConcessionUpdatePayload): Promise<void> => {
+    await apiClient.put(`/fee/concessions/${concessionId}`, data);
   },
 
   /** DELETE /fee/concessions/{concession_id} */
@@ -442,6 +653,26 @@ export const feeClassMappingTermAmountsApi = {
 
   deleteTermAmount: async (id: string): Promise<void> => {
     await apiClient.delete(`/fee/class-mapping-term-amounts/${id}`);
+  },
+
+  bulkCreateTermAmounts: async (data: {
+    fee_class_mapping_id: string;
+    term_amounts: { term_date_id: string; term_amount: number }[];
+  }): Promise<any> => {
+    // Web parity (src/api/fee/mappings.ts createClassMappingTermAmounts) — no
+    // "/bulk" suffix; the backend route is the same one for single or many.
+    const response = await apiClient.post('/fee/class-mapping-term-amounts/', data);
+    return response.data;
+  },
+
+  bulkUpdateTermAmounts: async (data: {
+    fee_class_mapping_id: string;
+    term_amounts: { id: string; term_date_id: string; term_amount: number }[];
+  }): Promise<any> => {
+    // Web parity (src/api/fee/mappings.ts updateClassMappingTermAmounts) — no
+    // "/bulk" suffix.
+    const response = await apiClient.put('/fee/class-mapping-term-amounts/', data);
+    return response.data;
   },
 };
 
@@ -590,8 +821,10 @@ export interface FeeClassMappingResponse {
 
 // Fee Class Mappings API
 export const feeClassMappingsApi = {
-  getFeeClassMappings: async (academicYearId?: string): Promise<FeeClassMappingResponse[]> => {
-    const params = academicYearId ? { academic_year_id: academicYearId } : {};
+  getFeeClassMappings: async (academicYearId?: string, classId?: string): Promise<FeeClassMappingResponse[]> => {
+    const params: Record<string, string> = {};
+    if (academicYearId) params.academic_year_id = academicYearId;
+    if (classId) params.class_id = classId;
     const response = await apiClient.get('/fee/class-mappings/', { params });
     return response.data.items || response.data;
   },
@@ -617,6 +850,12 @@ export const feeClassMappingsApi = {
 
   bulkCreateFeeClassMappings: async (data: FeeClassMappingBulkRequest): Promise<FeeClassMappingBulkResponse> => {
     const response = await apiClient.post('/fee/class-mappings/bulk', data);
+    return response.data;
+  },
+
+  /** PATCH /fee/class-mappings/{id}/toggle-mandatory — flips the all_by_default flag */
+  toggleMandatory: async (id: string): Promise<FeeClassMappingResponse> => {
+    const response = await apiClient.patch(`/fee/class-mappings/${id}/toggle-mandatory`);
     return response.data;
   },
 };
@@ -702,6 +941,36 @@ export const feeTransactionsApi = {
     const response = await apiClient.get(`/fee/transactions/transaction-number/${transactionNumber}`);
     return response.data;
   },
+
+  /**
+   * GET /fee/transactions/my-outstanding-fees — student self-service
+   * (requires only fee_transactions:read_own, already granted to Student).
+   *
+   * Web parity: replaces /fee/collection/my-summary as the data source for
+   * the student "My Fees" screen — that endpoint needs fee_collection:read,
+   * a permission the Student role doesn't have and isn't getting.
+   */
+  getMyOutstandingFees: async (): Promise<OutstandingFeeSummary> => {
+    const response = await apiClient.get('/fee/transactions/my-outstanding-fees');
+    return response.data;
+  },
+
+  /** GET /fee/transactions/my-fees — student views their own transactions (requires fee_transactions:read_own/list_own) */
+  getMyFeeTransactions: async (params?: { skip?: number; limit?: number }): Promise<FeeTransactionResponse[]> => {
+    const response = await apiClient.get('/fee/transactions/my-fees', { params });
+    return response.data.items || response.data || [];
+  },
+
+  /**
+   * GET /fee/transactions/my-children-fees — parent's "related" scope,
+   * resolves server-side to every linked child's transactions in one list
+   * (requires fee_transactions:read_related/list_related). Same pattern as
+   * getMyReceipts above for fee_receipts.
+   */
+  getMyChildrenFeeTransactions: async (params?: { skip?: number; limit?: number; academic_year_id?: string; transaction_status?: string }): Promise<FeeTransactionResponse[]> => {
+    const response = await apiClient.get('/fee/transactions/my-children-fees', { params });
+    return response.data.items || response.data || [];
+  },
 };
 
 // Fee Receipts API
@@ -759,6 +1028,24 @@ export const feeReceiptsApi = {
     const response = await apiClient.get(`/fee/receipts/${receiptId}/verify`);
     return response.data;
   },
+
+  /** GET /fee/receipts/my-receipts — student views their own receipts (requires fee_receipts:list_own) */
+  getMyReceipts: async (params?: { limit?: number; offset?: number }): Promise<FeeReceiptResponse[]> => {
+    const response = await apiClient.get('/fee/receipts/my-receipts', { params });
+    return response.data.items || response.data || [];
+  },
+
+  /**
+   * GET /fee/receipts/my-children-receipts — parent's "related" scope,
+   * resolves server-side to every linked child's receipts in one list
+   * (requires fee_receipts:list_related). Same pattern as
+   * getMyChildrenFeeTransactions above for fee_transactions. A parent has no
+   * fee_receipts:list_own grant, so getMyReceipts() above 403s for that role.
+   */
+  getMyChildrenReceipts: async (params?: { limit?: number; offset?: number }): Promise<FeeReceiptResponse[]> => {
+    const response = await apiClient.get('/fee/receipts/my-children-receipts', { params });
+    return response.data.items || response.data || [];
+  },
 };
 
 // Fee Refunds API
@@ -781,6 +1068,14 @@ export const feeRefundsApi = {
 
   deleteFeeRefund: async (id: string): Promise<void> => {
     await apiClient.delete(`/fee/refunds/${id}`);
+  },
+
+  /** POST /fee/refunds/{id}/cancel — proper cancel workflow (preserves audit trail), matches web app */
+  cancelFeeRefund: async (id: string, reason: string): Promise<FeeRefundResponse> => {
+    const response = await apiClient.post(`/fee/refunds/${id}/cancel`, {
+      cancellation_reason: reason,
+    });
+    return response.data;
   },
 
   getFeeRefund: async (id: string): Promise<FeeRefundResponse> => {

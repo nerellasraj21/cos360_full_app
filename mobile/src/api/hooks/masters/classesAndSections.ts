@@ -1,22 +1,23 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastContext } from '../../../../components/ToastProvider';
-import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { useMastersQuery } from './useMastersQuery';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { classSectionsApi } from '../../index';
 
 // ─── READ ────────────────────────────────────────────────────────────────────
 
-export function useClassSections() {
-  return usePermissionProtectedQuery<any[]>({
-    queryKey: ['classSections'],
-    queryFn: () => classSectionsApi.getClassSections(),
+export function useClassSections(params?: { academic_year_id?: string }) {
+  return useMastersQuery<any[]>({
+    queryKey: ['classSections', params],
+    queryFn: () => classSectionsApi.getClassSections(params),
     resource: PERMISSION_RESOURCES.CLASSES,
     action: 'list',
   });
 }
 
 export function useClassList() {
-  return usePermissionProtectedQuery<any[]>({
+  return useMastersQuery<any[]>({
     queryKey: ['classList'],
     queryFn: () => classSectionsApi.getClassList(),
     resource: PERMISSION_RESOURCES.CLASSES,
@@ -25,7 +26,7 @@ export function useClassList() {
 }
 
 export function useSectionList() {
-  return usePermissionProtectedQuery<any[]>({
+  return useMastersQuery<any[]>({
     queryKey: ['sectionList'],
     queryFn: () => classSectionsApi.getSectionList(),
     resource: PERMISSION_RESOURCES.SECTIONS,
@@ -34,10 +35,20 @@ export function useSectionList() {
 }
 
 export function useSectionsByClass(classId: string) {
-  return usePermissionProtectedQuery<any[]>({
+  return useMastersQuery<any[]>({
     queryKey: ['sections', classId],
     queryFn: () => classSectionsApi.getSectionsByClass(classId),
     resource: PERMISSION_RESOURCES.SECTIONS,
+    action: 'read',
+    enabled: !!classId,
+  });
+}
+
+export function useStudentsByClassSection(classId: string, sectionId?: string) {
+  return useMastersQuery<any[]>({
+    queryKey: ['students-by-class-section', classId, sectionId],
+    queryFn: () => classSectionsApi.getStudentsByClassSection(classId, sectionId),
+    resource: PERMISSION_RESOURCES.CLASSES,
     action: 'read',
     enabled: !!classId,
   });

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  Image,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -109,6 +110,7 @@ function StaffProfileScreenContent() {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
+              accessibilityLabel="Go back"
         >
           <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
         </TouchableOpacity>
@@ -134,12 +136,13 @@ function StaffProfileScreenContent() {
         {/* Profile Photo Section */}
         <View style={[styles.photoSection, { backgroundColor: themeColors.card }]}>
           <View style={styles.photoContainer}>
-            <View style={[styles.photoPlaceholder, { backgroundColor: themeColors.primary }]}>
-              <Ionicons name="person" size={48} color="white" />
-            </View>
-            <TouchableOpacity style={styles.photoEditButton}>
-              <Ionicons name="camera" size={16} color={themeColors.primary} />
-            </TouchableOpacity>
+            {profile?.profile_photo_url ? (
+              <Image source={{ uri: profile.profile_photo_url }} style={styles.photoPlaceholder} />
+            ) : (
+              <View style={[styles.photoPlaceholder, { backgroundColor: themeColors.primary, justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="person" size={48} color="white" />
+              </View>
+            )}
           </View>
           <ThemedText type="subtitle" style={styles.nameText}>
             {profile?.first_name} {profile?.last_name}
@@ -446,6 +449,7 @@ export default function StaffProfileScreen() {
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => router.back()}
+              accessibilityLabel="Go back"
             >
               <Ionicons name="arrow-back" size={24} color="#000" />
             </TouchableOpacity>

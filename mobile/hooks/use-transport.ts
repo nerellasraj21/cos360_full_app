@@ -9,7 +9,7 @@ import {
 import { routesApi, vehiclesApi, tripsApi, studentTransportApi, routeStopsApi, studentTripsApi } from '../src/api/transport';
 import { routeTypesApi, tripTypesApi } from '../src/api/transportTypes';
 import type { RouteTypeCreate, RouteType, RouteTypeDropdown, TripTypeCreate, TripType, TripTypeDropdown } from '../src/api/transportTypes';
-import { legacyStaffApi } from '../src/api/staff';
+import { staffApi, designationsApi } from '../src/api/staff';
 import { studentAdmissionsApi } from '../src/api/students';
 import { PERMISSION_RESOURCES } from '../src/types/permissions';
 import type {
@@ -198,11 +198,15 @@ export const useTrips = (params?: {
   route_id?: string;
   driver_id?: string;
 }) => {
-  return usePermissionProtectedListQuery(
-    PERMISSION_RESOURCES.TRANSPORT_TRIPS,
-    ['trips', params],
-    () => tripsApi.getTrips(params)
-  );
+  // Match the web app: the trips list is NOT permission-gated on the client.
+  // The backend still enforces access (403 if unauthorized). Gating the query on
+  // transport_trips:list silently disabled it for accounts whose permission set
+  // doesn't explicitly list that resource (e.g. admin), producing a blocked screen.
+  return useQuery({
+    queryKey: ['trips', params],
+    queryFn: () => tripsApi.getTrips(params),
+    staleTime: 5 * 60 * 1000,
+  });
 };
 
 export const useTrip = (id: string) => {
@@ -356,11 +360,39 @@ export const useDeleteStudentTransport = () => {
 export const useDrivers = () => {
   return useQuery({
     queryKey: ['drivers'],
-    queryFn: async (): Promise<Array<{ id: string, name: string }>> => {
-      const staff = await legacyStaffApi.getStaff();
-      return staff.map(s => ({
-        id: s.id,
-        name: [s.first_name, s.last_name].filter(Boolean).join(' '),
+    queryFn: async (): Promise<Array<{ id: string, staffId: string, name: string }>> => {
+      // A Trip's `driver_id` references the staff member's `user_id` (web app
+      // behaviour), but some records may store the staff record id instead, so
+      // both ids are exposed — `id` stays as user_id so the create/edit dropdown
+      // sends user_id like the web, `staffId` covers records still keyed by the
+      // staff row id.
+      //
+      // Mirrors the web app's approach (src/pages/transport/vehicles.tsx):
+      // fetch all staff + designations and filter client-side by the "Driver"
+      // designation, rather than the dedicated /staff/drivers endpoint — that
+      // endpoint returns nothing on this backend, which left the dropdown empty.
+      const [staffResult, designations] = await Promise.all([
+        staffApi.getStaffEnrollments({ limit: 500 }),
+        designationsApi.getDesignationsDropdown(),
+      ]);
+      const allStaff = staffResult.items || [];
+      const driverDesignation = designations.find((d) => d.title?.toLowerCase() === 'driver');
+
+      // GET /staff/ (StaffOut schema) returns the designation as a nested
+      // `designation_obj`/`designation` object, not always as a flat `designation_id`
+      // — match on whichever is populated, in order: title on the nested object,
+      // then designation_id, then fall back to the full staff list so the dropdown
+      // is never left empty.
+      const byTitle = allStaff.filter((s) =>
+        (s as any).designation_obj?.title?.toLowerCase() === 'driver' || (s as any).designation?.title?.toLowerCase() === 'driver'
+      );
+      const byId = driverDesignation ? allStaff.filter((s) => s.designation_id === driverDesignation.id) : [];
+      const driverStaff = byTitle.length > 0 ? byTitle : byId.length > 0 ? byId : allStaff;
+
+      return driverStaff.map((d) => ({
+        id: d.user_id,
+        staffId: d.id,
+        name: [d.first_name, d.last_name].filter(Boolean).join(' '),
       }));
     },
     staleTime: 5 * 60 * 1000,

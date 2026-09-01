@@ -19,6 +19,18 @@ import type {
     StaffQualificationUpdate,
 } from '@/src/types/masters/staff';
 
+export interface BulkUploadCreatedRow {
+  row: number;
+  [key: string]: unknown;
+}
+
+export interface BulkUploadResult {
+  created: BulkUploadCreatedRow[];
+  /** Each entry is a human-readable "Row N: ..." message, not a structured object. */
+  errors: string[];
+  total_rows: number;
+}
+
 // Staff Enrollment API functions
 export const staffApi = {
   // List Staff — GET /staff/?skip=0&limit=20&search={text}&designation_id={uuid}&is_active={bool}
@@ -61,6 +73,27 @@ export const staffApi = {
     await apiClient.delete(`/staff/enrollment/${id}`);
   },
 
+  // Upload Staff Photo — POST /staff/enrollment/{id}/photo
+  uploadStaffPhoto: async (staffId: string, uri: string, mimeType: string): Promise<Staff> => {
+    const formData = new FormData();
+    if (uri.startsWith('data:') || uri.startsWith('blob:')) {
+      const res = await fetch(uri);
+      const blob = await res.blob();
+      formData.append('photo', blob, 'photo.jpg');
+    } else {
+      formData.append('photo', { uri, type: mimeType, name: 'photo.jpg' } as any);
+    }
+    const response = await apiClient.post(`/staff/enrollment/${staffId}/photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // Delete Staff Photo — DELETE /staff/enrollment/{id}/photo
+  deleteStaffPhoto: async (staffId: string): Promise<void> => {
+    await apiClient.delete(`/staff/enrollment/${staffId}/photo`);
+  },
+
   // Filter by designation — GET /staff/by-designation?designation_id={id}
   getStaffByDesignation: async (designationId: string): Promise<Staff[]> => {
     const response = await apiClient.get('/staff/by-designation', { params: { designation_id: designationId } });
@@ -71,6 +104,57 @@ export const staffApi = {
   getDrivers: async (): Promise<Staff[]> => {
     const response = await apiClient.get('/staff/drivers');
     return response.data.items || response.data;
+  },
+
+  // Staff Qualification APIs
+  getQualifications: async (staffId: string): Promise<StaffQualification[]> => {
+    const response = await apiClient.get(`/staff/${staffId}/qualifications`);
+    return response.data;
+  },
+
+  addQualification: async (staffId: string, data: StaffQualificationInput): Promise<StaffQualification> => {
+    const response = await apiClient.post(`/staff/${staffId}/qualifications`, data);
+    return response.data;
+  },
+
+  updateQualification: async (staffId: string, qualificationId: string, data: StaffQualificationUpdate): Promise<StaffQualification> => {
+    const response = await apiClient.put(`/staff/${staffId}/qualifications/${qualificationId}`, data);
+    return response.data;
+  },
+
+  deleteQualification: async (staffId: string, qualificationId: string): Promise<void> => {
+    await apiClient.delete(`/staff/${staffId}/qualifications/${qualificationId}`);
+  },
+
+  // ── Bulk Upload ────────────────────────────────────────────────────────────
+
+  // Bulk-create staff enrollments from an Excel file — POST /staff/enrollment/bulk-upload
+  // Rows are validated independently; valid rows are created even if others fail.
+  bulkUploadEnrollments: async (
+    uri: string,
+    mimeType: string,
+    fileName: string,
+  ): Promise<BulkUploadResult> => {
+    const formData = new FormData();
+    if (uri.startsWith('data:') || uri.startsWith('blob:')) {
+      const res = await fetch(uri);
+      const blob = await res.blob();
+      formData.append('file', blob, fileName);
+    } else {
+      formData.append('file', { uri, type: mimeType, name: fileName } as any);
+    }
+    const response = await apiClient.post('/staff/enrollment/bulk-upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // Download the blank bulk-upload Excel template — GET /staff/enrollment/bulk-upload/template
+  getBulkUploadTemplate: async (): Promise<Blob> => {
+    const response = await apiClient.get('/staff/enrollment/bulk-upload/template', {
+      responseType: 'blob',
+    });
+    return response.data;
   },
 };
 
@@ -86,7 +170,12 @@ export const staffAttendanceApi = {
   }): Promise<{ items: StaffAttendance[]; total: number }> => {
     // Pass params directly to axios — it strips undefined values automatically (no URLSearchParams serialization)
     const response = await apiClient.get('/staff/attendance', { params });
-    return response.data;
+    const data = response.data;
+    // Backend may return a plain array or a wrapped { items, total } object
+    if (Array.isArray(data)) {
+      return { items: data, total: data.length };
+    }
+    return data;
   },
 
   // Create Staff Attendance
@@ -112,12 +201,12 @@ export const staffAttendanceApi = {
     return response.data;
   },
 
-  // Get Staff Attendance by Date Range — GET /masters/staff/{staffId}/attendance/filter
+  // Get Staff Attendance by Date Range — GET /staff/{staffId}/attendance/filter
   getStaffAttendanceByDateRange: async (staffId: string, params: {
     start_date: string;
     end_date: string;
   }): Promise<StaffAttendance[]> => {
-    const response = await apiClient.get(`/masters/staff/${staffId}/attendance/filter`, { params });
+    const response = await apiClient.get(`/staff/${staffId}/attendance/filter`, { params });
     return response.data;
   },
 };
@@ -357,6 +446,53 @@ export const staffQualificationsApi = {
   // DELETE /staff/{staffId}/qualifications/{qualId}
   deleteQualification: async (staffId: string, qualId: string): Promise<void> => {
     await apiClient.delete(`/staff/${staffId}/qualifications/${qualId}`);
+  },
+};
+
+// Staff Performance types
+export interface StaffPerformance {
+  id: string;
+  staff_id: string;
+  period_start: string;
+  period_end: string;
+  rating: number;
+  review_notes: string | null;
+  goals_achieved: number;
+  total_goals: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StaffPerformanceInput {
+  staff_id: string;
+  period_start: string;
+  period_end: string;
+  rating: number;
+  review_notes?: string;
+  goals_achieved: number;
+  total_goals: number;
+}
+
+// Staff Performance API
+export const staffPerformanceApi = {
+  getStaffPerformance: async (staffId: string): Promise<StaffPerformance[]> => {
+    const response = await apiClient.get(`/staff/${staffId}/performance`);
+    return response.data.items || response.data;
+  },
+
+  createPerformanceReview: async (data: StaffPerformanceInput): Promise<StaffPerformance> => {
+    const response = await apiClient.post('/staff/performance', data);
+    return response.data;
+  },
+
+  updatePerformanceReview: async (id: string, data: Partial<StaffPerformanceInput>): Promise<StaffPerformance> => {
+    const response = await apiClient.put(`/staff/performance/${id}`, data);
+    return response.data;
+  },
+
+  deletePerformanceReview: async (id: string): Promise<void> => {
+    await apiClient.delete(`/staff/performance/${id}`);
   },
 };
 

@@ -13,6 +13,8 @@ import {
 import { ScreenLayout } from '@/components';
 import { useTheme } from '@/contexts';
 import { studentAttendanceApi } from '@/src/api/students';
+import { exportToCsv } from '@/src/utils/exportCsv';
+import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const COLOR = '#3B82F6';
 
@@ -36,7 +38,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   late:    { bg: '#fef3c7', text: '#92400e' },
 };
 
-export default function StudentReportsScreen() {
+function StudentReportsScreenContent() {
   const { colors, theme } = useTheme();
   const [rangeDays, setRangeDays] = useState(7);
 
@@ -55,6 +57,13 @@ export default function StudentReportsScreen() {
   const late = records.filter((r: any) => r.status === 'late').length;
   const rate = records.length > 0 ? `${((present / records.length) * 100).toFixed(1)}%` : '—';
 
+  const handleExport = () =>
+    exportToCsv(
+      'student_attendance_report.csv',
+      ['#', 'Student ID', 'Date', 'Status', 'Remarks'],
+      records.map((r: any, i: number) => [i + 1, r.student_id, r.date, r.status, r.remarks]),
+    );
+
   return (
     <ScreenLayout title="Student Reports">
       <View style={[styles.banner, { backgroundColor: COLOR }]}>
@@ -63,6 +72,10 @@ export default function StudentReportsScreen() {
           <Ionicons name="people" size={24} color="white" />
         </View>
         <Text style={styles.bannerTitle}>Student Attendance Report</Text>
+        <TouchableOpacity style={styles.exportBtn} onPress={handleExport}>
+          <Ionicons name="share-outline" size={16} color="white" />
+          <Text style={styles.exportBtnText}>Export</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={[styles.filterBar, { backgroundColor: cardBg, borderBottomColor: borderCol }]}>
@@ -152,7 +165,9 @@ const styles = StyleSheet.create({
   banner: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, overflow: 'hidden' },
   bannerDecor: { position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.12)' },
   bannerIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700' },
+  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700', flex: 1 },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  exportBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
   filterBar: { flexDirection: 'row', gap: 8, padding: 12, borderBottomWidth: 1 },
   filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
   filterChipText: { fontSize: 12, fontWeight: '600' },
@@ -173,3 +188,16 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', gap: 8, paddingTop: 40 },
   emptyText: { fontSize: 14 },
 });
+
+
+// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+export default function StudentReportsScreen() {
+  return (
+    <ScreenAccessGate
+      title="Student Reports"
+      resources={['students', 'student_attendance']}
+    >
+      <StudentReportsScreenContent />
+    </ScreenAccessGate>
+  );
+}

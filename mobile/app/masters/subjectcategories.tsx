@@ -1,17 +1,20 @@
-import { Ionicons } from '@expo/vector-icons';
+﻿import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
     FlatList,
     Modal,
+    Platform,
     RefreshControl,
-    ScrollView,
     StyleSheet,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { escapeCsv } from '@/src/utils/exportCsv';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -28,12 +31,9 @@ import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 export default function SubjectCategoriesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [showExportOptions, setShowExportOptions] = useState(false);
   const [editingCategory, setEditingCategory] = useState<SubjectCategory | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    is_active: true,
-  });
+  const [formData, setFormData] = useState({ name: '' });
 
   const router = useRouter();
   const { theme, colors } = useTheme();
@@ -102,22 +102,82 @@ export default function SubjectCategoriesScreen() {
     });
   }, [categoriesData, searchQuery]);
 
+  // ── Export (mirrors the web app's Subject Categories Export menu: CSV / Excel / JSON) ────
+  const EXPORT_HEADERS = ['Name', 'Description', 'Active'];
+
+  const buildExportRows = () =>
+    filteredCategories.map((c) => [
+      c.name,
+      c.description || '',
+      c.is_active ? 'Yes' : 'No',
+    ]);
+
+  // Web: real blob download, identical to the web app. Native: write the file
+  // locally and hand it to the OS share sheet so it can be saved/shared.
+  const shareOrDownload = async (filename: string, content: string, mimeType: string) => {
+    if (Platform.OS === 'web') {
+      const w = globalThis as any;
+      const blob = new w.Blob([content], { type: `${mimeType};charset=utf-8;` });
+      const url = w.URL.createObjectURL(blob);
+      const link = w.document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      w.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      w.URL.revokeObjectURL(url);
+      return;
+    }
+    const fileUri = FileSystem.documentDirectory + filename;
+    await FileSystem.writeAsStringAsync(fileUri, content);
+    await Sharing.shareAsync(fileUri, { mimeType });
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const lines = [EXPORT_HEADERS, ...buildExportRows()].map((row) => row.map(escapeCsv).join(','));
+      await shareOrDownload('subject_categories_data.csv', lines.join('\n'), 'text/csv');
+    } catch {
+      showError('Error', 'Failed to export CSV');
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const rows = [EXPORT_HEADERS, ...buildExportRows()];
+      const html = `<table>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')}</table>`;
+      await shareOrDownload('subject_categories_data.xls', html, 'application/vnd.ms-excel');
+    } catch {
+      showError('Error', 'Failed to export Excel');
+    }
+  };
+
+  const handleDownloadData = async () => {
+    try {
+      const jsonData = {
+        title: 'Subject Categories',
+        columns: EXPORT_HEADERS,
+        data: filteredCategories.map((c) => ({
+          name: c.name,
+          description: c.description || '',
+          is_active: c.is_active ? 'Yes' : 'No',
+        })),
+        exportedAt: new Date().toISOString(),
+      };
+      await shareOrDownload('subject_categories_data.json', JSON.stringify(jsonData, null, 2), 'application/json');
+    } catch {
+      showError('Error', 'Failed to export data');
+    }
+  };
+
   const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      is_active: true,
-    });
+    setFormData({ name: '' });
     setEditingCategory(null);
   };
 
   const handleEdit = (category: SubjectCategory) => {
     setEditingCategory(category);
-    setFormData({
-      name: category.name,
-      description: category.description || '',
-      is_active: category.is_active,
-    });
+    setFormData({ name: category.name });
     setIsModalVisible(true);
   };
 
@@ -138,30 +198,27 @@ export default function SubjectCategoriesScreen() {
     }
 
     if (editingCategory) {
-      updateMutation.mutate({ id: editingCategory.id, data: formData });
+      updateMutation.mutate({ id: editingCategory.id, data: { name: formData.name } });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate({ name: formData.name, is_active: true });
     }
   };
 
-  const renderCategoryItem = useCallback(({ item }: { item: SubjectCategory }) => (
+  const renderCategoryItem = useCallback(({ item, index }: { item: SubjectCategory; index: number }) => (
     <View style={[styles.categoryCard, { backgroundColor: themeColors.card }]}>
       <View style={styles.categoryHeader}>
         <View style={styles.categoryInfo}>
+          <ThemedText style={[styles.serialNo, { color: themeColors['muted-foreground'] }]}>{index + 1}</ThemedText>
           <ThemedText type="subtitle" style={styles.categoryName}>
             {item.name}
           </ThemedText>
-          <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#D1FAE5' : '#FEE2E2' }]}>
-            <ThemedText style={[styles.statusText, { color: item.is_active ? '#065F46' : '#991B1B' }]}>
-              {item.is_active ? 'Active' : 'Inactive'}
-            </ThemedText>
-          </View>
         </View>
         <View style={styles.actionButtons}>
           <PermissionGuard resourceConstant={PERMISSION_RESOURCES.SUBJECT_CATEGORIES} actionConstant="update">
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: themeColors.primary }]}
               onPress={() => handleEdit(item)}
+              accessibilityLabel="Edit"
             >
               <Ionicons name="create" size={16} color="white" />
             </TouchableOpacity>
@@ -170,22 +227,12 @@ export default function SubjectCategoriesScreen() {
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
               onPress={() => handleDelete(item)}
+              accessibilityLabel="Delete"
             >
               <Ionicons name="trash" size={16} color="white" />
             </TouchableOpacity>
           </PermissionGuard>
         </View>
-      </View>
-
-      <View style={styles.categoryDetails}>
-        {item.description && (
-          <View style={styles.detailRow}>
-            <Ionicons name="information-circle" size={16} color={themeColors['muted-foreground']} />
-            <ThemedText style={styles.detailText}>
-              {item.description}
-            </ThemedText>
-          </View>
-        )}
       </View>
     </View>
   ), [themeColors]);
@@ -217,7 +264,8 @@ export default function SubjectCategoriesScreen() {
       <ThemedView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}
+              accessibilityLabel="Go back">
             <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
           </TouchableOpacity>
           <View style={styles.headerContent}>
@@ -226,6 +274,18 @@ export default function SubjectCategoriesScreen() {
               {filteredCategories.length} categor{filteredCategories.length !== 1 ? 'ies' : 'y'}
             </ThemedText>
           </View>
+        </View>
+
+        {/* Actions: Export + Add */}
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={[styles.exportButton, { borderColor: themeColors.border, backgroundColor: themeColors.card }]}
+            onPress={() => setShowExportOptions(true)}
+            accessibilityLabel="Export"
+          >
+            <Ionicons name="download-outline" size={16} color={themeColors['card-foreground']} />
+            <ThemedText style={[styles.exportButtonText, { color: themeColors['card-foreground'] }]}>Export</ThemedText>
+          </TouchableOpacity>
           <PermissionGuard resourceConstant={PERMISSION_RESOURCES.SUBJECT_CATEGORIES} actionConstant="create">
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: themeColors.primary }]}
@@ -233,11 +293,61 @@ export default function SubjectCategoriesScreen() {
                 resetForm();
                 setIsModalVisible(true);
               }}
+              accessibilityLabel="Add Subject Categories"
             >
-              <Ionicons name="add" size={24} color="white" />
+              <Ionicons name="add" size={16} color="white" />
+              <ThemedText style={styles.addButtonText}>Add Subject Categories</ThemedText>
             </TouchableOpacity>
           </PermissionGuard>
         </View>
+
+      {/* Export Options Modal */}
+      <Modal
+        visible={showExportOptions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowExportOptions(false)}
+      >
+        <TouchableOpacity
+          style={styles.exportOverlay}
+          activeOpacity={1}
+          onPress={() => setShowExportOptions(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.exportOptions, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
+          >
+            <ThemedText style={[styles.exportOptionTitle, { color: themeColors['muted-foreground'] }]}>Export As</ThemedText>
+            <TouchableOpacity
+              style={styles.exportOption}
+              onPress={() => { setShowExportOptions(false); handleExportCSV(); }}
+            >
+              <Ionicons name="document-text" size={18} color={themeColors['card-foreground']} />
+              <ThemedText style={styles.exportOptionText}>Export to CSV</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.exportOption}
+              onPress={() => { setShowExportOptions(false); handleExportExcel(); }}
+            >
+              <Ionicons name="grid" size={18} color={themeColors['card-foreground']} />
+              <ThemedText style={styles.exportOptionText}>Export to Excel</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.exportOption}
+              onPress={() => { setShowExportOptions(false); handleDownloadData(); }}
+            >
+              <Ionicons name="download" size={18} color={themeColors['card-foreground']} />
+              <ThemedText style={styles.exportOptionText}>Download Data</ThemedText>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Filters label */}
+      <View style={styles.filtersLabelRow}>
+        <Ionicons name="filter-outline" size={14} color={themeColors['muted-foreground']} />
+        <ThemedText style={[styles.filtersLabelText, { color: themeColors['muted-foreground'] }]}>Filters</ThemedText>
+      </View>
 
       {/* Search Bar */}
       <View style={[styles.searchContainer, { backgroundColor: themeColors.card }]}>
@@ -250,7 +360,8 @@ export default function SubjectCategoriesScreen() {
           onChangeText={setSearchQuery}
         />
         {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityLabel="Close">
             <Ionicons name="close" size={20} color={themeColors['muted-foreground']} />
           </TouchableOpacity>
         ) : null}
@@ -296,14 +407,15 @@ export default function SubjectCategoriesScreen() {
           <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="title" style={styles.modalTitle}>
-                {editingCategory ? 'Edit Category' : 'Add Category'}
+                {editingCategory ? 'Edit Category' : 'Add Subject Categories'}
               </ThemedText>
-              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+              <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody}>
+            <View style={styles.modalBody}>
               <View style={styles.formGroup}>
                 <ThemedText style={styles.label}>Category Name *</ThemedText>
                 <TextInput
@@ -311,36 +423,10 @@ export default function SubjectCategoriesScreen() {
                   placeholder="Enter category name"
                   placeholderTextColor={themeColors['muted-foreground']}
                   value={formData.name}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+                  onChangeText={(text) => setFormData({ name: text })}
                 />
-
-                <ThemedText style={styles.label}>Description</ThemedText>
-                <TextInput
-                  style={[styles.textarea, { color: themeColors['card-foreground'], borderColor: themeColors.border }]}
-                  placeholder="Enter category description (optional)"
-                  placeholderTextColor={themeColors['muted-foreground']}
-                  value={formData.description}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-                  multiline
-                  numberOfLines={3}
-                />
-
               </View>
-
-              <View style={styles.checkboxContainer}>
-                <TouchableOpacity
-                  style={styles.checkbox}
-                  onPress={() => setFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
-                >
-                  <Ionicons
-                    name={formData.is_active ? "checkbox" : "square-outline"}
-                    size={24}
-                    color={themeColors.primary}
-                  />
-                </TouchableOpacity>
-                <ThemedText style={styles.checkboxLabel}>Active</ThemedText>
-              </View>
-            </ScrollView>
+            </View>
 
             <View style={styles.modalFooter}>
               <TouchableOpacity
@@ -355,7 +441,7 @@ export default function SubjectCategoriesScreen() {
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
                 <ThemedText style={styles.submitButtonText}>
-                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingCategory ? 'Update' : 'Create')}
+                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingCategory ? 'Update' : 'Add Subject Categories')}
                 </ThemedText>
               </TouchableOpacity>
             </View>
@@ -395,12 +481,85 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     marginTop: 4,
   },
-  addButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
+  actionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addButtonText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  exportButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  exportOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  exportOptions: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  exportOptionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  exportOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  exportOptionText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  filtersLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  filtersLabelText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -437,19 +596,13 @@ const styles = StyleSheet.create({
   categoryInfo: {
     flex: 1,
   },
-  categoryName: {
-    marginBottom: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
+  serialNo: {
+    fontSize: 11,
     fontWeight: '600',
+    marginBottom: 2,
+  },
+  categoryName: {
+    marginBottom: 4,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -461,18 +614,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  categoryDetails: {
-    gap: 8,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  detailText: {
-    fontSize: 14,
-    marginLeft: 8,
-    opacity: 0.8,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -521,6 +662,7 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     padding: 20,
+    paddingBottom: 0,
   },
   formGroup: {
     marginBottom: 16,
@@ -534,25 +676,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
-  },
-  textarea: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  checkbox: {
-    marginRight: 8,
-  },
-  checkboxLabel: {
     fontSize: 16,
   },
   modalFooter: {

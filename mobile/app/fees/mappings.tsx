@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
@@ -7,106 +8,148 @@ import { useTheme } from '@/contexts';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
+import { AssignStudentFeesContent } from './assign-student-fees';
+import { ClassMappingsContent } from './class-mappings';
+import { StudentMappingsContent } from './student-mappings';
+
 const PURPLE = '#8B5CF6';
 
-const sections = [
+type TabKey = 'student-mappings' | 'assign-student-fees' | 'class-mappings';
+
+const tabs: {
+  key: TabKey;
+  label: string;
+  resource: string;
+  action: string;
+}[] = [
   {
-    title: 'Class Mappings',
-    description: 'Configure fee mappings for classes and term amounts',
-    icon: 'school-outline' as const,
-    color: '#8B5CF6',
-    route: '/fees/class-mappings',
-    resource: PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS,
+    key: 'student-mappings',
+    label: 'Student Mappings',
+    resource: PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS,
     action: 'list',
   },
   {
-    title: 'Student Mappings',
-    description: 'Assign fee types to individual students',
-    icon: 'person-outline' as const,
-    color: '#3B82F6',
-    route: '/fees/student-mappings',
+    key: 'assign-student-fees',
+    label: 'Assign Student Fees',
     resource: PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS,
+    action: 'list',
+  },
+  {
+    key: 'class-mappings',
+    label: 'Class Mappings',
+    resource: PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS,
     action: 'list',
   },
 ];
 
 export default function FeeMappingsScreen() {
-  const router = useRouter();
   const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    tab === 'class-mappings' || tab === 'assign-student-fees' ? tab : 'student-mappings'
+  );
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
+  const canAccess = (resource: string, action: string) =>
+    hasPermission ? hasPermission(resource, action) : false;
+
+  const activeTabConfig = tabs.find(t => t.key === activeTab)!;
+  const activeAllowed = canAccess(activeTabConfig.resource, activeTabConfig.action);
+
   return (
     <AppLayout title="Fee Mappings">
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-
+      <View style={styles.container}>
         {/* Banner */}
         <View style={[styles.banner, { backgroundColor: PURPLE }]}>
           <View style={styles.bannerDecor} />
           <View style={styles.bannerDecor2} />
           <View style={styles.bannerIcon}>
-            <Ionicons name="git-merge" size={28} color="white" />
+            <Ionicons name="git-merge" size={26} color="white" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.bannerTitle}>Fee Mappings</Text>
-            <Text style={styles.bannerSub}>Map fee types to classes or individual students</Text>
+            <Text style={styles.bannerTitle}>Fee Mappings Management</Text>
+            <Text style={styles.bannerSub}>
+              Manage fee assignments for classes and individual students within the selected academic year
+            </Text>
           </View>
         </View>
 
-        <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>MAPPING SECTIONS</Text>
-
-        {/* Grid */}
-        <View style={styles.grid}>
-          {sections.map((section, i) => {
-            const hasAccess = hasPermission ? hasPermission(section.resource, section.action) : false;
+        {/* Tabs */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabBar}
+          style={styles.tabBarWrapper}
+        >
+          {tabs.map(t => {
+            const active = t.key === activeTab;
+            const allowed = canAccess(t.resource, t.action);
             return (
               <TouchableOpacity
-                key={i}
+                key={t.key}
                 style={[
-                  styles.sectionCard,
+                  styles.tab,
                   { backgroundColor: cardBg, borderColor: borderCol },
-                  !hasAccess && { opacity: 0.5 },
+                  active && { backgroundColor: PURPLE, borderColor: PURPLE },
+                  !allowed && { opacity: 0.5 },
                 ]}
-                onPress={() => hasAccess && router.push(section.route as any)}
-                disabled={!hasAccess}
-                activeOpacity={0.75}
+                onPress={() => allowed && setActiveTab(t.key)}
+                disabled={!allowed}
+                activeOpacity={0.8}
               >
-                <View style={[styles.sectionIconBox, { backgroundColor: section.color + '18' }]}>
-                  <Ionicons
-                    name={hasAccess ? section.icon : 'lock-closed'}
-                    size={24}
-                    color={hasAccess ? section.color : '#9ca3af'}
-                  />
-                </View>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]} numberOfLines={2}>
-                  {section.title}
-                </Text>
-                <Text style={[styles.sectionDesc, { color: colors['muted-foreground'] }]} numberOfLines={2}>
-                  {hasAccess ? section.description : 'No access — contact admin'}
-                </Text>
-                {hasAccess && (
-                  <View style={[styles.sectionArrow, { backgroundColor: section.color + '18' }]}>
-                    <Ionicons name="arrow-forward" size={12} color={section.color} />
-                  </View>
+                {!allowed && (
+                  <Ionicons name="lock-closed" size={11} color={colors['muted-foreground']} />
                 )}
+                <Text
+                  style={[
+                    styles.tabText,
+                    { color: active ? 'white' : colors['muted-foreground'] },
+                  ]}
+                >
+                  {t.label}
+                </Text>
               </TouchableOpacity>
             );
           })}
+        </ScrollView>
+
+        {/* Active tab */}
+        <View style={styles.tabContent}>
+          {!activeAllowed ? (
+            <View style={styles.noAccess}>
+              <Ionicons name="lock-closed" size={40} color={colors['muted-foreground']} />
+              <Text style={[styles.noAccessText, { color: colors['muted-foreground'] }]}>
+                No access — contact admin
+              </Text>
+            </View>
+          ) : activeTab === 'student-mappings' ? (
+            <StudentMappingsContent />
+          ) : activeTab === 'assign-student-fees' ? (
+            <AssignStudentFeesContent />
+          ) : (
+            <ClassMappingsContent />
+          )}
         </View>
-      </ScrollView>
+      </View>
     </AppLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1 },
-  content: { padding: 16, paddingBottom: 32 },
+  container: { flex: 1 },
   banner: {
-    borderRadius: 18, padding: 18,
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    marginBottom: 16, overflow: 'hidden',
+    borderRadius: 18,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    margin: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
   },
   bannerDecor: {
     position: 'absolute', top: -30, right: -30,
@@ -119,31 +162,34 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.07)',
   },
   bannerIcon: {
-    width: 52, height: 52, borderRadius: 14,
+    width: 48, height: 48, borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center',
   },
-  bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 2 },
-  bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 16 },
-  sectionLabel: {
-    fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12,
+  bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700', marginBottom: 2 },
+  bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 15 },
+  tabBarWrapper: { flexGrow: 0, marginBottom: 4 },
+  tabBar: {
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingBottom: 4,
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  sectionCard: {
-    width: '48%', borderRadius: 14, borderWidth: 1,
-    padding: 16, minHeight: 120,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  sectionIconBox: {
-    width: 44, height: 44, borderRadius: 12,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 10,
+  tabText: { fontSize: 12, fontWeight: '600' },
+  tabContent: { flex: 1 },
+  noAccess: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
   },
-  sectionTitle: { fontSize: 13, fontWeight: '700', marginBottom: 4, lineHeight: 18 },
-  sectionDesc: { fontSize: 11, lineHeight: 16, flex: 1 },
-  sectionArrow: {
-    alignSelf: 'flex-end', marginTop: 8,
-    width: 22, height: 22, borderRadius: 11,
-    justifyContent: 'center', alignItems: 'center',
-  },
+  noAccessText: { fontSize: 13 },
 });

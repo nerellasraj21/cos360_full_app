@@ -121,6 +121,7 @@ export interface AuthResponse {
   change_password_token?: string;
   academic_year_id?: string;
   academic_year_title?: string;
+  client_name?: string;
 }
 
 /**
@@ -147,6 +148,7 @@ export const storeAuthData = async (authResponse: AuthResponse): Promise<void> =
       AsyncStorage.setItem(ROLE_DATA_KEY, JSON.stringify(authResponse.role)),
       AsyncStorage.setItem(PERMISSIONS_DATA_KEY, JSON.stringify(permissionsToStore || [])),
       AsyncStorage.setItem(MENU_DATA_KEY, JSON.stringify(authResponse.menu || [])),
+      AsyncStorage.setItem(CLIENT_SCHEMA_KEY, authResponse.client_name || 'test_tenant'),
     ]);
   } catch (error) {
     console.error('Error storing auth data:', error);
@@ -361,6 +363,7 @@ export const clearAuthData = async (): Promise<void> => {
       AsyncStorage.removeItem(AVAILABLE_STUDENTS_KEY),
       AsyncStorage.removeItem(STUDENT_ID_KEY),
       AsyncStorage.removeItem(MENU_DATA_KEY),
+      AsyncStorage.removeItem(CLIENT_SCHEMA_KEY),
     ]);
   } catch (error) {
     console.error('Error clearing auth data:', error);

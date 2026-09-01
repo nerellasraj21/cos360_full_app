@@ -209,6 +209,7 @@ export default function StudentTripsScreen() {
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.primary }]}
                 onPress={() => handleEdit(item)}
+              accessibilityLabel="Edit"
               >
                 <Ionicons name="create" size={16} color="white" />
               </TouchableOpacity>
@@ -218,6 +219,7 @@ export default function StudentTripsScreen() {
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
                 onPress={() => handleDelete(item)}
+              accessibilityLabel="Delete"
               >
                 <Ionicons name="trash" size={16} color="white" />
               </TouchableOpacity>
@@ -321,7 +323,8 @@ export default function StudentTripsScreen() {
                 onChangeText={setSearchQuery}
               />
               {searchQuery ? (
-                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={20} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               ) : null}
@@ -383,7 +386,8 @@ export default function StudentTripsScreen() {
                   <ThemedText type="title" style={styles.modalTitle}>
                     {editingTrip ? 'Edit Transport Assignment' : 'Add Transport Assignment'}
                   </ThemedText>
-                  <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                  <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                     <Ionicons name="close" size={24} color={colors.foreground} />
                   </TouchableOpacity>
                 </View>

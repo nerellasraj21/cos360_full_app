@@ -1,12 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastContext } from '../../../../components/ToastProvider';
-import { usePermissionProtectedQuery, usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { usePermissionProtectedMutation } from '../../../../hooks/use-permission-protected-api';
+import { useMastersQuery } from './useMastersQuery';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { subjectsApi, Subject, SubjectInput, SubjectUpdate } from '../../index';
 
 // Get all subjects - permission protected
 export function useSubjects(params?: { academic_year_id?: string; active_only?: boolean; limit?: number }) {
-  return usePermissionProtectedQuery<Subject[]>({
+  return useMastersQuery<Subject[]>({
     queryKey: ['subjects', params?.academic_year_id, params?.active_only, params?.limit],
     queryFn: () => subjectsApi.getSubjects(params),
     resource: PERMISSION_RESOURCES.SUBJECTS,
@@ -17,7 +18,7 @@ export function useSubjects(params?: { academic_year_id?: string; active_only?: 
 
 // Get subject by ID - permission protected
 export function useSubject(id: string) {
-  return usePermissionProtectedQuery<Subject>({
+  return useMastersQuery<Subject>({
     queryKey: ['subjects', id],
     queryFn: () => subjectsApi.getSubject(id),
     resource: PERMISSION_RESOURCES.SUBJECTS,

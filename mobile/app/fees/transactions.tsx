@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState, useEffect } from 'react';
+import { roleBlocksFees } from '@/src/lib/menuUtils';
 import {
   ActivityIndicator,
   FlatList,
@@ -66,8 +67,9 @@ type PaymentMethod = 'cash' | 'cheque' | 'upi' | 'bank_transfer'; // C-3: matche
 
 // Component
 export default function FeeTransactionsScreen() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, role } = useAuth();
   const router = useRouter();
+  const isFeeBlocked = roleBlocksFees(role?.name);
 
   const [isModalVisible, setIsModalVisible]         = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<FeeTransactionResponse | null>(null);
@@ -115,6 +117,12 @@ export default function FeeTransactionsScreen() {
       router.replace('/login');
     }
   }, [isAuthenticated, authLoading, router]);
+
+  // Web parity (_app/fee.tsx beforeLoad): teachers cannot access the Fee
+  // module, even via a deep link into a specific fee sub-screen.
+  useEffect(() => {
+    if (isFeeBlocked) router.replace('/(tabs)');
+  }, [isFeeBlocked, router]);
 
   const { data: transactions = [], isLoading, error } = useQuery({
     queryKey: ['feeTransactions', activeAcademicYearId],
@@ -297,7 +305,7 @@ export default function FeeTransactionsScreen() {
   });
 
 
-  const renderTransactionItem = ({ item }: { item: FeeTransactionResponse }) => {
+  const renderTransactionItem = ({ item, index }: { item: FeeTransactionResponse; index: number }) => {
     const student     = students.find(s => s.id === item.student_id);
     const staffMember = staff.find(s => s.id === item.collected_by);
     const txStatus    = deriveStatus(item);
@@ -305,6 +313,7 @@ export default function FeeTransactionsScreen() {
     return (
       <View style={[styles.transactionCard, { backgroundColor: colors.card }]}>
         <View style={styles.transactionInfo}>
+          <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
           <View style={styles.transactionHeaderRow}>
             <Text style={[styles.transactionId, { color: colors.foreground }]}>
               #{item.id.slice(0, 8)}
@@ -340,6 +349,7 @@ export default function FeeTransactionsScreen() {
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: colors.primary }]}
               onPress={() => handleEdit(item)}
+              accessibilityLabel="Edit"
             >
               <Ionicons name="pencil" size={16} color="white" />
             </TouchableOpacity>
@@ -373,6 +383,7 @@ export default function FeeTransactionsScreen() {
     );
   }
   if (!isAuthenticated) { return null; }
+  if (isFeeBlocked) { return null; }
   if (isLoading) {
     return (
       <AppLayout title="Fee Transactions">
@@ -491,7 +502,8 @@ export default function FeeTransactionsScreen() {
                   <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                     {editingTransaction ? 'Edit Fee Transaction' : 'Add Fee Transaction'}
                   </Text>
-                  <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                  <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                     <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                   </TouchableOpacity>
                 </View>
@@ -670,6 +682,7 @@ export default function FeeTransactionsScreen() {
                             <TouchableOpacity
                               onPress={() => setFormData(prev => ({ ...prev, transaction_items: prev.transaction_items.filter((_, i) => i !== index) }))}
                               disabled={isSubmitting}
+              accessibilityLabel="Delete"
                             >
                               <Ionicons name="trash" size={20} color={isSubmitting ? colors['muted-foreground'] : colors.destructive} />
                             </TouchableOpacity>
@@ -820,7 +833,8 @@ export default function FeeTransactionsScreen() {
                   <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                     Outstanding Fees - {outstandingFeesModal.studentName}
                   </Text>
-                  <TouchableOpacity onPress={() => setOutstandingFeesModal(prev => ({ ...prev, visible: false }))}>
+                  <TouchableOpacity onPress={() => setOutstandingFeesModal(prev => ({ ...prev, visible: false }))}
+              accessibilityLabel="Close">
                     <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                   </TouchableOpacity>
                 </View>
@@ -869,6 +883,7 @@ const styles = StyleSheet.create({
   transactionCard:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 16, marginBottom: 8, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
   transactionInfo:         { flex: 1, marginRight: 8 },
   transactionHeaderRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  serialNo:                { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   transactionId:           { fontSize: 15, fontWeight: '700' },
   statusPill:              { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
   statusPillText:          { fontSize: 11, fontWeight: '600' },

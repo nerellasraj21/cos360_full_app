@@ -424,10 +424,11 @@ export default function RolesPermissionsScreen() {
     }
   };
 
-  const renderRoleItem = useCallback(({ item }: { item: Role }) => (
+  const renderRoleItem = useCallback(({ item, index }: { item: Role; index: number }) => (
     <View style={[styles.roleCard, { backgroundColor: themeColors.card }]}>
       <View style={styles.roleHeader}>
         <View style={styles.roleInfo}>
+          <ThemedText style={[styles.serialNo, { color: themeColors['muted-foreground'] }]}>{index + 1}</ThemedText>
           <ThemedText type="subtitle" style={styles.roleName}>
             {item.name}
           </ThemedText>
@@ -442,6 +443,7 @@ export default function RolesPermissionsScreen() {
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: themeColors.primary }]}
               onPress={() => handleEditRole(item)}
+              accessibilityLabel="Edit"
             >
               <Ionicons name="create" size={16} color="white" />
             </TouchableOpacity>
@@ -451,6 +453,7 @@ export default function RolesPermissionsScreen() {
               style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
               onPress={() => handleDeleteRole(item)}
               disabled={item.name === 'Admin'}
+              accessibilityLabel="Delete"
             >
               <Ionicons name="trash" size={16} color="white" />
             </TouchableOpacity>
@@ -470,10 +473,11 @@ export default function RolesPermissionsScreen() {
     </View>
   ), [themeColors]);
 
-  const renderPermissionItem = useCallback(({ item }: { item: Permission }) => (
+  const renderPermissionItem = useCallback(({ item, index }: { item: Permission; index: number }) => (
     <View style={[styles.permissionCard, { backgroundColor: themeColors.card }]}>
       <View style={styles.permissionHeader}>
         <View style={styles.permissionInfo}>
+          <ThemedText style={[styles.serialNo, { color: themeColors['muted-foreground'] }]}>{index + 1}</ThemedText>
           <View style={styles.resourceRow}>
             <Ionicons name={getResourceIcon(item.resource)} size={20} color={themeColors.primary} />
             <ThemedText type="subtitle" style={styles.resourceText}>
@@ -491,6 +495,7 @@ export default function RolesPermissionsScreen() {
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: themeColors.primary }]}
               onPress={() => handleEditPermission(item)}
+              accessibilityLabel="Edit"
             >
               <Ionicons name="create" size={16} color="white" />
             </TouchableOpacity>
@@ -499,6 +504,7 @@ export default function RolesPermissionsScreen() {
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
               onPress={() => handleDeletePermission(item)}
+              accessibilityLabel="Delete"
             >
               <Ionicons name="trash" size={16} color="white" />
             </TouchableOpacity>
@@ -549,7 +555,8 @@ export default function RolesPermissionsScreen() {
     >
       <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}
+              accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
@@ -945,7 +952,8 @@ export default function RolesPermissionsScreen() {
               <ThemedText type="title" style={styles.modalTitle}>
                 {editingRole ? 'Edit Role' : 'Add Role'}
               </ThemedText>
-              <TouchableOpacity onPress={() => setIsRoleModalVisible(false)}>
+              <TouchableOpacity onPress={() => setIsRoleModalVisible(false)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
               </TouchableOpacity>
             </View>
@@ -1024,7 +1032,8 @@ export default function RolesPermissionsScreen() {
               <ThemedText type="title" style={styles.modalTitle}>
                 {editingPermission ? 'Edit Permission' : 'Add Permission'}
               </ThemedText>
-              <TouchableOpacity onPress={() => setIsPermissionModalVisible(false)}>
+              <TouchableOpacity onPress={() => setIsPermissionModalVisible(false)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
               </TouchableOpacity>
             </View>
@@ -1151,7 +1160,8 @@ export default function RolesPermissionsScreen() {
               <ThemedText type="title" style={styles.modalTitle}>
                 Bulk Create Permissions
               </ThemedText>
-              <TouchableOpacity onPress={() => setIsBulkModalVisible(false)}>
+              <TouchableOpacity onPress={() => setIsBulkModalVisible(false)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
               </TouchableOpacity>
             </View>
@@ -1231,6 +1241,7 @@ export default function RolesPermissionsScreen() {
                         <TouchableOpacity
                           style={styles.removePermissionButton}
                           onPress={() => removeBulkPermission(index)}
+              accessibilityLabel="Delete"
                         >
                           <Ionicons name="trash" size={16} color="#EF4444" />
                         </TouchableOpacity>
@@ -1268,6 +1279,7 @@ export default function RolesPermissionsScreen() {
 }
 
 const styles = StyleSheet.create({
+  serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   container: {
     flex: 1,
     padding: 16,

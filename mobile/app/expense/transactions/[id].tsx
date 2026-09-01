@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { getValidAccessToken, getClientSchema } from '../../../services/authUtils';
 import {
@@ -305,6 +305,7 @@ export default function ExpenseTransactionDetailScreen() {
                   <TouchableOpacity
                     style={styles.downloadButton}
                     onPress={() => handleDownload(attachment.id, attachment.original_filename)}
+              accessibilityLabel="Download"
                   >
                     <Ionicons name="download-outline" size={20} color={colors.primary} />
                   </TouchableOpacity>
@@ -361,7 +362,8 @@ export default function ExpenseTransactionDetailScreen() {
             <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle">Add Attachment</ThemedText>
-                <TouchableOpacity onPress={() => setUploadModalVisible(false)}>
+                <TouchableOpacity onPress={() => setUploadModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>
@@ -396,7 +398,8 @@ export default function ExpenseTransactionDetailScreen() {
                     {uploadFile ? uploadFile.name : 'Tap to select file'}
                   </ThemedText>
                   {uploadFile && (
-                    <TouchableOpacity onPress={() => setUploadFile(null)}>
+                    <TouchableOpacity onPress={() => setUploadFile(null)}
+              accessibilityLabel="Close">
                       <Ionicons name="close-circle" size={18} color={colors['muted-foreground']} />
                     </TouchableOpacity>
                   )}
@@ -437,7 +440,8 @@ export default function ExpenseTransactionDetailScreen() {
                 <ThemedText type="subtitle">
                   {approvalAction === 'approve' ? 'Approve Transaction' : 'Reject Transaction'}
                 </ThemedText>
-                <TouchableOpacity onPress={() => setApprovalModalVisible(false)}>
+                <TouchableOpacity onPress={() => setApprovalModalVisible(false)}
+              accessibilityLabel="Close">
                   <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                 </TouchableOpacity>
               </View>

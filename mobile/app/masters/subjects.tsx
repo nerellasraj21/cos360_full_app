@@ -1,10 +1,11 @@
-import { Ionicons } from '@expo/vector-icons';
+﻿import { Ionicons } from '@expo/vector-icons';
 
 import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
     FlatList,
     Modal,
+    Platform,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -12,6 +13,9 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { escapeCsv } from '@/src/utils/exportCsv';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -21,6 +25,7 @@ import type { Subject, SubjectInput, SubjectUpdate, SubjectCategory, AcademicYea
 import { useSubjects, useCreateSubject, useUpdateSubject, useDeleteSubject } from '@/src/api/hooks/masters/subjects';
 import { useSubjectCategories, useCreateSubjectCategory } from '@/src/api/hooks/masters/subjectCategories';
 import { useAcademicYearsDropdown } from '@/src/api/hooks/masters/academicYears';
+import CustomDropdown from '@/components/ui/dropdown';
 import { useTheme, useAcademicYear } from '@/contexts';
 import { PermissionGuard, ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
@@ -28,16 +33,29 @@ import { useToastContext } from '@/components/ToastProvider';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 
 
+// Toggleable fields shown on each subject card — mirrors the web app's
+// column-visibility filter (Masters > Subjects "Filters" dropdown).
+const FILTER_COLUMNS: { key: 'name' | 'category' | 'short_code' | 'is_active'; label: string }[] = [
+  { key: 'name', label: 'Name' },
+  { key: 'category', label: 'Category' },
+  { key: 'short_code', label: 'Short Code' },
+  { key: 'is_active', label: 'Active' },
+];
+
 export default function SubjectsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
+  const [showExportOptions, setShowExportOptions] = useState(false);
+  const [showFilterOptions, setShowFilterOptions] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
+    new Set(FILTER_COLUMNS.map((c) => c.key))
+  );
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     short_code: '',
-    description: '',
     category_id: '',
     academic_year_id: '',
     is_practical: false,
@@ -117,7 +135,6 @@ export default function SubjectsScreen() {
     setFormData({
       name: '',
       short_code: '',
-      description: '',
       category_id: '',
       academic_year_id: activeAcademicYearId || '',
       is_practical: false,
@@ -131,7 +148,6 @@ export default function SubjectsScreen() {
     setFormData({
       name: subject.name,
       short_code: subject.short_code || '',
-      description: subject.description || '',
       category_id: subject.category?.id || '',
       academic_year_id: subject.academic_year_id,
       is_practical: subject.is_practical,
@@ -177,6 +193,27 @@ export default function SubjectsScreen() {
     createCategoryMutation.mutate({ name: newCategoryName.trim() }, { onError: (e: any) => showError('Create Failed', e.message || 'Failed to create category') });
   };
 
+  const handleColumnToggle = (columnKey: string) => {
+    setVisibleColumns((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(columnKey)) {
+        if (newSet.size === 1) return prev; // keep at least one column visible
+        newSet.delete(columnKey);
+      } else {
+        newSet.add(columnKey);
+      }
+      return newSet;
+    });
+  };
+
+  const handleToggleSelectAllColumns = () => {
+    if (visibleColumns.size === FILTER_COLUMNS.length) {
+      setVisibleColumns(new Set([FILTER_COLUMNS[0].key]));
+    } else {
+      setVisibleColumns(new Set(FILTER_COLUMNS.map((c) => c.key)));
+    }
+  };
+
   const getCategoryName = (categoryId: string) => {
     const category = categoriesData?.find((cat: SubjectCategory) => cat.id === categoryId);
     return category?.name || 'Unknown Category';
@@ -187,24 +224,109 @@ export default function SubjectsScreen() {
     return academicYear?.title || 'Unknown Year';
   };
 
-  const renderSubjectItem = useCallback(({ item }: { item: Subject }) => (
+  // ── Export (mirrors the web app's Subjects Export menu: CSV / Excel / JSON) ────
+  const EXPORT_HEADERS = ['Name', 'Code', 'Category', 'Practical', 'Active'];
+
+  const buildExportRows = () =>
+    filteredSubjects.map((s) => [
+      s.name,
+      s.short_code || '',
+      s.category ? getCategoryName(s.category.id) : '',
+      s.is_practical ? 'Yes' : 'No',
+      s.is_active ? 'Yes' : 'No',
+    ]);
+
+  // Web: real blob download, identical to the web app. Native: write the file
+  // locally and hand it to the OS share sheet so it can be saved/shared.
+  const shareOrDownload = async (filename: string, content: string, mimeType: string) => {
+    if (Platform.OS === 'web') {
+      const w = globalThis as any;
+      const blob = new w.Blob([content], { type: `${mimeType};charset=utf-8;` });
+      const url = w.URL.createObjectURL(blob);
+      const link = w.document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      w.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      w.URL.revokeObjectURL(url);
+      return;
+    }
+    const fileUri = FileSystem.documentDirectory + filename;
+    await FileSystem.writeAsStringAsync(fileUri, content);
+    await Sharing.shareAsync(fileUri, { mimeType });
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const lines = [EXPORT_HEADERS, ...buildExportRows()].map((row) => row.map(escapeCsv).join(','));
+      await shareOrDownload('subjects_data.csv', lines.join('\n'), 'text/csv');
+    } catch {
+      showError('Error', 'Failed to export CSV');
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const rows = [EXPORT_HEADERS, ...buildExportRows()];
+      const html = `<table>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')}</table>`;
+      await shareOrDownload('subjects_data.xls', html, 'application/vnd.ms-excel');
+    } catch {
+      showError('Error', 'Failed to export Excel');
+    }
+  };
+
+  const handleDownloadData = async () => {
+    try {
+      const jsonData = {
+        title: 'Subjects',
+        columns: EXPORT_HEADERS,
+        data: filteredSubjects.map((s) => ({
+          name: s.name,
+          short_code: s.short_code || '',
+          category: s.category ? getCategoryName(s.category.id) : '',
+          is_practical: s.is_practical ? 'Yes' : 'No',
+          is_active: s.is_active ? 'Yes' : 'No',
+        })),
+        exportedAt: new Date().toISOString(),
+      };
+      await shareOrDownload('subjects_data.json', JSON.stringify(jsonData, null, 2), 'application/json');
+    } catch {
+      showError('Error', 'Failed to export data');
+    }
+  };
+
+  const renderSubjectItem = useCallback(({ item, index }: { item: Subject; index: number }) => (
     <View style={[styles.subjectCard, { backgroundColor: themeColors.card }]}>
       <View style={styles.subjectHeader}>
         <View style={styles.subjectInfo}>
-          <ThemedText type="subtitle" style={styles.subjectName}>
-            {item.name}
-          </ThemedText>
-          <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#10B981' : '#EF4444' }]}>
-            <ThemedText style={styles.statusText}>
-              {item.is_active ? 'Active' : 'Inactive'}
-            </ThemedText>
+          <View style={styles.nameRow}>
+            <ThemedText style={[styles.serialNo, { color: themeColors['muted-foreground'] }]}>{index + 1}.</ThemedText>
+            {visibleColumns.has('name') && (
+              <ThemedText
+                type="subtitle"
+                style={styles.subjectName}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {item.name}
+              </ThemedText>
+            )}
           </View>
+          {visibleColumns.has('is_active') && (
+            <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#10B981' : '#EF4444' }]}>
+              <ThemedText style={styles.statusText}>
+                {item.is_active ? 'Active' : 'Inactive'}
+              </ThemedText>
+            </View>
+          )}
         </View>
         <View style={styles.actionButtons}>
           <PermissionGuard resourceConstant={PERMISSION_RESOURCES.SUBJECTS} actionConstant="update">
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: themeColors.primary }]}
               onPress={() => handleEdit(item)}
+              accessibilityLabel="Edit"
             >
               <Ionicons name="create" size={16} color="white" />
             </TouchableOpacity>
@@ -213,6 +335,7 @@ export default function SubjectsScreen() {
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: '#EF4444' }]}
               onPress={() => handleDelete(item)}
+              accessibilityLabel="Delete"
             >
               <Ionicons name="trash" size={16} color="white" />
             </TouchableOpacity>
@@ -221,18 +344,20 @@ export default function SubjectsScreen() {
       </View>
 
       <View style={styles.subjectDetails}>
-        {item.short_code ? (
+        {visibleColumns.has('short_code') && item.short_code ? (
           <View style={styles.detailRow}>
             <Ionicons name="code-slash" size={16} color={themeColors['muted-foreground']} />
             <ThemedText style={styles.detailText}>Code: {item.short_code}</ThemedText>
           </View>
         ) : null}
-        <View style={styles.detailRow}>
-          <Ionicons name="folder" size={16} color={themeColors['muted-foreground']} />
-          <ThemedText style={styles.detailText}>
-            Category: {item.category ? getCategoryName(item.category.id) : 'No Category'}
-          </ThemedText>
-        </View>
+        {visibleColumns.has('category') && (
+          <View style={styles.detailRow}>
+            <Ionicons name="folder" size={16} color={themeColors['muted-foreground']} />
+            <ThemedText style={styles.detailText}>
+              Category: {item.category ? getCategoryName(item.category.id) : 'No Category'}
+            </ThemedText>
+          </View>
+        )}
         {item.is_practical ? (
           <View style={styles.detailRow}>
             <Ionicons name="flask" size={16} color="#0891B2" />
@@ -241,7 +366,7 @@ export default function SubjectsScreen() {
         ) : null}
       </View>
     </View>
-  ), [themeColors, categoriesData, academicYearsData]);
+  ), [themeColors, categoriesData, academicYearsData, visibleColumns]);
 
   if (error) {
     return (
@@ -270,28 +395,137 @@ export default function SubjectsScreen() {
       <ThemedView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
-          </TouchableOpacity>
-          <View style={styles.headerContent}>
-            <ThemedText type="title">Subjects</ThemedText>
-            <ThemedText style={styles.subtitle}>
-              {filteredSubjects.length} subject{filteredSubjects.length !== 1 ? 's' : ''}
-            </ThemedText>
-          </View>
-          <PermissionGuard resourceConstant={PERMISSION_RESOURCES.SUBJECTS} actionConstant="create">
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: themeColors.primary }]}
-              onPress={() => {
-                resetForm();
-                refetchCategories();
-                setIsModalVisible(true);
-              }}
-            >
-              <Ionicons name="add" size={24} color="white" />
+          <View style={styles.headerTopRow}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}
+                accessibilityLabel="Go back">
+              <Ionicons name="arrow-back" size={24} color={themeColors['card-foreground']} />
             </TouchableOpacity>
-          </PermissionGuard>
+            <View style={styles.headerContent}>
+              <ThemedText type="title" numberOfLines={1} style={styles.headerTitle}>Subjects</ThemedText>
+              <ThemedText style={styles.subtitle}>
+                {filteredSubjects.length} subject{filteredSubjects.length !== 1 ? 's' : ''}
+              </ThemedText>
+            </View>
+          </View>
+          <View style={styles.headerActionsRow}>
+            <TouchableOpacity
+              style={[styles.exportButton, { borderColor: themeColors.border }]}
+              onPress={() => setShowExportOptions(true)}
+              accessibilityLabel="Export"
+            >
+              <Ionicons name="download-outline" size={16} color={themeColors['card-foreground']} />
+              <ThemedText style={styles.exportButtonText}>Export</ThemedText>
+            </TouchableOpacity>
+            <PermissionGuard resourceConstant={PERMISSION_RESOURCES.SUBJECTS} actionConstant="create">
+              <TouchableOpacity
+                style={[styles.addButton, { backgroundColor: themeColors.primary }]}
+                onPress={() => {
+                  resetForm();
+                  refetchCategories();
+                  setIsModalVisible(true);
+                }}
+                accessibilityLabel="Add Subject"
+              >
+                <Ionicons name="add" size={18} color="white" />
+                <ThemedText style={styles.addButtonText}>Add Subject</ThemedText>
+              </TouchableOpacity>
+            </PermissionGuard>
+          </View>
         </View>
+
+      {/* Export Options Modal */}
+      <Modal
+        visible={showExportOptions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowExportOptions(false)}
+      >
+        <TouchableOpacity
+          style={styles.exportOverlay}
+          activeOpacity={1}
+          onPress={() => setShowExportOptions(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.exportOptions, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
+          >
+            <ThemedText style={[styles.exportOptionTitle, { color: themeColors['muted-foreground'] }]}>Export As</ThemedText>
+            <TouchableOpacity
+              style={styles.exportOption}
+              onPress={() => { setShowExportOptions(false); handleExportCSV(); }}
+            >
+              <Ionicons name="document-text" size={18} color={themeColors['card-foreground']} />
+              <ThemedText style={styles.exportOptionText}>Export to CSV</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.exportOption}
+              onPress={() => { setShowExportOptions(false); handleExportExcel(); }}
+            >
+              <Ionicons name="grid" size={18} color={themeColors['card-foreground']} />
+              <ThemedText style={styles.exportOptionText}>Export to Excel</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.exportOption}
+              onPress={() => { setShowExportOptions(false); handleDownloadData(); }}
+            >
+              <Ionicons name="download" size={18} color={themeColors['card-foreground']} />
+              <ThemedText style={styles.exportOptionText}>Download Data</ThemedText>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Filters — toggle which fields show on each subject card (mirrors web) */}
+      <TouchableOpacity style={styles.filtersLabelRow} onPress={() => setShowFilterOptions(true)}>
+        <Ionicons name="filter-outline" size={14} color={themeColors['muted-foreground']} />
+        <ThemedText style={[styles.filtersLabelText, { color: themeColors['muted-foreground'] }]}>Filters</ThemedText>
+      </TouchableOpacity>
+
+      {/* Filter Options Modal */}
+      <Modal
+        visible={showFilterOptions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFilterOptions(false)}
+      >
+        <TouchableOpacity
+          style={styles.exportOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFilterOptions(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.exportOptions, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
+          >
+            <ThemedText style={[styles.exportOptionTitle, { color: themeColors['muted-foreground'] }]}>Filters</ThemedText>
+            <TouchableOpacity
+              style={[styles.exportOption, styles.filterSelectAllOption, { borderBottomColor: themeColors.border }]}
+              onPress={handleToggleSelectAllColumns}
+            >
+              <Ionicons
+                name={visibleColumns.size === FILTER_COLUMNS.length ? 'checkbox' : 'square-outline'}
+                size={18}
+                color={themeColors.primary}
+              />
+              <ThemedText style={[styles.exportOptionText, { fontWeight: '600' }]}>Select All</ThemedText>
+            </TouchableOpacity>
+            {FILTER_COLUMNS.map((col) => (
+              <TouchableOpacity
+                key={col.key}
+                style={styles.exportOption}
+                onPress={() => handleColumnToggle(col.key)}
+              >
+                <Ionicons
+                  name={visibleColumns.has(col.key) ? 'checkbox' : 'square-outline'}
+                  size={18}
+                  color={themeColors.primary}
+                />
+                <ThemedText style={styles.exportOptionText}>{col.label}</ThemedText>
+              </TouchableOpacity>
+            ))}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Search Bar */}
       <View style={[styles.searchContainer, { backgroundColor: themeColors.card }]}>
@@ -304,7 +538,8 @@ export default function SubjectsScreen() {
           onChangeText={setSearchQuery}
         />
         {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityLabel="Close">
             <Ionicons name="close" size={20} color={themeColors['muted-foreground']} />
           </TouchableOpacity>
         ) : null}
@@ -350,9 +585,10 @@ export default function SubjectsScreen() {
           <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="title" style={styles.modalTitle}>
-                {editingSubject ? 'Edit Subject' : 'Add Subject'}
+                {editingSubject ? 'Edit Subject' : 'Add New Subject'}
               </ThemedText>
-              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+              <TouchableOpacity onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
               </TouchableOpacity>
             </View>
@@ -368,33 +604,12 @@ export default function SubjectsScreen() {
                   onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
                 />
 
-                <ThemedText style={styles.label}>Subject Code</ThemedText>
-                <TextInput
-                  style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border }]}
-                  placeholder="Enter subject code (optional)"
-                  placeholderTextColor={themeColors['muted-foreground']}
-                  value={formData.short_code}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, short_code: text }))}
-                />
-
-                <ThemedText style={styles.label}>Description</ThemedText>
-                <TextInput
-                  style={[styles.textarea, { color: themeColors['card-foreground'], borderColor: themeColors.border }]}
-                  placeholder="Enter subject description (optional)"
-                  placeholderTextColor={themeColors['muted-foreground']}
-                  value={formData.description}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
                 <View style={styles.labelRow}>
                   <ThemedText style={styles.label}>Category</ThemedText>
                   <TouchableOpacity
                     style={[styles.addButtonSmall, { backgroundColor: themeColors.primary }]}
                     onPress={() => setIsCategoryModalVisible(true)}
+              accessibilityLabel="Add"
                   >
                     <Ionicons name="add" size={16} color="white" />
                   </TouchableOpacity>
@@ -406,29 +621,21 @@ export default function SubjectsScreen() {
                     No subject categories found. Click + to create one.
                   </ThemedText>
                 )}
-                <View style={styles.pickerContainer}>
-                  {categoriesData?.map((category: SubjectCategory) => (
-                    <TouchableOpacity
-                      key={category.id}
-                      style={[
-                        styles.pickerOption,
-                        { borderColor: themeColors.border },
-                        formData.category_id === category.id && { borderColor: themeColors.primary, backgroundColor: themeColors.primary + '10' }
-                      ]}
-                      onPress={() => setFormData(prev => ({ ...prev, category_id: category.id }))}
-                    >
-                      <ThemedText style={[
-                        styles.pickerText,
-                        formData.category_id === category.id && { color: themeColors.primary, fontWeight: '600' }
-                      ]}>
-                        {category.name}
-                      </ThemedText>
-                      <ThemedText style={styles.pickerDescription}>
-                        {category.description}
-                      </ThemedText>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <CustomDropdown
+                  data={(categoriesData || []).map((category: SubjectCategory) => ({ label: category.name, value: category.id }))}
+                  value={formData.category_id}
+                  onChange={(v) => setFormData(prev => ({ ...prev, category_id: v?.toString() ?? '' }))}
+                  placeholder="Select Category"
+                />
+
+                <ThemedText style={styles.label}>Short Code</ThemedText>
+                <TextInput
+                  style={[styles.input, { color: themeColors['card-foreground'], borderColor: themeColors.border }]}
+                  placeholder="Enter short code (optional)"
+                  placeholderTextColor={themeColors['muted-foreground']}
+                  value={formData.short_code}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, short_code: text }))}
+                />
               </View>
 
 
@@ -460,7 +667,7 @@ export default function SubjectsScreen() {
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
                 <ThemedText style={styles.submitButtonText}>
-                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingSubject ? 'Update' : 'Create')}
+                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (editingSubject ? 'Update' : 'Add Subject')}
                 </ThemedText>
               </TouchableOpacity>
             </View>
@@ -481,7 +688,8 @@ export default function SubjectsScreen() {
               <ThemedText type="title" style={styles.modalTitle}>
                 Create Subject Category
               </ThemedText>
-              <TouchableOpacity onPress={() => setIsCategoryModalVisible(false)}>
+              <TouchableOpacity onPress={() => setIsCategoryModalVisible(false)}
+              accessibilityLabel="Close">
                 <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
               </TouchableOpacity>
             </View>
@@ -537,9 +745,17 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   header: {
+    marginBottom: 16,
+  },
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  headerActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
   },
   backButton: {
     marginRight: 16,
@@ -547,17 +763,91 @@ const styles = StyleSheet.create({
   headerContent: {
     flex: 1,
   },
+  headerTitle: {
+    fontSize: 22,
+    lineHeight: 28,
+  },
   subtitle: {
     fontSize: 14,
     opacity: 0.7,
     marginTop: 4,
   },
   addButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+    height: 40,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+  },
+  addButtonText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+  },
+  exportButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  exportOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  exportOptions: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  exportOptionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  exportOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  filterSelectAllOption: {
+    borderBottomWidth: 1,
+    marginBottom: 4,
+  },
+  exportOptionText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  filtersLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  filtersLabelText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -594,8 +884,22 @@ const styles = StyleSheet.create({
   subjectInfo: {
     flex: 1,
   },
-  subjectName: {
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'nowrap',
+    gap: 6,
     marginBottom: 8,
+  },
+  serialNo: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 24,
+    flexShrink: 0,
+  },
+  subjectName: {
+    lineHeight: 24,
+    flexShrink: 1,
   },
   statusBadge: {
     paddingHorizontal: 8,
