@@ -144,7 +144,7 @@ POST /reports/<group>/export returns the report as csv, xlsx (openpyxl) or pdf (
 
 Staff summary and per-staff detail reports with export.
 - Roles: staff_reports:read and :export.
-- Parity: No web page. Mobile staff-reports sends start_date/end_date/limit instead of date_from/date_to/page_size and reads data.items, so filters are ignored.
+- Parity: No web page. Mobile app/reports/staff-reports.tsx shows the staff attendance report and stats for Today / 7 / 30 / 90 days.
 - Flows: [reports-dashboards/fetch-report](#reports-dashboardsfetch-report)
 - Implemented by: `endpoint:GET /reports/staff/details/{staff_id}`, `endpoint:GET /reports/staff/summary`, `endpoint:POST /reports/staff/export`, `mobile:app/reports/staff-reports.tsx`, `mobile:src/api/staff.ts`, `service:app/service/reports/staff_report_service.py`
 - Shaped by: [reports-dashboards/per-group-report-permissions](#reports-dashboardsper-group-report-permissions), [reports-dashboards/tenant-schema-via-tenant-service](#reports-dashboardstenant-schema-via-tenant-service)
@@ -229,7 +229,7 @@ Implements: `feature:reports-dashboards/attendance-reports`, `feature:reports-da
 3. It returns a ReportResponse {data:[...], total_count, page, page_size, total_pages}; page_size is capped at 1000 (default 100).
 4. Stats endpoints such as `endpoint:GET /reports/fees/collection-summary/stats` return a group-specific summary object.
 
-- Note: Web `web:src/api/staff/attendance.ts` sends the correct names; mobile `mobile:src/api/staff.ts` sends start_date/end_date/limit and ignores the data key.
+- Note: Web `web:src/api/staff/attendance.ts` and mobile `mobile:src/api/staff.ts` both send date_from/date_to/page_size and read rows from the data key.
 
 ```mermaid
 flowchart TD

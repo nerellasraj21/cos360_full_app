@@ -496,26 +496,50 @@ export const staffPerformanceApi = {
   },
 };
 
+export interface StaffAttendanceReportRow {
+  sl_no: number;
+  staff_id: string;
+  staff_name: string;
+  designation: string | null;
+  department: string | null;
+  date: string | null;
+  attendance_status: string;
+  remarks: string | null;
+}
+
+export interface StaffAttendanceStats {
+  summary_stats: {
+    total_staff: number;
+    present_count: number;
+    absent_count: number;
+    late_count: number;
+    half_day_count: number;
+    excused_count: number;
+    attendance_percentage: number;
+    date_range: string | null;
+  };
+}
+
 // Staff Attendance Reports API
 export const staffAttendanceReportsApi = {
   // GET /reports/attendance/staff
   getAttendanceReport: async (params?: {
-    start_date?: string;
-    end_date?: string;
+    date_from?: string;
+    date_to?: string;
     staff_id?: string;
-    skip?: number;
-    limit?: number;
-  }): Promise<any[]> => {
+    page?: number;
+    page_size?: number;
+  }): Promise<StaffAttendanceReportRow[]> => {
     const response = await apiClient.get('/reports/attendance/staff', { params });
-    return response.data.items || response.data;
+    return response.data?.data ?? [];
   },
 
   // GET /reports/attendance/staff/stats
   getAttendanceStats: async (params?: {
-    start_date?: string;
-    end_date?: string;
+    date_from?: string;
+    date_to?: string;
     staff_id?: string;
-  }): Promise<any> => {
+  }): Promise<StaffAttendanceStats> => {
     const response = await apiClient.get('/reports/attendance/staff/stats', { params });
     return response.data;
   },

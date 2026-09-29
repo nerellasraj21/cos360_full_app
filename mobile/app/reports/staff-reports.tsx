@@ -30,7 +30,7 @@ function getDateRange(days: number) {
   const start = new Date();
   if (days > 0) start.setDate(start.getDate() - days);
   const fmt = (d: Date) => d.toISOString().split('T')[0];
-  return { start_date: fmt(start), end_date: fmt(end) };
+  return { date_from: fmt(start), date_to: fmt(end) };
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
@@ -38,7 +38,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   absent:   { bg: '#fee2e2', text: '#991b1b' },
   late:     { bg: '#fef3c7', text: '#92400e' },
   leave:    { bg: '#dbeafe', text: '#1e40af' },
-  'half-day': { bg: '#ede9fe', text: '#5b21b6' },
+  half_day: { bg: '#ede9fe', text: '#5b21b6' },
 };
 
 function StaffReportsScreenContent() {
@@ -48,25 +48,26 @@ function StaffReportsScreenContent() {
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
-  const { start_date, end_date } = getDateRange(rangeDays);
+  const { date_from, date_to } = getDateRange(rangeDays);
 
   const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['staff-attendance-stats', start_date, end_date],
-    queryFn: () => staffAttendanceReportsApi.getAttendanceStats({ start_date, end_date }),
+    queryKey: ['staff-attendance-stats', date_from, date_to],
+    queryFn: () => staffAttendanceReportsApi.getAttendanceStats({ date_from, date_to }),
   });
 
   const { data: records = [], isLoading: recordsLoading } = useQuery({
-    queryKey: ['staff-attendance-report', start_date, end_date],
-    queryFn: () => staffAttendanceReportsApi.getAttendanceReport({ start_date, end_date, limit: 100 }),
+    queryKey: ['staff-attendance-report', date_from, date_to],
+    queryFn: () => staffAttendanceReportsApi.getAttendanceReport({ date_from, date_to, page_size: 100 }),
   });
 
   const isLoading = statsLoading || recordsLoading;
+  const summary = stats?.summary_stats;
 
   const handleExport = () =>
     exportToCsv(
       'staff_attendance_report.csv',
       ['#', 'Staff Name', 'Date', 'Status', 'Designation'],
-      (records as any[]).map((r, i) => [i + 1, r.staff_name ?? r.name, r.date, r.status, r.designation]),
+      records.map((r, i) => [i + 1, r.staff_name, r.date ?? '', r.attendance_status, r.designation ?? '']),
     );
 
   return (
@@ -114,21 +115,21 @@ function StaffReportsScreenContent() {
           keyExtractor={(_, i) => String(i)}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
-            stats ? (
+            summary ? (
               <View>
                 {/* Stats Row */}
                 <View style={styles.statsRow}>
                   <View style={[styles.statCard, { backgroundColor: '#d1fae5' }]}>
-                    <Text style={[styles.statValue, { color: '#065f46' }]}>{stats.present_count ?? stats.total_present ?? '—'}</Text>
+                    <Text style={[styles.statValue, { color: '#065f46' }]}>{summary.present_count}</Text>
                     <Text style={[styles.statLabel, { color: '#065f46' }]}>Present</Text>
                   </View>
                   <View style={[styles.statCard, { backgroundColor: '#fee2e2' }]}>
-                    <Text style={[styles.statValue, { color: '#991b1b' }]}>{stats.absent_count ?? stats.total_absent ?? '—'}</Text>
+                    <Text style={[styles.statValue, { color: '#991b1b' }]}>{summary.absent_count}</Text>
                     <Text style={[styles.statLabel, { color: '#991b1b' }]}>Absent</Text>
                   </View>
                   <View style={[styles.statCard, { backgroundColor: '#ede9fe' }]}>
                     <Text style={[styles.statValue, { color: '#5b21b6' }]}>
-                      {stats.attendance_rate != null ? `${stats.attendance_rate.toFixed(1)}%` : '\u2014'}
+                      {`${summary.attendance_percentage.toFixed(1)}%`}
                     </Text>
                     <Text style={[styles.statLabel, { color: '#5b21b6' }]}>Rate</Text>
                   </View>
@@ -143,18 +144,17 @@ function StaffReportsScreenContent() {
               <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>No records for this period</Text>
             </View>
           }
-          renderItem={({ item }) => {
-            const rec = item as any;
-            const statusColor = STATUS_COLORS[rec.status] || STATUS_COLORS.present;
+          renderItem={({ item: rec }) => {
+            const statusColor = STATUS_COLORS[rec.attendance_status] || STATUS_COLORS.present;
             return (
               <View style={[styles.rowCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
                 <View style={styles.rowHeader}>
                   <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>
-                    {rec.staff_name || rec.name || 'Staff'}
+                    {rec.staff_name || 'Staff'}
                   </Text>
                   <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
                     <Text style={[styles.statusText, { color: statusColor.text }]}>
-                      {(rec.status || '').replace(/-/g, ' ')}
+                      {(rec.attendance_status || '').replace(/[-_]/g, ' ')}
                     </Text>
                   </View>
                 </View>
