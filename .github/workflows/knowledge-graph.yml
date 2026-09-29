@@ -1,0 +1,25 @@
+name: Knowledge Graph
+
+on:
+  push:
+    paths:
+      - "docs/graph/**"
+      - "scripts/graph/**"
+  pull_request:
+    paths:
+      - "docs/graph/**"
+      - "scripts/graph/**"
+
+jobs:
+  lint:
+    name: Lint graph and check rendered views
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Lint
+        run: python scripts/graph/kg_lint.py
+      - name: Views up to date
+        run: python scripts/graph/kg_render.py --check

@@ -12,7 +12,10 @@
       "Bash(git status *)",
       "Bash(git diff *)",
       "Bash(git log *)",
-      "Bash(ls *)"
+      "Bash(ls *)",
+      "mcp__knowledge-graph__search_nodes",
+      "mcp__knowledge-graph__open_nodes",
+      "mcp__knowledge-graph__read_graph"
     ]
   }
 }
