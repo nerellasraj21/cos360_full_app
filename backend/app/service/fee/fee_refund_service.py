@@ -5,12 +5,18 @@ import secrets
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, desc, select
+from sqlalchemy import and_, desc, func, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.fee.fee_refund_model import FeeRefund
 from app.models.fee.fee_transaction_model import FeeTransaction
-from app.schemas.fee import FeeRefundApproval, FeeRefundCreate, FeeRefundProcessing, FeeRefundRead
+from app.schemas.fee import (
+    FeeRefundApproval,
+    FeeRefundCreate,
+    FeeRefundProcessing,
+    FeeRefundRead,
+    FeeRefundStatistics,
+)
 
 log = log.getLogger("fee.refund_service")
 
@@ -255,6 +261,65 @@ class FeeRefundService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="An error occurred while retrieving approved refunds",
+            )
+
+    @staticmethod
+    async def get_refund_statistics(
+        db: AsyncSession,
+        academic_year_id: UUID | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+    ) -> FeeRefundStatistics:
+        """Refund counts by status, processed amount, counts by reason and monthly totals"""
+        try:
+            conditions = []
+            if academic_year_id:
+                conditions.append(FeeRefund.academic_year_id == academic_year_id)
+            if date_from:
+                conditions.append(FeeRefund.requested_date >= date_from)
+            if date_to:
+                conditions.append(FeeRefund.requested_date <= date_to)
+            where = and_(*conditions) if conditions else true()
+
+            by_status = await db.execute(
+                select(FeeRefund.status, func.count(), func.coalesce(func.sum(FeeRefund.refund_amount), 0))
+                .where(where)
+                .group_by(FeeRefund.status)
+            )
+            counts, amounts = {}, {}
+            for refund_status, count, amount in by_status.all():
+                counts[refund_status] = count
+                amounts[refund_status] = amount
+
+            by_reason = await db.execute(
+                select(FeeRefund.refund_reason, func.count()).where(where).group_by(FeeRefund.refund_reason)
+            )
+
+            month = func.to_char(FeeRefund.requested_date, "YYYY-MM")
+            by_month = await db.execute(
+                select(month, func.count(), func.coalesce(func.sum(FeeRefund.refund_amount), 0))
+                .where(where, FeeRefund.status != "rejected")
+                .group_by(month)
+                .order_by(month)
+            )
+
+            return FeeRefundStatistics(
+                total_refund_amount=float(amounts.get("processed", 0)),
+                total_pending_refunds=counts.get("pending", 0),
+                total_approved_refunds=counts.get("approved", 0),
+                total_processed_refunds=counts.get("processed", 0),
+                total_rejected_refunds=counts.get("rejected", 0),
+                refunds_by_reason=dict(by_reason.all()),
+                monthly_refunds=[
+                    {"month": m, "count": count, "amount": float(amount)} for m, count, amount in by_month.all()
+                ],
+            )
+
+        except Exception as e:
+            log.error(f"Error computing refund statistics: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An error occurred while computing refund statistics",
             )
 
     @staticmethod

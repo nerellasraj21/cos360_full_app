@@ -162,11 +162,13 @@ export const fetchRefundByTransactionId = async (
 // Get refund statistics
 export const fetchRefundStatistics = async (
   academicYearId?: string,
-  dateRange?: { start_date?: string; end_date?: string }
+  dateRange?: { date_from?: string; date_to?: string }
 ): Promise<{
   total_refund_amount: number;
   total_pending_refunds: number;
+  total_approved_refunds: number;
   total_processed_refunds: number;
+  total_rejected_refunds: number;
   refunds_by_reason: Record<string, number>;
   monthly_refunds: Array<{ month: string; amount: number; count: number }>;
 }> => {
@@ -174,8 +176,8 @@ export const fetchRefundStatistics = async (
     const params: any = {};
     if (academicYearId) params.academic_year_id = academicYearId;
     if (dateRange) {
-      if (dateRange.start_date) params.start_date = dateRange.start_date;
-      if (dateRange.end_date) params.end_date = dateRange.end_date;
+      if (dateRange.date_from) params.date_from = dateRange.date_from;
+      if (dateRange.date_to) params.date_to = dateRange.date_to;
     }
 
     const { data } = await CAxios.get(`${FEE_REFUNDS}statistics`, { params });

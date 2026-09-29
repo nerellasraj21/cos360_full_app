@@ -813,7 +813,7 @@ function FeeRefundsContent() {
                 <XCircle className="h-5 w-5 text-red-600" />
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Rejected Refunds</p>
-                  <p className="text-2xl font-bold">{refunds.filter(r => r.status === 'rejected').length}</p>
+                  <p className="text-2xl font-bold">{refundStats.total_rejected_refunds}</p>
                 </div>
               </div>
             </CardContent>

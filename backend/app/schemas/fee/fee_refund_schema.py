@@ -91,3 +91,19 @@ class FeeRefundProcessing(BaseModel):
     refund_reference: str | None = None
     processing_remarks: str | None = None
     processed_by_user_id: UUID
+
+
+class FeeRefundMonthly(BaseModel):
+    month: str
+    amount: float
+    count: int
+
+
+class FeeRefundStatistics(BaseModel):
+    total_refund_amount: float
+    total_pending_refunds: int
+    total_approved_refunds: int
+    total_processed_refunds: int
+    total_rejected_refunds: int
+    refunds_by_reason: dict[str, int]
+    monthly_refunds: list[FeeRefundMonthly]

@@ -14,6 +14,7 @@ from .fee_refund_schema import (
     FeeRefundCreate,
     FeeRefundProcessing,
     FeeRefundRead,
+    FeeRefundStatistics,
     FeeRefundSummary,
     FeeRefundUpdate,
 )
@@ -50,6 +51,7 @@ __all__ = [
     "ReceiptContent",
     "FeeRefundCreate",
     "FeeRefundUpdate",
+    "FeeRefundStatistics",
     "FeeRefundRead",
     "FeeRefundSummary",
     "FeeRefundApproval",

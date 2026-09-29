@@ -108,7 +108,7 @@ Endpoint prefixes:
   - Refund approve leaves out `approved_by_user_id`.
   - Refund process sends `reference_number` and no `refund_method`.
   - `app/fees/collection.tsx` calls my-summary, child-summary and summary without `academic_year_id`, which is a required query parameter. The `X-Academic-Year-ID` header does not satisfy it.
-- **Both clients call refund endpoints that don't exist**: `PUT`/`DELETE /fee/refunds/{id}` and `POST /{id}/cancel`. Web also calls `GET /statistics` and `/by-transaction/{id}`.
+- **Both clients call refund endpoints that don't exist**: `PUT`/`DELETE /fee/refunds/{id}` and `POST /{id}/cancel`. Web also calls `/by-transaction/{id}`.
 - `web/src/api/fee/mappings.ts` points at a `/fee/mappings/` API that doesn't exist. Use `classMappings.ts` or `studentMappings.ts`.
 
 ## Known gaps

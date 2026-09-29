@@ -10,6 +10,7 @@ from app.schemas.fee import (
     FeeRefundCreate,
     FeeRefundProcessing,
     FeeRefundRead,
+    FeeRefundStatistics,
     RefundReason,
     RefundStatus,
 )
@@ -51,6 +52,31 @@ async def create_refund_request(
     refund_data.requested_by_user_id = UUID(current_user.get("sub"))
 
     return await FeeRefundService.create_refund_request(db, refund_data)
+
+
+@router.get("/statistics", response_model=FeeRefundStatistics)
+async def get_refund_statistics(
+    request: Request,
+    db: AsyncSession = Depends(get_tenant_db),
+    academic_year_id: UUID | None = Query(None, description="Filter by academic year"),
+    date_from: datetime | None = Query(None, description="Filter from requested date"),
+    date_to: datetime | None = Query(None, description="Filter to requested date"),
+):
+    """
+    Refund statistics for the refunds dashboard
+
+    **Required permissions**: fee_refunds:list
+    """
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    await check_role_plan_permission_with_error(db, request, role, "fee_refunds", "list")
+
+    validate_date_range(date_from, date_to)
+
+    return await FeeRefundService.get_refund_statistics(
+        db=db, academic_year_id=academic_year_id, date_from=date_from, date_to=date_to
+    )
 
 
 @router.get("/{refund_id}", response_model=FeeRefundRead)

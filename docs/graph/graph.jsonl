@@ -321,6 +321,7 @@
 {"type": "entity", "name": "decision:fee/receipt-hash-over-rendered-content", "entityType": "Decision", "observations": ["Decision: The receipt integrity hash is SHA-256 over the rendered ReceiptContent (number, student name, class-section, year, collector, items), and verify re-renders from live data.", "Why: Not a deliberate choice. The hash should cover a stored snapshot of the receipt, so later renames or promotions do not invalidate old receipts.", "Tradeoff: Legitimate changes (student rename, promotion, receipt renumber) make is_valid=false.", "Status: unintended"]}
 {"type": "entity", "name": "decision:fee/receipt-number-max-plus-one", "entityType": "Decision", "observations": ["Decision: Receipt numbers are REC-YYMM-NNNN, computed as current max plus one per tenant per month and protected by a unique constraint, not a sequence or lock.", "Why: Not a deliberate choice. Receipt numbers should come from a sequence or a lock so concurrent payments cannot collide.", "Tradeoff: Concurrent payments can collide and return 500.", "Status: unintended"]}
 {"type": "entity", "name": "decision:fee/receipt-pdf-on-demand", "entityType": "Decision", "observations": ["Decision: Receipt PDFs are regenerated from data on every download rather than stored; pdf_file_path is unused.", "Why: No files to manage per tenant.", "Tradeoff: The PDF prints placeholder school name and address; it does not read school settings."]}
+{"type": "entity", "name": "decision:fee/refund-total-counts-processed", "entityType": "Decision", "observations": ["Decision: The refund dashboard's Total Refund Amount sums only refunds with status processed; pending, approved and rejected refunds are counted but not added to the amount.", "Why: The card should show money actually paid back, matching how the financial reports count only money that moved.", "Alternatives: Summing every requested refund, which would include rejected and not-yet-paid amounts.", "Status: active", "Since: 2026-09"]}
 {"type": "entity", "name": "decision:fee/sms-optional-per-payment", "entityType": "Decision", "observations": ["Decision: The parent SMS is chosen per payment (send_sms, default on) and is sent last; an SMS failure never rolls back the payment.", "Why: The parent may be present at the counter, or the SMS quota may be limited."]}
 {"type": "entity", "name": "decision:fee/update-term-dates-in-place", "entityType": "Decision", "observations": ["Decision: update_fee_term_with_dates zips existing fee_term_dates rows with the new dates and updates them in place instead of delete and re-insert.", "Why: term_date_id is an FK from both term-amount tables and from fee_transaction_items; deleting and re-inserting would break those links or orphan payments.", "Tradeoff: Reducing the count still deletes rows (fails if referenced), and changing number_of_terms does not rebuild existing student term amounts."]}
 {"type": "entity", "name": "decision:masters/castes-per-tenant-locations-shared", "entityType": "Decision", "observations": ["Decision: Castes and sub-castes live in each tenant schema; states, districts and mandals live once in the public schema.", "Why: Schools can customise caste and sub-caste lists, while states, districts and mandals are the same for everyone."]}
@@ -666,6 +667,7 @@
 {"type": "entity", "name": "endpoint:GET /fee/receipts/{receipt_id}/verify", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:GET /fee/refunds/approved/processing", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:GET /fee/refunds/pending/approval", "entityType": "Endpoint", "observations": []}
+{"type": "entity", "name": "endpoint:GET /fee/refunds/statistics", "entityType": "Endpoint", "observations": ["Purpose: Refund dashboard numbers: counts by status, processed amount, counts by reason, monthly totals; filters academic_year_id, date_from, date_to on requested_date; permission fee_refunds:list."]}
 {"type": "entity", "name": "endpoint:GET /fee/refunds/transaction/{transaction_id}/summary", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:GET /fee/transactions", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:GET /fee/transactions/my-children-fees", "entityType": "Endpoint", "observations": []}
@@ -2269,6 +2271,8 @@
 {"type": "relation", "from": "decision:fee/receipt-pdf-on-demand", "to": "endpoint:GET /fee/collection/receipts/{receipt_id}/pdf", "relationType": "shapes"}
 {"type": "relation", "from": "decision:fee/receipt-pdf-on-demand", "to": "feature:fee/receipts", "relationType": "shapes"}
 {"type": "relation", "from": "decision:fee/receipt-pdf-on-demand", "to": "flow:fee/receipt-lifecycle", "relationType": "shapes"}
+{"type": "relation", "from": "decision:fee/refund-total-counts-processed", "to": "endpoint:GET /fee/refunds/statistics", "relationType": "shapes"}
+{"type": "relation", "from": "decision:fee/refund-total-counts-processed", "to": "feature:fee/refunds", "relationType": "shapes"}
 {"type": "relation", "from": "decision:fee/sms-optional-per-payment", "to": "feature:fee/collect-payment", "relationType": "shapes"}
 {"type": "relation", "from": "decision:fee/sms-optional-per-payment", "to": "flow:fee/collect-payment", "relationType": "shapes"}
 {"type": "relation", "from": "decision:fee/sms-optional-per-payment", "to": "service:app/service/fee/fee_collection_service.py", "relationType": "shapes"}
@@ -2666,6 +2670,7 @@
 {"type": "relation", "from": "endpoint:GET /fee/receipts/{receipt_id}/verify", "to": "service:app/service/fee/fee_receipt_service.py", "relationType": "handled_by"}
 {"type": "relation", "from": "endpoint:GET /fee/refunds/approved/processing", "to": "service:app/service/fee/fee_refund_service.py", "relationType": "handled_by"}
 {"type": "relation", "from": "endpoint:GET /fee/refunds/pending/approval", "to": "service:app/service/fee/fee_refund_service.py", "relationType": "handled_by"}
+{"type": "relation", "from": "endpoint:GET /fee/refunds/statistics", "to": "service:app/service/fee/fee_refund_service.py", "relationType": "handled_by"}
 {"type": "relation", "from": "endpoint:GET /fee/refunds/transaction/{transaction_id}/summary", "to": "service:app/service/fee/fee_refund_service.py", "relationType": "handled_by"}
 {"type": "relation", "from": "endpoint:GET /fee/transactions", "to": "service:app/service/fee/fee_transaction_service.py", "relationType": "handled_by"}
 {"type": "relation", "from": "endpoint:GET /fee/transactions/my-children-fees", "to": "service:app/service/fee/fee_transaction_service.py", "relationType": "handled_by"}
@@ -3583,6 +3588,7 @@
 {"type": "relation", "from": "feature:fee/receipts", "to": "module:fee", "relationType": "part_of"}
 {"type": "relation", "from": "feature:fee/refunds", "to": "endpoint:GET /fee/refunds/approved/processing", "relationType": "implemented_by"}
 {"type": "relation", "from": "feature:fee/refunds", "to": "endpoint:GET /fee/refunds/pending/approval", "relationType": "implemented_by"}
+{"type": "relation", "from": "feature:fee/refunds", "to": "endpoint:GET /fee/refunds/statistics", "relationType": "implemented_by"}
 {"type": "relation", "from": "feature:fee/refunds", "to": "endpoint:POST /fee/refunds", "relationType": "implemented_by"}
 {"type": "relation", "from": "feature:fee/refunds", "to": "endpoint:POST /fee/refunds/approve", "relationType": "implemented_by"}
 {"type": "relation", "from": "feature:fee/refunds", "to": "endpoint:POST /fee/refunds/process", "relationType": "implemented_by"}
@@ -5766,4 +5772,5 @@
 {"type": "relation", "from": "web:src/pages/exam/SubjectGradeSchemes.tsx", "to": "endpoint:GET /grade-schemes/subject", "relationType": "calls"}
 {"type": "relation", "from": "web:src/pages/exam/SubjectGradeSchemes.tsx", "to": "endpoint:POST /grade-schemes/subject", "relationType": "calls"}
 {"type": "relation", "from": "web:src/pages/exam/SubjectGradeSchemes.tsx", "to": "endpoint:PUT /grade-schemes/subject/{scheme_id}", "relationType": "calls"}
+{"type": "relation", "from": "web:src/pages/fee/FeeRefunds.tsx", "to": "endpoint:GET /fee/refunds/statistics", "relationType": "calls"}
 {"type": "relation", "from": "web:src/pages/masters/AddClassAndSectionsModal.tsx", "to": "endpoint:POST /masters/class_sections", "relationType": "calls"}

@@ -79,11 +79,13 @@ graph LR
   n34[/"receipt-pdf-on-demand"/]
   n34 -.->|shapes| n11
   n34 -.->|shapes| n20
-  n35[/"sms-optional-per-payment"/]
-  n35 -.->|shapes| n2
-  n35 -.->|shapes| n17
-  n36[/"update-term-dates-in-place"/]
-  n36 -.->|shapes| n8
+  n35[/"refund-total-counts-processed"/]
+  n35 -.->|shapes| n12
+  n36[/"sms-optional-per-payment"/]
+  n36 -.->|shapes| n2
+  n36 -.->|shapes| n17
+  n37[/"update-term-dates-in-place"/]
+  n37 -.->|shapes| n8
 ```
 
 ## Features
@@ -190,7 +192,8 @@ Refund requests against completed transactions with an approval flow: pending ->
 - Roles: fee_refunds permission with extra actions approve and process.
 - Parity: Both clients. Mobile approve omits approved_by_user_id and process sends reference_number without refund_method (422). Both call PUT/DELETE /fee/refunds/{id} and POST /{id}/cancel, which do not exist.
 - Flows: [fee/refund](#feerefund)
-- Implemented by: `endpoint:GET /fee/refunds/approved/processing`, `endpoint:GET /fee/refunds/pending/approval`, `endpoint:POST /fee/refunds`, `endpoint:POST /fee/refunds/approve`, `endpoint:POST /fee/refunds/process`, `mobile:app/fees/refunds.tsx`, `service:app/service/fee/fee_refund_service.py`, `table:fee_refunds`, `web:src/pages/fee/FeeRefunds.tsx`
+- Implemented by: `endpoint:GET /fee/refunds/approved/processing`, `endpoint:GET /fee/refunds/pending/approval`, `endpoint:GET /fee/refunds/statistics`, `endpoint:POST /fee/refunds`, `endpoint:POST /fee/refunds/approve`, `endpoint:POST /fee/refunds/process`, `mobile:app/fees/refunds.tsx`, `service:app/service/fee/fee_refund_service.py`, `table:fee_refunds`, `web:src/pages/fee/FeeRefunds.tsx`
+- Shaped by: [fee/refund-total-counts-processed](#feerefund-total-counts-processed)
 
 ### fee/student-fee-mapping
 
@@ -581,6 +584,14 @@ Shaped by: [fee/mandatory-fees-applied-by-backend](#feemandatory-fees-applied-by
 - **Why**: No files to manage per tenant.
 - **Tradeoff**: The PDF prints placeholder school name and address; it does not read school settings.
 - Shapes: `endpoint:GET /fee/collection/receipts/{receipt_id}/pdf`, `feature:fee/receipts`, `flow:fee/receipt-lifecycle`
+
+### fee/refund-total-counts-processed (active)
+
+- **Decision**: The refund dashboard's Total Refund Amount sums only refunds with status processed; pending, approved and rejected refunds are counted but not added to the amount.
+- **Why**: The card should show money actually paid back, matching how the financial reports count only money that moved.
+- **Alternatives**: Summing every requested refund, which would include rejected and not-yet-paid amounts.
+- **Since**: 2026-09
+- Shapes: `endpoint:GET /fee/refunds/statistics`, `feature:fee/refunds`
 
 ### fee/sms-optional-per-payment
 
