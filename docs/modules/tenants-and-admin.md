@@ -112,7 +112,7 @@ How requests resolve to a tenant schema is in [../architecture.md](../architectu
     | Status | Endpoints |
     |---|---|
     | Intended | `/auth/academic-years`, `/auth/login`, `/auth/refresh`, `/auth/staff/set-password`, `/super_admin/auth/login`, `/health*` |
-    | **Not intended; dangerous** | `/auth/test-jwt/*` (mints signed Admin/Teacher/Student/Staff/Parent **and super-admin** tokens), `/auth/test-setup/create-test-users` (upserts known-password users in the request tenant), `/super_admin/setup/initialize` (creates a super admin with a hardcoded password and returns it), `/auth/seed/{all-role-permissions,permission-data,verify-permission-data,location-data}`, `/auth/fix-permissions/*` |
+    | **Not intended; dangerous** | `/auth/test-setup/create-test-users` (upserts known-password users in the request tenant), `/super_admin/setup/initialize` (creates a super admin with a hardcoded password and returns it), `/auth/seed/{all-role-permissions,permission-data,verify-permission-data,location-data}`, `/auth/fix-permissions/*` |
 
 17. **DDL takes raw names.** `POST /super_admin/system/tenants/` interpolates the `schema_name` query parameter straight into `CREATE SCHEMA` and `CREATE TABLE` f-strings. Validate names before reusing this code.
 

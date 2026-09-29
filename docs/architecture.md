@@ -67,7 +67,7 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 ## 3. Auth at the architecture level
 
 - Tokens are HS256 JWTs signed with `JWT_SECRET_KEY` (`backend/app/tools/jwt_utils.py`). Access tokens last **24 h** and refresh tokens **7 d**. Both lifetimes are hard-coded; `ACCESS_TOKEN_EXPIRE_MINUTES` in config is unused. The claim `token_type` is `access` / `refresh` / `change_password`.
-- **Tenant user token claims:** `sub` (user UUID), `username`, `role` (role **name**), `client_name`, `academic_year_id`, `academic_year_title`, `exp`, `token_type`. The token does NOT contain permissions, `schema_name` or `user_type`. Test tokens from `/auth/test-jwt/*` use different claims, so don't rely on them.
+- **Tenant user token claims:** `sub` (user UUID), `username`, `role` (role **name**), `client_name`, `academic_year_id`, `academic_year_title`, `exp`, `token_type`. The token does NOT contain permissions, `schema_name` or `user_type`.
 - **Super admin token:** `user_type: "super_admin"` plus `sub`, `username` and `permissions` (a list of strings). Issued by `POST /super_admin/auth/login` from `public.super_admin_users`, which locks the account for 30 min after 5 failures.
 - **Login:** `POST /auth/login` `{username, password, academic_year_id (required), client_name?}`.
   - `username` may be a username, an email, or a staff phone number, tried in that order.
@@ -134,7 +134,6 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 - **Processes:** prod runs `uvicorn --workers 4` (`backend/start.sh`). The tenant lookup cache, in-memory rate limits and the blacklist-table init flag are **per process**. The tenant cache is never invalidated, so deactivating a tenant takes effect only after a restart. It only caches hits, so newly added tenants show up immediately.
 - **Model before migration:** a model column that doesn't exist in a tenant's DB table breaks every query on that model with a 500. Apply the migration or script to every schema **before** adding the column to the model.
 - **Unauthenticated dev routers are mounted in every environment:**
-  - `/auth/test-jwt/*`, which mints Admin and **super-admin** tokens
   - `/auth/test-setup/*`
   - `/auth/seed/*`
   - `/auth/fix-permissions/*`

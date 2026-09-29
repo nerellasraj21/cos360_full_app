@@ -153,7 +153,6 @@ Other facts:
   - `/admin/role-mgmt/debug-roles/` has no permission check and prints the request headers, including `Authorization`, to stdout.
 - **No tenant binding.** The backend never compares the JWT's `client_name` with the request tenant, and the role is taken by name from the token.
 - **Unauthenticated privileged endpoints mounted in every environment:**
-  - `GET /api/v1/auth/test-jwt/{admin,teacher,staff,student,parent,super-admin}-token` mints valid tokens, **including super-admin**, signed with the real secret.
   - `POST /auth/seed/all-role-permissions` and `/auth/seed/permission-data`, `/auth/test-setup/create-test-users`, `/auth/fix-permissions/*`, `POST /super_admin/setup/initialize`.
 
   Gate these behind `ENVIRONMENT` or remove them.

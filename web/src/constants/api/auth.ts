@@ -24,7 +24,3 @@ export const AUTH_RESOURCE_PERMISSIONS_DROPDOWN_ACTIONS = `${AUTH_RESOURCE_PERMI
 
 // Roles
 export const AUTH_ROLES = `${AUTH_BASE}/roles/`;
-
-// Test endpoints (development only)
-export const AUTH_TEST_ADMIN_TOKEN = `${AUTH_BASE}/test-jwt/admin-token`;
-export const AUTH_TEST_STUDENT_TOKEN = `${AUTH_BASE}/test-jwt/student-token`;

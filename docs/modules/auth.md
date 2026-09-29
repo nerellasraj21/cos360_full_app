@@ -58,7 +58,7 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 
 ## Rules & gotchas
 
-1. **Use `current_user["sub"]` for the user id.** Real tokens have no `id` claim. The `/auth/test-jwt/*` tokens use fixed fake UUIDs.
+1. **Use `current_user["sub"]` for the user id.** Real tokens have no `id` claim.
 2. **Menus, permissions and role are a login-time snapshot.** Role or permission edits, menu seeding and role reassignment all need a **logout + login**. A refresh does not help because it copies the old `role` claim. Server-side checks use the role name from the JWT, so a demoted user keeps old rights for up to 7 days by refreshing.
 3. **`is_first_login` is not in the SQLAlchemy `User` model.** It is read and written only with raw SQL inside try/except. If a tenant schema lacks the column, the first-login check silently passes and the user logs in normally. No Alembic revision creates the column (it was added by hand), so it exists only in schemas cloned from one that has it. Admin password reset does **not** set it.
 4. **The refresh path is `/auth/refresh`.**

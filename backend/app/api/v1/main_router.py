@@ -10,7 +10,6 @@ from app.api.v1.auth.permissions_endpoints import router as permissions_router
 from app.api.v1.auth.resource_permission_endpoints import router as resource_permission_router
 from app.api.v1.auth.role_endpoints import router as role_router
 from app.api.v1.auth.seed_endpoints import router as seed_router
-from app.api.v1.auth.test_jwt_endpoints import router as test_jwt_router
 from app.api.v1.auth.test_setup_endpoints import router as test_setup_router
 from app.api.v1.exam.audit_endpoints import router as exam_audit_router
 from app.api.v1.exam.board_pattern_endpoints import router as board_pattern_router
@@ -147,7 +146,6 @@ router.include_router(fee_concession_router)
 router.include_router(fee_old_router)
 router.include_router(seed_router)
 router.include_router(test_setup_router)
-router.include_router(test_jwt_router)
 router.include_router(fix_permissions_router)
 router.include_router(super_admin_auth_router)
 router.include_router(super_admin_setup_router)
