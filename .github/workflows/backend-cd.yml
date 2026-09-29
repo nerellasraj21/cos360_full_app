@@ -1,8 +1,15 @@
-name: CD — Integration & Production Build
+name: Backend CD — Integration & Production Build
 
 on:
   push:
     branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-cd.yml"
+
+defaults:
+  run:
+    working-directory: backend
 
 jobs:
   # ─── Job 1: Integration Tests (Neon live DB) ─────────────────────────────────
@@ -23,7 +30,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}-${{ hashFiles('requirements-dev.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}-${{ hashFiles('backend/requirements-dev.txt') }}
           restore-keys: ${{ runner.os }}-pip-
 
       - name: Install dependencies
@@ -51,7 +58,7 @@ jobs:
         if: always()
         with:
           name: integration-coverage
-          path: coverage.xml
+          path: backend/coverage.xml
 
   # ─── Job 2: Production Docker Build Validation ───────────────────────────────
   production-build:
@@ -69,7 +76,7 @@ jobs:
       - name: Build production Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: backend
           push: false
           tags: cos360-api:${{ github.sha }}
           cache-from: type=gha

@@ -1,0 +1,22 @@
+# Each app also has its own .gitignore (backend/, web/, mobile/).
+
+# Secrets — only .env.example files are tracked
+.env
+.env.*
+!.env.example
+
+# Claude Code personal settings
+.claude/settings.local.json
+**/.claude/settings.local.json
+
+# Dependencies and build output
+node_modules/
+.venv/
+venv/
+__pycache__/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
