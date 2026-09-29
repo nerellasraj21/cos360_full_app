@@ -51,6 +51,15 @@ _Last verified against code: 2026-09-29_
   needs the real navigation hooks must `jest.unmock` it.
 - `mobile/scripts/test-*-api.mjs` are manual API smoke scripts, not Jest tests.
 
+## Local smoke test (backend + web)
+
+- Start both servers from `.claude/launch.json` (`backend`, `web`). The backend config sets `TENANT_DEFAULT_NAME=test_tenant`, overriding `backend/.env`, so every request uses `test_tenant_schema` instead of the live school. The middleware ignores the `cschema` value (see `docs/architecture.md`), so this override is what keeps tests off production data.
+- Confirm the tenant before writing anything: `GET /api/v1/auth/academic-years` must return `test_tenant_schema`'s academic years, not `little_bunny`'s.
+- Log in with the test-tenant admin from `.claude/commands/test-api.md` and keep the current academic year selected; admin login activates the chosen year for the whole tenant.
+- The backend logs errors to `backend/cos360_errors.log`, not the console. Read that file for tracebacks of 500s.
+- Backend changes need a server restart (the launch config has no `--reload`); web changes hot-reload.
+- Verify writes you must make inside a DB transaction that is rolled back, or delete what you created, so `test_tenant` data stays stable.
+
 ## Manual regression (before any web or mobile release)
 
 Seed a test tenant with at least one active academic year, and one user per role: Admin, Staff, Teacher, Student

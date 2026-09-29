@@ -112,6 +112,7 @@ Endpoint prefixes:
 - `web/src/api/fee/mappings.ts` points at a `/fee/mappings/` API that doesn't exist. Use `classMappings.ts` or `studentMappings.ts`.
 
 ## Known gaps
+- `FeeRefundService.search_refunds` has a parameter named `status` that shadows `fastapi.status`, so its `except` block raises `AttributeError` instead of a 500 if the search fails.
 - The pending-fees report (`fee_report_service.get_pending_fees`) still has two problems:
   - It filters by `fee_term_id`, which every instalment shares.
   - It ignores concessions, and `due_date` is a placeholder (now + 30 days).
