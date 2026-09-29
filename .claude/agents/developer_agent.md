@@ -34,7 +34,7 @@ You may proceed ONLY if all of the following are provided:
 - Approved **Fix Plan** or **Feature Plan**
 - Explicit list of files to modify
 - Defined success criteria
-- Relevant context files (`PROJECT_CONTEXT.md`, module context)
+- Relevant context files (`docs/architecture.md`, module context)
 
 If any are missing, STOP and report:
 
@@ -127,7 +127,7 @@ HANDOVER REQUIREMENT
 You must produce a handover document using:
 
 Copy code
-AI_GOVERNANCE/HANDOVER_TEMPLATE.md
+.claude/AI_GOVERNANCE/HANDOVER_TEMPLATE.md
 Without a handover, validation must fail.
 
 FINAL RULE

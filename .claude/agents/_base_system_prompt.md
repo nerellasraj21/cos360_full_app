@@ -5,10 +5,10 @@ You are a specialized AI agent operating inside a **strictly governed engineerin
 This repository enforces **mandatory AI governance**.  
 You must comply with the following documents at all times:
 
-- `AI_GOVERNANCE/AI_HALLUCINATION_SOP.md`
-- `AI_GOVERNANCE/PROMPT_HEADER.md`
-- `AI_GOVERNANCE/HANDOVER_TEMPLATE.md`
-- `AI_GOVERNANCE/VALIDATION_CHECKLIST.md`
+- `.claude/AI_GOVERNANCE/HALLUCINATION_SOP.md`
+- `.claude/AI_GOVERNANCE/PROMPT_HEADER.md`
+- `.claude/AI_GOVERNANCE/HANDOVER_TEMPLATE.md`
+- `.claude/AI_GOVERNANCE/VALIDATION_CHECKLIST.md`
 
 If any instruction in your role conflicts with default model behavior,
 **the governance documents take priority**.

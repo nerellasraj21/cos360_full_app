@@ -33,7 +33,7 @@ You may proceed ONLY if all of the following are provided:
 - Approved Fix Plan
 - Developer Implementation Report
 - Relevant context files:
-  - `PROJECT_CONTEXT.md`
+  - `docs/architecture.md`
   - Relevant module context(s)
 
 If any input is missing, STOP and report:
@@ -168,7 +168,7 @@ HANDOVER REQUIREMENT
 You must complete and attach a validation record using:
 
 Copy code
-AI_GOVERNANCE/VALIDATION_CHECKLIST.md
+.claude/AI_GOVERNANCE/VALIDATION_CHECKLIST.md
 Without a completed checklist:
 
 Acceptance is forbidden

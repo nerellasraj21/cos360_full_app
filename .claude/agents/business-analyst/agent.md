@@ -75,41 +75,39 @@ If implementation is required, STOP and hand off.
 **Read pre-analyzed context documents before exploring code.**
 
 ```
-backend/context/
-├── PROJECT_CONTEXT.md      <- Read FIRST (project overview)
-└── modules/
-    ├── authentication.md   <- Auth features
-    ├── admin.md            <- Admin/user management features
-    ├── fee_management.md   <- Fee-related features
-    ├── expense_management.md
-    ├── masters.md          <- Masters data (classes, subjects, transport, etc.)
-    ├── student_management.md
-    ├── reports.md
-    ├── profile.md
-    ├── public_system.md
-    └── super_admin.md
+docs/
+├── README.md          ← index
+├── architecture.md    ← Read FIRST (tenancy, auth, request flow)
+├── permissions.md     ← access control end to end
+├── modules/<module>.md  ← auth, tenants-and-admin, students, staff, certificates, masters,
+│                          timetable-calendar, fee, transport, expense, exam, communication, reports-dashboards
+└── operations/        ← deploy, migrations, mobile release, testing
 ```
 
 **Steps:**
 
-1. Read `backend/context/PROJECT_CONTEXT.md` (architecture overview)
+1. Read `docs/architecture.md` (architecture overview)
 2. Identify target module for the new feature
-3. Read the relevant `backend/context/modules/<module>.md`
+3. Read the relevant `docs/modules/<module>.md`
 4. THEN proceed to pattern analysis
 
 **Module Mapping:**
 
-| Feature Domain                              | Read Module Context     |
-| ------------------------------------------- | ----------------------- |
-| Login, tokens, permissions                  | `authentication.md`     |
-| Users, roles, tenants                       | `admin.md`              |
-| Fee types, collections, receipts            | `fee_management.md`     |
-| Expense types, tracking                     | `expense_management.md` |
-| Classes, subjects, transport, academic data | `masters.md`            |
-| Student records, admissions, attendance     | `student_management.md` |
-| Report generation, exports                  | `reports.md`            |
-| User profile, settings                      | `profile.md`            |
-| SuperAdmin operations                       | `super_admin.md`        |
+| Feature domain / URL path | Read |
+| --- | --- |
+| `/auth/` (login, tokens, passwords), `/profile/` | `docs/modules/auth.md` |
+| `/admin/`, `/super_admin/`, `/public/`, roles, menus, tenants | `docs/modules/tenants-and-admin.md` + `docs/permissions.md` |
+| `/students/`, `/parents/`, attendance, documents | `docs/modules/students.md` |
+| `/staff/`, designations | `docs/modules/staff.md` |
+| `/certificates/`, issuable certificates | `docs/modules/certificates.md` |
+| `/masters/` (years, classes, sections, subjects, settings) | `docs/modules/masters.md` |
+| timetable, holidays | `docs/modules/timetable-calendar.md` |
+| `/fee/` | `docs/modules/fee.md` |
+| transport (routes, stops, trips, pricing) | `docs/modules/transport.md` |
+| `/expense/` | `docs/modules/expense.md` |
+| `/exams/` | `docs/modules/exam.md` |
+| `/communication/`, `/announcements/` | `docs/modules/communication.md` |
+| `/reports/`, dashboards | `docs/modules/reports-dashboards.md` |
 
 ---
 
@@ -302,7 +300,7 @@ High / Medium / Low
 
 ## HANDOVER REQUIREMENT
 
-You must produce a handover using: `AI_GOVERNANCE/HANDOVER_TEMPLATE.md`
+You must produce a handover using: `.claude/AI_GOVERNANCE/HANDOVER_TEMPLATE.md`
 
 Without a handover, Developer Agent must refuse to proceed.
 

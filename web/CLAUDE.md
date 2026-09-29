@@ -1,906 +1,180 @@
-# COS360 Frontend - Claude Code Instructions
+# COS360 Web — Coding Conventions
 
-This document provides comprehensive instructions for Claude Code when working with the COS360 Frontend codebase.
+React 19 + TypeScript 5.8 + Vite 6, TanStack Router v1 (file routes) + TanStack Query v5, Zustand 5, Tailwind 4 + shadcn/ui (Radix), react-hook-form + Zod, axios, sonner, lucide-react.
+Cross-app contract (base URL, `cschema`, auth, types): root `CLAUDE.md`. System design: `docs/architecture.md`. Module business rules: `docs/modules/<module>.md`. Permissions model: `docs/permissions.md`.
 
-## Project Overview
+## Code quality rule — MANDATORY (set by the user)
 
-**COS360** is a multi-tenant school management system frontend built with React 19, TypeScript, Vite, and TanStack Router. It handles students, staff, fees, expenses, transport, and more across different organizations with role-based access control.
+Before writing ANY new code:
+1. Read every similar existing implementation first (e.g. before a new transport page, read `pages/transport/routes.tsx` and `pricing.tsx` in full).
+2. Read the exact TypeScript types in `src/types/` for every field you use.
+3. Verify every import exists — check real file paths, never assume.
+4. Check hook signatures in the existing hook file — never guess parameter names.
+5. Copy the structure of a working screen; don't invent new patterns.
+6. Dry-run the data flow: API → hook → component render.
 
-**Key Technologies:**
+The user tests everything. If it crashes or doesn't work, it's on us for not verifying first.
 
-- React 19.1.0 + TypeScript 5.8.3
-- TanStack Router v1 (file-based routing)
-- TanStack React Query v5 (server state)
-- Zustand 5 (client state)
-- Tailwind CSS 4 + shadcn/ui + Radix UI
-- Axios for API calls
-- React Hook Form + Zod for forms
+## Commands (run from `web/`)
 
-## Architecture Principles
+`npm install` · `npm run dev` · `npm run build:check` (tsc -b + vite build — the real type check) · `npm run lint` · `npx shadcn@latest add <component>`.
+There is no `test` script and no web CI. Vitest is installed; the only tests are under `src/components/dropdown-system/**/__tests__` (`npx vitest run`).
+Use npm (`package-lock.json`); don't use yarn.
 
-### 1. Multi-Tenant Architecture
+## Folder layout (`src/`)
 
-- Tenant is extracted from subdomain or defaults to `test_tenant`
-- API client adds `cschema` header for tenant identification
-- All API requests are tenant-scoped
+| Path | What goes there |
+|---|---|
+| `api/index.ts` | `CAxios` — the only HTTP client. Import `CAxios from '@/api'` (or `'@/api/index'`). |
+| `api/<module>/*.ts`, `api/<module>.ts` | Plain API functions (no React). |
+| `api/hooks/<module>/` **and** `hooks/<module>/` | React Query hooks. Both folders are live: masters/staff/students/exam/communication/fee receipts+transactions live in `api/hooks/`; fee, expense, dropdown and some staff/masters hooks live in `hooks/`. Grep both before adding; add next to the module's existing hooks. |
+| `hooks/` (root files) | `usePermission`, `usePermissionProtectedQuery/Mutation`, `useFormGuard`, `useStudentContext`. |
+| `routes/` | TanStack file routes — thin wrappers that render a page from `pages/`. |
+| `pages/<module>/` | Page components. `pages/masters/common/MasterPage.tsx` is the generic CRUD page. |
+| `components/ui/` | shadcn primitives + app primitives (`PageHeader`, `StatusBadge`, `FilterBar`, `DatePicker`, `TimePicker`, custom `select`, `dialog`). |
+| `components/common/` | `TableActions`, `ConfirmDialog`, `PermissionGuard` (simple), `table.tsx` (MasterPage table). |
+| `components/dropdown-system/` | Pre-built entity dropdowns (`ClassesDropdown`, `SectionsByClassDropdown`, `SubjectsDropdown`, `AcademicYearsDropdown`, `FeeTypesDropdown`, `TransportRoutesDropdown`, `VehiclesDropdown`, ...). |
+| `lib/` | Zustand stores, `config.ts`, `routeLabels.ts`, `menuUtils.ts`, `roleUtils.ts`, role permission matrices, `useSelectStyles.ts`. |
+| `constants/` | `permissions.ts` (`PERMISSIONS`), `dropdown/endpoints.ts`, `api/`. |
+| `types/` | Mirrors of backend Pydantic schemas. |
 
-### 2. State Management Strategy
+Gotchas:
+- `@/api/expense`, `@/api/staff`, `@/api/parent` resolve to the **flat file** (`api/expense.ts` etc.), not the folder's `index.ts`. Import folder files explicitly (`@/api/staff/attendance`). `expenseApi` from `@/api/expense` is a flat `ExpenseService`: call `expenseApi.getCategories()`, not `expenseApi.categories.x()`.
+- `src/lib/apiClient.ts` and `src/lib/expenseApiClient.ts` are unused legacy clients (the former hardcodes a misspelled tenant header). Never import them.
+- `src/api/staff/index.ts` `staffAttendanceApi` calls `/masters/staff/attendance`, which the backend does not have. Use `src/api/staff/attendance.ts` (`/staff/attendance`).
 
-- **Server State**: TanStack React Query for ALL API data
-- **Global Client State**: Zustand stores in `src/lib/*Store.ts`
-  - `authStore`: Authentication, user, permissions, student selection
-  - `academicYearStore`: Current academic year
-  - `themeStore`: Dark/light theme
-  - `expenseStore`: Expense module state
-- **Form State**: React Hook Form with Zod validation
-- **Component State**: React useState/useReducer for UI-only state
+## API layer
 
-### 3. API Integration Pattern
+`CAxios` (`src/api/index.ts`) adds on every request: `Authorization: Bearer`, `cschema` (tenant from subdomain via `getTenantFromHostname`, else `VITE_DEFAULT_TENANT`), and for parents `X-Student-ID` / `X-Academic-Year-ID` / `X-Class-ID` from `authStore.selectedStudent`. On 401 it tries one refresh, then logs out to `/login`. It rewrites `error.message` from FastAPI `detail` (string, array of `{msg}`, or object), so `onError` can show `error.message` directly.
 
-```
-Component → React Query Hook → API Helper → CAxios → Backend
-           ↓
-    Cache Management (auto-invalidation)
-           ↓
-    Toast Notifications
-```
+Rules:
+- Components never call `CAxios` directly — always through a React Query hook.
+- Don't copy server data into `useState`; read it from the query.
+- Env: `VITE_API_BASE_URL` (includes `/api/v1`), `VITE_DEFAULT_TENANT`, `VITE_TENANT_HEADER`, `VITE_LOG_LEVEL` — see `.env.example`, read via `src/lib/config.ts`.
+- Backend `Decimal` fields (amounts, salaries) arrive as **strings**: `Number(val)` for display/math, and before `form.reset()` (`z.number()` rejects strings).
+- Some list endpoints return a plain array, others `{ items, total, ... }`. Check the backend response model; don't assume.
+- Drop empty optional fields before POST/PATCH instead of sending `""`/`undefined`.
 
-### 4. File Organization
+### Query hooks
 
-```
-src/
-├── api/
-│   ├── hooks/           # React Query hooks by feature
-│   │   ├── staff/
-│   │   ├── students/
-│   │   └── fee/
-│   ├── staff/           # API endpoint functions
-│   ├── students/
-│   └── index.ts         # CAxios client
-├── components/
-│   ├── ui/              # shadcn/ui primitives
-│   ├── common/          # Shared components
-│   ├── dropdown-system/ # Advanced dropdown infrastructure
-│   ├── [feature]/       # Feature-specific components
-│   └── layouts/
-├── lib/                 # Utilities, stores, config
-├── routes/              # TanStack Router file-based routes
-├── types/               # TypeScript definitions
-└── main.tsx             # Entry point
-```
+One key factory per resource, exported from the hook file:
 
-## Critical Coding Guidelines
-
-### 1. API & Data Fetching
-
-#### Always Use React Query Hooks
-
-```typescript
-// ✅ CORRECT - Use React Query hook
-const { data, isLoading } = useStaffAttendance(date);
-
-// ❌ WRONG - Don't call API directly in components
-const data = await CAxios.get("/staff/attendance");
+```ts
+export const vehiclesKeys = {
+  all: ['vehicles'] as const,
+  lists: () => [...vehiclesKeys.all, 'list'] as const,
+  list: (activeOnly?: boolean) => [...vehiclesKeys.lists(), { activeOnly }] as const,
+  dropdown: (activeOnly?: boolean) => [...vehiclesKeys.all, 'dropdown', { activeOnly }] as const,
+  details: () => [...vehiclesKeys.all, 'detail'] as const,
+  detail: (id: string) => [...vehiclesKeys.details(), id] as const,
+};   // src/api/hooks/masters/vehicles.ts
 ```
 
-#### Hook Structure Pattern
+- Mutations invalidate in `onSuccess` and toast via `sonner`: `toast.success(...)` / `toast.error(error.message)`. Don't add a second `onError` toast at the call site.
+- Invalidate every key the change affects. Dropdown keys (e.g. `vehiclesKeys.dropdown`) are **not** under `lists()`; invalidate `keys.all` if dropdowns show the entity.
+- The global `QueryClient` (`src/main.tsx`) uses `staleTime` 5 min, `refetchOnMount: false`, `refetchOnWindowFocus: false`, `retry: 1`. **Missing invalidation = stale UI until reload.**
+- Permission-gated queries (`enabled: hasPermission`) can get stuck: Zustand `persist` rehydrates after the first render, so the query registers as disabled and `refetchOnMount: false` stops it from firing when it flips to enabled. Add `refetchOnMount: true` to such list hooks (see `src/hooks/expense/index.ts`).
+- `enabled: !!id` for detail queries.
 
-```typescript
-// src/api/hooks/staff/attendance.ts
-export const useStaffAttendance = (date: string) => {
-  return useQuery({
-    queryKey: staffKeys.attendanceByDate(date),
-    queryFn: () => staffApi.getStaffAttendanceByDate(date),
-    enabled: !!date,
-  });
-};
+## State
 
-export const useCreateStaffAttendance = () => {
-  const queryClient = useQueryClient();
+Server state = React Query only. Zustand stores in `src/lib/`:
+- `authStore` (persisted as `auth-storage`): `user`, `role`, `permissionsMap`, `menuItems`, tokens, `entityId`, `academicYearId/Title`, `selectedStudent`/`availableStudents`, `hasPermission(resource, action)`, `login/logout/refreshTokens/selectStudent`.
+- `academicYearStore`, `themeStore` (persisted as `theme-storage`, toggles `dark` on `<html>`), `examStore`, `expenseStore`.
+- `academicYearStore` persists only `selectedAcademicYearId` (`academic-year-storage`). A page that reads `academicYears` must call `fetchAndSetAcademicYears()` when the list is empty.
+Don't create parallel auth state. For a parent's children use `useParentChildren(entityId)` (`src/api/auth.ts`), not `availableStudents` from the store (timing issues).
 
-  return useMutation({
-    mutationFn: (data: CreateRequest) => staffApi.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: staffKeys.attendance() });
-      toast.success("Created successfully");
-    },
-    onError: (error) => {
-      toast.error(error.message || "Failed to create");
-    },
-  });
-};
+## Forms
+
+- New forms: react-hook-form + `zodResolver`. Don't use Zod `.default()` in form schemas — it splits input/output types and breaks `useForm<T>`; set defaults in `useForm({ defaultValues })`.
+- Multi-step wizards: don't wrap in `<form>` (Enter/autofill triggers implicit submit). Use a `<div>` with a `type="button"` submit + `onClick` (see `components/students/MultiStepAdmissionForm.tsx`).
+- Disable submit while `mutation.isPending`.
+
+## Routing
+
+- File routes under `src/routes/`; `@tanstack/router-plugin` (vite) regenerates `src/routeTree.gen.ts` on `dev`/`build`. Never hand-edit it; commit it when routes change.
+- Layouts: `__root.tsx`, `_auth.tsx` (login, set-password, forgot-password), `_app.tsx` (auth guard in `beforeLoad`, sidebar, navbar, breadcrumb).
+- Route files stay thin: `createFileRoute('/_app/x/y')({ component: Page })`, page in `src/pages/`.
+- Role/permission redirects go in `beforeLoad` using `useAuthStore.getState()` (e.g. `routes/_app/exam/settings.tsx` with `isAdminRoleName`).
+- Layout routes with children render `<Outlet />`, with the list page in `index.tsx` (e.g. `fee/collection.tsx` + `fee/collection/index.tsx`).
+- Breadcrumb labels come from `src/lib/routeLabels.ts` — add new segments there. Pages don't render an extra `<h1>` that repeats the breadcrumb.
+- Sidebar (`components/ui/sidebar.tsx`) derives top-level module URLs from the menu name (`MODULE_ROUTE_MAP`) and compares URLs with `normalizeUrl` (lowercase, no `-_ `). Backend menu IDs can repeat, so use composite React keys (`${id}-${index}`).
+- lucide's `Route` icon clashes with TanStack's `Route` export: import it as `Route as RouteIcon`.
+- Sidebar and hub icons come from `getIconForMenuItem(name)` in `sidebar.tsx`: an exact menu-name key, else `Folder`. Add a key when a seed adds a new menu name.
+
+## UI standards
+
+- Page header: `PageHeader` (`title`, `subtitle`, `icon`, `actions`). Status pills: `StatusBadge status={...}` (accepts a boolean for active/inactive and ~25 status strings). Filters: wrap controls in `FilterBar`.
+- Loading: `Loader2` from lucide with `animate-spin` plus text ("Loading staff..."). Handle loading, error and empty states.
+- Icons: `Edit` (never `Edit2`/`Pencil`), `Trash2`, `Eye`, `Plus`, `Download`.
+- Toasts: `sonner` only. **No `window.confirm/alert`** — use `ConfirmDialog` (`components/common/ConfirmDialog.tsx`, `isPending`, `pendingLabel`; `isDestructive` defaults to `true`, so pass `false` for non-destructive confirms such as Enable).
+- Module overview pages (`GradingDashboard.tsx`, `pages/expense/index.tsx`, fee `FeeNavigation.tsx`): `PageHeader` + live stat cards + nav cards styled `bg-chart-N/10 border-chart-N/20 hover:bg-chart-N/20`. Copy one.
+- Card-based pages without a `PageHeader`: page title is `<CardTitle className="text-2xl font-bold">` on its own line at the top of `CardHeader`, controls below it; secondary labels (e.g. month/year) are a plain `<span>`, never a second `CardTitle`.
+- Colours: use theme tokens (`text-foreground`, `text-muted-foreground`, `bg-muted`, `border-border`, `bg-card`), not `text-gray-*`, so dark mode works. Faint icons: `text-muted-foreground` or `opacity-75`, never `opacity-50` (invisible on dark).
+
+### Tables
+
+- Row actions: `EditButton`, `DeleteButton`, `ViewButton`, `DownloadButton`, `ActivateButton`, `DeactivateButton` inside `TableActionGroup` (`components/common/TableActions.tsx`). Inline equivalent: `<Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit">`; delete adds `text-destructive hover:text-destructive/80`. No `variant="outline"` on row actions.
+- Every data table has: an `S.No.` first column (`className="w-12"`, pagination-aware `idx + 1 + page * pageSize`), sortable headers with `ChevronUp/ChevronDown/ChevronsUpDown`, a filter bar with search above, and `style={{ height: '48px' }}` rows. Expandable rows: include S.No. in `colSpan`.
+- Simple master CRUD: use `MasterPage` (`pages/masters/common/MasterPage.tsx`) with `columns`, `formFields`, hooks and `permissions: { resource: 'SUBJECTS', create, update, ... }` — `resource` there is a **`PERMISSIONS` key (UPPERCASE)**, mapped internally to the backend resource.
+  - Button/dialog text defaults to `Add ${title.slice(0, -1)}` (drops the last char to singularise), so any title that isn't a simple plural ("Route Management") needs `addButtonLabel`. For multi-selects or cascading fields, pass your own dialog as `addModal` (rendered in place of the built-in one, still behind the create guard) or use `renderCustomField`.
+
+### Dialogs (`components/ui/dialog.tsx` — customised, not stock shadcn)
+
+- `DialogContent` already has a sticky X, `max-h-[85vh]`, an inner scroll area and padding. Only pass width (`max-w-*`) and optionally a smaller `max-h`. **Don't add `overflow-*` or `flex flex-col`.**
+- A `<DialogFooter>` that is a **direct child** of `DialogContent` is pinned below the scroll area. Use `customLayout` when the dialog manages its own header/scroll/footer.
+- Outside-click close is off by default (`allowOutsideClose`); Escape is on. `showCloseButton={false}` hides the X; for full-page forms/panels use `components/ui/CloseButton.tsx`.
+- Dirty-form guard: `<Dialog guardDirty={isDirty} onDirtyDiscard={reset}>` shows "Discard changes?" on close. Set dirty in `onChange`/`onValueChange`, reset dirty to `false` when opening and **before** closing after a successful save. Cancel = `<DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>`.
+
+### react-select inside a Dialog
+
+Portaled menus are blocked by the modal overlay unless you do all of these:
+
+```tsx
+const selectStyles = useSelectStyles();   // src/lib/useSelectStyles.ts
+<Dialog open={open} onOpenChange={setOpen} modal={false}>
+  ...
+  <Select menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+          styles={selectStyles} menuPlacement="auto" ... />
 ```
 
-#### Query Key Namespacing
+`useSelectStyles()` supplies `zIndex: 9999`, `pointerEvents: 'auto'` on `menuPortal` and `menu`, and dark-mode colours. Without `modal={false}` the menu shows but can't be clicked. Reference: `components/fee/mappings/ClassMappingTable.tsx`.
 
-```typescript
-// src/hooks/staff/useStaff.ts
-export const staffKeys = {
-  all: ["staff"] as const,
-  attendance: () => [...staffKeys.all, "attendance"] as const,
-  attendanceList: () => [...staffKeys.attendance(), "list"] as const,
-  attendanceDetail: (id: number) => [...staffKeys.attendance(), id] as const,
-  attendanceByDate: (date: string) =>
-    [...staffKeys.attendance(), "date", date] as const,
-};
-```
+### Custom `Select` (`components/ui/select.tsx`)
 
-#### Dual API Paths Warning
+This is **not** Radix. It reads `SelectItem`s from `SelectContent`'s direct children:
+- `value=""` is silently dropped. For "All"/"None" use a sentinel (`"__all__"`, `"__none__"`) and map it back to `null`/`undefined` in `onValueChange`.
+- Don't wrap items in a fragment. Arrays from `.map()` are fine. Mixed text/expression labels work.
+- Its menu is `absolute` (no portal), so it gets clipped inside overflow containers (dialog scroll area, table cells, `overflow-x-auto`). Use a native `<select>` there (see `pages/exam/BoardPatternSetup.tsx`, `components/exam/SubjectConfigAccordion.tsx`).
 
-Some features have BOTH legacy and new API paths:
+### Dropdown system
 
-- **Staff Attendance**: `/staff/attendance` (new) vs `/masters/staff/attendance` (legacy)
-- Check existing code before adding new endpoints
-- Prefer new paths when adding features
+- `value` accepts `string | number | undefined`, never `null` (`val ?? undefined`). The clear prop is `clearable` (not `isClearable`).
+- `SectionsByClassDropdown` takes `classId` and uses `useSectionsByClassId`. `DROPDOWN_ENDPOINTS.SECTIONS_BY_CLASS` is unused and broken; don't use it.
 
-### 2. Authentication & Permissions
+### Date and time
 
-#### Check Permissions
+- Use `DatePicker` (`value`/`onChange` as `YYYY-MM-DD`, `min`/`max`) and `TimePicker` (`HH:MM` 24h) from `components/ui/`. Their icons use `dark:text-white text-gray-400`. Don't add raw `<input type="date">` without `color-scheme` handling.
 
-```typescript
-// In components
-import { useAuthStore } from '@/lib/authStore';
+## Permissions in the UI
 
-const hasEditPermission = useAuthStore(s => s.hasPermission('students', 'update'));
+Summary only (model: `docs/permissions.md`). The UI hides what the backend would reject; the backend is the source of truth.
+- `useAuthStore(s => s.hasPermission)` / `usePermission().checkPermission(resource, action)` with **lowercase backend resource names** (`'fee_types'`, `'list'`).
+- `<PermissionGuard resource="students" action="create">` (`components/PermissionGuard.tsx`, also `permissions={[[r,a],...]}` + `requireAll`, `resourceConstant="STUDENTS"`, `disabled`). `components/common/PermissionGuard` is the simple variant.
+- `usePermissionProtectedMutation` throws `Permission denied` before calling the API. Hide or disable the control using its `hasPermission` rather than relying on the error.
+- View-only users still get the page: gate each button on its action, render inputs `readOnly` when neither `create` nor `update` is granted, and drop the Actions column when no row action is allowed (e.g. `components/fee/terms/FeeTermsList.tsx`).
+- Teacher and staff roles are capped by frontend allowlists in `src/lib/teacherPermissionMatrix.ts` and `staffPermissionMatrix.ts`, applied inside `hasPermission`. Mobile has identical copies, so change both. Don't special-case roles in pages.
+- Module dashboards render cards from `authStore.menuItems` (backend-seeded menu). New permissions or menu entries need a re-login to show up.
 
-// With PermissionGuard component
-<PermissionGuard resource="students" action="create">
-  <Button>Add Student</Button>
-</PermissionGuard>
-```
+## TypeScript gotchas
 
-#### Student Context for Parents
+- Mutable refs in React 19: `useRef<string | undefined>(undefined)`, not `useRef<string>()`.
+- `onClick={() => fn(arg)}`: don't pass a handler whose params aren't a MouseEvent.
+- Generic `T extends Record<string, unknown>`: cast to `Record<string, unknown>` to assign props, then back to `T`.
+- `{str && <X/>}` renders `""` when `str` is empty. Use `{!!str && <X/>}`.
+- Avoid `any` in new code; mirror backend field names exactly.
+- `tsconfig.app.json` is `strict`, but `noUnusedLocals` is off, so lint catches unused code.
 
-Parents can switch between their children's student contexts:
+## Logging
 
-```typescript
-const selectedStudent = useAuthStore((s) => s.selectedStudent);
-const availableStudents = useAuthStore((s) => s.availableStudents);
-
-// API automatically adds these headers:
-// X-Student-ID, X-Academic-Year-ID, X-Class-ID
-```
-
-#### Never Store Sensitive Data
-
-- Tokens are managed by `authStore` with persistence
-- Don't create duplicate auth state
-- Don't store passwords or raw credentials
-
-### 3. Routing with TanStack Router
-
-#### File-Based Routes
-
-```
-routes/
-├── __root.tsx           # Root layout
-├── _auth.tsx            # Auth layout (login, etc.)
-├── _app.tsx             # App layout (requires auth)
-├── _app/
-│   ├── dashboard.tsx
-│   ├── students/
-│   │   ├── admission.tsx
-│   │   └── attendance.tsx
-│   └── fee/
-│       └── transactions.tsx
-```
-
-#### Route File Pattern
-
-```typescript
-// src/routes/_app/students/admission.tsx
-import { createFileRoute } from '@tanstack/react-router';
-
-export const Route = createFileRoute('/_app/students/admission')({
-  component: AdmissionPage,
-  beforeLoad: ({ context }) => {
-    // Check permissions here if needed
-  },
-});
-
-function AdmissionPage() {
-  return <div>...</div>;
-}
-```
-
-#### Navigation
-
-```typescript
-import { useNavigate } from "@tanstack/react-router";
-
-const navigate = useNavigate();
-navigate({ to: "/students/admission" });
-```
-
-### 4. Forms & Validation
-
-#### React Hook Form + Zod Pattern
-
-```typescript
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-
-const schema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  email: z.string().email('Invalid email'),
-  is_active: z.boolean().default(true),
-});
-
-type FormData = z.infer<typeof schema>;
-
-function MyForm() {
-  const form = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: { is_active: true },
-  });
-
-  const createMutation = useCreateData();
-
-  const onSubmit = (data: FormData) => {
-    createMutation.mutate(data);
-  };
-
-  return (
-    <form onSubmit={form.handleSubmit(onSubmit)}>
-      <input {...form.register('name')} />
-      {form.formState.errors.name && <span>{form.formState.errors.name.message}</span>}
-      <button type="submit" disabled={createMutation.isPending}>
-        Submit
-      </button>
-    </form>
-  );
-}
-```
-
-### 5. UI Components & Styling
-
-#### Use shadcn/ui Components
-
-```typescript
-// Import from @/components/ui
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-```
-
-#### Loading States Standard
-
-```typescript
-// ✅ CORRECT - Use Loader2 from lucide-react
-import { Loader2 } from 'lucide-react';
-
-{isLoading ? (
-  <div className="flex justify-center items-center py-8">
-    <Loader2 className="h-8 w-8 animate-spin" />
-    <span className="ml-2">Loading data...</span>
-  </div>
-) : (
-  <div>{/* Content */}</div>
-)}
-```
-
-#### Active/Inactive Badge Pattern
-
-```typescript
-import { Badge } from '@/components/ui/badge';
-
-// In table columns
-render: (value: boolean) => (
-  <Badge variant={value ? "default" : "secondary"}>
-    {value ? 'Active' : 'Inactive'}
-  </Badge>
-)
-```
-
-#### Icon Standards (from UI_CONSISTENCY_IMPROVEMENT_PLAN.md)
-
-```typescript
-import { Edit, Trash2, Eye, Plus } from 'lucide-react';
-
-// ✅ Use Edit (NOT Edit2)
-<Button variant="ghost" size="sm">
-  <Edit className="h-4 w-4" />
-</Button>
-
-// ✅ Use Trash2 for delete
-<Button variant="ghost" size="sm">
-  <Trash2 className="h-4 w-4" />
-</Button>
-```
-
-#### Dark Mode Icon Visibility
-
-When using icons with reduced opacity, ensure dark mode visibility:
-
-```typescript
-// ❌ WRONG - opacity-50 is too faint in dark mode
-<CalendarIcon className="h-4 w-4 opacity-50" />
-
-// ✅ CORRECT - Use opacity-75 for better dark mode visibility
-<CalendarIcon className="h-4 w-4 opacity-75" />
-
-// ✅ ALSO CORRECT - Use semantic color classes (handles both modes automatically)
-<CalendarIcon className="h-4 w-4 text-muted-foreground" />
-```
-
-**Why:** In dark mode, foreground color is white. `opacity-50` on white = 50% gray = barely visible on dark background. Use `opacity-75` or `text-muted-foreground` for better contrast.
-
-**Applied To:**
-- `DatePicker.tsx` - Calendar icon (opacity-75)
-- `TimePicker.tsx` - Clock icon (opacity-75)
-
-#### Tailwind Utility Classes
-
-```typescript
-// Use Tailwind for all styling
-<div className="flex items-center justify-between gap-4 p-4 rounded-lg border bg-card">
-  <span className="text-sm font-medium">Label</span>
-</div>
-```
-
-### 6. Dropdown System
-
-The project has a sophisticated dropdown infrastructure in `src/components/dropdown-system/`:
-
-```typescript
-// Use pre-built dropdowns
-import { ClassesDropdown } from '@/components/dropdown-system/components/ClassesDropdown';
-import { SubjectsDropdown } from '@/components/dropdown-system/components/SubjectsDropdown';
-
-<ClassesDropdown
-  value={selectedClass}
-  onChange={setSelectedClass}
-  placeholder="Select Class"
-/>
-```
-
-Available dropdowns:
-
-- `AcademicYearsDropdown`
-- `ClassesDropdown`
-- `SectionsByClassDropdown`
-- `SubjectsDropdown`
-- `StudentsDropdown`
-- `TransportRoutesDropdown`
-- `VehiclesDropdown`
-- `FeeTypesDropdown`
-- `FeeTermsDropdown`
-
-### 7. Error Handling
-
-#### API Error Handling
-
-```typescript
-// In API helpers (src/api/staff/attendance.ts)
-const handleApiError = (error: unknown): never => {
-  if (axios.isAxiosError(error)) {
-    const message = error.response?.data?.detail || error.message;
-    throw new Error(message);
-  }
-  throw error;
-};
-
-export const getStaffAttendance = async (id: number) => {
-  try {
-    const response = await CAxios.get(`/staff/attendance/${id}`);
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-  }
-};
-```
-
-#### Component Error Handling
-
-```typescript
-// Let React Query handle errors
-const { data, error, isError } = useStaffAttendance(id);
-
-if (isError) {
-  return <div className="text-red-500">Error: {error.message}</div>;
-}
-```
-
-### 8. TypeScript Guidelines
-
-#### Define Types Properly
-
-```typescript
-// src/types/staff.ts
-export interface StaffAttendance {
-  id: number;
-  staff_id: number;
-  date: string;
-  status: "present" | "absent" | "late";
-  remarks?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface StaffAttendanceCreateRequest {
-  staff_id: number;
-  date: string;
-  status: "present" | "absent" | "late";
-  remarks?: string;
-}
-```
-
-#### Use Type Inference
-
-```typescript
-// ✅ Let TypeScript infer when obvious
-const [count, setCount] = useState(0);
-
-// ✅ Provide types when needed
-const [data, setData] = useState<StaffAttendance[]>([]);
-```
-
-#### Avoid `any`
-
-```typescript
-// ❌ WRONG
-const handleData = (data: any) => { ... };
-
-// ✅ CORRECT
-const handleData = (data: StaffAttendance) => { ... };
-
-// ✅ If truly dynamic, use unknown and type guard
-const handleData = (data: unknown) => {
-  if (isStaffAttendance(data)) { ... }
-};
-```
-
-## Common Patterns
-
-### 1. MasterPage Pattern
-
-For simple CRUD pages with inline editing:
-
-```typescript
-import { MasterPage } from '@/pages/masters/common/MasterPage';
-import { Badge } from '@/components/ui/badge';
-
-const columns = [
-  { key: 'id', label: 'ID', editable: false },
-  { key: 'name', label: 'Name', editable: true },
-  {
-    key: 'is_active',
-    label: 'Active',
-    editable: true,
-    render: (v: boolean) => (
-      <Badge variant={v ? "default" : "secondary"}>
-        {v ? 'Active' : 'Inactive'}
-      </Badge>
-    ),
-    renderEdit: (value: boolean, _row, onChange) => (
-      <input
-        type="checkbox"
-        checked={!!value}
-        onChange={(e) => onChange(e.target.checked)}
-        className="w-4 h-4"
-      />
-    )
-  },
-];
-
-export default function SubjectsPage() {
-  return (
-    <MasterPage
-      title="Subjects"
-      columns={columns}
-      useReadHook={useSubjects}
-      useCreateHook={useCreateSubject}
-      useUpdateHook={useUpdateSubject}
-      useDeleteHook={useDeleteSubject}
-      resource="subjects"
-    />
-  );
-}
-```
-
-### 2. Custom Table Component Pattern
-
-For complex tables with custom logic:
-
-```typescript
-import { Loader2, Edit, Trash2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-
-function StaffTable() {
-  const { data, isLoading } = useStaff();
-  const deleteMutation = useDeleteStaff();
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Loading staff...</span>
-      </div>
-    );
-  }
-
-  return (
-    <table className="w-full">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data?.map((staff) => (
-          <tr key={staff.id}>
-            <td>{staff.name}</td>
-            <td>
-              <Badge variant={staff.is_active ? "default" : "secondary"}>
-                {staff.is_active ? 'Active' : 'Inactive'}
-              </Badge>
-            </td>
-            <td>
-              <Button variant="ghost" size="sm">
-                <Edit className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => deleteMutation.mutate(staff.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-```
-
-### 3. Modal/Dialog Pattern
-
-```typescript
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-
-function EditDialog({ open, onOpenChange, itemId }: Props) {
-  const { data } = useItem(itemId);
-  const updateMutation = useUpdateItem();
-
-  const handleSubmit = (formData) => {
-    updateMutation.mutate(
-      { id: itemId, data: formData },
-      {
-        onSuccess: () => {
-          onOpenChange(false);
-          toast.success('Updated successfully');
-        },
-      }
-    );
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit Item</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          {/* Form fields */}
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-```
-
-### 4. React-Select in Dialog Pattern
-
-When using react-select dropdowns inside Dialog components, you must handle portaling correctly to avoid pointer event blocking:
-
-```typescript
-import Select from 'react-select';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-
-// CRITICAL: Dialog must have modal={false} when using portaled react-select menus
-<Dialog open={isOpen} onOpenChange={setIsOpen} modal={false}>
-  <DialogContent>
-    <Select
-      options={options}
-      value={selectedValue}
-      onChange={handleChange}
-      placeholder="Select option"
-      classNamePrefix="react-select"
-      menuPlacement="auto"
-      // Portal the menu to document.body to avoid clipping
-      menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-      // CRITICAL: Add pointer events to ensure clickability
-      styles={{
-        menuPortal: base => ({
-          ...base,
-          zIndex: 9999,
-          pointerEvents: 'auto'  // Essential for clickability
-        }),
-        menu: base => ({
-          ...base,
-          pointerEvents: 'auto'  // Essential for clickability
-        })
-      }}
-      // Keyboard accessibility props
-      menuShouldBlockScroll={false}
-      closeMenuOnScroll={false}
-      tabSelectsValue={false}
-      openMenuOnFocus={true}
-      blurInputOnSelect={true}
-    />
-  </DialogContent>
-</Dialog>
-```
-
-**Key Requirements:**
-
-1. **Dialog `modal={false}`** - Prevents overlay from blocking pointer events
-2. **`menuPortalTarget={document.body}`** - Renders menu outside dialog to avoid clipping
-3. **`pointerEvents: 'auto'`** - Ensures menu is clickable (both menuPortal and menu styles)
-4. **`zIndex: 9999`** - Places menu above dialog overlay
-5. **Keyboard accessibility props** - Ensures keyboard navigation (arrows, Enter, Escape) works properly
-
-**Common Mistakes:**
-
-- ❌ Forgetting `modal={false}` → dropdowns visible but unclickable
-- ❌ Missing `pointerEvents: 'auto'` → dropdowns may be blocked
-- ❌ Not using `menuPortalTarget` → dropdowns clipped by dialog overflow
-
-**Reference:** See `TRANSPORT_ROUTES_DROPDOWN_FIX.md` for detailed explanation
-
-## Important Conventions
-
-### 1. Naming Conventions
-
-- **Files**: PascalCase for components (`StaffTable.tsx`), camelCase for utilities (`staffHelpers.ts`)
-- **Variables/Functions**: camelCase (`getUserData`, `isActive`)
-- **Components**: PascalCase (`StaffTable`, `FeeForm`)
-- **Types/Interfaces**: PascalCase (`StaffAttendance`, `CreateRequest`)
-- **Constants**: UPPER_SNAKE_CASE (`API_BASE_URL`, `MAX_FILE_SIZE`)
-
-### 2. Import Organization
-
-```typescript
-// 1. React and core libraries
-import React, { useState, useEffect } from "react";
-
-// 2. Third-party libraries
-import { useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-
-// 3. UI components
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-
-// 4. Icons (alphabetically)
-import { Edit, Loader2, Trash2 } from "lucide-react";
-
-// 5. API hooks
-import { useStaff, useCreateStaff } from "@/api/hooks/staff";
-
-// 6. Types
-import type { Staff } from "@/types/staff";
-
-// 7. Local components
-import { StaffTable } from "./StaffTable";
-
-// 8. Utilities
-import { cn } from "@/lib/utils";
-```
-
-### 3. File Comments
-
-Add JSDoc comments for complex functions:
-
-```typescript
-/**
- * Fetches staff attendance records for a specific date range
- * @param staffId - The ID of the staff member
- * @param params - Date range parameters (start_date, end_date)
- * @returns Promise with attendance records
- */
-export const getStaffAttendanceByDateRange = async (
-  staffId: number,
-  params: { start_date: string; end_date: string }
-) => {
-  // Implementation
-};
-```
-
-## Testing
-
-Vitest is configured. Tests are colocated in `__tests__` directories:
-
-```typescript
-// src/components/dropdown-system/components/__tests__/ClassesDropdown.test.tsx
-import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
-import { ClassesDropdown } from '../ClassesDropdown';
-
-describe('ClassesDropdown', () => {
-  it('renders without crashing', () => {
-    const { container } = render(<ClassesDropdown value={null} onChange={() => {}} />);
-    expect(container).toBeTruthy();
-  });
-});
-```
-
-## Environment Setup
-
-### .env File
-
-```bash
-# API Configuration
-VITE_API_BASE_URL=http://localhost:8000/api/v1
-
-# Tenant Configuration
-VITE_DEFAULT_TENANT=test_tenant
-
-# Optional: Feature Flags
-VITE_ENABLE_DARK_MODE=true
-```
-
-### Running the Project
-
-```bash
-npm run dev          # Start development server
-npm run build        # Production build
-npm run build:check  # Type check + build
-npm run lint         # Run ESLint
-npm run preview      # Preview production build
-```
-
-## Common Pitfalls to Avoid
-
-### 1. ❌ Don't Call API Directly in Components
-
-```typescript
-// ❌ WRONG
-const fetchData = async () => {
-  const response = await CAxios.get("/staff");
-  setData(response.data);
-};
-
-// ✅ CORRECT
-const { data } = useStaff();
-```
-
-### 2. ❌ Don't Create Duplicate State for Server Data
-
-```typescript
-// ❌ WRONG
-const [staff, setStaff] = useState([]);
-const { data } = useStaff();
-useEffect(() => {
-  setStaff(data);
-}, [data]);
-
-// ✅ CORRECT
-const { data: staff } = useStaff();
-```
-
-### 3. ❌ Don't Forget to Invalidate Queries
-
-```typescript
-// ❌ WRONG - UI won't update
-const createMutation = useMutation({
-  mutationFn: createStaff,
-});
-
-// ✅ CORRECT - Queries auto-refresh
-const createMutation = useMutation({
-  mutationFn: createStaff,
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: staffKeys.all });
-  },
-});
-```
-
-### 4. ❌ Don't Use Edit2 Icon
-
-```typescript
-// ❌ WRONG
-import { Edit2 } from 'lucide-react';
-<Edit2 className="h-4 w-4" />
-
-// ✅ CORRECT
-import { Edit } from 'lucide-react';
-<Edit className="h-4 w-4" />
-```
-
-### 5. ❌ Don't Skip Loading States
-
-```typescript
-// ❌ WRONG - No loading feedback
-const { data } = useStaff();
-return <Table data={data} />;
-
-// ✅ CORRECT
-const { data, isLoading } = useStaff();
-if (isLoading) return <LoadingSpinner />;
-return <Table data={data} />;
-```
-
-## When Making Changes
-
-### Adding a New Feature
-
-1. **Create types** in `src/types/[feature].ts`
-2. **Add API functions** in `src/api/[feature].ts`
-3. **Create React Query hooks** in `src/api/hooks/[feature]/*.ts`
-4. **Build components** in `src/components/[feature]/`
-5. **Create route** in `src/routes/_app/[feature]/`
-6. **Test thoroughly** with proper permissions
-
-### Modifying Existing Features
-
-1. **Read existing code first** - understand patterns used
-2. **Check for dual API paths** (legacy vs new)
-3. **Maintain consistency** with existing conventions
-4. **Update types** if data structure changes
-5. **Invalidate relevant queries** in mutations
-6. **Test edge cases** (loading, errors, empty states)
-
-### Debugging Tips
-
-1. Check **React Query DevTools** (available in dev mode)
-2. Check **TanStack Router DevTools** (available in dev mode)
-3. Inspect **Network tab** for API calls
-4. Check **Console** for validation errors
-5. Verify **authStore** state for permission issues
-6. Check `src/lib/config.ts` for logger settings
-
-## Documentation References
-
-- **Architecture**: See `context_guide.json`
-- **Staff Attendance Flow**: See `STAFF_ATTENDANCE_FLOW.md`
-- **UI Standards**: See `UI_CONSISTENCY_IMPROVEMENT_PLAN.md`
-- **TanStack Router**: https://tanstack.com/router
-- **TanStack Query**: https://tanstack.com/query
-- **shadcn/ui**: https://ui.shadcn.com
-- **Tailwind CSS**: https://tailwindcss.com
-
-## Quick Command Reference
-
-```bash
-# Development
-npm run dev
-
-# Type checking
-npm run build:check
-
-# Linting
-npm run lint
-
-# Production build
-npm run build
-
-# Preview build
-npm run preview
-
-# Add shadcn component
-npx shadcn@latest add [component-name]
-```
-
-## Final Notes
-
-- **Consistency is key**: Follow existing patterns in the codebase
-- **Security matters**: Always check permissions, never expose sensitive data
-- **User experience**: Show loading states, handle errors gracefully, provide feedback
-- **Performance**: Use React Query caching, avoid unnecessary re-renders
-- **Maintainability**: Write clean, documented, testable code
-
-When in doubt, check existing implementations in the codebase for reference patterns.
+Don't add `console.log`. Use `logger` from `src/lib/config.ts` (`logger.debug` respects `VITE_LOG_LEVEL`). Existing `console.log`s in `authStore.hasPermission`, `usePermission` and `PermissionGuard` are noise and should be removed when touched.

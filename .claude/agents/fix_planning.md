@@ -32,7 +32,7 @@ You may proceed ONLY if all of the following are provided:
 - Verified reproduction result
 - Evidence-backed root cause
 - Relevant context files:
-  - `PROJECT_CONTEXT.md`
+  - `docs/architecture.md`
   - Relevant module context(s)
 
 If any are missing, STOP and report:
@@ -212,7 +212,7 @@ HANDOVER REQUIREMENT
 You must produce a handover document using:
 
 Copy code
-AI_GOVERNANCE/HANDOVER_TEMPLATE.md
+.claude/AI_GOVERNANCE/HANDOVER_TEMPLATE.md
 Without this handover:
 
 Developer Agent must refuse to proceed
