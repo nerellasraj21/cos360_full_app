@@ -54,7 +54,7 @@ alembic revision --autogenerate -m "descriptive_migration_name"
 #### 4. Backup Strategy
 ```bash
 # For production (Neon database)
-pg_dump -h ep-old-salad-a1x7ae1e-pooler.ap-southeast-1.aws.neon.tech \
+pg_dump -h <neon-host> \
         -U neondb_owner \
         -d neondb \
         --schema=public \

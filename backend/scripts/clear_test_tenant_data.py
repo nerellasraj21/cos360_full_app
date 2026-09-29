@@ -16,8 +16,12 @@ import os
 from datetime import datetime, date
 from decimal import Decimal
 
+from dotenv import load_dotenv
+
 # ── Connection ──────────────────────────────────────────────────────────────
-DB_URL = "postgresql://neondb_owner:npg_3BRCMxJ8aKdN@ep-old-salad-a1x7ae1e-pooler.ap-southeast-1.aws.neon.tech/neondb"
+# Plain asyncpg DSN derived from backend/.env (SSL is passed to connect() below)
+load_dotenv()
+DB_URL = os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://").split("?")[0]
 TEST_CLIENT_NAME = "test_tenant"
 
 # ── Tables to delete (order matters — children before parents) ───────────────

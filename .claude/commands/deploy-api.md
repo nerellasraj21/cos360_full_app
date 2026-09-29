@@ -47,7 +47,7 @@ locust -f tests/performance/load_test.py --headless --users 100 --spawn-rate 10 
 $env:DATABASE_URL='postgresql+asyncpg://<user>:<password>@<neon-host>/neondb?ssl=require'
 
 # Backup current production data
-pg_dump -h ep-old-salad-a1x7ae1e-pooler.ap-southeast-1.aws.neon.tech \
+pg_dump -h <neon-host> \
         -U neondb_owner \
         -d neondb \
         --schema=public \
