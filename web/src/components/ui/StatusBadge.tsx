@@ -32,14 +32,14 @@ const STATUS_MAP: Record<string, StatusConfig> = {
 };
 
 interface StatusBadgeProps {
-  status: string | boolean;
+  status: string | boolean | null | undefined;
   label?: string;
   className?: string;
 }
 
 export function StatusBadge({ status, label, className }: StatusBadgeProps) {
-  const key = typeof status === 'boolean' ? (status ? 'active' : 'inactive') : status.toLowerCase();
-  const config = STATUS_MAP[key] ?? { label: key, className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' };
+  const key = typeof status === 'boolean' ? (status ? 'active' : 'inactive') : (status ?? '').toLowerCase();
+  const config = STATUS_MAP[key] ?? { label: key || '—', className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' };
 
   return (
     <span

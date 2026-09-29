@@ -84,6 +84,7 @@ Endpoint prefixes:
 - **Attachments are metadata only.** Upload reads the file (max 10 MB) but stores `file_path="/temp/path"` and a generic MIME type. Download returns a mock text body, and delete doesn't remove any file. Virus scanning and encryption fields are placeholders.
 - **The audit trail is empty.** Every `create_audit_log` call in the category, type and transaction services is commented out ("temporarily disabled"). There is also `DELETE /expense/audit/logs/{id}`, a hard delete, which conflicts with the idea of an immutable audit record.
 - **Report export is mocked.** `POST /expense/reports/export` returns a fixed `export_id`, and `/export/{id}/status` always says `completed`. `_generate_report_summary` leaves `categories_count` and `departments_count` at 0.
+- **The Settings page summary cards read fields the API never returns.** `ExpenseSettings.tsx` shows `approval_workflow_enabled`, `attachment_required` and `notification_enabled`, but `GET /expense/settings/ui/common` returns `auto_approval_limit`, `require_receipts_over_amount`, `default_approval_required`, `max_file_size_mb` and `allowed_file_types` as `{value, type}`. The cards always show Disabled / No.
 - `/expense/audit/transactions/{id}/summary` is defined twice in `expense_audit_endpoints.py`. The second definition is never reached.
 - There are no budgets, no multi-level approval, and no recurring expenses.
 - The combined fee-plus-expense view lives in `/reports/financial` (`service/reports/financial_report_service.py`), not in this module.
