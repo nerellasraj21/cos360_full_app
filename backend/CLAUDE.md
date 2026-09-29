@@ -75,6 +75,7 @@ return row                             # expire_on_commit=False keeps it readabl
 - Any field the client sends must be on the Create/Update schema — unknown fields are dropped silently and the
   column stays NULL.
 - A Read field the ORM object may lack must be `... | None = None`, or serialization 500s.
+- Read/Out schemas must not inherit input validators (`field_validator`, `Literal`, `EmailStr`) from Base/Create. One stored row that fails them turns the whole list response into a 422 (this broke `GET /parents/`). Validate on Create/Update only.
 - `Numeric` columns serialize as strings (`"4.50"`); clients must convert.
 
 ## Models

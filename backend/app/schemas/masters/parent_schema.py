@@ -56,8 +56,16 @@ class StudentSimpleOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ParentOut(ParentBase):
+class ParentOut(BaseModel):
     id: UUID
+    name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    occupation: str | None = None
+    aadhar_number: str | None = None
+    gender: str | None = None
+    relation_to_student: str | None = None
+    salary_range: str | None = None
     students: list[StudentSimpleOut] = []
 
     model_config = ConfigDict(from_attributes=True)

@@ -116,6 +116,7 @@ Related: `docs/architecture.md` (tenancy, file storage, Celery), `docs/permissio
 | Admission form dates | `DatePicker` | typed `DD/MM/YYYY` (slashes auto-inserted) **or** calendar icon, both kept in sync; form state and payload stay `YYYY-MM-DD` |
 
 ## Known gaps
+- Admission stores parent Aadhaar numbers unvalidated: `admission_schema.py` has no check on `father_/mother_/guardian_aadhar_number`, while `ParentCreate` requires 12 digits. `test_tenant_schema` has one 10-digit value. `ParentOut` no longer re-validates, so reads work, but the admission form can still save bad values.
 - Attendance roster capped at 10 students and includes inactive students (rule 6).
 - Teachers are not scoped to their classes; they see and mark every student.
 - Student document files cannot be downloaded (rule 14), and there is no document-type master or verification on the backend.
