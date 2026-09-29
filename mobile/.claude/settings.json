@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/nerel/Documents/Workspace/React Workspace/COS360_Frontend/**)",
+      "Bash(curl:*)",
+      "WebFetch(domain:www.cos360.app)",
+      "Bash(ls:*)",
+      "Bash(python:*)",
+      "Bash(npx tsc:*)",
+      "Bash(echo:*)",
+      "Bash(npx eslint:*)",
+      "Read(//c/Users/nerel/.claude/projects/c--Users-nerel-Documents-Workspace-React-Workspace-cos360-mobile-cos360-mobile-app/memory/**)",
+      "Read(//c/Users/nerel/AppData/Local/Temp/claude/c--Users-nerel-Documents-Workspace-React-Workspace-cos360-mobile-cos360-mobile-app/tasks/**)",
+      "Bash(git add:*)",
+      "Bash(git diff:*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\nerel\\.claude\\projects\\c--Users-nerel-Documents-Workspace-React-Workspace-cos360-mobile-cos360-mobile-app\\memory",
+      "C:\\Users\\nerel\\Documents\\Workspace\\PythonWorkspace\\COS360\\app\\models\\expense"
+    ]
+  }
+}
