@@ -1,0 +1,119 @@
+from datetime import datetime
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.tenant_session import get_tenant_db
+from app.middleware.rate_limit_middleware import rate_limit_create, rate_limit_dropdown
+from app.schemas.fee.fee_type_schema import FeeTypeCreate, FeeTypeDropdown, FeeTypeRead, FeeTypeUpdate
+from app.service.fee.fee_type_service import (
+    create_fee_type,
+    delete_fee_type,
+    get_all_fee_types,
+    get_fee_type_by_id,
+    get_fee_types_dropdown,
+    update_fee_type,
+)
+from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
+
+router = APIRouter(prefix="/fee/types", tags=["Fee/Fee Types"])
+
+
+@router.get("/health", status_code=status.HTTP_200_OK)
+async def type_health_check():
+    """Health check for fee type endpoints"""
+    return {"status": "healthy", "module": "fee_types", "timestamp": datetime.now()}
+
+
+# Create Fee Type
+@router.post("/", response_model=FeeTypeRead, status_code=status.HTTP_201_CREATED)
+@rate_limit_create("30 per minute")
+async def create_fee_type_endpoint(
+    request: Request, fee_type_data: FeeTypeCreate, db: AsyncSession = Depends(get_tenant_db)
+):
+    """Create a new fee type. Rate limited to 30 creates per minute."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, "fee_types", "create")
+
+    return await create_fee_type(db, fee_type_data)
+
+
+# Get All Fee Types
+@router.get("/", response_model=list[FeeTypeRead])
+async def get_all_fee_types_endpoint(
+    request: Request,
+    limit: int = Query(50, ge=1, le=500, description="Number of records to return (1-500)"),
+    offset: int = Query(0, ge=0, description="Number of records to skip"),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Get all fee types with their related information and pagination"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, "fee_types", "list")
+
+    return await get_all_fee_types(db, limit, offset)
+
+
+# Get Fee Types for Dropdown
+@router.get("/dropdown", response_model=list[FeeTypeDropdown])
+@rate_limit_dropdown("100 per minute")
+async def get_fee_types_dropdown_endpoint(
+    request: Request,
+    fee_category_id: UUID | None = Query(None, description="Filter by fee category ID"),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """Get fee types for dropdown (id + type_name only). Optionally filter by fee category. Rate limited to 100 requests per minute."""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, "fee_types", "list")
+
+    return await get_fee_types_dropdown(db, fee_category_id)
+
+
+# Get Single Fee Type
+@router.get("/{fee_type_id}", response_model=FeeTypeRead)
+async def get_fee_type_endpoint(request: Request, fee_type_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
+    """Get a specific fee type with all related information"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, "fee_types", "read")
+
+    return await get_fee_type_by_id(db, fee_type_id)
+
+
+# Update Fee Type
+@router.put("/{fee_type_id}", response_model=FeeTypeRead)
+async def update_fee_type_endpoint(
+    request: Request, fee_type_id: UUID, fee_type_data: FeeTypeUpdate, db: AsyncSession = Depends(get_tenant_db)
+):
+    """Update a fee type"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, "fee_types", "update")
+
+    return await update_fee_type(db, fee_type_id, fee_type_data)
+
+
+# Delete Fee Type
+@router.delete("/{fee_type_id}", response_model=FeeTypeRead, status_code=status.HTTP_200_OK)
+async def delete_fee_type_endpoint(request: Request, fee_type_id: UUID, db: AsyncSession = Depends(get_tenant_db)):
+    """Delete a fee type"""
+    current_user = await get_current_user_token(request)
+    role = current_user.get("role")
+
+    # Multi-layer permission check: Role + Plan validation
+    await check_role_plan_permission_with_error(db, request, role, "fee_types", "delete")
+
+    return await delete_fee_type(db, fee_type_id)

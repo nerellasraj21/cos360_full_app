@@ -1,0 +1,325 @@
+import logging as log
+from uuid import UUID
+
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.fee.fee_term_dates_model import FeeTermDates as FeeTermDatesModel
+from app.models.fee.fee_term_model import FeeTerm as FeeTermModel
+from app.models.masters.academic_year_model import AcademicYear
+from app.schemas.fee.fee_term_schema import FeeTermCreate, FeeTermUpdate
+
+log = log.getLogger("fee.term_service")
+
+
+async def validate_academic_year_exists(db: AsyncSession, academic_year_id: UUID):
+    result = await db.execute(select(AcademicYear).where(AcademicYear.id == academic_year_id))
+    academic_year = result.scalar_one_or_none()
+    if not academic_year:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Academic year with id {academic_year_id} not found"
+        )
+    return academic_year
+
+
+async def create_fee_term_with_dates(db: AsyncSession, fee_term_data: FeeTermCreate):
+    try:
+        # Validate academic year exists
+        await validate_academic_year_exists(db, fee_term_data.academic_year_id)
+
+        # Validate that number of fee term dates matches number_of_terms
+        if len(fee_term_data.fee_term_dates) != fee_term_data.number_of_terms:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Number of fee term dates ({len(fee_term_data.fee_term_dates)}) must match number_of_terms ({fee_term_data.number_of_terms})",
+            )
+
+        # Check for duplicate dates
+        dates = [date.fee_term_date for date in fee_term_data.fee_term_dates]
+        if len(dates) != len(set(dates)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Duplicate fee term dates are not allowed"
+            )
+
+        # Create fee term
+        db_fee_term = FeeTermModel(
+            term_name=fee_term_data.term_name,
+            term_status=fee_term_data.term_status,
+            number_of_terms=fee_term_data.number_of_terms,
+            academic_year_id=fee_term_data.academic_year_id,
+        )
+        db.add(db_fee_term)
+        await db.flush()  # Ensure the fee term is created before adding dates and get fee term id
+
+        # Create fee term dates
+        for fee_date in fee_term_data.fee_term_dates:
+            db_fee_term_date = FeeTermDatesModel(term_id=db_fee_term.id, fee_term_date=fee_date.fee_term_date)
+            db.add(db_fee_term_date)
+
+        await db.commit()
+
+        # Get the created ID before losing session context
+        created_id = db_fee_term.id
+
+        # Load the fee term with dates for response using a fresh query (don't use refresh to avoid loading problematic relationships)
+        result = await db.execute(
+            select(FeeTermModel).options(selectinload(FeeTermModel.fee_term_dates)).where(FeeTermModel.id == created_id)
+        )
+        return result.scalar_one()
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error creating fee term with dates: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating fee term with dates",
+        )
+
+
+async def get_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
+    try:
+        result = await db.execute(
+            select(FeeTermModel)
+            .options(selectinload(FeeTermModel.fee_term_dates))
+            .where(FeeTermModel.id == fee_term_id)
+        )
+        fee_term = result.scalar_one_or_none()
+        if not fee_term:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Fee term with id {fee_term_id} not found"
+            )
+        return fee_term
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"Error getting fee term with dates: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while retrieving fee term: {str(e)}",
+        )
+
+
+async def get_all_fee_terms(db: AsyncSession, limit: int = 50, offset: int = 0):
+    try:
+        result = await db.execute(
+            select(FeeTermModel).options(selectinload(FeeTermModel.fee_term_dates)).limit(limit).offset(offset)
+        )
+        return result.scalars().all()
+    except Exception as e:
+        log.error(f"Error getting all fee terms: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An error occurred while retrieving fee terms"
+        )
+
+
+async def update_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID, fee_term_data: FeeTermUpdate):
+    try:
+        # Get existing fee term
+        result = await db.execute(
+            select(FeeTermModel)
+            .options(selectinload(FeeTermModel.fee_term_dates))
+            .where(FeeTermModel.id == fee_term_id)
+        )
+        db_fee_term = result.scalar_one_or_none()
+        if not db_fee_term:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Fee term with id {fee_term_id} not found"
+            )
+
+        # Validate academic year if provided
+        if fee_term_data.academic_year_id is not None:
+            await validate_academic_year_exists(db, fee_term_data.academic_year_id)
+
+        # Update fee term fields
+        if fee_term_data.term_name is not None:
+            db_fee_term.term_name = fee_term_data.term_name
+        if fee_term_data.term_status is not None:
+            db_fee_term.term_status = fee_term_data.term_status
+        if fee_term_data.academic_year_id is not None:
+            db_fee_term.academic_year_id = fee_term_data.academic_year_id
+
+        # Handle number_of_terms and fee_term_dates update
+        if fee_term_data.number_of_terms is not None:
+            db_fee_term.number_of_terms = fee_term_data.number_of_terms
+
+        if fee_term_data.fee_term_dates is not None:
+            # Validate that number of fee term dates matches number_of_terms
+            expected_count = (
+                fee_term_data.number_of_terms
+                if fee_term_data.number_of_terms is not None
+                else db_fee_term.number_of_terms
+            )
+            if len(fee_term_data.fee_term_dates) != expected_count:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Number of fee term dates ({len(fee_term_data.fee_term_dates)}) must match number_of_terms ({expected_count})",
+                )
+
+            # Check for duplicate dates
+            dates = [date.fee_term_date for date in fee_term_data.fee_term_dates]
+            if len(dates) != len(set(dates)):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Duplicate fee term dates are not allowed"
+                )
+
+            # Fetch existing dates sorted by date (stable order for in-place update)
+            existing_result = await db.execute(
+                select(FeeTermDatesModel)
+                .where(FeeTermDatesModel.term_id == fee_term_id)
+                .order_by(FeeTermDatesModel.fee_term_date)
+            )
+            existing_dates = list(existing_result.scalars().all())
+            new_dates = sorted(fee_term_data.fee_term_dates, key=lambda d: d.fee_term_date)
+
+            if len(existing_dates) == len(new_dates):
+                # Same count — update existing records in-place so term_date_id FKs stay valid
+                for existing, new in zip(existing_dates, new_dates):
+                    existing.fee_term_date = new.fee_term_date
+            else:
+                # Count changed — only safe if no FK references exist yet
+                # Delete extras or add new ones
+                if len(existing_dates) > len(new_dates):
+                    for extra in existing_dates[len(new_dates):]:
+                        await db.delete(extra)
+                for existing, new in zip(existing_dates[:len(new_dates)], new_dates):
+                    existing.fee_term_date = new.fee_term_date
+                for new in new_dates[len(existing_dates):]:
+                    db.add(FeeTermDatesModel(term_id=db_fee_term.id, fee_term_date=new.fee_term_date))
+
+        await db.commit()
+
+        # Load the updated fee term with dates for response (don't use refresh to avoid loading problematic relationships)
+        result = await db.execute(
+            select(FeeTermModel)
+            .options(selectinload(FeeTermModel.fee_term_dates))
+            .where(FeeTermModel.id == db_fee_term.id)
+        )
+        return result.scalar_one()
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except ValueError:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid fee term ID format")
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error updating fee term with dates: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An error occurred while updating fee term"
+        )
+
+
+async def delete_fee_term_date(db: AsyncSession, fee_term_date_id: UUID):
+    try:
+        result = await db.execute(select(FeeTermDatesModel).where(FeeTermDatesModel.id == fee_term_date_id))
+        db_fee_term_date = result.scalar_one_or_none()
+        if not db_fee_term_date:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Fee term date with id {fee_term_date_id} not found"
+            )
+
+        await db.delete(db_fee_term_date)
+        await db.commit()
+        return {"message": "Fee term date deleted successfully"}
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error deleting fee term date: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An error occurred while deleting fee term date"
+        )
+
+
+async def delete_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
+    try:
+        result = await db.execute(select(FeeTermModel).where(FeeTermModel.id == fee_term_id))
+        db_fee_term = result.scalar_one_or_none()
+        if not db_fee_term:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Fee term with id {fee_term_id} not found"
+            )
+
+        # Check if fee term is in use by fee types
+        from sqlalchemy import func
+
+        from app.models.fee.fee_type_model import FeeType
+
+        fee_types_count = await db.execute(select(func.count(FeeType.id)).where(FeeType.fee_term_id == fee_term_id))
+        fee_type_dependencies = fee_types_count.scalar()
+
+        if fee_type_dependencies > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete fee term '{db_fee_term.term_name}' because it is being used by {fee_type_dependencies} fee type(s). Please reassign or delete the fee types first.",
+            )
+
+        # Delete fee term (cascade will delete associated dates)
+        await db.delete(db_fee_term)
+        await db.commit()
+        return db_fee_term
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        log.error(f"Error deleting fee term: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An error occurred while deleting fee term"
+        )
+
+
+async def get_fee_terms_dropdown(db: AsyncSession):
+    """Get fee terms for dropdown (id, name, number of terms only)"""
+    try:
+        result = await db.execute(
+            select(FeeTermModel.id, FeeTermModel.term_name, FeeTermModel.number_of_terms)
+            .where(FeeTermModel.term_status == "active")
+            .order_by(FeeTermModel.term_name)
+        )
+        fee_terms = result.all()
+        return [
+            {"id": term.id, "term_name": term.term_name, "number_of_terms": term.number_of_terms} for term in fee_terms
+        ]
+    except Exception as e:
+        log.error(f"Error fetching fee terms dropdown: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching fee terms dropdown: {str(e)}"
+        )
+
+
+async def get_fee_term_dates_only(db: AsyncSession, fee_term_id: UUID):
+    """Get only the dates for a specific fee term"""
+    try:
+        # First check if fee term exists
+        fee_term_result = await db.execute(select(FeeTermModel).where(FeeTermModel.id == fee_term_id))
+        fee_term = fee_term_result.scalar_one_or_none()
+        if not fee_term:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Fee term with id {fee_term_id} not found"
+            )
+
+        # Get the dates
+        result = await db.execute(
+            select(FeeTermDatesModel.id, FeeTermDatesModel.fee_term_date)
+            .where(FeeTermDatesModel.term_id == fee_term_id)
+            .order_by(FeeTermDatesModel.fee_term_date)
+        )
+        dates = result.all()
+        return [{"id": date.id, "fee_term_date": date.fee_term_date} for date in dates]
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"Error fetching fee term dates: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching fee term dates: {str(e)}"
+        )

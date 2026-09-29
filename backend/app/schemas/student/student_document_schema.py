@@ -1,0 +1,40 @@
+from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+
+class StudentDocumentBase(BaseModel):
+    document_type: str = Field(..., max_length=100)
+    file_path: str = Field(...)
+
+
+class StudentDocumentCreate(StudentDocumentBase):
+    student_id: UUID
+
+
+class StudentDocumentUpdate(BaseModel):
+    document_type: str | None = Field(None, max_length=100)
+    file_path: str | None = None
+
+
+class StudentDocumentOut(StudentDocumentBase):
+    id: UUID
+    student_id: UUID
+    upload_date: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UnifiedDocumentItem(BaseModel):
+    id: UUID
+    student_id: UUID
+    source: str  # "document", "certificate", "receipt"
+    document_type: str
+    file_path: str | None = None
+    upload_date: datetime
+    certificate_category: str | None = None
+    type_name: str | None = None
+    receipt_number: str | None = None
+
+    model_config = {"from_attributes": True}

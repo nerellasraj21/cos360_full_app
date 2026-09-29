@@ -1,0 +1,19 @@
+version: "3.3"
+
+services:
+  web:
+    image: ${CI_REGISTRY_IMAGE}:${IMAGE_TAG}
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql+asyncpg://neondb_owner:npg_3BRCMxJ8aKdN@ep-old-salad-a1x7ae1e-pooler.ap-southeast-1.aws.neon.tech/neondb?ssl=require
+      TENANT_DEFAULT_NAME: "little bunny"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
