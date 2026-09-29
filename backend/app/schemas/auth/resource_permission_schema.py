@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, validator
 
 
 class ResourcePermissionBase(BaseModel):
@@ -40,14 +40,16 @@ class ResourcePermissionUpdate(BaseModel):
     is_granted: bool | None = Field(None, description="Whether the permission is granted or denied")
 
 
-class ResourcePermissionRead(ResourcePermissionBase):
+class ResourcePermissionRead(BaseModel):
     """Schema for reading ResourcePermission data"""
 
     id: UUID = Field(..., description="Unique permission ID")
     role_id: UUID = Field(..., description="UUID of the role this permission belongs to")
+    resource: str = Field(..., description="Resource name")
+    action: str = Field(..., description="Action name, including scoped actions such as read_own")
+    is_granted: bool = Field(..., description="Whether the permission is granted or denied")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ResourcePermissionWithRole(ResourcePermissionRead):
