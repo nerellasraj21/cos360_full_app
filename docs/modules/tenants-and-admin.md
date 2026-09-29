@@ -128,7 +128,7 @@ How requests resolve to a tenant schema is in [../architecture.md](../architectu
 | Org/tenant choice at login | Subdomain (`getTenantFromHostname`) with the `VITE_DEFAULT_TENANT` fallback | Hardcoded `ORGANIZATIONS` list plus free text |
 
 ## Known gaps
-- Creating a resource permission rejects scoped actions. `ResourcePermissionCreate` only allows create/read/update/delete/list/export/approve/import/bulk_delete, but live data and the `/auth/resource-permissions/dropdown/actions` list include read_own, list_own, read_related, list_related, update_own, download, process and admin, so choosing one of those returns 422. The web Permissions tab also fetches `limit=500` with no paging, so rows past 500 (755 in test_tenant) are not shown.
+- The web Permissions tab fetches `/auth/resource-permissions/?limit=500` with no paging, so rows past 500 (755 in test_tenant) are not shown.
 
 - Serious unauthenticated endpoints need to be removed or guarded before any public deployment (gotcha 16).
 - The `cschema` header is ignored and the deployment is pinned to one tenant (gotcha 1).

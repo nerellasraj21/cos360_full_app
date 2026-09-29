@@ -1,3 +1,4 @@
+import re
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, validator
@@ -21,11 +22,11 @@ class ResourcePermissionBase(BaseModel):
 
     @validator("action")
     def validate_action(cls, v):
-        """Validate action name"""
-        valid_actions = ["create", "read", "update", "delete", "list", "export", "approve", "import", "bulk_delete"]
-        if v.lower() not in valid_actions:
-            raise ValueError(f'Action must be one of: {", ".join(valid_actions)}')
-        return v.lower()
+        """Validate action name format; scoped actions such as read_own and list_related are valid"""
+        v = (v or "").strip().lower()
+        if not re.fullmatch(r"[a-z][a-z0-9_]*", v):
+            raise ValueError("Action must start with a letter and contain only lowercase letters, digits, and underscores")
+        return v
 
 
 class ResourcePermissionCreate(ResourcePermissionBase):
