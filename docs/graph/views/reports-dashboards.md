@@ -43,28 +43,30 @@ graph LR
   n18 -.->|shapes| n8
   n18 -.->|shapes| n12
   n18 -.->|shapes| n13
-  n19[/"home-screen-not-permission-guarded"/]
-  n19 -.->|shapes| n6
-  n20[/"menu-driven-module-hubs"/]
-  n20 -.->|shapes| n7
-  n20 -.->|shapes| n16
-  n21[/"mobile-home-union-of-cards"/]
-  n21 -.->|shapes| n6
-  n21 -.->|shapes| n15
-  n22[/"per-group-report-permissions"/]
-  n22 -.->|shapes| n1
-  n22 -.->|shapes| n3
-  n22 -.->|shapes| n4
-  n22 -.->|shapes| n8
-  n22 -.->|shapes| n9
-  n22 -.->|shapes| n10
-  n23[/"report-audit-in-public-schema"/]
-  n23 -.->|shapes| n2
-  n24[/"tenant-schema-via-tenant-service"/]
+  n19[/"financial-totals-count-settled-money"/]
+  n19 -.->|shapes| n4
+  n20[/"home-screen-not-permission-guarded"/]
+  n20 -.->|shapes| n6
+  n21[/"menu-driven-module-hubs"/]
+  n21 -.->|shapes| n7
+  n21 -.->|shapes| n16
+  n22[/"mobile-home-union-of-cards"/]
+  n22 -.->|shapes| n6
+  n22 -.->|shapes| n15
+  n23[/"per-group-report-permissions"/]
+  n23 -.->|shapes| n1
+  n23 -.->|shapes| n3
+  n23 -.->|shapes| n4
+  n23 -.->|shapes| n8
+  n23 -.->|shapes| n9
+  n23 -.->|shapes| n10
+  n24[/"report-audit-in-public-schema"/]
   n24 -.->|shapes| n2
-  n24 -.->|shapes| n9
-  n24 -.->|shapes| n10
-  n24 -.->|shapes| n14
+  n25[/"tenant-schema-via-tenant-service"/]
+  n25 -.->|shapes| n2
+  n25 -.->|shapes| n9
+  n25 -.->|shapes| n10
+  n25 -.->|shapes| n14
 ```
 
 ## Features
@@ -103,7 +105,7 @@ Expenditure, ledger and financial summary reports; expenditure and ledger can be
 - Parity: No client consumer on web or mobile.
 - Flows: [reports-dashboards/fetch-report](#reports-dashboardsfetch-report)
 - Implemented by: `endpoint:GET /reports/financial/expenditure`, `endpoint:GET /reports/financial/ledger`, `endpoint:GET /reports/financial/summary`, `endpoint:POST /reports/financial/export`, `service:app/service/reports/financial_report_service.py`
-- Shaped by: [reports-dashboards/per-group-report-permissions](#reports-dashboardsper-group-report-permissions)
+- Shaped by: [reports-dashboards/financial-totals-count-settled-money](#reports-dashboardsfinancial-totals-count-settled-money), [reports-dashboards/per-group-report-permissions](#reports-dashboardsper-group-report-permissions)
 
 ### reports-dashboards/mobile-client-side-reports
 
@@ -306,6 +308,14 @@ Shaped by: [reports-dashboards/menu-driven-module-hubs](#reports-dashboardsmenu-
 - **Decision**: Exports over 1000 rows, xlsx over 500 or pdf over 300 are routed to a background Celery job instead of rendering in the request.
 - **Why**: Avoids request timeouts on big xlsx/pdf renders.
 - Shapes: `feature:reports-dashboards/report-export`, `flow:reports-dashboards/background-export`, `flow:reports-dashboards/export-report`, `job:app/tasks/report_tasks.py`, `service:app/service/reports/base_report_service.py`
+
+### reports-dashboards/financial-totals-count-settled-money (active)
+
+- **Decision**: Financial summary and ledger totals exclude expenses with status rejected, cancelled or deleted, and include only fee transactions with status completed.
+- **Why**: Totals should reflect money that actually moved; rejected or cancelled expenses were never spent, and only completed fee transactions are counted everywhere else (fee reports, pending-fees paid amounts).
+- **Alternatives**: Counting every row regardless of status, which is what the report code did before it was fixed.
+- **Since**: 2026-09
+- Shapes: `feature:reports-dashboards/financial-reports`, `service:app/service/reports/financial_report_service.py`
 
 ### reports-dashboards/home-screen-not-permission-guarded
 

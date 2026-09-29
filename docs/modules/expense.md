@@ -69,6 +69,7 @@ Endpoint prefixes:
    - Web `pages/expense/departments.tsx` and the department dropdown call `/expense/departments/`, which returns 404.
    - Mobile shows a "Not Available" placeholder instead.
    - `department_id` on a transaction is a free UUID with no FK.
+   - The `expense_departments` table does not exist in any tenant schema (only the model does), so nothing can join to it.
 
 ## Web / mobile parity
 - **Both clients:** categories, types, transactions (create, edit, view), approvals (stats, search, approve/reject with a comment), summary, reports, settings and audit screens.

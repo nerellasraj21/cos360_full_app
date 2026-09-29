@@ -61,6 +61,8 @@ Endpoint prefixes (under `/api/v1`, mounted in `backend/app/api/v1/main_router.p
 8. **Synchronous exports are not audited.** Only the background path writes `report_audit`, so `/reports/audit` does not show normal downloads.
 9. **There is no file retention or PII masking in code**, even though older docs claim a "7-day cleanup" and "role-based masking".
 10. **Mobile has two report hubs.** `app/(tabs)/reports.tsx` merges the menu with the permission list. `app/reports/index.tsx` is permission-only. The menu `/reports` path maps to the tab version.
+11. **Financial totals count only money that moved.** Summary and ledger exclude expenses with status `rejected`, `cancelled` or `deleted` and include only fee transactions with status `completed`. The ledger casts fee `transaction_date` (TIMESTAMP) to DATE to union it with expense dates. The expenditure list shows every expense.
+12. **Some report fields have no source column.** Attendance rows have no timestamp, so `marked_at` is always null; staff have no employee code, so the staff attendance report's `staff_id` is the staff UUID; the expenditure report's `department` is the raw `department_id` because no tenant schema has an `expense_departments` table.
 
 ## Web / mobile parity
 - Web has no pages for student, staff, attendance (outside staff attendance) or financial reports; only the Reports hub exists. Mobile has five report screens (the fee screen is broken, see rule 4).

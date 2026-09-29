@@ -41,8 +41,7 @@ class AttendanceReportService(BaseReportService):
                     StudentAttendance.date,
                     StudentAttendance.status,
                     StudentAttendance.remarks,
-                    StudentAttendance.marked_at,
-                    Student.admission_number,
+                    Admission.admission_number,
                     func.concat(Student.first_name, " ", Student.last_name).label("student_name"),
                     Class.name.label("class_name"),
                     Section.name.label("section_name"),
@@ -51,11 +50,8 @@ class AttendanceReportService(BaseReportService):
                 .join(Student, StudentAttendance.student_id == Student.id)
                 .join(Admission, Student.id == Admission.student_id)
                 .join(Class, Admission.current_class_id == Class.id)
-                .join(Section, Admission.current_section_id == Section.id)
+                .outerjoin(Section, Admission.current_section_id == Section.id)
                 .join(AcademicYear, Admission.academic_year_id == AcademicYear.id)
-                .where(StudentAttendance.deleted_at.is_(None))
-                .where(Student.deleted_at.is_(None))
-                .where(Admission.deleted_at.is_(None))
             )
 
             # Apply filters
@@ -117,10 +113,10 @@ class AttendanceReportService(BaseReportService):
                         "sl_no": i + ((filters.page - 1) * filters.page_size),
                         "admission_no": row.admission_number,
                         "student_name": row.student_name,
-                        "class_section": f"{row.class_name}-{row.section_name}",
+                        "class_section": "-".join(filter(None, [row.class_name, row.section_name])),
                         "date": row.date.isoformat() if row.date else None,
                         "attendance_status": row.status,
-                        "marked_at": row.marked_at.isoformat() if row.marked_at else None,
+                        "marked_at": None,
                         "remarks": row.remarks,
                         "academic_year": row.academic_year,
                     }
@@ -142,16 +138,13 @@ class AttendanceReportService(BaseReportService):
                     StaffAttendance.date,
                     StaffAttendance.status,
                     StaffAttendance.remarks,
-                    StaffAttendance.created_at.label("marked_at"),
-                    Staff.staff_id,
+                    Staff.id.label("staff_id"),
                     func.concat(Staff.first_name, " ", Staff.last_name).label("staff_name"),
                     Staff.department,
                     Designation.title.label("designation"),
                 )
                 .join(Staff, StaffAttendance.staff_id == Staff.id)
                 .outerjoin(Designation, Staff.designation_id == Designation.id)
-                .where(StaffAttendance.deleted_at.is_(None))
-                .where(Staff.deleted_at.is_(None))
             )
 
             # Apply filters
@@ -208,7 +201,7 @@ class AttendanceReportService(BaseReportService):
                 data.append(
                     {
                         "sl_no": i + ((filters.page - 1) * filters.page_size),
-                        "staff_id": row.staff_id,
+                        "staff_id": str(row.staff_id),
                         "staff_name": row.staff_name,
                         "designation": row.designation,
                         "department": row.department,
@@ -217,7 +210,7 @@ class AttendanceReportService(BaseReportService):
                         "clock_in": None,  # Not available in current model
                         "clock_out": None,  # Not available in current model
                         "total_hours": None,  # Not available in current model
-                        "marked_at": row.marked_at.isoformat() if row.marked_at else None,
+                        "marked_at": None,
                         "remarks": row.remarks,
                     }
                 )
@@ -246,8 +239,6 @@ class AttendanceReportService(BaseReportService):
                     func.max(StudentAttendance.date).label("date_to"),
                 )
                 .join(Student, StudentAttendance.student_id == Student.id)
-                .where(StudentAttendance.deleted_at.is_(None))
-                .where(Student.deleted_at.is_(None))
             )
 
             # Apply same filters as main query
@@ -326,8 +317,6 @@ class AttendanceReportService(BaseReportService):
                     func.max(StaffAttendance.date).label("date_to"),
                 )
                 .join(Staff, StaffAttendance.staff_id == Staff.id)
-                .where(StaffAttendance.deleted_at.is_(None))
-                .where(Staff.deleted_at.is_(None))
             )
 
             # Apply filters

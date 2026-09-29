@@ -7,8 +7,9 @@ from datetime import date
 from decimal import Decimal
 import logging
 from typing import Any
+from uuid import UUID
 
-from sqlalchemy import asc, desc, func, select
+from sqlalchemy import Date, String, asc, cast, desc, func, literal, select
 
 from app.models.expense.expense_category_model import ExpenseCategory
 from app.models.expense.expense_transaction_model import ExpenseTransaction
@@ -27,6 +28,9 @@ from app.service.reports.base_report_service import BaseReportService
 
 logger = logging.getLogger(__name__)
 
+EXCLUDED_EXPENSE_STATUSES = ("rejected", "cancelled", "deleted")
+COMPLETED_FEE_STATUS = "completed"
+
 
 class FinancialReportService(BaseReportService):
     """Service for generating financial-related reports"""
@@ -41,22 +45,19 @@ class FinancialReportService(BaseReportService):
                     ExpenseTransaction.transaction_date,
                     ExpenseTransaction.amount,
                     ExpenseTransaction.description,
-                    ExpenseTransaction.receipt_number,
+                    ExpenseTransaction.reference_number,
                     ExpenseTransaction.vendor_name,
-                    ExpenseTransaction.approved_by_staff_id,
                     ExpenseTransaction.approved_at,
                     ExpenseTransaction.created_at,
                     ExpenseCategory.name.label("category_name"),
                     ExpenseType.name.label("type_name"),
-                    ExpenseTransaction.department,
+                    ExpenseTransaction.department_id,
                     func.concat(Staff.first_name, " ", Staff.last_name).label("approved_by_name"),
                 )
-                .join(ExpenseCategory, ExpenseTransaction.category_id == ExpenseCategory.id)
-                .join(ExpenseType, ExpenseTransaction.type_id == ExpenseType.id)
-                .outerjoin(Staff, ExpenseTransaction.approved_by_staff_id == Staff.id)
-                .where(ExpenseTransaction.deleted_at.is_(None))
-                .where(ExpenseCategory.deleted_at.is_(None))
-                .where(ExpenseType.deleted_at.is_(None))
+                .select_from(ExpenseTransaction)
+                .join(ExpenseType, ExpenseTransaction.expense_type_id == ExpenseType.id)
+                .join(ExpenseCategory, ExpenseType.category_id == ExpenseCategory.id)
+                .outerjoin(Staff, ExpenseTransaction.approved_by_user_id == Staff.user_id)
             )
 
             # Apply filters
@@ -79,7 +80,10 @@ class FinancialReportService(BaseReportService):
                 query = query.where(ExpenseTransaction.amount <= filters.amount_max)
 
             if filters.department:
-                query = query.where(ExpenseTransaction.department.ilike(f"%{filters.department}%"))
+                try:
+                    query = query.where(ExpenseTransaction.department_id == UUID(str(filters.department)))
+                except ValueError:
+                    pass
 
             if filters.month and filters.year:
                 query = query.where(
@@ -122,10 +126,10 @@ class FinancialReportService(BaseReportService):
                         "type_name": row.type_name,
                         "description": row.description,
                         "amount": float(row.amount) if row.amount else 0.0,
-                        "department": row.department,
+                        "department": str(row.department_id) if row.department_id else None,
                         "approved_by": row.approved_by_name,
                         "approved_at": row.approved_at.isoformat() if row.approved_at else None,
-                        "receipt_number": row.receipt_number,
+                        "receipt_number": row.reference_number,
                         "vendor_name": row.vendor_name,
                         "created_at": row.created_at.isoformat() if row.created_at else None,
                     }
@@ -144,87 +148,74 @@ class FinancialReportService(BaseReportService):
             expense_query = select(
                 ExpenseTransaction.id,
                 ExpenseTransaction.transaction_date.label("date"),
-                func.cast("Expense", func.text("VARCHAR")).label("account_type"),
-                func.cast("Debit", func.text("VARCHAR")).label("transaction_type"),
-                func.cast("Expense Payment", func.text("VARCHAR")).label("reference_type"),
-                func.cast(ExpenseTransaction.id, func.text("VARCHAR")).label("reference_id"),
-                ExpenseTransaction.amount,
-                ExpenseTransaction.description,
+                literal("Expense", String).label("account_type"),
+                literal("Debit", String).label("transaction_type"),
+                literal("Expense Payment", String).label("reference_type"),
+                cast(ExpenseTransaction.id, String).label("reference_id"),
+                ExpenseTransaction.amount.label("amount"),
+                ExpenseTransaction.description.label("description"),
                 ExpenseTransaction.created_at,
-            ).where(ExpenseTransaction.deleted_at.is_(None))
+            ).where(ExpenseTransaction.status.notin_(EXCLUDED_EXPENSE_STATUSES))
 
             # Create subquery for fee collections (Credit entries)
             fee_query = (
                 select(
                     FeeTransaction.id,
-                    FeeTransaction.transaction_date.label("date"),
-                    func.cast("Income", func.text("VARCHAR")).label("account_type"),
-                    func.cast("Credit", func.text("VARCHAR")).label("transaction_type"),
-                    func.cast("Fee Payment", func.text("VARCHAR")).label("reference_type"),
-                    func.cast(FeeTransaction.id, func.text("VARCHAR")).label("reference_id"),
-                    FeeTransaction.amount_paid.label("amount"),
+                    cast(FeeTransaction.transaction_date, Date).label("date"),
+                    literal("Income", String).label("account_type"),
+                    literal("Credit", String).label("transaction_type"),
+                    literal("Fee Payment", String).label("reference_type"),
+                    cast(FeeTransaction.id, String).label("reference_id"),
+                    FeeTransaction.total_amount.label("amount"),
                     func.concat("Fee payment for ", Student.first_name, " ", Student.last_name).label("description"),
                     FeeTransaction.created_at,
                 )
                 .join(Student, FeeTransaction.student_id == Student.id)
-                .where(FeeTransaction.deleted_at.is_(None))
-                .where(Student.deleted_at.is_(None))
+                .where(FeeTransaction.status == COMPLETED_FEE_STATUS)
             )
 
-            # Combine both queries using UNION ALL
-            combined_query = expense_query.union_all(fee_query)
+            combined = expense_query.union_all(fee_query).subquery()
 
-            # Apply filters to combined query
-            if filters.date_from or filters.date_to or filters.account_type or filters.transaction_type:
-                # We need to create a new query from the combined results
-                subquery = combined_query.subquery()
+            query = select(
+                combined.c.id,
+                combined.c.date,
+                combined.c.account_type,
+                combined.c.transaction_type,
+                combined.c.reference_type,
+                combined.c.reference_id,
+                combined.c.amount,
+                combined.c.description,
+                combined.c.created_at,
+            ).select_from(combined)
 
-                query = select(
-                    subquery.c.id,
-                    subquery.c.date,
-                    subquery.c.account_type,
-                    subquery.c.transaction_type,
-                    subquery.c.reference_type,
-                    subquery.c.reference_id,
-                    subquery.c.amount,
-                    subquery.c.description,
-                    subquery.c.created_at,
-                ).select_from(subquery)
-
-                if filters.date_from:
-                    query = query.where(subquery.c.date >= filters.date_from)
-                if filters.date_to:
-                    query = query.where(subquery.c.date <= filters.date_to)
-                if filters.account_type:
-                    query = query.where(subquery.c.account_type == filters.account_type)
-                if filters.transaction_type:
-                    query = query.where(subquery.c.transaction_type == filters.transaction_type)
-                if filters.amount_min:
-                    query = query.where(subquery.c.amount >= filters.amount_min)
-                if filters.amount_max:
-                    query = query.where(subquery.c.amount <= filters.amount_max)
-
-                if filters.month and filters.year:
-                    query = query.where(
-                        func.extract("month", subquery.c.date) == filters.month,
-                        func.extract("year", subquery.c.date) == filters.year,
-                    )
-            else:
-                query = combined_query
+            if filters.date_from:
+                query = query.where(combined.c.date >= filters.date_from)
+            if filters.date_to:
+                query = query.where(combined.c.date <= filters.date_to)
+            if filters.account_type:
+                query = query.where(combined.c.account_type == filters.account_type)
+            if filters.transaction_type:
+                query = query.where(combined.c.transaction_type == filters.transaction_type)
+            if filters.amount_min:
+                query = query.where(combined.c.amount >= filters.amount_min)
+            if filters.amount_max:
+                query = query.where(combined.c.amount <= filters.amount_max)
+            if filters.month and filters.year:
+                query = query.where(
+                    func.extract("month", combined.c.date) == filters.month,
+                    func.extract("year", combined.c.date) == filters.year,
+                )
 
             # Get total count
             count_query = select(func.count()).select_from(query.subquery())
             total_count = await self.db.scalar(count_query)
 
             # Apply sorting
-            if filters.sort_by and hasattr(query.selected_columns, filters.sort_by):
-                if filters.sort_order.lower() == "desc":
-                    query = query.order_by(desc(getattr(query.selected_columns, filters.sort_by)))
-                else:
-                    query = query.order_by(asc(getattr(query.selected_columns, filters.sort_by)))
+            sort_column = getattr(combined.c, filters.sort_by, None) if filters.sort_by else None
+            if sort_column is not None:
+                query = query.order_by(desc(sort_column) if filters.sort_order.lower() == "desc" else asc(sort_column))
             else:
-                # Default sort by date descending
-                query = query.order_by(desc("date"))
+                query = query.order_by(desc(combined.c.date), desc(combined.c.created_at))
 
             # Apply pagination
             if filters.page and filters.page_size:
@@ -240,11 +231,10 @@ class FinancialReportService(BaseReportService):
             running_balance = Decimal("0.00")
 
             for i, row in enumerate(rows, 1):
-                # Update running balance
                 if row.transaction_type == "Credit":
-                    running_balance += Decimal(str(row.amount))
+                    running_balance += Decimal(str(row.amount or 0))
                 else:
-                    running_balance -= Decimal(str(row.amount))
+                    running_balance -= Decimal(str(row.amount or 0))
 
                 data.append(
                     {
@@ -292,34 +282,38 @@ class FinancialReportService(BaseReportService):
             fee_collections = Decimal("0.00")
             fee_pending = Decimal("0.00")
 
+            fee_date = cast(FeeTransaction.transaction_date, Date)
+            spent = ExpenseTransaction.status.notin_(EXCLUDED_EXPENSE_STATUSES)
+
             # Get fee collections (income)
             if filters.include_fees:
                 fee_income_query = (
-                    select(func.sum(FeeTransaction.amount_paid))
-                    .where(FeeTransaction.deleted_at.is_(None))
-                    .where(FeeTransaction.transaction_date >= date_from)
-                    .where(FeeTransaction.transaction_date <= date_to)
+                    select(func.sum(FeeTransaction.total_amount))
+                    .where(FeeTransaction.status == COMPLETED_FEE_STATUS)
+                    .where(fee_date >= date_from)
+                    .where(fee_date <= date_to)
                 )
                 fee_collections = await self.db.scalar(fee_income_query) or Decimal("0.00")
                 total_income += fee_collections
 
-            # Get total expenses
+            expense_by_category = {}
+            expense_by_type = {}
             if filters.include_expenses:
                 expense_query = (
                     select(func.sum(ExpenseTransaction.amount))
-                    .where(ExpenseTransaction.deleted_at.is_(None))
+                    .where(spent)
                     .where(ExpenseTransaction.transaction_date >= date_from)
                     .where(ExpenseTransaction.transaction_date <= date_to)
                 )
                 total_expenses = await self.db.scalar(expense_query) or Decimal("0.00")
 
-            # Get expense breakdown by category
-            expense_by_category = {}
-            if filters.include_expenses:
+                # Expense breakdown by category
                 category_query = (
                     select(ExpenseCategory.name, func.sum(ExpenseTransaction.amount))
-                    .join(ExpenseTransaction, ExpenseCategory.id == ExpenseTransaction.category_id)
-                    .where(ExpenseTransaction.deleted_at.is_(None))
+                    .select_from(ExpenseTransaction)
+                    .join(ExpenseType, ExpenseTransaction.expense_type_id == ExpenseType.id)
+                    .join(ExpenseCategory, ExpenseType.category_id == ExpenseCategory.id)
+                    .where(spent)
                     .where(ExpenseTransaction.transaction_date >= date_from)
                     .where(ExpenseTransaction.transaction_date <= date_to)
                     .group_by(ExpenseCategory.name)
@@ -328,13 +322,12 @@ class FinancialReportService(BaseReportService):
                 for row in category_result.fetchall():
                     expense_by_category[row[0]] = float(row[1]) if row[1] else 0.0
 
-            # Get expense breakdown by type
-            expense_by_type = {}
-            if filters.include_expenses:
+                # Expense breakdown by type
                 type_query = (
                     select(ExpenseType.name, func.sum(ExpenseTransaction.amount))
-                    .join(ExpenseTransaction, ExpenseType.id == ExpenseTransaction.type_id)
-                    .where(ExpenseTransaction.deleted_at.is_(None))
+                    .select_from(ExpenseTransaction)
+                    .join(ExpenseType, ExpenseTransaction.expense_type_id == ExpenseType.id)
+                    .where(spent)
                     .where(ExpenseTransaction.transaction_date >= date_from)
                     .where(ExpenseTransaction.transaction_date <= date_to)
                     .group_by(ExpenseType.name)
