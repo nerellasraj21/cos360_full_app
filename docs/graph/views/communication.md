@@ -389,18 +389,18 @@ flowchart TD
 
 ## Decisions
 
-### communication/batch-level-retry
+### communication/batch-level-retry (unintended)
 
 - **Decision**: _process_single re-raises on a provider error so Celery retries the whole batch (max 3 retries, 60 s delay, acks_late).
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice. The spec wanted per-message handling so one failure does not block or re-send the others.
 - **Alternatives**: The spec wanted per-row processing where one failure does not block others.
 - **Tradeoff**: The batch transaction rolls back, the failed log is lost, earlier rows in the batch are re-sent, and nothing checks status done before sending.
 - Shapes: `feature:communication/async-delivery`, `job:app/tasks/communication/send_tasks.py`
 
-### communication/compose-four-target-kinds
+### communication/compose-four-target-kinds (unintended)
 
 - **Decision**: The Compose UI exposes only four target kinds (Parents, Students, Staff, Entire School); the backend keeps all target types for API callers and QuickSend.
-- **Why**: Not recorded (documented only as a product decision).
+- **Why**: Not a deliberate choice; the Compose UI simply exposes fewer target types than the backend supports.
 - Shapes: `feature:communication/recipient-targeting`, `mobile:app/(tabs)/communication.tsx`, `web:src/pages/Communication/SendMessagePanel.tsx`
 
 ### communication/direct-rest-no-sdk
@@ -463,7 +463,7 @@ flowchart TD
 ### communication/students-resolve-to-parents
 
 - **Decision**: Student and class targets always resolve to the linked parents' contacts, one row per (parent, student); students are never contacted directly.
-- **Why**: Not recorded.
+- **Why**: Students are minors and usually have no phone of their own, so the parent's contact is the reliable one; sending per child keeps the child's name in each message.
 - **Tradeoff**: A parent of two children gets two personalized messages; only all_users dedupes.
 - Shapes: `feature:communication/recipient-targeting`, `service:app/service/communication/recipient_resolver.py`
 
@@ -484,7 +484,7 @@ flowchart TD
 ### communication/template-soft-delete
 
 - **Decision**: Template DELETE is a soft deactivate (is_active=false); inactive templates cannot be sent.
-- **Why**: Not recorded.
+- **Why**: Queue and log rows reference the template by foreign key, so it must stay to keep the audit trail of messages already sent.
 - Note: Queue and log rows reference message_templates.id by foreign key.
 - Shapes: `endpoint:DELETE /communication/templates/{template_id}`, `table:message_templates`
 
@@ -507,23 +507,23 @@ flowchart TD
 - **Why**: Tenant isolation comes from the schema-per-tenant model; the worker runs outside the request, so it must set the schema context itself.
 - Shapes: `job:app/tasks/communication/send_tasks.py`, `table:message_templates`, `table:notification_log`, `table:notification_queue`
 
-### communication/variables-derived-server-side
+### communication/variables-derived-server-side (unintended)
 
 - **Decision**: The template variables list is always re-derived from the body on the server; any client-sent value is ignored.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice; it is how the endpoint was first written.
 - Shapes: `feature:communication/templates`, `table:message_templates`
 
 ### communication/whatsapp-free-text-exception
 
 - **Decision**: WhatsApp may send a free-text message without a template, limited to plain parent/student/staff target types (WHATSAPP_TEMPLATE_LESS_TARGET_TYPES); SMS and email still need a template.
-- **Why**: Not recorded (documented only as a later product decision).
+- **Why**: Schools wanted to send one-off notes without creating a template first. SMS cannot do this because DLT rules require registered templates.
 - Note: Migration d9e0f1a2b3c4 made notification_queue.template_id nullable for this.
 - Shapes: `feature:communication/send-message`, `service:app/service/communication/dispatch_service.py`, `table:notification_queue`
 
-### communication/whatsapp-plain-text
+### communication/whatsapp-plain-text (unintended)
 
 - **Decision**: WhatsApp sends a free-form text message via the Meta Cloud API; approved Meta message templates are not implemented.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice: Meta's 24-hour customer-service window for free-form text was not known when this was built. School-initiated WhatsApp messages need approved Meta templates.
 - **Tradeoff**: Meta delivers free-form text only inside the 24-hour customer-service window, so business-initiated messages may not arrive.
 - Shapes: `feature:communication/async-delivery`, `job:app/tasks/communication/send_tasks.py`
 

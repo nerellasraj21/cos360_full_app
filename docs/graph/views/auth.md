@@ -439,10 +439,10 @@ flowchart TD
 - Note: Web sets isAuthenticated first; components should use useParentChildren or useMyChildren rather than the persisted availableStudents.
 - Shapes: `endpoint:GET /student-parent-links/my-children`, `feature:auth/tenant-login`, `flow:auth/normal-login`, `mobile:app/login.tsx`, `web:src/components/providers/AuthProvider.tsx`
 
-### auth/refresh-copies-claims
+### auth/refresh-copies-claims (unintended)
 
 - **Decision**: /auth/refresh copies claims, including role, from the old refresh token instead of re-reading the user row, and does not revoke the old refresh token.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice. Refresh should re-read the user (role, is_active) and revoke or rotate the old refresh token.
 - **Tradeoff**: Role changes, deactivation and permission edits need logout and login; a demoted or deactivated user keeps old rights for up to 7 days by refreshing.
 - Shapes: `concept:auth/login-snapshot`, `endpoint:POST /auth/refresh`, `flow:auth/token-refresh`
 

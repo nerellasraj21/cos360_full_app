@@ -221,10 +221,10 @@ flowchart TD
 - **Why**: Stops a double-submit from creating two transactions.
 - Shapes: `feature:expense/record-expense`, `flow:expense/record-expense`, `service:app/service/expense/expense_transaction_service.py`
 
-### expense/hard-coded-approval-threshold
+### expense/hard-coded-approval-threshold (unintended)
 
 - **Decision**: requires_approval is computed once at create in ExpenseTransactionService.create_transaction: override, or amount > 1000.00, or payment method check/wire_transfer.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice. Approval rules are meant to come from ExpenseSettings and be re-evaluated when the amount changes.
 - **Tradeoff**: ExpenseSettings is ignored; clients send cheque and bank_transfer, so only the amount rule and override trigger; editing the amount later skips approval.
 - Shapes: `feature:expense/expense-approval`, `flow:expense/record-expense`, `service:app/service/expense/expense_transaction_service.py`
 
@@ -247,10 +247,10 @@ flowchart TD
 - **Why**: The Zustand permission store rehydrates asynchronously; the permission-gated query first registers as disabled and otherwise never refetches.
 - Shapes: `feature:expense/categories-and-types`, `feature:expense/record-expense`
 
-### expense/remove-approvals-audit-entry-points
+### expense/remove-approvals-audit-entry-points (unintended)
 
 - **Decision**: The web expense overview shows only Categories, Types, Transactions and Summary; the Pending Approvals and Audit Trail cards and sidebar icon keys were removed, while the /expense/approvals and /expense/audit routes and backend APIs remain.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate product decision; the entry points were removed while the features stayed.
 - **Tradeoff**: The menu seed still inserts Pending Approvals and Audit Trail rows; re-running it brings them back with a fallback icon unless removed from the seed.
 - Shapes: `feature:expense/expense-approval`, `feature:expense/expense-audit-trail`, `feature:expense/expense-overview`
 

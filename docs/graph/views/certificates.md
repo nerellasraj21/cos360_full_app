@@ -291,10 +291,10 @@ flowchart TD
 
 ## Decisions
 
-### certificates/admin-only-by-role-name (active)
+### certificates/admin-only-by-role-name (unintended)
 
 - **Decision**: Certificate upload, admin lists, the selector, template writes and generate check role == Admin by role name in addition to the permission check.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice. Access should come from the student_certificates permissions alone, not a hard-coded role name.
 - **Tradeoff**: A tenant Staff user holding every student_certificates permission still gets 403.
 - Shapes: `endpoint:POST /certificates/received`, `feature:certificates/generate-issuable-certificate`, `feature:certificates/issuable-templates`, `feature:certificates/issued-certificate-files`, `feature:certificates/received-documents`
 
@@ -312,10 +312,10 @@ flowchart TD
 - **Tradeoff**: A client that skips filling (mobile) stores unfilled placeholders; there is no server PDF.
 - Shapes: `feature:certificates/generate-issuable-certificate`, `flow:certificates/generate-issuable-certificate`, `table:generated_certificates`, `web:src/components/students/IssuableCertificateGenerator.tsx`
 
-### certificates/local-media-instead-of-s3 (active)
+### certificates/local-media-instead-of-s3 (temporary)
 
 - **Decision**: Certificate files are stored on local media/ and served as /media/ paths, not S3 pre-signed URLs as the spec (DD-001) chose.
-- **Why**: Not recorded.
+- **Why**: A stopgap until the AWS deployment, when certificate files are meant to move to S3 (same as decision:platform/local-media-storage).
 - **Alternatives**: S3 pre-signed URLs (the original spec).
 - **Tradeoff**: URLs never expire and are public; method names generate_presigned_url and delete_from_s3 are leftovers from the spec.
 - Shapes: `feature:certificates/download-certificate`, `flow:certificates/download-certificate`, `service:app/service/student/file_manager.py`

@@ -403,7 +403,7 @@ flowchart TD
 ### students/active-status-on-users (active)
 
 - **Decision**: Student active status lives on users.is_active; the students table has no active column.
-- **Why**: Not recorded.
+- **Why**: Deactivating a student must also block their login, so a single flag on the user record controls both.
 - Note: Effect: an inactive student cannot log in and is excluded from /students/dropdown* by default.
 - Shapes: `concept:students/student-active-status`, `feature:students/student-records`, `table:users`
 

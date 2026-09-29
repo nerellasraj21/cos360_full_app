@@ -294,16 +294,16 @@ flowchart TD
 
 ## Decisions
 
-### transport/assignment-not-year-scoped
+### transport/assignment-not-year-scoped (unintended)
 
 - **Decision**: Student transport assignments have no academic_year_id (and no fee_term_id); an assignment carries over into the next year until deleted.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice; assignments were never tied to an academic year.
 - Shapes: `feature:transport/student-transport-assignment`, `table:student_transport_assignments`
 
-### transport/cache-transport-dropdowns
+### transport/cache-transport-dropdowns (unintended)
 
 - **Decision**: Route-type, trip-type, route and vehicle dropdowns are cached in memory for 5 minutes with @cache_dropdown (app/tools/cache_utils.py).
-- **Why**: Not recorded.
+- **Why**: Not a deliberate design choice; the cache decorator was added without a recorded need.
 - **Tradeoff**: Invalidation only affects the current worker, so others can serve stale data for up to 5 minutes; the cache key includes the tenant schema only when db is passed positionally.
 - Shapes: `endpoint:GET /masters/route-types/dropdown`, `endpoint:GET /masters/routes/dropdown`, `endpoint:GET /masters/trip-types/dropdown`, `endpoint:GET /masters/vehicles/dropdown`
 
@@ -313,31 +313,31 @@ flowchart TD
 - **Why**: So each student's fee can be overridden.
 - Shapes: `feature:transport/student-transport-assignment`, `flow:transport/assign-student-transport`, `table:student_transport_assignments`
 
-### transport/hard-delete-trips-and-assignments
+### transport/hard-delete-trips-and-assignments (unintended)
 
 - **Decision**: Trips and student transport assignments are hard-deleted, while other transport masters use a soft delete (is_active = False).
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice. Trips and assignments should follow the same soft-delete rule as the other transport masters.
 - **Tradeoff**: Deleting a trip with assignments fails on the NOT NULL FK student_transport_assignments.trip_id.
 - Shapes: `feature:transport/student-transport-assignment`, `feature:transport/trips`, `table:student_transport_assignments`, `table:trips`
 
-### transport/no-backend-link-to-fee-module
+### transport/no-backend-link-to-fee-module (unintended)
 
 - **Decision**: Transport has no backend link to the fee module; transport fees are collected by creating a fee type such as Transport or Bus and mapping it to the student.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice; transport and fee were built separately and never connected.
 - **Tradeoff**: fee_per_term and pricing are informational; fee summary, payments and reports never read them. The only coupling is the web pre-fill heuristic in the assign flow.
 - Shapes: `feature:fee/student-fee-mapping`, `feature:transport/student-transport-assignment`, `feature:transport/transport-pricing`, `flow:transport/assign-student-transport`
 
-### transport/one-trip-per-vehicle-route
+### transport/one-trip-per-vehicle-route (unintended)
 
 - **Decision**: trips is unique on (vehicle_id, route_id); a duplicate returns 400.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice. A vehicle should be able to run several trips on the same route (for example morning and evening).
 - **Tradeoff**: Morning and evening runs need different routes, not just different trip_numbers.
 - Shapes: `feature:transport/trips`, `table:trips`
 
 ### transport/route-derived-from-trip
 
 - **Decision**: An assignment stores trip_id and stop_id only; its route and vehicle are derived from the trip, and route_id is not stored.
-- **Why**: Not recorded.
+- **Why**: The trip already defines the route and vehicle, so storing them again on the assignment could let them disagree.
 - Shapes: `feature:transport/student-transport-assignment`, `table:student_transport_assignments`
 
 ### transport/type-names-as-strings

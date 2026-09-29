@@ -676,10 +676,10 @@ flowchart TD
 
 ## Decisions
 
-### exam/admin-screens-role-name-gating
+### exam/admin-screens-role-name-gating (unintended)
 
 - **Decision**: Exam admin screens (create, edit, delete, dates, permissions, audit) are gated by role name (admin, superadmin, principal, case-insensitive) in both clients rather than by resource permissions.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice. The exam admin screens should be gated by exam permissions, not a hard-coded role-name allowlist.
 - **Tradeoff**: The UI gate is independent of the permission system; the backend still enforces exams:* permissions.
 - Note: The allowlist is kept in one helper per app (web roleUtils.ts, mobile roles.ts) so the two stay in sync.
 - Note: Mark entry and result viewing stay permission-based so teachers keep them.
@@ -694,7 +694,7 @@ flowchart TD
 ### exam/board-level-type-plain-strings
 
 - **Decision**: exams.board, level and exam_type are plain strings with no foreign key to board patterns.
-- **Why**: Not recorded.
+- **Why**: Flexibility: an exam can exist without a configured board pattern, and later pattern edits do not cascade into existing exams.
 - **Tradeoff**: Board pattern delete checks in-use by matching board+level strings on exams (409).
 - Shapes: `feature:exam/board-patterns`, `table:board_exam_patterns`, `table:exams`
 
@@ -705,16 +705,16 @@ flowchart TD
 - Note: The exam is inserted with status active, skipping draft.
 - Shapes: `endpoint:POST /exams`, `feature:exam/exam-creation`, `flow:exam/create-exam`, `service:app/service/exam/exam_service.py`
 
-### exam/exam-header-fixed-after-creation
+### exam/exam-header-fixed-after-creation (unintended)
 
 - **Decision**: After creation only exam_name, mark_entry_deadline, hall_ticket_min_attendance, attendance dates, publish_rank and term are editable; board, level, type, nature, year, grade scheme and subject-config components are fixed.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate product rule; it is how the edit endpoint was first written.
 - Shapes: `endpoint:PUT /exams/{exam_id}`, `endpoint:PUT /exams/{exam_id}/subject-configs/{config_id}`, `feature:exam/exam-management`, `flow:exam/post-creation-changes`
 
 ### exam/exam-settings-singleton
 
 - **Decision**: Exam settings are a single row per tenant; GET returns 404 until the first PUT, and PUT overwrites every field (omitted fields reset to defaults).
-- **Why**: Not recorded.
+- **Why**: Exam settings are school-wide policy, so one row per tenant is enough; the full-overwrite PUT kept the endpoint simple.
 - Shapes: `endpoint:GET /exam-settings`, `endpoint:PUT /exam-settings`, `service:app/service/exam/exam_settings_service.py`, `table:exam_settings`
 
 ### exam/manual-result-and-hall-ticket-sms
@@ -730,16 +730,16 @@ flowchart TD
 - **Alternatives**: Teacher-class-section-subject assignment checks (_is_teacher_assigned stub) once the Staff module provides the table.
 - Shapes: `feature:exam/mark-entry-permissions`, `flow:exam/grant-mark-permissions`, `flow:exam/mark-entry`, `service:app/service/exam/mark_entry_service.py`, `table:exam_mark_entry_permissions`
 
-### exam/names-resolved-from-masters
+### exam/names-resolved-from-masters (unintended)
 
 - **Decision**: Exam class-sections and subject-configs responses carry no names; clients resolve class, section and subject names from masters dropdowns.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice; the responses were simply built without joined names.
 - Shapes: `endpoint:GET /exams/{exam_id}/class-sections`, `endpoint:GET /exams/{exam_id}/subject-configs`, `web:src/pages/exam/ExamDetail.tsx`, `web:src/pages/exam/MarkEntryGrid.tsx`
 
-### exam/nil-uuid-for-no-section
+### exam/nil-uuid-for-no-section (unintended)
 
 - **Decision**: Mark grid, template and upload endpoints declare section_id as a required UUID; the nil UUID means no section and the backend maps it to NULL.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice; a workaround for classes without sections.
 - Shapes: `endpoint:GET /exams/{exam_id}/marks`, `endpoint:GET /exams/{exam_id}/marks/template`, `endpoint:POST /exams/{exam_id}/marks/upload`, `flow:exam/mark-entry`
 
 ### exam/percentage-based-grading
@@ -750,23 +750,23 @@ flowchart TD
 - Note: Why ABS is kept distinct from F is not recorded.
 - Shapes: `feature:exam/grading-schemes`, `service:app/service/exam/aggregate_service.py`, `service:app/service/exam/grading_service.py`, `table:exam_grade_bands`, `table:subject_grade_bands`
 
-### exam/raw-marks-visible-before-publish
+### exam/raw-marks-visible-before-publish (unintended)
 
 - **Decision**: Raw marks are visible to students and parents before publish (my-marks, child-marks); computed results, grades and ranks are gated on published or finalized.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice. Raw marks should also stay hidden from students and parents until the exam is published.
 - Shapes: `endpoint:GET /exams/{exam_id}/child-marks/{student_id}`, `endpoint:GET /exams/{exam_id}/child-result/{student_id}`, `endpoint:GET /exams/{exam_id}/my-marks`, `endpoint:GET /exams/{exam_id}/my-result`, `feature:exam/student-parent-results`, `flow:exam/publish-and-view-results`
 
 ### exam/results-no-cascade-on-exam-delete
 
 - **Decision**: student_marks, student_subject_results and student_exam_results reference exams without ON DELETE CASCADE, while config, date, permission and eligibility tables cascade; DELETE is allowed only on draft exams.
-- **Why**: Not recorded.
+- **Why**: Marks and results must never disappear by accident when an exam is deleted, so those tables deliberately do not cascade.
 - **Tradeoff**: Deleting a draft that has marks or results (possible after active -> draft) fails with 500.
 - Shapes: `endpoint:DELETE /exams/{exam_id}`, `table:student_exam_results`, `table:student_marks`, `table:student_subject_results`
 
-### exam/service-commit-ownership
+### exam/service-commit-ownership (unintended)
 
 - **Decision**: grading_service, remark_grade_service and board_pattern_service commit internally, so their endpoints must not commit or refresh again; the other exam services only flush and the endpoint commits.
-- **Why**: Not recorded.
+- **Why**: Not a deliberate choice: these services were written earlier in a different style and never aligned with the flush-in-service, commit-in-endpoint rule.
 - Shapes: `service:app/service/exam/board_pattern_service.py`, `service:app/service/exam/exam_service.py`, `service:app/service/exam/grading_service.py`, `service:app/service/exam/remark_grade_service.py`
 
 ### exam/subjects-from-class-subject-map
@@ -784,7 +784,7 @@ flowchart TD
 ### exam/wizard-state-session-storage
 
 - **Decision**: The web exam-create wizard state persists in sessionStorage (exam-store), and CreateExam.tsx filters configs to the currently selected class|section keys before submit.
-- **Why**: Not recorded.
+- **Why**: A multi-step wizard should not lose the teacher's input on a page refresh, but it should not persist across browser sessions either.
 - **Tradeoff**: Configs for deselected class-sections linger in the store and would cause a 422 if not filtered.
 - Shapes: `flow:exam/create-exam`, `web:src/lib/examStore.ts`, `web:src/pages/exam/CreateExam.tsx`
 

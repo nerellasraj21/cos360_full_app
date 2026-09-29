@@ -35,7 +35,7 @@ The contract for `docs/graph/graph.jsonl`. `scripts/graph/kg_lint.py` enforces e
 
 ## Optional observation prefixes
 
-- Decision: `Alternatives: ...`, `Status: active|superseded`, `Since: YYYY-MM`, `Tradeoff: ...`
+- Decision: `Alternatives: ...`, `Status: active|superseded|temporary|unintended`, `Since: YYYY-MM`, `Tradeoff: ...` (`temporary` = a known stopgap meant to be replaced; `unintended` = never a deliberate choice, a candidate for change)
 - Flow: `Trigger: ...`, `Precondition: ...`, `Result: ...`, `Failure: ...`
 - Feature: `Roles: ...`, `Parity: ...`
 - Any node: `Note: ...`, `Purpose: ...`

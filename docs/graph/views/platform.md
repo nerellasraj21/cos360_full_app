@@ -283,7 +283,7 @@ flowchart TD
 ### platform/cschema-header (active)
 
 - **Decision**: Clients name their tenant in a cschema request header whose value is a public.tenants client_name. TenantMiddleware reads it and get_tenant_db maps it to schema_name. Subdomain and default fallbacks apply only when the header is missing and TENANT_STRICT_MODE is off.
-- **Why**: Not recorded; the code suggests the header gives both clients one way to name the tenant: web derives it from its subdomain, while mobile has no hostname and sends the org code chosen on the login screen.
+- **Why**: Web derives the tenant from its subdomain, but mobile has no hostname and sends the org code chosen on the login screen, so a header gives both clients one way to name the tenant.
 - **Alternatives**: Subdomain-only detection, which TenantMiddleware keeps as a fallback, or a tenant claim in the JWT.
 - Shapes: `concept:platform/cschema`, `mobile:src/api/client.ts`, `service:app/middleware/tenant_middleware.py`, `web:src/api/index.ts`
 
@@ -312,14 +312,14 @@ flowchart TD
 ### platform/live-permission-lookup (active)
 
 - **Decision**: Permission checks are live DB queries on every request with no cache, and permissions are not in the JWT. Clients cache the login response permissions map only to drive the UI.
-- **Why**: Not recorded; the code suggests it so that a grant change takes effect on the backend immediately without reissuing tokens.
+- **Why**: A grant change takes effect on the backend immediately, without reissuing tokens.
 - **Tradeoff**: Extra queries per request, and the UI reflects a grant change only after the user logs in again.
 - Shapes: `flow:platform/permission-check`, `service:app/tools/simple_permissions.py`, `web:src/lib/authStore.ts`
 
-### platform/local-media-storage (active)
+### platform/local-media-storage (temporary)
 
 - **Decision**: Uploaded files are stored on local disk under backend/media and served without auth by the /media StaticFiles mount in main.py. Stored paths start with /media/ and clients prefix them with the API origin.
-- **Why**: Not recorded.
+- **Why**: A stopgap until the AWS deployment, when uploaded files are meant to move to S3.
 - **Alternatives**: S3 via aiobotocore, which this replaced; S3_* settings and method names such as generate_presigned_url remain but return local /media paths.
 - **Tradeoff**: Anyone with a URL can fetch a file, photo paths are not tenant-scoped, uploads are lost on redeploy without a mounted volume, and several app instances would need shared storage.
 - Shapes: `service:app/main.py`, `service:app/service/student/file_manager.py`
@@ -364,7 +364,7 @@ flowchart TD
 ### platform/scoped-denial-returns-404 (active)
 
 - **Decision**: When a scoped check denies a targeted id outside the user's own or related scope, the backend returns 404, not 403. Clients treat both as not found or no access.
-- **Why**: Not recorded; docs/permissions.md states it is deliberate, and the effect is that a student or parent cannot probe whether records outside their scope exist.
+- **Why**: A student or parent cannot probe whether records outside their own scope exist.
 - Shapes: `concept:platform/access-scope`, `service:app/tools/enhanced_permissions.py`
 
 ### platform/tasks-receive-tenant-schema (active)
@@ -381,10 +381,10 @@ flowchart TD
 - **Tradeoff**: Nothing on the request path invalidates the cache, so deactivating a tenant takes effect only after a restart, and each uvicorn worker keeps its own copy.
 - Shapes: `service:app/db/tenant_session.py`, `table:public.tenants`
 
-### platform/tenant-default-name-pinning (active)
+### platform/tenant-default-name-pinning (temporary)
 
 - **Decision**: When a cschema header is present, TenantMiddleware.extract_client_name returns settings.TENANT_DEFAULT_NAME instead of the header value. The header only has to exist, so every tenant request hits the single tenant named by TENANT_DEFAULT_NAME.
-- **Why**: Not recorded in the docs; the commit that introduced it describes it as always using the default schema for testing, and production now relies on it by setting TENANT_DEFAULT_NAME to the live school's client_name in docker-compose.prod.yml.
+- **Why**: Added temporarily while testing and never reverted. Real multi-tenancy, using the sanitised header value, is meant to be restored.
 - **Tradeoff**: Real multi-tenancy is off until the middleware returns the sanitised header value again, and test requests sent with cschema test_tenant still hit the TENANT_DEFAULT_NAME tenant.
 - Note: Code that reads request.headers[cschema] directly (Celery task arguments, certificate media paths) still sees the raw header value, not the tenant the request session used.
 - Note: The code default for TENANT_DEFAULT_NAME is default, which get_tenant_db maps to cos360_master when no tenants row matches.
@@ -393,14 +393,14 @@ flowchart TD
 ### platform/tenant-models-via-search-path (active)
 
 - **Decision**: Tenant models inherit BaseOrg, whose MetaData has no schema, and get_tenant_db runs SET search_path TO the tenant schema on each request session. Public models inherit BasePublic with a fixed public schema.
-- **Why**: Not recorded; the code suggests it lets one set of ORM models and queries serve every tenant schema without per-tenant classes or schema-qualified SQL.
+- **Why**: One set of ORM models and queries serves every tenant schema, with no per-tenant classes or schema-qualified SQL.
 - **Tradeoff**: search_path is session state on a pooled connection, which is what forces the flush -> select -> commit rule.
 - Shapes: `service:app/db/base.py`, `service:app/db/tenant_session.py`
 
 ### platform/token-lifetimes (active)
 
 - **Decision**: Access tokens live 24 hours and refresh tokens 7 days, hard-coded in jwt_utils.py. The ACCESS_TOKEN_EXPIRE_MINUTES setting (default 30) is unused, and login and refresh responses carry no expires_in.
-- **Why**: Not recorded.
+- **Why**: Long sessions so staff are not logged out during the school day; fewer re-logins was preferred over short-lived access tokens.
 - **Alternatives**: The configurable ACCESS_TOKEN_EXPIRE_MINUTES lifetime of 30 minutes, which the earlier backend security notes described as the intended short-lived access token.
 - **Tradeoff**: A leaked access token stays valid for up to 24 hours unless logout blacklists it, and mobile assumes a 1 hour expiry because no expires_in is returned.
 - Shapes: `flow:platform/token-refresh-mobile`, `service:app/tools/jwt_utils.py`

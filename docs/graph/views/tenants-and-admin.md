@@ -327,10 +327,10 @@ Shaped by: [tenants-and-admin/separate-super-admin-accounts](#tenants-and-admins
 - **Tradeoff**: Changing existing rows needs a delete-and-reinsert script such as reseed_student_parent_permissions.py.
 - Shapes: `feature:tenants-and-admin/resource-rollout`, `feature:tenants-and-admin/tenant-onboarding`, `flow:tenants-and-admin/add-resource-for-tenants`, `flow:tenants-and-admin/onboard-tenant`
 
-### tenants-and-admin/no-admin-user-creation
+### tenants-and-admin/no-admin-user-creation (temporary)
 
 - **Decision**: Tenant users are never created from the admin screens; there is no create-user endpoint and accounts come from staff enrolment and student admission.
-- **Why**: Not recorded.
+- **Why**: Not built yet. A create-user path for tenant admins is planned; until then accounts come only from staff enrolment and student admission.
 - Shapes: `feature:tenants-and-admin/user-management`, `service:app/service/masters/staff_service.py`, `service:app/service/student/admission_service.py`
 
 ### tenants-and-admin/protected-system-role-names
