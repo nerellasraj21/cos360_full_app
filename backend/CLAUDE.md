@@ -108,6 +108,7 @@ except Exception as e:
   or `app/tools/database_error_mapper.map_database_error` where available.
 - `scalar_one_or_none()` raises on >1 row. Where duplicates are possible (a student can have several admissions),
   use `.limit(1)` + `scalars().first()`.
+- Grouping by a function with a string argument (`func.date_trunc("month", col)`) fails with `GroupingError`: the SELECT and GROUP BY get separate bind parameters. Build the expression once with `literal_column("'month'")` and reuse it in both.
 - Update child rows in place. Delete + re-insert changes ids and orphans grandchild references (fee term dates).
 - Raw SQL (`text()`): bind values as parameters, never f-strings. Schema names can't be bound — validate against
   `public.tenants` and double-quote them. Never log passwords, tokens, `DATABASE_URL` or request bodies.

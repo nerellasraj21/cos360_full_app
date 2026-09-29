@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import desc, func, literal_column, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -163,15 +163,18 @@ class ExpenseReportingService(BaseExpenseService):
         """Generate time-based trend report"""
 
         # Build monthly trend query
+        month = func.date_trunc(literal_column("'month'"), ExpenseTransaction.transaction_date)
         trend_query = (
             select(
-                func.date_trunc("month", ExpenseTransaction.transaction_date).label("month"),
+                month.label("month"),
                 func.sum(ExpenseTransaction.amount).label("total_amount"),
                 func.count(ExpenseTransaction.id).label("transaction_count"),
                 func.avg(ExpenseTransaction.amount).label("average_per_transaction"),
             )
-            .group_by(func.date_trunc("month", ExpenseTransaction.transaction_date))
-            .order_by("month")
+            .select_from(ExpenseTransaction)
+            .join(ExpenseType, ExpenseTransaction.expense_type_id == ExpenseType.id)
+            .group_by(month)
+            .order_by(month)
         )
 
         # Apply filters

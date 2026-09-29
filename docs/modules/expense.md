@@ -82,7 +82,6 @@ Endpoint prefixes:
 - **Mobile calls without a trailing slash:** `/expense/categories`, `/expense/transactions` and similar are called without the trailing slash, so FastAPI answers with a redirect. The export call is `POST /expense/reports` rather than `/expense/reports/export`.
 
 ## Known gaps
-- `GET /expense/reports/trend` returns 400 `DATABASE_ERROR` on the web Expense > Reports page (seen on test_tenant). Cause not yet investigated; the other expense report calls on that page succeed.
 - **Attachments are metadata only.** Upload reads the file (max 10 MB) but stores `file_path="/temp/path"` and a generic MIME type. Download returns a mock text body, and delete doesn't remove any file. Virus scanning and encryption fields are placeholders.
 - **The audit trail is empty.** Every `create_audit_log` call in the category, type and transaction services is commented out ("temporarily disabled"). There is also `DELETE /expense/audit/logs/{id}`, a hard delete, which conflicts with the idea of an immutable audit record.
 - **Report export is mocked.** `POST /expense/reports/export` returns a fixed `export_id`, and `/export/{id}/status` always says `completed`. `_generate_report_summary` leaves `categories_count` and `departments_count` at 0.
