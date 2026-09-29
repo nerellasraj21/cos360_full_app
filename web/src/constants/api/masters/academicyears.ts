@@ -1,0 +1,1 @@
+export const ACADEMIC_YEARS_API_BASE = '/masters/academic_years/';

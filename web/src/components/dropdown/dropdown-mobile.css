@@ -1,0 +1,160 @@
+/* Mobile-specific styles for dropdown components */
+
+/* Touch-friendly tap targets */
+.dropdown-touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Remove tap highlight on mobile */
+.dropdown-no-tap-highlight {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Mobile dropdown overlay */
+.dropdown-mobile-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9998;
+  backdrop-filter: blur(2px);
+}
+
+/* Mobile dropdown content */
+.dropdown-mobile-content {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: 70vh;
+  background: white;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  transform: translateY(100%);
+  transition: transform 0.3s ease-out;
+}
+
+.dropdown-mobile-content.open {
+  transform: translateY(0);
+}
+
+/* Mobile handle bar */
+.dropdown-mobile-handle {
+  width: 32px;
+  height: 4px;
+  background: #d1d5db;
+  border-radius: 2px;
+  margin: 12px auto 8px;
+}
+
+/* Prevent body scroll when dropdown is open */
+.dropdown-body-scroll-lock {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+/* iOS specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .dropdown-ios-fix {
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+  
+  /* Fix for iOS zoom on input focus */
+  .dropdown-search-input {
+    font-size: 16px;
+  }
+}
+
+/* Android specific fixes */
+@media screen and (-webkit-min-device-pixel-ratio: 0) and (min-resolution: 0.001dpcm) {
+  .dropdown-android-fix {
+    background-clip: padding-box;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .dropdown-option {
+    border: 1px solid transparent;
+  }
+  
+  .dropdown-option:focus,
+  .dropdown-option[aria-selected="true"] {
+    border-color: currentColor;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-mobile-content {
+    transition: none;
+  }
+  
+  .dropdown-option {
+    scroll-behavior: auto;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .dropdown-mobile-content {
+    background: #1f2937;
+    color: #f9fafb;
+  }
+  
+  .dropdown-mobile-handle {
+    background: #6b7280;
+  }
+}
+
+/* Landscape orientation adjustments */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+  .dropdown-mobile-content {
+    max-height: 60vh;
+  }
+}
+
+/* Large mobile devices */
+@media screen and (min-width: 768px) and (max-width: 1024px) {
+  .dropdown-tablet-adjustments {
+    max-width: 400px;
+    margin: 0 auto;
+  }
+}
+
+/* Focus visible for keyboard navigation */
+.dropdown-option:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+/* Touch feedback animations */
+.dropdown-option:active {
+  transform: scale(0.98);
+  transition: transform 0.1s ease-out;
+}
+
+/* Smooth scrolling for option lists */
+.dropdown-options-container {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Safe area adjustments for devices with notches */
+@supports (padding: max(0px)) {
+  .dropdown-mobile-content {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}

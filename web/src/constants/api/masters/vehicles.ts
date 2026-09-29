@@ -1,0 +1,1 @@
+export const VEHICLES_API_BASE = '/masters/vehicles/';

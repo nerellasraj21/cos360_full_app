@@ -1,0 +1,271 @@
+import { useAuthStore } from './authStore';
+import { useQuery } from '@tanstack/react-query';
+
+// TypeScript interfaces for the backend menu structure
+export interface MenuItem {
+    id: number;
+    name: string;
+    url: string | null;
+    level: "L0" | "L1" | "L2";
+    children?: MenuItem[];
+}
+
+const HIDDEN_MENU_ITEMS = new Set([
+    'route stops',
+    'transport trips',
+    'student transport',
+]);
+
+const isHiddenItem = (item: MenuItem): boolean =>
+    HIDDEN_MENU_ITEMS.has(item.name.toLowerCase());
+
+// "My Fees" (/fee/my-fees) needs fee_collection:read, a permission the Student
+// role doesn't have and isn't getting — hide it for students even though the
+// backend still sends it in the menu tree. Scoped to student only (not a
+// blanket HIDDEN_MENU_ITEMS entry) since other roles may use the same label.
+const isMyFeesItem = (item: MenuItem): boolean =>
+    item.name.toLowerCase() === 'my fees';
+
+const isFeeItem = (item: MenuItem): boolean => {
+    const url = item.url ?? '';
+    const name = item.name.toLowerCase();
+    return url.startsWith('/fee') || name === 'fee management' || name === 'fees' || name === 'fee';
+};
+
+const filterMenuForRole = (items: MenuItem[], roleName: string): MenuItem[] => {
+    // Always hide these items regardless of role
+    const visible = items.filter(item => !isHiddenItem(item));
+
+    if (roleName === 'teacher') {
+        return visible
+            .filter(item => !isFeeItem(item))
+            .map(item => ({
+                ...item,
+                children: item.children ? filterMenuForRole(item.children, roleName) : [],
+            }));
+    }
+
+    if (roleName === 'student') {
+        return visible
+            .filter(item => !isMyFeesItem(item))
+            .map(item => ({
+                ...item,
+                children: item.children ? filterMenuForRole(item.children, roleName) : [],
+            }));
+    }
+
+    return visible.map(item => ({
+        ...item,
+        children: item.children ? filterMenuForRole(item.children, roleName) : [],
+    }));
+};
+
+// Students/parents get a stripped-down Fee menu if the backend didn't
+// include one. Must run ONCE against the top-level menu tree only — never
+// recursed into children, or it re-injects a duplicate "Fee" node under
+// every parent group.
+// Both roles get the same two entries: Student sees its own fee_receipts/
+// fee_transactions (read_own/list_own); Parent's "related" scope resolves
+// server-side to every linked child's records for the same two resources
+// (see UserContextService._get_related_entity_ids).
+const SELF_SERVICE_FEE_CHILDREN: MenuItem[] = [
+    { id: 99003, name: 'My Receipts',     url: '/fee/my-receipts',     level: 'L1' as const, children: [] },
+    { id: 99004, name: 'My Transactions', url: '/fee/my-transactions', level: 'L1' as const, children: [] },
+];
+
+const hasChildUrl = (item: MenuItem, url: string): boolean =>
+    (item.children ?? []).some(child => child.url === url);
+
+const ensureFeeMenu = (items: MenuItem[]): MenuItem[] => {
+    const feeIdx = items.findIndex(item => isFeeItem(item));
+
+    if (feeIdx === -1) {
+        // Backend sent no Fee node at all — inject a full self-service one.
+        return [
+            ...items,
+            {
+                id: 99001,
+                name: 'Fee',
+                url: '/fee',
+                level: 'L0' as const,
+                children: SELF_SERVICE_FEE_CHILDREN,
+            },
+        ];
+    }
+
+    // Backend already sent a Fee node (e.g. with "My Fees") — merge in
+    // whichever self-service children (My Receipts / My Transactions) it's
+    // missing, without touching whatever the backend already provided.
+    const existing = items[feeIdx];
+    const missing = SELF_SERVICE_FEE_CHILDREN.filter(child => !hasChildUrl(existing, child.url as string));
+    if (missing.length === 0) return items;
+
+    return items.map((item, i) =>
+        i === feeIdx
+            ? { ...item, children: [...(item.children ?? []), ...missing] }
+            : item
+    );
+};
+
+
+const SCHOOL_REG_ITEM: MenuItem = {
+    id: 99010,
+    name: 'School Registration',
+    url: '/settings/school',
+    level: 'L1',
+    children: [],
+};
+
+// Matches the sections on FeeDashboard's FeeNavigation cards
+const FEE_SUBMENU_ITEMS: MenuItem[] = [
+    { id: 99101, name: 'Fee Categories',    url: '/fee/categories',    level: 'L1', children: [] },
+    { id: 99102, name: 'Fee Types',         url: '/fee/types',         level: 'L1', children: [] },
+    { id: 99103, name: 'Fee Terms',         url: '/fee/terms',         level: 'L1', children: [] },
+    { id: 99104, name: 'Fee Mappings',      url: '/fee/mappings',      level: 'L1', children: [] },
+    { id: 99105, name: 'Fee Term Amounts',  url: '/fee/term-amounts',  level: 'L1', children: [] },
+    { id: 99106, name: 'Fee Collection',    url: '/fee/collection',    level: 'L1', children: [] },
+    { id: 99107, name: 'Fee Receipts',      url: '/fee/receipts',      level: 'L1', children: [] },
+    { id: 99108, name: 'Fee Refunds',       url: '/fee/refunds',       level: 'L1', children: [] },
+];
+
+// Backend sometimes sends "Fee Management" as a flat L0 link with no children.
+// Only admin/staff-type roles should get the full admin submodule list here —
+// students and parents have their own restricted Fee views handled elsewhere.
+const injectFeeSubmenu = (items: MenuItem[], roleName: string): MenuItem[] => {
+    if (roleName === 'student' || roleName === 'parent' || roleName === 'teacher') return items;
+
+    return items.map(item => {
+        if (isFeeItem(item) && item.level === 'L0' && (!item.children || item.children.length === 0)) {
+            return { ...item, children: FEE_SUBMENU_ITEMS };
+        }
+        return item;
+    });
+};
+
+// Canonical top-level menu order as agreed in MOM 13-6-2026
+const MENU_ORDER: string[] = [
+    'dashboard',
+    'students',
+    'student',
+    'staff management',
+    'staff',
+    'exam management',
+    'exams',
+    'fee management',
+    'fee',
+    'fees',
+    'expense',
+    'expenses',
+    'communication',
+    'reports',
+    'masters',
+    'administration',
+    'transport',
+];
+
+const menuOrderIndex = (item: MenuItem): number => {
+    const name = item.name.toLowerCase();
+    const idx = MENU_ORDER.indexOf(name);
+    return idx === -1 ? MENU_ORDER.length : idx;
+};
+
+const reorderMenu = (items: MenuItem[]): MenuItem[] =>
+    [...items].sort((a, b) => menuOrderIndex(a) - menuOrderIndex(b));
+
+const injectSchoolSettings = (items: MenuItem[], roleName: string): MenuItem[] => {
+    if (roleName === 'teacher' || roleName === 'student') return items;
+
+    // Check if already present anywhere (backend may add it later)
+    const alreadyExists = items.some(item =>
+        item.children?.some(child => child.url === '/settings/school')
+    );
+    if (alreadyExists) return items;
+
+    // Inject under Masters
+    const mastersIdx = items.findIndex(item => item.name.toLowerCase() === 'masters');
+    if (mastersIdx !== -1) {
+        return items.map((item, i) =>
+            i === mastersIdx
+                ? { ...item, children: [...(item.children ?? []), SCHOOL_REG_ITEM] }
+                : item
+        );
+    }
+
+    return items;
+};
+
+export const useMenuData = () => {
+    const { menuItems, user, isAuthenticated, role } = useAuthStore();
+
+    return useQuery({
+        queryKey: ['menu', role?.name],
+        queryFn: () => {
+            console.log('Loading menu data from authStore - User:', user, 'Authenticated:', isAuthenticated);
+
+            if (!menuItems || menuItems.length === 0) {
+                console.warn('No menu data found in authStore, returning empty array');
+                return [];
+            }
+
+            // Transform authStore menu format to menuUtils format
+            const transformMenuItem = (item: { id: string; name: string; path: string | null; children?: { id: string; name: string; path: string | null; children?: any[] }[] }, level: number = 0): MenuItem => {
+                const levelStr = level === 0 ? "L0" : level === 1 ? "L1" : "L2";
+
+                return {
+                    id: parseInt(item.id) || Math.floor(Math.random() * 10000), // Fallback for non-numeric ids
+                    name: item.name,
+                    url: item.path, // Map path to url
+                    level: levelStr as "L0" | "L1" | "L2",
+                    children: item.children ? item.children.map((child) => transformMenuItem(child, level + 1)) : []
+                };
+            };
+
+            const transformedMenu = menuItems.map((item: any) => transformMenuItem(item, 0));
+            const roleName = role?.name?.toLowerCase() ?? '';
+            let filteredMenu = filterMenuForRole(transformedMenu, roleName);
+            if (roleName === 'student' || roleName === 'parent') {
+                filteredMenu = ensureFeeMenu(filteredMenu);
+            }
+            const feeEnrichedMenu = injectFeeSubmenu(filteredMenu, roleName);
+            const enrichedMenu = injectSchoolSettings(feeEnrichedMenu, roleName);
+            const orderedMenu = reorderMenu(enrichedMenu);
+            console.log('Transformed menu data:', orderedMenu);
+            return orderedMenu;
+        },
+        enabled: !!user && !!menuItems && menuItems.length > 0
+    });
+};
+
+// Utility function to find menu item by ID
+export const findMenuItemById = (id: number, items: MenuItem[]): MenuItem | null => {
+    for (const item of items) {
+        if (item.id === id) return item;
+        if (item.children) {
+            const found = findMenuItemById(id, item.children);
+            if (found) return found;
+        }
+    }
+    return null;
+};
+
+// Utility function to get breadcrumb path for a menu item
+export const getBreadcrumbPath = (id: number, items: MenuItem[]): MenuItem[] => {
+    const path: MenuItem[] = [];
+
+    const findPath = (targetId: number, currentItems: MenuItem[], currentPath: MenuItem[]): boolean => {
+        for (const item of currentItems) {
+            const newPath = [...currentPath, item];
+            if (item.id === targetId) {
+                path.push(...newPath);
+                return true;
+            }
+            if (item.children && findPath(targetId, item.children, newPath)) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    findPath(id, items, []);
+    return path;
+}; 

@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Read(//c/Users/nerel/Documents/Workspace/**)",
+      "Bash(npm run dev:*)",
+      "Bash(python3:*)",
+      "Bash(npm run build:check:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(git diff *)",
+      "Bash(git -C \"c:/Users/ADMIN/Documents/workspace/ReactWorkspace/Cos360_frontend/cos360_frontend\" status --porcelain)",
+      "Bash(cd \"c:/Users/ADMIN/Documents/workspace/cos360_mobile_app\" && grep -rli \"mark\" --include=\"*.tsx\" app 2>/dev/null | grep -i exam)",
+      "Read(//c/Users/ADMIN/Documents/workspace/cos360_mobile_app/**)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(grep -n \"export\" \"/c/Users/ADMIN/Documents/workspace/cos360_mobile_app/src/lib/menuUtils.ts\" | head -30)",
+      "Read(//c/Users/ADMIN/Documents/workspace/cos360_mobile_app/src/lib/**)",
+      "Bash(xargs grep -liE \"admission\")",
+      "Bash(find /c/Users/ADMIN/Documents/workspace -maxdepth 1 -type d 2>/dev/null | grep -i cos360)",
+      "Read(//c/Users/ADMIN/Documents/workspace/**)",
+      "Read(//c/Users/ADMIN/Documents/workspace/cos360_mobile_app/app/fees/**)",
+      "Bash(cd \"c:/Users/ADMIN/Documents/workspace/cos360_mobile_app\" && grep -n \"getMyReceipts\\\\|getFeeReceipts\\\\|getMyChildrenReceipts\\\\|feeReceiptsApi\" src/api/fees.ts | head -50)",
+      "Read(//c/Users/ADMIN/Documents/workspace/cos360_mobile_app/src/api/**)",
+      "Read(//c/Users/ADMIN/Documents/workspace/cos360_mobile_app/src/api/hooks/fee/**)",
+      "Bash(cd \"c:/Users/ADMIN/Documents/workspace/cos360_mobile_app\" && grep -n \"detail\" src/api/client.ts src/lib/axios.ts 2>/dev/null)",
+      "Bash(cd /c/Users/ADMIN/Documents/workspace/cos360_mobile_app && grep -rn \"checkPermission\\\\|usePermission\\\\|hasPermission\" --include=\"*.ts*\" -l | head -20)",
+      "Bash(cd \"c:/Users/ADMIN/Documents/workspace/cos360_mobile_app\" && grep -rn \"from '@/src/lib/axios'\\\\|from '../lib/axios'\\\\|from '../../lib/axios'\\\\|require.*lib/axios\" --include=\"*.ts\" --include=\"*.tsx\" . 2>/dev/null | grep -v node_modules)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\ADMIN\\Documents\\workspace\\cos360_mobile_app\\app\\fees\\collection",
+      "c:\\Users\\ADMIN\\Documents\\workspace\\cos360_mobile_app\\src\\api\\hooks\\students",
+      "c:\\Users\\ADMIN\\Documents\\workspace\\cos360_mobile_app\\src\\api",
+      "c:\\Users\\ADMIN\\Documents\\workspace\\cos360_mobile_app\\app\\fees"
+    ]
+  }
+}

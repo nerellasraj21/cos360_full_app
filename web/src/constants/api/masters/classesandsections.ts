@@ -1,0 +1,1 @@
+export const CLASSES_AND_SECTIONS_API_BASE = '/masters/class_sections/';

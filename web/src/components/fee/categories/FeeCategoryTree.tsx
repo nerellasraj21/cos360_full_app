@@ -1,0 +1,546 @@
+import React, { useState, useMemo } from 'react';
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Loader2, ChevronLeft, ChevronsLeft, ChevronRightIcon, ChevronsRight, Search, Filter } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
+import { useFeeCategories, useCreateFeeCategory, useUpdateFeeCategory, useDeleteFeeCategory } from '@/hooks/fee/useFeeCategories';
+import { useFeeCategoryTypes } from '@/hooks/fee/useFeeCategories';
+import { useAcademicYearStore } from '@/lib/academicYearStore';
+import { usePermission } from '@/hooks/usePermission';
+import { CategoryTypeManager } from './CategoryTypeManager';
+import type { FeeCategory, FeeCategoryInput, CategoryStatus } from '@/types/fee/category';
+import type { FeeType } from '@/types/fee/type';
+import { toast } from 'sonner';
+
+interface FeeCategoryTreeProps {
+    className?: string;
+}
+
+interface CategoryNodeProps {
+    category: FeeCategory;
+    serialNumber: number;
+    onEdit: (category: FeeCategory) => void;
+    onDelete: (category: FeeCategory) => void;
+    onManageTypes: (category: FeeCategory) => void;
+    canUpdate: boolean;
+    canDelete: boolean;
+    canViewTypes: boolean;
+    canManageTypes: boolean;
+}
+
+function CategoryRow({ category, serialNumber, onEdit, onDelete, onManageTypes, canUpdate, canDelete, canViewTypes, canManageTypes }: CategoryNodeProps) {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const { data: feeTypes = [], isLoading: typesLoading } = useFeeCategoryTypes(category.id, canViewTypes);
+
+    return (
+        <>
+            <TableRow
+                className={canViewTypes ? 'cursor-pointer' : undefined}
+                onClick={canViewTypes ? () => setIsExpanded(!isExpanded) : undefined}
+            >
+                <TableCell className="w-8 pr-0 py-2">
+                    {canViewTypes && (
+                        isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                    )}
+                </TableCell>
+                <TableCell className="w-12 py-2 text-muted-foreground text-sm">{serialNumber}</TableCell>
+                <TableCell className="py-2 font-medium">{category.category_name}</TableCell>
+                <TableCell className="py-2"><StatusBadge status={category.category_status} /></TableCell>
+                <TableCell className="py-2 text-sm text-muted-foreground">
+                    {canViewTypes ? `${feeTypes.length} fee type${feeTypes.length !== 1 ? 's' : ''}` : '—'}
+                </TableCell>
+                <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1">
+                        {canManageTypes && (
+                            <Button variant="ghost" size="sm" onClick={() => onManageTypes(category)} className="h-8 w-8 p-0" title="Manage Fee Types">
+                                <Plus className="h-4 w-4" />
+                            </Button>
+                        )}
+                        {canUpdate && (
+                            <Button variant="ghost" size="sm" onClick={() => onEdit(category)} className="h-8 w-8 p-0" title="Edit Category">
+                                <Edit className="h-4 w-4" />
+                            </Button>
+                        )}
+                        {canDelete && (
+                            <Button variant="ghost" size="sm" onClick={() => onDelete(category)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700" title="Delete Category">
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                </TableCell>
+            </TableRow>
+
+            {/* Expanded Fee Types row */}
+            {isExpanded && canViewTypes && (
+                <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={6} className="bg-muted/30 p-0">
+                        {typesLoading ? (
+                            <div className="p-4 flex justify-center items-center">
+                                <Loader2 className="h-6 w-6 animate-spin" />
+                                <span className="ml-2 text-muted-foreground">Loading fee types...</span>
+                            </div>
+                        ) : feeTypes.length > 0 ? (
+                            <div className="p-3 space-y-2">
+                                {feeTypes.map((feeType: FeeType) => (
+                                    <div key={feeType.id} className="flex items-center justify-between p-2 bg-card rounded border border-border">
+                                        <div>
+                                            <span className="font-medium text-sm text-foreground">{feeType.type_name}</span>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <StatusBadge status={feeType.fee_status} />
+                                                <span className="text-xs text-muted-foreground">
+                                                    Term: {(() => {
+                                                        if (!feeType.fee_term_name) return 'Unknown';
+                                                        if (feeType.fee_term_name === feeType.fee_term_id) {
+                                                            return `Installment ${feeType.fee_term_name ? 1 : 'N/A'}`;
+                                                        }
+                                                        return feeType.fee_term_name;
+                                                    })()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="p-4 text-center text-muted-foreground">
+                                No fee types found. Click the + button to add fee types.
+                            </div>
+                        )}
+                    </TableCell>
+                </TableRow>
+            )}
+        </>
+    );
+}
+
+export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
+    const { selectedAcademicYearId } = useAcademicYearStore();
+    const { checkPermission } = usePermission();
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(50);
+    const [statusFilter, setStatusFilter] = useState<CategoryStatus | 'all'>('all');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Dialog states
+    const [editingCategory, setEditingCategory] = useState<FeeCategory | null>(null);
+    const [showCreateDialog, setShowCreateDialog] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState<FeeCategory | null>(null);
+    const [showTypeManager, setShowTypeManager] = useState<FeeCategory | null>(null);
+
+    // Form state
+    const [formData, setFormData] = useState<FeeCategoryInput>({
+        category_name: '',
+        category_status: 'active',
+        academic_year_id: selectedAcademicYearId || ''
+    });
+    const [isFormDirty, setIsFormDirty] = useState(false);
+
+    // Check permissions
+    const canCreate = checkPermission('fee_categories', 'create');
+    const canUpdate = checkPermission('fee_categories', 'update');
+    const canDelete = checkPermission('fee_categories', 'delete');
+    const canViewTypes = checkPermission('fee_types', 'list');
+    const canManageTypes = checkPermission('fee_types', 'create') || checkPermission('fee_types', 'update') || checkPermission('fee_types', 'delete');
+
+    // Calculate pagination params
+    const skip = (currentPage - 1) * pageSize;
+
+    // Fetch categories with pagination
+    const { data: categoriesResponse, isLoading, error, isFetching } = useFeeCategories({
+        academic_year_id: selectedAcademicYearId,
+        category_status: statusFilter === 'all' ? undefined : statusFilter,
+        skip,
+        limit: pageSize,
+    });
+
+    const createMutation = useCreateFeeCategory();
+    const updateMutation = useUpdateFeeCategory();
+    const deleteMutation = useDeleteFeeCategory();
+
+    // Extract data from paginated response
+    const allCategories = categoriesResponse?.items || [];
+    const totalCategories = categoriesResponse?.total || 0;
+    const totalPages = Math.ceil(totalCategories / pageSize);
+
+    // Client-side filters (status + search)
+    const categories = useMemo(() => {
+        let filtered = allCategories;
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(c => c.category_status === statusFilter);
+        }
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            filtered = filtered.filter(c => c.category_name.toLowerCase().includes(q));
+        }
+        return filtered;
+    }, [allCategories, searchQuery, statusFilter]);
+
+    const handleCreate = () => {
+        setFormData({
+            category_name: '',
+            category_status: 'active',
+            academic_year_id: selectedAcademicYearId || ''
+        });
+        setEditingCategory(null);
+        setIsFormDirty(false);
+        setShowCreateDialog(true);
+    };
+
+    const handleEdit = (category: FeeCategory) => {
+        setFormData({
+            category_name: category.category_name,
+            category_status: category.category_status,
+            academic_year_id: category.academic_year_id
+        });
+        setEditingCategory(category);
+        setIsFormDirty(false);
+        setShowCreateDialog(true);
+    };
+
+    const handleDelete = (category: FeeCategory) => {
+        setShowDeleteDialog(category);
+    };
+
+    const handleManageTypes = (category: FeeCategory) => {
+        setShowTypeManager(category);
+    };
+
+    const handleSubmit = async () => {
+        try {
+            if (editingCategory) {
+                await updateMutation.mutateAsync({
+                    id: editingCategory.id,
+                    data: formData
+                });
+            } else {
+                await createMutation.mutateAsync(formData);
+            }
+
+            // Small delay to ensure cache invalidation and refetch complete
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            setShowCreateDialog(false);
+            setEditingCategory(null);
+        } catch (error) {
+            // Error handling is done in the mutation hooks
+        }
+    };
+
+    const handleConfirmDelete = async () => {
+        if (showDeleteDialog) {
+            try {
+                await deleteMutation.mutateAsync(showDeleteDialog.id);
+
+                // Small delay to ensure cache invalidation and refetch complete
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                setShowDeleteDialog(null);
+
+                // If we deleted the last item on the current page, go to previous page
+                if (categories.length === 1 && currentPage > 1) {
+                    setCurrentPage(currentPage - 1);
+                }
+            } catch (error) {
+                // Error handling is done in the mutation hook
+            }
+        }
+    };
+
+    const handlePageChange = (newPage: number) => {
+        setCurrentPage(newPage);
+    };
+
+    const handlePageSizeChange = (newSize: string) => {
+        setPageSize(parseInt(newSize));
+        setCurrentPage(1); // Reset to first page
+    };
+
+    const handleStatusFilterChange = (status: string) => {
+        setStatusFilter(status as CategoryStatus | 'all');
+        setCurrentPage(1); // Reset to first page
+    };
+
+    console.log('[FeeCategoryTree] Render check:', { isLoading, error, categoriesLength: categories.length });
+
+    if (isLoading && !isFetching && !categoriesResponse) {
+        return (
+            <div className={cn("p-6", className)}>
+                <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Loading fee categories...</span>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        console.error('[FeeCategoryTree] Error loading categories:', error);
+        return (
+            <div className={cn("p-6", className)}>
+                <div className="text-center py-8 text-red-600">
+                    Error loading categories: {error.message}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className={cn("space-y-4", className)}>
+            {/* Filter Bar */}
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                    <Filter className="h-3.5 w-3.5" />
+                    <span>Filters</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="relative max-w-sm">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                            <Input
+                                placeholder="Search categories..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="pl-8 h-8 text-sm w-64"
+                            />
+                        </div>
+                        {/* Status Filter */}
+                        <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+                            <SelectTrigger className="w-[150px] h-8 text-sm">
+                                <SelectValue placeholder="Filter by status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    {canCreate && (
+                        <Button onClick={handleCreate} className="flex items-center gap-2">
+                            <Plus className="h-4 w-4" />
+                            Add Category
+                        </Button>
+                    )}
+                </div>
+            </div>
+
+            {/* Summary */}
+            <div className="text-sm text-muted-foreground">
+                Showing {categories.length > 0 ? skip + 1 : 0}-{Math.min(skip + pageSize, totalCategories)} of {totalCategories} categories
+            </div>
+
+            {/* Categories Table */}
+            {categories.length > 0 ? (
+                <div className="rounded-lg border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-8"></TableHead>
+                                <TableHead className="w-12">S.No.</TableHead>
+                                <TableHead>Category Name</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Fee Types</TableHead>
+                                <TableHead>Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {categories.map((category, index) => (
+                                <CategoryRow
+                                    key={category.id}
+                                    category={category}
+                                    serialNumber={skip + index + 1}
+                                    onEdit={handleEdit}
+                                    onDelete={handleDelete}
+                                    onManageTypes={handleManageTypes}
+                                    canUpdate={canUpdate}
+                                    canDelete={canDelete}
+                                    canViewTypes={canViewTypes}
+                                    canManageTypes={canManageTypes}
+                                />
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                    <p>No fee categories found for the selected filters.</p>
+                    {canCreate && (
+                        <Button onClick={handleCreate} className="mt-4">
+                            Create First Category
+                        </Button>
+                    )}
+                </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-border pt-4">
+                    {/* Page Size Selector */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Items per page:</span>
+                        <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                            <SelectTrigger className="w-[80px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="10">10</SelectItem>
+                                <SelectItem value="25">25</SelectItem>
+                                <SelectItem value="50">50</SelectItem>
+                                <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Page Navigation */}
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(1)}
+                            disabled={currentPage === 1}
+                        >
+                            <ChevronsLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+
+                        <span className="text-sm text-muted-foreground px-4">
+                            Page {currentPage} of {totalPages}
+                        </span>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                        >
+                            <ChevronRightIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(totalPages)}
+                            disabled={currentPage === totalPages}
+                        >
+                            <ChevronsRight className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* Create/Edit Dialog */}
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} guardDirty={isFormDirty} onDirtyDiscard={() => setIsFormDirty(false)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {editingCategory ? 'Edit Fee Category' : 'Create Fee Category'}
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-1">
+                                Category Name *
+                            </label>
+                            <Input
+                                value={formData.category_name}
+                                onChange={(e) => { setFormData({ ...formData, category_name: e.target.value }); setIsFormDirty(true); }}
+                                placeholder="Enter category name"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="category_status"
+                                checked={formData.category_status === 'active'}
+                                onChange={(e) => { setFormData({ ...formData, category_status: e.target.checked ? 'active' : 'inactive' }); setIsFormDirty(true); }}
+                                className="rounded border-border"
+                            />
+                            <label htmlFor="category_status" className="text-sm font-medium text-foreground">
+                                Active
+                            </label>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <Button
+                            onClick={handleSubmit}
+                            disabled={!formData.category_name.trim() || createMutation.isPending || updateMutation.isPending}
+                        >
+                            {createMutation.isPending || updateMutation.isPending ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                'Save'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={!!showDeleteDialog} onOpenChange={() => setShowDeleteDialog(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Delete Fee Category</DialogTitle>
+                    </DialogHeader>
+
+                    <p className="text-muted-foreground">
+                        Are you sure you want to delete the category "{showDeleteDialog?.category_name}"?
+                        This action cannot be undone.
+                    </p>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowDeleteDialog(null)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleConfirmDelete}
+                            disabled={deleteMutation.isPending}
+                        >
+                            {deleteMutation.isPending ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                'Delete'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Category Type Manager Modal */}
+            {showTypeManager && (
+                <CategoryTypeManager
+                    category={showTypeManager}
+                    open={!!showTypeManager}
+                    onOpenChange={() => setShowTypeManager(null)}
+                />
+            )}
+        </div>
+    );
+}
