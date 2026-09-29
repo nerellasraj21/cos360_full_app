@@ -136,7 +136,7 @@ From the Summary tab, preview and send a fee-due summary SMS to the parent; a re
 Fee reports under /reports/fees: collection summary, pending fees and fee structure, each with stats and an export.
 - Roles: fee_reports permission with the export extra action.
 - Parity: Web exports xlsx and pdf. Mobile calls /reports/fee/... and /structure (404) and exports CSV only.
-- Note: The pending-fees report sums payments across all students, filters by the shared fee_term_id and ignores concessions.
+- Note: The pending-fees report filters by the shared fee_term_id, ignores concessions and uses a placeholder due date; the /stats endpoints return hard-coded zeros.
 - Implemented by: `endpoint:GET /reports/fees/collection-summary`, `endpoint:GET /reports/fees/fee-structure`, `endpoint:GET /reports/fees/pending-fees`, `endpoint:POST /reports/fees/export`, `mobile:app/fees/reports.tsx`, `service:app/service/reports/fee_report_service.py`, `web:src/pages/fee/FeeReports.tsx`
 
 ### fee/fee-self-service

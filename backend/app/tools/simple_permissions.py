@@ -59,6 +59,7 @@ async def get_current_user(
 
         return {
             "user_id": user_id,
+            "sub": user_id,
             "username": token.get("username"),
             "role": token.get("role"),
             "client_name": token.get("client_name"),

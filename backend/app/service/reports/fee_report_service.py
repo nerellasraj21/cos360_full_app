@@ -70,15 +70,9 @@ class FeeReportService(BaseReportService):
                 .join(FeeCategory, FeeType.fee_category_id == FeeCategory.id)
                 .join(FeeTerm, FeeTransactionItem.fee_term_id == FeeTerm.id)
                 .join(Student, FeeTransaction.student_id == Student.id)
-                .join(
-                    Admission,
-                    and_(
-                        FeeTransaction.student_admission_num == Admission.admission_number,
-                        FeeTransaction.academic_year_id == Admission.academic_year_id,
-                    ),
-                )
+                .join(Admission, FeeTransaction.student_admission_num == Admission.admission_number)
                 .join(Class, Admission.current_class_id == Class.id)
-                .join(Section, Admission.current_section_id == Section.id)
+                .outerjoin(Section, Admission.current_section_id == Section.id)
                 .join(AcademicYear, FeeTransaction.academic_year_id == AcademicYear.id)
             )
 
@@ -147,7 +141,7 @@ class FeeReportService(BaseReportService):
                         "transaction_number": row.transaction_number,
                         "student_admission_no": row.student_admission_num,
                         "student_name": row.student_name,
-                        "class_section": f"{row.class_name} - {row.section_name}",
+                        "class_section": " - ".join(filter(None, [row.class_name, row.section_name])),
                         "fee_category": row.fee_category_name,
                         "fee_type": row.fee_type_name,
                         "fee_term": row.fee_term_name,
@@ -170,32 +164,31 @@ class FeeReportService(BaseReportService):
         """Get pending fees report data"""
         try:
             # Base query to get student fee mappings with outstanding amounts
-            query = select(
-                FeeStudentMapping.id,
-                FeeStudentMapping.student_admission_num,
-                FeeStudentMapping.total_fee,
-                FeeType.type_name.label("fee_type_name"),
-                FeeCategory.category_name.label("fee_category_name"),
-                FeeTerm.term_name.label("fee_term_name"),
-                func.concat(Student.first_name, " ", Student.last_name).label("student_name"),
-                Class.name.label("class_name"),
-                Section.name.label("section_name"),
-                AcademicYear.title.label("academic_year"),
-                FeeStudentMapTermAmount.term_amount,
-                FeeStudentMapTermAmount.term_id,
-            ).select_from(
-                FeeStudentMapping.join(FeeType, FeeStudentMapping.fee_type_id == FeeType.id)
+            query = (
+                select(
+                    FeeStudentMapping.id,
+                    FeeStudentMapping.student_id,
+                    FeeStudentMapping.academic_year_id,
+                    FeeStudentMapping.fee_type_id,
+                    FeeStudentMapping.student_admission_num,
+                    FeeStudentMapping.total_fee,
+                    FeeType.type_name.label("fee_type_name"),
+                    FeeCategory.category_name.label("fee_category_name"),
+                    FeeTerm.term_name.label("fee_term_name"),
+                    func.concat(Student.first_name, " ", Student.last_name).label("student_name"),
+                    Class.name.label("class_name"),
+                    Section.name.label("section_name"),
+                    AcademicYear.title.label("academic_year"),
+                    FeeStudentMapTermAmount.term_amount,
+                    FeeStudentMapTermAmount.term_id,
+                )
+                .select_from(FeeStudentMapping)
+                .join(FeeType, FeeStudentMapping.fee_type_id == FeeType.id)
                 .join(FeeCategory, FeeType.fee_category_id == FeeCategory.id)
                 .join(Student, FeeStudentMapping.student_id == Student.id)
-                .join(
-                    Admission,
-                    and_(
-                        FeeStudentMapping.student_admission_num == Admission.admission_number,
-                        FeeStudentMapping.academic_year_id == Admission.academic_year_id,
-                    ),
-                )
+                .join(Admission, FeeStudentMapping.student_admission_num == Admission.admission_number)
                 .join(Class, Admission.current_class_id == Class.id)
-                .join(Section, Admission.current_section_id == Section.id)
+                .outerjoin(Section, Admission.current_section_id == Section.id)
                 .join(AcademicYear, FeeStudentMapping.academic_year_id == AcademicYear.id)
                 .outerjoin(FeeStudentMapTermAmount, FeeStudentMapping.id == FeeStudentMapTermAmount.fee_student_map_id)
                 .outerjoin(FeeTerm, FeeStudentMapTermAmount.term_id == FeeTerm.id)
@@ -254,16 +247,13 @@ class FeeReportService(BaseReportService):
                 # Get paid amount for this student/fee type/term combination
                 paid_query = (
                     select(func.coalesce(func.sum(FeeTransactionItem.amount_paid), 0))
-                    .select_from(
-                        FeeTransactionItem.join(
-                            FeeTransaction, FeeTransactionItem.fee_transaction_id == FeeTransaction.id
-                        )
-                    )
+                    .select_from(FeeTransactionItem)
+                    .join(FeeTransaction, FeeTransactionItem.fee_transaction_id == FeeTransaction.id)
                     .where(
                         and_(
-                            FeeTransaction.student_id == FeeStudentMapping.student_id,
-                            FeeTransaction.academic_year_id == FeeStudentMapping.academic_year_id,
-                            FeeTransactionItem.fee_type_id == FeeStudentMapping.fee_type_id,
+                            FeeTransaction.student_id == row.student_id,
+                            FeeTransaction.academic_year_id == row.academic_year_id,
+                            FeeTransactionItem.fee_type_id == row.fee_type_id,
                             FeeTransaction.status == "completed",
                         )
                     )
@@ -303,7 +293,7 @@ class FeeReportService(BaseReportService):
                             "sl_no": len(data) + 1,
                             "student_admission_no": row.student_admission_num,
                             "student_name": row.student_name,
-                            "class_section": f"{row.class_name} - {row.section_name}",
+                            "class_section": " - ".join(filter(None, [row.class_name, row.section_name])),
                             "fee_category": row.fee_category_name,
                             "fee_type": row.fee_type_name,
                             "fee_term": row.fee_term_name or "Annual",
@@ -325,23 +315,23 @@ class FeeReportService(BaseReportService):
         """Get fee structure report data"""
         try:
             # Base query for fee structure
-            query = select(
-                FeeType.id,
-                FeeType.type_name,
-                FeeCategory.category_name,
-                FeeTerm.term_name,
-                Class.name.label("class_name"),
-                Section.name.label("section_name"),
-                AcademicYear.title,
-                FeeClassMapping.total_fee,
-                FeeType.fee_status,
-            ).select_from(
-                FeeType.join(FeeCategory, FeeType.fee_category_id == FeeCategory.id)
+            query = (
+                select(
+                    FeeType.id,
+                    FeeType.type_name,
+                    FeeCategory.category_name,
+                    FeeTerm.term_name,
+                    Class.name.label("class_name"),
+                    AcademicYear.title.label("year_name"),
+                    FeeClassMapping.total_fee,
+                    FeeType.fee_status,
+                )
+                .select_from(FeeType)
+                .join(FeeCategory, FeeType.fee_category_id == FeeCategory.id)
                 .join(FeeTerm, FeeType.fee_term_id == FeeTerm.id)
                 .join(AcademicYear, FeeType.academic_year_id == AcademicYear.id)
                 .join(FeeClassMapping, FeeType.id == FeeClassMapping.fee_type_id)
                 .join(Class, FeeClassMapping.class_id == Class.id)
-                .outerjoin(Section, FeeClassMapping.section_id == Section.id)
             )
 
             # Apply filters
@@ -395,7 +385,7 @@ class FeeReportService(BaseReportService):
                         "fee_type": row.type_name,
                         "fee_term": row.term_name,
                         "class_name": row.class_name,
-                        "section_name": row.section_name,
+                        "section_name": None,
                         "fee_amount": float(row.total_fee),
                         "academic_year": row.year_name,
                         "status": row.fee_status,

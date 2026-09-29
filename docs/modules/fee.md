@@ -112,10 +112,10 @@ Endpoint prefixes:
 - `web/src/api/fee/mappings.ts` points at a `/fee/mappings/` API that doesn't exist. Use `classMappings.ts` or `studentMappings.ts`.
 
 ## Known gaps
-- The pending-fees report is wrong in three ways (`fee_report_service.get_pending_fees`):
-  - The paid-amount subquery references `FeeStudentMapping` without correlating it, so it sums payments across all students.
+- The pending-fees report (`fee_report_service.get_pending_fees`) still has two problems:
   - It filters by `fee_term_id`, which every instalment shares.
   - It ignores concessions, and `due_date` is a placeholder (now + 30 days).
+- The fee report `/stats` endpoints (collection summary, pending fees, fee structure) return hard-coded zeros; `get_*_summary_stats` in `fee_report_service.py` are placeholders.
 - The payment SMS always ends up `failed` when a parent phone exists: `_dispatch_sms_receipt` reads `txn.created_by`, which is not a column on `FeeTransaction`.
 - `DELETE /fee/concessions/{id}` and `DELETE /fee/old-fees/{id}` declare `response_model` Read schemas but return a dict. The change is committed, then response validation returns a 500.
 - A concession can't be revoked and then re-added for the same student, type and year. The unique constraint still counts the inactive row, so the insert returns a 500.
