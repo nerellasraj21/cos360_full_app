@@ -40,6 +40,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import {
   fetchResourcePermissions,
   fetchResourcePermissionsPaginated,
+  getPermissionsByRole,
   createResourcePermission,
   updateResourcePermission,
   deleteResourcePermission,
@@ -149,7 +150,7 @@ const RolesPermissionsPage: React.FC = () => {
 
   // Pagination state for permissions
   const [permissionsPage, setPermissionsPage] = useState(1);
-  const [permissionsPageSize, setPermissionsPageSize] = useState(500);
+  const [permissionsPageSize, setPermissionsPageSize] = useState(100);
 
   const queryClient = useQueryClient();
 
@@ -162,25 +163,27 @@ const RolesPermissionsPage: React.FC = () => {
   const roles = Array.isArray(rolesData) ? rolesData : [];
 
   // Fetch permissions with pagination
-  const { data: permissionsData, isLoading: permissionsLoading } = useQuery({
+  const { data: permissionsData, isLoading: pagedPermissionsLoading } = useQuery({
     queryKey: ['resource-permissions', permissionsPage, permissionsPageSize],
-    queryFn: () => fetchResourcePermissionsPaginated((permissionsPage - 1) * permissionsPageSize, permissionsPageSize)
+    queryFn: () => fetchResourcePermissionsPaginated((permissionsPage - 1) * permissionsPageSize, permissionsPageSize),
+    enabled: !selectedRole
   });
 
-  // Map role names to permissions and filter by selected role
-  const allPermissions = (permissionsData?.items || []).map(permission => ({
+  const { data: rolePermissionsData, isLoading: rolePermissionsLoading } = useQuery({
+    queryKey: ['resource-permissions', 'role', selectedRole],
+    queryFn: () => getPermissionsByRole(selectedRole),
+    enabled: !!selectedRole
+  });
+
+  const permissionsLoading = selectedRole ? rolePermissionsLoading : pagedPermissionsLoading;
+
+  const permissions = ((selectedRole ? rolePermissionsData : permissionsData?.items) || []).map(permission => ({
     ...permission,
     role_name: roles.find(r => r.id === permission.role_id)?.name || permission.role_id
   }));
 
-  // Filter permissions by selected role if one is selected
-  const filteredPermissions = selectedRole
-    ? allPermissions.filter(permission => permission.role_id === selectedRole)
-    : allPermissions;
-
-  const permissions = filteredPermissions;
-  const totalPermissions = selectedRole ? filteredPermissions.length : (permissionsData?.total_count || 0);
-  const hasNextPage = selectedRole ? false : (permissionsData?.has_next || false); // Disable pagination when filtering
+  const totalPermissions = selectedRole ? permissions.length : (permissionsData?.total_count || 0);
+  const hasNextPage = selectedRole ? false : (permissionsData?.has_next || false);
 
   // Fetch permission matrix
   const { data: permissionMatrix, isLoading: matrixLoading } = useQuery({
@@ -970,9 +973,9 @@ const RolesPermissionsPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <Label htmlFor="role-filter">Filter by Role:</Label>
                   <Select
-                    value={selectedRole}
+                    value={selectedRole || '__all__'}
                     onValueChange={(value) => {
-                      setSelectedRole(value);
+                      setSelectedRole(value === '__all__' ? '' : value);
                       setPermissionsPage(1); // Reset to first page when filtering
                     }}
                   >
@@ -980,7 +983,7 @@ const RolesPermissionsPage: React.FC = () => {
                       <SelectValue placeholder="All Roles" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Roles</SelectItem>
+                      <SelectItem value="__all__">All Roles</SelectItem>
                       {roles.map((role) => (
                         <SelectItem key={role.id} value={role.id}>
                           {role.name}

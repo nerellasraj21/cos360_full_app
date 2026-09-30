@@ -128,7 +128,6 @@ How requests resolve to a tenant schema is in [../architecture.md](../architectu
 | Org/tenant choice at login | Subdomain (`getTenantFromHostname`) with the `VITE_DEFAULT_TENANT` fallback | Hardcoded `ORGANIZATIONS` list plus free text |
 
 ## Known gaps
-- The web Permissions tab fetches `/auth/resource-permissions/?limit=500` with no paging, so rows past 500 (755 in test_tenant) are not shown.
 
 - Serious unauthenticated endpoints need to be removed or guarded before any public deployment (gotcha 16).
 - The `cschema` header is ignored and the deployment is pinned to one tenant (gotcha 1).
