@@ -117,7 +117,7 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 
 - The app is defined in `backend/app/celery_app.py`. The broker and result backend are Redis, taken from `REDIS_HOST/PORT/DB`.
 - Task modules:
-  - reports export (`tasks/report_tasks.py`)
+  - reports export (`tasks/report_tasks.py`, not enqueued by any endpoint; see `docs/modules/reports-dashboards.md`)
   - exam (excel upload, PDF, aggregates, notifications)
   - certificate tasks
   - communication `send_notification_batch`

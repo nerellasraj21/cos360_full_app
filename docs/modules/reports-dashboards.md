@@ -16,8 +16,8 @@ Module-owned reports are documented with their modules: fee reports in [fee](fee
 - **Report response shape** (`ReportResponse`): `{data: [...], total_count, page, page_size, total_pages}`. Pagination uses `page` and `page_size` (≤1000, default 100). Dates are filtered with `date_from` and `date_to`.
 - **Export routing**:
   - Every export ignores `page` and `page_size` in its filters and returns every matching row (`BaseReportService.fetch_all_rows`).
-  - Fee, attendance and financial exports always stream straight back as a file download; they have no background task.
-  - Student and staff summary exports stream when small. Large ones (>1000 rows; xlsx >500; pdf >300) are meant to become a Celery job. That job writes a `public.report_audit` row and saves the file under `exports/<tenant>/`, to be fetched later through `/reports/audit/{id}` and `/reports/download/{id}` (see gaps: this path is broken).
+  - Every export streams straight back as a file download, whatever its size.
+  - The background path (`should_use_background_job` thresholds, `create_background_export_job`, `app/tasks/report_tasks.py`) is not called by any endpoint. See gaps before re-enabling it.
 - **Permissions**: each group checks `<group>_reports:read` or `:export` (`student_reports`, `staff_reports`, `fee_reports`, `attendance_reports`, `financial_reports`). The audit and download endpoints check `reports:read`. Attendance, fee and financial endpoints skip the check for `is_superadmin` tokens.
 - **Web home dashboard** (`/_app/dashboard`, where `/` redirects): currently just a page header, with no widgets.
 - **Module hubs** (web `/admin`, `/masters`, `/reports`, `/students`, `/transport`; mobile hubs for masters and reports):
@@ -55,7 +55,7 @@ Endpoint prefixes (under `/api/v1`, mounted in `backend/app/api/v1/main_router.p
 4. **Mobile "Academic", "Transport" and "Student" reports are client-side aggregations** of normal list APIs: exams, routes/vehicles/trips, and `/student/attendance/search`. There is no `/reports/academic` or `/reports/transport` backend, so don't build web pages expecting one.
 5. **Student and staff report endpoints return 500 for permission failures.** They use a bare `except Exception` that swallows the `HTTPException(403)`, so a 403 comes back as a 500 "Internal server error". `GET /reports/audit` has the same problem. Fee, attendance and financial endpoints re-raise `HTTPException` correctly.
 6. **Tenant ID is derived two ways.** Student, staff, audit and download endpoints read `request.state.schema_name`. The only middleware that sets it (`app/middleware/middleware.py`) is not registered, so the value is `None`. Attendance, fee and financial endpoints use `TenantService.get_tenant_schema(request.state.client_name)`, which is correct. Use the second pattern.
-7. **Synchronous exports are not audited.** Only the background path writes `report_audit`, so `/reports/audit` does not show normal downloads.
+7. **Exports are not audited.** Only the unused background path writes `report_audit`, so `/reports/audit` and `/reports/download/{id}` have nothing to return.
 8. **There is no file retention or PII masking in code**, even though older docs claim a "7-day cleanup" and "role-based masking".
 9. **Mobile has two report hubs.** `app/(tabs)/reports.tsx` merges the menu with the permission list. `app/reports/index.tsx` is permission-only. The menu `/reports` path maps to the tab version.
 11. **Financial totals count only money that moved.** Summary and ledger exclude expenses with status `rejected`, `cancelled` or `deleted` and include only fee transactions with status `completed`. The ledger casts fee `transaction_date` (TIMESTAMP) to DATE to union it with expense dates. The expenditure list shows every expense.
@@ -67,8 +67,13 @@ Endpoint prefixes (under `/api/v1`, mounted in `backend/app/api/v1/main_router.p
 - Mobile tab visibility in `app/(tabs)/_layout.tsx` is gated by `moduleResources`, for example Masters by `academic_years`, `classes`, `subjects`, `holidays` or `timetables`. Web has no equivalent gate beyond the menu.
 
 ## Known gaps
-- **Background export is broken.**
-  - `create_background_export_job` calls `log_export_request(..., filename=, user_id=, tenant_id=)`, but that method doesn't accept those arguments, so the call raises a `TypeError` and the export returns 500. As a result, student and staff summary exports over the thresholds fail.
-  - The response advertises `status_endpoint: /api/v1/reports/export-status/{id}`, which doesn't exist. The real route is `/reports/audit/{id}`.
+- **Background export is unused and broken.** No endpoint calls it. Before re-enabling it:
+  - No Redis or Celery worker is deployed (see [backend deploy](../operations/backend-deploy.md)).
+  - `create_background_export_job` calls `log_export_request(..., filename=, user_id=, tenant_id=)`, which doesn't accept those arguments, so it raises `TypeError`.
+  - Only `student*` and `staff*` report types have tasks.
+  - The tasks open their session with `async with get_tenant_db(tenant_id)`, but `get_tenant_db` is a FastAPI dependency that takes a `Request`.
+  - The tasks build filters with the defaults, so they would export only 100 rows.
+  - Files are saved under `exports/<tenant>/` on the worker's own disk, which a separate API container can't serve.
+  - The job response advertises `status_endpoint: /api/v1/reports/export-status/{id}`, which doesn't exist. The real route is `/reports/audit/{id}`.
 - The financial reports and the student/staff summary reports have no client consumer.
 - The web home dashboard has no content.
