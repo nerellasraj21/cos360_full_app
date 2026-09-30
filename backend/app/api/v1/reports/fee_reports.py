@@ -36,6 +36,13 @@ def _parse_date_to(value: str | None) -> datetime | None:
     return parsed
 
 
+async def _fetch_all_rows(fetch, filters):
+    data, total_count = await fetch(filters)
+    if total_count > len(data):
+        data, total_count = await fetch(filters.model_copy(update={"page": 1, "page_size": total_count}))
+    return data, total_count
+
+
 @router.get("/collection-summary", response_model=ReportResponse)
 async def get_fee_collection_summary(
     request: Request,
@@ -499,40 +506,16 @@ async def export_fee_report(
             filters = FeeCollectionSummaryFilter(
                 **{**export_request.filters, "date_to": _parse_date_to(export_request.filters.get("date_to"))}
             )
-            data, total_count = await service.get_fee_collection_summary(filters)
+            data, total_count = await _fetch_all_rows(service.get_fee_collection_summary, filters)
         elif export_request.report_type == "pending_fees":
             filters = PendingFeesFilter(**export_request.filters)
-            data, total_count = await service.get_pending_fees(filters)
+            data, total_count = await _fetch_all_rows(service.get_pending_fees, filters)
         elif export_request.report_type == "fee_structure":
             filters = FeeStructureFilter(**export_request.filters)
-            data, total_count = await service.get_fee_structure(filters)
+            data, total_count = await _fetch_all_rows(service.get_fee_structure, filters)
         else:
             raise HTTPException(status_code=400, detail="Unsupported fee report type")
 
-        # Check if we should use background job
-        if service.should_use_background_job(total_count, export_request.format):
-            # Use background job for large exports
-            base_filename = export_request.filename or f"fee_{export_request.report_type}_{tenant_id}"
-
-            job_id, audit_id = await service.create_background_export_job(
-                report_type=export_request.report_type,
-                filters=export_request.filters,
-                export_format=export_request.format,
-                filename=base_filename,
-                user_id=user_id,
-                tenant_id=tenant_id,
-            )
-
-            return {
-                "message": "Export job started",
-                "job_id": job_id,
-                "audit_id": audit_id,
-                "is_background": True,
-                "estimated_completion": "5-10 minutes",
-                "status_endpoint": f"/api/v1/reports/export-status/{audit_id}",
-            }
-
-        # Generate export based on format (synchronous for small datasets)
         base_filename = export_request.filename or f"fee_{export_request.report_type}_{tenant_id}"
 
         if export_request.format == "csv":

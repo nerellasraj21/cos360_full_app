@@ -59,35 +59,37 @@ graph LR
   n27[/"enrich-receipt-at-read-time"/]
   n27 -.->|shapes| n11
   n27 -.->|shapes| n20
-  n28[/"legacy-fee-routes-redirect"/]
-  n28 -.->|shapes| n4
-  n29[/"mandatory-fees-applied-by-backend"/]
-  n29 -.->|shapes| n1
-  n29 -.->|shapes| n14
-  n29 -.->|shapes| n24
-  n30[/"no-receipt-until-cheque-clears"/]
-  n30 -.->|shapes| n2
-  n30 -.->|shapes| n16
-  n31[/"old-fees-separate-table"/]
-  n31 -.->|shapes| n10
-  n31 -.->|shapes| n15
-  n31 -.->|shapes| n19
-  n32[/"receipt-hash-over-rendered-content"/]
-  n32 -.->|shapes| n11
-  n33[/"receipt-number-max-plus-one"/]
+  n28[/"export-all-rows-synchronously"/]
+  n28 -.->|shapes| n6
+  n29[/"legacy-fee-routes-redirect"/]
+  n29 -.->|shapes| n4
+  n30[/"mandatory-fees-applied-by-backend"/]
+  n30 -.->|shapes| n1
+  n30 -.->|shapes| n14
+  n30 -.->|shapes| n24
+  n31[/"no-receipt-until-cheque-clears"/]
+  n31 -.->|shapes| n2
+  n31 -.->|shapes| n16
+  n32[/"old-fees-separate-table"/]
+  n32 -.->|shapes| n10
+  n32 -.->|shapes| n15
+  n32 -.->|shapes| n19
+  n33[/"receipt-hash-over-rendered-content"/]
   n33 -.->|shapes| n11
-  n34[/"receipt-pdf-on-demand"/]
+  n34[/"receipt-number-max-plus-one"/]
   n34 -.->|shapes| n11
-  n34 -.->|shapes| n20
-  n35[/"refund-total-counts-processed"/]
-  n35 -.->|shapes| n12
-  n36[/"report-stats-reuse-report-query"/]
-  n36 -.->|shapes| n6
-  n37[/"sms-optional-per-payment"/]
-  n37 -.->|shapes| n2
-  n37 -.->|shapes| n17
-  n38[/"update-term-dates-in-place"/]
-  n38 -.->|shapes| n8
+  n35[/"receipt-pdf-on-demand"/]
+  n35 -.->|shapes| n11
+  n35 -.->|shapes| n20
+  n36[/"refund-total-counts-processed"/]
+  n36 -.->|shapes| n12
+  n37[/"report-stats-reuse-report-query"/]
+  n37 -.->|shapes| n6
+  n38[/"sms-optional-per-payment"/]
+  n38 -.->|shapes| n2
+  n38 -.->|shapes| n17
+  n39[/"update-term-dates-in-place"/]
+  n39 -.->|shapes| n8
 ```
 
 ## Features
@@ -140,9 +142,9 @@ From the Summary tab, preview and send a fee-due summary SMS to the parent; a re
 Fee reports under /reports/fees: collection summary, pending fees and fee structure, each with stats and an export.
 - Roles: fee_reports permission with the export extra action.
 - Parity: Web exports xlsx and pdf. Mobile exports CSV only.
-- Note: The pending-fees report ignores concessions, and export only includes the first 100 rows.
+- Note: The pending-fees report ignores concessions.
 - Implemented by: `endpoint:GET /reports/fees/collection-summary`, `endpoint:GET /reports/fees/fee-structure`, `endpoint:GET /reports/fees/pending-fees`, `endpoint:POST /reports/fees/export`, `mobile:app/fees/reports.tsx`, `service:app/service/reports/fee_report_service.py`, `web:src/pages/fee/FeeReports.tsx`
-- Shaped by: [fee/report-stats-reuse-report-query](#feereport-stats-reuse-report-query)
+- Shaped by: [fee/export-all-rows-synchronously](#feeexport-all-rows-synchronously), [fee/report-stats-reuse-report-query](#feereport-stats-reuse-report-query)
 
 ### fee/fee-self-service
 
@@ -540,6 +542,15 @@ Shaped by: [fee/mandatory-fees-applied-by-backend](#feemandatory-fees-applied-by
 - **Why**: Assigning looked-up values onto the ORM object marks it dirty, and autoflush would write to the DB on the next query.
 - Note: The admission lookup must not require Admission.academic_year_id to equal the transaction year, or receipts break for students whose admission year differs.
 - Shapes: `feature:fee/receipts`, `flow:fee/receipt-lifecycle`, `service:app/service/fee/fee_receipt_service.py`
+
+### fee/export-all-rows-synchronously (active)
+
+- **Decision**: POST /reports/fees/export ignores page and page_size in its filters, fetches every matching row, and always streams the file directly instead of handing large exports to the background job.
+- **Why**: The filter schemas default to page_size 100, so exports silently stopped at 100 rows; and the background path has no fee task and fails with 500, so large fee exports could never complete.
+- **Alternatives**: Fixing the background export path and adding a fee Celery task.
+- **Tradeoff**: A very large export (especially pdf) is generated inside the request and can be slow; it is not written to report_audit.
+- **Since**: 2026-09
+- Shapes: `endpoint:POST /reports/fees/export`, `feature:fee/fee-reports`
 
 ### fee/legacy-fee-routes-redirect
 

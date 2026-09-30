@@ -201,7 +201,7 @@ Implements: `feature:reports-dashboards/report-export`
 
 1. Client calls POST /reports/<group>/export (for example `endpoint:POST /reports/fees/export`) with {report_type, format: csv|xlsx|pdf, filters:{...}, filename?} and reads the response as a blob.
 2. The endpoint checks <group>_reports:export; an unknown format or report_type returns 400.
-3. The service runs the report query and checks should_use_background_job `service:app/service/reports/base_report_service.py`: over 1000 rows, xlsx over 500, or pdf over 300 goes to the background path.
+3. The service runs the report query and checks should_use_background_job `service:app/service/reports/base_report_service.py`: over 1000 rows, xlsx over 500, or pdf over 300 goes to the background path. Fee exports skip this check and always return every row directly `decision:fee/export-all-rows-synchronously`.
 4. Small exports are generated in-process (csv, openpyxl xlsx, reportlab pdf) and streamed straight back as a file download; no audit row is written.
 
 - Failure: Exports over the thresholds fail with 500 because the background path is broken `flow:reports-dashboards/background-export`.
@@ -211,7 +211,7 @@ flowchart TD
   s1["1. Client calls POST /reports/<group>/export (for example ) with {repo...<br/>endpoint:POST /reports/fees/export"]
   s2["2. The endpoint checks <group>_reports:export; an unknown format or re..."]
   s1 --> s2
-  s3["3. The service runs the report query and checks should_use_background_...<br/>service:app/service/reports/base_report_service.py"]
+  s3["3. The service runs the report query and checks should_use_background_...<br/>service:app/service/reports/base_report_service.py<br/>decision:fee/export-all-rows-synchronously"]
   s2 --> s3
   s4["4. Small exports are generated in-process (csv, openpyxl xlsx, reportl..."]
   s3 --> s4

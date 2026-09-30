@@ -16,7 +16,7 @@ Module-owned reports are documented with their modules: fee reports in [fee](fee
 - **Report response shape** (`ReportResponse`): `{data: [...], total_count, page, page_size, total_pages}`. Pagination uses `page` and `page_size` (≤1000, default 100). Dates are filtered with `date_from` and `date_to`.
 - **Export routing**:
   - Small exports stream straight back as a file download.
-  - Large ones (>1000 rows; xlsx >500; pdf >300) are meant to become a Celery job. That job writes a `public.report_audit` row and saves the file under `exports/<tenant>/`, to be fetched later through `/reports/audit/{id}` and `/reports/download/{id}` (see gaps: this path is broken).
+  - Large ones (>1000 rows; xlsx >500; pdf >300) are meant to become a Celery job, except fee exports, which always stream every row directly. That job writes a `public.report_audit` row and saves the file under `exports/<tenant>/`, to be fetched later through `/reports/audit/{id}` and `/reports/download/{id}` (see gaps: this path is broken).
 - **Permissions**: each group checks `<group>_reports:read` or `:export` (`student_reports`, `staff_reports`, `fee_reports`, `attendance_reports`, `financial_reports`). The audit and download endpoints check `reports:read`. Attendance, fee and financial endpoints skip the check for `is_superadmin` tokens.
 - **Web home dashboard** (`/_app/dashboard`, where `/` redirects): currently just a page header, with no widgets.
 - **Module hubs** (web `/admin`, `/masters`, `/reports`, `/students`, `/transport`; mobile hubs for masters and reports):
@@ -68,7 +68,8 @@ Endpoint prefixes (under `/api/v1`, mounted in `backend/app/api/v1/main_router.p
 ## Known gaps
 - **Background export is broken.**
   - `create_background_export_job` calls `log_export_request(..., filename=, user_id=, tenant_id=)`, but that method doesn't accept those arguments, so the call raises a `TypeError` and the export returns 500. As a result, any export over the thresholds fails.
-  - Only `student*` and `staff*` report types have Celery tasks; fee, attendance and financial types raise `ValueError`.
+  - Only `student*` and `staff*` report types have Celery tasks; attendance and financial types raise `ValueError`.
   - The response advertises `status_endpoint: /api/v1/reports/export-status/{id}`, which doesn't exist. The real route is `/reports/audit/{id}`.
+- Student, staff, attendance and financial exports only include the first page of rows: the filter schemas default to `page_size=100` and those export handlers do not override it. Fee export fetches every row (`_fetch_all_rows` in `fee_reports.py`).
 - The financial reports and the student/staff summary reports have no client consumer.
 - The web home dashboard has no content.

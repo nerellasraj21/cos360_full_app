@@ -95,7 +95,7 @@ Endpoint prefixes:
     - `/fee/collection/pay`: aware of concessions and old fees.
     - New UI should use `/pay`.
 18. **Web year default:** `web/src/api/fee/{categories,terms,classMappings,studentMappings,transactions}.ts` fill a missing `academic_year_id` from `academicYearStore.selectedAcademicYearId` (the header selector); creates throw "Academic year is required" when none is selected.
-19. **Fee report numbers:** a pending-fees row is one unpaid instalment (`fee_student_map_term_amounts`), matched to `completed` payments by `term_date_id` and due on its `fee_term_dates` date. Collection stats count only `completed` transactions, and their total due counts each paid instalment's amount once. Each `/stats` endpoint aggregates the same filtered query as its table, so the two always agree. A plain `date_to` (`YYYY-MM-DD`) includes that whole day.
+19. **Fee report numbers:** a pending-fees row is one unpaid instalment (`fee_student_map_term_amounts`), matched to `completed` payments by `term_date_id` and due on its `fee_term_dates` date. Collection stats count only `completed` transactions, and their total due counts each paid instalment's amount once. Each `/stats` endpoint aggregates the same filtered query as its table, so the two always agree. A plain `date_to` (`YYYY-MM-DD`) includes that whole day. Export ignores any `page`/`page_size` in its filters, returns every matching row, and always streams the file directly (it never uses the background job).
 
 ## Web / mobile parity
 - **Both clients**: structure CRUD, the collection detail page with 5 tabs and `fee_items`, receipts (including verify and PDF), refunds, reports, and my-fees/my-receipts/my-transactions.
@@ -114,7 +114,6 @@ Endpoint prefixes:
 
 ## Known gaps
 - The pending-fees report ignores concessions, so a student with a concession still shows the full instalment as pending.
-- Fee report export (`POST /reports/fees/export`) only includes the first 100 rows: the filter schemas default to `page_size=100` and the export does not override it.
 - Web Fee Reports only loads the stats tables once a filter is set (`enabled` in `web/src/hooks/fee/useFeeReports.ts`).
 - The payment SMS always ends up `failed` when a parent phone exists: `_dispatch_sms_receipt` reads `txn.created_by`, which is not a column on `FeeTransaction`.
 - `DELETE /fee/concessions/{id}` and `DELETE /fee/old-fees/{id}` declare `response_model` Read schemas but return a dict. The change is committed, then response validation returns a 500.
