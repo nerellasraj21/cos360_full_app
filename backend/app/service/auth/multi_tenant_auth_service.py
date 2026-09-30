@@ -348,43 +348,8 @@ class MultiTenantAuthService:
                             "academic_year_title": academic_year_title,
                         }
 
-                # Determine entity_id based on role
-                entity_id = None
-                logger.info(f"DEBUG 11: Determining entity_id for role: {role_name}")
-
-                try:
-                    if role_name == "Student":
-                        # Query student entity
-                        from app.models.student.student_model import Student
-
-                        student_result = await db.execute(select(Student).where(Student.user_id == user.id))
-                        student = student_result.scalar_one_or_none()
-                        if student:
-                            entity_id = str(student.id)
-                            logger.info(f"DEBUG 12: Student entity_id found: {entity_id}")
-                    elif role_name == "Parent":
-                        # Query parent entity
-                        from app.models.masters.parent_model import Parent
-
-                        parent_result = await db.execute(select(Parent).where(Parent.user_id == user.id))
-                        parent = parent_result.scalar_one_or_none()
-                        if parent:
-                            entity_id = str(parent.id)
-                            logger.info(f"DEBUG 12: Parent entity_id found: {entity_id}")
-                    elif role_name == "Staff":
-                        # Query staff entity
-                        from app.models.masters.staff_model import Staff
-
-                        staff_result = await db.execute(select(Staff).where(Staff.user_id == user.id))
-                        staff = staff_result.scalar_one_or_none()
-                        if staff:
-                            entity_id = str(staff.id)
-                            logger.info(f"DEBUG 12: Staff entity_id found: {entity_id}")
-                    else:
-                        logger.info(f"DEBUG 12: Role '{role_name}' does not have an associated entity")
-                except Exception as entity_error:
-                    logger.warning(f"DEBUG 12: Error fetching entity_id for role {role_name}: {str(entity_error)}")
-                    # Continue without entity_id rather than failing login
+                # Determine entity_id based on role (student, parent, else staff record)
+                entity_id = await MultiTenantAuthService._resolve_entity_id(db, user.id, role_name)
 
                 # Create access token and refresh token with client information
                 token_data = {
@@ -508,33 +473,10 @@ class MultiTenantAuthService:
                 menu = await MultiTenantAuthService.build_hierarchical_menu(db, user.role_id)
                 permissions = await MultiTenantAuthService.get_user_permissions(db, user.role_id)
 
-                # Resolve entity_id based on role
-                entity_id = None
-                role_name_sp = user.role.name if user.role else ""
-                try:
-                    if role_name_sp == "Student":
-                        from app.models.student.student_model import Student
-
-                        stu_result = await db.execute(select(Student).where(Student.user_id == user.id))
-                        stu = stu_result.scalar_one_or_none()
-                        if stu:
-                            entity_id = str(stu.id)
-                    elif role_name_sp == "Parent":
-                        from app.models.masters.parent_model import Parent
-
-                        par_result = await db.execute(select(Parent).where(Parent.user_id == user.id))
-                        par = par_result.scalar_one_or_none()
-                        if par:
-                            entity_id = str(par.id)
-                    else:
-                        from app.models.masters.staff_model import Staff
-
-                        staff_result = await db.execute(select(Staff).where(Staff.user_id == user.id))
-                        staff = staff_result.scalar_one_or_none()
-                        if staff:
-                            entity_id = str(staff.id)
-                except Exception:
-                    pass
+                # Resolve entity_id based on role (student, parent, else staff record)
+                entity_id = await MultiTenantAuthService._resolve_entity_id(
+                    db, user.id, user.role.name if user.role else ""
+                )
 
                 token_data = {
                     "sub": str(user.id),
@@ -580,6 +522,24 @@ class MultiTenantAuthService:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update password"
                 )
+
+    @staticmethod
+    async def _resolve_entity_id(db, user_id, role_name: str) -> str | None:
+        """Student or parent record id for those roles; the staff record id for every other role
+        (Staff, Teacher, and any Admin or custom role that has one)."""
+        from app.models.masters.parent_model import Parent
+        from app.models.masters.staff_model import Staff
+        from app.models.student.student_model import Student
+
+        model = {"Student": Student, "Parent": Parent}.get(role_name, Staff)
+        try:
+            async with db.begin_nested():
+                result = await db.execute(select(model.id).where(model.user_id == user_id).limit(1))
+                entity = result.scalars().first()
+        except Exception as e:
+            logger.warning(f"Could not resolve entity_id for role {role_name}: {e}")
+            return None
+        return str(entity) if entity else None
 
     @staticmethod
     async def validate_tenant(client_name: str) -> bool:

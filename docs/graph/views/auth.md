@@ -142,7 +142,7 @@ One login endpoint for every tenant user type (Admin, Teacher, Staff, Student, P
 - Note: Identifier lookup order is users.username, then users.email, then staff.phone; inactive users and wrong passwords return the same 401.
 - Note: Tokens are HS256 JWTs (app/tools/jwt_utils.py): access 24 h, refresh 7 d; claims sub, username, role (name), client_name, academic_year_id, academic_year_title.
 - Note: Use current_user['sub'] for the user id; real tokens have no id claim.
-- Note: Teacher entity_id is null on normal login because only role name Staff resolves a staff entity; the set-password path resolves Teacher too.
+- Note: entity_id is the student or parent record id for those roles and the staff record id for every other role (including Teacher); login and set-password share _resolve_entity_id.
 - Flows: [auth/normal-login](#authnormal-login)
 - Implemented by: `endpoint:GET /auth/academic-years`, `endpoint:POST /auth/login`, `mobile:app/login.tsx`, `service:app/service/auth/multi_tenant_auth_service.py`, `service:app/tools/jwt_utils.py`, `table:academic_years`, `table:users`, `web:src/api/auth.ts`, `web:src/components/login-form.tsx`, `web:src/lib/authStore.ts`, `web:src/pages/auth/LoginPage.tsx`
 - Shaped by: [auth/academic-year-in-jwt](#authacademic-year-in-jwt), [auth/menus-from-login-response](#authmenus-from-login-response), [auth/mobile-init-auth-order](#authmobile-init-auth-order), [auth/mobile-secure-token-storage](#authmobile-secure-token-storage), [auth/no-request-body-logging](#authno-request-body-logging), [auth/parent-context-before-login-success](#authparent-context-before-login-success)

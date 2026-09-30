@@ -75,7 +75,7 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 8. **Set-password signs the user straight in on both clients.** The response has the same shape as login (including `expires_in`). Web calls `login(data)`. Mobile `authApi.setStaffPassword` returns it, and `completePasswordSetup` stores it with `storeAuthData` and then runs the same `completeLogin` steps as a normal login (parent students, interceptor headers, one `LOGIN_SUCCESS`).
 9. **Mobile keeps the organization chosen at login.** `storeAuthData` writes `@auth/client_schema` from `response.client_name`, which login responses do not include, so it falls back to the already-stored org (set from the login screen) and only then to `test_tenant`.
 10. **Web admin login activates the selected academic year for the whole tenant.** `useLoginMutation` sends `PUT /masters/academic_years/{id} {is_active:true}`, and the backend deactivates all other years. An admin who picks a past year at login flips the tenant's active year. Other roles only scope their own session.
-11. **Teacher `entity_id` is null on normal login.** The login code only resolves a staff entity for role name `Staff`. The set-password path resolves Teacher too. Clients must not rely on `entity_id` for teachers.
+11. **`entity_id` in the login and set-password responses** comes from `MultiTenantAuthService._resolve_entity_id`: the student record id for `Student`, the parent record id for `Parent`, and the staff record id for every other role (Staff, Teacher, and an Admin or custom role that has a staff record). It is null when no record exists, for example an Admin without a staff row.
 12. **Profile updates silently drop unknown fields.**
     - Both clients send `phone` and `address` for students; the backend accepts only `email`, because Pydantic ignores extra fields.
     - Staff and parent email edits change the `staff`/`parent` row, **not `users.email`**, so the login identifier does not change.
@@ -105,6 +105,5 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 
 - There is no backend forgot/reset-password flow (email/OTP), and no endpoint to read `profile_audit_logs`.
 - `/auth/refresh` does not rotate or revoke the old refresh token, so a leaked refresh token stays usable until it expires or is revoked at logout.
-- Teacher `entity_id` is missing on normal login; see Rules & gotchas #11.
 - Mobile `src/api/auth.ts` holds a dead `refreshToken()` and dead token helpers that use AsyncStorage keys (`@auth/access_token`). The live path is `services/authUtils.ts`. The web equivalents `src/lib/apiClient.ts` and `src/constants/api/auth.ts` are also unused or stale.
 - The web forgot-password page tells users a reset link was sent when nothing was sent.
