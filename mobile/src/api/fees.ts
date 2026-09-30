@@ -1120,12 +1120,12 @@ export const feeRefundsApi = {
 
 /** Returned by GET /reports/fees/collection-summary/stats */
 export interface FeeCollectionStats {
-  total_collected: string;   // Decimal as string
-  total_due: string;
+  total_collected: number;
+  total_due: number;
   collection_percentage: number;
-  payment_methods: Record<string, string>;   // { cash: "12000.00", ... }
-  fee_categories: Record<string, string>;
-  monthly_collection: Record<string, string>;
+  payment_methods: Record<string, number>;
+  fee_categories: Record<string, number>;
+  monthly_collection: Record<string, number>;
 }
 
 /** Item in GET /reports/fees/collection-summary data[] */
@@ -1175,46 +1175,61 @@ export interface FeeStructureItem {
   status: string;
 }
 
-/** Stats returned by GET /reports/fee/pending-fees/stats */
+/** Returned by GET /reports/fees/pending-fees/stats */
 export interface FeePendingStats {
-  total_pending: string;
-  student_count: number;
-  overdue_count: number;
+  total_pending_amount: number;
+  total_overdue_amount: number;
+  total_students_with_pending: number;
+  total_students_overdue: number;
+  average_overdue_days: number;
+  fee_categories_pending: Record<string, number>;
+  class_wise_pending: Record<string, number>;
 }
 
-/** Stats returned by GET /reports/fee/structure/stats */
+/** Returned by GET /reports/fees/fee-structure/stats */
 export interface FeeStructureStats {
-  total_structure_amount: string;
-  class_count: number;
-  fee_type_count: number;
+  total_fee_types: number;
+  total_categories: number;
+  total_terms: number;
+  average_fee_amount: number;
+  fee_range: { min: number; max: number };
+  category_wise_breakdown: Record<string, number>;
 }
+
+const FEE_REPORT_EXPORT_TYPES = {
+  collection: 'fee_collection_summary',
+  pending: 'pending_fees',
+  structure: 'fee_structure',
+} as const;
 
 export const feeReportsApi = {
-  /** GET /reports/fee/collection-summary/stats — aggregate totals card */
+  /** GET /reports/fees/collection-summary/stats — aggregate totals card */
   getCollectionStats: async (params?: {
     academic_year_id?: string;
     date_from?: string;
     date_to?: string;
     payment_method?: string;
+    status?: string;
   }): Promise<FeeCollectionStats> => {
-    const response = await apiClient.get('/reports/fee/collection-summary/stats', { params });
+    const response = await apiClient.get('/reports/fees/collection-summary/stats', { params });
     return response.data;
   },
 
-  /** GET /reports/fee/collection-summary — paginated transaction rows */
+  /** GET /reports/fees/collection-summary — paginated transaction rows */
   getCollectionSummary: async (params?: {
     academic_year_id?: string;
     date_from?: string;
     date_to?: string;
     payment_method?: string;
+    status?: string;
     page?: number;
     page_size?: number;
   }): Promise<FeeCollectionItem[]> => {
-    const response = await apiClient.get('/reports/fee/collection-summary', { params });
+    const response = await apiClient.get('/reports/fees/collection-summary', { params });
     return response.data.data || [];
   },
 
-  /** GET /reports/fee/pending-fees — paginated pending rows */
+  /** GET /reports/fees/pending-fees — paginated pending rows */
   getPendingFees: async (params?: {
     academic_year_id?: string;
     class_id?: string;
@@ -1223,20 +1238,21 @@ export const feeReportsApi = {
     page?: number;
     page_size?: number;
   }): Promise<FeePendingItem[]> => {
-    const response = await apiClient.get('/reports/fee/pending-fees', { params });
+    const response = await apiClient.get('/reports/fees/pending-fees', { params });
     return response.data.data || [];
   },
 
-  /** GET /reports/fee/pending-fees/stats */
+  /** GET /reports/fees/pending-fees/stats */
   getPendingFeesStats: async (params?: {
     academic_year_id?: string;
     class_id?: string;
+    section_id?: string;
   }): Promise<FeePendingStats> => {
-    const response = await apiClient.get('/reports/fee/pending-fees/stats', { params });
+    const response = await apiClient.get('/reports/fees/pending-fees/stats', { params });
     return response.data;
   },
 
-  /** GET /reports/fee/structure — paginated structure rows */
+  /** GET /reports/fees/fee-structure — paginated structure rows */
   getFeeStructure: async (params?: {
     academic_year_id?: string;
     class_id?: string;
@@ -1244,26 +1260,34 @@ export const feeReportsApi = {
     page?: number;
     page_size?: number;
   }): Promise<FeeStructureItem[]> => {
-    const response = await apiClient.get('/reports/fee/structure', { params });
+    const response = await apiClient.get('/reports/fees/fee-structure', { params });
     return response.data.data || [];
   },
 
-  /** GET /reports/fee/structure/stats */
+  /** GET /reports/fees/fee-structure/stats */
   getFeeStructureStats: async (params?: {
     academic_year_id?: string;
     class_id?: string;
   }): Promise<FeeStructureStats> => {
-    const response = await apiClient.get('/reports/fee/structure/stats', { params });
+    const response = await apiClient.get('/reports/fees/fee-structure/stats', { params });
     return response.data;
   },
 
-  /** POST /reports/fee/export → Blob (CSV/XLSX) */
+  /** POST /reports/fees/export → Blob (CSV/XLSX) */
   exportReport: async (data: {
-    report_type: 'collection' | 'pending' | 'structure';
+    report_type: keyof typeof FEE_REPORT_EXPORT_TYPES;
     format?: 'csv' | 'xlsx';
     filters?: Record<string, any>;
   }): Promise<Blob> => {
-    const response = await apiClient.post('/reports/fee/export', data, { responseType: 'blob' });
+    const response = await apiClient.post(
+      '/reports/fees/export',
+      {
+        report_type: FEE_REPORT_EXPORT_TYPES[data.report_type],
+        format: data.format ?? 'csv',
+        filters: data.filters ?? {},
+      },
+      { responseType: 'blob' },
+    );
     return response.data;
   },
 };

@@ -2,6 +2,7 @@
 API endpoints for fee-related reports
 """
 
+from datetime import datetime
 import logging
 from uuid import UUID
 
@@ -24,6 +25,15 @@ from app.tools.simple_permissions import check_role_plan_permission_with_error, 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _parse_date_to(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    parsed = datetime.fromisoformat(value)
+    if len(value) == 10:
+        return parsed.replace(hour=23, minute=59, second=59, microsecond=999999)
+    return parsed
 
 
 @router.get("/collection-summary", response_model=ReportResponse)
@@ -79,7 +89,7 @@ async def get_fee_collection_summary(
         from datetime import datetime
 
         parsed_date_from = datetime.fromisoformat(date_from) if date_from else None
-        parsed_date_to = datetime.fromisoformat(date_to) if date_to else None
+        parsed_date_to = _parse_date_to(date_to)
 
         # Create filters
         filters = FeeCollectionSummaryFilter(
@@ -160,7 +170,7 @@ async def get_fee_collection_summary_stats(
         from datetime import datetime
 
         parsed_date_from = datetime.fromisoformat(date_from) if date_from else None
-        parsed_date_to = datetime.fromisoformat(date_to) if date_to else None
+        parsed_date_to = _parse_date_to(date_to)
 
         # Create filters
         filters = FeeCollectionSummaryFilter(
@@ -486,7 +496,9 @@ async def export_fee_report(
         total_count = 0
 
         if export_request.report_type == "fee_collection_summary":
-            filters = FeeCollectionSummaryFilter(**export_request.filters)
+            filters = FeeCollectionSummaryFilter(
+                **{**export_request.filters, "date_to": _parse_date_to(export_request.filters.get("date_to"))}
+            )
             data, total_count = await service.get_fee_collection_summary(filters)
         elif export_request.report_type == "pending_fees":
             filters = PendingFeesFilter(**export_request.filters)

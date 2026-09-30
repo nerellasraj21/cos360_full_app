@@ -140,15 +140,15 @@ function FeeReportsScreenContent() {
     return (
       <View style={styles.statsRow}>
         <View style={[styles.statCard, { backgroundColor: '#fee2e2' }]}>
-          <Text style={[styles.statValue, { color: '#991b1b' }]}>{fmt(stats.total_pending)}</Text>
+          <Text style={[styles.statValue, { color: '#991b1b' }]}>{fmt(stats.total_pending_amount)}</Text>
           <Text style={[styles.statLabel, { color: '#991b1b' }]}>Total Pending</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: '#fef3c7' }]}>
-          <Text style={[styles.statValue, { color: '#92400e' }]}>{stats.student_count}</Text>
+          <Text style={[styles.statValue, { color: '#92400e' }]}>{stats.total_students_with_pending}</Text>
           <Text style={[styles.statLabel, { color: '#92400e' }]}>Students</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: '#ffe4e6' }]}>
-          <Text style={[styles.statValue, { color: '#9f1239' }]}>{stats.overdue_count}</Text>
+          <Text style={[styles.statValue, { color: '#9f1239' }]}>{stats.total_students_overdue}</Text>
           <Text style={[styles.statLabel, { color: '#9f1239' }]}>Overdue</Text>
         </View>
       </View>
@@ -160,15 +160,15 @@ function FeeReportsScreenContent() {
     return (
       <View style={styles.statsRow}>
         <View style={[styles.statCard, { backgroundColor: '#ede9fe' }]}>
-          <Text style={[styles.statValue, { color: '#5b21b6' }]}>{fmt(stats.total_structure_amount)}</Text>
-          <Text style={[styles.statLabel, { color: '#5b21b6' }]}>Total Amt</Text>
+          <Text style={[styles.statValue, { color: '#5b21b6' }]}>{fmt(stats.average_fee_amount)}</Text>
+          <Text style={[styles.statLabel, { color: '#5b21b6' }]}>Avg Fee</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: '#dbeafe' }]}>
-          <Text style={[styles.statValue, { color: '#1e40af' }]}>{stats.class_count}</Text>
-          <Text style={[styles.statLabel, { color: '#1e40af' }]}>Classes</Text>
+          <Text style={[styles.statValue, { color: '#1e40af' }]}>{stats.total_categories}</Text>
+          <Text style={[styles.statLabel, { color: '#1e40af' }]}>Categories</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: '#d1fae5' }]}>
-          <Text style={[styles.statValue, { color: '#065f46' }]}>{stats.fee_type_count}</Text>
+          <Text style={[styles.statValue, { color: '#065f46' }]}>{stats.total_fee_types}</Text>
           <Text style={[styles.statLabel, { color: '#065f46' }]}>Fee Types</Text>
         </View>
       </View>

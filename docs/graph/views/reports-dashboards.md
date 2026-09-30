@@ -93,7 +93,7 @@ List export audit rows and download files produced by background exports.
 
 Fee collection summary, pending fees and fee structure reports, each with /stats, plus export.
 - Roles: fee_reports:read and :export; superadmin tokens skip the check.
-- Parity: Web fee reports live under /fee/reports. Mobile calls /reports/fee/* and /structure, which return 404 (real paths /reports/fees/* and /fee-structure).
+- Parity: Web fee reports live under /fee/reports. Mobile app/reports/fee-reports.tsx and app/fees/reports.tsx use the same endpoints and stats.
 - Flows: [reports-dashboards/fetch-report](#reports-dashboardsfetch-report)
 - Implemented by: `endpoint:GET /reports/fees/collection-summary`, `endpoint:GET /reports/fees/collection-summary/stats`, `endpoint:GET /reports/fees/fee-structure`, `endpoint:GET /reports/fees/pending-fees`, `endpoint:POST /reports/fees/export`, `mobile:app/reports/fee-reports.tsx`, `mobile:src/api/fees.ts`, `service:app/service/reports/fee_report_service.py`, `web:src/constants/api/fee.ts`, `web:src/pages/fee/FeeReports.tsx`
 - Shaped by: [reports-dashboards/per-group-report-permissions](#reports-dashboardsper-group-report-permissions)

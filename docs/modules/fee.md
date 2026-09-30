@@ -95,6 +95,7 @@ Endpoint prefixes:
     - `/fee/collection/pay`: aware of concessions and old fees.
     - New UI should use `/pay`.
 18. **Web year default:** `web/src/api/fee/{categories,terms,classMappings,studentMappings,transactions}.ts` fill a missing `academic_year_id` from `academicYearStore.selectedAcademicYearId` (the header selector); creates throw "Academic year is required" when none is selected.
+19. **Fee report numbers:** a pending-fees row is one unpaid instalment (`fee_student_map_term_amounts`), matched to `completed` payments by `term_date_id` and due on its `fee_term_dates` date. Collection stats count only `completed` transactions, and their total due counts each paid instalment's amount once. Each `/stats` endpoint aggregates the same filtered query as its table, so the two always agree. A plain `date_to` (`YYYY-MM-DD`) includes that whole day.
 
 ## Web / mobile parity
 - **Both clients**: structure CRUD, the collection detail page with 5 tabs and `fee_items`, receipts (including verify and PDF), refunds, reports, and my-fees/my-receipts/my-transactions.
@@ -102,21 +103,20 @@ Endpoint prefixes:
 - **Mobile only**: separate `class-mappings`, `student-mappings` and `assign-student-fees` screens. Web handles these as tabs in `/fee/mappings`.
 - **Mobile paths that are wrong** (all 404):
   - Old fees use `/fee/old/...`; the backend path is `/fee/old-fees/...`.
-  - Reports use `/reports/fee/...` and `/structure`; the backend paths are `/reports/fees/...` and `/fee-structure`. Mobile export is also CSV-only (share sheet), while web offers xlsx and pdf.
 - **Mobile payloads that are wrong** (all 422):
   - Carry-forward sends `{previous_year_id, current_year_id, student_ids}`.
   - Refund approve leaves out `approved_by_user_id`.
   - Refund process sends `reference_number` and no `refund_method`.
   - `app/fees/collection.tsx` calls my-summary, child-summary and summary without `academic_year_id`, which is a required query parameter. The `X-Academic-Year-ID` header does not satisfy it.
 - **Both clients call refund endpoints that don't exist**: `PUT`/`DELETE /fee/refunds/{id}` and `POST /{id}/cancel`. Web also calls `/by-transaction/{id}`.
+- Report export: web offers xlsx and pdf. Mobile is CSV only: `app/fees/reports.tsx` downloads the backend CSV, and `app/reports/fee-reports.tsx` builds it from the rows on screen.
 - `web/src/api/fee/mappings.ts` points at a `/fee/mappings/` API that doesn't exist. Use `classMappings.ts` or `studentMappings.ts`.
 
 ## Known gaps
 - `FeeRefundService.search_refunds` has a parameter named `status` that shadows `fastapi.status`, so its `except` block raises `AttributeError` instead of a 500 if the search fails.
-- The pending-fees report (`fee_report_service.get_pending_fees`) still has two problems:
-  - It filters by `fee_term_id`, which every instalment shares.
-  - It ignores concessions, and `due_date` is a placeholder (now + 30 days).
-- The fee report `/stats` endpoints (collection summary, pending fees, fee structure) return hard-coded zeros; `get_*_summary_stats` in `fee_report_service.py` are placeholders.
+- The pending-fees report ignores concessions, so a student with a concession still shows the full instalment as pending.
+- Fee report export (`POST /reports/fees/export`) only includes the first 100 rows: the filter schemas default to `page_size=100` and the export does not override it.
+- Web Fee Reports only loads the stats tables once a filter is set (`enabled` in `web/src/hooks/fee/useFeeReports.ts`).
 - The payment SMS always ends up `failed` when a parent phone exists: `_dispatch_sms_receipt` reads `txn.created_by`, which is not a column on `FeeTransaction`.
 - `DELETE /fee/concessions/{id}` and `DELETE /fee/old-fees/{id}` declare `response_model` Read schemas but return a dict. The change is committed, then response validation returns a 500.
 - A concession can't be revoked and then re-added for the same student, type and year. The unique constraint still counts the inactive row, so the insert returns a 500.

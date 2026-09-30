@@ -111,24 +111,24 @@ class FeeStructureData(BaseModel):
 class FeeCollectionSummary(BaseModel):
     """Fee collection summary statistics"""
 
-    total_collected: Decimal
-    total_due: Decimal
+    total_collected: float
+    total_due: float
     collection_percentage: float
-    payment_methods: dict[str, Decimal]  # payment_method -> amount
-    fee_categories: dict[str, Decimal]  # category -> amount
-    monthly_collection: dict[str, Decimal]  # month -> amount
+    payment_methods: dict[str, float]  # payment_method -> amount
+    fee_categories: dict[str, float]  # category -> amount
+    monthly_collection: dict[str, float]  # month -> amount
 
 
 class PendingFeesSummary(BaseModel):
     """Pending fees summary statistics"""
 
-    total_pending_amount: Decimal
-    total_overdue_amount: Decimal
+    total_pending_amount: float
+    total_overdue_amount: float
     total_students_with_pending: int
     total_students_overdue: int
     average_overdue_days: float
-    fee_categories_pending: dict[str, Decimal]  # category -> amount
-    class_wise_pending: dict[str, Decimal]  # class -> amount
+    fee_categories_pending: dict[str, float]  # category -> amount
+    class_wise_pending: dict[str, float]  # class -> amount
 
 
 class FeeStructureSummary(BaseModel):
@@ -137,6 +137,6 @@ class FeeStructureSummary(BaseModel):
     total_fee_types: int
     total_categories: int
     total_terms: int
-    average_fee_amount: Decimal
-    fee_range: dict[str, Decimal]  # min, max
+    average_fee_amount: float
+    fee_range: dict[str, float]  # min, max
     category_wise_breakdown: dict[str, int]  # category -> count

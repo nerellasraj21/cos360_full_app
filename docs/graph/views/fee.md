@@ -81,11 +81,13 @@ graph LR
   n34 -.->|shapes| n20
   n35[/"refund-total-counts-processed"/]
   n35 -.->|shapes| n12
-  n36[/"sms-optional-per-payment"/]
-  n36 -.->|shapes| n2
-  n36 -.->|shapes| n17
-  n37[/"update-term-dates-in-place"/]
-  n37 -.->|shapes| n8
+  n36[/"report-stats-reuse-report-query"/]
+  n36 -.->|shapes| n6
+  n37[/"sms-optional-per-payment"/]
+  n37 -.->|shapes| n2
+  n37 -.->|shapes| n17
+  n38[/"update-term-dates-in-place"/]
+  n38 -.->|shapes| n8
 ```
 
 ## Features
@@ -137,9 +139,10 @@ From the Summary tab, preview and send a fee-due summary SMS to the parent; a re
 
 Fee reports under /reports/fees: collection summary, pending fees and fee structure, each with stats and an export.
 - Roles: fee_reports permission with the export extra action.
-- Parity: Web exports xlsx and pdf. Mobile calls /reports/fee/... and /structure (404) and exports CSV only.
-- Note: The pending-fees report filters by the shared fee_term_id, ignores concessions and uses a placeholder due date; the /stats endpoints return hard-coded zeros.
+- Parity: Web exports xlsx and pdf. Mobile exports CSV only.
+- Note: The pending-fees report ignores concessions, and export only includes the first 100 rows.
 - Implemented by: `endpoint:GET /reports/fees/collection-summary`, `endpoint:GET /reports/fees/fee-structure`, `endpoint:GET /reports/fees/pending-fees`, `endpoint:POST /reports/fees/export`, `mobile:app/fees/reports.tsx`, `service:app/service/reports/fee_report_service.py`, `web:src/pages/fee/FeeReports.tsx`
+- Shaped by: [fee/report-stats-reuse-report-query](#feereport-stats-reuse-report-query)
 
 ### fee/fee-self-service
 
@@ -592,6 +595,15 @@ Shaped by: [fee/mandatory-fees-applied-by-backend](#feemandatory-fees-applied-by
 - **Alternatives**: Summing every requested refund, which would include rejected and not-yet-paid amounts.
 - **Since**: 2026-09
 - Shapes: `endpoint:GET /fee/refunds/statistics`, `feature:fee/refunds`
+
+### fee/report-stats-reuse-report-query (active)
+
+- **Decision**: Each fee report /stats endpoint aggregates the same filtered query as its table: collection and structure stats wrap the report query as a subquery, and pending stats sum the same computed pending rows.
+- **Why**: The stats cards must agree with the table under any filter; separate aggregation queries had drifted into placeholders returning zeros.
+- **Alternatives**: Separate SQL aggregates per stat, which duplicate the join and filter logic.
+- **Tradeoff**: Pending fees are computed in Python from one mapping query and one grouped payment query, so the report and its stats load every pending instalment for the filter before paginating.
+- **Since**: 2026-09
+- Shapes: `feature:fee/fee-reports`, `service:app/service/reports/fee_report_service.py`
 
 ### fee/sms-optional-per-payment
 

@@ -398,21 +398,21 @@ function FeeReportsScreenContent() {
                   <View style={styles.statsRow}>
                     <View style={[styles.statCard, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
                       <Text style={[styles.statValue, { color: '#92400E' }]}>
-                        {formatINR(pendingStats.total_pending)}
+                        {formatINR(pendingStats.total_pending_amount)}
                       </Text>
                       <Text style={[styles.statLabel, { color: '#B45309' }]}>Total Pending</Text>
                     </View>
                     <View style={[styles.statCard, { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}>
-                      <Text style={[styles.statValue, { color: '#991B1B' }]}>{pendingStats.student_count}</Text>
+                      <Text style={[styles.statValue, { color: '#991B1B' }]}>{pendingStats.total_students_with_pending}</Text>
                       <Text style={[styles.statLabel, { color: '#B91C1C' }]}>Students</Text>
                     </View>
                     <View style={[styles.statCard, { backgroundColor: '#EDE9FE', borderColor: '#DDD6FE' }]}>
-                      <Text style={[styles.statValue, { color: '#5B21B6' }]}>{pendingStats.overdue_count}</Text>
+                      <Text style={[styles.statValue, { color: '#5B21B6' }]}>{pendingStats.total_students_overdue}</Text>
                       <Text style={[styles.statLabel, { color: '#6D28D9' }]}>Overdue</Text>
                     </View>
                     <View style={[styles.statCard, { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' }]}>
-                      <Text style={[styles.statValue, { color: '#9A3412' }]}>{formatINR((pendingData??[]).reduce((s,r)=>s+Number(r.balance_amount),0))}</Text>
-                      <Text style={[styles.statLabel, { color: '#C2410C' }]}>Total Due</Text>
+                      <Text style={[styles.statValue, { color: '#9A3412' }]}>{formatINR(pendingStats.total_overdue_amount)}</Text>
+                      <Text style={[styles.statLabel, { color: '#C2410C' }]}>Overdue Amt</Text>
                     </View>
                   </View>
                 )}
@@ -478,17 +478,17 @@ function FeeReportsScreenContent() {
                   <View style={styles.statsRow}>
                     <View style={[styles.statCard, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' }]}>
                       <Text style={[styles.statValue, { color: '#3730A3' }]}>
-                        {formatINR(structureStats.total_structure_amount)}
+                        {formatINR(structureStats.average_fee_amount)}
                       </Text>
-                      <Text style={[styles.statLabel, { color: '#4338CA' }]}>Total Amount</Text>
+                      <Text style={[styles.statLabel, { color: '#4338CA' }]}>Avg Fee</Text>
                     </View>
                     <View style={[styles.statCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
-                      <Text style={[styles.statValue, { color: '#14532D' }]}>{structureStats.fee_type_count}</Text>
+                      <Text style={[styles.statValue, { color: '#14532D' }]}>{structureStats.total_fee_types}</Text>
                       <Text style={[styles.statLabel, { color: '#166534' }]}>Fee Types</Text>
                     </View>
                     <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
-                      <Text style={[styles.statValue, { color: colors.foreground }]}>{structureStats.class_count}</Text>
-                      <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Classes</Text>
+                      <Text style={[styles.statValue, { color: colors.foreground }]}>{structureStats.total_categories}</Text>
+                      <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Categories</Text>
                     </View>
                   </View>
                 )}
