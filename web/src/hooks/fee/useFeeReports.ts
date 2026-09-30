@@ -46,7 +46,6 @@ export function useFeeCollectionStats(
   return useQuery({
     queryKey: feeReportKeys.collectionStats(filters),
     queryFn: () => getFeeCollectionStats(filters),
-    enabled: Object.values(filters).some((v) => v !== undefined && v !== ''),
   });
 }
 
@@ -64,7 +63,6 @@ export function usePendingFeesStats(
   return useQuery({
     queryKey: feeReportKeys.pendingFeesStats(filters),
     queryFn: () => getPendingFeesStats(filters),
-    enabled: Object.values(filters).some((v) => v !== undefined && v !== ''),
   });
 }
 
@@ -82,7 +80,6 @@ export function useFeeStructureStats(
   return useQuery({
     queryKey: feeReportKeys.feeStructureStats(filters),
     queryFn: () => getFeeStructureStats(filters),
-    enabled: Object.values(filters).some((v) => v !== undefined && v !== ''),
   });
 }
 

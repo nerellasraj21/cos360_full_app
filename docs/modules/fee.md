@@ -114,7 +114,6 @@ Endpoint prefixes:
 
 ## Known gaps
 - The pending-fees report ignores concessions, so a student with a concession still shows the full instalment as pending.
-- Web Fee Reports only loads the stats tables once a filter is set (`enabled` in `web/src/hooks/fee/useFeeReports.ts`).
 - The payment SMS always ends up `failed` when a parent phone exists: `_dispatch_sms_receipt` reads `txn.created_by`, which is not a column on `FeeTransaction`.
 - `DELETE /fee/concessions/{id}` and `DELETE /fee/old-fees/{id}` declare `response_model` Read schemas but return a dict. The change is committed, then response validation returns a 500.
 - A concession can't be revoked and then re-added for the same student, type and year. The unique constraint still counts the inactive row, so the insert returns a 500.
