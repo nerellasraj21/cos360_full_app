@@ -87,7 +87,7 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 | Base URL | `VITE_API_BASE_URL` (includes `/api/v1`) | `EXPO_PUBLIC_API_URL` (includes `/api/v1`) |
 | `cschema` value | Subdomain of `window.location.hostname`, else `VITE_DEFAULT_TENANT` (`getTenantFromHostname`, `lib/config.ts`) | Org code chosen on login screen (hardcoded list in `app/login.tsx`), stored in AsyncStorage, else `EXPO_PUBLIC_DEFAULT_TENANT`, else `test_tenant` |
 | Token storage | Zustand `persist` → `localStorage['auth-storage']` (tokens, permissions, menu) | `expo-secure-store` for tokens; AsyncStorage for user/role/permissions/menu/schema |
-| Refresh on 401 | Calls **`/auth/login/refresh`** (wrong path, 404) → logout | Calls `/auth/refresh` with a shared in-flight lock; assumes 1 h expiry because there is no `expires_in` |
+| Refresh on 401 | Calls `/auth/refresh` with a shared in-flight refresh, retries once, logs out if the refresh fails | Calls `/auth/refresh` with a shared in-flight lock; assumes 1 h expiry because there is no `expires_in` |
 | Error text | `detail` (string, array or object) copied into `error.message` | `services/errorHandler.ts` copies `detail` or `message` into `error.message` |
 
 - Both clients send `Authorization: Bearer`, `cschema`, and for parents `X-Student-ID`, `X-Academic-Year-ID`, `X-Class-ID`. **The backend ignores the `X-*` headers.** Child scoping comes from the `student_id` in the path or query plus `_related` permissions.

@@ -61,11 +61,8 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 1. **Use `current_user["sub"]` for the user id.** Real tokens have no `id` claim.
 2. **Menus, permissions and role are a login-time snapshot.** Role or permission edits, menu seeding and role reassignment all need a **logout + login**. A refresh does not help because it copies the old `role` claim. Server-side checks use the role name from the JWT, so a demoted user keeps old rights for up to 7 days by refreshing.
 3. **`is_first_login` is not in the SQLAlchemy `User` model.** It is read and written only with raw SQL inside try/except. If a tenant schema lacks the column, the first-login check silently passes and the user logs in normally. No Alembic revision creates the column (it was added by hand), so it exists only in schemas cloned from one that has it. Admin password reset does **not** set it.
-4. **The refresh path is `/auth/refresh`.**
-   - Web calls `/auth/login/refresh` (`src/api/index.ts`). That 404s, so the interceptor logs the user out and redirects to `/login` on the first 401 after the 24 h access token expires.
-   - Web refresh is effectively broken.
-   - `src/constants/api/auth.ts` and the root `CLAUDE.md` also give the wrong path.
-   - Mobile uses the correct path.
+4. **The refresh path is `POST /auth/refresh`** on both clients.
+   - Web (`src/api/index.ts`): on a 401 (except `/auth/login*`) it runs one shared refresh for every request that fails while it is in flight, sends the current tenant header, stores the new pair and retries each request once. A request that fails after another one already refreshed is retried with the newer token instead of refreshing again. If the refresh itself fails, the store is logged out and the page goes to `/login`.
 5. **`client_name` in the login body does not choose the database schema.**
    - It is only used to validate that the tenant exists and to fill the JWT `client_name` claim.
    - The DB session always uses the request tenant resolved by `TenantMiddleware` (see [../architecture.md](../architecture.md)).
@@ -102,7 +99,7 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 | Capability | Web | Mobile |
 |---|---|---|
 | Organization picker at login | No (tenant from subdomain; body `client_name` hardcoded) | Yes (hardcoded org list + free text, normalized to lowercase) |
-| Token refresh | Broken path (rule 4) | Works, with a proactive 1 h assumption (rule 7) |
+| Token refresh | On 401, one shared refresh (rule 4) | Works, with a proactive 1 h assumption (rule 7) |
 | First-login set-password | Logs straight in | Forces re-login (rule 8) |
 | Forgot password | Fake "reset link sent" after a `setTimeout`; misleading | Stub that tells the user to contact the school admin |
 | Self password change | Only on Admin Profile (`/admin/profile`) | All roles (`app/profile/change-password.tsx`) |
@@ -113,7 +110,6 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 ## Known gaps
 
 - There is no backend forgot/reset-password flow (email/OTP), and no endpoint to read `profile_audit_logs`.
-- Web refresh path is wrong; see Rules & gotchas #4.
 - Logout does not revoke the refresh token on either client, and mobile does not revoke the access token either; see Rules & gotchas #6.
 - Mobile clears still-refreshable sessions on cold start (Rules & gotchas #7) and discards the set-password session (Rules & gotchas #8).
 - `/auth/refresh` does not rotate or revoke the old refresh token and does not re-check `users.is_active`, so a deactivated user keeps refreshing for up to 7 days.

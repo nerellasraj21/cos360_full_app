@@ -3,7 +3,7 @@ export const AUTH_BASE = '/auth';
 
 // Login & Authentication
 export const AUTH_LOGIN = `${AUTH_BASE}/login`;
-export const AUTH_REFRESH = `${AUTH_BASE}/login/refresh`;
+export const AUTH_REFRESH = `${AUTH_BASE}/refresh`;
 export const AUTH_LOGOUT = `${AUTH_BASE}/login/logout`;
 
 // User Management

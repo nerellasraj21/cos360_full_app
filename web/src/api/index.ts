@@ -41,39 +41,58 @@ CAxios.interceptors.request.use((axiosConfig) => {
   return axiosConfig;
 });
 
+// One refresh shared by every request that gets a 401 while it is in flight
+let refreshPromise: Promise<string> | null = null;
+
+const refreshAccessToken = async (refreshToken: string): Promise<string> => {
+  const tenant = typeof window !== 'undefined'
+    ? getTenantFromHostname(window.location.hostname)
+    : config.tenant.defaultTenant;
+  const { data } = await axios.post(`${config.api.baseURL}/auth/refresh`, {
+    refresh_token: refreshToken,
+  }, {
+    headers: {
+      'Content-Type': 'application/json',
+      [config.tenant.headerName]: tenant,
+    },
+  });
+  useAuthStore.getState().refreshTokens(data.access_token, data.refresh_token);
+  return data.access_token;
+};
+
 // Response interceptor to handle token refresh
 CAxios.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const isLoginRequest = typeof originalRequest?.url === 'string' && originalRequest.url.includes('/auth/login');
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isLoginRequest) {
+      const { accessToken: currentToken, refreshToken } = useAuthStore.getState();
+      const sentToken = String(originalRequest.headers?.Authorization ?? '').replace('Bearer ', '');
 
-      try {
-        const { refreshToken } = useAuthStore.getState();
-        if (refreshToken) {
-          // Attempt to refresh token
-          const refreshResponse = await axios.post(`${config.api.baseURL}/auth/login/refresh`, {
-            refresh_token: refreshToken,
-          }, {
-            headers: {
-              'Content-Type': 'application/json',
-              [config.tenant.headerName]: config.tenant.defaultTenant, // Use default tenant for refresh
-            },
+      // Another request already refreshed after this one was sent: retry with the newer token
+      if (currentToken && sentToken && sentToken !== currentToken && !refreshPromise) {
+        originalRequest._retry = true;
+        originalRequest.headers.Authorization = `Bearer ${currentToken}`;
+        return CAxios(originalRequest);
+      }
+
+      if (refreshToken) {
+        originalRequest._retry = true;
+        try {
+          refreshPromise = refreshPromise ?? refreshAccessToken(refreshToken).finally(() => {
+            refreshPromise = null;
           });
+          const accessToken = await refreshPromise;
 
-          const { access_token, refresh_token } = refreshResponse.data;
-          useAuthStore.getState().refreshTokens(access_token, refresh_token);
-
-          // Retry the original request with new token
-          originalRequest.headers.Authorization = `Bearer ${access_token}`;
+          // Retry the original request with the new token
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           return CAxios(originalRequest);
+        } catch {
+          useAuthStore.getState().logout();
+          window.location.href = '/login';
         }
-      } catch (refreshError) {
-        // If refresh fails, logout
-        useAuthStore.getState().logout();
-        window.location.href = '/login';
       }
     }
 

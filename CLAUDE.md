@@ -29,7 +29,7 @@ Web and mobile are both clients of the same backend. When a feature touches the 
 
 - **Base URL**: everything is under `/api/v1` (`backend/app/main.py`). Web reads `VITE_API_BASE_URL`; mobile reads `EXPO_PUBLIC_API_URL` (both include `/api/v1`).
 - **Tenant**: every request carries a `cschema` header (schema-per-tenant PostgreSQL). Middleware: `backend/app/middleware/tenant_middleware.py`. Warning: it currently resolves every request to `TENANT_DEFAULT_NAME`, not the header value — read `docs/architecture.md` before touching tenancy.
-- **Auth**: JWT bearer tokens; refresh via `POST /auth/refresh`. (The web client still posts to `/auth/login/refresh` — a known bug, see `docs/modules/auth.md`.)
+- **Auth**: JWT bearer tokens; refresh via `POST /auth/refresh` (both clients). Details: `docs/modules/auth.md`.
 - **Permissions**: a permission is a `(resource, action)` pair on the user's role. The plan layer is intended to cap it but is **not enforced at runtime**. The backend is the source of truth; clients only hide UI. See `docs/permissions.md`.
 - **Types**: backend Pydantic schemas in `backend/app/schemas/` are the source of truth. Mirror them in `web/src/types/` and `mobile/src/types/`.
 

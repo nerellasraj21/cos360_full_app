@@ -148,7 +148,7 @@ One login endpoint for every tenant user type (Admin, Teacher, Staff, Student, P
 ### auth/token-refresh
 
 Exchange a refresh token for a new access/refresh pair without logging in again.
-- Parity: Web calls /auth/login/refresh, which 404s, so web users are logged out when the 24 h access token expires; mobile uses the correct /auth/refresh path.
+- Parity: Both clients call /auth/refresh; web refreshes on a 401 with one shared in-flight refresh.
 - Parity: Mobile refreshes proactively on an assumed 1 h expiry and clears the session on cold start after about 55 minutes.
 - Note: Refresh does not re-check users.is_active, so a deactivated user keeps refreshing for up to 7 days.
 - Flows: [auth/token-refresh](#authtoken-refresh)
@@ -304,7 +304,7 @@ Implements: `feature:auth/token-refresh`
 4. Claims (sub, username, role, client_name, academic year) are copied from the old refresh token; the user row is not re-read.
 5. The backend returns a new access/refresh pair `service:app/tools/jwt_utils.py`; the old refresh token is not revoked.
 
-- Failure: Web posts to /auth/login/refresh `web:src/api/index.ts`, which 404s, so the interceptor logs the user out and redirects to /login.
+- Failure: On web a failed refresh logs the store out and redirects to /login `web:src/api/index.ts`.
 - Failure: On mobile a failed refresh calls onSessionExpired so the app dispatches LOGOUT.
 
 ```mermaid

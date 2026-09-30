@@ -232,23 +232,21 @@ Shaped by: [platform/token-lifetimes](#platformtoken-lifetimes)
 
 ### platform/token-refresh-web
 
-- Trigger: A web API call through the shared axios instance gets a 401 and has not been retried yet.
+- Trigger: A web API call through the shared axios instance gets a 401, has not been retried yet, and is not an /auth/login request.
 
-1. The response interceptor marks the request as retried and reads refreshToken from the persisted auth store `web:src/api/index.ts` `web:src/lib/authStore.ts`
-2. It posts {refresh_token} to /auth/login/refresh with config.tenant.defaultTenant as the cschema header; the backend has no such route, so the call fails with 404 `web:src/api/index.ts` `web:src/lib/config.ts`
-3. On success it would store the new access and refresh tokens with refreshTokens and retry the original request with the new bearer token `web:src/lib/authStore.ts`
-4. On failure it calls logout() on the store and redirects to /login, so in practice a web 401 ends the session `web:src/lib/authStore.ts`
-
-- Note: The backend refresh route is `endpoint:POST /auth/refresh`; root CLAUDE.md also names the wrong /auth/login/refresh path.
+1. If the store already holds a newer access token than the one the request was sent with, and no refresh is running, the request is retried once with that token `web:src/api/index.ts` `web:src/lib/authStore.ts`
+2. Otherwise it reads refreshToken from the persisted auth store and joins the single in-flight refresh, starting one if none is running: POST {refresh_token} to `endpoint:POST /auth/refresh` with the current tenant header `web:src/api/index.ts` `web:src/lib/config.ts`
+3. On success the new access and refresh tokens are stored with refreshTokens and every waiting request is retried once with the new bearer token `web:src/lib/authStore.ts`
+4. If the refresh fails, it calls logout() on the store and redirects to /login `web:src/lib/authStore.ts`
 
 ```mermaid
 flowchart TD
-  s1["1. The response interceptor marks the request as retried and reads ref...<br/>web:src/api/index.ts<br/>web:src/lib/authStore.ts"]
-  s2["2. It posts {refresh_token} to /auth/login/refresh with config.tenant....<br/>web:src/api/index.ts<br/>web:src/lib/config.ts"]
+  s1["1. If the store already holds a newer access token than the one the re...<br/>web:src/api/index.ts<br/>web:src/lib/authStore.ts"]
+  s2["2. Otherwise it reads refreshToken from the persisted auth store and j...<br/>endpoint:POST /auth/refresh<br/>web:src/api/index.ts<br/>web:src/lib/config.ts"]
   s1 --> s2
-  s3["3. On success it would store the new access and refresh tokens with re...<br/>web:src/lib/authStore.ts"]
+  s3["3. On success the new access and refresh tokens are stored with refres...<br/>web:src/lib/authStore.ts"]
   s2 --> s3
-  s4["4. On failure it calls logout() on the store and redirects to /login, ...<br/>web:src/lib/authStore.ts"]
+  s4["4. If the refresh fails, it calls logout() on the store and redirects ...<br/>web:src/lib/authStore.ts"]
   s3 --> s4
 ```
 
