@@ -53,11 +53,11 @@ curl -X POST http://localhost:8003/api/v1/super_admin/auth/login \
 ```python
 # Test data isolation between tenants
 async def test_tenant_isolation():
-    # Create data in tenant A
-    tenant_a_data = await create_test_data(schema="cos360_main")
+    # Create data in tenant A (test tenants only; never the live little_bunny schema)
+    tenant_a_data = await create_test_data(schema="test_tenant_schema")
 
-    # Verify data not accessible from tenant B
-    tenant_b_data = await get_data_from_tenant(schema="test_tenant_schema")
+    # Verify data not accessible from tenant B (a second test schema cloned from cos360_master)
+    tenant_b_data = await get_data_from_tenant(schema="<second_test_schema>")
 
     assert tenant_a_data not in tenant_b_data
 ```

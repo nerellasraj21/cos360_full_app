@@ -12,7 +12,7 @@ _Last verified against code: 2026-09-29_
 | `public` | System tables (`BasePublic`): `tenants`, `plans`, `plan_resource_access`, super-admin tables, public menus. |
 | `cos360_master` | **Structure-only template and source of truth** for tenant structure. New tenants are cloned from it, and its `alembic_version` is the reference revision. It holds no business data, and its `resource_permissions` table is empty. |
 | tenant schemas | One per row in `public.tenants` (`client_name` = the `cschema` header value, `schema_name` = the schema). In code: `test_tenant_schema` (client `test_tenant`, dev/test) and `little_bunny` (client `little bunny`, the prod host default). |
-| legacy names | `cos360_masters` (the `env.py` default; has no `alembic_version`) and `cos360_main` (used by some scripts and slash commands). Check they still exist before targeting them. |
+| legacy names | `cos360_masters` (the `env.py` default; has no `alembic_version`) and `cos360_main` (client `default`: an active `public.tenants` row, but an empty schema with 55 of the template's tables and no data, as of 2026-09-30). Neither is migrated. `cos360_main` is only reached if a backend starts without `TENANT_DEFAULT_NAME`, whose code default is `default`. |
 
 List the live targets with `SELECT client_name, schema_name, is_active FROM public.tenants;`.
 

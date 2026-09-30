@@ -41,31 +41,14 @@ locust -f tests/performance/load_test.py --headless --users 100 --spawn-rate 10 
 
 ### 4. Database Preparation
 
-#### Production Database Setup
-```bash
-# Set production environment
-$env:DATABASE_URL='postgresql+asyncpg://<user>:<password>@<neon-host>/neondb?ssl=require'
+#### Backup
+Back up `public`, `cos360_master`, `test_tenant_schema` and `little_bunny` as described in the Backups section of `docs/operations/database-migrations.md`. `cos360_main` (client `default`) is an empty legacy schema and is not backed up or migrated.
 
-# Backup current production data
-pg_dump -h <neon-host> \
-        -U neondb_owner \
-        -d neondb \
-        --schema=public \
-        --schema=cos360_main \
-        --schema=test_tenant_schema \
-        > backup_pre_deploy_$(date +%Y%m%d_%H%M%S).sql
-```
-
-#### Migration Validation
-```bash
-# Check migration status
-python migrate_tenants.py --action verify-sync
-
-# Apply pending migrations
-python migrate_tenants.py --action sync-all
-
-# Verify schema integrity
-python migrate_tenants.py --action verify-schemas
+#### Migrations
+Apply pending revisions with the `/migration` workflow (`.claude/commands/migration.md`): `cos360_master` first, then each live tenant, one schema at a time with `SCHEMA_NAME` set. Every live schema must be migrated **before** the new code is deployed, or queries on new tables/columns return 500 for the schemas that lack them.
+```powershell
+$env:SCHEMA_NAME='little_bunny'; alembic current
+python scripts/diagnose_schema_drift.py
 ```
 
 ## Deployment Process
@@ -193,7 +176,7 @@ curl -X POST http://localhost:8003/api/v1/fee/categories/ \
 # Student Management
 curl -X GET http://localhost:8003/api/v1/student/admissions/ \
   -H "Authorization: Bearer <token>" \
-  -H "cschema: cos360_main"
+  -H "cschema: test_tenant"
 
 # Staff Management
 curl -X GET http://localhost:8003/api/v1/masters/staff/ \
@@ -245,12 +228,9 @@ uvicorn app.main:app --host 0.0.0.0 --port 8003 --workers 4
 ```
 
 ### Database Rollback
-```bash
-# Rollback migrations if needed
-python migrate_tenants.py --action downgrade --target <previous_revision>
-
-# Verify rollback success
-python migrate_tenants.py --action current
+```powershell
+# Per schema, newest tenant first, cos360_master last
+$env:SCHEMA_NAME='<schema>'; alembic downgrade <previous_revision>; alembic current
 ```
 
 ## Monitoring and Alerting
