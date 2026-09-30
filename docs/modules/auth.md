@@ -33,7 +33,7 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 - **Password change**
   - Self-service: `POST /profile/change-password`. It needs `current_password` plus a new password (min 8) and a matching confirmation, and requires permission `profile:update_own`.
   - Admin reset: `POST /admin/users/{id}/reset-password` (see [tenants-and-admin.md](tenants-and-admin.md)).
-- **No self-service forgot/reset password exists on the backend.** Both clients' "forgot password" screens are stubs. Recovery means asking the school admin to reset the password.
+- **No self-service forgot/reset password exists on the backend** (email is not integrated yet). Both clients' "forgot password" screens tell the user to contact the school admin, who resets the password. Replace them with a real reset request once email is integrated.
 - **Profiles:** `GET`/`PUT /profile/{student|staff|parent}/me`. Access is checked through `profile:read_own` / `profile:update_own`. Editable fields:
 
   | Role | Editable fields | Written to |
@@ -95,7 +95,7 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 | Organization picker at login | No (tenant from subdomain; body `client_name` hardcoded) | Yes (hardcoded org list + free text, normalized to lowercase) |
 | Token refresh | On 401, one shared refresh (rule 4) | On 401 and before `expires_in`, and on cold start (rule 7) |
 | First-login set-password | Logs straight in | Logs straight in (rule 8) |
-| Forgot password | Fake "reset link sent" after a `setTimeout`; misleading | Stub that tells the user to contact the school admin |
+| Forgot password | Tells the user to contact the school admin (no form) | Takes a username, then tells the user to contact the school admin |
 | Self password change | Only on Admin Profile (`/admin/profile`) | All roles (`app/profile/change-password.tsx`) |
 | Profile view/edit | Student/Staff/Parent pages; any other role is routed to StaffProfile, which 404s when the user has no `staff` row (typical for Admin) | Same role routing; falls back to a basic view on error |
 | Admin academic-year activation on login | Yes (rule 10) | No |
@@ -106,4 +106,3 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 - There is no backend forgot/reset-password flow (email/OTP), and no endpoint to read `profile_audit_logs`.
 - `/auth/refresh` does not rotate or revoke the old refresh token, so a leaked refresh token stays usable until it expires or is revoked at logout.
 - Mobile `src/api/auth.ts` holds a dead `refreshToken()` and dead token helpers that use AsyncStorage keys (`@auth/access_token`). The live path is `services/authUtils.ts`. The web equivalents `src/lib/apiClient.ts` and `src/constants/api/auth.ts` are also unused or stale.
-- The web forgot-password page tells users a reset link was sent when nothing was sent.
