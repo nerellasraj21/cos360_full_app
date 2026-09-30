@@ -96,6 +96,7 @@ Endpoint prefixes:
     - New UI should use `/pay`.
 18. **Web year default:** `web/src/api/fee/{categories,terms,classMappings,studentMappings,transactions}.ts` fill a missing `academic_year_id` from `academicYearStore.selectedAcademicYearId` (the header selector); creates throw "Academic year is required" when none is selected.
 19. **Fee report numbers:** a pending-fees row is one unpaid instalment (`fee_student_map_term_amounts`), matched to `completed` payments by `term_date_id` and due on its `fee_term_dates` date. Collection stats count only `completed` transactions, and their total due counts each paid instalment's amount once. Each `/stats` endpoint aggregates the same filtered query as its table, so the two always agree. A plain `date_to` (`YYYY-MM-DD`) includes that whole day. Export returns every matching row and always streams the file directly (see [reports](reports-dashboards.md) export routing).
+20. **Transaction status changes** (`PUT /fee/transactions/{id}`, `STATUS_TRANSITIONS` in `fee_transaction_service.py`): `pending` can become `completed`, `cancelled` or `bounced`; `completed` can only become `bounced`, and only for cheque/DD; `cancelled` and `bounced` are final. A completed payment is reversed through a refund, not a status change. `cheque_status` applies only to cheque/DD and moves `pending` to `cleared` or `bounced` (`cleared` can still bounce); a bounced cheque needs `status: bounced` in the same request. Anything else returns 400.
 
 ## Web / mobile parity
 - **Both clients**: structure CRUD, the collection detail page with 5 tabs and `fee_items`, receipts (including verify and PDF), refunds, reports, and my-fees/my-receipts/my-transactions.
@@ -119,5 +120,4 @@ Endpoint prefixes:
 - Refund and receipt services use `commit()` → `refresh()`, which breaks the repo rule of flush → select → commit.
 - Fee audit writes (`_write_audit_log` in the collection, concession and old-fee services) insert into `audit_logs`, which exists in no schema, so nothing is recorded. Each write runs in a savepoint before the commit, so the failure never affects the request.
 - Old-fee `settle` is gated on the `fee_old:delete` permission.
-- `PUT /fee/transactions/{id}` (`update_transaction_status`) writes any `status`/`cheque_status` with no transition check (e.g. `cancelled` → `completed`), so clients must restrict the choices.
 - No online payment gateway: parents cannot pay in-app. Every payment is recorded by staff, with UPI/bank references typed in by hand.

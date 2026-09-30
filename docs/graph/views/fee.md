@@ -267,8 +267,9 @@ Implements: `feature:fee/collect-payment`, `feature:fee/fee-transactions`, `feat
 1. A cheque or DD payment through `endpoint:POST /fee/collection/pay` is saved as status=pending with cheque_status=pending, and no receipt is created `table:fee_transactions`.
 2. Once the cheque clears, staff update the transaction with {status: completed, cheque_status: cleared} `endpoint:PUT /fee/transactions/{transaction_id}` `service:app/service/fee/fee_transaction_service.py` `web:src/pages/fee/FeeTransactions.tsx` `mobile:app/fees/transactions.tsx`.
 3. Staff then generate the receipt explicitly `endpoint:POST /fee/receipts/generate/{transaction_id}` `service:app/service/fee/fee_receipt_service.py` `table:fee_receipts`; nothing generates it automatically on status change.
+4. If the cheque bounces, staff send {status: bounced, cheque_status: bounced} in one request; bounced is final.
 
-- Failure: The status update has no transition check (for example cancelled -> completed is accepted), so clients must restrict the choices.
+- Failure: Transitions outside STATUS_TRANSITIONS / CHEQUE_STATUS_TRANSITIONS return 400, for example cancelled -> completed, completed -> cancelled, or bounced on a cash payment `service:app/service/fee/fee_transaction_service.py`.
 
 ```mermaid
 flowchart TD
@@ -277,6 +278,8 @@ flowchart TD
   s1 --> s2
   s3["3. Staff then generate the receipt explicitly   ; nothing generates it...<br/>endpoint:POST /fee/receipts/generate/{transaction_id}<br/>service:app/service/fee/fee_receipt_service.py<br/>table:fee_receipts"]
   s2 --> s3
+  s4["4. If the cheque bounces, staff send {status: bounced, cheque_status: ..."]
+  s3 --> s4
 ```
 
 Shaped by: [fee/no-receipt-until-cheque-clears](#feeno-receipt-until-cheque-clears)

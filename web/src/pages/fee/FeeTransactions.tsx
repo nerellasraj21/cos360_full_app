@@ -1228,24 +1228,6 @@ function FeeTransactionsContent() {
                     </Button>
                   </>
                 )}
-
-                {/* General Status Updates */}
-                {canUpdate && selectedTransaction.status !== 'completed' && selectedTransaction.status !== 'cancelled' && selectedTransaction.status !== 'bounced' && (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleStatusUpdate(selectedTransaction.id, 'completed')}
-                    >
-                      Mark Completed
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleStatusUpdate(selectedTransaction.id, 'cancelled')}
-                    >
-                      Cancel Transaction
-                    </Button>
-                  </>
-                )}
               </div>
             </div>
           )}

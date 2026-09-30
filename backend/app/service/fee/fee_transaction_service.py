@@ -43,6 +43,19 @@ from app.tools.error_handler import (
 log = log.getLogger("fee.transaction_service")
 
 
+# Allowed status changes for PUT /fee/transactions/{id}; cancelled and bounced are final.
+STATUS_TRANSITIONS = {
+    "pending": {"completed", "cancelled", "bounced"},
+    "completed": {"bounced"},
+}
+CHEQUE_STATUS_TRANSITIONS = {
+    None: {"pending", "cleared", "bounced"},
+    "pending": {"cleared", "bounced"},
+    "cleared": {"bounced"},
+}
+CHEQUE_PAYMENT_METHODS = {"cheque", "dd"}
+
+
 class FeeTransactionService:
     """Core service for handling fee transactions and related operations"""
 
@@ -674,20 +687,55 @@ class FeeTransactionService:
                     status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction with ID {transaction_id} not found"
                 )
 
-            # Update fields
-            if update_data.status is not None:
-                transaction.status = update_data.status
-            if update_data.cheque_status is not None:
-                transaction.cheque_status = update_data.cheque_status
+            new_status = update_data.status or transaction.status
+            new_cheque_status = update_data.cheque_status or transaction.cheque_status
+            is_cheque = transaction.payment_method in CHEQUE_PAYMENT_METHODS
+
+            if new_status != transaction.status:
+                if new_status not in STATUS_TRANSITIONS.get(transaction.status, set()):
+                    hint = (
+                        " Completed payments are reversed through refunds." if transaction.status == "completed" else ""
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Cannot change status from {transaction.status} to {new_status}.{hint}",
+                    )
+                if new_status == "bounced" and not is_cheque:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Only cheque and DD payments can bounce",
+                    )
+
+            if new_cheque_status != transaction.cheque_status:
+                if not is_cheque:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Cheque status applies only to cheque and DD payments",
+                    )
+                if new_cheque_status not in CHEQUE_STATUS_TRANSITIONS.get(transaction.cheque_status, set()):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Cannot change cheque status from {transaction.cheque_status} to {new_cheque_status}",
+                    )
+
+            if new_cheque_status == "bounced" and new_status != "bounced":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="A bounced cheque needs the transaction status set to bounced as well",
+                )
+
+            transaction.status = new_status
+            transaction.cheque_status = new_cheque_status
             if update_data.approved_by_user_id is not None:
                 transaction.approved_by_user_id = update_data.approved_by_user_id
             if update_data.remarks is not None:
                 transaction.remarks = update_data.remarks
 
+            await db.flush()
+            updated = await FeeTransactionService.get_transaction_by_id(db, transaction.id)
             await db.commit()
-            await db.refresh(transaction)
 
-            return await FeeTransactionService.get_transaction_by_id(db, transaction.id)
+            return updated
 
         except HTTPException:
             await db.rollback()
