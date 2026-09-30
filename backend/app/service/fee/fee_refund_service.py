@@ -165,7 +165,7 @@ class FeeRefundService:
             refund.status = "approved" if approval_data.action == "approve" else "rejected"
             refund.approved_by_user_id = approval_data.approved_by_user_id
             refund.approval_remarks = approval_data.approval_remarks
-            refund.approved_date = datetime.now()
+            refund.approved_date = datetime.utcnow()
 
             await db.flush()
             result = await db.execute(
@@ -208,7 +208,7 @@ class FeeRefundService:
             refund.refund_method = processing_data.refund_method
             refund.refund_reference = processing_data.refund_reference
             refund.processing_remarks = processing_data.processing_remarks
-            refund.processed_date = datetime.now()
+            refund.processed_date = datetime.utcnow()
 
             await db.flush()
             result = await db.execute(
