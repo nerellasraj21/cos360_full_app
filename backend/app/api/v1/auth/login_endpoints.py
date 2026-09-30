@@ -1,10 +1,14 @@
 import logging
 from typing import Union
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
+from app.models.auth.role_model import Role
+from app.models.auth.user_model import User
 from app.schemas.auth.login_schema import (
     AcademicYearOption,
     LegacyLoginResponse,
@@ -165,7 +169,9 @@ async def set_password_first_login(body: SetPasswordRequest, fastapi_request: Re
         500: {"model": LoginErrorResponse, "description": "Server error"},
     },
 )
-async def refresh_token(request: RefreshTokenRequest, fastapi_request: Request):
+async def refresh_token(
+    request: RefreshTokenRequest, fastapi_request: Request, db: AsyncSession = Depends(get_tenant_db)
+):
     """
     Refresh access token using a valid refresh token.
 
@@ -192,11 +198,26 @@ async def refresh_token(request: RefreshTokenRequest, fastapi_request: Request):
             if not is_valid_tenant:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid connection")
 
+        # Re-read the user so a deactivated account stops refreshing and a role change takes effect
+        user_row = (
+            await db.execute(
+                select(User.is_active, Role.name.label("role_name"))
+                .join(Role, Role.id == User.role_id)
+                .where(User.id == UUID(payload.get("sub")))
+            )
+        ).first()
+        if not user_row or not user_row.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account is inactive. Please contact the administrator.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
         # Create new token data (excluding exp and token_type)
         new_token_data = {
             "sub": payload.get("sub"),
             "username": payload.get("username"),
-            "role": payload.get("role"),
+            "role": user_row.role_name,
             "client_name": payload.get("client_name"),
             "academic_year_id": payload.get("academic_year_id"),
             "academic_year_title": payload.get("academic_year_title"),
@@ -241,36 +262,52 @@ async def logout(request: Request, body: LogoutRequest = None):
     in the request body) so they cannot be used again even before natural expiry.
     """
     try:
-        # Extract access token from Authorization header
         authorization = request.headers.get("Authorization")
-        if not authorization or not authorization.startswith("Bearer "):
+        access_token = authorization.split(" ")[1] if authorization and authorization.startswith("Bearer ") else None
+        refresh = body.refresh_token if body else None
+
+        if not access_token and not refresh:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authorization header missing or invalid",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        access_token = authorization.split(" ")[1]
+        username = "unknown"
+        revoked = False
 
-        # Verify the access token (raises 401 if invalid/expired)
-        payload = verify_access_token(access_token)
-
-        username = payload.get("username", "unknown")
-        client_name = payload.get("client_name", "unknown")
-
-        # Blacklist the access token
-        await TokenBlacklistService.blacklist_token(access_token, payload)
-        logger.info(f"User logout: {username} from tenant: {client_name} — access token blacklisted")
+        # Blacklist the access token when it is still valid. An expired one is left alone
+        # so the refresh token can still be revoked below.
+        if access_token:
+            try:
+                payload = verify_access_token(access_token)
+                username = payload.get("username", "unknown")
+                await TokenBlacklistService.blacklist_token(access_token, payload)
+                revoked = True
+                logger.info(
+                    f"User logout: {username} from tenant: {payload.get('client_name', 'unknown')}"
+                    " - access token blacklisted"
+                )
+            except HTTPException:
+                if not refresh:
+                    raise
 
         # Blacklist the refresh token too if the client sent it
-        if body and body.refresh_token:
+        if refresh:
             try:
-                refresh_payload = verify_refresh_token(body.refresh_token)
-                await TokenBlacklistService.blacklist_token(body.refresh_token, refresh_payload)
-                logger.info(f"Refresh token also blacklisted for user: {username}")
+                refresh_payload = verify_refresh_token(refresh)
+                await TokenBlacklistService.blacklist_token(refresh, refresh_payload)
+                revoked = True
+                logger.info(f"Refresh token blacklisted for user: {refresh_payload.get('username', username)}")
             except HTTPException:
-                # Invalid refresh token — ignore, access token is already revoked
                 logger.warning(f"Could not blacklist refresh token for user: {username} (invalid token)")
+
+        if not revoked:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
         return LogoutResponse(
             message="Logout successful",

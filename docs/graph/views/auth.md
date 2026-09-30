@@ -68,11 +68,13 @@ graph LR
   n27 -.->|shapes| n12
   n28[/"refresh-copies-claims"/]
   n28 -.->|shapes| n13
-  n29[/"single-set-password-endpoint"/]
-  n29 -.->|shapes| n2
-  n29 -.->|shapes| n10
-  n30[/"uniform-invalid-credentials"/]
-  n30 -.->|shapes| n12
+  n29[/"refresh-rereads-user"/]
+  n29 -.->|shapes| n8
+  n30[/"single-set-password-endpoint"/]
+  n30 -.->|shapes| n2
+  n30 -.->|shapes| n10
+  n31[/"uniform-invalid-credentials"/]
+  n31 -.->|shapes| n12
 ```
 
 ## Features
@@ -106,8 +108,8 @@ Forgot-password screens exist on both clients but no backend reset flow exists; 
 
 ### auth/logout
 
-Log out by blacklisting the bearer access token and, when sent, the refresh token.
-- Parity: Neither client sends refresh_token; mobile also loses the Bearer header, so its logout blacklists nothing.
+Log out by blacklisting the bearer access token and the refresh token from the body; the refresh token is revoked even if the access token has expired.
+- Parity: Both clients send refresh_token; mobile sends its stored access token explicitly after clearing local state.
 - Flows: [auth/logout](#authlogout)
 - Implemented by: `endpoint:POST /auth/logout`, `mobile:src/api/client.ts`, `service:app/service/auth/token_blacklist_service.py`, `table:public.token_blacklist`, `web:src/lib/authStore.ts`
 - Shaped by: [auth/mobile-logout-fire-and-forget](#authmobile-logout-fire-and-forget)
@@ -149,11 +151,11 @@ One login endpoint for every tenant user type (Admin, Teacher, Staff, Student, P
 
 Exchange a refresh token for a new access/refresh pair without logging in again.
 - Parity: Both clients call /auth/refresh; web refreshes on a 401 with one shared in-flight refresh.
-- Parity: Mobile refreshes proactively on an assumed 1 h expiry and clears the session on cold start after about 55 minutes.
-- Note: Refresh does not re-check users.is_active, so a deactivated user keeps refreshing for up to 7 days.
+- Parity: Mobile refreshes proactively before expires_in (returned by login and refresh) and also on cold start when the access token has expired.
+- Note: Refresh re-reads users.is_active and the role name; an inactive or missing user gets 401. The old refresh token is not revoked.
 - Flows: [auth/token-refresh](#authtoken-refresh)
 - Implemented by: `endpoint:POST /auth/refresh`, `mobile:src/api/client.ts`, `service:app/service/auth/token_blacklist_service.py`, `service:app/tools/jwt_utils.py`, `table:public.token_blacklist`, `web:src/api/index.ts`
-- Shaped by: [auth/mobile-assumed-token-expiry](#authmobile-assumed-token-expiry), [auth/mobile-refresh-lock](#authmobile-refresh-lock)
+- Shaped by: [auth/mobile-assumed-token-expiry](#authmobile-assumed-token-expiry), [auth/mobile-refresh-lock](#authmobile-refresh-lock), [auth/refresh-rereads-user](#authrefresh-rereads-user)
 
 ## Flows
 
@@ -223,10 +225,9 @@ Implements: `feature:auth/logout`
 1. The client posts to `endpoint:POST /auth/logout` with the Bearer access token and optional refresh_token in the body.
 2. The backend inserts the SHA-256 hash of each token into `table:public.token_blacklist` with expires_at set to the token exp `service:app/service/auth/token_blacklist_service.py`.
 3. Every authenticated request checks the blacklist in get_current_user_token (app/tools/permission_decorators.py).
-4. Web clears the persisted auth store `web:src/lib/authStore.ts`; mobile clears SecureStore first and fires the API call without awaiting it `mobile:src/api/client.ts`.
+4. Web clears the persisted auth store `web:src/lib/authStore.ts`; mobile reads its tokens, clears SecureStore, then fires the API call with those tokens without awaiting it `mobile:src/api/client.ts`.
 
-- Failure: Neither client sends refresh_token, so the refresh token stays valid for 7 days; mobile sends no Bearer header, gets 401, and blacklists nothing.
-
+- Step 2b: An expired access token is skipped rather than rejected when a refresh_token is sent, so the refresh token is still revoked; with no valid token at all the endpoint returns 401.
 - Note: The blacklist fails open on DB errors, and cleanup_expired() exists but nothing schedules it.
 
 ```mermaid
@@ -236,7 +237,7 @@ flowchart TD
   s1 --> s2
   s3["3. Every authenticated request checks the blacklist in get_current_use..."]
   s2 --> s3
-  s4["4. Web clears the persisted auth store ; mobile clears SecureStore fir...<br/>web:src/lib/authStore.ts<br/>mobile:src/api/client.ts"]
+  s4["4. Web clears the persisted auth store ; mobile reads its tokens, clea...<br/>web:src/lib/authStore.ts<br/>mobile:src/api/client.ts"]
   s3 --> s4
 ```
 
@@ -301,7 +302,7 @@ Implements: `feature:auth/token-refresh`
 1. The client posts refresh_token `endpoint:POST /auth/refresh`.
 2. The backend checks the token type is refresh and that the token is not blacklisted `service:app/service/auth/token_blacklist_service.py` `table:public.token_blacklist`.
 3. The backend re-validates that the tenant in the client_name claim exists `service:app/service/auth/multi_tenant_auth_service.py` `table:public.tenants`.
-4. Claims (sub, username, role, client_name, academic year) are copied from the old refresh token; the user row is not re-read.
+4. The backend re-reads the user in the tenant schema `table:users` `table:roles`: an inactive or missing user gets 401; the role claim comes from the user's current role, and the other claims are copied from the old refresh token.
 5. The backend returns a new access/refresh pair `service:app/tools/jwt_utils.py`; the old refresh token is not revoked.
 
 - Failure: On web a failed refresh logs the store out and redirects to /login `web:src/api/index.ts`.
@@ -314,7 +315,7 @@ flowchart TD
   s1 --> s2
   s3["3. The backend re-validates that the tenant in the client_name claim e...<br/>service:app/service/auth/multi_tenant_auth_service.py<br/>table:public.tenants"]
   s2 --> s3
-  s4["4. Claims (sub, username, role, client_name, academic year) are copied..."]
+  s4["4. The backend re-reads the user in the tenant schema  : an inactive o...<br/>table:users<br/>table:roles"]
   s3 --> s4
   s5["5. The backend returns a new access/refresh pair ; the old refresh tok...<br/>service:app/tools/jwt_utils.py"]
   s4 --> s5
@@ -394,11 +395,12 @@ flowchart TD
 - **Why**: Menu visibility per role stays controlled by tenant data (role_menu_permissions) rather than client code.
 - Shapes: `concept:auth/login-snapshot`, `feature:auth/tenant-login`, `flow:auth/normal-login`, `mobile:app/login.tsx`, `web:src/lib/authStore.ts`
 
-### auth/mobile-assumed-token-expiry
+### auth/mobile-assumed-token-expiry (superseded)
 
 - **Decision**: Mobile assumes a 3600 s access-token lifetime when storing tokens.
 - **Why**: The backend returns no expires_in.
 - **Tradeoff**: While running it only causes extra proactive refreshes, but on cold start after about 55 minutes isAuthenticated() clears the session instead of refreshing.
+- Note: The backend now returns expires_in, and a cold start with an expired access token refreshes instead of clearing the session.
 - Shapes: `feature:auth/token-refresh`, `flow:auth/token-refresh`, `mobile:src/api/client.ts`
 
 ### auth/mobile-init-auth-order
@@ -411,7 +413,7 @@ flowchart TD
 
 - **Decision**: Mobile logout clears local state first and calls POST /auth/logout fire-and-forget.
 - **Why**: Awaiting the API used to hang when the call triggered a token refresh.
-- **Tradeoff**: The request goes out without a Bearer header, gets 401, and the access token is never blacklisted.
+- **Tradeoff**: The server call is not awaited, so a network failure leaves the tokens unrevoked; the tokens are read before clearing and sent explicitly, so a normal logout revokes both.
 - Shapes: `feature:auth/logout`, `flow:auth/logout`, `mobile:src/api/client.ts`
 
 ### auth/mobile-refresh-lock
@@ -439,12 +441,23 @@ flowchart TD
 - Note: Web sets isAuthenticated first; components should use useParentChildren or useMyChildren rather than the persisted availableStudents.
 - Shapes: `endpoint:GET /student-parent-links/my-children`, `feature:auth/tenant-login`, `flow:auth/normal-login`, `mobile:app/login.tsx`, `web:src/components/providers/AuthProvider.tsx`
 
-### auth/refresh-copies-claims (unintended)
+### auth/refresh-copies-claims (superseded)
 
 - **Decision**: /auth/refresh copies claims, including role, from the old refresh token instead of re-reading the user row, and does not revoke the old refresh token.
 - **Why**: Not a deliberate choice. Refresh should re-read the user (role, is_active) and revoke or rotate the old refresh token.
 - **Tradeoff**: Role changes, deactivation and permission edits need logout and login; a demoted or deactivated user keeps old rights for up to 7 days by refreshing.
 - Shapes: `concept:auth/login-snapshot`, `endpoint:POST /auth/refresh`, `flow:auth/token-refresh`
+- Superseded by: `decision:auth/refresh-rereads-user`
+
+### auth/refresh-rereads-user (active)
+
+- **Decision**: /auth/refresh re-reads the user's is_active flag and current role name from the tenant schema before issuing new tokens; other claims are still copied from the old refresh token.
+- **Why**: Copying the role claim let a deactivated or demoted user keep old rights for up to 7 days by refreshing.
+- **Alternatives**: Rotating and revoking the refresh token on every refresh, which breaks web tabs that still hold the previous token.
+- **Tradeoff**: One query per refresh; the client's menu and permission map still change only at the next login, and the old refresh token is not revoked or rotated.
+- **Since**: 2026-09
+- Shapes: `endpoint:POST /auth/refresh`, `feature:auth/token-refresh`
+- Supersedes: `decision:auth/refresh-copies-claims`
 
 ### auth/single-set-password-endpoint
 

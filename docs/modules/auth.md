@@ -27,7 +27,8 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
   | Change-password | 15 min | `change_password` |
 
   - Claims: `sub` (user UUID), `username`, `role` (role **name**), `client_name`, `academic_year_id`, `academic_year_title`.
-- **Logout** (`POST /auth/logout`) blacklists the bearer access token. It also blacklists the refresh token when the body contains `refresh_token`.
+  - Login and refresh responses include `expires_in` (access-token lifetime in seconds, 86400; `ACCESS_TOKEN_EXPIRES_IN` in `jwt_utils.py`).
+- **Logout** (`POST /auth/logout`) blacklists the bearer access token and the `refresh_token` from the body. When the access token has already expired, the refresh token is still revoked; with neither valid it returns 401.
 - **Password change**
   - Self-service: `POST /profile/change-password`. It needs `current_password` plus a new password (min 8) and a matching confirmation, and requires permission `profile:update_own`.
   - Admin reset: `POST /admin/users/{id}/reset-password` (see [tenants-and-admin.md](tenants-and-admin.md)).
@@ -59,7 +60,7 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 ## Rules & gotchas
 
 1. **Use `current_user["sub"]` for the user id.** Real tokens have no `id` claim.
-2. **Menus, permissions and role are a login-time snapshot.** Role or permission edits, menu seeding and role reassignment all need a **logout + login**. A refresh does not help because it copies the old `role` claim. Server-side checks use the role name from the JWT, so a demoted user keeps old rights for up to 7 days by refreshing.
+2. **Menus and permissions are a login-time snapshot on the client.** Permission edits, menu seeding and role reassignment only reach the UI after **logout + login**. `/auth/refresh` re-reads the user's current role name and `is_active`, so server-side checks (which use the JWT role) follow a role change at the next refresh, and an inactive user's refresh returns 401.
 3. **`is_first_login` is not in the SQLAlchemy `User` model.** It is read and written only with raw SQL inside try/except. If a tenant schema lacks the column, the first-login check silently passes and the user logs in normally. No Alembic revision creates the column (it was added by hand), so it exists only in schemas cloned from one that has it. Admin password reset does **not** set it.
 4. **The refresh path is `POST /auth/refresh`** on both clients.
    - Web (`src/api/index.ts`): on a 401 (except `/auth/login*`) it runs one shared refresh for every request that fails while it is in flight, sends the current tenant header, stores the new pair and retries each request once. A request that fails after another one already refreshed is retried with the newer token instead of refreshing again. If the refresh itself fails, the store is logged out and the page goes to `/login`.
@@ -68,13 +69,8 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
    - The DB session always uses the request tenant resolved by `TenantMiddleware` (see [../architecture.md](../architecture.md)).
    - Web hardcodes `client_name: "test_tenant"` in `login-form.tsx`.
    - Legacy path: a request with no tenant anywhere falls into a login that returns only an access token (`auth_service.login_user`). It is effectively dead.
-6. **Logout rarely revokes anything.**
-   - Neither client sends `refresh_token` in the logout body, so the refresh token stays valid for 7 days after logout.
-   - Mobile `logoutUser()` clears SecureStore *before* firing `POST /auth/logout`, and the request interceptor then finds no token. The call goes out without a Bearer header, gets a 401, and the access token is never blacklisted either.
-7. **Mobile expiry is an assumption.**
-   - The backend returns no `expires_in`, so mobile assumes 3600 s.
-   - While the app runs, this only causes extra proactive refreshes.
-   - On a cold start after roughly 55 minutes, `isAuthenticated()` treats the session as expired and **clears it instead of refreshing**, so the user must log in again even though the refresh token is valid for 7 days.
+6. **Logout revokes both tokens.** Both clients send `refresh_token` in the logout body. Mobile `logoutUser()` reads its tokens, clears SecureStore, then fires `POST /auth/logout` with the access token set explicitly and `_retry` set so a 401 does not start a refresh.
+7. **Mobile token expiry** comes from `expires_in` (falling back to 3600 s). On a cold start with an expired access token, `isAuthenticated()` refreshes; the session is cleared only when that refresh fails.
 8. **Mobile set-password discards the returned session.**
    - `authApi.setStaffPassword` returns `void`.
    - `refreshAuth()` then finds no stored tokens, so the user ends up back on login and must sign in with the new password.
@@ -99,7 +95,7 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 | Capability | Web | Mobile |
 |---|---|---|
 | Organization picker at login | No (tenant from subdomain; body `client_name` hardcoded) | Yes (hardcoded org list + free text, normalized to lowercase) |
-| Token refresh | On 401, one shared refresh (rule 4) | Works, with a proactive 1 h assumption (rule 7) |
+| Token refresh | On 401, one shared refresh (rule 4) | On 401 and before `expires_in`, and on cold start (rule 7) |
 | First-login set-password | Logs straight in | Forces re-login (rule 8) |
 | Forgot password | Fake "reset link sent" after a `setTimeout`; misleading | Stub that tells the user to contact the school admin |
 | Self password change | Only on Admin Profile (`/admin/profile`) | All roles (`app/profile/change-password.tsx`) |
@@ -110,9 +106,8 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 ## Known gaps
 
 - There is no backend forgot/reset-password flow (email/OTP), and no endpoint to read `profile_audit_logs`.
-- Logout does not revoke the refresh token on either client, and mobile does not revoke the access token either; see Rules & gotchas #6.
-- Mobile clears still-refreshable sessions on cold start (Rules & gotchas #7) and discards the set-password session (Rules & gotchas #8).
-- `/auth/refresh` does not rotate or revoke the old refresh token and does not re-check `users.is_active`, so a deactivated user keeps refreshing for up to 7 days.
+- Mobile discards the set-password session (Rules & gotchas #8).
+- `/auth/refresh` does not rotate or revoke the old refresh token, so a leaked refresh token stays usable until it expires or is revoked at logout.
 - `/auth/staff/set-password` does not check that the user is still in first-login state. Any valid unexpired change-password token can reset the password.
 - Teacher `entity_id` is missing on normal login; see Rules & gotchas #11.
 - Mobile `src/api/auth.ts` holds a dead `refreshToken()` and dead token helpers that use AsyncStorage keys (`@auth/access_token`). The live path is `services/authUtils.ts`. The web equivalents `src/lib/apiClient.ts` and `src/constants/api/auth.ts` are also unused or stale.

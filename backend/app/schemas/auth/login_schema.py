@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.tools.jwt_utils import ACCESS_TOKEN_EXPIRES_IN
+
 
 class LoginRequest(BaseModel):
     username: str = Field(..., description="User's username")
@@ -51,6 +53,7 @@ class LoginResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    expires_in: int = Field(ACCESS_TOKEN_EXPIRES_IN, description="Access token lifetime in seconds")
 
 
 # Legacy response for backward compatibility
@@ -68,6 +71,7 @@ class RefreshTokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    expires_in: int = Field(ACCESS_TOKEN_EXPIRES_IN, description="Access token lifetime in seconds")
     academic_year_id: Optional[UUID] = None
     academic_year_title: Optional[str] = None
 

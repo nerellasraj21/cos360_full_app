@@ -209,8 +209,8 @@ Shaped by: [platform/flush-select-commit](#platformflush-select-commit)
 1. The request interceptor had attached the stored access token from expo-secure-store and the cschema header (stored org code, else EXPO_PUBLIC_DEFAULT_TENANT, else test_tenant) `mobile:src/api/client.ts`
 2. The response interceptor marks the request as retried and reuses the shared in-flight refreshPromise, so concurrent 401s trigger a single refresh `mobile:src/api/client.ts`
 3. refreshAccessToken in services/authUtils.ts posts {refresh_token} through apiClient `endpoint:POST /auth/refresh`
-4. The backend verifies the refresh token type, rejects blacklisted tokens, checks the token's tenant is still active, and returns a new access and refresh pair with the same claims `endpoint:POST /auth/refresh` `service:app/tools/jwt_utils.py` `service:app/service/auth/token_blacklist_service.py` `service:app/service/auth/multi_tenant_auth_service.py`
-5. The client stores the new tokens with an expiry of expires_in, or 1 hour because the backend sends none, and retries the original request with the new bearer token `mobile:src/api/client.ts`
+4. The backend verifies the refresh token type, rejects blacklisted tokens, checks the token's tenant is still active, and returns a new access and refresh pair with the current role and expires_in `endpoint:POST /auth/refresh` `service:app/tools/jwt_utils.py` `service:app/service/auth/token_blacklist_service.py` `service:app/service/auth/multi_tenant_auth_service.py`
+5. The client stores the new tokens with an expiry of expires_in (86400 s), and retries the original request with the new bearer token `mobile:src/api/client.ts`
 6. If refresh returns nothing or throws, the client calls the onSessionExpired callback registered by AuthProvider, which dispatches LOGOUT and returns to the login screen `mobile:src/api/client.ts`
 
 ```mermaid
@@ -222,7 +222,7 @@ flowchart TD
   s2 --> s3
   s4["4. The backend verifies the refresh token type, rejects blacklisted to...<br/>endpoint:POST /auth/refresh<br/>service:app/tools/jwt_utils.py<br/>service:app/service/auth/token_blacklist_service.py<br/>service:app/service/auth/multi_tenant_auth_service.py"]
   s3 --> s4
-  s5["5. The client stores the new tokens with an expiry of expires_in, or 1...<br/>mobile:src/api/client.ts"]
+  s5["5. The client stores the new tokens with an expiry of expires_in (8640...<br/>mobile:src/api/client.ts"]
   s4 --> s5
   s6["6. If refresh returns nothing or throws, the client calls the onSessio...<br/>mobile:src/api/client.ts"]
   s5 --> s6
@@ -397,10 +397,10 @@ flowchart TD
 
 ### platform/token-lifetimes (active)
 
-- **Decision**: Access tokens live 24 hours and refresh tokens 7 days, hard-coded in jwt_utils.py. The ACCESS_TOKEN_EXPIRE_MINUTES setting (default 30) is unused, and login and refresh responses carry no expires_in.
+- **Decision**: Access tokens live 24 hours and refresh tokens 7 days, hard-coded in jwt_utils.py. The ACCESS_TOKEN_EXPIRE_MINUTES setting (default 30) is unused; login and refresh responses return expires_in from ACCESS_TOKEN_EXPIRES_IN.
 - **Why**: Long sessions so staff are not logged out during the school day; fewer re-logins was preferred over short-lived access tokens.
 - **Alternatives**: The configurable ACCESS_TOKEN_EXPIRE_MINUTES lifetime of 30 minutes, which the earlier backend security notes described as the intended short-lived access token.
-- **Tradeoff**: A leaked access token stays valid for up to 24 hours unless logout blacklists it, and mobile assumes a 1 hour expiry because no expires_in is returned.
+- **Tradeoff**: A leaked access token stays valid for up to 24 hours unless logout blacklists it.
 - Shapes: `flow:platform/token-refresh-mobile`, `service:app/tools/jwt_utils.py`
 
 ### platform/uuid-primary-keys (active)

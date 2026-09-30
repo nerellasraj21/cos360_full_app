@@ -4,7 +4,7 @@ _Generated from `docs/graph/graph.jsonl` by `scripts/graph/kg_render.py`. Do not
 
 | Module | Features | Flows | Decisions | Concepts |
 |---|---|---|---|---|
-| [auth](auth.md) | 8 | 6 | 16 | 9 |
+| [auth](auth.md) | 8 | 6 | 17 | 9 |
 | [certificates](certificates.md) | 8 | 6 | 10 | 8 |
 | [communication](communication.md) | 9 | 7 | 21 | 9 |
 | [exam](exam.md) | 18 | 13 | 17 | 20 |

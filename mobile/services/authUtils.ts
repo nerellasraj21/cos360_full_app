@@ -444,14 +444,13 @@ export const isAuthenticated = async (): Promise<boolean> => {
       return false;
     }
 
-    // Check if tokens are expired
+    // An expired access token is renewed with the refresh token (valid 7 days);
+    // refreshAccessToken() clears the stored session itself when the refresh fails.
     const expired = await isTokenExpired();
     if (expired) {
-      // Don't try to refresh during initialization - just clear and return false
-      // This prevents refresh token errors on app startup
-      if (__DEV__) console.log('Tokens expired during initialization, clearing auth data');
-      await clearAuthData();
-      return false;
+      if (__DEV__) console.log('Access token expired at startup, refreshing');
+      const refreshed = await refreshAccessToken();
+      return !!refreshed;
     }
 
     return true;
@@ -526,10 +525,18 @@ export const loginUser = async (username: string, password: string, clientName?:
  * Logout user
  */
 export const logoutUser = async (): Promise<void> => {
-  // Clear local auth data immediately — don't wait for the API
+  // Read the tokens before clearing them so the server can revoke both
+  const tokens = await getStoredTokens();
   await clearAuthData();
-  // Notify server in background (fire-and-forget)
-  apiClient.post('/auth/logout').catch(() => {});
+  if (!tokens) return;
+  // Notify server in background (fire-and-forget); _retry stops the 401 handler from refreshing
+  apiClient
+    .post(
+      '/auth/logout',
+      { refresh_token: tokens.refresh_token },
+      { headers: { Authorization: `Bearer ${tokens.access_token}` }, _retry: true } as any,
+    )
+    .catch(() => {});
 };
 
 /**

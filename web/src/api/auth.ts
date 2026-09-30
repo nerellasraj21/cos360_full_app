@@ -398,7 +398,8 @@ export function useLogoutMutation() {
 
   return useMutation({
     mutationFn: async (): Promise<void> => {
-      await CAxios.post('/auth/logout');
+      const { refreshToken } = useAuthStore.getState();
+      await CAxios.post('/auth/logout', refreshToken ? { refresh_token: refreshToken } : {});
     },
     onSuccess: () => {
       logout();

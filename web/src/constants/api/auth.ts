@@ -4,7 +4,7 @@ export const AUTH_BASE = '/auth';
 // Login & Authentication
 export const AUTH_LOGIN = `${AUTH_BASE}/login`;
 export const AUTH_REFRESH = `${AUTH_BASE}/refresh`;
-export const AUTH_LOGOUT = `${AUTH_BASE}/login/logout`;
+export const AUTH_LOGOUT = `${AUTH_BASE}/logout`;
 
 // User Management
 export const AUTH_USER_MENU = `${AUTH_BASE}/user-menu`;

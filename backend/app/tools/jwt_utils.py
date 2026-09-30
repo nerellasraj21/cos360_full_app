@@ -5,10 +5,12 @@ from jose import JWTError, jwt
 
 from app.config import settings
 
+ACCESS_TOKEN_EXPIRES_IN = 24 * 60 * 60  # seconds
+
 
 def create_access_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(hours=24)  # 24 hours expiry
+    expire = datetime.utcnow() + timedelta(seconds=ACCESS_TOKEN_EXPIRES_IN)
     to_encode.update({"exp": expire, "token_type": "access"})
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
