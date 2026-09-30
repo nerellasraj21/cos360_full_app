@@ -29,13 +29,13 @@ pytest app/service/student/test_admission_service.py -v
 #### Authentication Testing
 ```bash
 # Test tenant authentication
-curl -X POST http://localhost:8003/api/v1/auth/login \
+curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -H "cschema: test_tenant" \
   -d '{"username": "admin", "password": "testpass123"}'
 
 # Test super admin authentication
-curl -X POST http://localhost:8003/api/v1/super_admin/auth/login \
+curl -X POST http://localhost:8000/api/v1/super_admin/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "superadmin", "password": "admin123"}'
 ```
@@ -154,7 +154,7 @@ async def test_database_integration():
 #### Load Testing
 ```bash
 # Use locust for load testing
-locust -f tests/performance/locustfile.py --host=http://localhost:8003
+locust -f tests/performance/locustfile.py --host=http://localhost:8000
 ```
 
 #### Database Performance
@@ -240,7 +240,7 @@ pytest tests/test_multi_tenant.py -v
 pytest tests/performance/ -v
 
 # Load testing
-locust -f tests/performance/load_test.py --host=http://localhost:8003 --users=50 --spawn-rate=5
+locust -f tests/performance/load_test.py --host=http://localhost:8000 --users=50 --spawn-rate=5
 ```
 
 ## Test Data Management

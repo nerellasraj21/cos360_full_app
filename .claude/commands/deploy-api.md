@@ -85,7 +85,7 @@ docker build -t cos360:latest .
 docker run -d \
   --name cos360-api \
   --env-file .env.production \
-  -p 8003:8000 \
+  -p 8000:8000 \
   cos360:latest
 ```
 
@@ -95,7 +95,7 @@ docker run -d \
 pip install -r requirements.txt
 
 # Start with production server
-uvicorn app.main:app --host 0.0.0.0 --port 8003 --workers 4
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 ### 7. Health Checks
@@ -103,13 +103,13 @@ uvicorn app.main:app --host 0.0.0.0 --port 8003 --workers 4
 #### Application Health
 ```bash
 # Test basic health endpoint
-curl -f http://localhost:8003/health
+curl -f http://localhost:8000/health
 
 # Test database connectivity
-curl -f http://localhost:8003/api/v1/auth/health
+curl -f http://localhost:8000/api/v1/auth/health
 
 # Test multi-tenant functionality
-curl -H "cschema: test_tenant" http://localhost:8003/api/v1/fee/categories/
+curl -H "cschema: test_tenant" http://localhost:8000/api/v1/fee/categories/
 ```
 
 #### Performance Validation
@@ -123,7 +123,7 @@ curl -H "cschema: test_tenant" http://localhost:8003/api/v1/fee/categories/
 #### Authentication Testing
 ```bash
 # Test tenant authentication
-curl -X POST http://localhost:8003/api/v1/auth/login \
+curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -H "cschema: test_tenant" \
   -d '{"username": "admin", "password": "testpass123"}'
@@ -131,7 +131,7 @@ curl -X POST http://localhost:8003/api/v1/auth/login \
 # Verify JWT token validation
 curl -H "Authorization: Bearer <token>" \
      -H "cschema: test_tenant" \
-     http://localhost:8003/api/v1/fee/categories/
+     http://localhost:8000/api/v1/fee/categories/
 ```
 
 #### Permission System Verification
@@ -167,19 +167,19 @@ async def get_metrics():
 ```bash
 # Test critical business operations
 # Fee Management
-curl -X POST http://localhost:8003/api/v1/fee/categories/ \
+curl -X POST http://localhost:8000/api/v1/fee/categories/ \
   -H "Authorization: Bearer <token>" \
   -H "cschema: test_tenant" \
   -H "Content-Type: application/json" \
   -d '{"category_name": "Tuition", "academic_year_id": "<uuid>"}'
 
 # Student Management
-curl -X GET http://localhost:8003/api/v1/student/admissions/ \
+curl -X GET http://localhost:8000/api/v1/student/admissions/ \
   -H "Authorization: Bearer <token>" \
   -H "cschema: test_tenant"
 
 # Staff Management
-curl -X GET http://localhost:8003/api/v1/masters/staff/ \
+curl -X GET http://localhost:8000/api/v1/masters/staff/ \
   -H "Authorization: Bearer <token>" \
   -H "cschema: test_tenant"
 ```
@@ -224,7 +224,7 @@ git checkout <previous_commit>
 psql -h hostname -U username -d database < backup_pre_deploy.sql
 
 # Restart application
-uvicorn app.main:app --host 0.0.0.0 --port 8003 --workers 4
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 ### Database Rollback
