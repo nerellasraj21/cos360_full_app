@@ -130,6 +130,7 @@ class SetPasswordResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    expires_in: int = Field(ACCESS_TOKEN_EXPIRES_IN, description="Access token lifetime in seconds")
 
 
 # Enable forward references for nested MenuItemResponse

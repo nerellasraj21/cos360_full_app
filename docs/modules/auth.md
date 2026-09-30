@@ -72,11 +72,8 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
    - Legacy path: a request with no tenant anywhere falls into a login that returns only an access token (`auth_service.login_user`). It is effectively dead.
 6. **Logout revokes both tokens.** Both clients send `refresh_token` in the logout body. Mobile `logoutUser()` reads its tokens, clears SecureStore, then fires `POST /auth/logout` with the access token set explicitly and `_retry` set so a 401 does not start a refresh.
 7. **Mobile token expiry** comes from `expires_in` (falling back to 3600 s). On a cold start with an expired access token, `isAuthenticated()` refreshes; the session is cleared only when that refresh fails.
-8. **Mobile set-password discards the returned session.**
-   - `authApi.setStaffPassword` returns `void`.
-   - `refreshAuth()` then finds no stored tokens, so the user ends up back on login and must sign in with the new password.
-   - Web calls `login(data)` with the response and goes straight in.
-9. **Mobile resets the stored organization after login.** `storeAuthData` writes `@auth/client_schema = response.client_name || 'test_tenant'`. The login response has no `client_name`, so after every login the stored org becomes `test_tenant` and the next launch pre-selects the wrong organization.
+8. **Set-password signs the user straight in on both clients.** The response has the same shape as login (including `expires_in`). Web calls `login(data)`. Mobile `authApi.setStaffPassword` returns it, and `completePasswordSetup` stores it with `storeAuthData` and then runs the same `completeLogin` steps as a normal login (parent students, interceptor headers, one `LOGIN_SUCCESS`).
+9. **Mobile keeps the organization chosen at login.** `storeAuthData` writes `@auth/client_schema` from `response.client_name`, which login responses do not include, so it falls back to the already-stored org (set from the login screen) and only then to `test_tenant`.
 10. **Web admin login activates the selected academic year for the whole tenant.** `useLoginMutation` sends `PUT /masters/academic_years/{id} {is_active:true}`, and the backend deactivates all other years. An admin who picks a past year at login flips the tenant's active year. Other roles only scope their own session.
 11. **Teacher `entity_id` is null on normal login.** The login code only resolves a staff entity for role name `Staff`. The set-password path resolves Teacher too. Clients must not rely on `entity_id` for teachers.
 12. **Profile updates silently drop unknown fields.**
@@ -97,7 +94,7 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 |---|---|---|
 | Organization picker at login | No (tenant from subdomain; body `client_name` hardcoded) | Yes (hardcoded org list + free text, normalized to lowercase) |
 | Token refresh | On 401, one shared refresh (rule 4) | On 401 and before `expires_in`, and on cold start (rule 7) |
-| First-login set-password | Logs straight in | Forces re-login (rule 8) |
+| First-login set-password | Logs straight in | Logs straight in (rule 8) |
 | Forgot password | Fake "reset link sent" after a `setTimeout`; misleading | Stub that tells the user to contact the school admin |
 | Self password change | Only on Admin Profile (`/admin/profile`) | All roles (`app/profile/change-password.tsx`) |
 | Profile view/edit | Student/Staff/Parent pages; any other role is routed to StaffProfile, which 404s when the user has no `staff` row (typical for Admin) | Same role routing; falls back to a basic view on error |
@@ -107,7 +104,6 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 ## Known gaps
 
 - There is no backend forgot/reset-password flow (email/OTP), and no endpoint to read `profile_audit_logs`.
-- Mobile discards the set-password session (Rules & gotchas #8).
 - `/auth/refresh` does not rotate or revoke the old refresh token, so a leaked refresh token stays usable until it expires or is revoked at logout.
 - Teacher `entity_id` is missing on normal login; see Rules & gotchas #11.
 - Mobile `src/api/auth.ts` holds a dead `refreshToken()` and dead token helpers that use AsyncStorage keys (`@auth/access_token`). The live path is `services/authUtils.ts`. The web equivalents `src/lib/apiClient.ts` and `src/constants/api/auth.ts` are also unused or stale.

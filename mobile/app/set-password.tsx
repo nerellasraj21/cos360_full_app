@@ -14,7 +14,7 @@ const ACCENT_COLOR = '#556ee6';
 
 const SetPasswordScreen: React.FC = () => {
   const router = useRouter();
-  const { refreshAuth } = useAuth();
+  const { completePasswordSetup } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [newPassword, setNewPassword] = useState('');
@@ -48,14 +48,14 @@ const SetPasswordScreen: React.FC = () => {
         router.replace('/login');
         return;
       }
-      await authApi.setStaffPassword({
+      const session = await authApi.setStaffPassword({
         change_password_token: token,
         new_password: newPassword,
         confirm_password: confirmPassword,
       });
       // Token consumed — clean it up
       await clearChangePasswordToken();
-      await refreshAuth();
+      await completePasswordSetup(session);
       router.replace('/(tabs)');
     } catch (err: any) {
       const detail = err?.response?.data?.detail;

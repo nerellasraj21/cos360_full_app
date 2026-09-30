@@ -93,7 +93,7 @@ A logged-in user changes their own password by giving the current password and a
 
 Staff, Teacher, Student and Parent accounts with users.is_first_login = TRUE must set a new password before they get a session.
 - Roles: Staff, Teacher, Student, Parent. Admin accounts are never forced.
-- Parity: Web logs the user straight in with the returned session; mobile discards it and sends the user back to login.
+- Parity: Both clients sign the user straight in with the returned session.
 - Note: /auth/staff/set-password only accepts a change-password token while the user is active and still in first-login state, so a token cannot be reused.
 - Flows: [auth/first-login-password-change](#authfirst-login-password-change)
 - Implemented by: `endpoint:POST /auth/login`, `endpoint:POST /auth/staff/set-password`, `mobile:app/login.tsx`, `mobile:app/set-password.tsx`, `service:app/service/auth/multi_tenant_auth_service.py`, `service:app/tools/jwt_utils.py`, `table:users`, `web:src/components/login-form.tsx`, `web:src/pages/auth/SetPasswordPage.tsx`
@@ -194,7 +194,7 @@ Implements: `feature:auth/first-login-password`
 4. Mobile keeps the token in SecureStore under auth_change_password_token and opens `mobile:app/set-password.tsx`.
 5. The client posts change_password_token, new_password and confirm_password `endpoint:POST /auth/staff/set-password`.
 6. The backend verifies the change_password token type, rejects an inactive user (401) or one whose is_first_login is no longer TRUE (400), hashes the new password, clears is_first_login through raw SQL `table:users` and returns a full login payload (SetPasswordResponse).
-7. Web calls login(data) with the response and goes straight in; mobile setStaffPassword returns void, so the user lands on login and signs in with the new password.
+7. Web calls login(data) with the response and goes straight in; mobile completePasswordSetup stores the response with storeAuthData and runs the same completeLogin steps as a normal login `mobile:app/set-password.tsx`.
 
 - Failure: If the tenant schema lacks the is_first_login column, the check silently passes and the user logs in normally.
 
@@ -211,7 +211,7 @@ flowchart TD
   s4 --> s5
   s6["6. The backend verifies the change_password token type, rejects an ina...<br/>table:users"]
   s5 --> s6
-  s7["7. Web calls login(data) with the response and goes straight in; mobil..."]
+  s7["7. Web calls login(data) with the response and goes straight in; mobil...<br/>mobile:app/set-password.tsx"]
   s6 --> s7
 ```
 
@@ -264,7 +264,7 @@ Implements: `feature:auth/tenant-login`
 - Result: The client renders the menu from the response and sends the access token on every request; the snapshot is fixed until the next login.
 
 - Note: client_name in the body only validates the tenant and fills the JWT claim; the DB session always uses the request tenant resolved by the tenant middleware.
-- Note: Mobile stores @auth/client_schema = response.client_name or test_tenant after login, but the response has no client_name, so the next launch pre-selects test_tenant.
+- Note: Mobile stores @auth/client_schema from response.client_name, falling back to the org already stored at login, then test_tenant.
 
 ```mermaid
 flowchart TD

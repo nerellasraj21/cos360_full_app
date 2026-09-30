@@ -7,6 +7,7 @@ import {
   loginUser,
   logoutUser,
   normalisePermissions,
+  storeAuthData,
   User,
   Permission
 } from '../services/authUtils';
@@ -60,6 +61,7 @@ interface AuthContextType extends AuthState {
   login: (username: string, password: string, clientName?: string, academicYearId?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
+  completePasswordSetup: (response: AuthResponse) => Promise<void>;
   clearError: () => void;
   getAccessToken: () => Promise<string | null>;
   hasPermission: (resource: string, action: string) => boolean;
@@ -276,57 +278,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (__DEV__) console.log('Attempting login for user:', username);
       const response = await loginUser(username, password, clientName, academicYearId);
-
-      // Fetch parent students BEFORE setting authenticated (to prevent navigation)
-      const roleName = response.role?.name?.toLowerCase();
-      let availableStudents: ParentStudent[] = [];
-      let selectedStudent: ParentStudent | null = null;
-      if (roleName === 'student') {
-        if (__DEV__) console.log("Student logged in, setting studentId to entity_id:", response.entity_id);
-        dispatch({ type: 'SET_STUDENT_ID', payload: response.entity_id || null });
-      }
-      let studentFetchFailed = false;
-      if (roleName === 'parent' || roleName === 'guardian' || roleName === 'father' || roleName === 'mother') {
-        try {
-          const students = await parentStudentsApi.getParentStudents();
-          availableStudents = students;
-
-          // Auto-select first student if available
-          if (students.length > 0) {
-            selectedStudent = students[0];
-          }
-        } catch (studentsError) {
-          console.error('Failed to fetch parent students:', studentsError);
-          studentFetchFailed = true;
-        }
-      }
-
-      // H-4: Set interceptor headers BEFORE dispatching LOGIN_SUCCESS so the very first
-      // API calls fired by navigation effects (e.g. dashboard queries) already carry
-      // the correct X-Student-ID / X-Academic-Year-ID headers.
-      if (availableStudents.length > 0 && selectedStudent) {
-        try {
-          await storeStudentData(selectedStudent, availableStudents, selectedStudent?.id || null);
-          setSelectedStudentForInterceptor(selectedStudent);
-        } catch (persistError) {
-          console.error('Failed to persist student data during login:', persistError);
-        }
-      }
-
-      // M-4: Commit user + student context atomically so components never observe
-      // isAuthenticated=true with selectedStudent=null during the first render cycle.
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: response,
-        selectedStudent: selectedStudent || null,
-        availableStudents,
-      });
-
-      // Surface parent-student fetch failure so user is not silently left without context
-      if (studentFetchFailed) {
-        dispatch({ type: 'SET_ERROR', payload: 'Could not load student information. Please refresh.' });
-      }
-
+      await completeLogin(response);
     } catch (error) {
       const axiosError = error as any;
       const backendDetail = axiosError?.response?.data?.detail;
@@ -338,6 +290,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const errorMessage = detailStr || (error instanceof Error ? error.message : 'Login failed');
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error;
+    }
+  };
+
+  // First-login set-password returns the same payload as login: store it and sign straight in
+  const completePasswordSetup = async (response: AuthResponse): Promise<void> => {
+    await storeAuthData(response);
+    await completeLogin(response);
+  };
+
+  // Shared by login and completePasswordSetup: load the parent's students, set the
+  // interceptor headers, then commit everything in a single LOGIN_SUCCESS.
+  const completeLogin = async (response: AuthResponse): Promise<void> => {
+    // Fetch parent students BEFORE setting authenticated (to prevent navigation)
+    const roleName = response.role?.name?.toLowerCase();
+    let availableStudents: ParentStudent[] = [];
+    let selectedStudent: ParentStudent | null = null;
+    if (roleName === 'student') {
+      if (__DEV__) console.log("Student logged in, setting studentId to entity_id:", response.entity_id);
+      dispatch({ type: 'SET_STUDENT_ID', payload: response.entity_id || null });
+    }
+    let studentFetchFailed = false;
+    if (roleName === 'parent' || roleName === 'guardian' || roleName === 'father' || roleName === 'mother') {
+      try {
+        const students = await parentStudentsApi.getParentStudents();
+        availableStudents = students;
+
+        // Auto-select first student if available
+        if (students.length > 0) {
+          selectedStudent = students[0];
+        }
+      } catch (studentsError) {
+        console.error('Failed to fetch parent students:', studentsError);
+        studentFetchFailed = true;
+      }
+    }
+
+    // H-4: Set interceptor headers BEFORE dispatching LOGIN_SUCCESS so the very first
+    // API calls fired by navigation effects (e.g. dashboard queries) already carry
+    // the correct X-Student-ID / X-Academic-Year-ID headers.
+    if (availableStudents.length > 0 && selectedStudent) {
+      try {
+        await storeStudentData(selectedStudent, availableStudents, selectedStudent?.id || null);
+        setSelectedStudentForInterceptor(selectedStudent);
+      } catch (persistError) {
+        console.error('Failed to persist student data during login:', persistError);
+      }
+    }
+
+    // M-4: Commit user + student context atomically so components never observe
+    // isAuthenticated=true with selectedStudent=null during the first render cycle.
+    dispatch({
+      type: 'LOGIN_SUCCESS',
+      payload: response,
+      selectedStudent: selectedStudent || null,
+      availableStudents,
+    });
+
+    // Surface parent-student fetch failure so user is not silently left without context
+    if (studentFetchFailed) {
+      dispatch({ type: 'SET_ERROR', payload: 'Could not load student information. Please refresh.' });
     }
   };
 
@@ -462,6 +474,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     logout,
     refreshAuth,
+    completePasswordSetup,
     clearError,
     getAccessToken,
     hasPermission,
