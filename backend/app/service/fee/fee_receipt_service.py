@@ -257,8 +257,12 @@ class FeeReceiptService:
             transaction.receipt_generated = True
             transaction.receipt_hash = content_hash
 
+            await db.flush()
+            result = await db.execute(
+                select(FeeReceipt).where(FeeReceipt.id == db_receipt.id).execution_options(populate_existing=True)
+            )
+            db_receipt = result.scalar_one()
             await db.commit()
-            await db.refresh(db_receipt)
 
             return db_receipt
 
@@ -293,8 +297,14 @@ class FeeReceiptService:
                     detail=f"Receipt number '{new_number}' is already in use",
                 )
             receipt.receipt_number = new_number
+            await db.flush()
+            result = await db.execute(
+                select(FeeReceipt).where(FeeReceipt.id == receipt.id).execution_options(populate_existing=True)
+            )
+            receipt = result.scalar_one()
+            enriched = await FeeReceiptService._enrich_receipt_fields(db, receipt)
             await db.commit()
-            await db.refresh(receipt)
+            return enriched
 
         return await FeeReceiptService._enrich_receipt_fields(db, receipt)
 
@@ -427,8 +437,12 @@ class FeeReceiptService:
             current_count = receipt.reprint_count if isinstance(receipt.reprint_count, int) else 0
             receipt.reprint_count = current_count + 1
 
+            await db.flush()
+            result = await db.execute(
+                select(FeeReceipt).where(FeeReceipt.id == receipt.id).execution_options(populate_existing=True)
+            )
+            receipt = result.scalar_one()
             await db.commit()
-            await db.refresh(receipt)
 
             log.info(f"Receipt {receipt.receipt_number} reprinted by user {user_id}")
 

@@ -104,8 +104,12 @@ class FeeRefundService:
             )
 
             db.add(db_refund)
+            await db.flush()
+            result = await db.execute(
+                select(FeeRefund).where(FeeRefund.id == db_refund.id).execution_options(populate_existing=True)
+            )
+            db_refund = result.scalar_one()
             await db.commit()
-            await db.refresh(db_refund)
 
             log.info(f"Refund request created: {refund_number} for transaction {transaction.transaction_number}")
 
@@ -163,8 +167,12 @@ class FeeRefundService:
             refund.approval_remarks = approval_data.approval_remarks
             refund.approved_date = datetime.now()
 
+            await db.flush()
+            result = await db.execute(
+                select(FeeRefund).where(FeeRefund.id == refund.id).execution_options(populate_existing=True)
+            )
+            refund = result.scalar_one()
             await db.commit()
-            await db.refresh(refund)
 
             action_text = "approved" if approval_data.action == "approve" else "rejected"
             log.info(f"Refund {refund.refund_number} {action_text} by user {approval_data.approved_by_user_id}")
@@ -202,8 +210,12 @@ class FeeRefundService:
             refund.processing_remarks = processing_data.processing_remarks
             refund.processed_date = datetime.now()
 
+            await db.flush()
+            result = await db.execute(
+                select(FeeRefund).where(FeeRefund.id == refund.id).execution_options(populate_existing=True)
+            )
+            refund = result.scalar_one()
             await db.commit()
-            await db.refresh(refund)
 
             log.info(f"Refund {refund.refund_number} processed via {processing_data.refund_method}")
 

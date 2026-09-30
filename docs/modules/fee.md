@@ -117,6 +117,6 @@ Endpoint prefixes:
 - The pending-fees report ignores concessions, so a student with a concession still shows the full instalment as pending.
 - Carry-forward ignores concessions. It carries forward `total_fee − paid`.
 - Cheque/DD payments mark old fees as paid straight away, even though the transaction is still `pending` and could bounce. This only applies to the auto-distribute path.
-- Refund and receipt services use `commit()` → `refresh()`, which breaks the repo rule of flush → select → commit.
+- Refund `approved_date` and `processed_date` are written with `datetime.now()` (server local time) while every other timestamp is naive UTC, so they are offset by the server's time zone.
 - Fee audit writes (`_write_audit_log` in the collection, concession and old-fee services) insert into `audit_logs`, which exists in no schema, so nothing is recorded. Each write runs in a savepoint before the commit, so the failure never affects the request.
 - No online payment gateway: parents cannot pay in-app. Every payment is recorded by staff, with UPI/bank references typed in by hand.
