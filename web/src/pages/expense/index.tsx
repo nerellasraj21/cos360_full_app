@@ -5,6 +5,7 @@ import {
   Tags,
   ArrowLeftRight,
   LayoutList,
+  Building2,
   ChevronRight,
   ShieldX,
 } from 'lucide-react';
@@ -47,6 +48,13 @@ const navItems: NavItem[] = [
     path: '/expense/transactions',
     icon: <ArrowLeftRight className="h-5 w-5" />,
     color: 'bg-chart-3/10 border-chart-3/20 hover:bg-chart-3/20',
+  },
+  {
+    title: 'Departments',
+    description: 'Maintain the departments that expenses can be assigned to and filtered by',
+    path: '/expense/departments',
+    icon: <Building2 className="h-5 w-5" />,
+    color: 'bg-chart-4/10 border-chart-4/20 hover:bg-chart-4/20',
   },
   {
     title: 'Summary',

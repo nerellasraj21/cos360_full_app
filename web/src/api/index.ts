@@ -88,7 +88,7 @@ CAxios.interceptors.response.use(
         } else if (typeof detail === 'object') {
           // Object-shaped detail (e.g. nested FastAPI errors) — String(obj)
           // collapses to "[object Object]", so stringify it properly instead.
-          message = JSON.stringify(detail);
+          message = typeof detail.message === 'string' ? detail.message : JSON.stringify(detail);
         } else {
           message = String(detail);
         }

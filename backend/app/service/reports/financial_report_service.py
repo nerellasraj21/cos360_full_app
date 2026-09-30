@@ -12,6 +12,7 @@ from uuid import UUID
 from sqlalchemy import Date, String, asc, cast, desc, func, literal, select
 
 from app.models.expense.expense_category_model import ExpenseCategory
+from app.models.expense.expense_department_model import ExpenseDepartment
 from app.models.expense.expense_transaction_model import ExpenseTransaction
 from app.models.expense.expense_type_model import ExpenseType
 from app.models.fee.fee_transaction_model import FeeTransaction
@@ -52,11 +53,13 @@ class FinancialReportService(BaseReportService):
                     ExpenseCategory.name.label("category_name"),
                     ExpenseType.name.label("type_name"),
                     ExpenseTransaction.department_id,
+                    ExpenseDepartment.name.label("department_name"),
                     func.concat(Staff.first_name, " ", Staff.last_name).label("approved_by_name"),
                 )
                 .select_from(ExpenseTransaction)
                 .join(ExpenseType, ExpenseTransaction.expense_type_id == ExpenseType.id)
                 .join(ExpenseCategory, ExpenseType.category_id == ExpenseCategory.id)
+                .outerjoin(ExpenseDepartment, ExpenseTransaction.department_id == ExpenseDepartment.id)
                 .outerjoin(Staff, ExpenseTransaction.approved_by_user_id == Staff.user_id)
             )
 
@@ -126,7 +129,7 @@ class FinancialReportService(BaseReportService):
                         "type_name": row.type_name,
                         "description": row.description,
                         "amount": float(row.amount) if row.amount else 0.0,
-                        "department": str(row.department_id) if row.department_id else None,
+                        "department": row.department_name or (str(row.department_id) if row.department_id else None),
                         "approved_by": row.approved_by_name,
                         "approved_at": row.approved_at.isoformat() if row.approved_at else None,
                         "receipt_number": row.reference_number,

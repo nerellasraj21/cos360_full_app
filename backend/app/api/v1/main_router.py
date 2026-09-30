@@ -27,6 +27,7 @@ from app.api.v1.exam.result_endpoints import router as exam_result_router
 from app.api.v1.expense.expense_attachment_endpoints import router as expense_attachment_router
 from app.api.v1.expense.expense_audit_endpoints import router as expense_audit_router
 from app.api.v1.expense.expense_category_endpoints import router as expense_category_router
+from app.api.v1.expense.expense_department_endpoints import router as expense_department_router
 from app.api.v1.expense.expense_reporting_endpoints import router as expense_reporting_router
 from app.api.v1.expense.expense_settings_endpoints import router as expense_settings_router
 from app.api.v1.expense.expense_summary_endpoints import router as expense_summary_router
@@ -153,6 +154,7 @@ router.include_router(super_admin_system_router)
 router.include_router(super_admin_plan_router)
 router.include_router(super_admin_tenant_data_router)
 router.include_router(expense_category_router)
+router.include_router(expense_department_router)
 router.include_router(expense_type_router)
 router.include_router(expense_transaction_router)
 router.include_router(expense_summary_router)

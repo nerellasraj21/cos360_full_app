@@ -21,6 +21,7 @@ import {
 import { PERMISSION_RESOURCES } from '../src/types/permissions';
 import type {
   ExpenseCategoryInput,
+  ExpenseDepartmentInput,
   ExpenseTypeInput,
   ExpenseTransactionInput,
   ExpenseApprovalRequest,
@@ -378,6 +379,49 @@ export const useExpenseDepartmentDropdownProtected = () => {
     queryKey: ['expense-departments-dropdown'],
     queryFn: () => expenseDepartmentsApi.getDepartmentsDropdown(),
   });
+};
+
+export const useCreateExpenseDepartmentProtected = () => {
+  const queryClient = useQueryClient();
+  return usePermissionProtectedCreateMutation(
+    PERMISSION_RESOURCES.EXPENSE_DEPARTMENTS,
+    (data: ExpenseDepartmentInput) => expenseDepartmentsApi.createDepartment(data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['expense-departments'] });
+        queryClient.invalidateQueries({ queryKey: ['expense-departments-dropdown'] });
+      },
+    }
+  );
+};
+
+export const useUpdateExpenseDepartmentProtected = () => {
+  const queryClient = useQueryClient();
+  return usePermissionProtectedUpdateMutation(
+    PERMISSION_RESOURCES.EXPENSE_DEPARTMENTS,
+    ({ id, data }: { id: string; data: Partial<ExpenseDepartmentInput> }) =>
+      expenseDepartmentsApi.updateDepartment(id, data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['expense-departments'] });
+        queryClient.invalidateQueries({ queryKey: ['expense-departments-dropdown'] });
+      },
+    }
+  );
+};
+
+export const useDeleteExpenseDepartmentProtected = () => {
+  const queryClient = useQueryClient();
+  return usePermissionProtectedDeleteMutation(
+    PERMISSION_RESOURCES.EXPENSE_DEPARTMENTS,
+    (id: string) => expenseDepartmentsApi.deleteDepartment(id),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['expense-departments'] });
+        queryClient.invalidateQueries({ queryKey: ['expense-departments-dropdown'] });
+      },
+    }
+  );
 };
 
 // Permission-protected Reports hooks

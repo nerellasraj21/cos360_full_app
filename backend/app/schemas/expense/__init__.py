@@ -7,6 +7,12 @@ from .expense_category_schema import (
     ExpenseCategoryRead,
     ExpenseCategoryUpdate,
 )
+from .expense_department_schema import (
+    ExpenseDepartmentCreate,
+    ExpenseDepartmentDropdown,
+    ExpenseDepartmentRead,
+    ExpenseDepartmentUpdate,
+)
 from .expense_report_schema import (
     CategorySummary,
     ExpenseCategoryReport,
@@ -48,6 +54,11 @@ __all__ = [
     "ExpenseCategoryRead",
     "ExpenseCategoryUpdate",
     "ExpenseCategoryDropdown",
+    # Department schemas
+    "ExpenseDepartmentCreate",
+    "ExpenseDepartmentRead",
+    "ExpenseDepartmentUpdate",
+    "ExpenseDepartmentDropdown",
     # Type schemas
     "ExpenseTypeCreate",
     "ExpenseTypeRead",

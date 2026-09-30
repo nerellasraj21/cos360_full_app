@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.expense import (
+    ExpenseDepartment,
     ExpenseTransaction,
     ExpenseType,
 )
@@ -26,6 +27,11 @@ class ExpenseTransactionService(BaseExpenseService):
 
     def __init__(self, db: AsyncSession):
         super().__init__(db)
+
+    async def _check_active_department(self, department_id: UUID) -> None:
+        department = await self.check_record_exists(ExpenseDepartment, department_id, "Expense department not found")
+        if not department.is_active:
+            raise self.build_error_response("INACTIVE_DEPARTMENT", "Cannot use an inactive expense department")
 
     async def create_transaction(
         self,
@@ -47,6 +53,9 @@ class ExpenseTransactionService(BaseExpenseService):
             raise self.build_error_response(
                 "INACTIVE_EXPENSE_TYPE", "Cannot create transaction for inactive expense type"
             )
+
+        if transaction_data.department_id:
+            await self._check_active_department(transaction_data.department_id)
 
         # Check for duplicate idempotency key
         existing_transaction = await self.db.execute(
@@ -205,6 +214,8 @@ class ExpenseTransactionService(BaseExpenseService):
 
         # Update fields
         update_data = transaction_data.model_dump(exclude_unset=True)
+        if update_data.get("department_id") and update_data["department_id"] != db_transaction.department_id:
+            await self._check_active_department(update_data["department_id"])
         for field, value in update_data.items():
             setattr(db_transaction, field, value)
 

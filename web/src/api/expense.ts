@@ -28,6 +28,8 @@ import type {
   ExpenseSettingsValue,
   ExpenseCommonSettings,
   ExpenseDepartment,
+  ExpenseDepartmentCreate,
+  ExpenseDepartmentUpdate,
   ExpenseDepartmentDropdown,
   ExpenseCategoryReport,
   ExpenseTypeReport,
@@ -312,6 +314,26 @@ class ExpenseService {
 
   getDepartmentDropdown = async (): Promise<ExpenseDepartmentDropdown[]> => {
     return this.request(`${EXPENSE_ENDPOINTS.DEPARTMENTS}dropdown`);
+  };
+
+  createDepartment = async (data: ExpenseDepartmentCreate): Promise<ExpenseDepartment> => {
+    return this.request(EXPENSE_ENDPOINTS.DEPARTMENTS, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  };
+
+  updateDepartment = async (id: string, data: ExpenseDepartmentUpdate): Promise<ExpenseDepartment> => {
+    return this.request(`${EXPENSE_ENDPOINTS.DEPARTMENTS}${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  };
+
+  deleteDepartment = async (id: string): Promise<ExpenseDepartment> => {
+    return this.request(`${EXPENSE_ENDPOINTS.DEPARTMENTS}${id}`, {
+      method: 'DELETE',
+    });
   };
 
   getSettingValue = async (key: string): Promise<ExpenseSettingsValue> => {

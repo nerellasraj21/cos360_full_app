@@ -45,6 +45,7 @@ SUB_MENUS = [
     ("Summary",           "/expense/summary",      6),
     ("Audit Trail",       "/expense/audit",        7),
     ("Settings",          "/expense/settings",     8),
+    ("Departments",       "/expense/departments",  9),
 ]
 
 

@@ -120,8 +120,7 @@ except Exception as e:
   `cos360_masters`. PowerShell: `$env:SCHEMA_NAME='cos360_master'; alembic upgrade <rev>`.
 - In a revision, read `os.getenv("SCHEMA_NAME")` and pass `schema=` to ops. Write DDL to be idempotent
   (`IF NOT EXISTS`, guarded `DO $$` blocks) because schemas are not uniformly versioned.
-- Keep a single head (`alembic heads`). There are currently **two heads** (`d3e4f5a6b7c8`, `e0f1a2b3c4d5`).
-  Add a merge revision before the next migration.
+- Keep a single head (`alembic heads`); new revisions go on top of it.
 - Review `--autogenerate` output line by line: it picks up drift noise (missing FKs, index names) as real changes.
 
 ## Run, lint, test (from `backend/`)

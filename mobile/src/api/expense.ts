@@ -17,6 +17,7 @@ import type {
   ExpenseCommonSettings,
   ExpenseDepartment,
   ExpenseDepartmentDropdown,
+  ExpenseDepartmentInput,
   ExpenseCategoryReport,
   ExpenseTypeReport,
   ExpenseTrendReport,
@@ -284,6 +285,21 @@ export const expenseDepartmentsApi = {
 
   getDepartmentsDropdown: async (): Promise<ExpenseDepartmentDropdown[]> => {
     const response = await apiClient.get('/expense/departments/dropdown');
+    return response.data;
+  },
+
+  createDepartment: async (data: ExpenseDepartmentInput): Promise<ExpenseDepartment> => {
+    const response = await apiClient.post('/expense/departments', data);
+    return response.data;
+  },
+
+  updateDepartment: async (id: string, data: Partial<ExpenseDepartmentInput>): Promise<ExpenseDepartment> => {
+    const response = await apiClient.put(`/expense/departments/${id}`, data);
+    return response.data;
+  },
+
+  deleteDepartment: async (id: string): Promise<ExpenseDepartment> => {
+    const response = await apiClient.delete(`/expense/departments/${id}`);
     return response.data;
   },
 };

@@ -115,7 +115,7 @@ Android auto-commits and dismisses. iOS (`components/ui/ios-date-picker-modal.ts
 
 ## Backend endpoints and field traps
 
-- **Don't call (not implemented in backend):** `GET /expense/departments`, `GET /expense/departments/dropdown` (the screen shows "Not Available"). There are also no mobile permission sync/check endpoints (`/auth/mobile/permissions/sync`, `/auth/permissions/check`, `/auth/permissions/bulk-check`).
+- **Don't call (not implemented in backend):** the mobile permission sync/check endpoints (`/auth/mobile/permissions/sync`, `/auth/permissions/check`, `/auth/permissions/bulk-check`).
 - Field names the mobile code has got wrong before (verify against `backend/app/schemas/` whenever you touch these):
   - Exams: `exam_name` (not `title`); list filter `exam_status`; marks pagination `page_size`.
   - Results: `is_passed`, `total_marks_obtained`, `grade_label`.

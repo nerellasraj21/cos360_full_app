@@ -34,6 +34,8 @@ import type {
   ExpenseSettingsValue,
   ExpenseCommonSettings,
   ExpenseDepartment,
+  ExpenseDepartmentCreate as ExpenseDepartmentCreateRequest,
+  ExpenseDepartmentUpdate as ExpenseDepartmentUpdateRequest,
   ExpenseDepartmentDropdown,
   ExpenseCategoryReport,
   ExpenseTypeReport,
@@ -421,18 +423,72 @@ export function useExpenseDepartments(params?: {
   limit?: number;
   active_only?: boolean;
 }) {
-  return useQuery<ExpenseDepartment[]>({
+  return usePermissionProtectedQuery<ExpenseDepartment[]>({
     queryKey: ['expense-departments', params],
-    queryFn: async () => [] as ExpenseDepartment[],
+    queryFn: () => expenseApi.getDepartments(params),
+    resource: 'expense_departments',
+    action: 'list',
     staleTime: expenseCacheUtils.TTL.MEDIUM,
+    refetchOnMount: true,
   });
 }
 
 export function useExpenseDepartmentDropdown() {
-  return useQuery<ExpenseDepartmentDropdown[]>({
+  return usePermissionProtectedQuery<ExpenseDepartmentDropdown[]>({
     queryKey: ['expense-departments-dropdown'],
-    queryFn: async () => [] as ExpenseDepartmentDropdown[],
-    staleTime: expenseCacheUtils.TTL.LONG,
+    queryFn: () => expenseApi.getDepartmentDropdown(),
+    resource: 'expense_departments',
+    action: 'read',
+    staleTime: 0,
+    refetchOnMount: true,
+  });
+}
+
+export function useCreateExpenseDepartment() {
+  const queryClient = useQueryClient();
+
+  return usePermissionProtectedMutation<ExpenseDepartment, Error, ExpenseDepartmentCreateRequest>({
+    resource: 'expense_departments',
+    action: 'create',
+    mutationFn: (data) => expenseApi.createDepartment(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expense-departments'] });
+      queryClient.invalidateQueries({ queryKey: ['expense-departments-dropdown'] });
+      expenseNotifications.departmentCreated();
+    },
+    onError: handleExpenseApiError,
+  });
+}
+
+export function useUpdateExpenseDepartment() {
+  const queryClient = useQueryClient();
+
+  return usePermissionProtectedMutation<ExpenseDepartment, Error, { id: string; data: ExpenseDepartmentUpdateRequest }>({
+    resource: 'expense_departments',
+    action: 'update',
+    mutationFn: ({ id, data }) => expenseApi.updateDepartment(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expense-departments'] });
+      queryClient.invalidateQueries({ queryKey: ['expense-departments-dropdown'] });
+      expenseNotifications.departmentUpdated();
+    },
+    onError: handleExpenseApiError,
+  });
+}
+
+export function useDeleteExpenseDepartment() {
+  const queryClient = useQueryClient();
+
+  return usePermissionProtectedMutation<ExpenseDepartment, Error, string>({
+    resource: 'expense_departments',
+    action: 'delete',
+    mutationFn: (id) => expenseApi.deleteDepartment(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expense-departments'] });
+      queryClient.invalidateQueries({ queryKey: ['expense-departments-dropdown'] });
+      expenseNotifications.departmentDeleted();
+    },
+    onError: handleExpenseApiError,
   });
 }
 

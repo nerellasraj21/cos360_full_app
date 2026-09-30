@@ -59,7 +59,8 @@
 {"type": "entity", "name": "feature:expense/expense-approval", "entityType": "Feature", "observations": ["Summary: Single-step approve or reject, with a required 1-500 character comment, for transactions that are pending and require approval; approved transactions cannot be edited.", "Roles: expense_transactions with the approve extra action.", "Parity: Both clients have an approvals screen with stats, search and approve/reject."]}
 {"type": "entity", "name": "feature:expense/expense-attachments", "entityType": "Feature", "observations": ["Summary: Upload, list and download files attached to an expense transaction (max 10 MB).", "Roles: expense_attachments permission.", "Parity: Web accepts multiple files; mobile single-file upload.", "Note: Metadata only: file_path is a placeholder, download returns a mock body and delete removes no file."]}
 {"type": "entity", "name": "feature:expense/expense-audit-trail", "entityType": "Feature", "observations": ["Summary: Read audit logs overall and per transaction.", "Roles: expense_audit_logs permission.", "Parity: Both clients have an audit screen.", "Note: The trail is empty because every create_audit_log call in the category, type and transaction services is commented out."]}
-{"type": "entity", "name": "feature:expense/expense-overview", "entityType": "Feature", "observations": ["Summary: Web expense landing page with 3 stat cards (Categories, Types, Transactions) and 4 navigation cards (Categories, Types, Transactions, Summary).", "Parity: Web only."]}
+{"type": "entity", "name": "feature:expense/expense-departments", "entityType": "Feature", "observations": ["Summary: Maintain expense departments (unique active names, case-insensitive) and assign them to transactions; delete deactivates.", "Roles: expense_departments permission (Admin all actions; Staff and Teacher read and list in the default seeds).", "Parity: Both clients: web /expense/departments page and department filter on the audit page; mobile app/expense/departments.tsx.", "Note: The expenditure report shows the department name, falling back to the raw id."]}
+{"type": "entity", "name": "feature:expense/expense-overview", "entityType": "Feature", "observations": ["Summary: Web expense landing page with 3 stat cards (Categories, Types, Transactions) and 5 navigation cards (Categories, Types, Transactions, Departments, Summary).", "Parity: Web only; the mobile Expense tab hub lists the same sections."]}
 {"type": "entity", "name": "feature:expense/expense-reports", "entityType": "Feature", "observations": ["Summary: Reports by category, by type, trend and period summary, plus an export.", "Roles: expense_reports with the export extra action.", "Parity: Both clients; mobile posts export to /expense/reports instead of /expense/reports/export.", "Note: Export is mocked: a fixed export_id and a status that always says completed."]}
 {"type": "entity", "name": "feature:expense/expense-settings", "entityType": "Feature", "observations": ["Summary: Key/value settings rows with CRUD, value lookup by key, UI common settings and reset.", "Roles: expense_settings permission.", "Parity: Both clients.", "Note: Nothing in the transaction flow reads the settings."]}
 {"type": "entity", "name": "feature:expense/expense-summary", "entityType": "Feature", "observations": ["Summary: Hierarchical totals Category -> Type -> Entries with a grand total, filtered by academic year, dates and status.", "Roles: expense_transactions:list.", "Parity: Both clients."]}
@@ -306,6 +307,7 @@
 {"type": "entity", "name": "decision:exam/web-excel-client-side", "entityType": "Decision", "observations": ["Decision: Web handles Excel export and import client-side with the xlsx library and loads imported values as unsaved edits; mobile uses the backend template and upload endpoints.", "Why: Not recorded."]}
 {"type": "entity", "name": "decision:exam/wizard-state-session-storage", "entityType": "Decision", "observations": ["Decision: The web exam-create wizard state persists in sessionStorage (exam-store), and CreateExam.tsx filters configs to the currently selected class|section keys before submit.", "Why: A multi-step wizard should not lose the teacher's input on a page refresh, but it should not persist across browser sessions either.", "Tradeoff: Configs for deselected class-sections linger in the store and would cause a 422 if not filtered."]}
 {"type": "entity", "name": "decision:expense/client-idempotency-key", "entityType": "Decision", "observations": ["Decision: The client generates a unique idempotency_key per expense transaction, and the backend rejects duplicates.", "Why: Stops a double-submit from creating two transactions."]}
+{"type": "entity", "name": "decision:expense/department-reference-checked-in-service", "entityType": "Decision", "observations": ["Decision: ExpenseTransactionService checks on create and update that a department_id exists and is active, instead of relying on a foreign key.", "Why: Tenant schemas are cloned without FK constraints, so the database cannot reject an unknown or inactive department.", "Alternatives: Adding an FK in the migration, which cloned schemas would not carry and which would block deactivated departments on old rows.", "Status: active", "Since: 2026-09"]}
 {"type": "entity", "name": "decision:expense/hard-coded-approval-threshold", "entityType": "Decision", "observations": ["Decision: requires_approval is computed once at create in ExpenseTransactionService.create_transaction: override, or amount > 1000.00, or payment method check/wire_transfer.", "Why: Not a deliberate choice. Approval rules are meant to come from ExpenseSettings and be re-evaluated when the amount changes.", "Tradeoff: ExpenseSettings is ignored; clients send cheque and bank_transfer, so only the amount rule and override trigger; editing the amount later skips approval.", "Status: unintended"]}
 {"type": "entity", "name": "decision:expense/line-items-ui-only", "entityType": "Decision", "observations": ["Decision: Expense line items are only a calculator in the UI; the backend stores just the total amount.", "Why: Keeps the API to a single amount.", "Tradeoff: expense_transaction_items exists but is never written."]}
 {"type": "entity", "name": "decision:expense/org-id-from-tenant", "entityType": "Decision", "observations": ["Decision: Every expense table keeps org_id NOT NULL, filled on create with public.tenants.id looked up from the cschema client name; tenant isolation itself comes from the schema.", "Why: org_id is a leftover from the earlier single-schema design."]}
@@ -461,7 +463,7 @@
 {"type": "entity", "name": "concept:exam/subject-config", "entityType": "Concept", "observations": ["Definition: A subject config is one subject of an exam for one (class, section); it holds an optional subject grade scheme and one or more components."]}
 {"type": "entity", "name": "concept:expense/approval-threshold", "entityType": "Concept", "observations": ["Definition: The rule deciding requires_approval at create: override, amount above 1000.00, or payment method check/wire_transfer; transactions that do not require approval can never be approved."]}
 {"type": "entity", "name": "concept:expense/expense-category", "entityType": "Concept", "observations": ["Definition: A top-level spending group such as Infrastructure or Utilities; unique name, soft-deleted."]}
-{"type": "entity", "name": "concept:expense/expense-department", "entityType": "Concept", "observations": ["Definition: A department an expense may belong to; the table exists but has no endpoints, and department_id on a transaction is a free UUID with no FK."]}
+{"type": "entity", "name": "concept:expense/expense-department", "entityType": "Concept", "observations": ["Definition: A per-tenant department (expense_departments row) that an expense may be assigned to and filtered by; deactivated rather than deleted."]}
 {"type": "entity", "name": "concept:expense/expense-line-items", "entityType": "Concept", "observations": ["Definition: Client-side rows (unit price x quantity with tax and discount) used only to compute the transaction amount; never persisted."]}
 {"type": "entity", "name": "concept:expense/expense-status", "entityType": "Concept", "observations": ["Definition: Expense transaction status: starts pending; approval moves it to approved or rejected. No endpoint sets paid or cancelled."]}
 {"type": "entity", "name": "concept:expense/expense-summary-hierarchy", "entityType": "Concept", "observations": ["Definition: The summary shape: category totals containing type totals containing entries, plus a grand total."]}
@@ -560,6 +562,7 @@
 {"type": "entity", "name": "endpoint:DELETE /exams/{exam_id}", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:DELETE /exams/{exam_id}/dates/{date_id}", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:DELETE /exams/{exam_id}/mark-permissions/{permission_id}", "entityType": "Endpoint", "observations": []}
+{"type": "entity", "name": "endpoint:DELETE /expense/departments/{department_id}", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:DELETE /fee/concessions/{concession_id}", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:DELETE /fee/old-fees/{old_fee_id}", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:DELETE /fee/student-mappings/{mapping_id}", "entityType": "Endpoint", "observations": []}
@@ -644,6 +647,8 @@
 {"type": "entity", "name": "endpoint:GET /expense/audit/logs", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:GET /expense/audit/transactions/{transaction_id}/logs", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:GET /expense/categories/dropdown", "entityType": "Endpoint", "observations": []}
+{"type": "entity", "name": "endpoint:GET /expense/departments", "entityType": "Endpoint", "observations": []}
+{"type": "entity", "name": "endpoint:GET /expense/departments/dropdown", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:GET /expense/reports/by-category", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:GET /expense/reports/by-type", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:GET /expense/reports/summary", "entityType": "Endpoint", "observations": []}
@@ -850,6 +855,7 @@
 {"type": "entity", "name": "endpoint:POST /exams/{exam_id}/unlock", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:POST /expense/attachments/transactions/{transaction_id}/upload", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:POST /expense/categories", "entityType": "Endpoint", "observations": []}
+{"type": "entity", "name": "endpoint:POST /expense/departments", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:POST /expense/reports/export", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:POST /expense/settings", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:POST /expense/transactions", "entityType": "Endpoint", "observations": []}
@@ -943,6 +949,7 @@
 {"type": "entity", "name": "endpoint:PUT /exams/{exam_id}/hall-tickets/{student_id}/override", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:PUT /exams/{exam_id}/mark-permissions/{permission_id}", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:PUT /exams/{exam_id}/subject-configs/{config_id}", "entityType": "Endpoint", "observations": []}
+{"type": "entity", "name": "endpoint:PUT /expense/departments/{department_id}", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:PUT /expense/transactions/{transaction_id}", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:PUT /fee/class-mappings/{mapping_id}", "entityType": "Endpoint", "observations": []}
 {"type": "entity", "name": "endpoint:PUT /fee/concessions/{concession_id}", "entityType": "Endpoint", "observations": []}
@@ -1011,6 +1018,7 @@
 {"type": "entity", "name": "service:app/service/expense/expense_attachment_service.py", "entityType": "Service", "observations": []}
 {"type": "entity", "name": "service:app/service/expense/expense_audit_service.py", "entityType": "Service", "observations": []}
 {"type": "entity", "name": "service:app/service/expense/expense_category_service.py", "entityType": "Service", "observations": []}
+{"type": "entity", "name": "service:app/service/expense/expense_department_service.py", "entityType": "Service", "observations": []}
 {"type": "entity", "name": "service:app/service/expense/expense_reporting_service.py", "entityType": "Service", "observations": []}
 {"type": "entity", "name": "service:app/service/expense/expense_settings_service.py", "entityType": "Service", "observations": []}
 {"type": "entity", "name": "service:app/service/expense/expense_summary_service.py", "entityType": "Service", "observations": []}
@@ -1680,6 +1688,7 @@
 {"type": "relation", "from": "concept:expense/expense-category", "to": "concept:expense/expense-type", "relationType": "relates_to"}
 {"type": "relation", "from": "concept:expense/expense-category", "to": "table:expense_categories", "relationType": "relates_to"}
 {"type": "relation", "from": "concept:expense/expense-department", "to": "module:expense", "relationType": "part_of"}
+{"type": "relation", "from": "concept:expense/expense-department", "to": "feature:expense/expense-departments", "relationType": "relates_to"}
 {"type": "relation", "from": "concept:expense/expense-department", "to": "mobile:app/expense/departments.tsx", "relationType": "relates_to"}
 {"type": "relation", "from": "concept:expense/expense-department", "to": "table:expense_departments", "relationType": "relates_to"}
 {"type": "relation", "from": "concept:expense/expense-department", "to": "web:src/pages/expense/departments.tsx", "relationType": "relates_to"}
@@ -2227,6 +2236,8 @@
 {"type": "relation", "from": "decision:expense/client-idempotency-key", "to": "feature:expense/record-expense", "relationType": "shapes"}
 {"type": "relation", "from": "decision:expense/client-idempotency-key", "to": "flow:expense/record-expense", "relationType": "shapes"}
 {"type": "relation", "from": "decision:expense/client-idempotency-key", "to": "service:app/service/expense/expense_transaction_service.py", "relationType": "shapes"}
+{"type": "relation", "from": "decision:expense/department-reference-checked-in-service", "to": "feature:expense/expense-departments", "relationType": "shapes"}
+{"type": "relation", "from": "decision:expense/department-reference-checked-in-service", "to": "service:app/service/expense/expense_transaction_service.py", "relationType": "shapes"}
 {"type": "relation", "from": "decision:expense/hard-coded-approval-threshold", "to": "feature:expense/expense-approval", "relationType": "shapes"}
 {"type": "relation", "from": "decision:expense/hard-coded-approval-threshold", "to": "flow:expense/record-expense", "relationType": "shapes"}
 {"type": "relation", "from": "decision:expense/hard-coded-approval-threshold", "to": "service:app/service/expense/expense_transaction_service.py", "relationType": "shapes"}
@@ -3439,6 +3450,16 @@
 {"type": "relation", "from": "feature:expense/expense-audit-trail", "to": "table:expense_audit_logs", "relationType": "implemented_by"}
 {"type": "relation", "from": "feature:expense/expense-audit-trail", "to": "web:src/pages/expense/audit.tsx", "relationType": "implemented_by"}
 {"type": "relation", "from": "feature:expense/expense-audit-trail", "to": "module:expense", "relationType": "part_of"}
+{"type": "relation", "from": "feature:expense/expense-departments", "to": "endpoint:DELETE /expense/departments/{department_id}", "relationType": "implemented_by"}
+{"type": "relation", "from": "feature:expense/expense-departments", "to": "endpoint:GET /expense/departments", "relationType": "implemented_by"}
+{"type": "relation", "from": "feature:expense/expense-departments", "to": "endpoint:GET /expense/departments/dropdown", "relationType": "implemented_by"}
+{"type": "relation", "from": "feature:expense/expense-departments", "to": "endpoint:POST /expense/departments", "relationType": "implemented_by"}
+{"type": "relation", "from": "feature:expense/expense-departments", "to": "endpoint:PUT /expense/departments/{department_id}", "relationType": "implemented_by"}
+{"type": "relation", "from": "feature:expense/expense-departments", "to": "mobile:app/expense/departments.tsx", "relationType": "implemented_by"}
+{"type": "relation", "from": "feature:expense/expense-departments", "to": "service:app/service/expense/expense_department_service.py", "relationType": "implemented_by"}
+{"type": "relation", "from": "feature:expense/expense-departments", "to": "table:expense_departments", "relationType": "implemented_by"}
+{"type": "relation", "from": "feature:expense/expense-departments", "to": "web:src/pages/expense/departments.tsx", "relationType": "implemented_by"}
+{"type": "relation", "from": "feature:expense/expense-departments", "to": "module:expense", "relationType": "part_of"}
 {"type": "relation", "from": "feature:expense/expense-overview", "to": "web:src/components/expense/dashboard/ExpenseNavigation.tsx", "relationType": "implemented_by"}
 {"type": "relation", "from": "feature:expense/expense-overview", "to": "web:src/components/expense/dashboard/ExpenseOverviewCards.tsx", "relationType": "implemented_by"}
 {"type": "relation", "from": "feature:expense/expense-overview", "to": "web:src/pages/expense/index.tsx", "relationType": "implemented_by"}

@@ -78,6 +78,7 @@ export type PermissionResource =
 
   // Expense Module
   | 'expense_categories'
+  | 'expense_departments'
   | 'expense_types'
   | 'expense_transactions'
   | 'expense_transaction_items'
@@ -495,6 +496,13 @@ export const PERMISSIONS = {
     update: 'expense_categories:update' as PermissionString,
     delete: 'expense_categories:delete' as PermissionString,
     list: 'expense_categories:list' as PermissionString,
+  },
+  expense_departments: {
+    create: 'expense_departments:create' as PermissionString,
+    read: 'expense_departments:read' as PermissionString,
+    update: 'expense_departments:update' as PermissionString,
+    delete: 'expense_departments:delete' as PermissionString,
+    list: 'expense_departments:list' as PermissionString,
   },
   expense_types: {
     create: 'expense_types:create' as PermissionString,

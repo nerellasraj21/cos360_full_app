@@ -65,11 +65,10 @@ Endpoint prefixes:
 7. **Clients never send `academic_year_id` on create**, and the backend doesn't set a default. Filtering the summary by academic year therefore leaves out every transaction created from the UI.
    - The column was added later by a one-off script, with no FK constraint. The index has to be created after the `DO $$` block, because the column may not exist before that block runs.
 8. **Seeds only cover** categories, types, transactions and reports. `expense_attachments`, `expense_audit_logs` and `expense_settings` have to be seeded separately, otherwise those endpoints return 403.
-9. **Expense departments have a model but no endpoints.**
-   - Web `pages/expense/departments.tsx` and the department dropdown call `/expense/departments/`, which returns 404.
-   - Mobile shows a "Not Available" placeholder instead.
-   - `department_id` on a transaction is a free UUID with no FK.
-   - The `expense_departments` table does not exist in any tenant schema (only the model does), so nothing can join to it.
+9. **Expense departments** are per-tenant rows in `expense_departments` (resource `expense_departments`), managed at `/expense/departments` (CRUD plus `/dropdown`).
+   - Names are unique among active departments, case-insensitively. Delete only deactivates, and a deactivated department leaves the dropdown.
+   - `department_id` on a transaction has no FK (cloned schemas have none), so create and update check in the service that the department exists (404) and is active (400).
+   - List endpoints return plain arrays, like the rest of the module (rule 4).
 
 ## Web / mobile parity
 - **Both clients:** categories, types, transactions (create, edit, view), approvals (stats, search, approve/reject with a comment), summary, reports, settings and audit screens.
@@ -77,7 +76,7 @@ Endpoint prefixes:
 - **Mobile only:**
   - The transactions screen has 5 status tabs: all, pending, approved, paid, cancelled.
   - The mobile API layer also defines `PUT /{id}/status`, which doesn't exist.
-  - It has a departments placeholder screen, a text-entry date filter, and single-file upload.
+  - It has a text-entry date filter and single-file upload.
 - **Web only:** the attachment input accepts multiple files.
 - **Mobile calls without a trailing slash:** `/expense/categories`, `/expense/transactions` and similar are called without the trailing slash, so FastAPI answers with a redirect. The export call is `POST /expense/reports` rather than `/expense/reports/export`.
 

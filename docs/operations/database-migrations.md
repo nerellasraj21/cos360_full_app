@@ -51,10 +51,9 @@ bumped (or didn't bump) the version row by hand. Before upgrading a schema, comp
    ```
    Pass `schema=schema` to `op.create_table` and similar calls. Put `CREATE INDEX` on a new column after the
    statement that adds the column (a `DO $$` block that adds it runs first). Implement `downgrade()`.
-3. **One head.** `alembic heads` must print one revision. Today it prints two: `e0f1a2b3c4d5` (main chain) and
-   `d3e4f5a6b7c8` (expense `academic_year_id`, branched from the old `ea91fcd9d2f8`). Create a merge with
-   `alembic merge -m "merge heads" d3e4f5a6b7c8 e0f1a2b3c4d5`. Make sure `d3e4f5a6b7c8` is idempotent first,
-   because some schemas already got that column from a script.
+3. **One head.** `alembic heads` must print one revision. `f7a8b9c0d1e2` merged the old expense branch
+   (`d3e4f5a6b7c8`) into the main chain. A schema whose `alembic_version` has duplicate or multiple rows fails the
+   version update ("expected to match one row"); collapse it to the correct single row before upgrading.
 4. **Back up** the target schemas ([Backups](#backups)).
 5. **Template first:** `SCHEMA_NAME=cos360_master alembic upgrade <rev>`, then `alembic current`.
    PowerShell: `$env:SCHEMA_NAME='cos360_master'; alembic upgrade <rev>`.

@@ -11,7 +11,7 @@ import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 
 const ORANGE = '#F97316';
 
-// Mirrors the web sidebar's Expense submenu: Overview, Categories, Types, Transactions, Summary.
+// Mirrors the web Expense hub: Overview, Categories, Types, Transactions, Departments, Summary.
 const sections: {
   title: string; description: string; icon: any; color: string;
   route: string; resource?: string; action?: string; alwaysShow?: boolean;
@@ -20,6 +20,7 @@ const sections: {
   { title: 'Categories',   description: 'Manage top-level expense categories such as Infrastructure, Utilities, and Operations', icon: 'pricetag' as const,        color: '#EA580C', route: '/expense/categories',   resource: PERMISSION_RESOURCES.EXPENSE_CATEGORIES,   action: 'list' },
   { title: 'Types',        description: 'Define specific expense types within each category with budget limits and controls',     icon: 'pricetags' as const,       color: ORANGE,    route: '/expense/types',        resource: PERMISSION_RESOURCES.EXPENSE_TYPES,        action: 'list' },
   { title: 'Transactions', description: 'Create, view, and track all expense transactions with full approval workflow',           icon: 'swap-horizontal' as const, color: '#C2410C', route: '/expense/transactions', resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS, action: 'list' },
+  { title: 'Departments',  description: 'Maintain the departments that expenses can be assigned to and filtered by',             icon: 'business' as const,        color: '#9A3412', route: '/expense/departments',  resource: PERMISSION_RESOURCES.EXPENSE_DEPARTMENTS,  action: 'list' },
   { title: 'Summary',      description: 'Category-wise breakdown with type totals and grand total — filterable by academic year', icon: 'list' as const,            color: '#EA580C', route: '/expense/summary',      resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS, action: 'list' },
 ];
 

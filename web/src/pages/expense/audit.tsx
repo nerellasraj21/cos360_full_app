@@ -178,12 +178,12 @@ export function ExpenseAuditPage() {
                     className="w-full"
                   />
                 </div>
-                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                <Select value={departmentFilter || '__all__'} onValueChange={(value) => setDepartmentFilter(value === '__all__' ? '' : value)}>
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="All Departments" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Departments</SelectItem>
+                    <SelectItem value="__all__">All Departments</SelectItem>
                     {departments.map(dept => (
                       <SelectItem key={dept.id} value={dept.id}>
                         {dept.name}

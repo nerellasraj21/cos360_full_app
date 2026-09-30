@@ -1,29 +1,22 @@
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ExpenseDepartments } from '@/components/expense';
-import { Building } from 'lucide-react';
-import { PageHeader } from '@/components/ui/PageHeader';
+import { PermissionGuard } from '@/components/PermissionGuard';
 
 export function ExpenseDepartmentsPage() {
     return (
-        <div className="p-6 space-y-6">
-            <PageHeader title="Expense Departments" icon={<Building className="h-5 w-5" />} subtitle="Manage departments for expense categorization and organization" />
-
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Building className="h-5 w-5" />
-                        Department Management
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                        Create and manage departments for organizing expenses
-                    </p>
-                </CardHeader>
-                <CardContent>
-                    <ExpenseDepartments />
-                </CardContent>
-            </Card>
-        </div>
+        <PermissionGuard
+            permissions={[["expense_departments", "list"]]}
+            fallback={
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
+                        <p className="text-muted-foreground">You don't have permission to view expense departments.</p>
+                    </div>
+                </div>
+            }
+        >
+            <ExpenseDepartments />
+        </PermissionGuard>
     );
 }
 

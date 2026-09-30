@@ -66,6 +66,7 @@ export const STAFF_PERMISSION_MATRIX: Record<string, string[]> = {
   // Expenses
   expense_types: ['read', 'list'],
   expense_categories: ['read', 'list'],
+  expense_departments: ['read', 'list'],
   expense_transactions: ['create', 'read', 'list'], // no update/approve
   expense_attachments: ['create', 'read'],
 

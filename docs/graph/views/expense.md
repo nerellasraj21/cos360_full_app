@@ -13,38 +13,41 @@ graph LR
   n2["expense-approval"] -->|part_of| n0
   n3["expense-attachments"] -->|part_of| n0
   n4["expense-audit-trail"] -->|part_of| n0
-  n5["expense-overview"] -->|part_of| n0
-  n6["expense-reports"] -->|part_of| n0
-  n7["expense-settings"] -->|part_of| n0
-  n8["expense-summary"] -->|part_of| n0
-  n9["record-expense"] -->|part_of| n0
-  n10{{"approve-expense"}}
-  n10 -->|implements| n2
-  n11{{"record-expense"}}
-  n11 -->|implements| n9
-  n12{{"set-up-categories-and-types"}}
-  n12 -->|implements| n1
-  n13{{"view-expense-summary"}}
-  n13 -->|implements| n8
-  n14[/"client-idempotency-key"/]
-  n14 -.->|shapes| n9
-  n14 -.->|shapes| n11
-  n15[/"hard-coded-approval-threshold"/]
-  n15 -.->|shapes| n2
-  n15 -.->|shapes| n11
-  n16[/"line-items-ui-only"/]
-  n16 -.->|shapes| n9
-  n16 -.->|shapes| n11
-  n17[/"org-id-from-tenant"/]
-  n17 -.->|shapes| n1
-  n17 -.->|shapes| n9
-  n18[/"refetch-expense-lists-on-mount"/]
-  n18 -.->|shapes| n1
-  n18 -.->|shapes| n9
-  n19[/"remove-approvals-audit-entry-points"/]
-  n19 -.->|shapes| n2
-  n19 -.->|shapes| n4
-  n19 -.->|shapes| n5
+  n5["expense-departments"] -->|part_of| n0
+  n6["expense-overview"] -->|part_of| n0
+  n7["expense-reports"] -->|part_of| n0
+  n8["expense-settings"] -->|part_of| n0
+  n9["expense-summary"] -->|part_of| n0
+  n10["record-expense"] -->|part_of| n0
+  n11{{"approve-expense"}}
+  n11 -->|implements| n2
+  n12{{"record-expense"}}
+  n12 -->|implements| n10
+  n13{{"set-up-categories-and-types"}}
+  n13 -->|implements| n1
+  n14{{"view-expense-summary"}}
+  n14 -->|implements| n9
+  n15[/"client-idempotency-key"/]
+  n15 -.->|shapes| n10
+  n15 -.->|shapes| n12
+  n16[/"department-reference-checked-in-service"/]
+  n16 -.->|shapes| n5
+  n17[/"hard-coded-approval-threshold"/]
+  n17 -.->|shapes| n2
+  n17 -.->|shapes| n12
+  n18[/"line-items-ui-only"/]
+  n18 -.->|shapes| n10
+  n18 -.->|shapes| n12
+  n19[/"org-id-from-tenant"/]
+  n19 -.->|shapes| n1
+  n19 -.->|shapes| n10
+  n20[/"refetch-expense-lists-on-mount"/]
+  n20 -.->|shapes| n1
+  n20 -.->|shapes| n10
+  n21[/"remove-approvals-audit-entry-points"/]
+  n21 -.->|shapes| n2
+  n21 -.->|shapes| n4
+  n21 -.->|shapes| n6
 ```
 
 ## Features
@@ -85,10 +88,19 @@ Read audit logs overall and per transaction.
 - Implemented by: `endpoint:GET /expense/audit/logs`, `endpoint:GET /expense/audit/transactions/{transaction_id}/logs`, `mobile:app/expense/audit.tsx`, `service:app/service/expense/expense_audit_service.py`, `table:expense_audit_logs`, `web:src/pages/expense/audit.tsx`
 - Shaped by: [expense/remove-approvals-audit-entry-points](#expenseremove-approvals-audit-entry-points)
 
+### expense/expense-departments
+
+Maintain expense departments (unique active names, case-insensitive) and assign them to transactions; delete deactivates.
+- Roles: expense_departments permission (Admin all actions; Staff and Teacher read and list in the default seeds).
+- Parity: Both clients: web /expense/departments page and department filter on the audit page; mobile app/expense/departments.tsx.
+- Note: The expenditure report shows the department name, falling back to the raw id.
+- Implemented by: `endpoint:DELETE /expense/departments/{department_id}`, `endpoint:GET /expense/departments`, `endpoint:GET /expense/departments/dropdown`, `endpoint:POST /expense/departments`, `endpoint:PUT /expense/departments/{department_id}`, `mobile:app/expense/departments.tsx`, `service:app/service/expense/expense_department_service.py`, `table:expense_departments`, `web:src/pages/expense/departments.tsx`
+- Shaped by: [expense/department-reference-checked-in-service](#expensedepartment-reference-checked-in-service)
+
 ### expense/expense-overview
 
-Web expense landing page with 3 stat cards (Categories, Types, Transactions) and 4 navigation cards (Categories, Types, Transactions, Summary).
-- Parity: Web only.
+Web expense landing page with 3 stat cards (Categories, Types, Transactions) and 5 navigation cards (Categories, Types, Transactions, Departments, Summary).
+- Parity: Web only; the mobile Expense tab hub lists the same sections.
 - Implemented by: `web:src/components/expense/dashboard/ExpenseNavigation.tsx`, `web:src/components/expense/dashboard/ExpenseOverviewCards.tsx`, `web:src/pages/expense/index.tsx`
 - Shaped by: [expense/remove-approvals-audit-entry-points](#expenseremove-approvals-audit-entry-points)
 
@@ -221,6 +233,14 @@ flowchart TD
 - **Why**: Stops a double-submit from creating two transactions.
 - Shapes: `feature:expense/record-expense`, `flow:expense/record-expense`, `service:app/service/expense/expense_transaction_service.py`
 
+### expense/department-reference-checked-in-service (active)
+
+- **Decision**: ExpenseTransactionService checks on create and update that a department_id exists and is active, instead of relying on a foreign key.
+- **Why**: Tenant schemas are cloned without FK constraints, so the database cannot reject an unknown or inactive department.
+- **Alternatives**: Adding an FK in the migration, which cloned schemas would not carry and which would block deactivated departments on old rows.
+- **Since**: 2026-09
+- Shapes: `feature:expense/expense-departments`, `service:app/service/expense/expense_transaction_service.py`
+
 ### expense/hard-coded-approval-threshold (unintended)
 
 - **Decision**: requires_approval is computed once at create in ExpenseTransactionService.create_transaction: override, or amount > 1000.00, or payment method check/wire_transfer.
@@ -268,8 +288,8 @@ A top-level spending group such as Infrastructure or Utilities; unique name, sof
 
 ### expense/expense-department
 
-A department an expense may belong to; the table exists but has no endpoints, and department_id on a transaction is a free UUID with no FK.
-- Related: `mobile:app/expense/departments.tsx`, `table:expense_departments`, `web:src/pages/expense/departments.tsx`
+A per-tenant department (expense_departments row) that an expense may be assigned to and filtered by; deactivated rather than deleted.
+- Related: `feature:expense/expense-departments`, `mobile:app/expense/departments.tsx`, `table:expense_departments`, `web:src/pages/expense/departments.tsx`
 
 ### expense/expense-line-items
 

@@ -77,6 +77,7 @@ export const WEB_TO_MOBILE: Record<string, string> = {
     // Expense
     '/expense': '/(tabs)/expense',
     '/expense/categories': '/expense/categories',
+    '/expense/departments': '/expense/departments',
     '/expense/types': '/expense/types',
     '/expense/transactions': '/expense/transactions',
     '/expense/approvals': '/expense/approvals',

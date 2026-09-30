@@ -6,6 +6,7 @@ Layer 2: test_tenant_schema.resource_permissions (per role)
 
 Resources:
   - expense_categories:   create, read, list, update, delete
+  - expense_departments:  create, read, list, update, delete
   - expense_types:        create, read, list, update, delete
   - expense_transactions: create, read, list, update, delete, approve
   - expense_reports:      read, list, export
@@ -38,6 +39,7 @@ SCHEMA = "test_tenant_schema"
 
 RESOURCES_ALL_ACTIONS = {
     "expense_categories": ["create", "read", "list", "update", "delete"],
+    "expense_departments": ["create", "read", "list", "update", "delete"],
     "expense_types": ["create", "read", "list", "update", "delete"],
     "expense_transactions": ["create", "read", "list", "update", "delete", "approve"],
     "expense_reports": ["read", "list", "export"],
@@ -47,18 +49,21 @@ RESOURCES_ALL_ACTIONS = {
 ROLE_PERMISSIONS = {
     "Admin": {
         "expense_categories": ["create", "read", "list", "update", "delete"],
+        "expense_departments": ["create", "read", "list", "update", "delete"],
         "expense_types": ["create", "read", "list", "update", "delete"],
         "expense_transactions": ["create", "read", "list", "update", "delete", "approve"],
         "expense_reports": ["read", "list", "export"],
     },
     "Staff": {
         "expense_categories": ["create", "read", "list", "update"],
+        "expense_departments": ["read", "list"],
         "expense_types": ["create", "read", "list", "update"],
         "expense_transactions": ["create", "read", "list", "update"],
         "expense_reports": ["read", "list"],
     },
     "Teacher": {
         "expense_categories": ["read", "list"],
+        "expense_departments": ["read", "list"],
         "expense_types": ["read", "list"],
         "expense_transactions": ["read", "list"],
         "expense_reports": ["read"],

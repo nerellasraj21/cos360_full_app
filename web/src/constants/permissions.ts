@@ -363,6 +363,13 @@ export const PERMISSIONS = {
     DELETE: 'expense_categories:delete',
     LIST: 'expense_categories:list',
   },
+  EXPENSE_DEPARTMENTS: {
+    CREATE: 'expense_departments:create',
+    READ: 'expense_departments:read',
+    UPDATE: 'expense_departments:update',
+    DELETE: 'expense_departments:delete',
+    LIST: 'expense_departments:list',
+  },
   EXPENSE_TYPES: {
     CREATE: 'expense_types:create',
     READ: 'expense_types:read',

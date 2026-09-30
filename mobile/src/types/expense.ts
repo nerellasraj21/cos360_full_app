@@ -205,6 +205,12 @@ export interface ExpenseDepartment {
   updated_at: string;
 }
 
+export interface ExpenseDepartmentInput {
+  name: string;
+  description?: string;
+  is_active?: boolean;
+}
+
 export interface ExpenseDepartmentDropdown {
   id: string;
   name: string;

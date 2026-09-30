@@ -107,6 +107,9 @@ export const expenseNotifications = {
   categoryCreated: () => showNotification('Category created successfully', 'success'),
   categoryUpdated: () => showNotification('Category updated successfully', 'success'),
   categoryDeleted: () => showNotification('Category deleted successfully', 'success'),
+  departmentCreated: () => showNotification('Department created successfully', 'success'),
+  departmentUpdated: () => showNotification('Department updated successfully', 'success'),
+  departmentDeleted: () => showNotification('Department deactivated', 'success'),
 
   // Type notifications
   typeCreated: () => showNotification('Expense type created successfully', 'success'),
