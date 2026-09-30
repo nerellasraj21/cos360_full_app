@@ -238,7 +238,7 @@ Implements: `feature:communication/module-sms-triggers`
 
 - Trigger: A fee payment is posted with send_sms true (the default) `endpoint:POST /fee/collection/pay`
 
-1. After the transaction completes, _dispatch_sms_receipt looks up the first linked parent's name and phone `service:app/service/fee/fee_collection_service.py` `table:student_parent_links` `table:parents`
+1. Before the payment commit, _load_sms_recipient reads the first linked parent's name and phone and the student name `service:app/service/fee/fee_collection_service.py` `table:student_parent_links` `table:parents`; after the commit _dispatch_sms_receipt sends without touching the database.
 2. It builds row_data with the MSG91 fee receipt template id and variables var1..3 and calls _call_provider(sms) synchronously via run_in_executor `job:app/tasks/communication/send_tasks.py` `service:app/service/communication/msg91_service.py`
 3. It returns sent, failed or skipped to the payment response; no queue row and no log row are written.
 
@@ -246,7 +246,7 @@ Implements: `feature:communication/module-sms-triggers`
 
 ```mermaid
 flowchart TD
-  s1["1. After the transaction completes, _dispatch_sms_receipt looks up the...<br/>service:app/service/fee/fee_collection_service.py<br/>table:student_parent_links<br/>table:parents"]
+  s1["1. Before the payment commit, _load_sms_recipient reads the first link...<br/>service:app/service/fee/fee_collection_service.py<br/>table:student_parent_links<br/>table:parents"]
   s2["2. It builds row_data with the MSG91 fee receipt template id and varia...<br/>job:app/tasks/communication/send_tasks.py<br/>service:app/service/communication/msg91_service.py"]
   s1 --> s2
   s3["3. It returns sent, failed or skipped to the payment response; no queu..."]

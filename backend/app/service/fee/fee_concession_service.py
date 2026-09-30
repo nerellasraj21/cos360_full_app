@@ -77,18 +77,24 @@ async def create_bulk_concessions(
                 detail=f"Invalid approver '{item.approved_by}'. Must be one of: {', '.join(valid_approvers)}",
             )
 
-        # Upsert: check for existing active concession
+        # Upsert: uq_concession_student_fee_year allows one row per student/fee type/year,
+        # active or revoked, so a revoked row is reactivated instead of inserting a duplicate.
         existing_result = await db.execute(
             select(FeeConcession).where(
                 and_(
                     FeeConcession.student_id == data.student_id,
                     FeeConcession.fee_type_id == item.fee_type_id,
                     FeeConcession.academic_year_id == data.academic_year_id,
-                    FeeConcession.is_active == True,  # noqa: E712
                 )
             )
         )
         existing = existing_result.scalar_one_or_none()
+        if existing and not existing.is_active:
+            existing.is_active = True
+            existing.concession_amount = Decimal("0.00")
+            existing.assigned_fee = mapping.total_fee
+            existing.fee_student_map_id = mapping.id
+            existing.student_admission_num = admission_num
 
         # New concessions are cumulative: newly entered amount is added on top of
         # whatever concession amount was already saved for this fee type/year.
@@ -159,11 +165,10 @@ async def create_bulk_concessions(
                 created_at=conc.created_at,
             ))
 
-    await db.commit()
-
-    # Audit log
     for c in created:
         await _write_audit_log(db, "fee_concession", "create", c.id, recorded_by, {"student_id": str(data.student_id), "amount": str(c.concession_amount)})
+
+    await db.commit()
 
     return created
 
@@ -378,13 +383,18 @@ async def update_concession(
         conc.approved_by = data.approved_by
 
     conc.recorded_by_user_id = UUID(current_user.get("sub"))
+    await db.flush()
 
-    await db.commit()
-    await db.refresh(conc)
-
-    # Audit log
     user_id = UUID(current_user.get("sub"))
     await _write_audit_log(db, "fee_concession", "update", concession_id, user_id, {"amount": str(conc.concession_amount)})
+
+    result = await db.execute(
+        select(FeeConcession)
+        .options(selectinload(FeeConcession.fee_type))
+        .where(FeeConcession.id == concession_id)
+    )
+    conc = result.scalar_one()
+    await db.commit()
 
     approver = conc.approved_by.value if hasattr(conc.approved_by, "value") else str(conc.approved_by)
 
@@ -416,12 +426,13 @@ async def revoke_concession(
         raise HTTPException(status_code=404, detail="Concession not found")
 
     conc.is_active = False
-    await db.commit()
+    await db.flush()
 
-    # Audit log
     if current_user:
         user_id = UUID(current_user.get("sub"))
         await _write_audit_log(db, "fee_concession", "revoke", concession_id, user_id, {"student_id": str(conc.student_id)})
+
+    await db.commit()
 
     return {"detail": "Concession revoked", "concession_id": str(concession_id)}
 
@@ -432,13 +443,13 @@ async def revoke_concession(
 async def _write_audit_log(db: AsyncSession, entity_type: str, action: str, entity_id: UUID, user_id: UUID, details: dict | None = None) -> None:
     try:
         import json as json_mod
-        await db.execute(
-            text(
-                "INSERT INTO audit_logs (entity_type, action, entity_id, performed_by, details, created_at) "
-                "VALUES (:et, :act, :eid, :uid, :det, NOW()) ON CONFLICT DO NOTHING"
-            ),
-            {"et": entity_type, "act": action, "eid": str(entity_id), "uid": str(user_id), "det": json_mod.dumps(details or {})},
-        )
-        await db.commit()
+        async with db.begin_nested():
+            await db.execute(
+                text(
+                    "INSERT INTO audit_logs (entity_type, action, entity_id, performed_by, details, created_at) "
+                    "VALUES (:et, :act, :eid, :uid, :det, NOW()) ON CONFLICT DO NOTHING"
+                ),
+                {"et": entity_type, "act": action, "eid": str(entity_id), "uid": str(user_id), "det": json_mod.dumps(details or {})},
+            )
     except Exception as e:
         log.debug(f"Audit log write skipped: {e}")

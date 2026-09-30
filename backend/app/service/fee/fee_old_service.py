@@ -302,12 +302,13 @@ async def settle_old_fee(
         raise HTTPException(status_code=404, detail="Old fee record not found")
 
     record.is_settled = True
-    await db.commit()
+    await db.flush()
 
-    # Audit log
     if current_user:
         user_id = UUID(current_user.get("sub"))
         await _write_audit_log(db, "fee_old", "settle", old_fee_id, user_id, {"action": "write_off"})
+
+    await db.commit()
 
     return {"detail": "Old fee marked as settled", "old_fee_id": str(old_fee_id)}
 
@@ -330,13 +331,15 @@ async def delete_old_fee(
             detail="Only manually entered old fees can be deleted. Auto carry-forward records cannot be deleted.",
         )
 
+    fee_type_name = record.fee_type_name
     await db.delete(record)
-    await db.commit()
+    await db.flush()
 
-    # Audit log
     if current_user:
         user_id = UUID(current_user.get("sub"))
-        await _write_audit_log(db, "fee_old", "delete", old_fee_id, user_id, {"fee_type": record.fee_type_name})
+        await _write_audit_log(db, "fee_old", "delete", old_fee_id, user_id, {"fee_type": fee_type_name})
+
+    await db.commit()
 
     return {"detail": "Old fee record deleted", "old_fee_id": str(old_fee_id)}
 
@@ -347,13 +350,13 @@ async def delete_old_fee(
 async def _write_audit_log(db: AsyncSession, entity_type: str, action: str, entity_id: UUID, user_id: UUID, details: dict | None = None) -> None:
     try:
         import json as json_mod
-        await db.execute(
-            text(
-                "INSERT INTO audit_logs (entity_type, action, entity_id, performed_by, details, created_at) "
-                "VALUES (:et, :act, :eid, :uid, :det, NOW()) ON CONFLICT DO NOTHING"
-            ),
-            {"et": entity_type, "act": action, "eid": str(entity_id), "uid": str(user_id), "det": json_mod.dumps(details or {})},
-        )
-        await db.commit()
+        async with db.begin_nested():
+            await db.execute(
+                text(
+                    "INSERT INTO audit_logs (entity_type, action, entity_id, performed_by, details, created_at) "
+                    "VALUES (:et, :act, :eid, :uid, :det, NOW()) ON CONFLICT DO NOTHING"
+                ),
+                {"et": entity_type, "act": action, "eid": str(entity_id), "uid": str(user_id), "det": json_mod.dumps(details or {})},
+            )
     except Exception as e:
         log.debug(f"Audit log write skipped: {e}")

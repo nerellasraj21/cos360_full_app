@@ -14,6 +14,7 @@ from app.schemas.fee.fee_concession_schema import (
     ConcessionSummaryResponse,
     FeeConcessionBulkCreate,
     FeeConcessionRead,
+    FeeConcessionRevokeResponse,
     FeeConcessionUpdate,
 )
 from app.service.fee.fee_concession_service import (
@@ -110,7 +111,7 @@ async def update_single_concession(
     return await update_concession(db, concession_id, data, current_user)
 
 
-@router.delete("/{concession_id}", response_model=FeeConcessionRead, status_code=status.HTTP_200_OK)
+@router.delete("/{concession_id}", response_model=FeeConcessionRevokeResponse, status_code=status.HTTP_200_OK)
 @rate_limit_api()
 async def delete_concession(
     concession_id: UUID,

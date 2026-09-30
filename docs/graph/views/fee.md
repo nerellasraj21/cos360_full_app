@@ -50,46 +50,47 @@ graph LR
   n24 -->|implements| n1
   n24 -->|implements| n8
   n24 -->|implements| n13
-  n25[/"collection-pay-is-canonical"/]
-  n25 -.->|shapes| n2
-  n25 -.->|shapes| n9
-  n26[/"concession-approver-is-a-label"/]
-  n26 -.->|shapes| n3
-  n26 -.->|shapes| n21
-  n27[/"enrich-receipt-at-read-time"/]
-  n27 -.->|shapes| n11
-  n27 -.->|shapes| n20
-  n28[/"export-all-rows-synchronously"/]
-  n28 -.->|shapes| n6
-  n29[/"legacy-fee-routes-redirect"/]
-  n29 -.->|shapes| n4
-  n30[/"mandatory-fees-applied-by-backend"/]
-  n30 -.->|shapes| n1
-  n30 -.->|shapes| n14
-  n30 -.->|shapes| n24
-  n31[/"no-receipt-until-cheque-clears"/]
-  n31 -.->|shapes| n2
-  n31 -.->|shapes| n16
-  n32[/"old-fees-separate-table"/]
-  n32 -.->|shapes| n10
-  n32 -.->|shapes| n15
-  n32 -.->|shapes| n19
-  n33[/"receipt-hash-over-rendered-content"/]
-  n33 -.->|shapes| n11
-  n34[/"receipt-number-max-plus-one"/]
+  n25[/"audit-writes-in-savepoint-before-commit"/]
+  n26[/"collection-pay-is-canonical"/]
+  n26 -.->|shapes| n2
+  n26 -.->|shapes| n9
+  n27[/"concession-approver-is-a-label"/]
+  n27 -.->|shapes| n3
+  n27 -.->|shapes| n21
+  n28[/"enrich-receipt-at-read-time"/]
+  n28 -.->|shapes| n11
+  n28 -.->|shapes| n20
+  n29[/"export-all-rows-synchronously"/]
+  n29 -.->|shapes| n6
+  n30[/"legacy-fee-routes-redirect"/]
+  n30 -.->|shapes| n4
+  n31[/"mandatory-fees-applied-by-backend"/]
+  n31 -.->|shapes| n1
+  n31 -.->|shapes| n14
+  n31 -.->|shapes| n24
+  n32[/"no-receipt-until-cheque-clears"/]
+  n32 -.->|shapes| n2
+  n32 -.->|shapes| n16
+  n33[/"old-fees-separate-table"/]
+  n33 -.->|shapes| n10
+  n33 -.->|shapes| n15
+  n33 -.->|shapes| n19
+  n34[/"receipt-hash-over-rendered-content"/]
   n34 -.->|shapes| n11
-  n35[/"receipt-pdf-on-demand"/]
+  n35[/"receipt-number-max-plus-one"/]
   n35 -.->|shapes| n11
-  n35 -.->|shapes| n20
-  n36[/"refund-total-counts-processed"/]
-  n36 -.->|shapes| n12
-  n37[/"report-stats-reuse-report-query"/]
-  n37 -.->|shapes| n6
-  n38[/"sms-optional-per-payment"/]
-  n38 -.->|shapes| n2
-  n38 -.->|shapes| n17
-  n39[/"update-term-dates-in-place"/]
-  n39 -.->|shapes| n8
+  n36[/"receipt-pdf-on-demand"/]
+  n36 -.->|shapes| n11
+  n36 -.->|shapes| n20
+  n37[/"refund-total-counts-processed"/]
+  n37 -.->|shapes| n12
+  n38[/"report-stats-reuse-report-query"/]
+  n38 -.->|shapes| n6
+  n39[/"sms-optional-per-payment"/]
+  n39 -.->|shapes| n2
+  n39 -.->|shapes| n17
+  n40[/"update-term-dates-in-place"/]
+  n40 -.->|shapes| n8
 ```
 
 ## Features
@@ -293,7 +294,7 @@ Implements: `feature:fee/collect-payment`, `feature:fee/receipts`
 5. The backend checks amount_to_pay is no more than the total due: this year's dues after concessions plus unsettled old fees `service:app/service/fee/fee_collection_service.py` `table:fee_student_mappings` `table:fee_concessions` `table:fee_old`.
 6. It splits each fee type's amount across that type's term amounts, oldest outstanding first `table:fee_student_map_term_amounts`.
 7. It writes the transaction and its items `table:fee_transactions` `table:fee_transaction_items`; if status is completed it also writes the receipt in the same commit `table:fee_receipts` `service:app/service/fee/fee_receipt_service.py`.
-8. It sends the parent SMS last via the communication provider call `job:app/tasks/communication/send_tasks.py` `table:student_parent_links`; the SMS result never affects the payment.
+8. It reads the parent SMS recipient before the commit and sends the SMS after it via the communication provider call `job:app/tasks/communication/send_tasks.py` `table:student_parent_links`; the SMS result never affects the payment.
 
 - Result: Response returns transaction_number, receipt_number and sms_status (sent, failed or skipped).
 
@@ -315,7 +316,7 @@ flowchart TD
   s5 --> s6
   s7["7. It writes the transaction and its items  ; if status is completed i...<br/>table:fee_transactions<br/>table:fee_transaction_items<br/>table:fee_receipts<br/>service:app/service/fee/fee_receipt_service.py"]
   s6 --> s7
-  s8["8. It sends the parent SMS last via the communication provider call  ;...<br/>job:app/tasks/communication/send_tasks.py<br/>table:student_parent_links"]
+  s8["8. It reads the parent SMS recipient before the commit and sends the S...<br/>job:app/tasks/communication/send_tasks.py<br/>table:student_parent_links"]
   s7 --> s8
 ```
 
@@ -414,9 +415,8 @@ Implements: `feature:fee/concessions`
 2. The service requires an existing student mapping `table:fee_student_mappings` and adds the amount to the running total for (student, fee_type, year) rather than replacing it `table:fee_concessions`.
 3. The cumulative amount is capped at the mapping total_fee.
 4. To set the value outright, use `endpoint:PUT /fee/concessions/{concession_id}`.
-5. To revoke, `endpoint:DELETE /fee/concessions/{concession_id}` soft-revokes (is_active=false).
-
-- Failure: Re-adding after a revoke for the same student, type and year hits the unique constraint (the inactive row still counts) and returns 500.
+5. To revoke, `endpoint:DELETE /fee/concessions/{concession_id}` soft-revokes (is_active=false) and returns {detail, concession_id}.
+6. Re-adding after a revoke reactivates the same row with the new amount, starting from zero, because uq_concession_student_fee_year also covers revoked rows `table:fee_concessions`.
 
 ```mermaid
 flowchart TD
@@ -427,8 +427,10 @@ flowchart TD
   s2 --> s3
   s4["4. To set the value outright, use .<br/>endpoint:PUT /fee/concessions/{concession_id}"]
   s3 --> s4
-  s5["5. To revoke,  soft-revokes (is_active=false).<br/>endpoint:DELETE /fee/concessions/{concession_id}"]
+  s5["5. To revoke,  soft-revokes (is_active=false) and returns {detail, con...<br/>endpoint:DELETE /fee/concessions/{concession_id}"]
   s4 --> s5
+  s6["6. Re-adding after a revoke reactivates the same row with the new amou...<br/>table:fee_concessions"]
+  s5 --> s6
 ```
 
 Shaped by: [fee/concession-approver-is-a-label](#feeconcession-approver-is-a-label)
@@ -521,6 +523,15 @@ flowchart TD
 Shaped by: [fee/mandatory-fees-applied-by-backend](#feemandatory-fees-applied-by-backend)
 
 ## Decisions
+
+### fee/audit-writes-in-savepoint-before-commit (temporary)
+
+- **Decision**: Fee audit writes (_write_audit_log in the collection, concession and old-fee services) run inside a savepoint before the request's single commit and never commit themselves.
+- **Why**: They insert into audit_logs, which exists in no schema. Run after the commit, the failed insert left the session aborted, so the payment SMS lookups that followed failed; the post-commit statements could also run on another tenant's search_path.
+- **Alternatives**: Removing the audit calls, or creating the table with a migration.
+- **Tradeoff**: Nothing is audited until an audit_logs table exists in each tenant schema.
+- **Since**: 2026-09
+- Shapes: `service:app/service/fee/fee_collection_service.py`, `service:app/service/fee/fee_concession_service.py`, `service:app/service/fee/fee_old_service.py`
 
 ### fee/collection-pay-is-canonical
 

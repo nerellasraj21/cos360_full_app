@@ -1118,8 +1118,6 @@ async def _process_fee_payment_inner(
         for of in old_fees_updated:
             of.receipt_system = receipt_number
 
-    await db.commit()
-
     # ── Audit log ────────────────────────────────────────────────────────
     await _write_audit_log(
         db, "fee_payment", "create",
@@ -1127,8 +1125,13 @@ async def _process_fee_payment_inner(
         details={"transaction_number": txn_number, "amount": str(actual_total), "method": data.payment_method},
     )
 
-    # ── SMS dispatch (async, non-blocking) ───────────────────────────────
-    sms_status = await _dispatch_sms_receipt(db, data, txn, receipt_number, admission)
+    # SMS recipient is read before commit so it comes from this tenant's schema
+    sms_recipient = await _load_sms_recipient(db, data, txn)
+
+    await db.commit()
+
+    # ── SMS dispatch (no DB access after commit) ─────────────────────────
+    sms_status = await _dispatch_sms_receipt(data, txn, receipt_number, sms_recipient)
 
     return FeePaymentResponse(
         transaction_id=txn.id,
@@ -1161,21 +1164,21 @@ async def _write_audit_log(
     try:
         import json as json_mod
 
-        await db.execute(
-            text(
-                "INSERT INTO audit_logs (entity_type, action, entity_id, performed_by, details, created_at) "
-                "VALUES (:et, :act, :eid, :uid, :det, NOW()) "
-                "ON CONFLICT DO NOTHING"
-            ),
-            {
-                "et": entity_type,
-                "act": action,
-                "eid": str(entity_id),
-                "uid": str(user_id),
-                "det": json_mod.dumps(details or {}),
-            },
-        )
-        await db.commit()
+        async with db.begin_nested():
+            await db.execute(
+                text(
+                    "INSERT INTO audit_logs (entity_type, action, entity_id, performed_by, details, created_at) "
+                    "VALUES (:et, :act, :eid, :uid, :det, NOW()) "
+                    "ON CONFLICT DO NOTHING"
+                ),
+                {
+                    "et": entity_type,
+                    "act": action,
+                    "eid": str(entity_id),
+                    "uid": str(user_id),
+                    "det": json_mod.dumps(details or {}),
+                },
+            )
     except Exception as e:
         log.debug(f"Audit log write skipped (table may not exist): {e}")
 
@@ -1183,18 +1186,61 @@ async def _write_audit_log(
 # ─── SMS Dispatch ─────────────────────────────────────────────────────────────
 
 
+async def _load_sms_recipient(db: AsyncSession, data: FeePaymentRequest, txn: FeeTransaction) -> dict | None:
+    """Parent and student details for the receipt SMS. None when no SMS is due."""
+    if not data.send_sms or txn.status != "completed":
+        return None
+
+    try:
+        async with db.begin_nested():
+            parent_result = await db.execute(
+                select(Parent.name, Parent.phone)
+                .select_from(StudentParentLink)
+                .join(Parent, Parent.id == StudentParentLink.parent_id)
+                .where(StudentParentLink.student_id == data.student_id)
+                .limit(1)
+            )
+            parent_row = parent_result.first()
+            student_result = await db.execute(
+                select(Student.first_name, Student.last_name).where(Student.id == data.student_id)
+            )
+            student_row = student_result.first()
+    except Exception as e:
+        log.warning(f"Fee receipt SMS recipient lookup failed for transaction {txn.transaction_number}: {e}")
+        return {"lookup_failed": True}
+
+    return {
+        "lookup_failed": False,
+        "has_parent": parent_row is not None,
+        "parent_name": (parent_row.name if parent_row else None) or "Parent",
+        "parent_phone": parent_row.phone if parent_row else None,
+        "student_name": f"{student_row.first_name} {student_row.last_name}" if student_row else "Student",
+    }
+
+
 async def _dispatch_sms_receipt(
-    db: AsyncSession,
     data: FeePaymentRequest,
     txn: FeeTransaction,
     receipt_number: str,
-    admission: Admission,
+    recipient: dict | None,
 ) -> str:
     """
     Dispatch SMS receipt via MSG91.
     Returns "sent", "failed", or "skipped".
     """
-    if not data.send_sms or txn.status != "completed":
+    if not data.send_sms or txn.status != "completed" or recipient is None:
+        return "skipped"
+
+    if recipient["lookup_failed"]:
+        return "failed"
+
+    if not recipient["has_parent"]:
+        log.warning(f"No parent found for student {data.student_id}, skipping SMS")
+        return "skipped"
+
+    parent_phone = recipient["parent_phone"]
+    if not parent_phone:
+        log.warning(f"No parent phone for student {data.student_id}, skipping SMS")
         return "skipped"
 
     try:
@@ -1202,29 +1248,8 @@ async def _dispatch_sms_receipt(
 
         from app.tasks.communication.send_tasks import _call_provider
 
-        # Get parent info
-        parent_result = await db.execute(
-            select(Parent.name, Parent.phone)
-            .select_from(StudentParentLink)
-            .join(Parent, Parent.id == StudentParentLink.parent_id)
-            .where(StudentParentLink.student_id == data.student_id)
-            .limit(1)
-        )
-        parent_row = parent_result.first()
-        if not parent_row:
-            log.warning(f"No parent found for student {data.student_id}, skipping SMS")
-            return "skipped"
-
-        parent_name = parent_row.name or "Parent"
-        parent_phone = parent_row.phone
-        if not parent_phone:
-            log.warning(f"No parent phone for student {data.student_id}, skipping SMS")
-            return "skipped"
-
-        # Get student info
-        student_result = await db.execute(select(Student).where(Student.id == data.student_id))
-        student = student_result.scalar_one_or_none()
-        student_name = f"{student.first_name} {student.last_name}" if student else "Student"
+        parent_name = recipient["parent_name"]
+        student_name = recipient["student_name"]
 
         # Build SMS message
         message = (
@@ -1243,7 +1268,7 @@ async def _dispatch_sms_receipt(
                 "var2": receipt_number,
                 "var3": f"{txn.total_amount:,.2f}",
             },
-            "triggered_by": str(txn.created_by),
+            "triggered_by": str(txn.collected_by_user_id),
             "target_type": "fee_receipt",
             "target_ref": {"transaction_id": str(txn.id), "receipt_number": receipt_number},
         }

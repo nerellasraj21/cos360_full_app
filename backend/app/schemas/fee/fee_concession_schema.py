@@ -91,3 +91,8 @@ class ConcessionHistoryItem(BaseModel):
     recorded_by_staff_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class FeeConcessionRevokeResponse(BaseModel):
+    detail: str
+    concession_id: UUID

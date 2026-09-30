@@ -11,6 +11,7 @@ from app.db.tenant_session import get_tenant_db
 from app.middleware.rate_limit_middleware import rate_limit_api
 from app.schemas.fee.fee_old_schema import (
     FeeOldCarryForwardRequest,
+    FeeOldDeleteResponse,
     FeeOldManualCreate,
     FeeOldRead,
     FeeOldSummaryResponse,
@@ -127,7 +128,7 @@ async def settle_old_fee_record(
     return await settle_old_fee(db, old_fee_id, current_user)
 
 
-@router.delete("/{old_fee_id}", response_model=FeeOldRead, status_code=status.HTTP_200_OK)
+@router.delete("/{old_fee_id}", response_model=FeeOldDeleteResponse, status_code=status.HTTP_200_OK)
 @rate_limit_api()
 async def delete_old_fee_record(
     old_fee_id: UUID,

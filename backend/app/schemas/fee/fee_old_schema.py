@@ -71,3 +71,8 @@ class FeeOldSummaryResponse(BaseModel):
     grand_total_outstanding: Decimal
 
     model_config = {"from_attributes": True}
+
+
+class FeeOldDeleteResponse(BaseModel):
+    detail: str
+    old_fee_id: UUID

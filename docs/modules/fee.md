@@ -114,12 +114,10 @@ Endpoint prefixes:
 
 ## Known gaps
 - The pending-fees report ignores concessions, so a student with a concession still shows the full instalment as pending.
-- The payment SMS always ends up `failed` when a parent phone exists: `_dispatch_sms_receipt` reads `txn.created_by`, which is not a column on `FeeTransaction`.
-- `DELETE /fee/concessions/{id}` and `DELETE /fee/old-fees/{id}` declare `response_model` Read schemas but return a dict. The change is committed, then response validation returns a 500.
-- A concession can't be revoked and then re-added for the same student, type and year. The unique constraint still counts the inactive row, so the insert returns a 500.
 - Carry-forward ignores concessions. It carries forward `total_fee − paid`.
 - Cheque/DD payments mark old fees as paid straight away, even though the transaction is still `pending` and could bounce. This only applies to the auto-distribute path.
-- Refund, receipt and concession services use `commit()` → `refresh()`, which breaks the repo rule of flush → select → commit.
+- Refund and receipt services use `commit()` → `refresh()`, which breaks the repo rule of flush → select → commit.
+- Fee audit writes (`_write_audit_log` in the collection, concession and old-fee services) insert into `audit_logs`, which exists in no schema, so nothing is recorded. Each write runs in a savepoint before the commit, so the failure never affects the request.
 - Old-fee `settle` is gated on the `fee_old:delete` permission.
 - `PUT /fee/transactions/{id}` (`update_transaction_status`) writes any `status`/`cheque_status` with no transition check (e.g. `cancelled` → `completed`), so clients must restrict the choices.
 - No online payment gateway: parents cannot pay in-app. Every payment is recorded by staff, with UPI/bank references typed in by hand.
