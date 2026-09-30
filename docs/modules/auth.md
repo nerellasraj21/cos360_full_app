@@ -18,6 +18,7 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
   - Default temporary passwords are hardcoded in those services. See the code; do not copy them into docs.
 - **The academic year is mandatory at login.** The client first calls the public `GET /auth/academic-years`, then sends `academic_year_id` (UUID). The chosen year's id and title go into the JWT and the response. A missing year returns 400, as does an unknown one, and an empty string fails with 422.
 - **Forced first-login change** for users whose role is `Staff`, `Teacher`, `Student` or `Parent` and whose `users.is_first_login = TRUE`. Account creation sets this flag (staff enrolment, admission for student/father/mother/guardian). Admin accounts are never forced.
+  - `POST /auth/staff/set-password` only accepts a change-password token while the user is active and `is_first_login` is still TRUE. A reused token, or one for a user who already set a password, gets 400; an inactive user gets 401.
 - **Tokens:** HS256, signed with `JWT_SECRET_KEY` (`app/tools/jwt_utils.py`).
 
   | Token | Lifetime | `token_type` |
@@ -108,7 +109,6 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 - There is no backend forgot/reset-password flow (email/OTP), and no endpoint to read `profile_audit_logs`.
 - Mobile discards the set-password session (Rules & gotchas #8).
 - `/auth/refresh` does not rotate or revoke the old refresh token, so a leaked refresh token stays usable until it expires or is revoked at logout.
-- `/auth/staff/set-password` does not check that the user is still in first-login state. Any valid unexpired change-password token can reset the password.
 - Teacher `entity_id` is missing on normal login; see Rules & gotchas #11.
 - Mobile `src/api/auth.ts` holds a dead `refreshToken()` and dead token helpers that use AsyncStorage keys (`@auth/access_token`). The live path is `services/authUtils.ts`. The web equivalents `src/lib/apiClient.ts` and `src/constants/api/auth.ts` are also unused or stale.
 - The web forgot-password page tells users a reset link was sent when nothing was sent.

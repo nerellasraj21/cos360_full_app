@@ -469,13 +469,33 @@ class MultiTenantAuthService:
                 if not user:
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+                if not user.is_active:
+                    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Credentials")
+
+                from sqlalchemy import text as _text
+
+                # The token only works while the user is still in first-login state, so a
+                # leaked or reused token cannot reset a password that has already been set.
+                try:
+                    async with db.begin_nested():
+                        is_first_login = (
+                            await db.execute(
+                                _text("SELECT is_first_login FROM users WHERE id = :id"), {"id": str(user.id)}
+                            )
+                        ).scalar()
+                except Exception:
+                    is_first_login = None
+                if not is_first_login:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Password has already been set. Please log in with your password.",
+                    )
+
                 user.password_hash = hash_password(new_password)
                 await db.flush()
 
                 # Clear first-login flag via raw SQL (graceful if column doesn't exist)
                 try:
-                    from sqlalchemy import text as _text
-
                     await db.execute(
                         _text("UPDATE users SET is_first_login = FALSE WHERE id = :id"), {"id": str(user.id)}
                     )

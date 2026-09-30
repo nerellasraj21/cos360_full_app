@@ -94,7 +94,7 @@ A logged-in user changes their own password by giving the current password and a
 Staff, Teacher, Student and Parent accounts with users.is_first_login = TRUE must set a new password before they get a session.
 - Roles: Staff, Teacher, Student, Parent. Admin accounts are never forced.
 - Parity: Web logs the user straight in with the returned session; mobile discards it and sends the user back to login.
-- Note: /auth/staff/set-password does not check that the user is still in first-login state; any valid unexpired change-password token can reset the password.
+- Note: /auth/staff/set-password only accepts a change-password token while the user is active and still in first-login state, so a token cannot be reused.
 - Flows: [auth/first-login-password-change](#authfirst-login-password-change)
 - Implemented by: `endpoint:POST /auth/login`, `endpoint:POST /auth/staff/set-password`, `mobile:app/login.tsx`, `mobile:app/set-password.tsx`, `service:app/service/auth/multi_tenant_auth_service.py`, `service:app/tools/jwt_utils.py`, `table:users`, `web:src/components/login-form.tsx`, `web:src/pages/auth/SetPasswordPage.tsx`
 - Shaped by: [auth/no-request-body-logging](#authno-request-body-logging), [auth/single-set-password-endpoint](#authsingle-set-password-endpoint)
@@ -193,7 +193,7 @@ Implements: `feature:auth/first-login-password`
 3. Web keeps the change-password token in sessionStorage `web:src/components/login-form.tsx` and opens `web:src/pages/auth/SetPasswordPage.tsx`.
 4. Mobile keeps the token in SecureStore under auth_change_password_token and opens `mobile:app/set-password.tsx`.
 5. The client posts change_password_token, new_password and confirm_password `endpoint:POST /auth/staff/set-password`.
-6. The backend verifies the change_password token type, hashes the new password, clears is_first_login through raw SQL `table:users` and returns a full login payload (SetPasswordResponse).
+6. The backend verifies the change_password token type, rejects an inactive user (401) or one whose is_first_login is no longer TRUE (400), hashes the new password, clears is_first_login through raw SQL `table:users` and returns a full login payload (SetPasswordResponse).
 7. Web calls login(data) with the response and goes straight in; mobile setStaffPassword returns void, so the user lands on login and signs in with the new password.
 
 - Failure: If the tenant schema lacks the is_first_login column, the check silently passes and the user logs in normally.
@@ -209,7 +209,7 @@ flowchart TD
   s3 --> s4
   s5["5. The client posts change_password_token, new_password and confirm_pa...<br/>endpoint:POST /auth/staff/set-password"]
   s4 --> s5
-  s6["6. The backend verifies the change_password token type, hashes the new...<br/>table:users"]
+  s6["6. The backend verifies the change_password token type, rejects an ina...<br/>table:users"]
   s5 --> s6
   s7["7. Web calls login(data) with the response and goes straight in; mobil..."]
   s6 --> s7
