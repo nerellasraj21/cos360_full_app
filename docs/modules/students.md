@@ -27,6 +27,7 @@ Related: `docs/architecture.md` (tenancy, file storage, Celery), `docs/permissio
   - `admission_date` defaults to today and cannot be in the future.
 - **Format validation:**
   - Aadhar/APAAR must be exactly 12 digits; `primary_phone` exactly 10.
+  - Parent Aadhaar (`father_/mother_/guardian_aadhar_number`) is optional and not format-checked on admission, by choice. The parents master (`ParentCreate`) still requires 12 digits when a value is given, and `ParentOut` does not re-validate, so stored values of any length read back fine.
   - `salary_range` is one of `below_1l | 1l_3l | 3l_5l | 5l_10l | above_10l` (see `GET /parents/salary-ranges/dropdown`).
 - **Parent reuse (siblings):** if a father, mother or guardian email already belongs to a user with role `Parent`, that parent is reused. Their fields are overwritten with the new payload and the new child is linked.
   - Father and mother may not share an email.
@@ -116,7 +117,6 @@ Related: `docs/architecture.md` (tenancy, file storage, Celery), `docs/permissio
 | Admission form dates | `DatePicker` | typed `DD/MM/YYYY` (slashes auto-inserted) **or** calendar icon, both kept in sync; form state and payload stay `YYYY-MM-DD` |
 
 ## Known gaps
-- Admission stores parent Aadhaar numbers unvalidated: `admission_schema.py` has no check on `father_/mother_/guardian_aadhar_number`, while `ParentCreate` requires 12 digits. `test_tenant_schema` has one 10-digit value. `ParentOut` no longer re-validates, so reads work, but the admission form can still save bad values.
 - Attendance roster capped at 10 students and includes inactive students (rule 6).
 - Teachers are not scoped to their classes; they see and mark every student.
 - Student document files cannot be downloaded (rule 14), and there is no document-type master or verification on the backend.
