@@ -177,7 +177,7 @@ List fee transactions, update transaction and cheque status (cheque/DD clearance
 ### fee/old-fees
 
 Dues from earlier years, carried forward from COS360 data or entered by hand, shown on their own tab and never mixed into this year's dues.
-- Roles: fee_old permission (settle is gated on fee_old:delete).
+- Roles: fee_old permission; settle (write-off) needs fee_old:update and delete needs fee_old:delete.
 - Parity: Both clients have an Old Fees tab, but mobile calls /fee/old/... (404) and sends the wrong carry-forward payload (422).
 - Flows: [fee/carry-forward-old-fees](#feecarry-forward-old-fees), [fee/manage-old-fees](#feemanage-old-fees)
 - Implemented by: `endpoint:DELETE /fee/old-fees/{old_fee_id}`, `endpoint:GET /fee/old-fees/student/{student_id}`, `endpoint:PATCH /fee/old-fees/{old_fee_id}/settle`, `endpoint:POST /fee/old-fees`, `endpoint:POST /fee/old-fees/carry-forward`, `endpoint:PUT /fee/old-fees/{old_fee_id}`, `mobile:app/fees/collection/[studentId].tsx`, `service:app/service/fee/fee_old_service.py`, `table:fee_old`, `web:src/pages/fee/FeeCollection/OldFeeTab.tsx`
@@ -359,7 +359,7 @@ Implements: `feature:fee/old-fees`
 1. Schools new to COS360 enter dues by hand with `endpoint:POST /fee/old-fees` (source manual_entry) `service:app/service/fee/fee_old_service.py` `table:fee_old`; rejected if one already exists for the same student, year label and fee type name.
 2. Old fees are listed per student with `endpoint:GET /fee/old-fees/student/{student_id}` on the Old Fees tab `web:src/pages/fee/FeeCollection/OldFeeTab.tsx`.
 3. Payments on old fees are recorded by editing paid_amount with `endpoint:PUT /fee/old-fees/{old_fee_id}`, because clients never pay old fees through /pay.
-4. `endpoint:PATCH /fee/old-fees/{old_fee_id}/settle` writes the fee off.
+4. `endpoint:PATCH /fee/old-fees/{old_fee_id}/settle` writes the fee off (fee_old:update); both clients confirm first, since it cannot be undone.
 5. `endpoint:DELETE /fee/old-fees/{old_fee_id}` only works for manual_entry rows.
 
 ```mermaid
@@ -369,7 +369,7 @@ flowchart TD
   s1 --> s2
   s3["3. Payments on old fees are recorded by editing paid_amount with , bec...<br/>endpoint:PUT /fee/old-fees/{old_fee_id}"]
   s2 --> s3
-  s4["4. writes the fee off.<br/>endpoint:PATCH /fee/old-fees/{old_fee_id}/settle"]
+  s4["4. writes the fee off (fee_old:update); both clients confirm first, si...<br/>endpoint:PATCH /fee/old-fees/{old_fee_id}/settle"]
   s3 --> s4
   s5["5. only works for manual_entry rows.<br/>endpoint:DELETE /fee/old-fees/{old_fee_id}"]
   s4 --> s5

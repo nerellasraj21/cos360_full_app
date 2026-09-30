@@ -123,7 +123,7 @@ async def settle_old_fee_record(
     """Mark old fee as settled (write-off). OF-06, AC-17."""
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
-    await check_role_plan_permission_with_error(db, request, role, "fee_old", "delete")
+    await check_role_plan_permission_with_error(db, request, role, "fee_old", "update")
 
     return await settle_old_fee(db, old_fee_id, current_user)
 

@@ -119,5 +119,4 @@ Endpoint prefixes:
 - Cheque/DD payments mark old fees as paid straight away, even though the transaction is still `pending` and could bounce. This only applies to the auto-distribute path.
 - Refund and receipt services use `commit()` → `refresh()`, which breaks the repo rule of flush → select → commit.
 - Fee audit writes (`_write_audit_log` in the collection, concession and old-fee services) insert into `audit_logs`, which exists in no schema, so nothing is recorded. Each write runs in a savepoint before the commit, so the failure never affects the request.
-- Old-fee `settle` is gated on the `fee_old:delete` permission.
 - No online payment gateway: parents cannot pay in-app. Every payment is recorded by staff, with UPI/bank references typed in by hand.

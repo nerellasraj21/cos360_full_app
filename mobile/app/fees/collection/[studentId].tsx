@@ -36,6 +36,7 @@ import {
   TermsDueItem,
 } from '@/src/api/fees';
 import { ScreenAccessGate } from '@/components/ScreenAccessGate';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 
 // INR currency formatter
@@ -101,6 +102,9 @@ function StudentFeeDetailScreenContent() {
   const canCreateConcession = checkPermission('fee_concessions', 'create');
   const canUpdateConcession = checkPermission('fee_concessions', 'update');
   const canDeleteConcession = checkPermission('fee_concessions', 'delete');
+  const canSettleOldFee = checkPermission('fee_old', 'update');
+  const canDeleteOldFee = checkPermission('fee_old', 'delete');
+  const { confirm, modalProps } = useConfirmModal();
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -1240,24 +1244,37 @@ function StudentFeeDetailScreenContent() {
                   </View>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
-                  {!item.is_settled && (
+                  {canSettleOldFee && !item.is_settled && (
                     <TouchableOpacity
                       style={[styles.iconBtn, { borderColor: '#10B981' }]}
-                      onPress={() => settleMutation.mutate(item.id)}
+                      onPress={() => confirm({
+                        title: 'Mark as Settled',
+                        message: 'Mark this old fee as settled? This cannot be undone.',
+                        confirmLabel: 'Settle',
+                        onConfirm: () => settleMutation.mutate(item.id),
+                      })}
                       disabled={settleMutation.isPending}
-              accessibilityLabel="Confirm"
+                      accessibilityLabel="Mark as settled"
                     >
                       <Ionicons name="checkmark" size={16} color="#10B981" />
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity
-                    style={[styles.iconBtn, { borderColor: '#EF4444' }]}
-                    onPress={() => deleteOldFeeMutation.mutate(item.id)}
-                    disabled={deleteOldFeeMutation.isPending}
-              accessibilityLabel="Delete"
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                  </TouchableOpacity>
+                  {canDeleteOldFee && item.source === 'manual_entry' && !item.is_settled && (
+                    <TouchableOpacity
+                      style={[styles.iconBtn, { borderColor: '#EF4444' }]}
+                      onPress={() => confirm({
+                        title: 'Delete Old Fee',
+                        message: 'Delete this manually entered old fee? This cannot be undone.',
+                        confirmLabel: 'Delete',
+                        destructive: true,
+                        onConfirm: () => deleteOldFeeMutation.mutate(item.id),
+                      })}
+                      disabled={deleteOldFeeMutation.isPending}
+                      accessibilityLabel="Delete"
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             </View>
@@ -1556,6 +1573,7 @@ function StudentFeeDetailScreenContent() {
           </View>
         </View>
       </Modal>
+      <ConfirmModal {...modalProps} />
     </AppLayout>
   );
 }
