@@ -95,7 +95,7 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 | Organization picker at login | No (tenant from subdomain; body `client_name` hardcoded) | Yes (hardcoded org list + free text, normalized to lowercase) |
 | Token refresh | On 401, one shared refresh (rule 4) | On 401 and before `expires_in`, and on cold start (rule 7) |
 | First-login set-password | Logs straight in | Logs straight in (rule 8) |
-| Forgot password | Tells the user to contact the school admin (no form) | Takes a username, then tells the user to contact the school admin |
+| Forgot password | Tells the user to contact the school admin (no form) | Same |
 | Self password change | Only on Admin Profile (`/admin/profile`) | All roles (`app/profile/change-password.tsx`) |
 | Profile view/edit | Student/Staff/Parent pages; any other role is routed to StaffProfile, which 404s when the user has no `staff` row (typical for Admin) | Same role routing; falls back to a basic view on error |
 | Admin academic-year activation on login | Yes (rule 10) | No |

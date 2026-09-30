@@ -102,7 +102,7 @@ Staff, Teacher, Student and Parent accounts with users.is_first_login = TRUE mus
 ### auth/forgot-password
 
 Forgot-password screens exist on both clients but no backend reset flow exists yet (email is not integrated); recovery means asking the school admin to reset the password.
-- Parity: Web shows a contact-your-school-administrator message; mobile takes a username and then shows the same advice.
+- Parity: Both clients show a contact-your-school-administrator message with no form.
 - Note: Once email is integrated, both screens should send a real reset request.
 - Implemented by: `mobile:app/forgot-password.tsx`, `web:src/pages/auth/ForgotPasswordPage.tsx`
 - Depends on: `feature:tenants-and-admin/user-management`
