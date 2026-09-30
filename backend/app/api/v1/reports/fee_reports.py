@@ -36,13 +36,6 @@ def _parse_date_to(value: str | None) -> datetime | None:
     return parsed
 
 
-async def _fetch_all_rows(fetch, filters):
-    data, total_count = await fetch(filters)
-    if total_count > len(data):
-        data, total_count = await fetch(filters.model_copy(update={"page": 1, "page_size": total_count}))
-    return data, total_count
-
-
 @router.get("/collection-summary", response_model=ReportResponse)
 async def get_fee_collection_summary(
     request: Request,
@@ -506,13 +499,13 @@ async def export_fee_report(
             filters = FeeCollectionSummaryFilter(
                 **{**export_request.filters, "date_to": _parse_date_to(export_request.filters.get("date_to"))}
             )
-            data, total_count = await _fetch_all_rows(service.get_fee_collection_summary, filters)
+            data, total_count = await service.fetch_all_rows(service.get_fee_collection_summary, filters)
         elif export_request.report_type == "pending_fees":
             filters = PendingFeesFilter(**export_request.filters)
-            data, total_count = await _fetch_all_rows(service.get_pending_fees, filters)
+            data, total_count = await service.fetch_all_rows(service.get_pending_fees, filters)
         elif export_request.report_type == "fee_structure":
             filters = FeeStructureFilter(**export_request.filters)
-            data, total_count = await _fetch_all_rows(service.get_fee_structure, filters)
+            data, total_count = await service.fetch_all_rows(service.get_fee_structure, filters)
         else:
             raise HTTPException(status_code=400, detail="Unsupported fee report type")
 

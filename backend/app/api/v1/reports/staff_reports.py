@@ -142,7 +142,7 @@ async def export_staff_report(
         # Get data based on report type
         if export_request.report_type == "staff_summary":
             filters = StaffSummaryFilter(**export_request.filters)
-            data, total_count = await service.get_staff_summary(filters)
+            data, total_count = await service.fetch_all_rows(service.get_staff_summary, filters)
         else:
             raise HTTPException(status_code=400, detail="Unsupported report type")
 

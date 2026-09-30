@@ -43,30 +43,32 @@ graph LR
   n18 -.->|shapes| n8
   n18 -.->|shapes| n12
   n18 -.->|shapes| n13
-  n19[/"financial-totals-count-settled-money"/]
-  n19 -.->|shapes| n4
-  n20[/"home-screen-not-permission-guarded"/]
-  n20 -.->|shapes| n6
-  n21[/"menu-driven-module-hubs"/]
-  n21 -.->|shapes| n7
-  n21 -.->|shapes| n16
-  n22[/"mobile-home-union-of-cards"/]
-  n22 -.->|shapes| n6
-  n22 -.->|shapes| n15
-  n23[/"per-group-report-permissions"/]
-  n23 -.->|shapes| n1
-  n23 -.->|shapes| n3
-  n23 -.->|shapes| n4
-  n23 -.->|shapes| n8
-  n23 -.->|shapes| n9
-  n23 -.->|shapes| n10
-  n24[/"report-audit-in-public-schema"/]
-  n24 -.->|shapes| n2
-  n25[/"tenant-schema-via-tenant-service"/]
+  n19[/"exports-return-every-row"/]
+  n19 -.->|shapes| n8
+  n20[/"financial-totals-count-settled-money"/]
+  n20 -.->|shapes| n4
+  n21[/"home-screen-not-permission-guarded"/]
+  n21 -.->|shapes| n6
+  n22[/"menu-driven-module-hubs"/]
+  n22 -.->|shapes| n7
+  n22 -.->|shapes| n16
+  n23[/"mobile-home-union-of-cards"/]
+  n23 -.->|shapes| n6
+  n23 -.->|shapes| n15
+  n24[/"per-group-report-permissions"/]
+  n24 -.->|shapes| n1
+  n24 -.->|shapes| n3
+  n24 -.->|shapes| n4
+  n24 -.->|shapes| n8
+  n24 -.->|shapes| n9
+  n24 -.->|shapes| n10
+  n25[/"report-audit-in-public-schema"/]
   n25 -.->|shapes| n2
-  n25 -.->|shapes| n9
-  n25 -.->|shapes| n10
-  n25 -.->|shapes| n14
+  n26[/"tenant-schema-via-tenant-service"/]
+  n26 -.->|shapes| n2
+  n26 -.->|shapes| n9
+  n26 -.->|shapes| n10
+  n26 -.->|shapes| n14
 ```
 
 ## Features
@@ -133,12 +135,12 @@ Hub pages (web /admin, /masters, /reports, /students, /transport; mobile masters
 
 ### reports-dashboards/report-export
 
-POST /reports/<group>/export returns the report as csv, xlsx (openpyxl) or pdf (reportlab); large exports are meant to go to a background job.
+POST /reports/<group>/export returns the report as csv, xlsx (openpyxl) or pdf (reportlab); every matching row is exported; large student and staff summary exports are meant to go to a background job.
 - Note: report_type values: student_summary, staff_summary, fee_collection_summary, pending_fees, fee_structure, student_attendance, staff_attendance, expenditure, ledger.
 - Note: Synchronous exports are not audited; only the background path writes report_audit.
 - Flows: [reports-dashboards/background-export](#reports-dashboardsbackground-export), [reports-dashboards/export-report](#reports-dashboardsexport-report)
 - Implemented by: `endpoint:POST /reports/attendance/export`, `endpoint:POST /reports/fees/export`, `endpoint:POST /reports/financial/export`, `endpoint:POST /reports/staff/export`, `endpoint:POST /reports/students/export`, `job:app/tasks/report_tasks.py`, `service:app/service/reports/base_report_service.py`
-- Shaped by: [reports-dashboards/export-size-thresholds](#reports-dashboardsexport-size-thresholds), [reports-dashboards/per-group-report-permissions](#reports-dashboardsper-group-report-permissions)
+- Shaped by: [reports-dashboards/export-size-thresholds](#reports-dashboardsexport-size-thresholds), [reports-dashboards/exports-return-every-row](#reports-dashboardsexports-return-every-row), [reports-dashboards/per-group-report-permissions](#reports-dashboardsper-group-report-permissions)
 
 ### reports-dashboards/staff-reports
 
@@ -201,7 +203,7 @@ Implements: `feature:reports-dashboards/report-export`
 
 1. Client calls POST /reports/<group>/export (for example `endpoint:POST /reports/fees/export`) with {report_type, format: csv|xlsx|pdf, filters:{...}, filename?} and reads the response as a blob.
 2. The endpoint checks <group>_reports:export; an unknown format or report_type returns 400.
-3. The service runs the report query and checks should_use_background_job `service:app/service/reports/base_report_service.py`: over 1000 rows, xlsx over 500, or pdf over 300 goes to the background path. Fee exports skip this check and always return every row directly `decision:fee/export-all-rows-synchronously`.
+3. The service runs the report query and checks should_use_background_job `service:app/service/reports/base_report_service.py`: over 1000 rows, xlsx over 500, or pdf over 300 goes to the background path. Every export first fetches all matching rows; fee, attendance and financial exports skip this check and always stream directly `decision:reports-dashboards/exports-return-every-row`.
 4. Small exports are generated in-process (csv, openpyxl xlsx, reportlab pdf) and streamed straight back as a file download; no audit row is written.
 
 - Failure: Exports over the thresholds fail with 500 because the background path is broken `flow:reports-dashboards/background-export`.
@@ -211,7 +213,7 @@ flowchart TD
   s1["1. Client calls POST /reports/<group>/export (for example ) with {repo...<br/>endpoint:POST /reports/fees/export"]
   s2["2. The endpoint checks <group>_reports:export; an unknown format or re..."]
   s1 --> s2
-  s3["3. The service runs the report query and checks should_use_background_...<br/>service:app/service/reports/base_report_service.py<br/>decision:fee/export-all-rows-synchronously"]
+  s3["3. The service runs the report query and checks should_use_background_...<br/>service:app/service/reports/base_report_service.py<br/>decision:reports-dashboards/exports-return-every-row"]
   s2 --> s3
   s4["4. Small exports are generated in-process (csv, openpyxl xlsx, reportl..."]
   s3 --> s4
@@ -308,6 +310,16 @@ Shaped by: [reports-dashboards/menu-driven-module-hubs](#reports-dashboardsmenu-
 - **Decision**: Exports over 1000 rows, xlsx over 500 or pdf over 300 are routed to a background Celery job instead of rendering in the request.
 - **Why**: Avoids request timeouts on big xlsx/pdf renders.
 - Shapes: `feature:reports-dashboards/report-export`, `flow:reports-dashboards/background-export`, `flow:reports-dashboards/export-report`, `job:app/tasks/report_tasks.py`, `service:app/service/reports/base_report_service.py`
+
+### reports-dashboards/exports-return-every-row (active)
+
+- **Decision**: Every POST /reports/<group>/export ignores page and page_size in its filters and exports every matching row (BaseReportService.fetch_all_rows); fee, attendance and financial exports always stream the file directly instead of using the background job.
+- **Why**: The filter schemas default to page_size 100, so exports silently stopped at 100 rows; fee, attendance and financial report types have no Celery task, so the background path could only fail with 500 for them.
+- **Alternatives**: Fixing the background export path and adding Celery tasks for every report group.
+- **Tradeoff**: A very large export (especially pdf) is generated inside the request and can be slow, and is not written to report_audit. Student and staff summary exports still route large results to the broken background path.
+- **Since**: 2026-09
+- Shapes: `feature:fee/fee-reports`, `feature:reports-dashboards/report-export`, `service:app/service/reports/base_report_service.py`
+- Supersedes: `decision:fee/export-all-rows-synchronously`
 
 ### reports-dashboards/financial-totals-count-settled-money (active)
 

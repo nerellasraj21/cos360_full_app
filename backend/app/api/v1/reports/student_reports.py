@@ -144,7 +144,7 @@ async def export_student_report(
         # Get data based on report type
         if export_request.report_type == "student_summary":
             filters = StudentSummaryFilter(**export_request.filters)
-            data, total_count = await service.get_student_summary(filters)
+            data, total_count = await service.fetch_all_rows(service.get_student_summary, filters)
         else:
             raise HTTPException(status_code=400, detail="Unsupported report type")
 

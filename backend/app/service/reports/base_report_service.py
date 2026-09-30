@@ -1,5 +1,6 @@
 import csv
 from datetime import datetime
+from enum import Enum
 import io
 import json
 import logging
@@ -126,6 +127,10 @@ class BaseReportService:
                         value = ""
                     elif isinstance(value, datetime):
                         value = value.strftime("%Y-%m-%d %H:%M:%S")
+                    elif isinstance(value, Enum):
+                        value = value.value
+                    elif isinstance(value, UUID):
+                        value = str(value)
                     ws.cell(row=row_idx, column=col_idx, value=value)
 
             # Auto-adjust column widths
@@ -306,6 +311,13 @@ class BaseReportService:
             raise ValueError(f"Unsupported report type for background export: {report_type}")
 
         return str(task.id), str(audit_id)
+
+    async def fetch_all_rows(self, fetch, filters) -> tuple[list[dict[str, Any]], int]:
+        """Run a paginated report fetch and return every matching row, ignoring the filter's page and page_size"""
+        data, total_count = await fetch(filters)
+        if total_count > len(data):
+            data, total_count = await fetch(filters.model_copy(update={"page": 1, "page_size": total_count}))
+        return data, total_count
 
     def should_use_background_job(self, data_count: int, export_format: str) -> bool:
         """

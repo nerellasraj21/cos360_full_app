@@ -275,37 +275,13 @@ async def export_financial_report(
 
         if export_request.report_type == "expenditure":
             filters = ExpenditureReportFilter(**export_request.filters)
-            data, total_count = await service.get_expenditure_report(filters)
+            data, total_count = await service.fetch_all_rows(service.get_expenditure_report, filters)
         elif export_request.report_type == "ledger":
             filters = LedgerReportFilter(**export_request.filters)
-            data, total_count = await service.get_ledger_report(filters)
+            data, total_count = await service.fetch_all_rows(service.get_ledger_report, filters)
         else:
             raise HTTPException(status_code=400, detail="Unsupported financial report type")
 
-        # Check if we should use background job
-        if service.should_use_background_job(total_count, export_request.format):
-            # Use background job for large exports
-            base_filename = export_request.filename or f"financial_{export_request.report_type}_{tenant_id}"
-
-            job_id, audit_id = await service.create_background_export_job(
-                report_type=export_request.report_type,
-                filters=export_request.filters,
-                export_format=export_request.format,
-                filename=base_filename,
-                user_id=user_id,
-                tenant_id=tenant_id,
-            )
-
-            return {
-                "message": "Export job started",
-                "job_id": job_id,
-                "audit_id": audit_id,
-                "is_background": True,
-                "estimated_completion": "5-10 minutes",
-                "status_endpoint": f"/api/v1/reports/export-status/{audit_id}",
-            }
-
-        # Generate export based on format (synchronous for small datasets)
         base_filename = export_request.filename or f"financial_{export_request.report_type}_{tenant_id}"
 
         if export_request.format == "csv":

@@ -144,7 +144,7 @@ Fee reports under /reports/fees: collection summary, pending fees and fee struct
 - Parity: Web exports xlsx and pdf. Mobile exports CSV only.
 - Note: The pending-fees report ignores concessions.
 - Implemented by: `endpoint:GET /reports/fees/collection-summary`, `endpoint:GET /reports/fees/fee-structure`, `endpoint:GET /reports/fees/pending-fees`, `endpoint:POST /reports/fees/export`, `mobile:app/fees/reports.tsx`, `service:app/service/reports/fee_report_service.py`, `web:src/pages/fee/FeeReports.tsx`
-- Shaped by: [fee/export-all-rows-synchronously](#feeexport-all-rows-synchronously), [fee/report-stats-reuse-report-query](#feereport-stats-reuse-report-query)
+- Shaped by: [fee/export-all-rows-synchronously](#feeexport-all-rows-synchronously), [fee/report-stats-reuse-report-query](#feereport-stats-reuse-report-query), [reports-dashboards/exports-return-every-row](#reports-dashboardsexports-return-every-row)
 
 ### fee/fee-self-service
 
@@ -543,7 +543,7 @@ Shaped by: [fee/mandatory-fees-applied-by-backend](#feemandatory-fees-applied-by
 - Note: The admission lookup must not require Admission.academic_year_id to equal the transaction year, or receipts break for students whose admission year differs.
 - Shapes: `feature:fee/receipts`, `flow:fee/receipt-lifecycle`, `service:app/service/fee/fee_receipt_service.py`
 
-### fee/export-all-rows-synchronously (active)
+### fee/export-all-rows-synchronously (superseded)
 
 - **Decision**: POST /reports/fees/export ignores page and page_size in its filters, fetches every matching row, and always streams the file directly instead of handing large exports to the background job.
 - **Why**: The filter schemas default to page_size 100, so exports silently stopped at 100 rows; and the background path has no fee task and fails with 500, so large fee exports could never complete.
@@ -551,6 +551,7 @@ Shaped by: [fee/mandatory-fees-applied-by-backend](#feemandatory-fees-applied-by
 - **Tradeoff**: A very large export (especially pdf) is generated inside the request and can be slow; it is not written to report_audit.
 - **Since**: 2026-09
 - Shapes: `endpoint:POST /reports/fees/export`, `feature:fee/fee-reports`
+- Superseded by: `decision:reports-dashboards/exports-return-every-row`
 
 ### fee/legacy-fee-routes-redirect
 
