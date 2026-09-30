@@ -86,6 +86,5 @@ Endpoint prefixes:
 - No check that `stop_id` belongs to the trip's route, and route stops can't be filtered by route on the server. See rule 3.
 - No capacity field or capacity check. GPS, trip logs and parent notifications are not built.
 - The pricing overlap check uses `scalar_one_or_none()`. If more than one plan already overlaps, it raises `MultipleResultsFound`, which becomes a 500.
-- The web Student Transport table (`pages/transport/studentTransport.tsx`) still has an "Active" column although assignments have no `is_active` (it always shows a dash), and it lists raw trip, student and stop IDs instead of names.
 - Trips and pricing services use `commit()` → `refresh()`, not the repo's flush → select → commit pattern.
 - An unapproved redesign proposal (Feb 2026, not kept) asked for a 3-step assign wizard, the student's class/section shown when assigning, a payment schedule (monthly/quarterly/yearly/bulk), bulk assign, and a trip roster grouped by stop. None of it is implemented.

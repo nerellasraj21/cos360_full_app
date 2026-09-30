@@ -54,6 +54,15 @@ export function ExpenseSettings() {
     category: categoryFilter || undefined
   });
   const { data: commonSettings } = useExpenseCommonSettings();
+  const defaultApprovalValue = commonSettings?.settings?.default_approval_required?.value;
+  const defaultApproval =
+    defaultApprovalValue === undefined || defaultApprovalValue === null
+      ? undefined
+      : defaultApprovalValue === true || String(defaultApprovalValue).toLowerCase() === 'true';
+  const formatSettingAmount = (value: unknown) =>
+    value === undefined || value === null || value === '' || Number.isNaN(Number(value))
+      ? 'Not set'
+      : `₹${Number(value).toLocaleString('en-IN')}`;
   const createMutation = useCreateExpenseSetting();
   const updateMutation = useUpdateExpenseSetting();
   const deleteMutation = useDeleteExpenseSetting();
@@ -208,8 +217,24 @@ export function ExpenseSettings() {
               <div className="flex items-center gap-2">
                 <Shield className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <p className="text-sm font-medium">Approval Workflow</p>
-                  <StatusBadge status={commonSettings.approval_workflow_enabled} label={commonSettings.approval_workflow_enabled ? 'Enabled' : 'Disabled'} />
+                  <p className="text-sm font-medium">Default Approval</p>
+                  {defaultApproval === undefined ? (
+                    <StatusBadge status={undefined} label="Not set" />
+                  ) : (
+                    <StatusBadge status={defaultApproval} label={defaultApproval ? 'Required' : 'Not required'} />
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Workflow className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Auto-Approval Limit</p>
+                  <p className="text-sm text-muted-foreground">{formatSettingAmount(commonSettings.settings?.auto_approval_limit?.value)}</p>
                 </div>
               </div>
             </CardContent>
@@ -220,20 +245,8 @@ export function ExpenseSettings() {
               <div className="flex items-center gap-2">
                 <Database className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <p className="text-sm font-medium">Attachment Required</p>
-                  <StatusBadge status={commonSettings.attachment_required} label={commonSettings.attachment_required ? 'Yes' : 'No'} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Notifications</p>
-                  <StatusBadge status={commonSettings.notification_enabled} label={commonSettings.notification_enabled ? 'Enabled' : 'Disabled'} />
+                  <p className="text-sm font-medium">Receipts Required Over</p>
+                  <p className="text-sm text-muted-foreground">{formatSettingAmount(commonSettings.settings?.require_receipts_over_amount?.value)}</p>
                 </div>
               </div>
             </CardContent>

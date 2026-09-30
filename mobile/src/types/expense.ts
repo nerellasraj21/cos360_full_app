@@ -179,13 +179,21 @@ export interface ExpenseSettingsValue {
   category: string;
 }
 
+export interface ExpenseCommonSettingValue {
+  value: string | number | boolean | string[] | null;
+  type: string;
+}
+
+export type ExpenseCommonSettingKey =
+  | 'auto_approval_limit'
+  | 'require_receipts_over_amount'
+  | 'default_approval_required'
+  | 'max_file_size_mb'
+  | 'allowed_file_types';
+
 export interface ExpenseCommonSettings {
-  approval_required_amount: number;
-  auto_approval_roles: string[];
-  currency: string;
-  date_format: string;
-  max_attachment_size: number;
-  allowed_file_types: string[];
+  settings: Partial<Record<ExpenseCommonSettingKey, ExpenseCommonSettingValue>>;
+  retrieved_at: string;
 }
 
 export interface ExpenseDepartment {

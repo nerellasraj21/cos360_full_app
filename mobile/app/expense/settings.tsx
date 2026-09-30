@@ -19,6 +19,16 @@ import { expenseSettingsApi } from '@/src/api/expense';
 import { ExpenseSettings } from '@/src/types/expense';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 
+const formatSettingAmount = (value: unknown) =>
+  value === undefined || value === null || value === '' || Number.isNaN(Number(value))
+    ? 'Not set'
+    : `₹${Number(value).toLocaleString('en-IN')}`;
+
+const formatApproval = (value: unknown) => {
+  if (value === undefined || value === null) return 'Not set';
+  return value === true || String(value).toLowerCase() === 'true' ? 'Required' : 'Not required';
+};
+
 function ExpenseSettingsScreenContent() {
   const { colors, theme } = useTheme();
   const { hasPermission } = useMobilePermission();
@@ -99,27 +109,18 @@ function ExpenseSettingsScreenContent() {
             <Text style={styles.summaryTitle}>Common Settings</Text>
             <View style={styles.summaryGrid}>
               <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Currency</Text>
-                <Text style={styles.summaryValue}>{common.currency}</Text>
+                <Text style={styles.summaryLabel}>Default Approval</Text>
+                <Text style={styles.summaryValue}>{formatApproval(common.settings?.default_approval_required?.value)}</Text>
               </View>
               <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Approval Threshold</Text>
-                <Text style={styles.summaryValue}>₹{Number(common.approval_required_amount).toLocaleString('en-IN')}</Text>
+                <Text style={styles.summaryLabel}>Auto-Approval Limit</Text>
+                <Text style={styles.summaryValue}>{formatSettingAmount(common.settings?.auto_approval_limit?.value)}</Text>
               </View>
               <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Date Format</Text>
-                <Text style={styles.summaryValue}>{common.date_format}</Text>
-              </View>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Max Attachment</Text>
-                <Text style={styles.summaryValue}>{common.max_attachment_size} MB</Text>
+                <Text style={styles.summaryLabel}>Receipts Required Over</Text>
+                <Text style={styles.summaryValue}>{formatSettingAmount(common.settings?.require_receipts_over_amount?.value)}</Text>
               </View>
             </View>
-            {common.auto_approval_roles?.length > 0 && (
-              <Text style={styles.summaryFooter}>
-                Auto-approve roles: {common.auto_approval_roles.join(', ')}
-              </Text>
-            )}
           </View>
         )}
 
@@ -233,7 +234,6 @@ const styles = StyleSheet.create({
   summaryItem: { minWidth: '45%' },
   summaryLabel: { color: 'rgba(255,255,255,0.65)', fontSize: 11 },
   summaryValue: { color: 'white', fontSize: 15, fontWeight: '700', marginTop: 2 },
-  summaryFooter: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 4 },
   group: { marginBottom: 16 },
   groupTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 },
   settingRow: {

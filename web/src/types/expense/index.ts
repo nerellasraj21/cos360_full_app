@@ -505,15 +505,21 @@ export interface ExpenseDepartmentDropdown {
   name: string;
 }
 
+export interface ExpenseCommonSettingValue {
+  value: string | number | boolean | string[] | null;
+  type: string;
+}
+
+export type ExpenseCommonSettingKey =
+  | 'auto_approval_limit'
+  | 'require_receipts_over_amount'
+  | 'default_approval_required'
+  | 'max_file_size_mb'
+  | 'allowed_file_types';
+
 export interface ExpenseCommonSettings {
-  approval_workflow_enabled: boolean;
-  default_approval_threshold: number;
-  attachment_required: boolean;
-  max_attachment_size: number;
-  allowed_file_types: string[];
-  audit_retention_days: number;
-  notification_enabled: boolean;
-  auto_archive_days: number;
+  settings: Partial<Record<ExpenseCommonSettingKey, ExpenseCommonSettingValue>>;
+  retrieved_at: string;
 }
 
 // ============================================================================

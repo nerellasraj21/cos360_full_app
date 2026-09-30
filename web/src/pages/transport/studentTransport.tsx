@@ -4,7 +4,6 @@ import { MasterPage } from "../masters/common/MasterPage";
 import type { MasterPageConfig, FormField } from "../masters/common/MasterPage";
 import type { StudentTransportOut, StudentTransportCreate } from "@/types/masters/studentTransport";
 import { useStudentTransports, useCreateStudentTransport, useUpdateStudentTransport, useDeleteStudentTransport } from '@/api/hooks/masters/studentTransport';
-import { StatusBadge } from '@/components/ui/StatusBadge';
 
 // Updated to match backend schema (2026-02-09)
 const formFields: FormField[] = [
@@ -38,44 +37,39 @@ export default function StudentTransportPage() {
     // Updated columns to match new backend schema
     const columns = [
         {
-            key: "trip_id",
-            label: "Trip ID",
+            key: "student_id",
+            label: "Student",
             editable: true,
+            render: (v: string, row: StudentTransportOut) =>
+                row.student ? `${row.student.first_name} ${row.student.last_name}`.trim() : v,
         },
         {
-            key: "student_id",
-            label: "Student ID",
+            key: "trip_id",
+            label: "Trip",
             editable: true,
+            render: (v: string, row: StudentTransportOut) =>
+                row.trip
+                    ? `${row.trip.route?.route_name ?? 'Trip'} #${row.trip.trip_number}${row.trip.vehicle ? ` - ${row.trip.vehicle.name}` : ''}`
+                    : v,
         },
         {
             key: "stop_id",
-            label: "Stop ID",
+            label: "Stop",
             editable: true,
-        },
-        {
-            key: "fee_term_id",
-            label: "Fee Term",
-            editable: true,
+            render: (v: string, row: StudentTransportOut) => row.stop?.name ?? v,
         },
         {
             key: "pricing_id",
             label: "Pricing",
             editable: true,
-            render: (v: string | null) => v || '—',
+            render: (_v: string | null, row: StudentTransportOut) =>
+                row.pricing ? `${row.pricing.cycle_name} (₹${Number(row.pricing.amount).toLocaleString()})` : '—',
         },
         {
             key: "fee_per_term",
             label: "Fee Per Term",
             editable: true,
             render: (v: number | string) => `₹${Number(v).toLocaleString()}`,
-        },
-        {
-            key: "is_active",
-            label: "Active",
-            editable: true,
-            render: (v: boolean) => (
-                <StatusBadge status={v} />
-            ),
         },
     ];
 
