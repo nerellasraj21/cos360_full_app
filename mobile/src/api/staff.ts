@@ -546,11 +546,17 @@ export const staffAttendanceReportsApi = {
 
   // POST /reports/attendance/export → Blob
   exportReport: async (data: {
-    start_date?: string;
-    end_date?: string;
-    format?: 'csv' | 'xlsx';
+    date_from?: string;
+    date_to?: string;
+    staff_id?: string;
+    format?: 'csv' | 'xlsx' | 'pdf';
   }): Promise<Blob> => {
-    const response = await apiClient.post('/reports/attendance/export', data, { responseType: 'blob' });
+    const { format = 'csv', ...filters } = data;
+    const response = await apiClient.post(
+      '/reports/attendance/export',
+      { report_type: 'staff_attendance', format, filters },
+      { responseType: 'blob' },
+    );
     return response.data;
   },
 };

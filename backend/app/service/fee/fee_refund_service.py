@@ -327,7 +327,7 @@ class FeeRefundService:
         db: AsyncSession,
         student_id: UUID | None = None,
         academic_year_id: UUID | None = None,
-        status: str | None = None,
+        refund_status: str | None = None,
         refund_reason: str | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
@@ -343,8 +343,8 @@ class FeeRefundService:
                 conditions.append(FeeRefund.student_id == student_id)
             if academic_year_id:
                 conditions.append(FeeRefund.academic_year_id == academic_year_id)
-            if status:
-                conditions.append(FeeRefund.status == status)
+            if refund_status:
+                conditions.append(FeeRefund.status == refund_status)
             if refund_reason:
                 conditions.append(FeeRefund.refund_reason == refund_reason)
             if date_from:

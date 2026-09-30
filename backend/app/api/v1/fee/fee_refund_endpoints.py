@@ -226,7 +226,7 @@ async def search_refunds(
         db=db,
         student_id=student_id,
         academic_year_id=academic_year_id,
-        status=status.value if status else None,
+        refund_status=status.value if status else None,
         refund_reason=refund_reason.value if refund_reason else None,
         date_from=date_from,
         date_to=date_to,

@@ -113,7 +113,6 @@ Endpoint prefixes:
 - `web/src/api/fee/mappings.ts` points at a `/fee/mappings/` API that doesn't exist. Use `classMappings.ts` or `studentMappings.ts`.
 
 ## Known gaps
-- `FeeRefundService.search_refunds` has a parameter named `status` that shadows `fastapi.status`, so its `except` block raises `AttributeError` instead of a 500 if the search fails.
 - The pending-fees report ignores concessions, so a student with a concession still shows the full instalment as pending.
 - Fee report export (`POST /reports/fees/export`) only includes the first 100 rows: the filter schemas default to `page_size=100` and the export does not override it.
 - Web Fee Reports only loads the stats tables once a filter is set (`enabled` in `web/src/hooks/fee/useFeeReports.ts`).
