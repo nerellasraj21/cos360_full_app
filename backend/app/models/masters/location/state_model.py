@@ -9,7 +9,6 @@ from app.db.base import BasePublic
 
 class State(BasePublic):
     __tablename__ = "states"
-    __table_args__ = {"schema": "public"}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     name = Column(String(100), nullable=False, unique=True, index=True)

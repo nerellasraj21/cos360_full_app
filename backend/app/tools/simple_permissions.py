@@ -63,6 +63,7 @@ async def get_current_user(
             "username": token.get("username"),
             "role": token.get("role"),
             "client_name": token.get("client_name"),
+            "tenant_id": token.get("tenant_id"),
             "tenant_schema": tenant_schema,
         }
 

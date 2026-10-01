@@ -85,7 +85,15 @@ class TenantMiddleware(BaseHTTPMiddleware):
         client_name = request.headers.get("cschema")
         if client_name:
             request.state.tenant_detection_method = "cschema_header"
-            return self.default_client_name
+            sanitized = self.sanitize_client_name(client_name)
+            if not sanitized:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid 'cschema' header")
+            return sanitized
+
+        # An authenticated request carries its tenant in the signed token claim
+        if request.headers.get("Authorization", "").startswith("Bearer "):
+            request.state.tenant_detection_method = "token"
+            return None
 
         # If strict mode is enabled, cschema header is required
         if self.strict_mode:

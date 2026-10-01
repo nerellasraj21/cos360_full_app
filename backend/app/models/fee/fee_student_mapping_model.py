@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import TIMESTAMP, Column, ForeignKey, Numeric, String, UniqueConstraint, func
+from sqlalchemy import TIMESTAMP, Column, ForeignKey, ForeignKeyConstraint, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -12,7 +12,7 @@ class FeeStudentMapping(BaseOrg):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
-    student_admission_num = Column(String(50), ForeignKey("student_admissions.admission_number"), nullable=False)
+    student_admission_num = Column(String(50), nullable=False)
     class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False)
     section_id = Column(UUID(as_uuid=True), ForeignKey("sections.id"), nullable=False)
     fee_type_id = Column(UUID(as_uuid=True), ForeignKey("fee_types.id"), nullable=False)
@@ -24,6 +24,10 @@ class FeeStudentMapping(BaseOrg):
     # Unique constraint: one mapping per student, fee type, and academic year
     __table_args__ = (
         UniqueConstraint("student_id", "fee_type_id", "academic_year_id", name="uq_student_fee_type_academic_year"),
+        ForeignKeyConstraint(
+            ["tenant_id", "student_admission_num"],
+            ["student_admissions.tenant_id", "student_admissions.admission_number"],
+        ),
     )
 
     # Relationships

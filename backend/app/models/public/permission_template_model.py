@@ -13,11 +13,10 @@ class PermissionTemplate(BasePublic):
     """
 
     __tablename__ = "permission_templates"
-    __table_args__ = {"schema": "public"}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    role_template_id = Column(UUID(as_uuid=True), ForeignKey("public.role_templates.id"), nullable=False)
-    menu_id = Column(UUID(as_uuid=True), ForeignKey("public.menus.id"), nullable=False)
+    role_template_id = Column(UUID(as_uuid=True), ForeignKey("role_templates.id"), nullable=False)
+    menu_id = Column(UUID(as_uuid=True), ForeignKey("menus.id"), nullable=False)
     can_view = Column(Boolean, default=True)
     can_edit = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)

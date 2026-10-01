@@ -6,7 +6,7 @@ from fastapi import HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.tenant_session import TenantService, get_tenant_db
+from app.db.tenant_session import TenantService, get_tenant_db, open_tenant_session
 from app.middleware.tenant_middleware import get_client_name_from_request
 from app.models.auth.menu_model import Menu
 from app.models.auth.permissions_model import RoleMenuPermission
@@ -270,18 +270,14 @@ class MultiTenantAuthService:
 
         logger.info(f"DEBUG 1: Login attempt for user '{username}' on tenant '{final_client_name}'")
 
-        # Validate tenant exists and is active
-        logger.info(f"DEBUG 2: Getting tenant schema for '{final_client_name}'")
-        schema_name = await TenantService.get_tenant_schema(final_client_name)
-        if not schema_name:
-            if final_client_name == "default":
-                schema_name = "cos360_masters"  # Backward compatibility
-                logger.info(f"DEBUG 3: Using default schema: {schema_name}")
-            else:
-                logger.warning(f"DEBUG 3: Tenant not found or inactive: {final_client_name}")
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid connection")
-        else:
-            logger.info(f"DEBUG 3: Found tenant schema: {schema_name}")
+        tenant_id = await TenantService.get_tenant_id(final_client_name or "")
+        if not tenant_id:
+            logger.warning(f"Tenant not found or inactive: {final_client_name}")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid connection")
+
+        session_tenant_id = getattr(request.state, "tenant_id", None)
+        if session_tenant_id and session_tenant_id != tenant_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant does not match the request")
 
         # Get tenant database session
         logger.info("DEBUG 4: Getting tenant database session")
@@ -335,6 +331,7 @@ class MultiTenantAuthService:
                                 "sub": str(user.id),
                                 "username": user.username,
                                 "role": role_name,
+                                "tenant_id": tenant_id,
                                 "client_name": final_client_name,
                                 "academic_year_id": str(academic_year_id),
                                 "academic_year_title": academic_year_title,
@@ -356,6 +353,7 @@ class MultiTenantAuthService:
                     "sub": str(user.id),
                     "username": user.username,
                     "role": user.role.name,
+                    "tenant_id": tenant_id,
                     "client_name": final_client_name,
                     "academic_year_id": str(academic_year_id),
                     "academic_year_title": academic_year_title,
@@ -417,15 +415,15 @@ class MultiTenantAuthService:
         payload = verify_change_password_token(change_password_token)
 
         user_id = payload.get("sub")
-        final_client_name = client_name or payload.get("client_name") or get_client_name_from_request(request)
+        final_client_name = payload.get("client_name") or client_name
         academic_year_id_str = payload.get("academic_year_id")
         academic_year_title = payload.get("academic_year_title", "")
 
-        schema_name = await TenantService.get_tenant_schema(final_client_name)
-        if not schema_name:
+        tenant_id = payload.get("tenant_id")
+        if not tenant_id or not await TenantService.is_active(tenant_id):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid connection")
 
-        async for db in get_tenant_db(request):
+        async with open_tenant_session(tenant_id) as db:
             try:
                 from uuid import UUID as _UUID
 
@@ -482,6 +480,7 @@ class MultiTenantAuthService:
                     "sub": str(user.id),
                     "username": user.username,
                     "role": user.role.name if user.role else "",
+                    "tenant_id": tenant_id,
                     "client_name": final_client_name,
                     "academic_year_id": academic_year_id_str,
                     "academic_year_title": academic_year_title,

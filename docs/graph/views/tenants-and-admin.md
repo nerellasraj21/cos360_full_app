@@ -133,7 +133,7 @@ Create a new school tenant by cloning the cos360_master template schema and seed
 - Note: Onboarding is script-based (backend/scripts/create_little_bunny_tenant.py and the seed_* pattern scripts); there is no working API or UI path.
 - Flows: [tenants-and-admin/onboard-tenant](#tenants-and-adminonboard-tenant)
 - Implemented by: `mobile:app/login.tsx`, `table:academic_years`, `table:issuable_certificate_templates`, `table:menus`, `table:public.tenants`, `table:resource_permissions`, `table:role_menu_permissions`, `table:roles`, `table:users`
-- Shaped by: [platform/schema-per-tenant](#platformschema-per-tenant), [tenants-and-admin/clone-from-master-template](#tenants-and-adminclone-from-master-template), [tenants-and-admin/idempotent-seed-scripts](#tenants-and-adminidempotent-seed-scripts)
+- Shaped by: [platform/provision-in-one-transaction](#platformprovision-in-one-transaction), [platform/schema-per-tenant](#platformschema-per-tenant), [tenants-and-admin/clone-from-master-template](#tenants-and-adminclone-from-master-template), [tenants-and-admin/idempotent-seed-scripts](#tenants-and-adminidempotent-seed-scripts)
 
 ### tenants-and-admin/user-management
 
@@ -241,42 +241,48 @@ flowchart TD
 
 Implements: `feature:tenants-and-admin/tenant-onboarding`
 
-- Trigger: A new school signs up. Onboarding is done with scripts, not an API.
+- Trigger: A new school signs up. A super admin provisions it with one API call.
+- Precondition: The shared menu catalog and the plan with its plan_resource_access and plan_menu_access rows already exist.
 
-1. Copy backend/scripts/create_little_bunny_tenant.py and change CLIENT_NAME and SCHEMA_NAME.
-2. Check that cos360_master is populated, then insert the public tenants row `table:public.tenants` and CREATE SCHEMA.
-3. Run CREATE TABLE ... (LIKE cos360_master.<t> INCLUDING ALL) for every table, and copy alembic_version from the master so future migrations apply.
-4. Seed the 5 system roles Admin, Teacher, Staff, Student and Parent `table:roles`.
-5. Run backend/scripts/fix_tenant_enum_types.py <schema> so enum columns point at types local to the new schema; LIKE keeps the source enum OIDs and inserts fail with type does not exist.
-6. Seed menus `table:menus`, role_menu_permissions `table:role_menu_permissions` and certificate templates `table:issuable_certificate_templates` from cos360_master (pattern: seed_master_data_little_bunny.py).
-7. Seed resource_permissions from test_tenant_schema, mapping role_id by role name, because cos360_master.resource_permissions is empty `table:resource_permissions` (pattern: seed_resource_permissions_little_bunny.py).
-8. Seed an academic year `table:academic_years` and an Admin user `table:users` (patterns: seed_*_academic_year.py, seed_*_admin.py). Without an academic year nobody can log in.
-9. Add the client_name to the ORGANIZATIONS list in `mobile:app/login.tsx` and configure the deployment tenant (TENANT_DEFAULT_NAME), because the cschema header value is currently ignored.
+1. A super admin calls POST /super_admin/system/tenants with client_name and plan_id as query parameters and an optional JSON body holding the first Admin's username, email and password.
+2. TenantProvisioningService validates client_name (2 to 63 characters of lowercase letters, digits, hyphen or underscore), the plan, and that the name is free `service:app/service/tenant/provisioning_service.py`
+3. It opens one transaction with the new tenant id on the session, inserts the tenants row and flushes `table:public.tenants`
+4. RoleSeedService creates the five system roles Admin, Teacher, Staff, Student and Parent `service:app/service/tenant/role_seed_service.py` `table:roles`
+5. It grants each role the catalog permissions limited to the plan's resource actions; Admin gets every plan action plus role_management `table:resource_permissions`
+6. It links each role to the plan's menus, and Student and Parent only to the student-facing menu URLs `table:role_menu_permissions`
+7. If credentials were given it creates the Admin user with a hashed password `table:users`
+8. The transaction commits, and any failure rolls everything back so no half-created tenant remains.
+9. Seed an academic year `table:academic_years`, because without one nobody can log in. Certificate templates are not seeded by provisioning.
+10. Add the client_name to the ORGANIZATIONS list in `mobile:app/login.tsx`, because mobile has no per-school host.
 
-- Result: A tenant at the master's table set and alembic version, with roles, menus, permissions, a year and an Admin, but with no foreign-key constraints.
+- Result: A tenant row with roles, permissions limited to its plan, menu access and optionally an Admin, ready for an academic year.
+
+- Failure: A plan with no plan_resource_access rows fails with 409 and creates nothing.
 
 ```mermaid
 flowchart TD
-  s1["1. Copy backend/scripts/create_little_bunny_tenant.py and change CLIEN..."]
-  s2["2. Check that cos360_master is populated, then insert the public tenan...<br/>table:public.tenants"]
+  s1["1. A super admin calls POST /super_admin/system/tenants with client_na..."]
+  s2["2. TenantProvisioningService validates client_name (2 to 63 characters...<br/>service:app/service/tenant/provisioning_service.py"]
   s1 --> s2
-  s3["3. Run CREATE TABLE ... (LIKE cos360_master.<t> INCLUDING ALL) for eve..."]
+  s3["3. It opens one transaction with the new tenant id on the session, ins...<br/>table:public.tenants"]
   s2 --> s3
-  s4["4. Seed the 5 system roles Admin, Teacher, Staff, Student and Parent .<br/>table:roles"]
+  s4["4. RoleSeedService creates the five system roles Admin, Teacher, Staff...<br/>service:app/service/tenant/role_seed_service.py<br/>table:roles"]
   s3 --> s4
-  s5["5. Run backend/scripts/fix_tenant_enum_types.py <schema> so enum colum..."]
+  s5["5. It grants each role the catalog permissions limited to the plan's r...<br/>table:resource_permissions"]
   s4 --> s5
-  s6["6. Seed menus , role_menu_permissions  and certificate templates  from...<br/>table:menus<br/>table:role_menu_permissions<br/>table:issuable_certificate_templates"]
+  s6["6. It links each role to the plan's menus, and Student and Parent only...<br/>table:role_menu_permissions"]
   s5 --> s6
-  s7["7. Seed resource_permissions from test_tenant_schema, mapping role_id ...<br/>table:resource_permissions"]
+  s7["7. If credentials were given it creates the Admin user with a hashed p...<br/>table:users"]
   s6 --> s7
-  s8["8. Seed an academic year  and an Admin user  (patterns: seed_*_academi...<br/>table:academic_years<br/>table:users"]
+  s8["8. The transaction commits, and any failure rolls everything back so n..."]
   s7 --> s8
-  s9["9. Add the client_name to the ORGANIZATIONS list in  and configure the...<br/>mobile:app/login.tsx"]
+  s9["9. Seed an academic year , because without one nobody can log in. Cert...<br/>table:academic_years"]
   s8 --> s9
+  s10["10. Add the client_name to the ORGANIZATIONS list in , because mobile h...<br/>mobile:app/login.tsx"]
+  s9 --> s10
 ```
 
-Shaped by: [platform/role-only-runtime-check](#platformrole-only-runtime-check), [tenants-and-admin/clone-from-master-template](#tenants-and-adminclone-from-master-template), [tenants-and-admin/idempotent-seed-scripts](#tenants-and-adminidempotent-seed-scripts)
+Shaped by: [platform/provision-in-one-transaction](#platformprovision-in-one-transaction), [platform/role-only-runtime-check](#platformrole-only-runtime-check), [tenants-and-admin/clone-from-master-template](#tenants-and-adminclone-from-master-template), [tenants-and-admin/idempotent-seed-scripts](#tenants-and-adminidempotent-seed-scripts)
 
 ### tenants-and-admin/super-admin-session
 
@@ -312,13 +318,14 @@ Shaped by: [tenants-and-admin/separate-super-admin-accounts](#tenants-and-admins
 
 ## Decisions
 
-### tenants-and-admin/clone-from-master-template
+### tenants-and-admin/clone-from-master-template (superseded)
 
 - **Decision**: cos360_master is a read-only template and new tenants are cloned from it with CREATE TABLE LIKE ... INCLUDING ALL.
 - **Why**: Every tenant starts at a known table set and alembic version.
 - **Alternatives**: Building each tenant schema by replaying Alembic migrations.
 - **Tradeoff**: LIKE does not copy foreign keys and keeps the source enum type OIDs, so clones have no FKs and need fix_tenant_enum_types.py.
 - Shapes: `concept:platform/template-schema`, `feature:tenants-and-admin/tenant-onboarding`, `flow:tenants-and-admin/onboard-tenant`
+- Superseded by: `decision:platform/provision-in-one-transaction`
 
 ### tenants-and-admin/idempotent-seed-scripts
 

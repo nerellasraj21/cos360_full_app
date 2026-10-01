@@ -190,13 +190,15 @@ async def refresh_token(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Validate tenant if present
-        client_name = payload.get("client_name")
-        if client_name and client_name != "default":
-            # Validate tenant is still active
-            is_valid_tenant = await MultiTenantAuthService.validate_tenant(client_name)
-            if not is_valid_tenant:
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid connection")
+        token_tenant_id = payload.get("tenant_id")
+        if not token_tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Your session is out of date. Please log in again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if token_tenant_id != getattr(fastapi_request.state, "tenant_id", None):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant does not match your session")
 
         # Re-read the user so a deactivated account stops refreshing and a role change takes effect
         user_row = (
@@ -218,6 +220,7 @@ async def refresh_token(
             "sub": payload.get("sub"),
             "username": payload.get("username"),
             "role": user_row.role_name,
+            "tenant_id": token_tenant_id,
             "client_name": payload.get("client_name"),
             "academic_year_id": payload.get("academic_year_id"),
             "academic_year_title": payload.get("academic_year_title"),

@@ -13,10 +13,10 @@ class MenuAction(BasePublic):
     """
 
     __tablename__ = "menu_actions"
-    __table_args__ = (UniqueConstraint("menu_id", "action_name", name="unique_menu_action"), {"schema": "public"})
+    __table_args__ = (UniqueConstraint("menu_id", "action_name", name="unique_menu_action"),)
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    menu_id = Column(UUID(as_uuid=True), ForeignKey("public.menus.id"), nullable=False)
+    menu_id = Column(UUID(as_uuid=True), ForeignKey("menus.id"), nullable=False)
     action_name = Column(String(30), nullable=False)  # create, update, delete, export, approve, etc.
     resource_name = Column(String(50), nullable=False)  # fee_categories, students, etc.
     description = Column(String(200))

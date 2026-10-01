@@ -28,13 +28,13 @@ Before writing new code: read every similar existing implementation in full, rea
 Web and mobile are both clients of the same backend. When a feature touches the API, keep all three in sync in the same change. Depth: `docs/architecture.md`, `docs/permissions.md`.
 
 - **Base URL**: everything is under `/api/v1` (`backend/app/main.py`). Web reads `VITE_API_BASE_URL`; mobile reads `EXPO_PUBLIC_API_URL` (both include `/api/v1`).
-- **Tenant**: every request carries a `cschema` header (schema-per-tenant PostgreSQL). Middleware: `backend/app/middleware/tenant_middleware.py`. Warning: it currently resolves every request to `TENANT_DEFAULT_NAME`, not the header value — read `docs/architecture.md` before touching tenancy.
+- **Tenant**: one shared schema; tenant tables carry `tenant_id` and are protected by row-level security. Login sends a `cschema` header (the tenant's `client_name`); after that the signed `tenant_id` in the JWT picks the tenant and a header that disagrees gets 403. Read `docs/architecture.md` before touching tenancy.
 - **Auth**: JWT bearer tokens; refresh via `POST /auth/refresh` (both clients). Details: `docs/modules/auth.md`.
 - **Permissions**: a permission is a `(resource, action)` pair on the user's role. The plan layer is intended to cap it but is **not enforced at runtime**. The backend is the source of truth; clients only hide UI. See `docs/permissions.md`.
 - **Types**: backend Pydantic schemas in `backend/app/schemas/` are the source of truth. Mirror them in `web/src/types/` and `mobile/src/types/`.
 
 ### Typical feature flow
-1. Backend: model (`app/models/`) → Alembic migration → schema (`app/schemas/`) → service (`app/service/`) → endpoint (`app/api/v1/`) + permission.
+1. Backend: model (`app/models/`) → Alembic migration (a new tenant table also calls `enable_tenant_rls`) → schema (`app/schemas/`) → service (`app/service/`) → endpoint (`app/api/v1/`) + permission.
 2. Web: types → API function → React Query hook → page/component.
 3. Mobile: types → API function → hook → screen under `mobile/app/` (expo-router).
 4. Check the module doc's web/mobile parity section, and update the module doc (see below).
@@ -54,9 +54,10 @@ Builds and deploys: `docs/operations/`.
 ## Rules
 
 - **Never commit secrets.** `.env` files are gitignored everywhere; only `.env.example` is tracked. Use env vars, never hardcoded DB URLs, passwords, or keys — including in docs and scripts.
-- **Backend DB pattern**: `flush() → select() → commit()`, never `commit() → refresh()` (breaks tenant schema context). See `backend/CLAUDE.md`.
+- **Never connect the API as the table owner or a superuser**: both bypass row-level security. The API uses `DATABASE_URL` (app role); Alembic uses `MIGRATION_DATABASE_URL` (owner role).
+- **Backend DB pattern**: `flush() → select() → commit()`, never `commit() → refresh()` (async sessions cannot lazy-load after commit). See `backend/CLAUDE.md`.
 - Don't introduce npm/yarn workspaces or hoisting — Expo is sensitive to it.
-- Local-only (gitignored) folders: `backend/tests/`, `backend/test_scripts/`, `backend/docs/`, `backend/archive/`, `web/docs/`.
+- Local-only (gitignored) folders: `backend/tests/` (except `tests/integration/test_tenant_*.py`), `backend/test_scripts/`, `backend/docs/`, `backend/archive/`, `web/docs/`.
 
 ## Knowledge base - how project memory works
 

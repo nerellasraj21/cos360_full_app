@@ -6,25 +6,6 @@ from sqlalchemy import text
 
 logger = logging.getLogger("token_blacklist_service")
 
-# Lazy flag so we only run CREATE TABLE IF NOT EXISTS once per process lifetime
-_table_initialized = False
-
-_CREATE_TABLE_SQL = """
-CREATE TABLE IF NOT EXISTS public.token_blacklist (
-    token_hash  VARCHAR(64)  PRIMARY KEY,
-    user_id     VARCHAR(255) NOT NULL,
-    username    VARCHAR(255),
-    client_name VARCHAR(255),
-    expires_at  TIMESTAMP    NOT NULL,
-    blacklisted_at TIMESTAMP DEFAULT NOW()
-)
-"""
-
-_CREATE_INDEX_SQL = """
-CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires_at
-    ON public.token_blacklist (expires_at)
-"""
-
 
 def _hash_token(token: str) -> str:
     """Return SHA-256 hex digest of the raw token string."""
@@ -32,17 +13,6 @@ def _hash_token(token: str) -> str:
 
 
 class TokenBlacklistService:
-
-    @staticmethod
-    async def _ensure_table(session) -> None:
-        """Create the blacklist table and index if they do not exist yet."""
-        global _table_initialized
-        if not _table_initialized:
-            await session.execute(text("SET search_path TO public"))
-            await session.execute(text(_CREATE_TABLE_SQL))
-            await session.execute(text(_CREATE_INDEX_SQL))
-            await session.commit()
-            _table_initialized = True
 
     # ------------------------------------------------------------------
     # Write path – called from the logout endpoint
@@ -73,7 +43,6 @@ class TokenBlacklistService:
 
         async with PublicAsyncSessionLocal() as session:
             try:
-                await TokenBlacklistService._ensure_table(session)
                 await session.execute(
                     text("""
                         INSERT INTO public.token_blacklist
@@ -115,7 +84,6 @@ class TokenBlacklistService:
 
         async with PublicAsyncSessionLocal() as session:
             try:
-                await TokenBlacklistService._ensure_table(session)
                 result = await session.execute(
                     text("""
                         SELECT 1
@@ -142,7 +110,6 @@ class TokenBlacklistService:
 
         async with PublicAsyncSessionLocal() as session:
             try:
-                await session.execute(text("SET search_path TO public"))
                 await session.execute(text("DELETE FROM public.token_blacklist WHERE expires_at <= NOW()"))
                 await session.commit()
                 logger.info("Cleaned up expired blacklist entries")

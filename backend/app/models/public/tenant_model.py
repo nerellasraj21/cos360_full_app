@@ -11,7 +11,7 @@ class Tenant(BasePublic):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     client_name = Column(String(100), unique=True, nullable=False, index=True)
-    schema_name = Column(String(100), unique=True, nullable=False, index=True)
+    schema_name = Column(String(100), unique=True, nullable=True, index=True)
     plan_id = Column(UUID(as_uuid=True), ForeignKey("plans.id"), nullable=True, index=True)
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())

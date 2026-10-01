@@ -9,10 +9,10 @@ Read the root `CLAUDE.md` first. Depth lives elsewhere — don't duplicate it he
 - `app/api/v1/<module>/*_endpoints.py` (a few `*_routes.py`) — routers, registered in `app/api/v1/main_router.py` (mounted at `/api/v1`).
 - `app/service/<module>/*_service.py` — business logic and all DB access.
 - `app/models/<module>/*_model.py` (SQLAlchemy 2, async) · `app/schemas/<module>/*_schema.py` (Pydantic v2).
-- `app/db/base.py` (`BaseOrg` tenant tables, `BasePublic` = `public` schema) · `app/db/tenant_session.py` (sessions).
+- `app/db/base.py` (`BaseOrg` = tenant tables with `tenant_id`, `BasePublic` = platform tables, one schema) · `app/db/tenant_session.py` (sessions, tenant resolution) · `app/db/rls.py` (RLS helper for migrations).
 - `app/tools/simple_permissions.py` (auth + permission checks) · `app/tools/error_handler.py` · `app/middleware/`.
 - `app/celery_app.py` + `app/tasks/` — Celery (broker from `REDIS_HOST/PORT/DB`, not `REDIS_URL`).
-- `migrations/` — Alembic. `scripts/` — ops/seed scripts (see bottom). `tests/` is local-only (gitignored).
+- `migrations/` — Alembic. `scripts/` — ops/seed scripts (see bottom). `tests/` is gitignored except `tests/integration/test_tenant_*.py`, which need the local database.
 
 ## Layering
 - **Endpoint**: auth + permission check, call one service function, return. No business logic, no SQL.
@@ -24,18 +24,16 @@ Read the root `CLAUDE.md` first. Depth lives elsewhere — don't duplicate it he
 - Pydantic schemas are the API contract; web and mobile mirror them (`web/src/types`, `mobile/src/types`).
 
 ## Tenant sessions
-- Every tenant endpoint takes `db: AsyncSession = Depends(get_tenant_db)` from `app/db/tenant_session.py`.
-  It maps the `cschema` header → `public.tenants.client_name` → `schema_name` (cached) and runs
-  `SET search_path TO "<schema>"` on the connection.
-- Tenant models inherit `BaseOrg` (no schema; resolved through `search_path`). Public models inherit `BasePublic`.
-- Public-schema work: the `get_public_db` *dependency* in `tenant_session.py`. The context manager of the same name in
-  `app/db/session.py` builds a new engine per call — don't use it on request paths.
-- Super-admin access to a named schema: `get_tenant_db_by_schema`. Never hardcode a schema name in `app/`.
+- One shared schema. Every tenant table has `tenant_id` and row-level security; the app connects as a non-owner role without `BYPASSRLS`. Never connect the API as the owner or a superuser: they bypass RLS.
+- Every tenant endpoint takes `db: AsyncSession = Depends(get_tenant_db)` from `app/db/tenant_session.py`. The tenant is the signed `tenant_id` claim in the JWT. The `cschema` header (a `public.tenants.client_name`) is only used before login, and if sent with a token it must match or the request gets 403.
+- An `after_begin` listener sets `app.tenant_id` at the start of every transaction, so the scope survives commits and pooled connections. Background code uses `open_tenant_session(tenant_id)`. A session without a tenant sees no rows and cannot insert.
+- Tenant models inherit `BaseOrg` and get `tenant_id` automatically; never declare it. Platform models inherit `BasePublic`. Both share one schema and one registry. Do not set `__table_args__ = {"schema": ...}`.
+- Unique constraints and unique indexes on tenant tables become per-tenant automatically (`scope_uniques_to_tenant`). A foreign key to a natural key (not `id`) must be composite with `tenant_id`.
+- Public-schema work uses the `get_public_db` *dependency* in `tenant_session.py`. The context manager of the same name in `app/db/session.py` builds a new engine per call; don't use it on request paths.
+- Never create tables or run DDL at runtime: the app role cannot, and `fail open` handlers hide the error.
 
 ## flush → select → commit (mandatory)
-`search_path` lives on the pooled connection. After `commit()` the session releases that connection; the next
-statement may run on a different connection whose `search_path` was left by another tenant's request. So
-`commit()` then `refresh()` (or any query after commit) can read the wrong schema.
+Async sessions cannot lazy-load, so a `refresh()` or an unloaded relationship after `commit()` raises `MissingGreenlet`. Tenant scope no longer depends on this (it is re-applied every transaction), but the pattern is still the house rule.
 ```python
 db.add(obj)
 await db.flush()                       # INSERT on the tenant connection
@@ -84,14 +82,13 @@ return row                             # expire_on_commit=False keeps it readabl
   Exceptions declared `timezone=True`: route/trip types, trips, transport pricing, location masters, exam results/streams.
 - Register new models in `app/models/<module>/__init__.py`. Order matters for string relationship targets
   (e.g. `Caste` before `Student`).
-- Never add a model column before its migration is applied to every schema. Querying the model then fails with
-  `UndefinedColumn` → 500 for every tenant that lacks it.
+- Never deploy a model column before its migration is applied. Querying the model then fails with
+  `UndefinedColumn` → 500.
 - Keep `Column` types equal to the real DB type. A script that changed a DB type without the model (e.g.
   `fee_receipts.reprint_count` VARCHAR → INTEGER) makes inserts fail with `DatatypeMismatchError`.
-- New enumerations: plain `VARCHAR` plus validation (Pydantic `Literal`/CHECK). Postgres enum types are per-schema
-  and have caused cross-schema breakage — see the migrations doc.
-- Tenant schemas created by cloning have **no FK constraints**. Check references in the service before deleting.
-  Don't rely on cascades.
+- New enumerations: plain `VARCHAR` plus validation (Pydantic `Literal`/CHECK). Postgres enum types are database-wide and
+  are not dropped with their tables — see the migrations doc.
+- Tenant tables have real FK constraints, but most have no `ON DELETE` rule. Check references in the service before deleting.
 
 ## Error handling
 ```python
@@ -110,24 +107,24 @@ except Exception as e:
   use `.limit(1)` + `scalars().first()`.
 - Grouping by a function with a string argument (`func.date_trunc("month", col)`) fails with `GroupingError`: the SELECT and GROUP BY get separate bind parameters. Build the expression once with `literal_column("'month'")` and reuse it in both.
 - Update child rows in place. Delete + re-insert changes ids and orphans grandchild references (fee term dates).
-- Raw SQL (`text()`): bind values as parameters, never f-strings. Schema names can't be bound — validate against
-  `public.tenants` and double-quote them. Never log passwords, tokens, `DATABASE_URL` or request bodies.
+- Raw SQL (`text()`): bind values as parameters, never f-strings. Don't schema-qualify tenant tables; row-level security
+  filters them. `ON CONFLICT` targets on tenant tables must include `tenant_id`. Never log passwords, tokens,
+  `DATABASE_URL` or request bodies.
 
 ## Migrations (summary — full procedure in `docs/operations/database-migrations.md`)
-- Every DDL change is an Alembic revision in `migrations/versions/`, applied to `cos360_master` first, then to each
-  tenant schema. No hand-run `ALTER`s without a revision; that is how schemas drifted before.
-- Target schema = `SCHEMA_NAME` env var. **Always set it explicitly**: `env.py` defaults to the legacy
-  `cos360_masters`. PowerShell: `$env:SCHEMA_NAME='cos360_master'; alembic upgrade <rev>`.
-- In a revision, read `os.getenv("SCHEMA_NAME")` and pass `schema=` to ops. Write DDL to be idempotent
-  (`IF NOT EXISTS`, guarded `DO $$` blocks) because schemas are not uniformly versioned.
-- Keep a single head (`alembic heads`); new revisions go on top of it.
-- Review `--autogenerate` output line by line: it picks up drift noise (missing FKs, index names) as real changes.
+- Every DDL change is an Alembic revision in `migrations/versions/`, applied once with `alembic upgrade head`. One schema,
+  one `alembic_version`. The old per-schema history is in `migrations/legacy_versions/` and cannot be applied.
+- `env.py` needs `MIGRATION_DATABASE_URL` (the owner role). The app role in `DATABASE_URL` cannot run DDL.
+- A new tenant table: inherit `BaseOrg`, and call `enable_tenant_rls(op, "<table>")` from `app.db.rls` in the same revision.
+  `test_every_tenant_table_has_forced_rls` fails if one is missed.
+- Keep a single head (`alembic heads`). After a revision, a second `--autogenerate` must produce no operations.
+- Review `--autogenerate` output line by line.
 
 ## Run, lint, test (from `backend/`)
 ```
 python -m venv .venv && pip install -r requirements.txt -r requirements-dev.txt
-cp .env.example .env            # needs DATABASE_URL, SECRET_KEY, JWT_SECRET_KEY at minimum
-uvicorn app.main:app --reload   # requests need header  cschema: <client_name>, e.g. test_tenant
+cp .env.example .env            # needs DATABASE_URL, MIGRATION_DATABASE_URL, SECRET_KEY, JWT_SECRET_KEY at minimum
+uvicorn app.main:app --reload   # login needs header  cschema: <client_name>; later requests carry the tenant in the token
 celery -A app.celery_app worker --loglevel=info   # only for .delay() features (PDFs, uploads, messaging)
 ruff check . && black --check . && pytest tests/unit/
 ```
@@ -144,7 +141,8 @@ script before running it and prefer its dry-run mode. Most files there are one-o
 templates for new schema changes — write an Alembic revision instead.
 
 Reusable tools:
-- Tenant onboarding (clone `cos360_master`), in order: `create_little_bunny_tenant.py` (reference, edit the
+- Tenants are created with `POST /super_admin/system/tenants/` (`app/service/tenant/`). The scripts below clone per-tenant schemas and no longer apply to the shared schema.
+- Legacy tenant onboarding (clone `cos360_master`), in order: `create_little_bunny_tenant.py` (reference, edit the
   constants) → `fix_tenant_enum_types.py <schema>` → `seed_master_data_little_bunny.py` (menus/roles/templates) →
   `seed_resource_permissions_little_bunny.py` (role permissions; `cos360_master`'s copy is empty). Procedure:
   `docs/operations/database-migrations.md#creating-a-tenant-schema`.

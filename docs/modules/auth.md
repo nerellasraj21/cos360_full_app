@@ -1,7 +1,7 @@
 # Auth & Profile
 
 Tenant-user login for every role, JWT issue/refresh/logout, forced first-login password change, password change/reset, and self-service profiles.
-_Last verified against code: 2026-09-29_
+_Last verified against code: 2026-10-01_
 Flows, decisions, and feature map: [graph view](../graph/views/auth.md) (source: docs/graph/graph.jsonl).
 
 System-level tenancy and the permission model live in [../architecture.md](../architecture.md) and [../permissions.md](../permissions.md). Super-admin login and tenant-admin user management are in [tenants-and-admin.md](tenants-and-admin.md).
@@ -27,7 +27,7 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
   | Refresh | 7 d | `refresh` |
   | Change-password | 15 min | `change_password` |
 
-  - Claims: `sub` (user UUID), `username`, `role` (role **name**), `client_name`, `academic_year_id`, `academic_year_title`.
+  - Claims: `sub` (user UUID), `username`, `role` (role **name**), `tenant_id`, `client_name`, `academic_year_id`, `academic_year_title`. `tenant_id` selects the tenant on every later request; tokens without it are rejected with 401, and a `cschema` header that disagrees gets 403.
   - Login and refresh responses include `expires_in` (access-token lifetime in seconds, 86400; `ACCESS_TOKEN_EXPIRES_IN` in `jwt_utils.py`).
 - **Logout** (`POST /auth/logout`) blacklists the bearer access token and the `refresh_token` from the body. When the access token has already expired, the refresh token is still revoked; with neither valid it returns 401.
 - **Password change**
@@ -62,12 +62,11 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 
 1. **Use `current_user["sub"]` for the user id.** Real tokens have no `id` claim.
 2. **Menus and permissions are a login-time snapshot on the client.** Permission edits, menu seeding and role reassignment only reach the UI after **logout + login**. `/auth/refresh` re-reads the user's current role name and `is_active`, so server-side checks (which use the JWT role) follow a role change at the next refresh, and an inactive user's refresh returns 401.
-3. **`is_first_login` is not in the SQLAlchemy `User` model.** It is read and written only with raw SQL inside try/except. If a tenant schema lacks the column, the first-login check silently passes and the user logs in normally. No Alembic revision creates the column (it was added by hand), so it exists only in schemas cloned from one that has it. Admin password reset does **not** set it.
+3. **`is_first_login` is still read and written with raw SQL inside try/except.** The column is now a real, migrated `users` column (default false) and is on the `User` model. Staff enrolment and student admission set it with raw `UPDATE`s. Admin password reset does **not** set it.
 4. **The refresh path is `POST /auth/refresh`** on both clients.
    - Web (`src/api/index.ts`): on a 401 (except `/auth/login*`) it runs one shared refresh for every request that fails while it is in flight, sends the current tenant header, stores the new pair and retries each request once. A request that fails after another one already refreshed is retried with the newer token instead of refreshing again. If the refresh itself fails, the store is logged out and the page goes to `/login`.
-5. **`client_name` in the login body does not choose the database schema.**
-   - It is only used to validate that the tenant exists and to fill the JWT `client_name` claim.
-   - The DB session always uses the request tenant resolved by `TenantMiddleware` (see [../architecture.md](../architecture.md)).
+5. **`client_name` in the login body cannot redirect the login.**
+   - The request tenant comes from the `cschema` header. A body `client_name` that resolves to a different tenant is rejected with 400, and the tokens always carry the tenant the user authenticated against.
    - Web hardcodes `client_name: "test_tenant"` in `login-form.tsx`.
    - Legacy path: a request with no tenant anywhere falls into a login that returns only an access token (`auth_service.login_user`). It is effectively dead.
 6. **Logout revokes both tokens.** Both clients send `refresh_token` in the logout body. Mobile `logoutUser()` reads its tokens, clears SecureStore, then fires `POST /auth/logout` with the access token set explicitly and `_retry` set so a 401 does not start a refresh.

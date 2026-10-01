@@ -13,7 +13,6 @@ class RoleTemplate(BasePublic):
     """
 
     __tablename__ = "role_templates"
-    __table_args__ = {"schema": "public"}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String(50), nullable=False, unique=True)  # Admin, Teacher, Student, Parent, etc.

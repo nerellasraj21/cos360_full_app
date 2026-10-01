@@ -9,12 +9,9 @@ from app.db.base import BasePublic
 
 class District(BasePublic):
     __tablename__ = "districts"
-    __table_args__ = {"schema": "public"}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
-    state_id = Column(
-        UUID(as_uuid=True), ForeignKey("public.states.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    state_id = Column(UUID(as_uuid=True), ForeignKey("states.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(100), nullable=False, index=True)
     code = Column(String(20), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)

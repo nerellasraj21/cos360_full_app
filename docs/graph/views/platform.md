@@ -35,21 +35,28 @@ graph LR
   n18 -.->|shapes| n0
   n19[/"no-js-workspaces"/]
   n19 -.->|shapes| n0
-  n20[/"role-only-runtime-check"/]
-  n20 -.->|shapes| n3
-  n21[/"schema-per-tenant"/]
-  n21 -.->|shapes| n0
-  n22[/"scoped-denial-returns-404"/]
-  n23[/"tasks-receive-tenant-schema"/]
-  n24[/"tenant-cache-hits-only"/]
-  n25[/"tenant-default-name-pinning"/]
-  n26[/"tenant-models-via-search-path"/]
-  n27[/"token-lifetimes"/]
-  n27 -.->|shapes| n5
-  n28[/"uuid-primary-keys"/]
-  n28 -.->|shapes| n1
-  n29[/"varchar-over-postgres-enums"/]
-  n29 -.->|shapes| n1
+  n20[/"provision-in-one-transaction"/]
+  n21[/"role-only-runtime-check"/]
+  n21 -.->|shapes| n3
+  n22[/"schema-per-tenant"/]
+  n22 -.->|shapes| n0
+  n23[/"scoped-denial-returns-404"/]
+  n24[/"shared-schema-rls"/]
+  n24 -.->|shapes| n0
+  n25[/"tasks-receive-tenant-schema"/]
+  n26[/"tenant-cache-hits-only"/]
+  n27[/"tenant-default-name-pinning"/]
+  n28[/"tenant-from-token"/]
+  n28 -.->|shapes| n4
+  n29[/"tenant-models-via-search-path"/]
+  n30[/"tenant-scoped-uniques"/]
+  n30 -.->|shapes| n0
+  n31[/"token-lifetimes"/]
+  n31 -.->|shapes| n5
+  n32[/"uuid-primary-keys"/]
+  n32 -.->|shapes| n1
+  n33[/"varchar-over-postgres-enums"/]
+  n33 -.->|shapes| n1
 ```
 
 ## Flows
@@ -161,10 +168,10 @@ Shaped by: [platform/live-permission-lookup](#platformlive-permission-lookup), [
 
 1. The client axios instance adds Authorization Bearer with the access token and the cschema header, plus X-Student-ID, X-Academic-Year-ID and X-Class-ID for parents, which the backend ignores `web:src/api/index.ts` `mobile:src/api/client.ts`
 2. Middleware runs outermost to innermost: CORSMiddleware, TenantMiddleware, SuperAdminMiddleware, RequestContextMiddleware, GlobalErrorMiddleware, all registered in main.py `service:app/main.py`
-3. TenantMiddleware bypasses /health, /docs, /redoc and /openapi.json, sends /api/v1/super_admin/ paths down a super-admin branch that ignores cschema, and otherwise sets request.state.client_name (TENANT_DEFAULT_NAME when a cschema header is present) `service:app/middleware/tenant_middleware.py`
+3. TenantMiddleware bypasses /health, /docs, /redoc and /openapi.json, sends /api/v1/super_admin/ paths down a super-admin branch that ignores cschema, and otherwise sets request.state.client_name from the sanitised cschema header, or None when an Authorization bearer token is present without the header `service:app/middleware/tenant_middleware.py`
 4. RequestContextMiddleware assigns a correlation id and returns it as the X-Correlation-ID response header `service:app/middleware/request_context_middleware.py`
 5. The router mounted at /api/v1 dispatches to the module endpoint `service:app/api/v1/main_router.py`
-6. get_tenant_db maps client_name to schema_name through the process cache or public.tenants, returns 404 for an unknown or inactive tenant (default falls back to cos360_master), opens a session and runs SET search_path `service:app/db/tenant_session.py` `table:public.tenants`
+6. get_tenant_db resolves the tenant id from the verified token's tenant_id claim (the cschema header, if sent, must match or 403; a token without the claim gets 401), falling back to the header lookup in public.tenants only when there is no valid token, then opens a session that sets app.tenant_id for each transaction `service:app/db/tenant_session.py` `table:public.tenants`
 7. The endpoint calls get_current_user_token, which verifies the HS256 access token and its token_type, then rejects blacklisted tokens with 401 `service:app/tools/simple_permissions.py` `service:app/tools/jwt_utils.py` `service:app/service/auth/token_blacklist_service.py`
 8. The endpoint checks the role grant for its resource and action and stops with 403 if it is missing `flow:platform/permission-check`
 9. The endpoint calls one service function, which runs the queries and rules on the tenant session and writes with flush -> select -> commit, rolling back on error.
@@ -173,7 +180,7 @@ Shaped by: [platform/live-permission-lookup](#platformlive-permission-lookup), [
 
 - Failure: An HTTPException raised inside a middleware, such as TenantMiddleware in strict mode, is not handled by FastAPI and surfaces as a plain 500.
 
-- Note: The backend never checks that the token's client_name matches the request tenant; a token works in any tenant whose roles table has a role with the same name.
+- Note: Row-level security filters every tenant table by the tenant set on the transaction, so a query that omits a tenant filter still returns only that tenant's rows.
 
 ```mermaid
 flowchart TD
@@ -186,7 +193,7 @@ flowchart TD
   s3 --> s4
   s5["5. The router mounted at /api/v1 dispatches to the module endpoint<br/>service:app/api/v1/main_router.py"]
   s4 --> s5
-  s6["6. get_tenant_db maps client_name to schema_name through the process c...<br/>service:app/db/tenant_session.py<br/>table:public.tenants"]
+  s6["6. get_tenant_db resolves the tenant id from the verified token's tena...<br/>service:app/db/tenant_session.py<br/>table:public.tenants"]
   s5 --> s6
   s7["7. The endpoint calls get_current_user_token, which verifies the HS256...<br/>service:app/tools/simple_permissions.py<br/>service:app/tools/jwt_utils.py<br/>service:app/service/auth/token_blacklist_service.py"]
   s6 --> s7
@@ -200,7 +207,7 @@ flowchart TD
   s10 --> s11
 ```
 
-Shaped by: [platform/flush-select-commit](#platformflush-select-commit)
+Shaped by: [platform/flush-select-commit](#platformflush-select-commit), [platform/tenant-from-token](#platformtenant-from-token)
 
 ### platform/token-refresh-mobile
 
@@ -252,12 +259,13 @@ flowchart TD
 
 ## Decisions
 
-### platform/alembic-per-schema (active)
+### platform/alembic-per-schema (superseded)
 
 - **Decision**: Alembic migrates one schema per run, chosen by the SCHEMA_NAME env var. migrations/env.py sets search_path to that schema plus public, every schema keeps its own alembic_version, and cos360_master is migrated before each tenant.
 - **Why**: Tenant models carry no schema, so each schema has to be targeted and versioned on its own; env.py also uses Neon's direct host because the pooler rejects SET search_path (docs/operations/database-migrations.md).
 - **Tradeoff**: History cannot be replayed from base and schemas are not uniformly versioned, so revisions must be idempotent (IF NOT EXISTS, guarded DO blocks).
 - Shapes: `concept:platform/template-schema`, `flow:platform/add-feature-end-to-end`
+- Superseded by: `decision:platform/shared-schema-rls`
 
 ### platform/backend-schemas-are-the-contract (active)
 
@@ -278,12 +286,13 @@ flowchart TD
 - **Tradeoff**: No compose file runs a worker or Redis, and most .delay() call sites are unguarded, so an unreachable broker fails the request after the DB commit; dispatch_service.py is the exception and logs the error.
 - Shapes: `job:app/tasks/communication/send_tasks.py`, `service:app/celery_app.py`
 
-### platform/cschema-header (active)
+### platform/cschema-header (superseded)
 
 - **Decision**: Clients name their tenant in a cschema request header whose value is a public.tenants client_name. TenantMiddleware reads it and get_tenant_db maps it to schema_name. Subdomain and default fallbacks apply only when the header is missing and TENANT_STRICT_MODE is off.
 - **Why**: Web derives the tenant from its subdomain, but mobile has no hostname and sends the org code chosen on the login screen, so a header gives both clients one way to name the tenant.
 - **Alternatives**: Subdomain-only detection, which TenantMiddleware keeps as a fallback, or a tenant claim in the JWT.
 - Shapes: `concept:platform/cschema`, `mobile:src/api/client.ts`, `service:app/middleware/tenant_middleware.py`, `web:src/api/index.ts`
+- Superseded by: `decision:platform/tenant-from-token`
 
 ### platform/dual-layer-permissions (active)
 
@@ -294,8 +303,8 @@ flowchart TD
 ### platform/flush-select-commit (active)
 
 - **Decision**: Service writes use flush() -> select() with selectinload -> commit(), and commit is the last DB action of the request. Never commit() -> refresh(). Sessions use expire_on_commit=False so returned objects stay readable.
-- **Why**: SET search_path is session state on the pooled connection. After commit() the session releases it, so a following refresh or lazy load may run on another pooled connection with no search_path (relation does not exist) or another tenant's search_path (cross-tenant read).
-- **Alternatives**: commit() then refresh(), the SQLAlchemy default, which still appears in about 90 legacy calls.
+- **Why**: Async sessions cannot lazy-load, so a second commit or a refresh after commit raises MissingGreenlet. Tenant scope no longer depends on the connection, because app.tenant_id is set per transaction and re-applied after each commit.
+- **Alternatives**: commit() then refresh(), the SQLAlchemy default, which still appears in about 90 legacy calls and is now safe for tenant scope but still fragile under MissingGreenlet.
 - **Tradeoff**: Every relationship a response reads must be selectinloaded before commit, because async sessions cannot lazy-load; a second commit or refresh in the same request raises MissingGreenlet.
 - Shapes: `flow:platform/request-lifecycle`, `service:app/db/tenant_session.py`
 
@@ -341,6 +350,16 @@ flowchart TD
 - **Why**: Expo is sensitive to workspace hoisting of dependencies (root CLAUDE.md).
 - Shapes: `module:platform`
 
+### platform/provision-in-one-transaction (active)
+
+- **Decision**: Creating a tenant is one transaction that inserts the tenants row, the five system roles, their permissions limited to the plan, the role menu links and optionally the first Admin user. Any failure rolls everything back.
+- **Why**: The previous provisioning paths ran several steps, swallowed errors and still reported success, which left tenants without permission rows.
+- **Alternatives**: Cloning a template schema and running seed scripts by hand.
+- **Since**: 2026-10
+- Note: Role permissions come from the catalog in app/service/tenant/permission_catalog.py, intersected with the plan's resources, so the plan caps what a role can be granted.
+- Shapes: `feature:tenants-and-admin/tenant-onboarding`, `flow:tenants-and-admin/onboard-tenant`, `service:app/service/tenant/provisioning_service.py`, `service:app/service/tenant/role_seed_service.py`
+- Supersedes: `decision:tenants-and-admin/clone-from-master-template`
+
 ### platform/role-only-runtime-check (active)
 
 - **Decision**: Only the role layer is checked at runtime. check_role_plan_permission_with_error ignores the plan despite its name; the plan layer applies only when grants are seeded or copied into a tenant.
@@ -350,7 +369,7 @@ flowchart TD
 - Note: Plan-aware checks in MultiTenantPermissionService, PlanService and AccessValidationService exist but live endpoints do not use them.
 - Shapes: `concept:platform/plan`, `feature:tenants-and-admin/plan-management`, `feature:tenants-and-admin/resource-rollout`, `flow:platform/permission-check`, `flow:tenants-and-admin/add-resource-for-tenants`, `flow:tenants-and-admin/onboard-tenant`, `service:app/service/auth/permission_service.py`, `service:app/tools/simple_permissions.py`, `table:public.plan_resource_access`, `table:resource_permissions`
 
-### platform/schema-per-tenant (active)
+### platform/schema-per-tenant (superseded)
 
 - **Decision**: One PostgreSQL database with one schema per school instead of tenant_id columns. System tables live in public, business tables plus users, roles, permissions and menus live in each tenant schema, and cos360_master is the structure-only template new tenants are cloned from.
 - **Why**: Gives each school a separate data store while keeping a single codebase and database.
@@ -358,12 +377,26 @@ flowchart TD
 - **Alternatives**: Shared tables with a tenant_id column on every row.
 - **Tradeoff**: Every DDL change must reach cos360_master and then each tenant schema separately, and schemas can drift from Alembic when changes are applied by hand.
 - Shapes: `concept:platform/template-schema`, `concept:platform/tenant`, `feature:tenants-and-admin/tenant-management`, `feature:tenants-and-admin/tenant-onboarding`, `module:platform`, `service:app/db/tenant_session.py`, `table:public.tenants`
+- Superseded by: `decision:platform/shared-schema-rls`
 
 ### platform/scoped-denial-returns-404 (active)
 
 - **Decision**: When a scoped check denies a targeted id outside the user's own or related scope, the backend returns 404, not 403. Clients treat both as not found or no access.
 - **Why**: A student or parent cannot probe whether records outside their own scope exist.
 - Shapes: `concept:platform/access-scope`, `service:app/tools/enhanced_permissions.py`
+
+### platform/shared-schema-rls (active)
+
+- **Decision**: One PostgreSQL database and one schema. Every tenant table carries a tenant_id column and row-level security (ENABLE and FORCE) limits each transaction to the tenant set in the app.tenant_id setting.
+- **Why**: Per-school schemas meant every migration ran once per tenant, schemas drifted, newly seeded data could miss a tenant, and a session-level search_path on pooled connections forced the flush -> select -> commit rule.
+- **Why**: With a shared schema there is one migration path and one alembic_version, a new permission reaches every tenant in one migration, and a forgotten WHERE tenant_id returns nothing instead of leaking another school's rows.
+- **Alternatives**: Schema per tenant (the previous design) and database per tenant, which is kept as the escape hatch for a customer that needs physical isolation.
+- **Tradeoff**: Restoring one school means a filtered export and import, and one noisy tenant can affect others, so indexes should lead with tenant_id.
+- **Since**: 2026-10
+- Note: The app connects as a role that is not the table owner, is not a superuser and has no BYPASSRLS. Migrations run as the owner role from MIGRATION_DATABASE_URL.
+- Note: Policies compare tenant_id to NULLIF(current_setting('app.tenant_id', true), '')::uuid, so an unset tenant matches no rows and inserts without a tenant fail with a NOT NULL error.
+- Shapes: `concept:platform/tenant`, `module:platform`, `service:app/db/base.py`, `service:app/db/rls.py`, `service:app/db/tenant_session.py`
+- Supersedes: `decision:platform/alembic-per-schema`, `decision:platform/schema-per-tenant`, `decision:platform/tenant-models-via-search-path`
 
 ### platform/tasks-receive-tenant-schema (active)
 
@@ -372,14 +405,15 @@ flowchart TD
 - Note: Most call sites pass request.headers.get(cschema), the raw client_name header, not a resolved schema_name; the communication send endpoint resolves the schema through TenantService first.
 - Shapes: `concept:platform/cschema`, `job:app/tasks/communication/send_tasks.py`
 
-### platform/tenant-cache-hits-only (active)
+### platform/tenant-cache-hits-only (superseded)
 
 - **Decision**: The client_name -> schema_name lookup is cached in process memory and only successful lookups are cached.
 - **Why**: Caching avoids a public.tenants query on every request, and never caching a miss means a newly added tenant works immediately (comments in app/db/tenant_session.py).
 - **Tradeoff**: Nothing on the request path invalidates the cache, so deactivating a tenant takes effect only after a restart, and each uvicorn worker keeps its own copy.
 - Shapes: `service:app/db/tenant_session.py`, `table:public.tenants`
+- Superseded by: `decision:platform/tenant-from-token`
 
-### platform/tenant-default-name-pinning (temporary)
+### platform/tenant-default-name-pinning (superseded)
 
 - **Decision**: When a cschema header is present, TenantMiddleware.extract_client_name returns settings.TENANT_DEFAULT_NAME instead of the header value. The header only has to exist, so every tenant request hits the single tenant named by TENANT_DEFAULT_NAME.
 - **Why**: Added temporarily while testing and never reverted. Real multi-tenancy, using the sanitised header value, is meant to be restored.
@@ -387,13 +421,34 @@ flowchart TD
 - Note: Code that reads request.headers[cschema] directly (Celery task arguments, certificate media paths) still sees the raw header value, not the tenant the request session used.
 - Note: The code default for TENANT_DEFAULT_NAME is default, which get_tenant_db maps to cos360_master when no tenants row matches.
 - Shapes: `concept:platform/cschema`, `service:app/config.py`, `service:app/middleware/tenant_middleware.py`
+- Superseded by: `decision:platform/tenant-from-token`
 
-### platform/tenant-models-via-search-path (active)
+### platform/tenant-from-token (active)
+
+- **Decision**: For authenticated requests the tenant is the signed tenant_id claim in the JWT. The cschema header is only a lookup hint for unauthenticated routes such as login, and when both are present they must agree or the request gets 403.
+- **Why**: A client-supplied header is spoofable, and with row-level security the tenant must come from something the client cannot choose after login.
+- **Alternatives**: Header only (the previous design) or subdomain only, which mobile cannot use because it has no per-school host.
+- **Tradeoff**: Tokens issued before this change have no tenant_id and are rejected with 401, so users must log in again.
+- **Since**: 2026-10
+- Note: A tenant deactivation takes effect after the 60 second tenant cache expires, and clear_cache runs in the process that handled the change.
+- Shapes: `concept:platform/cschema`, `flow:auth/normal-login`, `flow:platform/request-lifecycle`, `service:app/db/tenant_session.py`, `service:app/middleware/tenant_middleware.py`, `service:app/tools/simple_permissions.py`
+- Supersedes: `decision:platform/cschema-header`, `decision:platform/tenant-cache-hits-only`, `decision:platform/tenant-default-name-pinning`
+
+### platform/tenant-models-via-search-path (superseded)
 
 - **Decision**: Tenant models inherit BaseOrg, whose MetaData has no schema, and get_tenant_db runs SET search_path TO the tenant schema on each request session. Public models inherit BasePublic with a fixed public schema.
 - **Why**: One set of ORM models and queries serves every tenant schema, with no per-tenant classes or schema-qualified SQL.
 - **Tradeoff**: search_path is session state on a pooled connection, which is what forces the flush -> select -> commit rule.
 - Shapes: `service:app/db/base.py`, `service:app/db/tenant_session.py`
+- Superseded by: `decision:platform/shared-schema-rls`
+
+### platform/tenant-scoped-uniques (active)
+
+- **Decision**: Every unique constraint and unique index on a tenant table includes tenant_id. scope_uniques_to_tenant in app/db/base.py applies this when models load, except for single-column primary-key uniques such as id.
+- **Why**: Natural keys such as username, admission_number and receipt_number are unique per school, and doing it centrally means a new model cannot forget it.
+- **Tradeoff**: A foreign key to a natural key must be composite with tenant_id, as fee_student_mappings does to student_admissions.
+- **Since**: 2026-10
+- Shapes: `module:platform`, `service:app/db/base.py`
 
 ### platform/token-lifetimes (active)
 
@@ -436,7 +491,7 @@ The scope check_user_resource_access resolves for a request: own (the user's own
 
 The request header that names the tenant. Its value is the tenant's client_name (for example test_tenant), not the schema name.
 - Note: Web sends the subdomain of window.location.hostname, else VITE_DEFAULT_TENANT; mobile sends the org code chosen on the login screen, else EXPO_PUBLIC_DEFAULT_TENANT, else test_tenant.
-- Note: With a header present the backend currently resolves TENANT_DEFAULT_NAME instead of the header value.
+- Note: The header is a login-time hint. After login the tenant comes from the token's tenant_id claim, and a header that disagrees is rejected with 403.
 - Related: `mobile:app/login.tsx`, `service:app/middleware/tenant_middleware.py`, `web:src/lib/config.ts`
 
 ### platform/menu
@@ -474,12 +529,13 @@ cos360_master, the structure-only schema that new tenant schemas are cloned from
 - Note: cos360_masters (with an s) is a different schema used only as the auth service hard-coded fallback, and test_tenant_schema (client test_tenant) is the dev tenant.
 - Note: Cloning with LIKE ... INCLUDING ALL copies no foreign keys and copies enum column types by OID, so scripts/fix_tenant_enum_types.py must run after every clone.
 - Note: The client_name default falls back to cos360_master in get_tenant_db.
+- Note: Legacy. The shared-schema design has no template schema, no per-tenant alembic_version and no cloning.
 - Related: `feature:tenants-and-admin/tenant-onboarding`, `flow:tenants-and-admin/onboard-tenant`, `service:app/db/tenant_session.py`
 
 ### platform/tenant
 
-A school using COS360: one row in public.tenants (client_name, schema_name, plan_id, is_active) plus its own PostgreSQL schema holding its business tables, users, roles, resource_permissions and menus.
-- Note: client_name is unique and is the value clients send; it maps to schema_name.
+A school using COS360: one row in public.tenants (client_name, plan_id, is_active). Its data lives in the shared tables, identified by tenant_id and protected by row-level security. schema_name is legacy and null for new tenants.
+- Note: client_name is unique and is the value clients send as a login hint; the tenant id is what tokens and rows carry.
 - Note: client_name matching is exact and case-sensitive and names may contain spaces; mobile lowercases and trims what the user types.
 - Note: Only active tenants resolve; an unknown or inactive client_name gets 404 from get_tenant_db.
 - Related: `concept:platform/plan`, `feature:tenants-and-admin/tenant-management`, `service:app/db/tenant_session.py`, `table:public.tenants`

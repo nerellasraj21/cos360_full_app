@@ -8,11 +8,10 @@ from app.db.base import BasePublic
 
 class PlanMenuAccess(BasePublic):
     __tablename__ = "plan_menu_access"
-    __table_args__ = {"schema": "public"}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("public.plans.id"), nullable=False)
-    menu_id = Column(UUID(as_uuid=True), ForeignKey("public.menus.id"), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("plans.id"), nullable=False)
+    menu_id = Column(UUID(as_uuid=True), ForeignKey("menus.id"), nullable=False)
     is_active = Column(Boolean, default=True)
 
     def __repr__(self):

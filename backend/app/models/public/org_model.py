@@ -8,7 +8,6 @@ from app.db.base import BasePublic
 
 class Organization(BasePublic):
     __tablename__ = "organizations"
-    __table_args__ = {"schema": "public"}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String(50), nullable=False)
@@ -17,4 +16,4 @@ class Organization(BasePublic):
     subdomain = Column(String(50), nullable=True)
     schema_name = Column(String(50), nullable=True)
 
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("public.plans.id"))
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("plans.id"))

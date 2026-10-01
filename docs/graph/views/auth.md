@@ -266,6 +266,7 @@ Implements: `feature:auth/tenant-login`
 
 - Note: client_name in the body only validates the tenant and fills the JWT claim; the DB session always uses the request tenant resolved by the tenant middleware.
 - Note: Mobile stores @auth/client_schema from response.client_name, falling back to the org already stored at login, then test_tenant.
+- Note: Access and refresh tokens carry a tenant_id claim, and login refuses a body client_name that resolves to a different tenant than the request.
 
 ```mermaid
 flowchart TD
@@ -292,7 +293,7 @@ flowchart TD
   s10 --> s11
 ```
 
-Shaped by: [auth/academic-year-in-jwt](#authacademic-year-in-jwt), [auth/menus-from-login-response](#authmenus-from-login-response), [auth/mobile-secure-token-storage](#authmobile-secure-token-storage), [auth/parent-context-before-login-success](#authparent-context-before-login-success), [auth/uniform-invalid-credentials](#authuniform-invalid-credentials), [platform/menus-separate-from-permissions](#platformmenus-separate-from-permissions)
+Shaped by: [auth/academic-year-in-jwt](#authacademic-year-in-jwt), [auth/menus-from-login-response](#authmenus-from-login-response), [auth/mobile-secure-token-storage](#authmobile-secure-token-storage), [auth/parent-context-before-login-success](#authparent-context-before-login-success), [auth/uniform-invalid-credentials](#authuniform-invalid-credentials), [platform/menus-separate-from-permissions](#platformmenus-separate-from-permissions), [platform/tenant-from-token](#platformtenant-from-token)
 
 ### auth/token-refresh
 
