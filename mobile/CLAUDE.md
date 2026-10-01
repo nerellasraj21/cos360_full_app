@@ -31,12 +31,12 @@ Use npm (`package-lock.json`). No workspaces or hoisting.
 | `services/` | `authUtils.ts` (token/storage/login/refresh), `errorHandler.ts`. |
 | `constants/theme.ts` | Colour tokens (light/dark). |
 
-Dead code (don't import or wire up; excluded from `tsconfig` or unreferenced): `src/lib/axios.ts` (a web-style client with the wrong refresh path), `src/api/mobilePermissions.ts`, `src/components/mobile/*` (the `useMobileAuthStore` consumers; only `buildPermissionMap` from `src/stores/mobileAuthStore.ts` is live), `src/navigation/ProtectedNavigator.tsx`, `services/offlineStorage.ts` (offline queue removed), the legacy AsyncStorage token helpers at the top of `src/api/auth.ts`, and `components/ui/ConfirmModal.tsx` (use `components/ConfirmModal.tsx`).
+Dead code (don't import or wire up; excluded from `tsconfig` or unreferenced): `src/api/mobilePermissions.ts`, `src/components/mobile/*` (the `useMobileAuthStore` consumers; only `buildPermissionMap` from `src/stores/mobileAuthStore.ts` is live), `src/navigation/ProtectedNavigator.tsx`, `services/offlineStorage.ts` (offline queue removed), the legacy AsyncStorage token helpers at the top of `src/api/auth.ts`, and `components/ui/ConfirmModal.tsx` (use `components/ConfirmModal.tsx`).
 
 ## API client (`src/api/client.ts`)
 
 - Base URL: `EXPO_PUBLIC_API_URL` (includes `/api/v1`), falling back to `http://localhost:8000/api/v1`. A physical device needs a LAN IP or domain.
-- `cschema`: the stored client schema (`getClientSchema()`, AsyncStorage `@auth/client_schema`, set at login from the org field), else `EXPO_PUBLIC_DEFAULT_TENANT`, else `test_tenant`. It is **always** sent, including pre-login `/auth/academic-years`.
+- `cschema`: the stored organisation code (`getClientSchema()`, AsyncStorage `@auth/client_schema`). It is sent **only** on requests without an access token (`/auth/login`, `/auth/academic-years`) and on `/auth/refresh`. Authenticated calls never send it: the backend takes the tenant from the token, and a header that disagrees gets 403. There is no default tenant.
 - `Authorization`: from `getValidAccessToken(false)`. Skipped for `/auth/login*`, `/auth/refresh`, `/auth/academic-years`.
 - Parent context: `X-Student-ID`, `X-Academic-Year-ID`, `X-Class-ID` come from a module variable set by `setSelectedStudentForInterceptor()`. Each is sent only when defined, so no `"undefined"` strings.
 - 401: one shared `refreshPromise` (concurrent 401s make a single `POST /auth/refresh`) → retry. On failure `onSessionExpired` (registered by `AuthProvider`) logs out. Refresh tokens rotate: always store the new `refresh_token`.
@@ -49,7 +49,7 @@ Dead code (don't import or wire up; excluded from `tsconfig` or unreferenced): `
 ## Auth flow
 
 - Tokens (`auth_access_token`, `auth_refresh_token`, `auth_token_expiry`, `auth_change_password_token`) live in **expo-secure-store** via `secureSet/secureGet/secureDelete` (`services/authUtils.ts`; keys must match `[A-Za-z0-9._-]`; web falls back to prefixed AsyncStorage). User, role, permissions, menu, schema and student context stay in AsyncStorage. Never put tokens in AsyncStorage.
-- Login (`app/login.tsx`): org name → `setClientSchema` → academic year (public `GET /auth/academic-years`) → `POST /auth/login` with `username`, `password`, `client_name`, `academic_year_id`. Orgs come from the hardcoded `ORGANIZATIONS` list plus fuzzy matching in `login.tsx` (there's no public tenant endpoint), so add new tenants there.
+- Login (`app/login.tsx`): organisation code → `GET /auth/academic-years` with that code as the `cschema` header (404 means unknown organisation; the code is stored only on success) → sign-in form with the loaded academic years → `POST /auth/login` with `username`, `password`, `academic_year_id`. The response carries `tenant_id` and `client_name`.
 - **First login:** the backend returns `{ requires_password_change: true, change_password_token }`. `loginUser` stores only that token. `app/set-password.tsx` posts `{ change_password_token, new_password, confirm_password }` to `POST /auth/staff/set-password` (all roles; **no `current_password` field**), clears the token, then `refreshAuth()`. Validate passwords on the `trim()`med length.
 - **Parent login race:** in `AuthContext.login`, parent students are fetched, persisted and passed to `setSelectedStudentForInterceptor()` **before** a single `LOGIN_SUCCESS` dispatch that carries `selectedStudent` and `availableStudents`. Why: navigation fires on `isAuthenticated`, and dashboard queries sent before the student headers existed returned wrong or empty data. Keep that ordering and the atomic dispatch; don't reintroduce separate `SELECT_STUDENT` dispatches after login.
 - `initializeAuth()` awaits `isAuthenticated()` **before** reading user data in parallel, because the check can clear storage. Restore state with `refreshAuth()` (it also restores student context and headers), never by dispatching `INITIALIZE_AUTH` by hand.
@@ -107,7 +107,7 @@ Android auto-commits and dismisses. iOS (`components/ui/ios-date-picker-modal.ts
 
 **Taps swallowed in ScrollViews:** a `ScrollView` holding forms or action buttons (especially nested vertical + horizontal ones) needs `keyboardShouldPersistTaps="handled"`, or taps on Edit/Delete/Save do nothing.
 
-**Authenticated downloads:** use `FileSystem.downloadAsync(url, localUri, { headers })` from `expo-file-system/legacy` with the `Authorization` and `cschema` headers (see `downloadAuthenticatedFile` in `app/exam/hall-tickets/[examId].tsx`). `Linking.openURL` can't send headers and returns 401 on protected endpoints. `app/exam/hall-ticket-download.tsx` still uses `Linking.openURL`, which is a known bug.
+**Authenticated downloads:** use `FileSystem.downloadAsync(url, localUri, { headers })` from `expo-file-system/legacy` with the `Authorization` header only (see `downloadAuthenticatedFile` in `app/exam/hall-tickets/[examId].tsx`). `Linking.openURL` can't send headers and returns 401 on protected endpoints. `app/exam/hall-ticket-download.tsx` still uses `Linking.openURL`, which is a known bug.
 
 **Query keys:** use stable primitives (`['subjects', p?.academic_year_id, p?.active_only]`), not a whole params object built each render. Every mutation invalidates the affected list keys.
 
@@ -137,4 +137,4 @@ Jest with `jest-expo` preset (config in `package.json`). Tests live in `componen
 
 ## Environment and builds
 
-`.env` (gitignored; template `.env.example`): `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_DEFAULT_TENANT`, `APP_ENV`. `EXPO_PUBLIC_*` values are baked into the bundle, so never put secrets there. `eas.json` profiles (development/preview/production) set only `APP_ENV`, so provide `EXPO_PUBLIC_API_URL` via EAS env for builds. App ids: `com.cos360.mobile`. Release steps: `docs/operations/mobile-release.md`.
+`.env` (gitignored; template `.env.example`): `EXPO_PUBLIC_API_URL`, `APP_ENV`. `EXPO_PUBLIC_*` values are baked into the bundle, so never put secrets there. `eas.json` profiles (development/preview/production) set only `APP_ENV`, so provide `EXPO_PUBLIC_API_URL` via EAS env for builds. App ids: `com.cos360.mobile`. Release steps: `docs/operations/mobile-release.md`.

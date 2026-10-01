@@ -114,7 +114,7 @@ How requests resolve to a tenant is in [../architecture.md](../architecture.md).
 | Roles & permissions screen | Yes (role create works; role edit/delete broken; gotcha 12) | Yes (same breakage plus the 422s) |
 | Menu management | None | `app/admin/menu.tsx` (list/create work; update/delete call missing routes) |
 | Super-admin console | `/superorg` page exists but is non-functional | None |
-| Org/tenant choice at login | Subdomain (`getTenantFromHostname`) with the `VITE_DEFAULT_TENANT` fallback | Hardcoded `ORGANIZATIONS` list plus free text |
+| Org/tenant choice at login | Subdomain (`getTenantFromHostname`) with the `VITE_DEFAULT_TENANT` fallback | Typed organisation code, validated with `GET /auth/academic-years` |
 
 ## Known gaps
 

@@ -19,7 +19,7 @@ import React, { useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { getValidAccessToken, getClientSchema } from '../../../services/authUtils';
+import { getValidAccessToken } from '../../../services/authUtils';
 import {
   Modal,
   ScrollView,
@@ -150,10 +150,8 @@ export default function ExpenseTransactionDetailScreen() {
   const handleDownload = async (attachmentId: string, filename: string) => {
     try {
       const token = await getValidAccessToken(false);
-      const schema = await getClientSchema();
       const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
-      if (schema) headers.cschema = schema;
       const url = `${API_BASE_URL}/expense/attachments/${attachmentId}/download`;
       const localUri = FileSystem.documentDirectory + filename;
       const result = await FileSystem.downloadAsync(url, localUri, { headers });

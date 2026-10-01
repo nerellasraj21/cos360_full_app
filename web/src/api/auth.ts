@@ -52,6 +52,8 @@ export interface LoginResponse {
   permissions?: Record<string, string[]>;
   academic_year_id?: string;
   academic_year_title?: string;
+  tenant_id?: string | null;
+  client_name?: string | null;
 }
 
 export interface PasswordChangeRequiredResponse {

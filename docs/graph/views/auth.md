@@ -138,10 +138,10 @@ Students, staff and parents view their own profile and edit a few contact fields
 
 One login endpoint for every tenant user type (Admin, Teacher, Staff, Student, Parent, custom roles); the user picks an academic year first and gets tokens plus a menu/permission snapshot.
 - Roles: All tenant users. Super admins use a separate login.
-- Parity: Web takes the tenant from the subdomain and hardcodes client_name in the body; mobile has an organization picker (hardcoded list plus free text, lowercased).
+- Parity: Web takes the tenant from the subdomain and sends it as the cschema header at login; mobile asks for an organization code and validates it against the server with GET /auth/academic-years before showing the sign-in form.
 - Parity: Web admin login also activates the chosen academic year for the whole tenant; mobile does not.
 - Note: Identifier lookup order is users.username, then users.email, then staff.phone; inactive users and wrong passwords return the same 401.
-- Note: Tokens are HS256 JWTs (app/tools/jwt_utils.py): access 24 h, refresh 7 d; claims sub, username, role (name), client_name, academic_year_id, academic_year_title.
+- Note: Tokens are HS256 JWTs (app/tools/jwt_utils.py): access 24 h, refresh 7 d; claims sub, username, role (name), tenant_id, client_name, academic_year_id, academic_year_title.
 - Note: Use current_user['sub'] for the user id; real tokens have no id claim.
 - Note: entity_id is the student or parent record id for those roles and the staff record id for every other role (including Teacher); login and set-password share _resolve_entity_id.
 - Flows: [auth/normal-login](#authnormal-login)
@@ -265,7 +265,7 @@ Implements: `feature:auth/tenant-login`
 - Result: The client renders the menu from the response and sends the access token on every request; the snapshot is fixed until the next login.
 
 - Note: client_name in the body only validates the tenant and fills the JWT claim; the DB session always uses the request tenant resolved by the tenant middleware.
-- Note: Mobile stores @auth/client_schema from response.client_name, falling back to the org already stored at login, then test_tenant.
+- Note: Mobile stores @auth/client_schema from response.client_name, falling back to the organization already stored at login; it never defaults to a test tenant.
 - Note: Access and refresh tokens carry a tenant_id claim, and login refuses a body client_name that resolves to a different tenant than the request.
 
 ```mermaid

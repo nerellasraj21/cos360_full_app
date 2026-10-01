@@ -216,6 +216,8 @@ async def test_login_issues_tenant_claim_and_session_works(created, plan_id, cli
     claims = jwt.decode(body["access_token"], settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
     assert claims["tenant_id"] == tenant["tenant_id"]
     assert body["permissions"]
+    assert body["tenant_id"] == tenant["tenant_id"]
+    assert body["client_name"] == tenant["client_name"]
 
     auth = {"Authorization": f"Bearer {body['access_token']}"}
     with_header = await client.get(
@@ -395,6 +397,8 @@ async def test_first_login_flag_forces_a_password_change(created, plan_id, clien
     assert done.status_code == 200, done.text
     final = jwt.decode(done.json()["access_token"], settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
     assert final["tenant_id"] == tenant["tenant_id"]
+    assert done.json()["tenant_id"] == tenant["tenant_id"]
+    assert done.json()["client_name"] == tenant["client_name"]
 
 
 async def test_expense_create_uses_the_token_tenant_without_a_header(created, plan_id, client):

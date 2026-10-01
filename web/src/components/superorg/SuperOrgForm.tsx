@@ -26,7 +26,6 @@ const dummyData: SuperOrgFormData = {
     name: 'Acme Education Institute',
     description: 'A premier educational institution focused on excellence in learning and development.',
     subdomain: 'acme-edu',
-    schema_name: 'acme_education_db',
     is_active: true,
     plan_id: 2,
     terms_accepted: false,
@@ -66,7 +65,7 @@ const SuperOrgForm: React.FC<SuperOrgFormProps> = ({ onComplete }) => {
             case 0: // Basic Information
                 return ['name', 'description', 'subdomain'];
             case 1: // Technical Configuration
-                return ['schema_name', 'is_active'];
+                return ['is_active'];
             case 2: // Plan Selection
                 return ['plan_id'];
             case 3: // Review & Confirmation
@@ -95,7 +94,6 @@ const SuperOrgForm: React.FC<SuperOrgFormProps> = ({ onComplete }) => {
                 name: data.name,
                 description: data.description,
                 subdomain: data.subdomain,
-                schema_name: data.schema_name,
                 is_active: data.is_active,
                 plan_id: data.plan_id,
             };

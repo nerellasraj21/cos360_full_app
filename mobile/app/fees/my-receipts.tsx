@@ -12,7 +12,7 @@ import { useToastContext } from '@/components/ToastProvider';
 import { useMyFeeReceipts, useMyChildrenFeeReceipts } from '@/src/api/hooks/fee';
 import { apiClient } from '@/src/api';
 import { feeCollectionApi, FeeReceiptResponse } from '@/src/api/fees';
-import { getClientSchema, getValidAccessToken } from '../../services/authUtils';
+import { getValidAccessToken } from '../../services/authUtils';
 import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const INDIGO = '#556ee6';
@@ -65,10 +65,8 @@ function MyReceiptsScreenContent() {
         return;
       }
       const token = await getValidAccessToken(false);
-      const schema = await getClientSchema();
       const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
-      if (schema) headers.cschema = schema;
       const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
       const url = `${baseUrl}/fee/collection/receipts/${receiptId}/pdf`;
       const localUri = FileSystem.documentDirectory + `receipt_${receiptId}.pdf`;

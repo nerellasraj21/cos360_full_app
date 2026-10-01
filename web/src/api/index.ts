@@ -10,17 +10,24 @@ const CAxios = axios.create({
   },
 });
 
+const TOKENLESS_AUTH_PATHS = ['/auth/login', '/auth/academic-years', '/auth/refresh', '/auth/staff/set-password'];
+
 // Request interceptor to add auth token, tenant, and student context
 CAxios.interceptors.request.use((axiosConfig) => {
   const { accessToken, selectedStudent } = useAuthStore.getState();
 
-  // Add authorization header if token exists
-  if (accessToken) {
+  const url = typeof axiosConfig.url === 'string' ? axiosConfig.url : '';
+  const isTokenlessAuthRequest = TOKENLESS_AUTH_PATHS.some((path) => url.includes(path));
+
+  // These requests name the tenant with the header, so a leftover token must not override it
+  if (isTokenlessAuthRequest) {
+    delete axiosConfig.headers.Authorization;
+  } else if (accessToken) {
     axiosConfig.headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  // Add tenant header
-  if (typeof window !== 'undefined') {
+  // The tenant comes from the token on authenticated requests; the header is only for requests without one
+  if (typeof window !== 'undefined' && (isTokenlessAuthRequest || !axiosConfig.headers.Authorization)) {
     const tenant = getTenantFromHostname(window.location.hostname);
     axiosConfig.headers[config.tenant.headerName] = tenant;
     logger.debug('Setting tenant header', { tenant, header: config.tenant.headerName });

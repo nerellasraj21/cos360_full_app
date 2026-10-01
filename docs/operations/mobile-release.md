@@ -36,8 +36,6 @@ _Last verified against code: 2026-09-29_
 - Used by code:
   - `EXPO_PUBLIC_API_URL` — must include `/api/v1`. Defaults to `http://localhost:8000/api/v1`
     (`src/api/client.ts`, `src/api/auth.ts`, and a few screens that read it directly).
-  - `EXPO_PUBLIC_DEFAULT_TENANT` — the `cschema` fallback used before an org code is stored. Defaults to
-    `test_tenant`. Missing from `.env.example`.
 - **Cloud builds don't see your `.env`**: it is gitignored, so EAS doesn't upload it. Without further setup a store
   build silently talks to `localhost`. Set the variables per profile, either in the `env` block of `eas.json`
   (fine for public URLs) or as EAS environment variables (`eas env:create`).

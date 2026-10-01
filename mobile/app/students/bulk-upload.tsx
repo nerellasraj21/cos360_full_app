@@ -11,7 +11,7 @@ import { useToastContext } from '@/components/ToastProvider';
 import { useTheme } from '@/contexts';
 import apiClient from '@/src/api/client';
 import { BulkUploadResult, studentAdmissionsApi } from '@/src/api/students';
-import { getClientSchema, getValidAccessToken } from '@/services/authUtils';
+import { getValidAccessToken } from '@/services/authUtils';
 import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -86,10 +86,8 @@ function StudentBulkUploadScreenContent() {
         w.URL.revokeObjectURL(url);
       } else {
         const token = await getValidAccessToken(false);
-        const schema = await getClientSchema();
         const headers: Record<string, string> = {};
         if (token) headers.Authorization = `Bearer ${token}`;
-        if (schema) headers.cschema = schema;
         const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
         const url = `${baseUrl}/students/admission/bulk-upload/template?include_data=${includeData}`;
         const localUri = FileSystem.documentDirectory + 'student_admission_bulk_upload_template.xlsx';

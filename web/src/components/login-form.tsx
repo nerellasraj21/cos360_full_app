@@ -51,7 +51,7 @@ export default function LoginForm({
       .value;
 
     loginMutation.mutate(
-      { username, password, client_name: "test_tenant", academic_year_id: selectedAcademicYearId || undefined },
+      { username, password, academic_year_id: selectedAcademicYearId || undefined },
       {
         onSuccess: (data) => {
           if ('requires_password_change' in data && data.requires_password_change) {

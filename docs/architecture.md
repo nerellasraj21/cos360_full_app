@@ -49,7 +49,7 @@ Converted: models and base, session layer, middleware, login, refresh and set-pa
 - `POST /super_admin/setup/initialize` and `GET /super_admin/setup/status` (`setup_endpoints.py`) are unauthenticated. Initialize creates a super admin with a hardcoded password and returns it, and its `CREATE TABLE IF NOT EXISTS` cannot run as the app role.
 - `/auth/seed/*` except `all-role-permissions` is unauthenticated.
 - `app/db/session.py` is the older helper that builds an engine per call. Plan, super-admin auth, seed and setup code still import its `get_public_db`.
-- Web and mobile still send `cschema` on every request; mobile has no tenant lookup before login.
+- Web and mobile are converted: the tenant comes from the token and the header is sent only on tokenless auth calls. The legacy organizations screens on web no longer show a schema.
 - `scripts/` still assume per-tenant schemas.
 - `permission_endpoints.py` still has the `/test/` and `/debug-roles/` leftovers.
 ## 2. Request lifecycle and layering
@@ -76,8 +76,8 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 - **Super admin token:** `user_type: "super_admin"` plus `sub`, `username` and `permissions` (a list of strings). Issued by `POST /super_admin/auth/login` from `public.super_admin_users`, which locks the account for 30 min after 5 failures.
 - **Login:** `POST /auth/login` `{username, password, academic_year_id (required), client_name?}`.
   - `username` may be a username, an email, or a staff phone number, tried in that order.
-  - The response has `user`, `role{id,name,description}`, `menu` (tree), `permissions` (`{resource: [actions]}`), `entity_id`, academic year, `access_token` and `refresh_token`. There is no `expires_in` and no `client_name`.
-  - The body `client_name` only affects validation and the token claim. The DB session still comes from the middleware.
+  - The response has `user`, `role{id,name,description}`, `menu` (tree), `permissions` (`{resource: [actions]}`), `entity_id`, academic year, `access_token`, `refresh_token`, `expires_in`, `tenant_id` and `client_name`. The set-password response has the same fields. The refresh response has no `tenant_id` or `client_name`.
+  - The body `client_name` is optional. If sent, it must name the same tenant as the `cschema` header or login returns 400.
   - `GET /auth/academic-years` is public and is called before login.
 - **First login:** for roles `Staff`/`Teacher`/`Student`/`Parent` with `users.is_first_login = TRUE`, login returns `{requires_password_change, change_password_token (15 min), academic_year_*}`. The client then calls `POST /auth/staff/set-password` (used for every role), which returns a full login response. `is_first_login` is read and written with raw SQL only; it is not in the ORM model.
 - **Refresh:** `POST /api/v1/auth/refresh` `{refresh_token}` returns a new access and refresh token pair. It checks the blacklist, that the refresh token's `tenant_id` matches the request tenant (403 otherwise), and that the user is still active. Tokens without `tenant_id` get 401.
@@ -90,12 +90,12 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 | | Web (`web/src/api/index.ts`, `web/src/lib/`) | Mobile (`mobile/src/api/client.ts`, `mobile/services/authUtils.ts`) |
 |---|---|---|
 | Base URL | `VITE_API_BASE_URL` (includes `/api/v1`) | `EXPO_PUBLIC_API_URL` (includes `/api/v1`) |
-| `cschema` value | Subdomain of `window.location.hostname`, else `VITE_DEFAULT_TENANT` (`getTenantFromHostname`, `lib/config.ts`) | Org code chosen on login screen (hardcoded list in `app/login.tsx`), stored in AsyncStorage, else `EXPO_PUBLIC_DEFAULT_TENANT`, else `test_tenant` |
+| `cschema` value | Subdomain of `window.location.hostname`, else `VITE_DEFAULT_TENANT` (`getTenantFromHostname`, `lib/config.ts`). Sent only on requests without an access token and on refresh | The organisation code the user typed on the login screen, checked against the server with `GET /auth/academic-years`, stored in AsyncStorage. Sent only on requests without an access token and on refresh. No default tenant |
 | Token storage | Zustand `persist` → `localStorage['auth-storage']` (tokens, permissions, menu) | `expo-secure-store` for tokens; AsyncStorage for user/role/permissions/menu/schema |
 | Refresh on 401 | Calls `/auth/refresh` with a shared in-flight refresh, retries once, logs out if the refresh fails | Calls `/auth/refresh` with a shared in-flight lock; assumes 1 h expiry because there is no `expires_in` |
 | Error text | `detail` (string, array or object) copied into `error.message` | `services/errorHandler.ts` copies `detail` or `message` into `error.message` |
 
-- Both clients send `Authorization: Bearer`, `cschema`, and for parents `X-Student-ID`, `X-Academic-Year-ID`, `X-Class-ID`. **The backend ignores the `X-*` headers.** Child scoping comes from the `student_id` in the path or query plus `_related` permissions.
+- Both clients send `Authorization: Bearer` and, for parents, `X-Student-ID`, `X-Academic-Year-ID`, `X-Class-ID`. They send `cschema` only on login, `/auth/academic-years`, set-password and refresh. **The backend ignores the `X-*` headers.** Child scoping comes from the `student_id` in the path or query plus `_related` permissions.
 - **Error shapes:**
   - `HTTPException` raised in an endpoint or dependency gives FastAPI's `{"detail": ...}`.
   - Request validation errors give 422 `{"detail": [{loc,msg,type}]}`.

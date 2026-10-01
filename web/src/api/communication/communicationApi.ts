@@ -14,7 +14,7 @@ import type {
   TemplateFilters,
 } from '@/types/communication';
 
-// CAxios already injects Authorization + cschema headers via interceptors.
+// CAxios already injects the Authorization header via interceptors.
 
 export const communicationApi = {
   // ─── Templates ─────────────────────────────────────────────────────────────

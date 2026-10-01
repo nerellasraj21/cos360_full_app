@@ -20,7 +20,7 @@ import apiClient from '@/src/api/client';
 // SDK 54: documentDirectory/downloadAsync live in the /legacy export (matches fees/receipts.tsx).
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { getValidAccessToken, getClientSchema } from '../../services/authUtils';
+import { getValidAccessToken } from '../../services/authUtils';
 import { useMobilePermission } from '../../src/hooks/useMobilePermission';
 import { useToastContext } from '@/components/ToastProvider';
 import { getApiErrorMessage } from '@/src/utils/apiError';
@@ -404,10 +404,8 @@ function MarkEntryScreenContent() {
 
       // Must use FileSystem.downloadAsync (not Linking.openURL) — backend requires Authorization header
       const token = await getValidAccessToken(false);
-      const schema = await getClientSchema();
       const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
-      if (schema) headers.cschema = schema;
 
       const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
       const query = new URLSearchParams(params);

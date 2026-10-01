@@ -253,7 +253,7 @@ Implements: `feature:tenants-and-admin/tenant-onboarding`
 7. If credentials were given it creates the Admin user with a hashed password `table:users`
 8. The transaction commits, and any failure rolls everything back so no half-created tenant remains.
 9. Seed an academic year `table:academic_years`, because without one nobody can log in. Certificate templates are not seeded by provisioning.
-10. Add the client_name to the ORGANIZATIONS list in `mobile:app/login.tsx`, because mobile has no per-school host.
+10. Give the school its client_name; the mobile login screen validates the typed code with GET /auth/academic-years, so no client list needs editing `mobile:app/login.tsx`
 
 - Result: A tenant row with roles, permissions limited to its plan, menu access and optionally an Admin, ready for an academic year.
 
@@ -278,7 +278,7 @@ flowchart TD
   s7 --> s8
   s9["9. Seed an academic year , because without one nobody can log in. Cert...<br/>table:academic_years"]
   s8 --> s9
-  s10["10. Add the client_name to the ORGANIZATIONS list in , because mobile h...<br/>mobile:app/login.tsx"]
+  s10["10. Give the school its client_name; the mobile login screen validates ...<br/>mobile:app/login.tsx"]
   s9 --> s10
 ```
 

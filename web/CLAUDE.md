@@ -40,12 +40,12 @@ Use npm (`package-lock.json`); don't use yarn.
 
 Gotchas:
 - `@/api/expense`, `@/api/staff`, `@/api/parent` resolve to the **flat file** (`api/expense.ts` etc.), not the folder's `index.ts`. Import folder files explicitly (`@/api/staff/attendance`). `expenseApi` from `@/api/expense` is a flat `ExpenseService`: call `expenseApi.getCategories()`, not `expenseApi.categories.x()`.
-- `src/lib/apiClient.ts` and `src/lib/expenseApiClient.ts` are unused legacy clients (the former hardcodes a misspelled tenant header). Never import them.
+- `src/lib/expenseApiClient.ts` is an unused legacy client. Never import it.
 - `src/api/staff/index.ts` `staffAttendanceApi` calls `/masters/staff/attendance`, which the backend does not have. Use `src/api/staff/attendance.ts` (`/staff/attendance`).
 
 ## API layer
 
-`CAxios` (`src/api/index.ts`) adds on every request: `Authorization: Bearer`, `cschema` (tenant from subdomain via `getTenantFromHostname`, else `VITE_DEFAULT_TENANT`), and for parents `X-Student-ID` / `X-Academic-Year-ID` / `X-Class-ID` from `authStore.selectedStudent`. On 401 it tries one refresh, then logs out to `/login`. It rewrites `error.message` from FastAPI `detail` (string, array of `{msg}`, or object), so `onError` can show `error.message` directly.
+`CAxios` (`src/api/index.ts`) adds `Authorization: Bearer` to every request except `/auth/login`, `/auth/academic-years`, `/auth/refresh` and `/auth/staff/set-password`, which never carry a stored token. Those four send `cschema` (tenant from subdomain via `getTenantFromHostname`, else `VITE_DEFAULT_TENANT`); every other request relies on the token's `tenant_id` claim, and a `cschema` that disagrees would get 403. For parents it also adds `X-Student-ID` / `X-Academic-Year-ID` / `X-Class-ID` from `authStore.selectedStudent`. On 401 it tries one refresh, then logs out to `/login`. It rewrites `error.message` from FastAPI `detail` (string, array of `{msg}`, or object), so `onError` can show `error.message` directly.
 
 Rules:
 - Components never call `CAxios` directly — always through a React Query hook.

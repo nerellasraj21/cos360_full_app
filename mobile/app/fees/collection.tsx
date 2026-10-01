@@ -21,7 +21,7 @@ import { useAcademicYear, useAuth, useTheme } from '@/contexts';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { apiClient } from '@/src/api';
-import { getValidAccessToken, getClientSchema } from '../../services/authUtils';
+import { getValidAccessToken } from '../../services/authUtils';
 import {
   feeCollectionApi,
   feeConcessionsApi,

@@ -77,10 +77,6 @@ export const ReviewStep: React.FC = () => {
                     <CardContent className="space-y-4">
                         <div className="grid gap-4 md:grid-cols-2">
                             <div>
-                                <Label className="text-sm font-medium text-muted-foreground">Database Schema</Label>
-                                <p className="font-medium font-mono text-sm">{formData.schema_name || 'Not specified'}</p>
-                            </div>
-                            <div>
                                 <Label className="text-sm font-medium text-muted-foreground">Status</Label>
                                 <div className="flex items-center gap-2">
                                     <StatusBadge status={formData.is_active} />

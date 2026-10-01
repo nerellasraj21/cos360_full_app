@@ -54,6 +54,8 @@ class LoginResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int = Field(ACCESS_TOKEN_EXPIRES_IN, description="Access token lifetime in seconds")
+    tenant_id: str | None = Field(None, description="Tenant the session belongs to")
+    client_name: str | None = Field(None, description="Tenant client name, for clients to persist")
 
 
 # Legacy response for backward compatibility
@@ -131,6 +133,8 @@ class SetPasswordResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int = Field(ACCESS_TOKEN_EXPIRES_IN, description="Access token lifetime in seconds")
+    tenant_id: str | None = Field(None, description="Tenant the session belongs to")
+    client_name: str | None = Field(None, description="Tenant client name, for clients to persist")
 
 
 # Enable forward references for nested MenuItemResponse

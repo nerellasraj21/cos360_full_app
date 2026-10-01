@@ -24,7 +24,7 @@ import { useAcademicYear, useTheme } from '@/contexts';
 import { useToastContext } from '@/components/ToastProvider';
 import CustomDropdown from '@/components/ui/dropdown';
 import { apiClient } from '@/src/api';
-import { getClientSchema, getValidAccessToken } from '../../../services/authUtils';
+import { getValidAccessToken } from '../../../services/authUtils';
 import {
   feeCollectionApi,
   feeConcessionsApi,
@@ -594,10 +594,8 @@ function StudentFeeDetailScreenContent() {
         return;
       }
       const token = await getValidAccessToken(false);
-      const schema = await getClientSchema();
       const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
-      if (schema) headers.cschema = schema;
       const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
       const url = `${baseUrl}/fee/collection/receipts/${receiptId}/pdf`;
       const localUri = FileSystem.documentDirectory + `receipt_${receiptId}.pdf`;

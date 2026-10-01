@@ -67,12 +67,12 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
    - Web (`src/api/index.ts`): on a 401 (except `/auth/login*`) it runs one shared refresh for every request that fails while it is in flight, sends the current tenant header, stores the new pair and retries each request once. A request that fails after another one already refreshed is retried with the newer token instead of refreshing again. If the refresh itself fails, the store is logged out and the page goes to `/login`.
 5. **`client_name` in the login body cannot redirect the login.**
    - The request tenant comes from the `cschema` header. A body `client_name` that resolves to a different tenant is rejected with 400, and the tokens always carry the tenant the user authenticated against.
-   - Web hardcodes `client_name: "test_tenant"` in `login-form.tsx`.
+   - Neither client sends `client_name` in the login body; the header is the only tenant hint.
    - Legacy path: a request with no tenant anywhere falls into a login that returns only an access token (`auth_service.login_user`). It is effectively dead.
 6. **Logout revokes both tokens.** Both clients send `refresh_token` in the logout body. Mobile `logoutUser()` reads its tokens, clears SecureStore, then fires `POST /auth/logout` with the access token set explicitly and `_retry` set so a 401 does not start a refresh.
 7. **Mobile token expiry** comes from `expires_in` (falling back to 3600 s). On a cold start with an expired access token, `isAuthenticated()` refreshes; the session is cleared only when that refresh fails.
 8. **Set-password signs the user straight in on both clients.** The response has the same shape as login (including `expires_in`). Web calls `login(data)`. Mobile `authApi.setStaffPassword` returns it, and `completePasswordSetup` stores it with `storeAuthData` and then runs the same `completeLogin` steps as a normal login (parent students, interceptor headers, one `LOGIN_SUCCESS`).
-9. **Mobile keeps the organization chosen at login.** `storeAuthData` writes `@auth/client_schema` from `response.client_name`, which login responses do not include, so it falls back to the already-stored org (set from the login screen) and only then to `test_tenant`.
+9. **Mobile keeps the organization chosen at login.** The login screen checks the typed code with `GET /auth/academic-years` (404 means unknown organisation) and stores it only after that succeeds. `storeAuthData` then writes `@auth/client_schema` from `response.client_name`, which login and set-password responses now include, else the stored organisation, and never defaults to a test tenant. When refresh fails the stored organisation is cleared and the user is asked for it again.
 10. **Web admin login activates the selected academic year for the whole tenant.** `useLoginMutation` sends `PUT /masters/academic_years/{id} {is_active:true}`, and the backend deactivates all other years. An admin who picks a past year at login flips the tenant's active year. Other roles only scope their own session.
 11. **`entity_id` in the login and set-password responses** comes from `MultiTenantAuthService._resolve_entity_id`: the student record id for `Student`, the parent record id for `Parent`, and the staff record id for every other role (Staff, Teacher, and an Admin or custom role that has a staff record). It is null when no record exists, for example an Admin without a staff row.
 12. **Profile updates silently drop unknown fields.**
@@ -91,7 +91,7 @@ System-level tenancy and the permission model live in [../architecture.md](../ar
 
 | Capability | Web | Mobile |
 |---|---|---|
-| Organization picker at login | No (tenant from subdomain; body `client_name` hardcoded) | Yes (hardcoded org list + free text, normalized to lowercase) |
+| Organization picker at login | No (tenant from subdomain; header only) | Yes (free-text code validated against the server; no hardcoded list) |
 | Token refresh | On 401, one shared refresh (rule 4) | On 401 and before `expires_in`, and on cold start (rule 7) |
 | First-login set-password | Logs straight in | Logs straight in (rule 8) |
 | Forgot password | Tells the user to contact the school admin (no form) | Same |

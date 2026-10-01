@@ -55,15 +55,14 @@ apiClient.interceptors.request.use(
       }
     }
 
-    // Always send a tenant header. Mirror the web app, which defaults to
-    // `test_tenant` (VITE_DEFAULT_TENANT) whenever a schema can't be resolved.
-    // Without this fallback, a missing stored schema means NO cschema header is
-    // sent and the backend serves an empty/default schema (e.g. no trips).
-    const clientSchema = await getClientSchema();
-    const tenant = clientSchema || process.env.EXPO_PUBLIC_DEFAULT_TENANT || 'test_tenant';
-    config.headers.cschema = tenant;
-    if (!clientSchema && __DEV__) {
-      console.warn(`API Request: No stored client schema — defaulting cschema to "${tenant}"`);
+    const isRefresh = config.url?.includes('/auth/refresh');
+    if (!config.headers.cschema && (isRefresh || !config.headers.Authorization)) {
+      const clientSchema = await getClientSchema();
+      if (clientSchema) {
+        config.headers.cschema = clientSchema;
+      } else if (__DEV__) {
+        console.warn('API Request: No stored organisation, cschema header not sent');
+      }
     }
 
     // Add student context headers for parent users — guard each value to avoid "undefined" strings

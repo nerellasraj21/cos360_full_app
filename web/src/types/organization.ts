@@ -3,7 +3,6 @@ export interface OrganizationBase {
     description: string;
     is_active: boolean;
     subdomain: string;
-    schema_name: string;
 }
 
 export interface OrganizationCreate extends OrganizationBase {
@@ -36,7 +35,6 @@ export interface SuperOrgFormData {
     subdomain: string;
 
     // Step 2: Technical Configuration
-    schema_name: string;
     is_active: boolean;
 
     // Step 3: Plan Selection

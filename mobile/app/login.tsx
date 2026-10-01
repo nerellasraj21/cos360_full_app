@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -24,38 +24,6 @@ import { PrimaryButton, SecondaryButton, IconButton } from '@/components/buttons
 
 const BRAND_COLOR = '#556ee6';
 const ACCENT_COLOR = '#556ee6';
-
-// Hardcoded list of known dev/test organizations. There is no public,
-// pre-login endpoint that lists tenants (the only /organizations list
-// endpoint requires an authenticated super-admin token), so this screen
-// can't be backed by a live API call yet. `value` must match the tenant's
-// `client_name` in the backend exactly (see public.tenants table).
-const ORGANIZATIONS: { label: string; value: string }[] = [
-  { label: 'Test Tenant', value: 'test_tenant' },
-  { label: 'Little Bunny', value: 'little bunny' },
-];
-
-// Loose comparison key for the organization typeahead: tenant names are written
-// inconsistently across the label ("Little Bunny") and the backend `client_name`
-// ("little bunny", "test_tenant"), so spaces, underscores and hyphens must not
-// affect matching — typing "little" or "test tenant" has to find both forms.
-const orgKey = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, '');
-
-const filterOrganizations = (query: string) => {
-  const q = orgKey(query.trim());
-  if (!q) return ORGANIZATIONS;
-  return ORGANIZATIONS.filter(o => orgKey(o.label).includes(q) || orgKey(o.value).includes(q));
-};
-
-// Map whatever the user typed onto a known tenant's `client_name` when it matches
-// one (by label or value), otherwise fall back to the raw text so organizations
-// missing from this list can still be entered by hand.
-const resolveOrgValue = (text: string) => {
-  const q = orgKey(text.trim());
-  if (!q) return '';
-  const exact = ORGANIZATIONS.find(o => orgKey(o.label) === q || orgKey(o.value) === q);
-  return exact ? exact.value : text.trim();
-};
 
 interface AcademicYear {
   id: string;
@@ -99,29 +67,20 @@ const LoginScreen: React.FC = () => {
   const [academicYearLoading, setAcademicYearLoading] = useState(false);
   const [academicYearError, setAcademicYearError] = useState<string>('');
   const [showAcademicYearPicker, setShowAcademicYearPicker] = useState(false);
-  // Text typed into the organization combobox. Kept separate from `clientSchema`
-  // (the resolved tenant `client_name`) so the field can show a friendly label
-  // while still submitting the exact backend name.
   const [orgQuery, setOrgQuery] = useState<string>('');
-  const [showOrgSuggestions, setShowOrgSuggestions] = useState(false);
-
-  const orgSuggestions = useMemo(() => filterOrganizations(orgQuery), [orgQuery]);
-
-  const selectOrganization = (option: { label: string; value: string }) => {
-    setOrgQuery(option.label);
-    setClientSchemaState(option.value);
-    setShowOrgSuggestions(false);
-  };
+  const [orgError, setOrgError] = useState<string>('');
+  const [orgChecking, setOrgChecking] = useState<boolean>(false);
+  const skipYearFetchRef = useRef(false);
 
   const handleOrgQueryChange = (text: string) => {
     setOrgQuery(text);
-    setClientSchemaState(resolveOrgValue(text));
-    setShowOrgSuggestions(true);
+    setClientSchemaState(text.trim().toLowerCase());
+    setOrgError('');
   };
 
   const openOrgSelection = () => {
-    setOrgQuery(ORGANIZATIONS.find(o => o.value === clientSchema)?.label || clientSchema);
-    setShowOrgSuggestions(false);
+    setOrgQuery(clientSchema);
+    setOrgError('');
     setShowClientSelection(true);
   };
 
@@ -132,7 +91,7 @@ const LoginScreen: React.FC = () => {
         const storedSchema = await getClientSchema();
         if (storedSchema) {
           setClientSchemaState(storedSchema);
-          setOrgQuery(ORGANIZATIONS.find(o => o.value === storedSchema)?.label || storedSchema);
+          setOrgQuery(storedSchema);
           setFormData(prev => ({ ...prev, clientName: storedSchema }));
           setShowClientSelection(false);
         } else {
@@ -163,6 +122,20 @@ const LoginScreen: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { clearError(); }, [formData]);
 
+  const applyAcademicYears = (raw: any): AcademicYear[] => {
+    const years: AcademicYear[] = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.items)
+      ? raw.items
+      : Array.isArray(raw?.results)
+      ? raw.results
+      : [];
+    setAcademicYears(years);
+    const activeYear = years.find((y: AcademicYear) => y.is_active) || years[0];
+    setSelectedAcademicYearId(activeYear ? activeYear.id : '');
+    return years;
+  };
+
   const fetchAcademicYears = async (showErrors = false) => {
     setAcademicYearLoading(true);
     setAcademicYearError('');
@@ -174,17 +147,7 @@ const LoginScreen: React.FC = () => {
       // `Content-Type: application/json` header on a GET, which triggered a CORS
       // preflight the backend rejected in the browser ("Failed to fetch").
       const res = await apiClient.get('/auth/academic-years');
-      const raw = res.data;
-      const years: AcademicYear[] = Array.isArray(raw)
-        ? raw
-        : Array.isArray(raw?.items)
-        ? raw.items
-        : Array.isArray(raw?.results)
-        ? raw.results
-        : [];
-      setAcademicYears(years);
-      const activeYear = years.find((y: AcademicYear) => y.is_active) || years[0];
-      if (activeYear) setSelectedAcademicYearId(activeYear.id);
+      const years = applyAcademicYears(res.data);
       if (years.length === 0 && showErrors) setAcademicYearError('No academic years found for this organization.');
     } catch (err: any) {
       console.error('Failed to fetch academic years:', err);
@@ -199,6 +162,10 @@ const LoginScreen: React.FC = () => {
 
   useEffect(() => {
     if (!showClientSelection) {
+      if (skipYearFetchRef.current) {
+        skipYearFetchRef.current = false;
+        return;
+      }
       fetchAcademicYears();
     }
   }, [showClientSelection]);
@@ -231,34 +198,37 @@ const LoginScreen: React.FC = () => {
   };
 
   const handleClientSchemaSubmit = async () => {
-    if (!clientSchema.trim() || isLoading) return;
+    const normalizedClientName = clientSchema.trim().toLowerCase();
+    if (!normalizedClientName || isLoading || orgChecking) return;
+    setOrgChecking(true);
+    setOrgError('');
     try {
-      // Normalize before storing — the backend does an exact, case-sensitive
-      // match against the registered tenant name, so a stray leading/trailing
-      // space or unintended capitalization here would silently break every
-      // request that follows (surfacing later as a confusing "Invalid
-      // connection" on sign-in, with the field still *looking* correct).
-      const normalizedClientName = clientSchema.trim().toLowerCase();
+      const res = await apiClient.get('/auth/academic-years', {
+        headers: { cschema: normalizedClientName },
+      });
       await setClientSchema(normalizedClientName);
       setClientSchemaState(normalizedClientName);
+      setOrgQuery(normalizedClientName);
       setFormData(prev => ({ ...prev, clientName: normalizedClientName }));
+      applyAcademicYears(res.data);
+      setAcademicYearError('');
+      skipYearFetchRef.current = true;
       setShowClientSelection(false);
-    } catch (err) {
-      console.error('Error saving client schema:', err);
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        setOrgError('Organisation not found. Check the name and try again.');
+      } else {
+        setOrgError('Could not reach the server. Check your connection and try again.');
+      }
+    } finally {
+      setOrgChecking(false);
     }
   };
 
   const handleLogin = async () => {
     if (!validateForm()) return;
     try {
-      // Keep the stored client schema (used for the `cschema` header on every
-      // request) in sync with whatever Organization Name is actually being
-      // submitted here — the field is editable on this screen without going
-      // through "Change Organization", so without this the header could still
-      // carry a stale/previous tenant while the login body used the new one.
-      const normalizedClientName = formData.clientName.trim().toLowerCase();
-      await setClientSchema(normalizedClientName);
-      await login(formData.username, formData.password, normalizedClientName, selectedAcademicYearId);
+      await login(formData.username, formData.password, undefined, selectedAcademicYearId);
     } catch (err) {
       console.error('Login failed:', err);
     }
@@ -304,83 +274,47 @@ const LoginScreen: React.FC = () => {
           <View style={styles.formCard}>
             <View style={styles.formCardHandle} />
             <Text style={styles.cardTitle}>Select Organization</Text>
-            <Text style={styles.cardSubtitle}>Choose your organization to get started</Text>
+            <Text style={styles.cardSubtitle}>Enter your organization name to get started</Text>
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Organization</Text>
-              <View style={[styles.inputContainer, clientSchema ? styles.inputFocused : {}]}>
+              <View style={[styles.inputContainer, orgError ? styles.inputError : clientSchema ? styles.inputFocused : {}]}>
                 <Ionicons name="business-outline" size={20} color={clientSchema ? ACCENT_COLOR : '#9ca3af'} style={styles.inputIcon} />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Type or select organization"
+                  placeholder="Enter organization name"
                   placeholderTextColor="#9ca3af"
                   value={orgQuery}
                   onChangeText={handleOrgQueryChange}
-                  onFocus={() => setShowOrgSuggestions(true)}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  editable={!isLoading}
+                  editable={!isLoading && !orgChecking}
                   returnKeyType="done"
-                  onSubmitEditing={() => setShowOrgSuggestions(false)}
+                  onSubmitEditing={handleClientSchemaSubmit}
                 />
                 {orgQuery.length > 0 && (
                   <IconButton
-                    onPress={() => { setOrgQuery(''); setClientSchemaState(''); setShowOrgSuggestions(true); }}
+                    onPress={() => { setOrgQuery(''); setClientSchemaState(''); setOrgError(''); }}
                     icon={<Ionicons name="close-circle" size={18} color="#9ca3af" />}
                     accessibilityLabel="Clear organization"
                     variant="ghost"
                     size="sm"
                   />
                 )}
-                <IconButton
-                  onPress={() => setShowOrgSuggestions(prev => !prev)}
-                  icon={<Ionicons name={showOrgSuggestions ? 'chevron-up' : 'chevron-down'} size={18} color="#9ca3af" />}
-                  accessibilityLabel={showOrgSuggestions ? 'Hide organizations' : 'Show organizations'}
-                  variant="ghost"
-                  size="sm"
-                />
               </View>
 
-              {showOrgSuggestions && (
-                <View style={styles.suggestionBox}>
-                  {orgSuggestions.length > 0 ? (
-                    <ScrollView
-                      style={styles.suggestionList}
-                      keyboardShouldPersistTaps="handled"
-                      nestedScrollEnabled
-                    >
-                      {orgSuggestions.map(item => {
-                        const selected = clientSchema === item.value;
-                        return (
-                          <TouchableOpacity
-                            key={item.value}
-                            style={[styles.suggestionItem, selected && styles.modalItemActive]}
-                            onPress={() => selectOrganization(item)}
-                          >
-                            <Text style={[styles.modalItemText, selected && styles.modalItemTextActive]}>
-                              {item.label}
-                            </Text>
-                            {selected && <Ionicons name="checkmark-circle" size={20} color={ACCENT_COLOR} />}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
-                  ) : (
-                    <View style={styles.suggestionEmpty}>
-                      <Ionicons name="search-outline" size={16} color="#9ca3af" />
-                      <Text style={styles.suggestionEmptyText} numberOfLines={2}>
-                        No match — “{orgQuery.trim()}” will be used as typed.
-                      </Text>
-                    </View>
-                  )}
+              {!!orgError && (
+                <View style={styles.fieldErrorRow}>
+                  <Ionicons name="alert-circle" size={12} color="#ef4444" />
+                  <Text style={styles.fieldErrorText}>{orgError}</Text>
                 </View>
               )}
             </View>
 
             <PrimaryButton
               onPress={handleClientSchemaSubmit}
-              disabled={!clientSchema.trim() || isLoading}
-              loading={isLoading}
+              disabled={!clientSchema.trim() || isLoading || orgChecking}
+              loading={isLoading || orgChecking}
               fullWidth
               icon={!isLoading ? <Ionicons name="arrow-forward" size={18} color="white" /> : undefined}
             >
@@ -526,7 +460,7 @@ const LoginScreen: React.FC = () => {
                 onChangeText={(v) => handleInputChange('clientName', v)}
                 autoCapitalize="none"
                 autoCorrect={false}
-                editable={!isLoading}
+                editable={false}
               />
             </View>
             {errors.clientName && (
@@ -815,38 +749,6 @@ const styles = StyleSheet.create({
   eyeButton: {
     padding: 12,
     marginRight: 2,
-  },
-  suggestionBox: {
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 14,
-    backgroundColor: 'white',
-    overflow: 'hidden',
-  },
-  suggestionList: {
-    maxHeight: 200,
-  },
-  suggestionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  suggestionEmpty: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  suggestionEmptyText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#6b7280',
   },
   fieldErrorRow: {
     flexDirection: 'row',

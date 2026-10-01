@@ -20,7 +20,7 @@ import apiClient from '@/src/api/client';
 import { examsApi, examHallTicketsApi, HallTicketEligibility } from '@/src/api/exam';
 import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 import { isAdminRole } from '@/src/lib/roles';
-import { getValidAccessToken, getClientSchema } from '@/services/authUtils';
+import { getValidAccessToken } from '@/services/authUtils';
 
 // Web parity (HallTicketEligibility.tsx): this screen branches by role —
 // admin gets the eligibility management panel (compute / publish / override /
@@ -49,10 +49,8 @@ const downloadAuthenticatedFile = async (
 ) => {
   try {
     const token = await getValidAccessToken(false);
-    const schema = await getClientSchema();
     const headers: Record<string, string> = {};
     if (token) headers.Authorization = `Bearer ${token}`;
-    if (schema) headers.cschema = schema;
 
     if (Platform.OS === 'web') {
       const response = await fetch(url, { headers });

@@ -379,6 +379,8 @@ class MultiTenantAuthService:
                     "access_token": access_token,
                     "refresh_token": refresh_token,
                     "token_type": "bearer",
+                    "tenant_id": tenant_id,
+                    "client_name": final_client_name,
                 }
 
                 logger.info(f"Successful login for user '{username}' on tenant '{final_client_name}'")
@@ -511,6 +513,8 @@ class MultiTenantAuthService:
                     "access_token": access_token,
                     "refresh_token": refresh_token,
                     "token_type": "bearer",
+                    "tenant_id": tenant_id,
+                    "client_name": final_client_name,
                 }
             except HTTPException:
                 await db.rollback()

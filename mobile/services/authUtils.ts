@@ -121,7 +121,8 @@ export interface AuthResponse {
   change_password_token?: string;
   academic_year_id?: string;
   academic_year_title?: string;
-  client_name?: string;
+  tenant_id?: string | null;
+  client_name?: string | null;
 }
 
 /**
@@ -139,7 +140,7 @@ export const storeAuthData = async (authResponse: AuthResponse): Promise<void> =
     const expiryTime = Date.now() + ((authResponse.expires_in ?? 3600) * 1000);
 
     const permissionsToStore = normalisePermissions(authResponse.permissions as any);
-    const clientSchema = authResponse.client_name || (await getClientSchema()) || 'test_tenant';
+    const clientSchema = authResponse.client_name || (await getClientSchema());
 
     await Promise.all([
       secureSet(ACCESS_TOKEN_KEY, tokens.access_token),
@@ -149,7 +150,7 @@ export const storeAuthData = async (authResponse: AuthResponse): Promise<void> =
       AsyncStorage.setItem(ROLE_DATA_KEY, JSON.stringify(authResponse.role)),
       AsyncStorage.setItem(PERMISSIONS_DATA_KEY, JSON.stringify(permissionsToStore || [])),
       AsyncStorage.setItem(MENU_DATA_KEY, JSON.stringify(authResponse.menu || [])),
-      AsyncStorage.setItem(CLIENT_SCHEMA_KEY, clientSchema),
+      ...(clientSchema ? [AsyncStorage.setItem(CLIENT_SCHEMA_KEY, clientSchema)] : []),
     ]);
   } catch (error) {
     console.error('Error storing auth data:', error);

@@ -16,7 +16,6 @@ import {
     Search,
     Filter,
     Globe,
-    Database,
     Building2,
     Loader2,
     ChevronUp,
@@ -194,9 +193,6 @@ const SuperOrgTable: React.FC<SuperOrgTableProps> = ({ onRefresh, newOrganizatio
                                 <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('subdomain')}>
                                     <div className="flex items-center">Subdomain <SortIcon colKey="subdomain" /></div>
                                 </TableHead>
-                                <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('schema_name')}>
-                                    <div className="flex items-center">Schema <SortIcon colKey="schema_name" /></div>
-                                </TableHead>
                                 <TableHead>Plan</TableHead>
                                 <TableHead className="cursor-pointer select-none hover:bg-muted/80" onClick={() => handleSort('is_active')}>
                                     <div className="flex items-center">Status <SortIcon colKey="is_active" /></div>
@@ -207,7 +203,7 @@ const SuperOrgTable: React.FC<SuperOrgTableProps> = ({ onRefresh, newOrganizatio
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="text-center py-8">
+                                    <TableCell colSpan={6} className="text-center py-8">
                                         <div className="flex flex-col items-center gap-2">
                                             <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
                                             <p className="text-muted-foreground">Loading organizations...</p>
@@ -216,7 +212,7 @@ const SuperOrgTable: React.FC<SuperOrgTableProps> = ({ onRefresh, newOrganizatio
                                 </TableRow>
                             ) : filteredOrganizations.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="text-center py-8">
+                                    <TableCell colSpan={6} className="text-center py-8">
                                         <div className="flex flex-col items-center gap-2">
                                             <Building2 className="w-8 h-8 text-muted-foreground" />
                                             <p className="text-muted-foreground">
@@ -241,12 +237,6 @@ const SuperOrgTable: React.FC<SuperOrgTableProps> = ({ onRefresh, newOrganizatio
                                             <div className="flex items-center gap-1">
                                                 <Globe className="w-4 h-4 text-muted-foreground" />
                                                 <span className="font-mono text-sm">{org.subdomain}.yourapp.com</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="align-middle">
-                                            <div className="flex items-center gap-1">
-                                                <Database className="w-4 h-4 text-muted-foreground" />
-                                                <span className="font-mono text-sm">{org.schema_name}</span>
                                             </div>
                                         </TableCell>
                                         <TableCell className="align-middle">
