@@ -21,6 +21,8 @@ import { useMobilePermission } from '../../src/hooks/useMobilePermission';
  * components and max marks. Available to every role that can see the exam
  * (students included) — only the "Enter Marks" action is permission-gated.
  */
+const NO_STUDENTS: any[] = [];
+
 export default function MarkEntrySummaryScreen() {
   const { examId } = useLocalSearchParams<{ examId: string }>();
   const router = useRouter();
@@ -103,7 +105,7 @@ export default function MarkEntrySummaryScreen() {
     [subjectConfigs, selectedCs],
   );
 
-  const { data: studentsData = [], isLoading: studentsLoading } = useQuery({
+  const { data: studentsData = NO_STUDENTS, isLoading: studentsLoading } = useQuery({
     queryKey: ['students-by-class-section', selectedCs?.class_id, selectedCs?.section_id],
     queryFn: () => classSectionsApi.getStudentsByClassSection(selectedCs!.class_id, selectedCs!.section_id),
     enabled: !!selectedCs?.class_id,

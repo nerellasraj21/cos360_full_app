@@ -25,6 +25,7 @@ import type {
   ExpenseTypeInput,
   ExpenseTransactionInput,
   ExpenseApprovalRequest,
+  ExpenseReportFilter,
 } from '../src/types/expense';
 
 // Permission-protected Categories hooks
@@ -425,16 +426,30 @@ export const useDeleteExpenseDepartmentProtected = () => {
 };
 
 // Permission-protected Reports hooks
-export const useExpenseSummaryReportProtected = (params?: {
-  start_date?: string;
-  end_date?: string;
-  status_filter?: string;
-}) => {
+export const useExpenseCategoryReportProtected = (filters: ExpenseReportFilter) => {
   return usePermissionProtectedQuery({
-    resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS,
+    resource: PERMISSION_RESOURCES.EXPENSE_REPORTS,
     action: 'read',
-    queryKey: ['expense-summary-report', params],
-    queryFn: () => expenseReportsApi.getSummaryReport(params),
+    queryKey: ['expense-category-report', filters.start_date, filters.end_date],
+    queryFn: () => expenseReportsApi.getCategoryReport(filters),
+  });
+};
+
+export const useExpenseTypeReportProtected = (filters: ExpenseReportFilter) => {
+  return usePermissionProtectedQuery({
+    resource: PERMISSION_RESOURCES.EXPENSE_REPORTS,
+    action: 'read',
+    queryKey: ['expense-type-report', filters.start_date, filters.end_date],
+    queryFn: () => expenseReportsApi.getTypeReport(filters),
+  });
+};
+
+export const useExpenseTrendReportProtected = (filters: ExpenseReportFilter) => {
+  return usePermissionProtectedQuery({
+    resource: PERMISSION_RESOURCES.EXPENSE_REPORTS,
+    action: 'read',
+    queryKey: ['expense-trend-report', filters.start_date, filters.end_date],
+    queryFn: () => expenseReportsApi.getTrendReport(filters),
   });
 };
 
@@ -449,7 +464,7 @@ export const useExpenseGlobalAuditLogsProtected = (params?: {
   return usePermissionProtectedQuery({
     resource: PERMISSION_RESOURCES.EXPENSE_AUDIT,
     action: 'read',
-    queryKey: ['expense-global-audit-logs', params],
+    queryKey: ['expense-global-audit-logs', params?.skip, params?.limit, params?.transaction_id, params?.action, params?.action_category],
     queryFn: () => expenseAuditApi.getGlobalAuditLogs(params),
   });
 };

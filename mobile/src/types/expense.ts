@@ -137,29 +137,27 @@ export interface ExpenseAuditLog {
   id: string;
   transaction_id: string;
   action: string;
-  action_category?: string;
-  old_values?: Record<string, any>;
-  new_values?: Record<string, any>;
-  user_id?: string;
-  actor_user_id?: string;
-  actor_username?: string;
-  user_role: string;
-  actor_role?: string;
-  timestamp?: string;
-  created_at?: string;
-  ip_address?: string;
-  request_ip_address?: string;
-  user_agent?: string;
-  notes?: string;
-  action_notes?: string;
+  action_category: string;
+  field_name?: string | null;
+  old_value?: string | null;
+  new_value?: string | null;
+  action_reason?: string | null;
+  action_notes?: string | null;
+  workflow_stage?: string | null;
+  department_id?: string | null;
+  actor_user_id: string;
+  actor_role: string;
+  actor_username: string;
+  created_at: string;
 }
 
 export interface ExpenseAuditLogSummary {
   transaction_id: string;
-  total_logs: number;
-  last_modified: string;
-  last_modified_by: string;
-  actions: string[];
+  total_entries: number;
+  action_breakdown: Record<string, number>;
+  first_entry: string | null;
+  last_entry: string | null;
+  unique_actors: number;
 }
 
 export interface ExpenseSettings {
@@ -219,55 +217,67 @@ export interface ExpenseDepartmentDropdown {
 export interface ExpenseReportFilter {
   start_date?: string;
   end_date?: string;
-  category_ids?: string[];
-  type_ids?: string[];
-  department_ids?: string[];
-  status_filter?: string[];
+  status_filter?: string;
+  department_id?: string;
   min_amount?: number;
   max_amount?: number;
-  vendor_filter?: string;
 }
 
-export interface ExpenseCategoryReport {
+export interface ExpenseReportSummary {
+  report_period: string;
+  start_date: string;
+  end_date: string;
+  total_amount: string | number;
+  total_transactions: number;
+  average_transaction: string | number;
+  categories_count: number;
+  departments_count: number;
+}
+
+export interface ExpenseCategorySummary {
   category_id: string;
   category_name: string;
-  total_amount: number;
+  total_amount: string | number;
   transaction_count: number;
-  percentage: number;
-  trend: 'up' | 'down' | 'stable';
+  average_amount: string | number;
+  percentage_of_total: string | number;
 }
 
-export interface ExpenseTypeReport {
+export interface ExpenseTypeSummary {
   type_id: string;
   type_name: string;
   category_name: string;
-  total_amount: number;
+  total_amount: string | number;
   transaction_count: number;
-  percentage: number;
+  average_amount: string | number;
+}
+
+export interface ExpenseMonthlyTrend {
+  month: string;
+  total_amount: string | number;
+  transaction_count: number;
+  average_per_transaction: string | number;
+}
+
+export interface ExpenseCategoryReport {
+  summary: ExpenseReportSummary;
+  categories: ExpenseCategorySummary[];
+  generated_at: string;
+  generated_by: string;
+}
+
+export interface ExpenseTypeReport {
+  summary: ExpenseReportSummary;
+  types: ExpenseTypeSummary[];
+  generated_at: string;
+  generated_by: string;
 }
 
 export interface ExpenseTrendReport {
-  period: string;
-  total_amount: number;
-  transaction_count: number;
-  categories: ExpenseCategoryReport[];
-  growth_percentage: number;
-}
-
-export interface ExpenseSummaryReport {
-  total_transactions: number;
-  total_amount: number;
-  approved_amount: number;
-  pending_amount: number;
-  paid_amount: number;
-  cancelled_amount: number;
-  period_days: number;
-  top_categories: ExpenseCategoryReport[];
-  top_vendors: {
-    vendor_name: string;
-    total_amount: number;
-    transaction_count: number;
-  }[];
+  summary: ExpenseReportSummary;
+  monthly_trends: ExpenseMonthlyTrend[];
+  generated_at: string;
+  generated_by: string;
 }
 
 export interface ExpenseReportExportResponse {

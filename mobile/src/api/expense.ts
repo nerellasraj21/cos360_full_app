@@ -21,7 +21,6 @@ import type {
   ExpenseCategoryReport,
   ExpenseTypeReport,
   ExpenseTrendReport,
-  ExpenseSummaryReport,
   ExpenseReportExportResponse,
   ExpenseReportFilter,
   ExpenseApprovalRequest,
@@ -208,7 +207,7 @@ export const expenseAuditApi = {
   getAuditLogs: async (
     transactionId: string,
     params?: { skip?: number; limit?: number }
-  ): Promise<ExpensePaginatedResponse<ExpenseAuditLog>> => {
+  ): Promise<ExpenseAuditLog[]> => {
     const response = await apiClient.get(`/expense/audit/transactions/${transactionId}/logs`, { params });
     return response.data;
   },
@@ -218,7 +217,6 @@ export const expenseAuditApi = {
     return response.data;
   },
 
-  /** GET /expense/audit — all audit logs with filters */
   getGlobalAuditLogs: async (params?: {
     skip?: number;
     limit?: number;
@@ -226,10 +224,8 @@ export const expenseAuditApi = {
     action?: string;
     action_category?: string;
     actor_user_id?: string;
-    date_from?: string;
-    date_to?: string;
-  }): Promise<ExpensePaginatedResponse<ExpenseAuditLog>> => {
-    const response = await apiClient.get('/expense/audit', { params });
+  }): Promise<ExpenseAuditLog[]> => {
+    const response = await apiClient.get('/expense/audit/logs', { params });
     return response.data;
   },
 };
@@ -303,29 +299,18 @@ export const expenseDepartmentsApi = {
 
 // Reports API
 export const expenseReportsApi = {
-  getCategoryReport: async (filters: ExpenseReportFilter): Promise<ExpenseCategoryReport[]> => {
+  getCategoryReport: async (filters: ExpenseReportFilter): Promise<ExpenseCategoryReport> => {
     const response = await apiClient.get('/expense/reports/by-category', { params: filters });
     return response.data;
   },
 
-  getTypeReport: async (filters: ExpenseReportFilter): Promise<ExpenseTypeReport[]> => {
+  getTypeReport: async (filters: ExpenseReportFilter): Promise<ExpenseTypeReport> => {
     const response = await apiClient.get('/expense/reports/by-type', { params: filters });
     return response.data;
   },
 
   getTrendReport: async (filters: ExpenseReportFilter): Promise<ExpenseTrendReport> => {
     const response = await apiClient.get('/expense/reports/trend', { params: filters });
-    return response.data;
-  },
-
-  /** GET /expense/summary — hierarchical summary */
-  getSummaryReport: async (params?: {
-    academic_year_id?: string;
-    start_date?: string;
-    end_date?: string;
-    status_filter?: string;
-  }): Promise<ExpenseSummaryReport> => {
-    const response = await apiClient.get('/expense/summary', { params });
     return response.data;
   },
 

@@ -27,7 +27,6 @@ import type {
   ExpenseCategoryReport,
   ExpenseTypeReport,
   ExpenseTrendReport,
-  ExpenseSummaryReport,
   ExpenseReportFilter,
   ExpenseApprovalRequest,
 } from '../src/types/expense';
@@ -328,13 +327,23 @@ export const useExpenseDepartmentDropdown = () => {
 };
 
 // Reports hooks
-export const useExpenseSummaryReport = (params?: {
-  start_date?: string;
-  end_date?: string;
-  status_filter?: string;
-}) => {
+export const useExpenseCategoryReport = (filters: ExpenseReportFilter) => {
   return useQuery({
-    queryKey: ['expense-summary-report', params],
-    queryFn: () => expenseReportsApi.getSummaryReport(params),
+    queryKey: ['expense-category-report', filters.start_date, filters.end_date],
+    queryFn: () => expenseReportsApi.getCategoryReport(filters),
+  });
+};
+
+export const useExpenseTypeReport = (filters: ExpenseReportFilter) => {
+  return useQuery({
+    queryKey: ['expense-type-report', filters.start_date, filters.end_date],
+    queryFn: () => expenseReportsApi.getTypeReport(filters),
+  });
+};
+
+export const useExpenseTrendReport = (filters: ExpenseReportFilter) => {
+  return useQuery({
+    queryKey: ['expense-trend-report', filters.start_date, filters.end_date],
+    queryFn: () => expenseReportsApi.getTrendReport(filters),
   });
 };

@@ -111,10 +111,17 @@ export default function ProfileScreen() {
       fallback={
         <ThemedView style={styles.container}>
           <AppHeader title="Profile" />
-          <View style={styles.centerContent}>
-            <ThemedText style={styles.errorText}>
-              You don&apos;t have permission to view profile information.
-            </ThemedText>
+          <View style={styles.content}>
+            <FallbackProfileView user={user} role={role} />
+            <View style={styles.actionsContainer}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.logoutButton]}
+                onPress={handleLogout}
+              >
+                <IconSymbol name="arrow.right.square" size={20} color="white" />
+                <ThemedText style={styles.logoutButtonText}>Logout</ThemedText>
+              </TouchableOpacity>
+            </View>
           </View>
           <AppFooter />
         </ThemedView>

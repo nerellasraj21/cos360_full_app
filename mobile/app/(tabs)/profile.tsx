@@ -107,10 +107,19 @@ export default function ProfileTabScreen() {
       requireAll={false}
       fallback={
         <AppLayout title="Profile">
-          <View style={styles.centerContent}>
-            <ThemedText style={[styles.errorText, { color: colors.destructive }]}>
-              You don&apos;t have permission to view profile information.
-            </ThemedText>
+          <View style={styles.content}>
+            <FallbackProfileView user={user} role={role} />
+            <View style={styles.actionsContainer}>
+              <DestructiveButton
+                onPress={handleLogout}
+                fullWidth
+                style={[styles.actionButton, { backgroundColor: colors.destructive }]}
+                textStyle={styles.logoutButtonText}
+                icon={<IconSymbol name="arrow.right.square" size={20} color="white" />}
+              >
+                Logout
+              </DestructiveButton>
+            </View>
           </View>
         </AppLayout>
       }

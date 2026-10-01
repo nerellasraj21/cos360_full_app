@@ -29,16 +29,24 @@ const ACTION_COLORS: Record<string, string> = {
   delete: '#EF4444',
 };
 
-const ACTION_CATEGORIES = ['All', 'transaction', 'approval', 'payment', 'document'];
+const ACTION_CATEGORIES = ['All', 'transaction', 'attachment', 'category', 'type'];
 
-function getActionColor(action: string) {
-  return ACTION_COLORS[action?.toLowerCase()] ?? ORANGE;
+function humanize(val?: string | null) {
+  if (!val) return '';
+  const text = String(val).replace(/_/g, ' ').trim();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function getActionColor(action?: string) {
+  return ACTION_COLORS[(action || '').toLowerCase()] ?? ORANGE;
 }
 
 function formatDate(val?: string) {
-  if (!val) return '—';
-  return new Date(val).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  if (!val) return '-';
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 }
 
@@ -46,35 +54,37 @@ function AuditLogItem({ item, colors, theme }: { item: ExpenseAuditLog; colors: 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const color = getActionColor(item.action);
-  const timestamp = item.created_at || item.timestamp;
-  const username = item.actor_username || '—';
-  const role = item.actor_role || item.user_role || '—';
-  const notes = item.action_notes || item.notes;
+  const username = item.actor_username || 'Unknown user';
+  const role = humanize(item.actor_role);
+  const notes = item.action_notes || item.action_reason;
+  const hasChange = !!item.field_name && (item.old_value != null || item.new_value != null);
 
   return (
-    <View style={[styles.logCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+    <View style={[styles.logCard, { backgroundColor: cardBg, borderColor: borderCol, borderLeftColor: color, borderLeftWidth: 3 }]}>
       <View style={styles.logTop}>
         <View style={[styles.actionBadge, { backgroundColor: color + '20' }]}>
-          <Text style={[styles.actionText, { color }]}>{item.action?.toUpperCase()}</Text>
+          <Text style={[styles.actionText, { color }]}>{humanize(item.action).toUpperCase() || 'ACTION'}</Text>
         </View>
         {!!item.action_category && (
           <View style={[styles.catBadge, { backgroundColor: borderCol }]}>
-            <Text style={[styles.catText, { color: colors['muted-foreground'] }]}>{String(item.action_category).charAt(0).toUpperCase() + String(item.action_category).slice(1)}</Text>
+            <Text style={[styles.catText, { color: colors['muted-foreground'] }]}>{humanize(item.action_category)}</Text>
           </View>
         )}
-        <Text style={[styles.timestamp, { color: colors['muted-foreground'] }]}>{formatDate(timestamp)}</Text>
+        <Text style={[styles.timestamp, { color: colors['muted-foreground'] }]}>{formatDate(item.created_at)}</Text>
       </View>
       <View style={styles.logMeta}>
         <Ionicons name="person-outline" size={12} color={colors['muted-foreground']} />
         <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>{username}</Text>
-        <Text style={[styles.roleBadge, { color: colors['muted-foreground'] }]}>· {role}</Text>
+        {!!role && <Text style={[styles.roleBadge, { color: colors['muted-foreground'] }]}>({role})</Text>}
       </View>
-      {notes ? (
+      {hasChange && (
+        <Text style={[styles.notes, { color: colors.foreground }]} numberOfLines={3}>
+          {humanize(item.field_name)}: {item.old_value ?? '-'} to {item.new_value ?? '-'}
+        </Text>
+      )}
+      {!!notes && (
         <Text style={[styles.notes, { color: colors['muted-foreground'] }]} numberOfLines={2}>{notes}</Text>
-      ) : null}
-      <Text style={[styles.txnId, { color: colors['muted-foreground'] }]} numberOfLines={1}>
-        Transaction ref: {String(item.transaction_id ?? '').slice(-8).toUpperCase() || '—'}
-      </Text>
+      )}
     </View>
   );
 }
@@ -93,34 +103,37 @@ function ExpenseAuditScreenContent() {
 
   const categoryParam = actionFilter === 'All' ? undefined : actionFilter;
   const [refreshing, setRefreshing] = useState(false);
-  const { data: raw, isLoading, refetch } = useExpenseGlobalAuditLogsProtected({
-    limit: 100,
+  const { data: raw, isLoading, isError, error, refetch } = useExpenseGlobalAuditLogsProtected({
+    limit: 500,
     action_category: categoryParam,
   });
 
   const hasDateFilter = !!(dateFrom.trim() || dateTo.trim());
 
   const logs: ExpenseAuditLog[] = useMemo(() => {
-    const all: ExpenseAuditLog[] = Array.isArray(raw)
-      ? raw
-      : (raw as any)?.items ?? [];
+    const all: ExpenseAuditLog[] = Array.isArray(raw) ? raw : [];
 
     return all.filter(l => {
-      // Text search
       if (search.trim()) {
-        const q = search.toLowerCase();
-        const matchesSearch =
-          l.action?.toLowerCase().includes(q) ||
-          (l.actor_username || l.user_id || '').toLowerCase().includes(q) ||
-          l.transaction_id?.toLowerCase().includes(q) ||
-          (l.action_notes || l.notes || '').toLowerCase().includes(q);
-        if (!matchesSearch) return false;
+        const q = search.trim().toLowerCase();
+        const haystack = [
+          l.action,
+          l.action_category,
+          l.actor_username,
+          l.field_name,
+          l.action_notes,
+          l.action_reason,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .replace(/_/g, ' ');
+        if (!haystack.includes(q.replace(/_/g, ' '))) return false;
       }
 
-      // Date range filter (client-side)
-      const ts = l.created_at || l.timestamp;
+      const ts = l.created_at;
       if (ts) {
-        const logDate = ts.slice(0, 10); // "YYYY-MM-DD"
+        const logDate = ts.slice(0, 10);
         if (dateFrom.trim() && logDate < dateFrom.trim()) return false;
         if (dateTo.trim() && logDate > dateTo.trim()) return false;
       }
@@ -131,13 +144,12 @@ function ExpenseAuditScreenContent() {
 
   return (
     <AppLayout title="Expense Audit Trail">
-      {/* Search + date-filter toggle */}
-      <View style={[styles.searchRow, { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 }]}>
+            <View style={[styles.searchRow, { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 }]}>
         <View style={[styles.searchBox, { backgroundColor: inputBg, borderColor: borderCol }]}>
           <Ionicons name="search-outline" size={14} color={colors['muted-foreground']} />
           <TextInput
             style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Search by action, user, txn ID..."
+            placeholder="Search by action, user or notes"
             placeholderTextColor={colors['muted-foreground']}
             value={search}
             onChangeText={setSearch}
@@ -161,8 +173,7 @@ function ExpenseAuditScreenContent() {
         </TouchableOpacity>
       </View>
 
-      {/* Date range filter panel */}
-      {showDateFilter && (
+            {showDateFilter && (
         <View style={[styles.datePanel, { backgroundColor: inputBg, borderColor: borderCol }]}>
           <View style={styles.datePanelRow}>
             <View style={styles.dateField}>
@@ -204,8 +215,7 @@ function ExpenseAuditScreenContent() {
         </View>
       )}
 
-      {/* Category chips */}
-      <ScrollView
+            <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chipsRow}
@@ -221,15 +231,14 @@ function ExpenseAuditScreenContent() {
               onPress={() => setActionFilter(cat)}
             >
               <Text style={[styles.chipText, { color: active ? 'white' : colors['muted-foreground'] }]}>
-                {cat === 'All' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                {cat === 'All' ? 'All' : humanize(cat)}
               </Text>
             </TouchableOpacity>
           );
         })}
       </ScrollView>
 
-      {/* List */}
-      <ScrollView
+            <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -248,6 +257,20 @@ function ExpenseAuditScreenContent() {
         {isLoading ? (
           <View style={styles.centered}>
             <ActivityIndicator color={ORANGE} />
+          </View>
+        ) : isError ? (
+          <View style={styles.centered}>
+            <Ionicons name="alert-circle-outline" size={40} color="#EF4444" />
+            <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
+              {(error as any)?.message || 'Could not load audit logs'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.retryBtn, { borderColor: ORANGE }]}
+              onPress={() => refetch()}
+              accessibilityLabel="Retry"
+            >
+              <Text style={{ color: ORANGE, fontWeight: '600', fontSize: 13 }}>Retry</Text>
+            </TouchableOpacity>
           </View>
         ) : logs.length === 0 ? (
           <View style={styles.centered}>
@@ -312,13 +335,11 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12 },
   roleBadge: { fontSize: 12 },
   notes: { fontSize: 12, marginTop: 4, marginBottom: 4 },
-  txnId: { fontSize: 10, marginTop: 4 },
   centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
-  emptyText: { marginTop: 12, fontSize: 14 },
+  emptyText: { marginTop: 12, fontSize: 14, textAlign: 'center', paddingHorizontal: 24 },
+  retryBtn: { marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, borderWidth: 1 },
 });
 
-
-// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
 export default function ExpenseAuditScreen() {
   return (
     <ScreenAccessGate

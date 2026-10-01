@@ -64,23 +64,6 @@ export const FallbackProfileView: React.FC<FallbackProfileViewProps> = ({ user, 
             {role?.name || 'Not assigned'}
           </ThemedText>
         </View>
-
-        <View style={[styles.fieldContainer, { backgroundColor: colors.card }]}>
-          <ThemedText style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>User ID</ThemedText>
-          <ThemedText style={[styles.fieldValue, { color: colors.foreground }]}>{user.id}</ThemedText>
-        </View>
-      </View>
-
-      {/* Notice */}
-      <View style={[styles.noticeContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <IconSymbol name="info.circle" size={24} color={colors.primary} />
-        <View style={styles.noticeContent}>
-          <ThemedText style={[styles.noticeTitle, { color: colors.primary }]}>Limited Profile View</ThemedText>
-          <ThemedText style={[styles.noticeText, { color: colors['muted-foreground'] }]}>
-            The full profile system for your role is not yet available. 
-            This is basic account information from the authentication system.
-          </ThemedText>
-        </View>
       </View>
     </ScrollView>
   );

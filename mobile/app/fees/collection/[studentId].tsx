@@ -190,7 +190,7 @@ function StudentFeeDetailScreenContent() {
 
   // Per-fee-type concession rows (same endpoint the web uses for its concession table).
   // Also needed on the Summary tab to apply concessions to the term-wise installment schedule.
-  const { data: concessionRows = [], isLoading: concessionLoading } = useQuery({
+  const { data: concessionRows = NO_CONCESSIONS, isLoading: concessionLoading } = useQuery({
     queryKey: ['fee-concession-summary', studentId, activeAcademicYearId],
     queryFn: () =>
       feeConcessionsApi.getByStudent(studentId, {
@@ -691,7 +691,7 @@ function StudentFeeDetailScreenContent() {
                 </Text>
                 <Text style={{ color: muted, fontSize: 10, marginTop: 2 }} numberOfLines={1}>
                   Actual {formatINR(item.assigned_fee)}
-                  {item.last_paid_date ? ` · ${item.last_paid_date}` : ''}
+                  {item.last_paid_date && !Number.isNaN(new Date(item.last_paid_date).getTime()) ? ` · ${new Date(item.last_paid_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : ''}
                   {item.last_receipt_number ? ` · #${item.last_receipt_number}` : ''}
                 </Text>
                 {item.remarks ? (
@@ -1684,6 +1684,8 @@ const styles = StyleSheet.create({
 
 
 // Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
+const NO_CONCESSIONS: any[] = [];
+
 export default function StudentFeeDetailScreen() {
   return (
     <ScreenAccessGate
