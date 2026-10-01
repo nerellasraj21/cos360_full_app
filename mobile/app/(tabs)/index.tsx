@@ -126,7 +126,7 @@ const MODULES: ModuleCard[] = [
     bg: '#F8FAFC',
     darkBg: '#64748b20',
     route: '/(tabs)/admin',
-    resources: ['users', 'roles', 'staff'],
+    resources: ['user_management', 'role_management', 'staff'],
   },
   {
     id: 'transport',

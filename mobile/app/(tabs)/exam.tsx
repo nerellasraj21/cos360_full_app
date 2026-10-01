@@ -19,9 +19,6 @@ import { isAdminRole } from '../../src/lib/roles';
 const hasHallTicketAccess = (isAdmin: boolean, hasAnyPermission: (perms: [string, string][]) => boolean): boolean =>
   isAdmin || hasAnyPermission([
     ['exams', 'read'],
-    ['exam_hall_tickets', 'read_own'],
-    ['exam_hall_tickets', 'read_related'],
-    ['exam_hall_tickets', 'list_related'],
   ]);
 
 const RED = '#EF4444';

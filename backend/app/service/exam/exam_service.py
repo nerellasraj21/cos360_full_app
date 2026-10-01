@@ -1,16 +1,19 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.exam.exam_class_section_model import ExamClassSection
 from app.models.exam.exam_date_model import ExamDate
 from app.models.exam.exam_model import Exam
 from app.models.exam.exam_subject_config_model import ExamSubjectComponent, ExamSubjectConfig
+from app.models.exam.student_marks_model import StudentMark
+from app.models.exam.student_result_model import StudentExamResult, StudentSubjectResult
 from app.models.masters.class_subject_mapping_model import ClassSubjectMap
 from app.schemas.exam.exam_create_full_schema import ExamCreateFull, ExamCreateFullResponse
 from app.schemas.exam.exam_schema import ExamUpdate
+from app.service.exam.audit_service import log_action
 
 # ── Private helpers ────────────────────────────────────────────────────────────
 
@@ -269,20 +272,43 @@ async def update_exam(db: AsyncSession, exam_id: UUID, payload: ExamUpdate) -> E
 # ── delete_exam ────────────────────────────────────────────────────────────────
 
 
-async def delete_exam(db: AsyncSession, exam_id: UUID) -> None:
+async def delete_exam(db: AsyncSession, exam_id: UUID, performed_by: UUID | None = None) -> None:
     """
-    Hard-delete an exam.  Only permitted when status == 'draft'.
-    Cascades to class_sections, subject_configs, and exam_dates via DB cascade.
+    Hard-delete a non-published exam together with its marks and results.
+    Deletes student_marks and the result tables first (no DB cascade), then the exam,
+    which cascades to class_sections, subject_configs, components, dates, mark permissions
+    and hall ticket eligibility. Writes an audit row first (exam_audit_log has no FK).
     Caller commits.
     """
     exam = await get_exam_or_404(db, exam_id)
-    if exam.status != "draft":
+    if exam.status == "published":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                f"Exam '{exam.exam_name}' cannot be deleted because its status "
-                f"is '{exam.status}'. Only draft exams can be deleted."
+                f"Exam '{exam.exam_name}' cannot be deleted because it is published. "
+                "Unpublish or unlock it before deleting."
             ),
+        )
+    marks_deleted = (await db.execute(delete(StudentMark).where(StudentMark.exam_id == exam_id))).rowcount
+    subject_results_deleted = (
+        await db.execute(delete(StudentSubjectResult).where(StudentSubjectResult.exam_id == exam_id))
+    ).rowcount
+    exam_results_deleted = (
+        await db.execute(delete(StudentExamResult).where(StudentExamResult.exam_id == exam_id))
+    ).rowcount
+    if performed_by is not None:
+        await log_action(
+            db,
+            exam_id,
+            action="exam_deleted",
+            performed_by=performed_by,
+            old_value=exam.status,
+            metadata={
+                "exam_name": exam.exam_name,
+                "marks_deleted": marks_deleted,
+                "subject_results_deleted": subject_results_deleted,
+                "exam_results_deleted": exam_results_deleted,
+            },
         )
     await db.delete(exam)
     await db.flush()

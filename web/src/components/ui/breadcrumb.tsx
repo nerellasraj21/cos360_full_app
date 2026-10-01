@@ -28,7 +28,7 @@ export function AppBreadcrumb() {
         const isFirst = idx === 0;
 
         return (
-          <React.Fragment key={crumb.path}>
+          <React.Fragment key={`${crumb.path}-${idx}`}>
             {idx > 0 && (
               <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             )}

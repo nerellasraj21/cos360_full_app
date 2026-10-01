@@ -260,7 +260,7 @@ export const useApproveFeeRefund = () => {
 export const useProcessFeeRefund = () => {
   return usePermissionProtectedMutation<any, Error, { refund_id: string }>({
     resource: PERMISSION_RESOURCES.FEE_REFUNDS,
-    action: 'update',
+    action: 'process',
     mutationFn: ({ refund_id }) => feeRefundsApi.processFeeRefund({ refund_id })
   });
 };

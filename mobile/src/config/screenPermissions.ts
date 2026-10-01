@@ -143,22 +143,22 @@ export const SCREEN_PERMISSIONS: Record<string, ScreenPermissionConfig> = {
 
     // Transport Module Screens
     '/transport': {
-        requiredPermissions: [['transport_routes', 'list'], ['transport_vehicles', 'list'], ['transport_trips', 'list']],
+        requiredPermissions: [['routes', 'list'], ['vehicles', 'list'], ['transport_trips', 'list']],
         requireAll: false,
         description: 'View transport information',
     },
     '/transport/routes': {
-        requiredPermissions: [['transport_routes', 'list'], ['transport_routes', 'read']],
+        requiredPermissions: [['routes', 'list'], ['routes', 'read']],
         requireAll: false,
         description: 'View transport routes',
     },
     '/transport/route-stops': {
-        requiredPermissions: [['transport_routes', 'list'], ['transport_routes', 'read']],
+        requiredPermissions: [['routes', 'list'], ['routes', 'read']],
         requireAll: false,
         description: 'View route stops',
     },
     '/transport/vehicles': {
-        requiredPermissions: [['transport_vehicles', 'list'], ['transport_vehicles', 'read']],
+        requiredPermissions: [['vehicles', 'list'], ['vehicles', 'read']],
         requireAll: false,
         description: 'View transport vehicles',
     },
@@ -184,7 +184,6 @@ export const SCREEN_PERMISSIONS: Record<string, ScreenPermissionConfig> = {
             ['academic_years', 'list'], 
             ['classes', 'list'], 
             ['sections', 'list'],
-            ['classes_sections', 'list'], // Fallback
             ['subjects', 'list']
         ],
         requireAll: false,
@@ -201,8 +200,6 @@ export const SCREEN_PERMISSIONS: Record<string, ScreenPermissionConfig> = {
             ['classes', 'read'],
             ['sections', 'list'], 
             ['sections', 'read'],
-            ['classes_sections', 'list'], // Fallback for combined resource
-            ['classes_sections', 'read']
         ],
         requireAll: false,
         description: 'View classes and sections',
@@ -218,17 +215,17 @@ export const SCREEN_PERMISSIONS: Record<string, ScreenPermissionConfig> = {
         description: 'View subject categories',
     },
     '/masters/holidays': {
-        requiredPermissions: [['holidays', 'list'], ['holidays', 'read']],
+        requiredPermissions: [['holiday_management', 'list'], ['holiday_management', 'read']],
         requireAll: false,
         description: 'View holidays',
     },
     '/masters/timetable': {
-        requiredPermissions: [['timetables', 'list'], ['timetables', 'read']],
+        requiredPermissions: [['timetable_management', 'list'], ['timetable_management', 'read']],
         requireAll: false,
         description: 'View timetables',
     },
     '/masters/rolespermissions': {
-        requiredPermissions: [['roles_permissions', 'list'], ['roles_permissions', 'read']],
+        requiredPermissions: [['role_management', 'list'], ['role_management', 'read']],
         requireAll: false,
         description: 'View roles and permissions',
     },
@@ -260,26 +257,26 @@ export const SCREEN_PERMISSIONS: Record<string, ScreenPermissionConfig> = {
         description: 'Approve expense transactions',
     },
     '/expense/audit': {
-        requiredPermissions: [['expense_audit', 'list'], ['expense_audit', 'read']],
+        requiredPermissions: [['expense_audit_logs', 'list'], ['expense_audit_logs', 'read']],
         requireAll: false,
         description: 'View expense audit logs',
     },
 
     // Parent Module Screens
     '/parents': {
-        requiredPermissions: [['parent_profile', 'read_own'], ['students', 'read']],
+        requiredPermissions: [['profile', 'read_own'], ['students', 'read']],
         requireAll: false,
         description: 'View parent information',
     },
     '/parents/index': {
-        requiredPermissions: [['parent_profile', 'read_own'], ['students', 'read']],
+        requiredPermissions: [['profile', 'read_own'], ['students', 'read']],
         requireAll: false,
         description: 'View parent dashboard',
     },
 
     // Profile and Settings Screens
     '/profile': {
-        requiredPermissions: [['profile', 'read_own'], ['parent_profile', 'read_own']],
+        requiredPermissions: [['profile', 'read_own']],
         requireAll: false,
         description: 'View user profile',
     },

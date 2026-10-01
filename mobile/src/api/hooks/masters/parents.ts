@@ -4,7 +4,7 @@ import { usePermissionProtectedMutation } from '../../../../hooks/use-permission
 import { useMastersQuery } from './useMastersQuery';
 import { PERMISSION_RESOURCES } from '../../../types/permissions';
 import { parentsApi, SalaryRangeOption } from '../../index';
-import type { Parent } from '../../masters';
+import type { Parent, ParentUpdate } from '../../masters';
 
 export function useParents() {
   return useMastersQuery<Parent[]>({
@@ -37,7 +37,7 @@ export function useSalaryRangesDropdown() {
 export function useUpdateParent() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToastContext();
-  return usePermissionProtectedMutation<Parent, Error, { id: string; data: Partial<Parent> }>({
+  return usePermissionProtectedMutation<Parent, Error, { id: string; data: ParentUpdate }>({
     mutationFn: ({ id, data }) => parentsApi.updateParent(id, data),
     resource: PERMISSION_RESOURCES.PARENTS,
     action: 'update',

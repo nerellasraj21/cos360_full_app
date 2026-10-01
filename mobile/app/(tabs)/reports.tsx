@@ -65,7 +65,7 @@ const SECTIONS: {
     icon: 'bar-chart' as const,
     color: '#F59E0B',
     route: '/reports/transport-reports',
-    resources: ['transport_routes', 'transport_vehicles', 'transport_trips'],
+    resources: ['routes', 'vehicles', 'transport_trips'],
   },
   {
     title: 'Academic Reports',

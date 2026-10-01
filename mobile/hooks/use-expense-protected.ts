@@ -226,7 +226,7 @@ export const useDeleteExpenseTransactionProtected = () => {
 export const useApproveExpenseTransactionProtected = () => {
   const queryClient = useQueryClient();
   return usePermissionProtectedMutation({
-    resource: PERMISSION_RESOURCES.EXPENSE_APPROVALS,
+    resource: PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS,
     action: 'approve',
     mutationFn: ({ id, data }: { id: string; data: ExpenseApprovalRequest }) =>
       expenseTransactionsApi.approveTransaction(id, data),
@@ -240,7 +240,7 @@ export const useApproveExpenseTransactionProtected = () => {
 
 export const useExpensePendingApprovalsProtected = () => {
   return usePermissionProtectedListQuery(
-    PERMISSION_RESOURCES.EXPENSE_APPROVALS,
+    PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS,
     ['expense-pending-approvals'],
     () => expenseTransactionsApi.getPendingApprovals()
   );
@@ -343,7 +343,7 @@ export const useExpenseAuditSummaryProtected = (transactionId: string) => {
 // Permission-protected Settings hooks
 export const useExpenseSettingsProtected = (params?: { category?: string; active_only?: boolean }) => {
   return usePermissionProtectedQuery({
-    resource: PERMISSION_RESOURCES.SETTINGS,
+    resource: PERMISSION_RESOURCES.EXPENSE_SETTINGS,
     action: 'read',
     queryKey: ['expense-settings', params],
     queryFn: () => expenseSettingsApi.getSettings(params),
@@ -352,7 +352,7 @@ export const useExpenseSettingsProtected = (params?: { category?: string; active
 
 export const useExpenseCommonSettingsProtected = () => {
   return usePermissionProtectedQuery({
-    resource: PERMISSION_RESOURCES.SETTINGS,
+    resource: PERMISSION_RESOURCES.EXPENSE_SETTINGS,
     action: 'read',
     queryKey: ['expense-common-settings'],
     queryFn: () => expenseSettingsApi.getCommonSettings(),

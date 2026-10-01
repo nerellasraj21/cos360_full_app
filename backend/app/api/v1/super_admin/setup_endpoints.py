@@ -2,6 +2,7 @@ import bcrypt
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import text
 
+from app.config import settings
 from app.db.session import get_public_db
 
 router = APIRouter(prefix="/super_admin/setup", tags=["Super Admin/Setup"])
@@ -19,7 +20,24 @@ async def initialize_super_admin_system():
 
     **Warning**: This should only be run once during system setup
     """
+    password = settings.SUPER_ADMIN_INITIAL_PASSWORD
+    if not password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Set SUPER_ADMIN_INITIAL_PASSWORD in the server environment before running setup",
+        )
+
     try:
+        async with get_public_db() as db:
+            table_exists = (await db.execute(text("SELECT to_regclass('public.super_admin_users')"))).scalar()
+            if table_exists is not None:
+                existing = (await db.execute(text("SELECT 1 FROM public.super_admin_users LIMIT 1"))).first()
+                if existing is not None:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Super Admin system is already initialized",
+                    )
+
         async with get_public_db() as db:
             # 1. Create super_admin_users table
             await db.execute(text("""
@@ -78,7 +96,6 @@ async def initialize_super_admin_system():
             await db.execute(text(index_sql))
 
         # 5. Hash password for initial Super Admin
-        password = "SuperAdmin123!"
         password_bytes = password.encode("utf-8")
         salt = bcrypt.gensalt()
         hashed_password = bcrypt.hashpw(password_bytes, salt).decode("utf-8")
@@ -154,6 +171,8 @@ async def initialize_super_admin_system():
             ],
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

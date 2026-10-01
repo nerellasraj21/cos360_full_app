@@ -57,17 +57,17 @@ export default function ProfileTabScreen() {
     profileQuery = studentQuery;
     ProfileViewComponent = StudentProfileView;
     ProfileFormComponent = StudentProfileForm;
-    profileResource = 'student_profile';
+    profileResource = 'profile';
   } else if (isStaff) {
     profileQuery = staffQuery;
     ProfileViewComponent = StaffProfileView;
     ProfileFormComponent = StaffProfileForm;
-    profileResource = 'staff_profile';
+    profileResource = 'profile';
   } else if (isParent) {
     profileQuery = parentQuery;
     ProfileViewComponent = ParentProfileView;
     ProfileFormComponent = ParentProfileForm;
-    profileResource = 'parent_profile';
+    profileResource = 'profile';
   } else {
     // Fallback for unknown roles
     profileQuery = { data: null, isLoading: false, error: new Error('Unknown role'), refetch: () => {} };
@@ -102,9 +102,6 @@ export default function ProfileTabScreen() {
     <>
     <PermissionGuard
       permissions={[
-        ['student_profile', 'read_own'],
-        ['staff_profile', 'read_own'],
-        ['parent_profile', 'read_own'],
         ['profile', 'read_own'],
       ]}
       requireAll={false}

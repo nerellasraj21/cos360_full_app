@@ -13,7 +13,7 @@ export const PERMISSION_RESOURCES = {
   FEE_CATEGORIES: 'fee_categories',
   FEE_TYPES: 'fee_types',
   FEE_TERMS: 'fee_terms',
-  FEE_TERM_AMOUNTS: 'fee_term_amounts',
+  FEE_TERM_AMOUNTS: 'fee_class_mapping_term_amounts',
   FEE_TRANSACTIONS: 'fee_transactions',
   FEE_RECEIPTS: 'fee_receipts',
   FEE_REFUNDS: 'fee_refunds',
@@ -28,29 +28,29 @@ export const PERMISSION_RESOURCES = {
   STAFF_DESIGNATIONS: 'designations',
 
   // Transport module
-  TRANSPORT_ROUTES: 'transport_routes',
+  TRANSPORT_ROUTES: 'routes',
   TRANSPORT_ROUTE_STOPS: 'route_stops',
-  TRANSPORT_VEHICLES: 'transport_vehicles',
+  TRANSPORT_VEHICLES: 'vehicles',
   TRANSPORT_TRIPS: 'transport_trips',
   TRANSPORT_PRICING: 'transport_pricing',
-  ROUTES: 'routes', // Web app's generic transport resource (in addition to TRANSPORT_ROUTES)
-  VEHICLES: 'vehicles', // Web app's generic transport resource (in addition to TRANSPORT_VEHICLES)
+  ROUTES: 'routes',
+  VEHICLES: 'vehicles',
 
   // Masters module
   ACADEMIC_YEARS: 'academic_years',
   CLASSES: 'classes',
   SECTIONS: 'sections',
-  CLASSES_SECTIONS: 'classes_sections', // Keep for backward compatibility
+  CLASSES_SECTIONS: 'classes',
   SUBJECTS: 'subjects',
   SUBJECT_CATEGORIES: 'subject_categories',
-  HOLIDAYS: 'holidays',
+  HOLIDAYS: 'holiday_management',
   HOLIDAY_MANAGEMENT: 'holiday_management',
   LOCATIONS: 'locations',
-  TIMETABLES: 'timetables',
+  TIMETABLES: 'timetable_management',
   TIMETABLE_MANAGEMENT: 'timetable_management',
-  PARENTS: 'parents',
+  PARENTS: 'parent_management',
   PARENT_MANAGEMENT: 'parent_management',
-  ROLES_PERMISSIONS: 'roles_permissions',
+  ROLES_PERMISSIONS: 'role_management',
   CLASS_SUBJECT_MAPPINGS: 'class_subject_mappings',
 
   // User & Role Management (web app's admin.permissions.ts resources)
@@ -63,53 +63,53 @@ export const PERMISSION_RESOURCES = {
   // Reports module (web app's per-module report resources)
   STAFF_REPORTS: 'staff_reports',
   STUDENT_REPORTS: 'student_reports',
-  TRANSPORT_REPORTS: 'transport_reports',
-  ACADEMIC_REPORTS: 'academic_reports',
+  TRANSPORT_REPORTS: 'transport_trips',
+  ACADEMIC_REPORTS: 'exams',
 
   // Expense module
   EXPENSE_CATEGORIES: 'expense_categories',
   EXPENSE_TYPES: 'expense_types',
   EXPENSE_TRANSACTIONS: 'expense_transactions',
-  EXPENSE_TRANSACTION_ITEMS: 'expense_transaction_items',
+  EXPENSE_TRANSACTION_ITEMS: 'expense_transactions',
   EXPENSE_ATTACHMENTS: 'expense_attachments',
   EXPENSE_AUDIT_LOGS: 'expense_audit_logs',
   EXPENSE_SETTINGS: 'expense_settings',
   EXPENSE_REPORTS: 'expense_reports',
-  EXPENSE_APPROVALS: 'expense_approvals',
-  EXPENSE_AUDIT: 'expense_audit',
+  EXPENSE_APPROVALS: 'expense_transactions',
+  EXPENSE_AUDIT: 'expense_audit_logs',
   EXPENSE_DEPARTMENTS: 'expense_departments',
 
   // Exam module
   EXAMS: 'exams',
-  EXAM_DATES: 'exam_dates',
+  EXAM_DATES: 'exams',
   EXAM_MARKS: 'exam_marks',
-  EXAM_MARK_ENTRIES: 'exam_mark_entries',
-  EXAM_SCHEDULES: 'exam_schedules',
-  EXAM_HALL_TICKETS: 'exam_hall_tickets',
+  EXAM_MARK_ENTRIES: 'exam_marks',
+  EXAM_SCHEDULES: 'exams',
+  EXAM_HALL_TICKETS: 'exams',
   EXAM_RESULTS: 'exam_results',
-  GRADE_SCHEMES: 'grade_schemes',
-  EXAM_GRADE_SCHEMES: 'exam_grade_schemes',
-  EXAM_REMARKS: 'exam_remarks',
-  EXAM_AUDIT: 'exam_audit',
+  GRADE_SCHEMES: 'exams',
+  EXAM_GRADE_SCHEMES: 'exams',
+  EXAM_REMARKS: 'exams',
+  EXAM_AUDIT: 'exams',
 
   // Communication module
-  COMMUNICATION: 'communication',
-  COMMUNICATION_TEMPLATES: 'communication_templates',
-  COMMUNICATION_LOGS: 'communication_logs',
+  COMMUNICATION: 'communications',
+  COMMUNICATION_TEMPLATES: 'communications',
+  COMMUNICATION_LOGS: 'communications',
   ANNOUNCEMENTS: 'announcements',
 
   // Administration module
-  ADMIN_USERS: 'users',
-  ADMIN_ROLES: 'roles',
-  ADMIN_PERMISSIONS: 'permissions',
-  ADMIN_MENU: 'menu',
+  ADMIN_USERS: 'user_management',
+  ADMIN_ROLES: 'role_management',
+  ADMIN_PERMISSIONS: 'resource_permission_management',
+  ADMIN_MENU: 'menu_management',
   SCHOOL_SETTINGS: 'school_settings',
 
   // Profile and settings
   PROFILE: 'profile',
-  STUDENT_PROFILE: 'student_profile',
-  STAFF_PROFILE: 'staff_profile',
-  PARENT_PROFILE: 'parent_profile',
+  STUDENT_PROFILE: 'profile',
+  STAFF_PROFILE: 'profile',
+  PARENT_PROFILE: 'profile',
   SETTINGS: 'settings',
 } as const;
 

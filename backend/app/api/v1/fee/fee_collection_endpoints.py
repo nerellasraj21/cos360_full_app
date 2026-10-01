@@ -367,7 +367,7 @@ async def send_receipt_sms(
     from app.models.fee.fee_transaction_model import FeeTransaction
     from app.models.masters.parent_model import Parent
     from app.models.student.student_model import Student
-    from app.models.student.student_parent_association_model import StudentParentLink
+    from app.models.masters.student_parent_association_model import StudentParentLink
     from app.tasks.communication.send_tasks import send_notification_batch
 
     current_user = await get_current_user_token(request)

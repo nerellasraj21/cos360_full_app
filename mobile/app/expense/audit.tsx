@@ -323,7 +323,7 @@ export default function ExpenseAuditScreen() {
   return (
     <ScreenAccessGate
       title="Expense Audit"
-      resources={['expense_audit']}
+      resources={['expense_audit_logs']}
     >
       <ExpenseAuditScreenContent />
     </ScreenAccessGate>

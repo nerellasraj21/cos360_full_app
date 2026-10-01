@@ -63,7 +63,7 @@ const REPORT_MODULES: {
     darkBg: '#EC489920',
     title: 'Transport Reports',
     subtitle: 'Route utilisation, student transport summary',
-    resources: ['transport_routes', 'transport_vehicles', 'transport_trips'],
+    resources: ['routes', 'vehicles', 'transport_trips'],
   },
 ];
 

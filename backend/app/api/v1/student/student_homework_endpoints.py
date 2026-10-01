@@ -15,7 +15,7 @@ from app.models.communication.communication_model import NotificationQueue
 from app.models.masters.parent_model import Parent
 from app.models.student.student_homework_model import StudentHomework
 from app.models.student.student_model import Student
-from app.models.student.student_parent_association_model import StudentParentLink
+from app.models.masters.student_parent_association_model import StudentParentLink
 from app.tasks.communication.send_tasks import send_notification_batch
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 

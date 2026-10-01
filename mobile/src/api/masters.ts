@@ -228,16 +228,48 @@ export interface HolidayUpdate {
   color?: string;
 }
 
-export interface Parent {
+export type ParentRelation = 'Father' | 'Mother' | 'Guardian';
+export type ParentGender = 'Male' | 'Female' | 'Other';
+export type ParentSalaryRange = 'below_1l' | '1l_3l' | '3l_5l' | '5l_10l' | 'above_10l';
+
+export interface ParentStudentSimple {
   id: string;
   first_name: string;
   last_name: string;
-  email: string;
-  phone: string;
-  address?: string;
+}
+
+export interface Parent {
+  id: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  occupation: string | null;
+  aadhar_number: string | null;
+  gender: string | null;
+  relation_to_student: string | null;
+  salary_range: string | null;
+  students: ParentStudentSimple[];
+}
+
+export interface ParentCreate {
+  name?: string;
+  email?: string;
+  phone?: string;
   occupation?: string;
-  is_active: boolean;
-  students: Student[];
+  aadhar_number?: string;
+  gender?: ParentGender;
+  relation_to_student: ParentRelation;
+  salary_range?: ParentSalaryRange;
+}
+
+export type ParentUpdate = Partial<ParentCreate>;
+
+export interface ParentListResponse {
+  items: Parent[];
+  total_count: number;
+  has_next: boolean;
+  skip: number;
+  limit: number;
 }
 
 export interface Staff {
@@ -1030,16 +1062,25 @@ export const holidaysApi = {
 // Parents API
 export const parentsApi = {
   getParents: async (): Promise<Parent[]> => {
-    const response = await apiClient.get('/parents/');
-    return response.data.items || response.data;
+    const pageSize = 1000;
+    const all: Parent[] = [];
+    let skip = 0;
+    for (let page = 0; page < 50; page += 1) {
+      const response = await apiClient.get('/parents/', { params: { skip, limit: pageSize } });
+      const items: Parent[] = response.data?.items ?? response.data ?? [];
+      all.push(...items);
+      if (!response.data?.has_next || items.length === 0) break;
+      skip += pageSize;
+    }
+    return all;
   },
 
-  createParent: async (data: Omit<Parent, 'id' | 'students'>): Promise<Parent> => {
+  createParent: async (data: ParentCreate): Promise<Parent> => {
     const response = await apiClient.post('/parents/', data);
     return response.data;
   },
 
-  updateParent: async (id: string, data: Partial<Parent>): Promise<Parent> => {
+  updateParent: async (id: string, data: ParentUpdate): Promise<Parent> => {
     const response = await apiClient.patch(`/parents/${id}`, data);
     return response.data;
   },

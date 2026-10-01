@@ -143,7 +143,7 @@ export default function ParentDocumentsScreen() {
     <ScreenAccessGate
       title="Documents"
       permissions={[
-        ['parent_profile', 'read_own'],
+        ['profile', 'read_own'],
         ['students', 'read'],
         ['student_documents', 'read'],
         ['student_documents', 'list'],

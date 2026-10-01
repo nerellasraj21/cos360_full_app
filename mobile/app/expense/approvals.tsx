@@ -107,7 +107,7 @@ export default function ExpenseApprovalsScreen() {
           </ThemedText>
         </View>
 
-        <ApprovePermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_APPROVALS} fallback={null} loadingFallback={null}>
+        <ApprovePermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS} fallback={null} loadingFallback={null}>
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={[styles.actionButton, styles.rejectButton]}
@@ -152,7 +152,7 @@ export default function ExpenseApprovalsScreen() {
   }
 
   return (
-    <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_APPROVALS}>
+    <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS}>
       <AppLayout title="Expense Approvals">
         <View style={styles.container}>
         <FlatList

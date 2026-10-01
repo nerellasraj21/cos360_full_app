@@ -25,7 +25,7 @@ const TAB_CONFIGS: TabConfig[] = [
   },
   {
     name: 'masters',
-    moduleResources: ['academic_years', 'classes', 'subjects', 'holidays', 'timetables'],
+    moduleResources: ['academic_years', 'classes', 'subjects', 'holiday_management', 'timetable_management'],
     requireAll: false,
     hideForRoles: ['student', 'parent', 'guardian', 'father', 'mother'], // Web parity: student/parent have no Masters module
   },
@@ -59,7 +59,7 @@ const TAB_CONFIGS: TabConfig[] = [
   },
   {
     name: 'admin',
-    moduleResources: ['users', 'roles', 'permissions', 'menu', 'school_settings', 'announcements'],
+    moduleResources: ['user_management', 'role_management', 'resource_permission_management', 'menu_management', 'school_settings', 'announcements'],
     requireAll: false,
   },
   {

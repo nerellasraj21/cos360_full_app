@@ -1,3 +1,4 @@
+from datetime import date
 import logging
 import re
 from uuid import UUID, uuid4
@@ -9,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from app.db.tenant_session import AsyncSessionLocal
 from app.models.auth.role_model import Role
 from app.models.auth.user_model import User
+from app.models.masters.academic_year_model import AcademicYear
 from app.models.public.plan_model import Plan
 from app.models.public.tenant_model import Tenant
 from app.service.tenant.role_seed_service import PlanNotConfiguredError, RoleSeedService
@@ -58,6 +60,20 @@ class TenantProvisioningService:
                 await session.flush()
 
                 seeded = await RoleSeedService.seed_defaults(session)
+
+                has_year = (await session.execute(select(AcademicYear.id).limit(1))).scalars().first()
+                if has_year is None:
+                    today = date.today()
+                    start_year = today.year if today.month >= 6 else today.year - 1
+                    session.add(
+                        AcademicYear(
+                            title=f"{start_year}-{start_year + 1}",
+                            start_date=date(start_year, 6, 1),
+                            end_date=date(start_year + 1, 3, 31),
+                            is_active=True,
+                        )
+                    )
+                    await session.flush()
 
                 admin_user_id = None
                 if admin_username:

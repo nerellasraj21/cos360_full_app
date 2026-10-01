@@ -508,7 +508,7 @@ export default function AdminUsersScreen() {
   return (
     <ScreenAccessGate
       title="User Management"
-      resources={['users']}
+      resources={['user_management']}
     >
       <AdminUsersScreenContent />
     </ScreenAccessGate>

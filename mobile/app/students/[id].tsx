@@ -119,7 +119,7 @@ export default function StudentDetailsScreen() {
 
   return (
     <ReadPermissionGuard
-      resource={PERMISSION_RESOURCES.STUDENTS}
+      resource={PERMISSION_RESOURCES.STUDENT_ADMISSIONS}
       fallback={
         <AppLayout title="Student Details">
           <View style={styles.center}>
@@ -297,7 +297,7 @@ export default function StudentDetailsScreen() {
 
           {/* Actions */}
           <View style={styles.actions}>
-            <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENTS} fallback={null}>
+            <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_ADMISSIONS} fallback={null}>
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: colors.primary }]}
                 onPress={() => router.push({ pathname: '/students/admission', params: { id: student.student.id } })}

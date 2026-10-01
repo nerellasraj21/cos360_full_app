@@ -47,6 +47,16 @@ const formatINR = (amount: number | string | undefined | null): string => {
   return `₹${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
+const getRefundTransactionId = (refund: any): string => refund?.fee_transaction_id ?? refund?.transaction_id ?? '';
+
+const getRefundDateKey = (refund: any): string => String(refund?.requested_date ?? refund?.refund_date ?? refund?.created_at ?? '').slice(0, 10);
+
+const formatRefundDate = (refund: any): string => {
+  const raw = refund?.requested_date ?? refund?.refund_date ?? refund?.created_at;
+  const date = raw ? new Date(raw) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString() : '-';
+};
+
 export default function FeeRefundsScreen() {
    const { isAuthenticated, isLoading: authLoading, role } = useAuth();
    const router = useRouter();
@@ -338,37 +348,35 @@ export default function FeeRefundsScreen() {
       return;
     }
 
-    // processed_by is not part of FeeRefundCreateRequest but the backend accepts it,
-    // so it stays on the payload behind a widened local type.
-    const data: FeeRefundRequest & { processed_by?: string } = {
-      transaction_id: formData.fee_transaction_id,
+    const data = {
+      fee_transaction_id: formData.fee_transaction_id,
       refund_amount: formData.refund_amount,
       refund_reason: formData.refund_reason,
       detailed_reason: formData.detailed_reason,
-      refund_date: new Date().toISOString().split('T')[0],
-      processed_by: formData.requested_by_user_id,
-      refund_method: 'cash',
+      student_id: formData.student_id,
+      student_admission_num: formData.student_admission_num,
       academic_year_id: formData.academic_year_id,
+      requested_by_user_id: formData.requested_by_user_id,
     };
 
-    createMutation.mutate(data);
+    createMutation.mutate(data as unknown as FeeRefundRequest);
   };
 
   const filteredRefunds = refundsWithStatus.filter(refund => {
-    const transaction = transactions.find(t => t.id === refund.transaction_id);
-    const student = students.find(s => s.id === transaction?.student_id);
+    const transaction = transactions.find(t => t.id === getRefundTransactionId(refund));
+    const student = students.find(s => s.id === ((refund as any).student_id ?? transaction?.student_id));
 
     if (filters.status && refund.status !== filters.status) return false;
     if (filters.student_id && student?.id !== filters.student_id) return false;
     if (filters.refund_reason && !(refund.refund_reason ?? '').toLowerCase().includes(filters.refund_reason.toLowerCase())) return false;
-    if (filters.requested_date_from && refund.refund_date < filters.requested_date_from) return false;
-    if (filters.requested_date_to && refund.refund_date > filters.requested_date_to) return false;
+    if (filters.requested_date_from && getRefundDateKey(refund) < filters.requested_date_from) return false;
+    if (filters.requested_date_to && getRefundDateKey(refund) > filters.requested_date_to) return false;
     return true;
   });
 
   const renderRefundItem = ({ item, index }: { item: FeeRefundWithStatus; index: number }) => {
-    const transaction = transactions.find(t => t.id === item.transaction_id);
-    const student = students.find(s => s.id === transaction?.student_id);
+    const transaction = transactions.find(t => t.id === getRefundTransactionId(item));
+    const student = students.find(s => s.id === ((item as any).student_id ?? transaction?.student_id));
     const staffMember = staffList.find((s: any) => s.id === item.processed_by);
     const refundRef = (item as any).refund_number ?? item.id?.slice(-8) ?? 'N/A';
 
@@ -391,11 +399,13 @@ export default function FeeRefundsScreen() {
             Refund #{refundRef}
           </Text>
           <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
-            Student: {student?.display_name || 'Unknown'}
+            Student: {student?.display_name || (item as any).student_admission_num || 'Unknown'}
           </Text>
-          <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
-            Transaction: {transaction?.transaction_number || 'N/A'}
-          </Text>
+          {!!transaction?.transaction_number && (
+            <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
+              Transaction: {transaction.transaction_number}
+            </Text>
+          )}
           <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
             Amount: {formatINR(item.refund_amount)}
           </Text>
@@ -403,7 +413,7 @@ export default function FeeRefundsScreen() {
             Reason: {formatReason(item.refund_reason)}
           </Text>
           <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
-            Date: {new Date(item.refund_date).toLocaleDateString()}
+            Date: {formatRefundDate(item)}
           </Text>
           <View style={styles.statusContainer}>
             <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
@@ -420,7 +430,7 @@ export default function FeeRefundsScreen() {
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.secondary }]}
-            onPress={() => handleViewSummary(item.transaction_id)}
+            onPress={() => handleViewSummary(getRefundTransactionId(item))}
           >
             <Ionicons name="information-circle" size={16} color="white" />
           </TouchableOpacity>
@@ -788,7 +798,7 @@ export default function FeeRefundsScreen() {
                           Reason: {formatReason(refund.refund_reason)}
                         </Text>
                         <Text style={[styles.summaryRefundText, { color: colors['muted-foreground'] }]}>
-                          Date: {new Date(refund.refund_date).toLocaleDateString()}
+                          Date: {formatRefundDate(refund)}
                         </Text>
                       </View>
                     ))}

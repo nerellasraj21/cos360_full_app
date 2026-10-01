@@ -191,7 +191,7 @@ export default function TransportReportsScreen() {
   return (
     <ScreenAccessGate
       title="Transport Reports"
-      resources={['transport_routes', 'transport_vehicles', 'transport_trips']}
+      resources={['routes', 'vehicles', 'transport_trips']}
       blockRoles={['student']}
     >
       <TransportReportsScreenContent />

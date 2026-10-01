@@ -108,7 +108,7 @@ export default function SelectChildScreen() {
   return (
     <ScreenAccessGate
       title="Select Child"
-      permissions={[['parent_profile', 'read_own'], ['students', 'read']]}
+      permissions={[['profile', 'read_own'], ['students', 'read']]}
     >
       <SelectChildScreenContent />
     </ScreenAccessGate>

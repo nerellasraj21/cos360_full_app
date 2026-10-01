@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     # Secrets
     SECRET_KEY: str
+    SUPER_ADMIN_INITIAL_PASSWORD: str | None = None
 
     # JWT configuration
     JWT_SECRET_KEY: str

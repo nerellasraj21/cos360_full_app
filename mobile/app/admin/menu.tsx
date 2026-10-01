@@ -342,7 +342,7 @@ export default function AdminMenuScreen() {
   return (
     <ScreenAccessGate
       title="Menu Management"
-      resources={['menu']}
+      resources={['menu_management']}
     >
       <AdminMenuScreenContent />
     </ScreenAccessGate>

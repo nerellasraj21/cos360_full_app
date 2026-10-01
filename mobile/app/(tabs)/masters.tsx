@@ -39,11 +39,11 @@ const FALLBACK_SECTIONS: (MastersSection & { resource: string })[] = [
   { id: 'subjectcategories', name: 'Subject Categories', path: '/masters/subjectcategories', resource: 'subject_categories' },
   { id: 'subjects', name: 'Subjects', path: '/masters/subjects', resource: 'subjects' },
   { id: 'classsubjectmappings', name: 'Class Subject Mappings', path: '/masters/classsubjectmappings', resource: 'class_subject_mappings' },
-  { id: 'parents', name: 'Parents', path: '/masters/parents', resource: 'parents' },
-  { id: 'holidays', name: 'Holidays', path: '/masters/holidays', resource: 'holidays' },
-  { id: 'timetable', name: 'Timetable Management', path: '/masters/timetable', resource: 'timetables' },
+  { id: 'parents', name: 'Parents', path: '/masters/parents', resource: 'parent_management' },
+  { id: 'holidays', name: 'Holidays', path: '/masters/holidays', resource: 'holiday_management' },
+  { id: 'timetable', name: 'Timetable Management', path: '/masters/timetable', resource: 'timetable_management' },
   { id: 'locations', name: 'Locations', path: '/masters/locations', resource: 'locations' },
-  { id: 'rolespermissions', name: 'Roles & Permissions', path: '/masters/rolespermissions', resource: 'roles_permissions' },
+  { id: 'rolespermissions', name: 'Roles & Permissions', path: '/masters/rolespermissions', resource: 'role_management' },
 ];
 
 export default function MastersScreen() {

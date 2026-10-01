@@ -115,7 +115,7 @@ export default function LoginForm({
                   <Input
                     id="username"
                     type="text"
-                    placeholder="Email or Admission Number"
+                    placeholder="Username or Admission Number"
                     required
                   />
                 </div>

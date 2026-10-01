@@ -72,7 +72,7 @@ How requests resolve to a tenant is in [../architecture.md](../architecture.md).
 8. **`POST /super_admin/system/tenants/` is the onboarding path.**
    - Query parameters `client_name` and `plan_id`, plus an optional JSON body `{username, email, password}` for the first Admin. The password is never a query parameter.
    - One transaction creates the tenant, the five system roles, their permissions limited to the plan, and the role menu links. A plan with no resources fails with 409 and nothing is created.
-   - It does not create an academic year (nobody can log in without one), certificate templates, or the shared menu catalog and plan access, which must exist first.
+   - It also creates a default active academic year (June 1 to March 31, titled like `2026-2027`) if the tenant has none, because nobody can log in without one. It does not create certificate templates, or the shared menu catalog and plan access, which must exist first.
 9. **Role names are the join key throughout the system.** The first-login role list, `entity_id` resolution, the system-role protection list, the frontend Teacher/Staff allowlists and the seed scripts all match on the literal name. That is why system roles cannot be renamed. A custom role gets none of that behaviour.
 10. **Role reassignment takes effect only at the user's next login.** Runtime checks use the `role` claim in the JWT, and `/auth/refresh` copies it (see [auth.md](auth.md)).
 11. **Admin password reset has no safeguards.**
@@ -102,7 +102,7 @@ How requests resolve to a tenant is in [../architecture.md](../architecture.md).
     | Status | Endpoints |
     |---|---|
     | Intended | `/auth/academic-years`, `/auth/login`, `/auth/refresh`, `/auth/staff/set-password`, `/super_admin/auth/login`, `/health*` |
-    | **Not intended; dangerous** | `/super_admin/setup/initialize` (creates a super admin with a hardcoded password and returns it), `/auth/seed/{permission-data,verify-permission-data,location-data,caste-data}`. `POST /auth/seed/all-role-permissions` now requires an Admin, and the old `/auth/test-setup/*` and `/auth/fix-permissions/*` routers were removed. |
+    | **Not intended; dangerous** | `/super_admin/setup/initialize` (unauthenticated; refuses with 409 once any super admin exists, and takes the password from `SUPER_ADMIN_INITIAL_PASSWORD`, 400 if unset, but still echoes it in the response), `/auth/seed/{permission-data,verify-permission-data,location-data,caste-data}`. `POST /auth/seed/all-role-permissions` now requires an Admin, and the old `/auth/test-setup/*` and `/auth/fix-permissions/*` routers were removed. |
 
 17. **No per-tenant DDL remains.** Super-admin tenant data uses a `{tenant_id}` path parameter, validated against `public.tenants`, and each query runs in a tenant session. `/super_admin/tenant-data/schemas/` now returns `available_tenants`. `GET .../reports/` reads `report_audit` for the tenant, because the table it used to read does not exist.
 ## Web / mobile parity
@@ -119,8 +119,8 @@ How requests resolve to a tenant is in [../architecture.md](../architecture.md).
 ## Known gaps
 
 - Serious unauthenticated endpoints need to be removed or guarded before any public deployment (gotcha 16).
-- `POST /super_admin/setup/initialize` is unauthenticated and returns a hardcoded password (gotcha 16), and the onboarding scripts under `scripts/` still assume per-tenant schemas.
-- Provisioning does not seed an academic year or certificate templates, and the shared menu catalog must be imported before a plan can grant menus.
+- `POST /super_admin/setup/initialize` is unauthenticated and echoes the operator-set initial password, though it is one-shot (gotcha 16), and the onboarding scripts under `scripts/` still assume per-tenant schemas.
+- Provisioning does not seed certificate templates, and the shared menu catalog must be imported before a plan can grant menus.
 - There is no super-admin UI and no super-admin token refresh.
 - Plan resource edits reach tenants only when the plan is re-applied (gotcha 6).
 - Role edit/delete is broken on both clients (gotcha 12), and the permission templates are stale (gotcha 13).

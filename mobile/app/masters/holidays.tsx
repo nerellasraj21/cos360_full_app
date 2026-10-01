@@ -293,9 +293,9 @@ export default function HolidaysScreen() {
   const { hasPermission } = useAuth();
   const { activeAcademicYearId } = useAcademicYear();
 
-  const hasCreatePermission = hasPermission('holidays', 'create');
-  const hasUpdatePermission = hasPermission('holidays', 'update');
-  const hasDeletePermission = hasPermission('holidays', 'delete');
+  const hasCreatePermission = hasPermission('holiday_management', 'create');
+  const hasUpdatePermission = hasPermission('holiday_management', 'update');
+  const hasDeletePermission = hasPermission('holiday_management', 'delete');
 
   // ── View / navigation state ────────────────────────────────────────────
   const [view, setView] = useState<ViewType>('month');

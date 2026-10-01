@@ -80,7 +80,7 @@ function ExpenseTransactionsScreenContent() {
   const deleteMutation = useDeleteExpenseTransactionProtected();
 
   const allTransactions: ExpenseTransaction[] = useMemo(() => {
-    const items = (raw as any)?.items ?? [];
+    const items: ExpenseTransaction[] = Array.isArray(raw) ? raw : (raw as any)?.items ?? [];
     return items.filter((t: ExpenseTransaction) => {
       if (vendorFilter.trim() && !(t.vendor_name ?? '').toLowerCase().includes(vendorFilter.toLowerCase())) return false;
       if (fromDate && t.transaction_date < fromDate) return false;

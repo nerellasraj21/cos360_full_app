@@ -124,11 +124,11 @@ async def delete_exam_endpoint(
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
 ):
-    """Delete an exam (draft status only)."""
+    """Delete a non-published exam together with its marks and results."""
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     await check_role_plan_permission_with_error(db, request, role, "exams", "delete")
-    await delete_exam(db, exam_id)
+    await delete_exam(db, exam_id, performed_by=uuid.UUID(current_user.get("sub") or current_user.get("id")))
     await db.commit()
 
 

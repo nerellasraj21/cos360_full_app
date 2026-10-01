@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import TIMESTAMP, Boolean, Column, ForeignKey, String, func
+from sqlalchemy import TIMESTAMP, Boolean, Column, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -9,9 +9,10 @@ from app.db.base import BaseOrg
 
 class Section(BaseOrg):
     __tablename__ = "sections"
+    __table_args__ = (UniqueConstraint("class_id", "name", name="sections_tenant_id_class_id_name_key"),)
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
-    name = Column(String(50), nullable=False, unique=True)
+    name = Column(String(50), nullable=False)
     description = Column(String(50), nullable=True)
     is_active = Column(Boolean, default=False)
     class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False)

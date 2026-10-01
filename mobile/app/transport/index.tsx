@@ -118,7 +118,7 @@ export default function TransportIndexScreen() {
   return (
     <ScreenAccessGate
       title="Transport"
-      resources={['transport_routes', 'transport_vehicles', 'transport_trips']}
+      resources={['routes', 'vehicles', 'transport_trips']}
     >
       <TransportIndexScreenContent />
     </ScreenAccessGate>

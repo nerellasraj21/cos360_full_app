@@ -245,10 +245,9 @@ async def send_results_notification(
 
     from app.models.communication.communication_model import NotificationQueue
     from app.models.exam.exam_model import Exam
-    from app.models.exam.student_exam_result_model import StudentExamResult
+    from app.models.exam.student_result_model import StudentExamResult
     from app.models.masters.parent_model import Parent
     from app.models.student.student_model import Student
-    from app.models.student.student_parent_association_model import StudentParentLink
     from app.tasks.communication.send_tasks import send_notification_batch
 
     current_user = await get_current_user_token(request)
@@ -281,8 +280,8 @@ async def send_results_notification(
                 )
             )
             result = result_rec.scalar_one_or_none()
-            marks = f"{result.marks_obtained}" if result and hasattr(result, 'marks_obtained') else "N/A"
-            percentage = f"{result.percentage}" if result and hasattr(result, 'percentage') else "N/A"
+            marks = f"{result.total_marks_obtained}" if result and result.total_marks_obtained is not None else "N/A"
+            percentage = f"{result.percentage}" if result and result.percentage is not None else "N/A"
 
             parent_result = await db.execute(
                 select(Parent.name, Parent.phone)

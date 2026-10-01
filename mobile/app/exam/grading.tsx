@@ -131,7 +131,7 @@ export default function GradingScreen() {
   return (
     <ScreenAccessGate
       title="Grading"
-      resources={['exam_grade_schemes', 'exams']}
+      resources={['exams']}
     >
       <GradingScreenContent />
     </ScreenAccessGate>

@@ -72,9 +72,9 @@ Endpoint prefixes (all under `/api/v1`). Note that the naming is inconsistent (u
    - Dropdown items: always `{id, name}` (years use `{id, title}`). Mobile `getClassSectionsDropdown`/`getHolidaysDropdown` are typed `{id,label}`, which is wrong.
 8. **`SubjectRead.category` is required.** A subject with a null `category_id` (the column is nullable) breaks every subject response with a 500. Always set a category.
 9. **Uniqueness depends on which layer checks it.**
-   - The models declare `unique=True` on `classes.name`, `sections.name`, `subjects.name` and `subject_categories.name`.
+   - The models declare `unique=True` on `classes.name`, `subjects.name` and `subject_categories.name`. Sections are unique per class (`tenant_id, class_id, name`, migration 0005), so every class can have its own A, B, C.
    - The service only checks subject name and short code *per academic year*. Category names are compared case-sensitively.
-   - Section names are meant to repeat across classes (the web generates A–D for every class). Treat global uniqueness as unverified in tenant schemas, which are cloned from `cos360_master`, before relying on either behaviour.
+   - Section names repeat across classes (the web generates A–D for every class); a Section row belongs to one class through `class_id`, there is no shared mapping table.
 10. **A CSM created with a null section** (single `POST /` with no `section_id`) is a class-level row.
     - Postgres unique constraints treat NULLs as distinct, so duplicates are possible.
     - `GET /dropdown` fails validation for such rows (`section_name: str`).

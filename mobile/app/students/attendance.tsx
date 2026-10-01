@@ -705,7 +705,7 @@ function StaffAttendanceView() {
         )}
 
         {/* Total students summary bar */}
-        {selectedClass && stats.total > 0 && (
+        {!!selectedClass && stats.total > 0 && (
           <View style={sStyles.totalRow}>
             <View style={sStyles.progressBar}>
               <View style={[sStyles.progressSegment, { flex: stats.present, backgroundColor: '#22C55E' }]} />

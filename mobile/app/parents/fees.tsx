@@ -182,7 +182,7 @@ export default function ParentFeesScreen() {
     <ScreenAccessGate
       title="Fees"
       permissions={[
-        ['parent_profile', 'read_own'],
+        ['profile', 'read_own'],
         ['students', 'read'],
         ['fee_transactions', 'read'],
         ['fee_transactions', 'read_own'],

@@ -54,8 +54,7 @@ export const SimplePermissionTest: React.FC = () => {
         <PermissionGuard
           permissions={[
             ['classes', 'list'],
-            ['sections', 'list'],
-            ['classes_sections', 'list']
+            ['sections', 'list']
           ]}
           requireAll={false}
           fallback={<ThemedText style={styles.error}>❌ No matching permissions found</ThemedText>}

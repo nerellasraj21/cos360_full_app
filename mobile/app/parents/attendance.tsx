@@ -201,7 +201,7 @@ export default function ParentAttendanceScreen() {
     <ScreenAccessGate
       title="Attendance"
       permissions={[
-        ['parent_profile', 'read_own'],
+        ['profile', 'read_own'],
         ['students', 'read'],
         ['student_attendance', 'read'],
         ['student_attendance', 'list'],

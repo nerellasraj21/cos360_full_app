@@ -3,12 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -20,35 +20,106 @@ import {
 import { useToastContext } from '@/components/ToastProvider';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts';
-import { parentsApi, type Parent } from '@/src/api/masters';
+import {
+  parentsApi,
+  type Parent,
+  type ParentCreate,
+  type ParentGender,
+  type ParentRelation,
+  type ParentSalaryRange,
+} from '@/src/api/masters';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { ScreenAccessGate } from '@/components/ScreenAccessGate';
+import {
+  CreatePermissionGuard,
+  DeletePermissionGuard,
+  UpdatePermissionGuard,
+} from '@/components/PermissionGuards';
+import { CustomDropdown } from '@/components/ui/dropdown';
 
 const COLOR = '#f59e0b';
 
+const RELATION_OPTIONS: { label: string; value: ParentRelation }[] = [
+  { label: 'Father', value: 'Father' },
+  { label: 'Mother', value: 'Mother' },
+  { label: 'Guardian', value: 'Guardian' },
+];
+
+const GENDER_OPTIONS: { label: string; value: ParentGender }[] = [
+  { label: 'Male', value: 'Male' },
+  { label: 'Female', value: 'Female' },
+  { label: 'Other', value: 'Other' },
+];
+
+const SALARY_OPTIONS: { label: string; value: ParentSalaryRange }[] = [
+  { label: 'Below 1 lakh', value: 'below_1l' },
+  { label: '1 to 3 lakhs', value: '1l_3l' },
+  { label: '3 to 5 lakhs', value: '3l_5l' },
+  { label: '5 to 10 lakhs', value: '5l_10l' },
+  { label: 'Above 10 lakhs', value: 'above_10l' },
+];
+
+const RELATION_COLORS: Record<string, string> = {
+  Father: '#3b82f6',
+  Mother: '#ec4899',
+  Guardian: '#8b5cf6',
+};
+
 type ParentFormData = {
-  first_name: string;
-  last_name: string;
+  name: string;
   email: string;
   phone: string;
-  address: string;
   occupation: string;
-  is_active: boolean;
+  aadhar_number: string;
+  gender: ParentGender | null;
+  relation_to_student: ParentRelation;
+  salary_range: ParentSalaryRange | null;
 };
 
 const emptyForm: ParentFormData = {
-  first_name: '',
-  last_name: '',
+  name: '',
   email: '',
   phone: '',
-  address: '',
   occupation: '',
-  is_active: true,
+  aadhar_number: '',
+  gender: null,
+  relation_to_student: 'Father',
+  salary_range: null,
 };
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function parentLabel(p: Parent): string {
+  const n = (p.name ?? '').trim();
+  return n || p.relation_to_student || 'Parent';
+}
+
+function parentInitials(p: Parent): string {
+  const n = (p.name ?? '').trim();
+  if (n) {
+    const parts = n.split(/\s+/).filter(Boolean);
+    const first = parts[0]?.[0] ?? '';
+    const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
+    return (first + last).toUpperCase() || '?';
+  }
+  return (p.relation_to_student ?? '?').slice(0, 1).toUpperCase() || '?';
+}
+
+function buildPayload(form: ParentFormData): ParentCreate {
+  const payload: ParentCreate = { relation_to_student: form.relation_to_student };
+  if (form.name.trim()) payload.name = form.name.trim();
+  if (form.email.trim()) payload.email = form.email.trim();
+  if (form.phone.trim()) payload.phone = form.phone.trim();
+  if (form.occupation.trim()) payload.occupation = form.occupation.trim();
+  if (form.aadhar_number.trim()) payload.aadhar_number = form.aadhar_number.trim();
+  if (form.gender) payload.gender = form.gender;
+  if (form.salary_range) payload.salary_range = form.salary_range;
+  return payload;
+}
 
 function ParentsScreenContent() {
   const { colors, theme } = useTheme();
-  const { showError } = useToastContext();
+  const { showSuccess, showError } = useToastContext();
   const { confirm, modalProps } = useConfirmModal();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -62,44 +133,57 @@ function ParentsScreenContent() {
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const inputBg = theme === 'dark' ? '#0d1117' : '#f8fafc';
 
-  const { data: parents = [], isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ['parents'],
     queryFn: () => parentsApi.getParents(),
   });
+  const parents: Parent[] = Array.isArray(data) ? data : [];
 
   const filteredParents = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return parents as Parent[];
-    return (parents as Parent[]).filter(p =>
-      `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
-      p.email.toLowerCase().includes(q) ||
-      (p.phone || '').includes(q)
+    if (!q) return parents;
+    return parents.filter(
+      p =>
+        (p.name ?? '').toLowerCase().includes(q) ||
+        (p.email ?? '').toLowerCase().includes(q) ||
+        (p.phone ?? '').toLowerCase().includes(q)
     );
   }, [parents, searchQuery]);
 
+  const closeModal = () => {
+    setModalVisible(false);
+    setEditingParent(null);
+    setForm(emptyForm);
+  };
+
   const createMutation = useMutation({
-    mutationFn: (data: ParentFormData) => parentsApi.createParent(data),
+    mutationFn: (payload: ParentCreate) => parentsApi.createParent(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['parents'] });
+      showSuccess('Parent Added', 'The parent profile was created');
       closeModal();
     },
-    onError: () => showError('Error', 'Failed to create parent'),
+    onError: (e: Error) => showError('Create Failed', e.message),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<ParentFormData> }) =>
-      parentsApi.updateParent(id, data),
+    mutationFn: ({ id, data: payload }: { id: string; data: ParentCreate }) =>
+      parentsApi.updateParent(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['parents'] });
+      showSuccess('Parent Updated', 'The parent profile was saved');
       closeModal();
     },
-    onError: () => showError('Error', 'Failed to update parent'),
+    onError: (e: Error) => showError('Update Failed', e.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => parentsApi.deleteParent(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['parents'] }),
-    onError: () => showError('Error', 'Failed to delete parent'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parents'] });
+      showSuccess('Parent Deleted', 'The parent profile was removed');
+    },
+    onError: (e: Error) => showError('Delete Failed', e.message),
   });
 
   const openCreate = () => {
@@ -109,45 +193,45 @@ function ParentsScreenContent() {
   };
 
   const openEdit = (parent: Parent) => {
+    const relation = RELATION_OPTIONS.find(o => o.value === parent.relation_to_student)?.value ?? 'Father';
+    const gender = GENDER_OPTIONS.find(o => o.value === parent.gender)?.value ?? null;
+    const salary = SALARY_OPTIONS.find(o => o.value === parent.salary_range)?.value ?? null;
     setEditingParent(parent);
     setForm({
-      first_name: parent.first_name,
-      last_name: parent.last_name,
-      email: parent.email,
-      phone: parent.phone || '',
-      address: parent.address || '',
-      occupation: parent.occupation || '',
-      is_active: parent.is_active !== false,
+      name: parent.name ?? '',
+      email: parent.email ?? '',
+      phone: parent.phone ?? '',
+      occupation: parent.occupation ?? '',
+      aadhar_number: parent.aadhar_number ?? '',
+      gender,
+      relation_to_student: relation,
+      salary_range: salary,
     });
     setModalVisible(true);
   };
 
-  const closeModal = () => {
-    setModalVisible(false);
-    setEditingParent(null);
-    setForm(emptyForm);
-  };
-
   const handleSubmit = () => {
-    if (!form.first_name.trim() || !form.last_name.trim()) {
-      showError('Validation', 'First and last name are required');
+    if (form.email.trim() && !EMAIL_RE.test(form.email.trim())) {
+      showError('Validation', 'Enter a valid email address');
       return;
     }
-    if (!form.email.trim()) {
-      showError('Validation', 'Email is required');
+    const aadhar = form.aadhar_number.trim();
+    if (aadhar && !/^\d{12}$/.test(aadhar)) {
+      showError('Validation', 'Aadhar number must be 12 digits');
       return;
     }
+    const payload = buildPayload(form);
     if (editingParent) {
-      updateMutation.mutate({ id: editingParent.id, data: form });
+      updateMutation.mutate({ id: editingParent.id, data: payload });
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate(payload);
     }
   };
 
   const handleDelete = (parent: Parent) => {
     confirm({
       title: 'Delete Parent',
-      message: `Delete "${parent.first_name} ${parent.last_name}"? This cannot be undone.`,
+      message: `Delete "${parentLabel(parent)}"? This cannot be undone and removes all student associations.`,
       confirmLabel: 'Delete',
       destructive: true,
       onConfirm: () => deleteMutation.mutate(parent.id),
@@ -155,16 +239,114 @@ function ParentsScreenContent() {
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
-
   const inputStyle = { backgroundColor: inputBg, borderColor: borderCol, color: colors.foreground };
+  const muted = colors['muted-foreground'];
+
+  const renderItem = ({ item: p, index }: { item: Parent; index: number }) => {
+    const relation = p.relation_to_student ?? '';
+    const relColor = RELATION_COLORS[relation] ?? COLOR;
+    const childNames = (p.students ?? [])
+      .map(st => `${st.first_name ?? ''} ${st.last_name ?? ''}`.trim())
+      .filter(Boolean);
+    return (
+      <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
+        <View style={[styles.avatar, { backgroundColor: COLOR + '20' }]}>
+          <Text style={[styles.avatarText, { color: COLOR }]}>{parentInitials(p)}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.serialNo, { color: muted }]}>{index + 1}</Text>
+          <Text style={[styles.cardName, { color: colors.foreground }]}>{parentLabel(p)}</Text>
+          {!!relation && (
+            <View style={[styles.badge, { backgroundColor: relColor + '20' }]}>
+              <Text style={[styles.badgeText, { color: relColor }]}>{relation}</Text>
+            </View>
+          )}
+          {!!p.phone && (
+            <View style={styles.metaRow}>
+              <Ionicons name="call-outline" size={12} color={muted} />
+              <Text style={[styles.cardSub, { color: muted, marginBottom: 0 }]}>{p.phone}</Text>
+            </View>
+          )}
+          {!!p.email && (
+            <View style={styles.metaRow}>
+              <Ionicons name="mail-outline" size={12} color={muted} />
+              <Text style={[styles.cardSub, { color: muted, marginBottom: 0 }]}>{p.email}</Text>
+            </View>
+          )}
+          {!!p.occupation && (
+            <View style={styles.metaRow}>
+              <Ionicons name="briefcase-outline" size={12} color={muted} />
+              <Text style={[styles.cardSub, { color: muted, marginBottom: 0 }]}>{p.occupation}</Text>
+            </View>
+          )}
+          <View style={styles.studentRow}>
+            <Ionicons name="school-outline" size={12} color={muted} />
+            <Text style={[styles.studentCount, { color: muted, flex: 1 }]}>
+              {childNames.length > 0 ? childNames.join(', ') : 'No linked students'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.actions}>
+          <UpdatePermissionGuard resource={PERMISSION_RESOURCES.PARENTS} fallback={null} loadingFallback={null}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: '#dbeafe' }]}
+              onPress={() => openEdit(p)}
+              accessibilityLabel="Edit"
+            >
+              <Ionicons name="create-outline" size={15} color="#3b82f6" />
+            </TouchableOpacity>
+          </UpdatePermissionGuard>
+          <DeletePermissionGuard resource={PERMISSION_RESOURCES.PARENTS} fallback={null} loadingFallback={null}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: '#fee2e2', marginTop: 6 }]}
+              onPress={() => handleDelete(p)}
+              disabled={deleteMutation.isPending}
+              accessibilityLabel="Delete"
+            >
+              <Ionicons name="trash-outline" size={15} color="#ef4444" />
+            </TouchableOpacity>
+          </DeletePermissionGuard>
+        </View>
+      </View>
+    );
+  };
+
+  const listEmpty = isLoading ? (
+    <View style={styles.emptyState}>
+      <ActivityIndicator size="large" color={COLOR} />
+      <Text style={[styles.emptyText, { color: muted }]}>Loading parents...</Text>
+    </View>
+  ) : isError ? (
+    <View style={styles.errorBox}>
+      <Ionicons name="alert-circle-outline" size={44} color={colors.destructive} />
+      <Text style={[styles.emptyText, { color: muted }]}>
+        {(error as Error | null)?.message || 'Failed to load parents'}
+      </Text>
+      <TouchableOpacity style={[styles.emptyAddBtn, { backgroundColor: COLOR }]} onPress={() => refetch()}>
+        <Text style={styles.emptyAddBtnText}>Retry</Text>
+      </TouchableOpacity>
+    </View>
+  ) : (
+    <View style={styles.emptyState}>
+      <Ionicons name="home-outline" size={44} color={muted} />
+      <Text style={[styles.emptyText, { color: muted }]}>
+        {searchQuery ? 'No parents match your search' : 'No parents registered yet'}
+      </Text>
+      {!searchQuery && (
+        <CreatePermissionGuard resource={PERMISSION_RESOURCES.PARENTS} fallback={null} loadingFallback={null}>
+          <TouchableOpacity style={[styles.emptyAddBtn, { backgroundColor: COLOR }]} onPress={openCreate}>
+            <Text style={styles.emptyAddBtnText}>Add Parent</Text>
+          </TouchableOpacity>
+        </CreatePermissionGuard>
+      )}
+    </View>
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Banner */}
       <View style={[styles.banner, { backgroundColor: COLOR }]}>
         <View style={styles.bannerDecor} />
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}
-              accessibilityLabel="Go back">
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={20} color="white" />
         </TouchableOpacity>
         <View style={styles.bannerIcon}>
@@ -172,106 +354,43 @@ function ParentsScreenContent() {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.bannerTitle}>Parents</Text>
-          <Text style={styles.bannerSub}>{(parents as Parent[]).length} registered parents</Text>
+          <Text style={styles.bannerSub}>{parents.length} registered parents</Text>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={openCreate}
-              accessibilityLabel="Add">
-          <Ionicons name="add" size={20} color="white" />
-        </TouchableOpacity>
+        <CreatePermissionGuard resource={PERMISSION_RESOURCES.PARENTS} fallback={null} loadingFallback={null}>
+          <TouchableOpacity style={styles.addBtn} onPress={openCreate} accessibilityLabel="Add">
+            <Ionicons name="add" size={20} color="white" />
+          </TouchableOpacity>
+        </CreatePermissionGuard>
       </View>
 
-      {/* Search */}
       <View style={[styles.searchBox, { backgroundColor: cardBg, borderColor: borderCol }]}>
-        <Ionicons name="search" size={16} color={colors['muted-foreground']} />
+        <Ionicons name="search" size={16} color={muted} />
         <TextInput
           style={[styles.searchInput, { color: colors.foreground }]}
           placeholder="Search by name, email or phone..."
-          placeholderTextColor={colors['muted-foreground']}
+          placeholderTextColor={muted}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}
-              accessibilityLabel="Close">
-            <Ionicons name="close-circle" size={16} color={colors['muted-foreground']} />
+          <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityLabel="Clear search">
+            <Ionicons name="close-circle" size={16} color={muted} />
           </TouchableOpacity>
         )}
       </View>
 
       <FlatList
-        data={filteredParents}
+        data={isError ? [] : filteredParents}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={COLOR} />}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="home-outline" size={44} color={colors['muted-foreground']} />
-            <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>
-              {searchQuery ? 'No parents match your search' : 'No parents registered yet'}
-            </Text>
-            {!searchQuery && (
-              <TouchableOpacity style={[styles.emptyAddBtn, { backgroundColor: COLOR }]} onPress={openCreate}>
-                <Text style={styles.emptyAddBtnText}>Add Parent</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={isRefetching && !isLoading} onRefresh={refetch} tintColor={COLOR} />
         }
-        renderItem={({ item, index }) => {
-          const p = item as Parent;
-          const isActive = p.is_active !== false;
-          return (
-            <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
-              <View style={[styles.avatar, { backgroundColor: COLOR + '20' }]}>
-                <Text style={[styles.avatarText, { color: COLOR }]}>
-                  {p.first_name[0]}{p.last_name[0]}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
-                <Text style={[styles.cardName, { color: colors.foreground }]}>
-                  {p.first_name} {p.last_name}
-                </Text>
-                <Text style={[styles.cardSub, { color: colors['muted-foreground'] }]}>{p.email}</Text>
-                {p.phone ? (
-                  <Text style={[styles.cardSub, { color: colors['muted-foreground'] }]}>{p.phone}</Text>
-                ) : null}
-                {p.occupation ? (
-                  <Text style={[styles.cardOcc, { color: colors['muted-foreground'] }]}>{p.occupation}</Text>
-                ) : null}
-                <View style={styles.studentRow}>
-                  <Ionicons name="school-outline" size={11} color={colors['muted-foreground']} />
-                  <Text style={[styles.studentCount, { color: colors['muted-foreground'] }]}>
-                    {p.students?.length ?? 0} student{(p.students?.length ?? 0) !== 1 ? 's' : ''}
-                  </Text>
-                  <View style={[styles.statusDot, { backgroundColor: isActive ? '#10b981' : '#d1d5db' }]} />
-                  <Text style={[styles.statusText, { color: isActive ? '#10b981' : colors['muted-foreground'] }]}>
-                    {isActive ? 'Active' : 'Inactive'}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.actions}>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: '#dbeafe' }]}
-                  onPress={() => openEdit(p)}
-              accessibilityLabel="Edit"
-                >
-                  <Ionicons name="create-outline" size={15} color="#3b82f6" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: '#fee2e2', marginTop: 6 }]}
-                  onPress={() => handleDelete(p)}
-                  disabled={deleteMutation.isPending}
-              accessibilityLabel="Delete"
-                >
-                  <Ionicons name="trash-outline" size={15} color="#ef4444" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        }}
+        ListEmptyComponent={listEmpty}
+        renderItem={renderItem}
       />
 
-      {/* Create / Edit Modal */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={closeModal}>
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalContent, { backgroundColor: cardBg }]}>
@@ -279,92 +398,104 @@ function ParentsScreenContent() {
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                 {editingParent ? 'Edit Parent' : 'Add Parent'}
               </Text>
-              <TouchableOpacity onPress={closeModal}
-              accessibilityLabel="Close">
-                <Ionicons name="close" size={22} color={colors['muted-foreground']} />
+              <TouchableOpacity onPress={closeModal} accessibilityLabel="Close">
+                <Ionicons name="close" size={22} color={muted} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.formRow}>
-                <View style={[styles.formGroup, { flex: 1 }]}>
-                  <Text style={[styles.label, { color: colors['muted-foreground'] }]}>First Name *</Text>
-                  <TextInput
-                    style={[styles.input, inputStyle]}
-                    value={form.first_name}
-                    onChangeText={v => setForm(f => ({ ...f, first_name: v }))}
-                    placeholder="First name"
-                    placeholderTextColor={colors['muted-foreground']}
-                  />
-                </View>
-                <View style={[styles.formGroup, { flex: 1 }]}>
-                  <Text style={[styles.label, { color: colors['muted-foreground'] }]}>Last Name *</Text>
-                  <TextInput
-                    style={[styles.input, inputStyle]}
-                    value={form.last_name}
-                    onChangeText={v => setForm(f => ({ ...f, last_name: v }))}
-                    placeholder="Last name"
-                    placeholderTextColor={colors['muted-foreground']}
-                  />
-                </View>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: muted }]}>Full Name</Text>
+                <TextInput
+                  style={[styles.input, inputStyle]}
+                  value={form.name}
+                  onChangeText={v => setForm(f => ({ ...f, name: v }))}
+                  placeholder="Parent's full name"
+                  placeholderTextColor={muted}
+                />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors['muted-foreground'] }]}>Email *</Text>
+                <Text style={[styles.label, { color: muted }]}>Relationship to Student *</Text>
+                <CustomDropdown
+                  data={RELATION_OPTIONS.map(o => ({ label: o.label || '', value: o.value }))}
+                  value={form.relation_to_student}
+                  placeholder="Select relationship"
+                  search={false}
+                  onChange={v =>
+                    setForm(f => ({ ...f, relation_to_student: (v as ParentRelation | null) ?? f.relation_to_student }))
+                  }
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: muted }]}>Gender</Text>
+                <CustomDropdown
+                  data={GENDER_OPTIONS.map(o => ({ label: o.label || '', value: o.value }))}
+                  value={form.gender}
+                  placeholder="Select gender"
+                  search={false}
+                  onChange={v => setForm(f => ({ ...f, gender: (v as ParentGender | null) ?? null }))}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: muted }]}>Email</Text>
                 <TextInput
                   style={[styles.input, inputStyle]}
                   value={form.email}
                   onChangeText={v => setForm(f => ({ ...f, email: v }))}
                   placeholder="email@example.com"
-                  placeholderTextColor={colors['muted-foreground']}
+                  placeholderTextColor={muted}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors['muted-foreground'] }]}>Phone</Text>
+                <Text style={[styles.label, { color: muted }]}>Phone</Text>
                 <TextInput
                   style={[styles.input, inputStyle]}
                   value={form.phone}
                   onChangeText={v => setForm(f => ({ ...f, phone: v }))}
                   placeholder="Phone number"
-                  placeholderTextColor={colors['muted-foreground']}
+                  placeholderTextColor={muted}
                   keyboardType="phone-pad"
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors['muted-foreground'] }]}>Occupation</Text>
+                <Text style={[styles.label, { color: muted }]}>Occupation</Text>
                 <TextInput
                   style={[styles.input, inputStyle]}
                   value={form.occupation}
                   onChangeText={v => setForm(f => ({ ...f, occupation: v }))}
                   placeholder="e.g. Engineer"
-                  placeholderTextColor={colors['muted-foreground']}
+                  placeholderTextColor={muted}
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors['muted-foreground'] }]}>Address</Text>
+                <Text style={[styles.label, { color: muted }]}>Aadhar Number</Text>
                 <TextInput
-                  style={[styles.input, inputStyle, { height: 72, textAlignVertical: 'top' }]}
-                  value={form.address}
-                  onChangeText={v => setForm(f => ({ ...f, address: v }))}
-                  placeholder="Home address"
-                  placeholderTextColor={colors['muted-foreground']}
-                  multiline
-                  numberOfLines={3}
+                  style={[styles.input, inputStyle]}
+                  value={form.aadhar_number}
+                  onChangeText={v => setForm(f => ({ ...f, aadhar_number: v.replace(/\D/g, '').slice(0, 12) }))}
+                  placeholder="12-digit Aadhar number"
+                  placeholderTextColor={muted}
+                  keyboardType="number-pad"
+                  maxLength={12}
                 />
               </View>
 
-              <View style={styles.toggleRow}>
-                <Text style={[styles.label, { color: colors['muted-foreground'], marginBottom: 0 }]}>Active</Text>
-                <Switch
-                  value={form.is_active}
-                  onValueChange={v => setForm(f => ({ ...f, is_active: v }))}
-                  trackColor={{ false: '#d1d5db', true: COLOR + '88' }}
-                  thumbColor={form.is_active ? COLOR : '#9ca3af'}
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: muted }]}>Annual Income</Text>
+                <CustomDropdown
+                  data={SALARY_OPTIONS.map(o => ({ label: o.label || '', value: o.value }))}
+                  value={form.salary_range}
+                  placeholder="Select income range"
+                  search={false}
+                  onChange={v => setForm(f => ({ ...f, salary_range: (v as ParentSalaryRange | null) ?? null }))}
                 />
               </View>
 
@@ -403,14 +534,15 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 16, fontWeight: '700' },
   cardName: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
   cardSub: { fontSize: 12, marginBottom: 1 },
-  cardOcc: { fontSize: 11, fontStyle: 'italic', marginBottom: 3 },
+  badge: { alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 4 },
+  badgeText: { fontSize: 11, fontWeight: '700' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
   studentRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   studentCount: { fontSize: 11 },
-  statusDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 4 },
-  statusText: { fontSize: 11, fontWeight: '600' },
   actions: { alignItems: 'center' },
   actionBtn: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   emptyState: { alignItems: 'center', gap: 10, paddingTop: 60 },
+  errorBox: { alignItems: 'center', gap: 10, paddingTop: 60, paddingHorizontal: 24 },
   emptyText: { fontSize: 14, textAlign: 'center' },
   emptyAddBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, marginTop: 4 },
   emptyAddBtnText: { color: 'white', fontSize: 14, fontWeight: '600' },
@@ -418,23 +550,16 @@ const styles = StyleSheet.create({
   modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, maxHeight: '90%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 17, fontWeight: '700' },
-  formRow: { flexDirection: 'row', gap: 10 },
   formGroup: { marginBottom: 12 },
   label: { fontSize: 12, fontWeight: '600', marginBottom: 5 },
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   submitBtn: { borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   submitBtnText: { color: 'white', fontSize: 15, fontWeight: '700' },
 });
 
-
-// Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.
 export default function ParentsScreen() {
   return (
-    <ScreenAccessGate
-      title="Parents"
-      resources={['parents']}
-    >
+    <ScreenAccessGate title="Parents" resources={[PERMISSION_RESOURCES.PARENTS]}>
       <ParentsScreenContent />
     </ScreenAccessGate>
   );

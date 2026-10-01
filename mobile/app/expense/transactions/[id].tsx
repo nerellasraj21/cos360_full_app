@@ -326,7 +326,7 @@ export default function ExpenseTransactionDetailScreen() {
           </View>
 
           {transaction.status === 'pending' && (
-            <ApprovePermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_APPROVALS} fallback={null} loadingFallback={null}>
+            <ApprovePermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS} fallback={null} loadingFallback={null}>
               <View style={styles.approvalActions}>
                 <TouchableOpacity
                   style={[styles.actionButton, styles.rejectButton]}

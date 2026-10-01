@@ -29,8 +29,8 @@ export function useSectionList() {
   return useMastersQuery<any[]>({
     queryKey: ['sectionList'],
     queryFn: () => classSectionsApi.getSectionList(),
-    resource: PERMISSION_RESOURCES.SECTIONS,
-    action: 'read',
+    resource: PERMISSION_RESOURCES.CLASSES,
+    action: 'list',
   });
 }
 
@@ -38,8 +38,8 @@ export function useSectionsByClass(classId: string) {
   return useMastersQuery<any[]>({
     queryKey: ['sections', classId],
     queryFn: () => classSectionsApi.getSectionsByClass(classId),
-    resource: PERMISSION_RESOURCES.SECTIONS,
-    action: 'read',
+    resource: PERMISSION_RESOURCES.CLASSES,
+    action: 'list',
     enabled: !!classId,
   });
 }
@@ -139,7 +139,7 @@ export function useUpdateSection() {
   return usePermissionProtectedMutation<any, Error, { sectionId: string; data: { name?: string; is_active?: boolean } }>({
     mutationFn: ({ sectionId, data }) =>
       classSectionsApi.updateSectionDirect(sectionId, { ...data, id: sectionId }),
-    resource: PERMISSION_RESOURCES.SECTIONS,
+    resource: PERMISSION_RESOURCES.CLASSES,
     action: 'update',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classSections'] });
@@ -158,7 +158,7 @@ export function useDeleteSection() {
 
   return usePermissionProtectedMutation<void, Error, string>({
     mutationFn: (sectionId) => classSectionsApi.deleteSectionDirect(sectionId),
-    resource: PERMISSION_RESOURCES.SECTIONS,
+    resource: PERMISSION_RESOURCES.CLASSES,
     action: 'delete',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classSections'] });

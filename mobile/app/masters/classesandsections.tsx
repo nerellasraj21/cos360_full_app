@@ -883,7 +883,7 @@ export default function ClassesAndSectionsScreen() {
                         {section.is_active ? 'Active' : 'Inactive'}
                       </ThemedText>
                     </View>
-                    <PermissionGuard permissions={[[PERMISSION_RESOURCES.SECTIONS, 'update']]} requireAll={false} fallback={null} loadingFallback={null}>
+                    <PermissionGuard permissions={[[PERMISSION_RESOURCES.CLASSES, 'update']]} requireAll={false} fallback={null} loadingFallback={null}>
                       <TouchableOpacity
                         style={[styles.iconBtn, { backgroundColor: themeColors.primary + '20' }]}
                         onPress={() => handleEditSection(section, cls)}
@@ -892,7 +892,7 @@ export default function ClassesAndSectionsScreen() {
                         <Ionicons name="create-outline" size={14} color={themeColors.primary} />
                       </TouchableOpacity>
                     </PermissionGuard>
-                    <PermissionGuard permissions={[[PERMISSION_RESOURCES.SECTIONS, 'delete']]} requireAll={false} fallback={null} loadingFallback={null}>
+                    <PermissionGuard permissions={[[PERMISSION_RESOURCES.CLASSES, 'delete']]} requireAll={false} fallback={null} loadingFallback={null}>
                       <TouchableOpacity
                         style={[styles.iconBtn, { backgroundColor: '#EF444420' }]}
                         onPress={() => handleDeleteSection(section)}
