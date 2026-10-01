@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/form';
 import { User, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { useAuthStore } from '@/lib/authStore';
 
 interface ProfileFormData {
   email: string;
@@ -40,6 +41,7 @@ const StaffProfile: React.FC = () => {
   const canUpdateOwn = checkPermission('profile', 'update_own');
 
   const { data: profile, isLoading, error } = useStaffProfile();
+  const { user, role, academicYearTitle } = useAuthStore();
   const updateMutation = useUpdateStaffProfile();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
@@ -80,7 +82,34 @@ const StaffProfile: React.FC = () => {
   }
 
   if (error) {
-    return <div className="p-6 text-destructive">Error loading profile: {error.message}</div>;
+    const status = (error as { response?: { status?: number } }).response?.status;
+    if (status === 403 || status === 404) {
+      const accountFields = [
+        { label: 'Username', value: user?.username || 'N/A' },
+        { label: 'Email', value: user?.email || 'N/A' },
+        { label: 'Role', value: role?.name || user?.role?.name || 'N/A' },
+        { label: 'Academic Year', value: academicYearTitle || 'N/A' },
+      ];
+      return (
+        <div className="p-6 space-y-6">
+          <PageHeader title="My Profile" icon={<User className="h-5 w-5" />} />
+          <Card>
+            <CardHeader>
+              <CardTitle>Account Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {accountFields.map((field) => (
+                <div key={field.label} className="flex justify-between items-center py-2">
+                  <span className="font-medium">{field.label}:</span>
+                  <span className="text-muted-foreground">{field.value}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+    return <div className="p-6 text-muted-foreground">Your profile could not be loaded right now. Please try again later.</div>;
   }
 
   if (!profile) {

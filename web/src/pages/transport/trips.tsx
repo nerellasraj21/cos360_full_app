@@ -27,7 +27,7 @@ export default function TripsPage() {
     const trips = Array.isArray(tripsResponse) ? tripsResponse : (tripsResponse?.items || []);
     const vehicleMap = useMemo(() => new Map(vehicles?.map(v => [v.id, v.name]) || []), [vehicles]);
     const routeMap = useMemo(() => new Map(routes?.map(r => [r.id, r.route_name]) || []), [routes]);
-    const driverMap = useMemo(() => new Map((drivers || []).map(d => [d.user_id, `${d.first_name}${d.last_name ? ' ' + d.last_name : ''}`])), [drivers]);
+    const driverMap = useMemo(() => new Map((drivers || []).map(d => [d.user_id, d.full_name])), [drivers]);
 
     const total = Array.isArray(tripsResponse) ? trips.length : (tripsResponse?.total || trips.length || 0);
     const paginatedData = trips.slice(page * pageSize, (page + 1) * pageSize);
@@ -78,7 +78,7 @@ export default function TripsPage() {
                     value={value}
                     onChange={(newValue) => onChange(newValue)}
                     placeholder="Select Driver"
-                    data={(drivers || []).map(d => ({ id: d.user_id, value: d.user_id, label: `${d.first_name}${d.last_name ? ' ' + d.last_name : ''}` }))}
+                    data={(drivers || []).map(d => ({ id: d.user_id, value: d.user_id, label: d.full_name }))}
                 />
             ),
         },
@@ -144,7 +144,7 @@ export default function TripsPage() {
                     value={value}
                     onChange={(newValue) => onChange(newValue)}
                     placeholder="Select Driver"
-                    data={(drivers || []).map(d => ({ id: d.user_id, value: d.user_id, label: `${d.first_name}${d.last_name ? ' ' + d.last_name : ''}` }))}
+                    data={(drivers || []).map(d => ({ id: d.user_id, value: d.user_id, label: d.full_name }))}
                 />
             );
         }

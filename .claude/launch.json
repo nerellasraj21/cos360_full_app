@@ -4,17 +4,54 @@
     {
       "name": "backend",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
       "cwd": "backend",
-      "env": { "TENANT_DEFAULT_NAME": "test_tenant" },
+      "env": {
+        "TENANT_DEFAULT_NAME": "test_tenant"
+      },
       "port": 8000
     },
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5173", "--strictPort"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5173",
+        "--strictPort"
+      ],
       "cwd": "web",
-      "port": 5173
+      "port": 5173,
+      "env": {
+        "VITE_DEFAULT_TENANT": "demo_school"
+      }
+    },
+    {
+      "name": "mobile",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--web",
+        "--port",
+        "8081"
+      ],
+      "cwd": "mobile",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:8000/api/v1",
+        "CI": "1"
+      },
+      "port": 8081
     }
   ]
 }

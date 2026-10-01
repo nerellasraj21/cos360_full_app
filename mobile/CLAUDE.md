@@ -69,7 +69,7 @@ Model: `docs/permissions.md`. Single source: `useAuth().hasPermission(resource, 
 
 - The backend menu uses **web paths**. `components/navigation/menuMap.ts` `WEB_TO_MOBILE` / `mapPath()` translate them for the drawer and hubs, so a new screen reachable from the menu needs an entry there.
 - The Masters hub (and the student/parent sections of the Fees hub) render from the backend menu, with a permission-filtered fallback list for cold start. The Transport hub and admin Fee sections are hardcoded lists. Only show sections that the backend menu (and web dashboard) actually has.
-- Every module folder under `app/` has a `_layout.tsx` with `headerShown: false` (the root Stack would otherwise draw a native header above each screen's own `AppHeader`); new module folders need one too. Tab screens and most sub-screens use `AppLayout title="..."` (header + bottom nav, `showFooter`). `ScreenLayout` (no bottom nav, `headerRight` slot for actions like "+ Add") is used by a few admin screens. `AppHeader` has no back button; sub-screens rely on the stack or system back.
+- The root Stack in `app/_layout.tsx` sets `headerShown: false`, and every module folder under `app/` has a `_layout.tsx` doing the same, so only `AppHeader` shows (it has its own back button); new module folders need one too. Tab screens and most sub-screens use `AppLayout title="..."` (header + bottom nav, `showFooter`). `ScreenLayout` (no bottom nav, `headerRight` slot for actions like "+ Add") is used by a few admin screens. `AppHeader` has no back button; sub-screens rely on the stack or system back.
 - Typed routes: navigate with `router.push('/transport/routes')`. Hub-to-tab links use `'/(tabs)/masters'`.
 
 ## UI conventions

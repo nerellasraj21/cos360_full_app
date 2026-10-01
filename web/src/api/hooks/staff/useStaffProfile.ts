@@ -13,6 +13,11 @@ export function useStaffProfile() {
   return useQuery<StaffProfile>({
     queryKey: ['staff', 'profile'],
     queryFn: fetchStaffProfile,
+    retry: (failureCount, error) => {
+      const status = (error as { response?: { status?: number } }).response?.status;
+      if (status === 403 || status === 404) return false;
+      return failureCount < 2;
+    },
   });
 }
 

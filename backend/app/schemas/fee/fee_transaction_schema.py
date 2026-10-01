@@ -31,9 +31,14 @@ class FeeTransactionItemCreate(FeeTransactionItemBase):
     pass
 
 
-class FeeTransactionItemRead(FeeTransactionItemBase):
+class FeeTransactionItemRead(BaseModel):
     id: UUID
     fee_transaction_id: UUID
+    fee_type_id: UUID
+    term_date_id: UUID
+    amount_due: Decimal
+    amount_paid: Decimal
+    description: str | None = None
     created_at: datetime
     updated_at: datetime
     model_config = {"from_attributes": True}
@@ -105,11 +110,26 @@ class FeeTransactionUpdate(BaseModel):
     remarks: str | None = None
 
 
-class FeeTransactionRead(FeeTransactionBase):
+class FeeTransactionRead(BaseModel):
     id: UUID
     transaction_number: str
+    student_id: UUID
+    student_admission_num: str
+    academic_year_id: UUID
+    total_amount: Decimal
+    payment_method: str
     status: str
+
+    upi_reference: str | None = None
+    upi_app_name: str | None = None
+    cheque_number: str | None = None
+    cheque_date: datetime | None = None
+    cheque_bank: str | None = None
     cheque_status: str | None = None
+    bank_reference: str | None = None
+    bank_name: str | None = None
+
+    remarks: str | None = None
     collected_by_user_id: UUID
     approved_by_user_id: UUID | None = None
     receipt_generated: bool
@@ -118,7 +138,6 @@ class FeeTransactionRead(FeeTransactionBase):
     created_at: datetime
     updated_at: datetime
 
-    # Student information
     student_first_name: str | None = None
     student_last_name: str | None = None
     student_full_name: str | None = None

@@ -94,7 +94,7 @@ exam_streams (table only, no endpoints; exam_class_sections.stream_id unused)
 | Templates / copy / auto-detect / add class-section | API and hooks only, no screen | API only, no screen |
 
 ## Known gaps
-- **Publishing is broken.** `result_service.publish_exam` imports `app.models.student.student_parent_association_model` and `app.models.exam.student_exam_result_model`, and neither exists, so every `POST /publish` returns 500. The three `send-*` SMS endpoints fail the same way. `send-results-notification` also lacks an `HTTPException` import and reads non-existent `marks_obtained`.
+- **Results SMS endpoints are broken.** `POST /publish` only sets status `published` (it sends nothing). The `send-*` SMS endpoints in `result_endpoints.py` import `app.models.student.student_parent_association_model` and `app.models.exam.student_exam_result_model`, which do not exist (real paths: `app.models.masters.student_parent_association_model`, `app.models.exam.student_result_model`), so they return 500. `send-results-notification` also lacks an `HTTPException` import and reads non-existent `marks_obtained`.
 - **Compute bugs in multi-class exams.** Compute applies every subject config of the exam to every student. In any multi-class-section exam, and whenever a subject has no marks yet, students get spurious `ABS` subject rows and `is_passed=false`. `sub_max` counts only entered components, which inflates percentages when marks are partially entered.
 - **Stored but ignored settings.** These fields are stored but no logic reads them:
   - `publish_rank` (ranks are always returned), `mark_entry_deadline`, `weightage_percent`, `term`, `attendance_mode`, `is_internal`

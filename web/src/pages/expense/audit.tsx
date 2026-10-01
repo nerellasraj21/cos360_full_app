@@ -85,7 +85,7 @@ export function ExpenseAuditPage() {
 
   return (
     <PermissionGuard
-      permissions={[["expense_audit_logs", "list"]]}
+      permissions={[["expense_audit_logs", "read"]]}
       fallback={
         <div className="flex items-center justify-center h-64">
           <div className="text-center">

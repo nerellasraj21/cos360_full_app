@@ -291,6 +291,7 @@ class FeeTransactionService:
                         {
                             "fee_type_id": fee_type_id,
                             "term_date_id": term_date_id,
+                            "fee_term_id": term_amount.term_id,
                             "amount_due": term_amount.term_amount,
                             "amount_paid": amount_paid,
                             "description": item.get("description"),
@@ -535,6 +536,7 @@ class FeeTransactionService:
                 db_item = FeeTransactionItem(
                     fee_transaction_id=db_transaction.id,
                     fee_type_id=item_data["fee_type_id"],
+                    fee_term_id=item_data["fee_term_id"],
                     term_date_id=item_data["term_date_id"],
                     amount_due=item_data["amount_due"],
                     amount_paid=item_data["amount_paid"],
@@ -776,19 +778,19 @@ class FeeTransactionService:
                 for term_amount in mapping.term_amounts:
                     # Calculate paid amount for this fee type and term
                     paid_amount = await FeeTransactionService.get_student_payments_for_fee_term(
-                        db, student_id, mapping.fee_type_id, term_amount.fee_term_id, academic_year_id
+                        db, student_id, mapping.fee_type_id, term_amount.term_date_id, academic_year_id
                     )
 
-                    outstanding = term_amount.amount - paid_amount
+                    outstanding = term_amount.term_amount - paid_amount
 
                     if outstanding > 0:
                         outstanding_items.append(
                             OutstandingFeeItem(
                                 fee_type_id=mapping.fee_type_id,
                                 fee_type_name=mapping.fee_type.type_name,
-                                fee_term_id=term_amount.fee_term_id,
+                                fee_term_id=term_amount.term_id,
                                 fee_term_name=term_amount.fee_term.term_name,
-                                amount_due=term_amount.amount,
+                                amount_due=term_amount.term_amount,
                                 amount_paid=paid_amount,
                                 outstanding_amount=outstanding,
                             )
