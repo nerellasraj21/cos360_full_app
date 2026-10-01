@@ -37,7 +37,13 @@ function ReportsDashboard() {
   const reportsMenu = menuItems.find(
     (item) => item.name.toLowerCase() === 'reports'
   )
-  const sections = reportsMenu?.children ?? []
+  const hasPermission = useAuthStore((s) => s.hasPermission)
+  const menuSections = reportsMenu?.children ?? []
+  const fallbackSections = [
+    hasPermission('fee_reports', 'read') ? { id: 'fee-reports', name: 'Fee Reports', path: '/fee/reports' } : null,
+    hasPermission('expense_reports', 'read') ? { id: 'expense-reports', name: 'Expense Reports', path: '/expense/reports' } : null,
+  ].filter((section): section is { id: string; name: string; path: string } => section !== null)
+  const sections = menuSections.length > 0 ? menuSections : fallbackSections
 
   return (
     <div className="space-y-6">

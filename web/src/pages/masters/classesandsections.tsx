@@ -48,7 +48,7 @@ export default function ClassesAndSectionsPage() {
   const hasSectionsReadPermission = checkPermission("sections", "read");
 
   // Only call API if user has permission to view either classes or sections
-  const shouldFetchData = hasClassesListPermission && hasSectionsListPermission;
+  const shouldFetchData = hasClassesListPermission;
   const {
     data: classSectionsData,
     isLoading,
@@ -259,7 +259,7 @@ export default function ClassesAndSectionsPage() {
                       onDeleteSection={handleDeleteSection}
                       onAddSection={handleAddSection}
                       isLoading={isLoading}
-                      hasSectionsPermission={hasSectionsListPermission}
+                      hasSectionsPermission={hasClassesListPermission}
                       addButton={
                         <PermissionGuard
                           resource="classes"
