@@ -31,7 +31,8 @@ Each module doc covers backend, web, and mobile together: what it does, where th
 | Doc | What it covers |
 |---|---|
 | [backend-deploy](operations/backend-deploy.md) | How the backend is packaged, configured, and deployed; gaps; AWS plan |
-| [database-migrations](operations/database-migrations.md) | How schema changes reach `public`, the template schema, and every tenant; creating a tenant |
+| [database-migrations](operations/database-migrations.md) | The shared database and its two roles, local setup, how schema changes and tenant tables (RLS) are migrated, backups |
+| [legacy-data-migration](operations/legacy-data-migration.md) | Moving the old schema-per-tenant data into the shared database: plan, execute, quarantine, what is not covered |
 | [mobile-release](operations/mobile-release.md) | Expo/EAS configuration, Android and iOS builds, release steps |
 | [testing](operations/testing.md) | Automated checks per app, where tests live, the manual regression pass |
 

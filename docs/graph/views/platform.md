@@ -396,7 +396,7 @@ flowchart TD
 - **Since**: 2026-10
 - Note: The app connects as a role that is not the table owner, is not a superuser and has no BYPASSRLS. Migrations run as the owner role from MIGRATION_DATABASE_URL.
 - Note: Policies compare tenant_id to NULLIF(current_setting('app.tenant_id', true), '')::uuid, so an unset tenant matches no rows and inserts without a tenant fail with a NOT NULL error.
-- Shapes: `concept:platform/tenant`, `module:platform`, `service:app/db/base.py`, `service:app/db/rls.py`, `service:app/db/tenant_session.py`
+- Shapes: `concept:platform/tenant`, `flow:tenants-and-admin/migrate-legacy-data`, `module:platform`, `service:app/db/base.py`, `service:app/db/rls.py`, `service:app/db/tenant_session.py`
 - Supersedes: `decision:platform/alembic-per-schema`, `decision:platform/schema-per-tenant`, `decision:platform/tenant-models-via-search-path`
 
 ### platform/tasks-receive-tenant-id (active)

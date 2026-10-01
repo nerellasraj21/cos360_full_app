@@ -140,6 +140,7 @@ script before running it and prefer its dry-run mode. Most files there are one-o
 templates for new schema changes — write an Alembic revision instead.
 
 Reusable tools:
+- Moving data from the old per-schema databases into the shared schema: `python -m legacy_migration plan|migrate` (`backend/legacy_migration/`, procedure in `docs/operations/legacy-data-migration.md`). It only reads the source; run `plan` first.
 - Tenants are created with `POST /super_admin/system/tenants/` (`app/service/tenant/`). The scripts below clone per-tenant schemas and no longer apply to the shared schema.
 - Legacy tenant onboarding (clone `cos360_master`), in order: `create_little_bunny_tenant.py` (reference, edit the
   constants) → `fix_tenant_enum_types.py <schema>` → `seed_master_data_little_bunny.py` (menus/roles/templates) →

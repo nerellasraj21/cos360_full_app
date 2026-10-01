@@ -9,48 +9,65 @@ Module doc: [docs/modules/tenants-and-admin.md](../../../docs/modules/tenants-an
 ```mermaid
 graph LR
   n0(["tenants-and-admin"])
-  n1["menu-management"] -->|part_of| n0
-  n2["plan-management"] -->|part_of| n0
-  n3["resource-rollout"] -->|part_of| n0
-  n4["role-management"] -->|part_of| n0
-  n5["super-admin-account"] -->|part_of| n0
-  n6["super-admin-tenant-data"] -->|part_of| n0
-  n7["system-health"] -->|part_of| n0
-  n8["tenant-management"] -->|part_of| n0
-  n9["tenant-onboarding"] -->|part_of| n0
-  n10["user-management"] -->|part_of| n0
-  n11{{"add-resource-for-tenants"}}
-  n11 -->|implements| n3
-  n12{{"manage-roles"}}
+  n1["legacy-data-migration"] -->|part_of| n0
+  n2["menu-management"] -->|part_of| n0
+  n3["plan-management"] -->|part_of| n0
+  n4["resource-rollout"] -->|part_of| n0
+  n5["role-management"] -->|part_of| n0
+  n6["super-admin-account"] -->|part_of| n0
+  n7["super-admin-tenant-data"] -->|part_of| n0
+  n8["system-health"] -->|part_of| n0
+  n9["tenant-management"] -->|part_of| n0
+  n10["tenant-onboarding"] -->|part_of| n0
+  n11["user-management"] -->|part_of| n0
+  n12{{"add-resource-for-tenants"}}
   n12 -->|implements| n4
-  n13{{"manage-tenant-users"}}
-  n13 -->|implements| n10
-  n14{{"onboard-tenant"}}
-  n14 -->|implements| n9
-  n15{{"super-admin-session"}}
-  n15 -->|implements| n2
-  n15 -->|implements| n5
-  n15 -->|implements| n6
-  n15 -->|implements| n8
-  n16[/"clone-from-master-template"/]
-  n16 -.->|shapes| n9
-  n16 -.->|shapes| n14
-  n17[/"idempotent-seed-scripts"/]
-  n17 -.->|shapes| n3
-  n17 -.->|shapes| n9
-  n17 -.->|shapes| n11
-  n17 -.->|shapes| n14
-  n18[/"no-admin-user-creation"/]
+  n13{{"manage-roles"}}
+  n13 -->|implements| n5
+  n14{{"manage-tenant-users"}}
+  n14 -->|implements| n11
+  n15{{"migrate-legacy-data"}}
+  n15 -->|implements| n1
+  n16{{"onboard-tenant"}}
+  n16 -->|implements| n10
+  n17{{"super-admin-session"}}
+  n17 -->|implements| n3
+  n17 -->|implements| n6
+  n17 -->|implements| n7
+  n17 -->|implements| n9
+  n18[/"clone-from-master-template"/]
   n18 -.->|shapes| n10
-  n19[/"protected-system-role-names"/]
+  n18 -.->|shapes| n16
+  n19[/"idempotent-seed-scripts"/]
   n19 -.->|shapes| n4
+  n19 -.->|shapes| n10
   n19 -.->|shapes| n12
-  n20[/"separate-super-admin-accounts"/]
-  n20 -.->|shapes| n5
+  n19 -.->|shapes| n16
+  n20[/"migration-merges-menu-copies"/]
+  n20 -.->|shapes| n1
   n20 -.->|shapes| n15
+  n21[/"migration-quarantines-bad-rows"/]
+  n21 -.->|shapes| n1
+  n21 -.->|shapes| n15
+  n22[/"no-admin-user-creation"/]
+  n22 -.->|shapes| n11
+  n23[/"protected-system-role-names"/]
+  n23 -.->|shapes| n5
+  n23 -.->|shapes| n13
+  n24[/"separate-super-admin-accounts"/]
+  n24 -.->|shapes| n6
+  n24 -.->|shapes| n17
 ```
 
 ## Features
+
+### tenants-and-admin/legacy-data-migration
+
+A command-line tool that copies the old schema-per-tenant data into the shared database, with a read-only plan, a guarded execute step, per-tenant transactions and a quarantine file for rows that cannot be inserted.
+- Roles: Operators with database access; there is no API or UI.
+- Note: The tool is backend/legacy_migration, outside the app package; media files and tables that exist only in the source are not migrated, and the report lists the source-only tables.
+- Flows: [tenants-and-admin/migrate-legacy-data](#tenants-and-adminmigrate-legacy-data)
+- Shaped by: [tenants-and-admin/migration-merges-menu-copies](#tenants-and-adminmigration-merges-menu-copies), [tenants-and-admin/migration-quarantines-bad-rows](#tenants-and-adminmigration-quarantines-bad-rows)
 
 ### tenants-and-admin/menu-management
 
@@ -237,6 +254,47 @@ flowchart TD
   s5 --> s6
 ```
 
+### tenants-and-admin/migrate-legacy-data
+
+Implements: `feature:tenants-and-admin/legacy-data-migration`
+
+- Trigger: An operator moves a school from the old per-schema database to the shared database.
+- Precondition: The target is at the current Alembic head, and the source is reached through a read-only role.
+
+1. Run python -m legacy_migration plan; it reads the source, matches columns, finds id collisions and orphans, and writes a report without touching any database
+2. Resolve blockers: a table with rows whose source lacks a column the new schema requires.
+3. The tool merges the platform menus and every tenant's menu copy into one shared catalog and maps each tenant menu id to a catalog id `table:menus`
+4. Run migrate with --execute and --confirm-target; it refuses when source and target are the same database, and copies tenants and platform tables first `table:public.tenants`
+5. For each tenant, one transaction sets app.tenant_id and copies the tables in foreign-key order `table:roles` `table:users` `table:role_menu_permissions`
+6. A primary key already used by an earlier tenant gets a new id, and foreign keys in that tenant are rewritten; a row whose parent is missing has a nullable key set to NULL or is quarantined.
+7. Rows that fail to convert or insert are written to quarantine.jsonl with the reason, and the tenant continues.
+8. The tool recounts every table through row-level security and marks the tenant failed if a count differs from what it inserted.
+
+- Result: A report.json with per-table source, inserted and quarantined counts, dropped columns, remapped ids and menu name variants.
+
+- Failure: A failed tenant is rolled back and reported; the others stay migrated, and --replace redoes it.
+
+```mermaid
+flowchart TD
+  s1["1. Run python -m legacy_migration plan; it reads the source, matches c..."]
+  s2["2. Resolve blockers: a table with rows whose source lacks a column the..."]
+  s1 --> s2
+  s3["3. The tool merges the platform menus and every tenant's menu copy int...<br/>table:menus"]
+  s2 --> s3
+  s4["4. Run migrate with --execute and --confirm-target; it refuses when so...<br/>table:public.tenants"]
+  s3 --> s4
+  s5["5. For each tenant, one transaction sets app.tenant_id and copies the ...<br/>table:roles<br/>table:users<br/>table:role_menu_permissions"]
+  s4 --> s5
+  s6["6. A primary key already used by an earlier tenant gets a new id, and ..."]
+  s5 --> s6
+  s7["7. Rows that fail to convert or insert are written to quarantine.jsonl..."]
+  s6 --> s7
+  s8["8. The tool recounts every table through row-level security and marks ..."]
+  s7 --> s8
+```
+
+Shaped by: [platform/shared-schema-rls](#platformshared-schema-rls), [tenants-and-admin/migration-merges-menu-copies](#tenants-and-adminmigration-merges-menu-copies), [tenants-and-admin/migration-quarantines-bad-rows](#tenants-and-adminmigration-quarantines-bad-rows)
+
 ### tenants-and-admin/onboard-tenant
 
 Implements: `feature:tenants-and-admin/tenant-onboarding`
@@ -333,6 +391,23 @@ Shaped by: [tenants-and-admin/separate-super-admin-accounts](#tenants-and-admins
 - **Why**: They can be re-run safely against tenants that already have data.
 - **Tradeoff**: Changing existing rows needs a delete-and-reinsert script such as reseed_student_parent_permissions.py.
 - Shapes: `feature:tenants-and-admin/resource-rollout`, `feature:tenants-and-admin/tenant-onboarding`, `flow:tenants-and-admin/add-resource-for-tenants`, `flow:tenants-and-admin/onboard-tenant`
+
+### tenants-and-admin/migration-merges-menu-copies (active)
+
+- **Decision**: The per-tenant menu copies are merged into the shared menus catalog by url (or by name, level and parent for group menus), and role_menu_permissions is re-pointed to catalog ids.
+- **Why**: The shared design has one menu catalog, but every old tenant schema held its own copy with different ids, so ids cannot be carried over.
+- **Tradeoff**: A menu renamed in some tenants keeps a single name in the catalog, and a custom tenant menu becomes a catalog row that only that tenant's roles can see.
+- **Since**: 2026-10
+- Shapes: `feature:tenants-and-admin/legacy-data-migration`, `flow:tenants-and-admin/migrate-legacy-data`
+
+### tenants-and-admin/migration-quarantines-bad-rows (active)
+
+- **Decision**: Rows that cannot be converted or inserted are written to a quarantine file and skipped, instead of aborting the tenant, and a nullable foreign key to a missing parent is set to NULL by default.
+- **Why**: The old schemas had no foreign keys and drifted by hand, so some bad rows are expected; aborting a whole school over one orphan would make the migration unusable, while silently dropping rows would lose data.
+- **Alternatives**: Fail on the first bad row, or insert with foreign keys disabled.
+- **Tradeoff**: Rows that depend on a quarantined row are quarantined too, and the quarantine file holds personal data that must be reviewed and deleted.
+- **Since**: 2026-10
+- Shapes: `feature:tenants-and-admin/legacy-data-migration`, `flow:tenants-and-admin/migrate-legacy-data`
 
 ### tenants-and-admin/no-admin-user-creation (temporary)
 

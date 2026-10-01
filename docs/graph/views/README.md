@@ -15,6 +15,6 @@ _Generated from `docs/graph/graph.jsonl` by `scripts/graph/kg_render.py`. Do not
 | [reports-dashboards](reports-dashboards.md) | 11 | 5 | 11 | 7 |
 | [staff](staff.md) | 10 | 5 | 10 | 5 |
 | [students](students.md) | 11 | 8 | 15 | 10 |
-| [tenants-and-admin](tenants-and-admin.md) | 10 | 5 | 5 | 5 |
+| [tenants-and-admin](tenants-and-admin.md) | 11 | 6 | 7 | 5 |
 | [timetable-calendar](timetable-calendar.md) | 7 | 5 | 9 | 6 |
 | [transport](transport.md) | 8 | 7 | 8 | 10 |
