@@ -25,10 +25,10 @@ import type { Channel, Template, TemplateCreate, TemplateUpdate } from '@/types/
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CHANNEL_ICONS: Record<Channel, string> = {
-  sms: '📱',
-  whatsapp: '💬',
-  email: '📧',
+const CHANNEL_LABELS: Record<Channel, string> = {
+  sms: 'SMS',
+  whatsapp: 'WhatsApp',
+  email: 'Email',
 };
 
 const VARIABLE_SUGGESTIONS = [
@@ -461,7 +461,7 @@ export default function TemplatesTab() {
                   >
                     <td className="px-4 py-2 font-medium">{t.name}</td>
                     <td className="px-4 py-2">
-                      <span>{CHANNEL_ICONS[t.channel]} {t.channel.toUpperCase()}</span>
+                      <span>{CHANNEL_LABELS[t.channel]}</span>
                     </td>
                     <td className="px-4 py-2 text-muted-foreground hidden lg:table-cell">
                       {t.variables.join(', ') || '—'}
@@ -517,7 +517,7 @@ export default function TemplatesTab() {
                   <div>
                     <p className="font-medium">{t.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {CHANNEL_ICONS[t.channel]} {t.channel.toUpperCase()}
+                      {CHANNEL_LABELS[t.channel]}
                     </p>
                   </div>
                   <StatusBadge status={t.is_active} />

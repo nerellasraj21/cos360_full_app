@@ -36,6 +36,7 @@ import { feeStudentMappingsApi } from '@/api/fee/studentMappings';
 import { useFeeTypes } from '@/hooks/fee/useFeeTypes';
 import type { StudentTransportOut, StudentTransportCreate, StudentTransportUpdate } from '@/types/masters/studentTransport';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 // ─── Role router ─────────────────────────────────────────────────────────────
 
@@ -68,8 +69,14 @@ function AdminView() {
   const [editingTransport, setEditingTransport] = useState<StudentTransportOut | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
+  const [transportToDelete, setTransportToDelete] = useState<StudentTransportOut | null>(null);
 
-  const { data: transports = [], isLoading } = useStudentTransports();
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canCreate = hasPermission('student_transport', 'create');
+  const canUpdate = hasPermission('student_transport', 'update');
+  const canDelete = hasPermission('student_transport', 'delete');
+
+  const { data: transports = [], isLoading, isError, error } = useStudentTransports();
   const deleteMutation = useDeleteStudentTransport();
 
   const filtered = transports.filter((t) => {
@@ -114,7 +121,7 @@ function AdminView() {
   };
 
   const SortIcon = ({ col }: { col: string }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-50" />;
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-75" />;
     if (sortDir === 'asc') return <ChevronUp className="h-3 w-3 ml-1 inline" />;
     return <ChevronDown className="h-3 w-3 ml-1 inline" />;
   };
@@ -124,6 +131,19 @@ function AdminView() {
       <div className="flex justify-center items-center py-16">
         <Loader2 className="h-8 w-8 animate-spin" />
         <span className="ml-2">Loading assignments...</span>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="container mx-auto p-4 space-y-4">
+        <PageHeader title="Student Transport" icon={<Bus className="h-5 w-5" />} />
+        <Card>
+          <CardContent className="py-8 text-center text-destructive">
+            Failed to load transport assignments: {(error as Error)?.message}
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -143,10 +163,12 @@ function AdminView() {
                   {sortedData.length} of {transports.length}
                 </span>
               )}
-              <Button size="sm" onClick={() => setIsAddOpen(true)} className="ml-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Assign Transport
-              </Button>
+              {canCreate && (
+                <Button size="sm" onClick={() => setIsAddOpen(true)} className="ml-auto">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Assign Transport
+                </Button>
+              )}
             </div>
             <div className="relative max-w-xs">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
@@ -187,13 +209,13 @@ function AdminView() {
                 <TableHead className="cursor-pointer select-none" onClick={() => handleSort('fee')}>
                   Fee / Term<SortIcon col="fee" />
                 </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                {(canUpdate || canDelete) && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={(canUpdate || canDelete) ? 8 : 7} className="text-center text-muted-foreground py-8">
                     No transport assignments found.
                   </TableCell>
                 </TableRow>
@@ -204,7 +226,7 @@ function AdminView() {
                     <TableCell className="font-medium">
                       {t.student
                         ? `${t.student.first_name} ${t.student.last_name}`
-                        : <span className="text-muted-foreground text-xs">{t.student_id}</span>}
+                        : '—'}
                     </TableCell>
                     <TableCell>
                       {t.trip ? `Trip #${t.trip.trip_number}` : '—'}
@@ -231,19 +253,26 @@ function AdminView() {
                       ) : '—'}
                     </TableCell>
                     <TableCell>₹{Number(t.fee_per_term).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setEditingTransport(t)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={deleteMutation.isPending}
-                        onClick={() => deleteMutation.mutate(t.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
+                    {(canUpdate || canDelete) && (
+                      <TableCell className="text-right">
+                        {canUpdate && (
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit" onClick={() => setEditingTransport(t)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
+                            title="Delete"
+                            onClick={() => setTransportToDelete(t)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}
@@ -253,6 +282,21 @@ function AdminView() {
       </Card>
 
       <AssignTransportDialog open={isAddOpen} onOpenChange={setIsAddOpen} />
+
+      <ConfirmDialog
+        open={!!transportToDelete}
+        onOpenChange={(open) => { if (!open) setTransportToDelete(null); }}
+        title="Delete Transport Assignment"
+        description="Are you sure you want to delete this transport assignment? This action cannot be undone."
+        confirmLabel="Delete"
+        pendingLabel="Deleting..."
+        isPending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (transportToDelete) {
+            deleteMutation.mutate(transportToDelete.id, { onSuccess: () => setTransportToDelete(null) });
+          }
+        }}
+      />
 
       {editingTransport && (
         <AssignTransportDialog
@@ -354,7 +398,7 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
       const updateData: StudentTransportUpdate = {};
       if (tripId !== transport.trip_id) updateData.trip_id = tripId;
       if (stopId !== transport.stop_id) updateData.stop_id = stopId;
-      if (fee !== transport.fee_per_term) updateData.fee_per_term = fee;
+      if (fee !== Number(transport.fee_per_term)) updateData.fee_per_term = fee;
       if ((pricingId || null) !== (transport.pricing_id || null)) updateData.pricing_id = pricingId || null;
       updateMutation.mutate(
         { id: transport.id, transport: updateData },
@@ -440,7 +484,7 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
                   setPricingId(val as string);
                   const selected = pricingOptions.find(p => p.id === val);
                   if (selected) {
-                    setFeePerTerm(selected.amount.toString());
+                    setFeePerTerm(String(selected.amount));
                     setFeeSource('pricing');
                   }
                 }}
@@ -697,7 +741,7 @@ function TransportList({
                   <div>
                     <p className="text-muted-foreground text-xs">Pricing Plan</p>
                     <p className="font-medium">{t.pricing.cycle_name}</p>
-                    <p className="text-xs text-muted-foreground">₹{t.pricing.amount.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">₹{Number(t.pricing.amount).toLocaleString()}</p>
                   </div>
                 </div>
               )}

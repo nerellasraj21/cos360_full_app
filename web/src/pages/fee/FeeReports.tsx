@@ -37,7 +37,7 @@ import type {
 } from '@/types/fee/report';
 
 function formatCurrency(amount: number): string {
-  return `\u20B9${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `\u20B9${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 type ReportTab = 'collection' | 'pending' | 'structure';

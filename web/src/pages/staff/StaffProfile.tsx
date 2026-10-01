@@ -27,7 +27,7 @@ import {
   FormControl,
   FormMessage,
 } from '@/components/ui/form';
-import { User } from 'lucide-react';
+import { User, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 interface ProfileFormData {
@@ -71,11 +71,16 @@ const StaffProfile: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div className="p-6">Loading staff profile...</div>;
+    return (
+      <div className="flex justify-center items-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading staff profile...</span>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="p-6 text-red-500">Error loading profile: {error.message}</div>;
+    return <div className="p-6 text-destructive">Error loading profile: {error.message}</div>;
   }
 
   if (!profile) {
@@ -105,7 +110,7 @@ const StaffProfile: React.FC = () => {
         {profile.profile_photo_url ? (
           <img src={profile.profile_photo_url} alt="Profile Picture" className="w-24 h-24 rounded-full object-cover" />
         ) : (
-          <User className="w-24 h-24 text-gray-400" />
+          <User className="w-24 h-24 text-muted-foreground" />
         )}
       </div>
 
@@ -128,7 +133,7 @@ const StaffProfile: React.FC = () => {
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} guardDirty={form.formState.isDirty} onDirtyDiscard={() => form.reset()}>
               <DialogTrigger asChild>
                 <Button variant="default" size="sm" className="text-xs">
-                  edit email & phone
+                  Edit Email & Phone
                 </Button>
               </DialogTrigger>
               <DialogContent>

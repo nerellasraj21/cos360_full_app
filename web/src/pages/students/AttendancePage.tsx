@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Loader2, Save, UserCheck, Users, Filter, Search, X } from 'lucide-react';
+import { Loader2, Save, UserCheck, Users, Filter, Search, X, RefreshCw } from 'lucide-react';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from 'sonner';
 import { useClassSectionsDropdown, useStudentsByClassSection } from '@/api/hooks/masters/classesandsections';
@@ -99,11 +100,11 @@ function StudentOwnView({ studentId }: { studentId: string }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>From</Label>
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              <DatePicker value={dateFrom} onChange={setDateFrom} />
             </div>
             <div className="space-y-2">
               <Label>To</Label>
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              <DatePicker value={dateTo} onChange={setDateTo} />
             </div>
           </div>
         </CardContent>
@@ -184,11 +185,11 @@ function ParentView({ selectedStudent }: { selectedStudent: Student | null }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>From</Label>
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              <DatePicker value={dateFrom} onChange={setDateFrom} />
             </div>
             <div className="space-y-2">
               <Label>To</Label>
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              <DatePicker value={dateTo} onChange={setDateTo} />
             </div>
           </div>
           )}
@@ -313,6 +314,8 @@ function StaffView() {
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canMark = hasPermission('student_attendance', 'create') || hasPermission('student_attendance', 'update');
 
   const { data: classesData, isLoading: classesLoading } = useClassSectionsDropdown();
 
@@ -369,8 +372,7 @@ function StaffView() {
     try {
       const dateAttendances = await getAttendanceByDate(selectedDate);
       setExistingAttendances(dateAttendances);
-    } catch (error) {
-      console.error('Failed to load existing attendance:', error);
+    } catch {
       toast.error('Failed to load existing attendance data');
     } finally {
       if (!silent) setIsLoadingAttendance(false);
@@ -519,10 +521,10 @@ function StaffView() {
               <div className="flex items-center gap-2">
                 {hasUnsavedChanges && <Badge variant="secondary">Unsaved Changes</Badge>}
                 <Button variant="outline" size="sm" onClick={() => loadExistingAttendance()} disabled={isLoadingAttendance}>
-                  {isLoadingAttendance ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🔄</span>}
+                  {isLoadingAttendance ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                   Refresh
                 </Button>
-                <Button size="sm" onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
+                <Button size="sm" onClick={handleSave} disabled={isSaving || !hasUnsavedChanges || !canMark}>
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {isSaving ? 'Saving...' : 'Save Attendance'}
                 </Button>
@@ -561,7 +563,7 @@ function StaffView() {
           </div>
           <div className="space-y-1.5">
             <Label>Date</Label>
-            <Input type="date" value={selectedDate} onChange={(e) => handleDateChange(e.target.value)} />
+            <DatePicker value={selectedDate} onChange={handleDateChange} />
           </div>
         </div>
 
@@ -672,11 +674,11 @@ function StaffView() {
                       const attendance = studentAttendances.get(student.student.id);
                       const status = attendance?.status || 'present';
                       const statusStyles = {
-                        present: 'bg-green-100 text-green-700 border-green-300',
-                        absent: 'bg-red-100 text-red-700 border-red-300',
-                        late: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-                        half_day: 'bg-orange-100 text-orange-700 border-orange-300',
-                        leave: 'bg-blue-100 text-blue-700 border-blue-300',
+                        present: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800',
+                        absent: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
+                        late: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-800',
+                        half_day: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800',
+                        leave: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
                       }[status];
                       const rowStyles = status === 'absent'
                         ? 'border-red-200'

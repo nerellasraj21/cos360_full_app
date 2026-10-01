@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Send, Loader2, MessageSquare } from 'lucide-react'
 import { useForm } from 'react-hook-form'
@@ -8,50 +7,48 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useExamDetail } from '@/api/hooks/exam/useExam'
-import { sendExamNotification } from '@/api/exam'
-import { toast } from 'sonner'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { useExamDetail, useSendExamNotification } from '@/api/hooks/exam/useExam'
 
 const notificationSchema = z.object({
   message: z.string().min(10, 'Message must be at least 10 characters'),
-  channels: z.array(z.enum(['sms', 'whatsapp', 'push'])).min(1, 'Select at least one channel'),
-  target: z.enum(['all', 'failed', 'eligible', 'ineligible']),
+  channels: z.array(z.enum(['sms', 'email', 'push'])).min(1, 'Select at least one channel'),
+  target: z.enum(['students', 'parents', 'all']),
 })
 
 type FormData = z.infer<typeof notificationSchema>
 
 const channelLabels: Record<string, string> = {
   sms: 'SMS',
-  whatsapp: 'WhatsApp',
+  email: 'Email',
   push: 'Push Notification',
 }
 
 const targetLabels: Record<string, string> = {
-  all: 'All Students',
-  failed: 'Failed Students',
-  eligible: 'Hall Ticket Eligible',
-  ineligible: 'Hall Ticket Ineligible',
+  students: 'Students',
+  parents: 'Parents',
+  all: 'Students and Parents',
 }
 
 export default function ExamNotification() {
   const { id } = useParams({ strict: false }) as { id: string }
   const navigate = useNavigate()
-  const [sending, setSending] = useState(false)
 
   const { data: exam } = useExamDetail(id)
+  const sendMutation = useSendExamNotification(id)
 
   const form = useForm<FormData>({
     resolver: zodResolver(notificationSchema),
     defaultValues: {
       message: '',
       channels: ['push'],
-      target: 'all',
+      target: 'students',
     },
   })
 
   const channels = form.watch('channels')
 
-  const toggleChannel = (ch: 'sms' | 'whatsapp' | 'push') => {
+  const toggleChannel = (ch: 'sms' | 'email' | 'push') => {
     const current = form.getValues('channels')
     form.setValue(
       'channels',
@@ -60,37 +57,35 @@ export default function ExamNotification() {
     )
   }
 
-  const onSubmit = async (data: FormData) => {
-    try {
-      setSending(true)
-      await sendExamNotification(id, { ...data, notification_type: 'custom' })
-      toast.success('Notification sent successfully')
-      form.reset()
-    } catch {
-      toast.error('Failed to send notification')
-    } finally {
-      setSending(false)
-    }
+  const onSubmit = (data: FormData) => {
+    sendMutation.mutate(
+      {
+        notification_type: 'custom',
+        message: data.message,
+        target_audience: data.target,
+        send_push: data.channels.includes('push'),
+        send_sms: data.channels.includes('sms'),
+        send_email: data.channels.includes('email'),
+      },
+      { onSuccess: () => form.reset() }
+    )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate({ to: `/exam/exams/${id}` as any })}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-lg font-bold">Notifications — {exam?.exam_name ?? '...'}</h1>
-          <p className="text-xs text-muted-foreground">Send exam-related notifications</p>
-        </div>
-      </div>
+      <PageHeader
+        title={`Notifications - ${exam?.exam_name ?? ''}`}
+        subtitle="Send exam-related notifications"
+        icon={<MessageSquare className="h-5 w-5" />}
+        actions={
+          <Button variant="outline" onClick={() => navigate({ to: `/exam/exams/${id}` as any })} className="gap-1">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        }
+      />
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-w-xl">
-        {/* Target */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm">Target Audience</CardTitle>
@@ -115,14 +110,13 @@ export default function ExamNotification() {
           </CardContent>
         </Card>
 
-        {/* Channels */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm">Channels</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {(['sms', 'whatsapp', 'push'] as const).map(ch => (
+              {(['sms', 'email', 'push'] as const).map(ch => (
                 <button
                   key={ch}
                   type="button"
@@ -143,7 +137,6 @@ export default function ExamNotification() {
           </CardContent>
         </Card>
 
-        {/* Message */}
         <div className="space-y-2">
           <Label>Message</Label>
           <Textarea
@@ -160,8 +153,8 @@ export default function ExamNotification() {
           </p>
         </div>
 
-        <Button type="submit" disabled={sending}>
-          {sending ? (
+        <Button type="submit" disabled={sendMutation.isPending}>
+          {sendMutation.isPending ? (
             <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sending...</>
           ) : (
             <><Send className="h-4 w-4 mr-2" /> Send Notification</>
@@ -169,7 +162,6 @@ export default function ExamNotification() {
         </Button>
       </form>
 
-      {/* Info */}
       <div className="max-w-xl rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground flex items-start gap-3">
         <MessageSquare className="h-4 w-4 mt-0.5 shrink-0" />
         <p>

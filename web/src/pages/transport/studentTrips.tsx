@@ -8,6 +8,11 @@ import { PermissionGuard } from '@/components/common';
 import { Card, CardContent } from '@/components/ui/card';
 import { ShieldX, Bus } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { FilterBar } from '@/components/ui/FilterBar';
+import { Input } from '@/components/ui/input';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { useSelectStyles } from '@/lib/useSelectStyles';
+import { useRoutes } from '@/api/hooks/masters/routes';
 import Select, { type SingleValue } from 'react-select';
 import { useStudentsDropdown } from '@/api/hooks/students/admissions';
 import { useRouteStops } from '@/api/hooks/masters/routeStops';
@@ -32,6 +37,12 @@ const defaultValues: StudentTripBase = {
 
 const PAGE_SIZE_DEFAULT = 10;
 
+const statusOptions = [
+    { value: '', label: 'All Status' },
+    { value: 'true', label: 'Active' },
+    { value: 'false', label: 'Inactive' },
+];
+
 export default function StudentTripsPage() {
     const [page, setPage] = useState(0);
     const [pageSize, setPageSize] = useState(PAGE_SIZE_DEFAULT);
@@ -46,7 +57,10 @@ export default function StudentTripsPage() {
     // Fetch dropdown data
     const { data: students = [] } = useStudentsDropdown();
     const { data: routeStops = [] } = useRouteStops();
-    const { data: trips = [] } = useTrips();
+    const { data: tripsResponse } = useTrips();
+    const { data: routes = [] } = useRoutes();
+    const selectStyles = useSelectStyles();
+    const trips: any[] = Array.isArray(tripsResponse) ? tripsResponse : ((tripsResponse as any)?.items ?? []);
     const { data: feeTerms = [] } = useFeeTermsDropdown();
 
     // Transform data for react-select
@@ -64,19 +78,17 @@ export default function StudentTripsPage() {
         }));
     }, [routeStops]);
 
+    const tripLabel = (trip: any) => {
+        const routeName = routes.find(rt => rt.id === trip.route_id)?.route_name;
+        return routeName ? `${routeName} - Trip ${trip.trip_number}` : `Trip ${trip.trip_number}`;
+    };
+
     const tripOptions = useMemo(() => {
-        console.log('[DEBUG] tripOptions - trips data:', trips);
-        if (!trips || !Array.isArray(trips)) {
-            console.log('[DEBUG] tripOptions - returning empty array, trips:', trips);
-            return [];
-        }
-        const options = trips.map((trip: any) => ({
+        return trips.map((trip: any) => ({
             value: trip.id,
-            label: `Trip ${trip.trip_number}`
+            label: tripLabel(trip)
         }));
-        console.log('[DEBUG] tripOptions - generated options:', options);
-        return options;
-    }, [trips]);
+    }, [trips, routes]);
 
     const feeTermOptions = useMemo(() => {
         return feeTerms.map(term => ({
@@ -119,24 +131,23 @@ export default function StudentTripsPage() {
     // Helper functions to get display names
     const getStudentName = (studentId: string) => {
         const student = students.find(s => s.id === studentId);
-        return student ? (student.admission_number ? `${student.display_name} (${student.admission_number})` : student.name) : `Student ${studentId}`;
+        return student ? (student.admission_number ? `${student.display_name} (${student.admission_number})` : student.name) : '—';
     };
 
 
     const getStopName = (stopId: string) => {
         const stop = routeStops.find(s => s.id === stopId);
-        return stop ? stop.name : `Stop ${stopId}`;
+        return stop ? stop.name : '—';
     };
 
     const getTripName = (tripId: string) => {
-        if (!trips || !Array.isArray(trips)) return `Trip ${tripId}`;
         const trip = trips.find((t: any) => t.id === tripId);
-        return trip ? `Trip ${trip.trip_number}` : `Trip ${tripId}`;
+        return trip ? tripLabel(trip) : '—';
     };
 
     const getFeeTermName = (feeTermId: string) => {
         const term = feeTerms.find(t => t.id === feeTermId);
-        return term ? term.term_name : `Term ${feeTermId}`;
+        return term ? term.term_name : '—';
     };
 
 
@@ -164,12 +175,12 @@ export default function StudentTripsPage() {
         {
             key: "fee_per_term",
             label: "Fee Per Term",
-            render: (value: number) => `₹${value.toLocaleString()}`,
+            render: (value: number | string) => `₹${Number(value).toLocaleString()}`,
         },
         {
             key: "is_active",
             label: "Active",
-            render: (value: boolean) => value ? "Yes" : "No",
+            render: (value: boolean) => <StatusBadge status={!!value} />,
         },
     ];
 
@@ -185,19 +196,7 @@ export default function StudentTripsPage() {
                     classNamePrefix="react-select"
                     menuPlacement="auto"
                     menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                    styles={{
-                        menuPortal: base => ({ ...base, zIndex: 9999 }),
-                        menu: (provided) => ({ ...provided, zIndex: 9999 }),
-                        option: (provided, state) => ({
-                            ...provided,
-                            cursor: 'pointer',
-                            backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
-                            color: state.isSelected ? 'white' : 'black',
-                            '&:hover': {
-                                backgroundColor: state.isSelected ? '#3b82f6' : '#f3f4f6',
-                            },
-                        }),
-                    }}
+                    styles={selectStyles}
                 />
             );
         }
@@ -212,19 +211,7 @@ export default function StudentTripsPage() {
                     classNamePrefix="react-select"
                     menuPlacement="auto"
                     menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                    styles={{
-                        menuPortal: base => ({ ...base, zIndex: 9999 }),
-                        menu: (provided) => ({ ...provided, zIndex: 9999 }),
-                        option: (provided, state) => ({
-                            ...provided,
-                            cursor: 'pointer',
-                            backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
-                            color: state.isSelected ? 'white' : 'black',
-                            '&:hover': {
-                                backgroundColor: state.isSelected ? '#3b82f6' : '#f3f4f6',
-                            },
-                        }),
-                    }}
+                    styles={selectStyles}
                 />
             );
         }
@@ -239,19 +226,7 @@ export default function StudentTripsPage() {
                     classNamePrefix="react-select"
                     menuPlacement="auto"
                     menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                    styles={{
-                        menuPortal: base => ({ ...base, zIndex: 9999 }),
-                        menu: (provided) => ({ ...provided, zIndex: 9999 }),
-                        option: (provided, state) => ({
-                            ...provided,
-                            cursor: 'pointer',
-                            backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
-                            color: state.isSelected ? 'white' : 'black',
-                            '&:hover': {
-                                backgroundColor: state.isSelected ? '#3b82f6' : '#f3f4f6',
-                            },
-                        }),
-                    }}
+                    styles={selectStyles}
                 />
             );
         }
@@ -266,19 +241,7 @@ export default function StudentTripsPage() {
                     classNamePrefix="react-select"
                     menuPlacement="auto"
                     menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                    styles={{
-                        menuPortal: base => ({ ...base, zIndex: 9999 }),
-                        menu: (provided) => ({ ...provided, zIndex: 9999 }),
-                        option: (provided, state) => ({
-                            ...provided,
-                            cursor: 'pointer',
-                            backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
-                            color: state.isSelected ? 'white' : 'black',
-                            '&:hover': {
-                                backgroundColor: state.isSelected ? '#3b82f6' : '#f3f4f6',
-                            },
-                        }),
-                    }}
+                    styles={selectStyles}
                 />
             );
         }
@@ -287,6 +250,8 @@ export default function StudentTripsPage() {
 
     const config: MasterPageConfig<StudentTripOut, StudentTripBase> = {
         title: "Student Transport Assignments",
+        hideTitle: true,
+        addButtonLabel: "Add Assignment",
         columns,
         defaultValues,
         formFields,
@@ -340,47 +305,26 @@ export default function StudentTripsPage() {
                 <PageHeader title="Student Transport Assignments" icon={<Bus className="h-5 w-5" />} />
 
                 {/* Filters */}
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="text-sm font-medium">Search by Student</label>
-                                <input
-                                    type="text"
-                                    placeholder="Search by name or admission number..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium">Filter by Status</label>
-                                <Select
-                                    options={[
-                                        { value: '', label: 'All Status' },
-                                        { value: 'true', label: 'Active' },
-                                        { value: 'false', label: 'Inactive' },
-                                    ]}
-                                    value={[
-                                        { value: '', label: 'All Status' },
-                                        { value: 'true', label: 'Active' },
-                                        { value: 'false', label: 'Inactive' },
-                                    ].find(option => option.value === selectedActive)}
-                                    onChange={(option: SingleValue<{ value: string; label: string }>) => setSelectedActive(option?.value || '')}
-                                    placeholder="Select Status"
-                                    className="mt-1"
-                                    classNamePrefix="react-select"
-                                    menuPlacement="auto"
-                                    menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-                                    styles={{
-                                        menuPortal: base => ({ ...base, zIndex: 9999 }),
-                                        menu: (provided) => ({ ...provided, zIndex: 9999 }),
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                <FilterBar>
+                    <Input
+                        placeholder="Search by name or admission number..."
+                        value={searchTerm}
+                        onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+                        className="w-72"
+                    />
+                    <div className="w-48">
+                        <Select
+                            options={statusOptions}
+                            value={statusOptions.find(option => option.value === selectedActive)}
+                            onChange={(option: SingleValue<{ value: string; label: string }>) => { setSelectedActive(option?.value || ''); setPage(0); }}
+                            placeholder="Select Status"
+                            classNamePrefix="react-select"
+                            menuPlacement="auto"
+                            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                            styles={selectStyles}
+                        />
+                    </div>
+                </FilterBar>
 
                 <MasterPage config={config} />
             </div>

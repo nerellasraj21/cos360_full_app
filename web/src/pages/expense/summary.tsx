@@ -18,7 +18,7 @@ const statusColor = (s: string) => {
   if (s === 'approved') return 'bg-green-100 text-green-800';
   if (s === 'paid') return 'bg-blue-100 text-blue-800';
   if (s === 'pending') return 'bg-yellow-100 text-yellow-800';
-  return 'bg-gray-100 text-gray-600';
+  return 'bg-muted text-muted-foreground';
 };
 
 // ─── Type row (collapsible) ──────────────────────────────────────────────────
@@ -73,10 +73,10 @@ function TypeRow({ type }: { type: ExpenseTypeSummaryItem }) {
                       {entry.vendor_name || '—'}
                     </td>
                     <td className="py-2 pr-3 text-muted-foreground capitalize hidden sm:table-cell">
-                      {entry.payment_method.replace('_', ' ')}
+                      {entry.payment_method.replace(/_/g, ' ')}
                     </td>
                     <td className="py-2 pr-3 hidden sm:table-cell text-center">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(entry.status)}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${statusColor(entry.status)}`}>
                         {entry.status}
                       </span>
                     </td>
@@ -211,8 +211,8 @@ export function ExpenseSummaryPage() {
       fallback={
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Access Denied</h2>
-            <p className="text-gray-600">You don't have permission to view expense summaries.</p>
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">You don't have permission to view expense summaries.</p>
           </div>
         </div>
       }

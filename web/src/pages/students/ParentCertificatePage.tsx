@@ -1,8 +1,10 @@
 import React from "react";
+import { config } from "@/lib/config";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DownloadButton } from "@/components/common/TableActions";
-import { FileText, Loader2 } from "lucide-react";
+import { FileText, Loader2, ScrollText } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { useMyChildCertificates, useDownloadCertificateDocument } from "@/api/hooks/students/certificates";
 import { useAuthStore } from "@/lib/authStore";
 import type { CertificateRead } from "@/types/certificates/types";
@@ -10,6 +12,8 @@ import type { CertificateRead } from "@/types/certificates/types";
 // The active child is chosen via the header's student switcher
 // (authStore.selectedStudent) — there's no page-local selector here so every
 // module stays in sync with a single source of truth.
+const mediaBase = config.api.baseURL.replace(/\/api\/v\d+$/, '');
+
 export const ParentCertificatePage: React.FC = () => {
   const availableStudents = useAuthStore((s) => s.availableStudents);
   const selectedStudentFromStore = useAuthStore((s) => s.selectedStudent);
@@ -23,7 +27,10 @@ export const ParentCertificatePage: React.FC = () => {
   const handleDownload = async (certificateId: string) => {
     try {
       const result = await downloadCertificate.mutateAsync(certificateId);
-      window.location.href = result.presigned_url;
+      const url = result.presigned_url.startsWith('http')
+        ? result.presigned_url
+        : `${mediaBase}${result.presigned_url}`;
+      window.open(url, '_blank');
     } catch {
       // handled by mutation
     }
@@ -34,7 +41,7 @@ export const ParentCertificatePage: React.FC = () => {
       <div className="container mx-auto p-6">
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground">
-            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <FileText className="h-12 w-12 mx-auto mb-4 opacity-75" />
             <p>No children linked to your account.</p>
           </CardContent>
         </Card>
@@ -44,6 +51,7 @@ export const ParentCertificatePage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      <PageHeader title="Certificates" icon={<ScrollText className="h-5 w-5" />} />
       <Card>
         <CardHeader>
           <CardTitle>
@@ -69,7 +77,7 @@ export const ParentCertificatePage: React.FC = () => {
             </div>
           ) : certificates.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
+              <FileText className="h-12 w-12 mx-auto mb-4 opacity-75" />
               <p>No certificates found.</p>
             </div>
           ) : (

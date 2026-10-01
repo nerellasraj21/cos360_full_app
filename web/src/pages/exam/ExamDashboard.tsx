@@ -28,7 +28,7 @@ function ExamTable({ exams, subjectNameMap, sectionLabel }: { exams: ExamListIte
       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
         {sectionLabel}
       </h2>
-      <div className="overflow-hidden rounded-lg border">
+      <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/40">
@@ -95,7 +95,7 @@ export default function ExamDashboard() {
   const [searchQuery, setSearchQuery] = useState('')
 
   const selectedYear = academicYears.find(y => String(y.id) === String(selectedAcademicYearId))
-  const { data: exams = [], isLoading } = useExamList({ academic_year_id: selectedAcademicYearId || undefined })
+  const { data: exams = [], isLoading, isError, error } = useExamList({ academic_year_id: selectedAcademicYearId || undefined })
   const { data: subjectsList = [] } = useSubjectsDropdown()
   const subjectNameMap = Object.fromEntries(subjectsList.map(s => [s.id, s.name]))
 
@@ -113,7 +113,6 @@ export default function ExamDashboard() {
     { label: 'Mark Entry', icon: ClipboardList, to: '/exam/marks' },
     { label: 'Results', icon: Award, to: '/exam/results' },
     { label: 'Hall Tickets', icon: Ticket, to: '/exam/hall-tickets' },
-    // Settings is admin-only (exams:update) — see routes/_app/exam/settings.tsx guard
     ...(isAdmin ? [{ label: 'Settings', icon: Settings, to: '/exam/settings' }] : []),
   ]
 
@@ -131,7 +130,6 @@ export default function ExamDashboard() {
         ) : null}
       />
 
-      {/* Quick Links */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {quickLinks.map(link => (
           <button
@@ -145,7 +143,6 @@ export default function ExamDashboard() {
         ))}
       </div>
 
-      {/* Filter Bar */}
       <div className="space-y-2">
         <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
           <Filter className="h-3.5 w-3.5" />
@@ -162,7 +159,6 @@ export default function ExamDashboard() {
         </div>
       </div>
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {(['draft', 'active', 'locked', 'published'] as const).map(status => (
           <div key={status} className="rounded-lg border bg-card p-4">
@@ -172,10 +168,14 @@ export default function ExamDashboard() {
         ))}
       </div>
 
-      {/* Exam Tables */}
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-muted-foreground">Loading exams...</span>
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg border bg-muted/20 p-8 text-center">
+          <p className="text-muted-foreground">{error instanceof Error ? error.message : 'Failed to load exams.'}</p>
         </div>
       ) : (
         <div className="space-y-6">

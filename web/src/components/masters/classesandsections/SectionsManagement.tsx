@@ -245,7 +245,7 @@ export function SectionsManagement({
                     }
                   }}
                   onSelect={(e) => e.preventDefault()}
-                  className="cursor-pointer font-medium border-b border-b-gray-200"
+                  className="cursor-pointer font-medium border-b border-b-border"
                 >
                   Select All
                 </DropdownMenuCheckboxItem>
@@ -353,7 +353,7 @@ export function SectionsManagement({
                     {col.key === 'className' && (
                       <div>
                         <div className="font-medium">{section.className}</div>
-                        <div className="text-sm text-gray-500">{section.classShortCode}</div>
+                        <div className="text-sm text-muted-foreground">{section.classShortCode}</div>
                       </div>
                     )}
                     {col.key === 'classIsActive' && (
@@ -395,7 +395,7 @@ export function SectionsManagement({
             ))}
             {filteredSections.length === 0 && (
               <TableRow>
-                <TableCell colSpan={filteredColumns.length + 2} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={filteredColumns.length + 2} className="text-center py-8 text-muted-foreground">
                   {classFilter !== 'all' || statusFilter !== 'all' || searchQuery
                     ? 'No sections match your filters'
                     : 'No sections found'
@@ -410,7 +410,7 @@ export function SectionsManagement({
         {filteredSections.length > pageSize && (
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Rows per page:</span>
+              <span className="text-sm text-muted-foreground">Rows per page:</span>
               <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
                 <SelectTrigger className="w-20">
                   <SelectValue />
@@ -424,7 +424,7 @@ export function SectionsManagement({
               </Select>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted-foreground">
                 {Math.min((currentPage - 1) * pageSize + 1, filteredSections.length)}-{Math.min(currentPage * pageSize, filteredSections.length)} of {filteredSections.length}
               </span>
               <div className="flex gap-1">
@@ -449,7 +449,7 @@ export function SectionsManagement({
           </div>
         )}
 
-        <div className="mt-4 text-sm text-gray-600">
+        <div className="mt-4 text-sm text-muted-foreground">
           Showing {sortedSections.length} of {filteredSections.length} sections
         </div>
       </CardContent>

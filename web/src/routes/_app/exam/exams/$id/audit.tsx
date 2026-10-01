@@ -3,8 +3,6 @@ import AuditLog from '@/pages/exam/AuditLog'
 import { useAuthStore } from '@/lib/authStore'
 import { isAdminRoleName } from '@/lib/roleUtils'
 
-// Web parity (ExamDetail's isAdmin-gated "Audit" tab): guards the direct
-// URL, not just the hidden tab.
 export const Route = createFileRoute('/_app/exam/exams/$id/audit')({
   beforeLoad: ({ params }) => {
     const role = useAuthStore.getState().role

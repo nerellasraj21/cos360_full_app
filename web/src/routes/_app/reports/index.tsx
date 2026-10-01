@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Clock, BarChart2 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { BarChart2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useAuthStore } from '@/lib/authStore'
@@ -46,24 +45,7 @@ function ReportsDashboard() {
         title="Reports"
         subtitle="Comprehensive analytics and reporting across all school modules"
         icon={<BarChart2 className="h-5 w-5" />}
-        actions={
-          <Badge variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 text-sm">
-            <Clock className="h-3.5 w-3.5" />
-            Coming Soon
-          </Badge>
-        }
       />
-
-      {/* Coming Soon Banner */}
-      <div className="rounded-xl border-2 border-dashed border-indigo-300 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20 p-8 text-center">
-        <BarChart2 className="h-12 w-12 text-indigo-500 mx-auto mb-3" />
-        <h2 className="text-xl font-semibold text-indigo-700 dark:text-indigo-400">
-          Reports Dashboard — Coming Soon
-        </h2>
-        <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-          A unified reporting hub with charts, filters, and export options is being built. Module-specific reports are already available in each module section.
-        </p>
-      </div>
 
       {/* Sections */}
       {sections.length > 0 && (

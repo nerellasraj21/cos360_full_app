@@ -17,7 +17,7 @@ import {
   Shield,
   Database,
   Eye,
-  Download,
+  Loader2,
   X,
   Trash2
 } from 'lucide-react';
@@ -89,8 +89,8 @@ export function ExpenseAuditPage() {
       fallback={
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Access Denied</h2>
-            <p className="text-gray-600">You don't have permission to view expense audit logs.</p>
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">You don't have permission to view expense audit logs.</p>
           </div>
         </div>
       }
@@ -119,32 +119,6 @@ export function ExpenseAuditPage() {
                 </p>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Audit Logs Today</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">
-                  Activity logs
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Compliance Status</CardTitle>
-                <Shield className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">Good</div>
-                <p className="text-xs text-muted-foreground">
-                  All systems compliant
-                </p>
-              </CardContent>
-            </Card>
           </div>
 
           <Card>
@@ -153,7 +127,7 @@ export function ExpenseAuditPage() {
             </CardHeader>
             <CardContent>
               <div className="text-center py-8 text-muted-foreground">
-                <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <Database className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-75" />
                 <p>Select a transaction to view detailed audit information</p>
               </div>
             </CardContent>
@@ -197,6 +171,7 @@ export function ExpenseAuditPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">S.No.</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Department</TableHead>
@@ -207,32 +182,37 @@ export function ExpenseAuditPage() {
                   <TableBody>
                     {transactionsLoading ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8">
-                          Loading transactions...
+                        <TableCell colSpan={6} className="text-center py-8">
+                          <div className="flex justify-center items-center">
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                            <span className="ml-2 text-muted-foreground">Loading transactions...</span>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ) : filteredTransactions.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           No transactions found
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredTransactions.map((transaction) => (
+                      filteredTransactions.map((transaction, idx) => (
                         <TableRow
                           key={transaction.id}
+                          style={{ height: '48px' }}
                           className={selectedTransactionId === transaction.id ? 'bg-accent' : ''}
                         >
+                          <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                           <TableCell>
                             <div>
                               <div className="font-medium">{transaction.description}</div>
                               <div className="text-sm text-muted-foreground">
-                                {transaction.reference_number && `#${transaction.reference_number}`}
+                                {!!transaction.reference_number && `#${transaction.reference_number}`}
                               </div>
                             </div>
                           </TableCell>
                           <TableCell className="font-medium">
-                            ₹{transaction.amount.toLocaleString()}
+                            ₹{Number(transaction.amount).toLocaleString('en-IN')}
                           </TableCell>
                           <TableCell>
                             {getDepartmentName(transaction.department_id)}
@@ -289,8 +269,9 @@ export function ExpenseAuditPage() {
                 <div className="mt-4 pt-4 border-t">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
-                    Last activity: {new Date(auditSummary.last_action_at).toLocaleString()}
-                    by {auditSummary.last_actor}
+                    {auditSummary.last_action_at
+                      ? `Last activity: ${new Date(auditSummary.last_action_at).toLocaleString()}${auditSummary.last_actor ? ` by ${auditSummary.last_actor}` : ''}`
+                      : 'No activity recorded'}
                   </div>
                 </div>
               </CardContent>
@@ -312,13 +293,13 @@ export function ExpenseAuditPage() {
               </CardHeader>
               <CardContent>
                 {auditLogsLoading ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="text-muted-foreground mt-2">Loading audit logs...</p>
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2 text-muted-foreground">Loading audit logs...</span>
                   </div>
                 ) : auditLogs.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-75" />
                     <p>No audit logs found for this transaction</p>
                   </div>
                 ) : (
@@ -330,11 +311,11 @@ export function ExpenseAuditPage() {
                             {getActionIcon(log.action)}
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
-                                <Badge variant={getActionBadgeVariant(log.action)}>
-                                  {log.action}
+                                <Badge variant={getActionBadgeVariant(log.action)} className="capitalize">
+                                  {log.action.replace(/_/g, ' ')}
                                 </Badge>
-                                <Badge variant="outline">
-                                  {log.action_category}
+                                <Badge variant="outline" className="capitalize">
+                                  {log.action_category.replace(/_/g, ' ')}
                                 </Badge>
                                 <span className="text-sm text-muted-foreground">
                                   {new Date(log.created_at).toLocaleString()}
@@ -369,7 +350,7 @@ export function ExpenseAuditPage() {
           ) : (
             <Card>
               <CardContent className="text-center py-12">
-                <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-75" />
                 <h3 className="text-lg font-medium mb-2">Select a Transaction</h3>
                 <p className="text-muted-foreground">
                   Choose a transaction from the "Transaction Audit" tab to view its audit logs

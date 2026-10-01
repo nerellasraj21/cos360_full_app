@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
-import { FileText, Trash2, RotateCcw, ChevronDown, ChevronUp, Upload, Eye, Download, FolderOpen, Edit, CheckCircle } from "lucide-react";
+import { FileText, Trash2, RotateCcw, ChevronDown, ChevronUp, Upload, Eye, Download, FolderOpen, CheckCircle, Loader2 } from "lucide-react";
 import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from "sonner";
 import { useStudentDocuments, useUploadStudentDocument, useDeleteStudentDocument, useDownloadStudentDocument } from "@/api/hooks/students/documents";
@@ -17,7 +17,7 @@ import { useStudentsDropdown } from "@/api/hooks/students/useAdmission";
 import { useAuthStore } from "@/lib/authStore";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { usePermission } from "@/hooks/usePermission";
-import { ViewButton, EditButton, DeleteButton, DownloadButton, TableActionGroup } from "@/components/common/TableActions";
+import { ViewButton, DeleteButton, DownloadButton, TableActionGroup } from "@/components/common/TableActions";
 import type { Document } from "@/types/documents";
 
 interface DocumentActionsCellProps {
@@ -61,13 +61,6 @@ const DocumentActionsCell: React.FC<DocumentActionsCellProps> = ({
                 title="View Document"
             />
         )}
-        <EditButton
-            onClick={() => {
-                toast.info('Document editing is not supported');
-            }}
-            disabled
-            title="Edit (Not Supported)"
-        />
         {canVerify && (
             <Dialog
                 open={verifyDialogOpen === row.id}
@@ -77,7 +70,7 @@ const DocumentActionsCell: React.FC<DocumentActionsCellProps> = ({
                 }}
             >
                 <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm" title="Verify Document">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Verify Document">
                         <CheckCircle className="h-4 w-4 text-green-600" />
                     </Button>
                 </DialogTrigger>
@@ -150,7 +143,7 @@ export const DocumentUploadPage: React.FC = () => {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
     const [verifyDialogOpen, setVerifyDialogOpen] = useState<string | null>(null);
     const [verifyRemarks, setVerifyRemarks] = useState<string>("");
-    const [isUploadSectionOpen, setIsUploadSectionOpen] = useState(false);
+    const [isUploadSectionOpen, setIsUploadSectionOpen] = useState(true);
 
     // API hooks
     const { data: students = [] } = useStudentsDropdown();
@@ -183,8 +176,6 @@ export const DocumentUploadPage: React.FC = () => {
                 document_file: selectedFile
             });
 
-            // Reset form
-            setSelectedStudent("");
             setDocumentType("");
             setSelectedFile(null);
         } catch (error) {
@@ -365,7 +356,7 @@ export const DocumentUploadPage: React.FC = () => {
                                         accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                                     />
                                     {selectedFile && (
-                                        <p className="text-sm text-gray-600">
+                                        <p className="text-sm text-muted-foreground">
                                             Selected: {selectedFile.name}
                                         </p>
                                     )}
@@ -419,16 +410,17 @@ export const DocumentUploadPage: React.FC = () => {
                     )}
                     {!selectedStudent ? (
                         <div className="text-center py-8">
-                            <FolderOpen className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-50" />
+                            <FolderOpen className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-75" />
                             <p className="text-muted-foreground">Select a student above to view their documents</p>
                         </div>
                     ) : documentsLoading ? (
-                        <div className="text-center py-8">
-                            <p className="text-muted-foreground">Loading documents...</p>
+                        <div className="flex justify-center items-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                            <span className="ml-2 text-muted-foreground">Loading documents...</span>
                         </div>
                     ) : documents.length === 0 ? (
                         <div className="text-center py-8">
-                            <FileText className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-50" />
+                            <FileText className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-75" />
                             <p className="text-muted-foreground">No documents found for this student</p>
                         </div>
                     ) : (

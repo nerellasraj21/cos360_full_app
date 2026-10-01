@@ -113,7 +113,7 @@ const AdminProfile: React.FC = () => {
   }
 
   if (error) {
-    return <div className="p-6 text-red-500">Error loading profile: {error.message}</div>;
+    return <div className="p-6 text-destructive">Error loading profile: {error.message}</div>;
   }
 
   if (!profile) {

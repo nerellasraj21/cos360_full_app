@@ -56,7 +56,7 @@ const MyDocumentsView: React.FC = () => {
                 <PageHeader title="Student Documents" icon={<FolderOpen className="h-5 w-5" />} />
                 <Card>
                     <CardContent className="p-6 text-center text-muted-foreground">
-                        <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-75" />
                         <p>No student record is linked to your account.</p>
                     </CardContent>
                 </Card>
@@ -80,7 +80,7 @@ const MyDocumentsView: React.FC = () => {
                         </div>
                     ) : documents.length === 0 ? (
                         <div className="text-center py-10 text-muted-foreground">
-                            <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
+                            <FileText className="h-12 w-12 mx-auto mb-4 opacity-75" />
                             <p>No documents found.</p>
                             <p className="text-sm">Documents issued to you will appear here.</p>
                         </div>
@@ -165,12 +165,6 @@ const StaffDocumentsView: React.FC = () => {
             label: "Date",
             render: (value) => value ? new Date(value).toLocaleDateString() : '-'
         },
-        {
-            key: "actions",
-            label: "",
-            sortable: false,
-            render: () => null
-        },
     ];
 
     return (
@@ -206,14 +200,17 @@ const StaffDocumentsView: React.FC = () => {
 
                     {!selectedStudent ? (
                         <div className="text-center py-8 text-muted-foreground">
-                            <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <Search className="h-12 w-12 mx-auto mb-4 opacity-75" />
                             <p>Please select a student to view their documents.</p>
                         </div>
                     ) : isLoading ? (
-                        <div className="text-center py-4">Loading documents...</div>
+                        <div className="flex justify-center items-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                            <span className="ml-2">Loading documents...</span>
+                        </div>
                     ) : documents.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
-                            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <FileText className="h-12 w-12 mx-auto mb-4 opacity-75" />
                             <p>No documents found for this student.</p>
                             <p className="text-sm">Documents uploaded for the selected student will appear here.</p>
                         </div>

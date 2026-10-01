@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, Download, Search, RefreshCw, ChevronDown, Award, Ch
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/PageHeader'
 import {
   useExamDetail,
   useStudentResults,
@@ -16,13 +17,9 @@ import { useAuthStore } from '@/lib/authStore'
 import * as XLSX from 'xlsx'
 import type { StudentExamResult } from '@/types/exam'
 
-// ---------------------------------------------------------------------------
-// Shared result card — used by both StudentResultView and ParentResultView
-// ---------------------------------------------------------------------------
 function ResultSummaryCard({ result }: { result: StudentExamResult }) {
   return (
     <div className="space-y-4">
-      {/* Overall result */}
       <div className={`rounded-lg border p-6 ${
         result.is_passed
           ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
@@ -43,13 +40,12 @@ function ResultSummaryCard({ result }: { result: StudentExamResult }) {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-lg border bg-card p-4">
           <p className="text-xs text-muted-foreground mb-1">Total Marks</p>
           <p className="text-xl font-bold">
             {result.total_marks_obtained != null ? Number(result.total_marks_obtained).toFixed(1) : '—'}
-            <span className="text-sm text-muted-foreground font-normal"> / {result.total_max_marks ?? '—'}</span>
+            <span className="text-sm text-muted-foreground font-normal"> / {result.total_max_marks != null ? Number(result.total_max_marks) : '—'}</span>
           </p>
         </div>
         <div className="rounded-lg border bg-card p-4">
@@ -72,9 +68,8 @@ function ResultSummaryCard({ result }: { result: StudentExamResult }) {
         </div>
       </div>
 
-      {/* Subject breakdown */}
       {result.subject_results && result.subject_results.length > 0 && (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="rounded-lg border overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">
@@ -93,7 +88,7 @@ function ResultSummaryCard({ result }: { result: StudentExamResult }) {
                     {sr.is_absent ? (
                       <Badge variant="destructive" className="text-xs">Absent</Badge>
                     ) : (
-                      `${sr.marks_obtained != null ? Number(sr.marks_obtained).toFixed(1) : '—'} / ${sr.max_marks ?? '—'}`
+                      `${sr.marks_obtained != null ? Number(sr.marks_obtained).toFixed(1) : '—'} / ${sr.max_marks != null ? Number(sr.max_marks) : '—'}`
                     )}
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">
@@ -102,7 +97,7 @@ function ResultSummaryCard({ result }: { result: StudentExamResult }) {
                   <td className="px-4 py-2">{sr.grade_label ?? '—'}</td>
                   <td className="px-4 py-2">
                     {sr.is_passed != null ? (
-                      <span className={sr.is_passed ? 'text-green-600' : 'text-destructive'}>
+                      <span className={sr.is_passed ? 'text-green-600 dark:text-green-400' : 'text-destructive'}>
                         {sr.is_passed ? 'Pass' : 'Fail'}
                       </span>
                     ) : '—'}
@@ -117,9 +112,6 @@ function ResultSummaryCard({ result }: { result: StudentExamResult }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Student view — own result (exam_results: read_own)
-// ---------------------------------------------------------------------------
 function StudentResultView({ examId }: { examId: string }) {
   const navigate = useNavigate()
   const { data: exam } = useExamDetail(examId)
@@ -127,19 +119,22 @@ function StudentResultView({ examId }: { examId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/exam/results' as any })} className="gap-1">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-lg font-bold">Results — {exam?.exam_name ?? '...'}</h1>
-          <p className="text-xs text-muted-foreground">Your exam result</p>
-        </div>
-      </div>
+      <PageHeader
+        title={`Results - ${exam?.exam_name ?? ''}`}
+        subtitle="Your exam result"
+        icon={<Award className="h-5 w-5" />}
+        actions={
+          <Button variant="outline" onClick={() => navigate({ to: '/exam/results' as any })} className="gap-1">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-muted-foreground">Loading results...</span>
         </div>
       ) : error ? (
         <div className="rounded-lg border border-dashed p-10 text-center">
@@ -158,9 +153,6 @@ function StudentResultView({ examId }: { examId: string }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Parent view — child's result
-// ---------------------------------------------------------------------------
 function ParentResultView({ examId }: { examId: string }) {
   const navigate = useNavigate()
   const { data: exam } = useExamDetail(examId)
@@ -169,19 +161,22 @@ function ParentResultView({ examId }: { examId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/exam/results' as any })} className="gap-1">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-lg font-bold">Results — {exam?.exam_name ?? '...'}</h1>
-          {selectedStudent && <p className="text-xs text-muted-foreground">{selectedStudent.name}</p>}
-        </div>
-      </div>
+      <PageHeader
+        title={`Results - ${exam?.exam_name ?? ''}`}
+        subtitle={selectedStudent?.name}
+        icon={<Award className="h-5 w-5" />}
+        actions={
+          <Button variant="outline" onClick={() => navigate({ to: '/exam/results' as any })} className="gap-1">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-muted-foreground">Loading results...</span>
         </div>
       ) : error ? (
         <div className="rounded-lg border border-dashed p-10 text-center">
@@ -200,16 +195,13 @@ function ParentResultView({ examId }: { examId: string }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Admin view — all students (existing behaviour, unchanged)
-// ---------------------------------------------------------------------------
 function AdminResultView({ examId }: { examId: string }) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
 
   const { data: exam } = useExamDetail(examId)
-  const { data: results = [], isLoading } = useStudentResults(examId)
+  const { data: results = [], isLoading, isError, error } = useStudentResults(examId)
   const computeMutation = useComputeAggregate(examId)
 
   const canCompute = exam?.status === 'active' || exam?.status === 'locked'
@@ -279,80 +271,79 @@ function AdminResultView({ examId }: { examId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate({ to: `/exam/results` as any })}
-            className="gap-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-bold">Results — {exam?.exam_name ?? '...'}</h1>
-            <p className="text-xs text-muted-foreground">
-              {results.length} students · {exam?.status ?? ''}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {canCompute && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1"
-              onClick={() => computeMutation.mutate()}
-              disabled={computeMutation.isPending}
-            >
-              {computeMutation.isPending
-                ? <><Loader2 className="h-4 w-4 animate-spin" /> Computing...</>
-                : <><RefreshCw className="h-4 w-4" /> Compute Results</>
-              }
+      <PageHeader
+        title={`Results - ${exam?.exam_name ?? ''}`}
+        subtitle={`${results.length} students${exam?.status ? ` - ${exam.status}` : ''}`}
+        icon={<Award className="h-5 w-5" />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={() => navigate({ to: '/exam/results' as any })} className="gap-1">
+              <ArrowLeft className="h-4 w-4" />
+              Back
             </Button>
-          )}
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search student..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-8 h-9 w-56"
-            />
-          </div>
-          <div className="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1"
-              onClick={() => setExportMenuOpen(prev => !prev)}
-              disabled={filtered.length === 0}
-            >
-              <Download className="h-4 w-4" />
-              Export
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-            {exportMenuOpen && (
-              <div className="absolute right-0 mt-1 w-40 rounded-md border bg-popover shadow-md z-50">
-                <button
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground rounded-t-md"
-                  onClick={handleExportCSV}
+              {canCompute && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => computeMutation.mutate()}
+                  disabled={computeMutation.isPending}
                 >
-                  Export to CSV
-                </button>
-                <button
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground rounded-b-md"
-                  onClick={handleExportExcel}
-                >
-                  Export to Excel
-                </button>
+                  {computeMutation.isPending
+                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Computing...</>
+                    : <><RefreshCw className="h-4 w-4" /> Compute Results</>
+                  }
+                </Button>
+              )}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search student..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="pl-8 h-9 w-56"
+                />
               </div>
-            )}
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => setExportMenuOpen(prev => !prev)}
+                  disabled={filtered.length === 0}
+                >
+                  <Download className="h-4 w-4" />
+                  Export
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+                {exportMenuOpen && (
+                  <div className="absolute right-0 mt-1 w-40 rounded-md border bg-popover shadow-md z-50">
+                    <button
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground rounded-t-md"
+                      onClick={handleExportCSV}
+                    >
+                      Export to CSV
+                    </button>
+                    <button
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground rounded-b-md"
+                      onClick={handleExportExcel}
+                    >
+                      Export to Excel
+                    </button>
+                  </div>
+                )}
+              </div>
           </div>
-        </div>
-      </div>
+        }
+      />
 
-      <ResultsTable results={filtered} isLoading={isLoading || computeMutation.isPending} />
+      {isError ? (
+        <div className="rounded-lg border bg-muted/20 p-8 text-center">
+          <p className="text-muted-foreground">{error instanceof Error ? error.message : 'Failed to load results.'}</p>
+        </div>
+      ) : (
+        <ResultsTable results={filtered} isLoading={isLoading || computeMutation.isPending} />
+      )}
 
       <p className="text-xs text-muted-foreground">
         Showing {filtered.length} of {results.length} students
@@ -361,9 +352,6 @@ function AdminResultView({ examId }: { examId: string }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Router — picks view based on role
-// ---------------------------------------------------------------------------
 export default function StudentResults() {
   const { id } = useParams({ strict: false }) as { id: string }
   const role = useAuthStore(s => s.role?.name?.toLowerCase() ?? '')

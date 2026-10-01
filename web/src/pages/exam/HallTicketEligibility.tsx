@@ -3,10 +3,9 @@ import { useParams, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Loader2, RefreshCw, Users, CheckCircle, XCircle, Download, Ticket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog'
 import {
   useExamDetail,
   useEnrolledStudents,
@@ -20,11 +19,6 @@ import { EligibilityPanel } from '@/components/exam/EligibilityPanel'
 import { toast } from 'sonner'
 import type { IneligibilityReason } from '@/types/exam'
 
-// ---------------------------------------------------------------------------
-// Student view — own hall ticket only (exam_hall_tickets: read_own / list_own)
-// Backend filters /eligible and /ineligible by JWT identity for student role,
-// returning only that student's own record.
-// ---------------------------------------------------------------------------
 function StudentHallTicketView({ examId }: { examId: string }) {
   const navigate = useNavigate()
   const { data: exam } = useExamDetail(examId)
@@ -32,7 +26,6 @@ function StudentHallTicketView({ examId }: { examId: string }) {
   const eligible = eligibleQuery.data ?? []
   const ineligible = ineligibleQuery.data ?? []
   const isLoading = eligibleQuery.isLoading || ineligibleQuery.isLoading
-  // Backend returns at most one record per student (their own)
   const ticket = eligible[0] ?? ineligible[0] ?? null
   const [downloading, setDownloading] = useState(false)
 
@@ -64,19 +57,22 @@ function StudentHallTicketView({ examId }: { examId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/exam/hall-tickets' as any })}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-lg font-bold">Hall Ticket — {exam?.exam_name ?? '...'}</h1>
-          <p className="text-xs text-muted-foreground">Your hall ticket eligibility status</p>
-        </div>
-      </div>
+      <PageHeader
+        title={`Hall Ticket - ${exam?.exam_name ?? ''}`}
+        subtitle="Your hall ticket eligibility status"
+        icon={<Ticket className="h-5 w-5" />}
+        actions={
+          <Button variant="outline" onClick={() => navigate({ to: '/exam/hall-tickets' as any })} className="gap-1">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-muted-foreground">Loading hall ticket...</span>
         </div>
       ) : !ticket ? (
         <div className="rounded-lg border border-dashed p-10 text-center">
@@ -85,7 +81,6 @@ function StudentHallTicketView({ examId }: { examId: string }) {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Status card */}
           <div className={`rounded-lg border p-6 ${
             ticket.is_eligible
               ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
@@ -117,21 +112,20 @@ function StudentHallTicketView({ examId }: { examId: string }) {
             </div>
           </div>
 
-          {/* Attendance & Fee details */}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg border bg-card p-4">
               <p className="text-xs text-muted-foreground mb-1">Attendance</p>
               <p className="text-2xl font-bold">
                 {ticket.attendance_percent != null ? `${Number(ticket.attendance_percent).toFixed(1)}%` : '—'}
               </p>
-              <p className={`text-xs mt-1 ${ticket.attendance_ok ? 'text-green-600' : 'text-destructive'}`}>
+              <p className={`text-xs mt-1 ${ticket.attendance_ok ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
                 {ticket.attendance_ok ? 'Meets requirement' : 'Below requirement'}
               </p>
             </div>
             <div className="rounded-lg border bg-card p-4">
               <p className="text-xs text-muted-foreground mb-1">Fee Status</p>
               <p className="text-2xl font-bold">{ticket.fee_paid ? 'Paid' : 'Pending'}</p>
-              <p className={`text-xs mt-1 ${ticket.fee_paid ? 'text-green-600' : 'text-destructive'}`}>
+              <p className={`text-xs mt-1 ${ticket.fee_paid ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
                 {ticket.fee_paid ? 'All fees cleared' : 'Payment required'}
               </p>
             </div>
@@ -156,9 +150,6 @@ function StudentHallTicketView({ examId }: { examId: string }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Parent view — filtered to the selected child only (client-side filter)
-// ---------------------------------------------------------------------------
 function ParentHallTicketView({ examId }: { examId: string }) {
   const navigate = useNavigate()
   const { data: exam } = useExamDetail(examId)
@@ -169,7 +160,6 @@ function ParentHallTicketView({ examId }: { examId: string }) {
   const isLoading = eligibleQuery.isLoading || ineligibleQuery.isLoading
   const [downloading, setDownloading] = useState(false)
 
-  // Filter to only the selected child's record
   const childId = selectedStudent?.id
   const ticket =
     eligible.find(t => t.student_id === childId) ??
@@ -204,21 +194,22 @@ function ParentHallTicketView({ examId }: { examId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/exam/hall-tickets' as any })}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-lg font-bold">Hall Ticket — {exam?.exam_name ?? '...'}</h1>
-          <p className="text-xs text-muted-foreground">
-            {selectedStudent?.name ? `Showing hall ticket for ${selectedStudent.name}` : 'Hall ticket eligibility status'}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title={`Hall Ticket - ${exam?.exam_name ?? ''}`}
+        subtitle={selectedStudent?.name ? `Showing hall ticket for ${selectedStudent.name}` : 'Hall ticket eligibility status'}
+        icon={<Ticket className="h-5 w-5" />}
+        actions={
+          <Button variant="outline" onClick={() => navigate({ to: '/exam/hall-tickets' as any })} className="gap-1">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-muted-foreground">Loading hall ticket...</span>
         </div>
       ) : !ticket ? (
         <div className="rounded-lg border border-dashed p-10 text-center">
@@ -268,14 +259,14 @@ function ParentHallTicketView({ examId }: { examId: string }) {
               <p className="text-2xl font-bold">
                 {ticket.attendance_percent != null ? `${Number(ticket.attendance_percent).toFixed(1)}%` : '—'}
               </p>
-              <p className={`text-xs mt-1 ${ticket.attendance_ok ? 'text-green-600' : 'text-destructive'}`}>
+              <p className={`text-xs mt-1 ${ticket.attendance_ok ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
                 {ticket.attendance_ok ? 'Meets requirement' : 'Below requirement'}
               </p>
             </div>
             <div className="rounded-lg border bg-card p-4">
               <p className="text-xs text-muted-foreground mb-1">Fee Status</p>
               <p className="text-2xl font-bold">{ticket.fee_paid ? 'Paid' : 'Pending'}</p>
-              <p className={`text-xs mt-1 ${ticket.fee_paid ? 'text-green-600' : 'text-destructive'}`}>
+              <p className={`text-xs mt-1 ${ticket.fee_paid ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
                 {ticket.fee_paid ? 'All fees cleared' : 'Payment required'}
               </p>
             </div>
@@ -300,9 +291,6 @@ function ParentHallTicketView({ examId }: { examId: string }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Admin view — all students (existing behaviour, unchanged)
-// ---------------------------------------------------------------------------
 function AdminHallTicketView({ examId }: { examId: string }) {
   const navigate = useNavigate()
   const [confirmPublish, setConfirmPublish] = useState(false)
@@ -318,72 +306,51 @@ function AdminHallTicketView({ examId }: { examId: string }) {
   const publishMutation = usePublishHallTickets(examId)
 
   const handleCompute = () => {
-    computeMutation.mutate(undefined, {
-      onSuccess: () => toast.success('Hall ticket eligibility computed'),
-    })
+    computeMutation.mutate()
   }
 
   const handlePublish = () => {
     publishMutation.mutate(undefined, {
       onSuccess: () => {
         setConfirmPublish(false)
-        toast.success('Hall tickets published')
       },
     })
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate({ to: `/exam/exams/${examId}` as any })}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-bold">Hall Tickets — {exam?.exam_name ?? '...'}</h1>
-            <p className="text-xs text-muted-foreground">Manage eligibility and publish</p>
+      <PageHeader
+        title={`Hall Tickets - ${exam?.exam_name ?? ''}`}
+        subtitle="Manage eligibility and publish"
+        icon={<Ticket className="h-5 w-5" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate({ to: `/exam/exams/${examId}` as any })} className="gap-1">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            {canManage && (
+              <Button variant="outline" size="sm" onClick={handleCompute} disabled={computeMutation.isPending}>
+                {computeMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Recompute
+              </Button>
+            )}
+            {canManage && (
+              <Button size="sm" onClick={() => setConfirmPublish(true)} disabled={publishMutation.isPending}>
+                Publish Hall Tickets
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => navigate({ to: `/exam/hall-tickets/${examId}/download` as any })}>
+              Download
+            </Button>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {canManage && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCompute}
-              disabled={computeMutation.isPending}
-            >
-              {computeMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              Recompute
-            </Button>
-          )}
-          {canManage && (
-            <Button
-              size="sm"
-              onClick={() => setConfirmPublish(true)}
-              disabled={publishMutation.isPending}
-            >
-              Publish Hall Tickets
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate({ to: `/exam/hall-tickets/${examId}/download` as any })}
-          >
-            Download
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-lg border bg-card p-4 flex items-center gap-3">
           <Users className="h-8 w-8 text-muted-foreground" />
@@ -395,7 +362,7 @@ function AdminHallTicketView({ examId }: { examId: string }) {
         <div className="rounded-lg border bg-card p-4 flex items-center gap-3">
           <CheckCircle className="h-8 w-8 text-green-500" />
           <div>
-            <p className="text-2xl font-bold text-green-600">{eligible.length}</p>
+            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{eligible.length}</p>
             <p className="text-xs text-muted-foreground">Eligible</p>
           </div>
         </div>
@@ -428,6 +395,7 @@ function AdminHallTicketView({ examId }: { examId: string }) {
           {enrolledQuery.isLoading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">Loading students...</span>
             </div>
           ) : enrolled.length === 0 ? (
             <div className="rounded-lg border border-dashed p-8 text-center">
@@ -467,33 +435,21 @@ function AdminHallTicketView({ examId }: { examId: string }) {
         </TabsContent>
       </Tabs>
 
-      {/* Confirm Publish */}
-      <Dialog open={confirmPublish} onOpenChange={setConfirmPublish}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Publish Hall Tickets?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            This will make hall tickets visible to eligible students for{' '}
-            <strong>{exam?.exam_name}</strong>.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmPublish(false)}>Cancel</Button>
-            <Button onClick={handlePublish} disabled={publishMutation.isPending}>
-              {publishMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Publishing...</>
-              ) : 'Publish'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={confirmPublish}
+        onOpenChange={setConfirmPublish}
+        title="Publish Hall Tickets?"
+        description={`This will make hall tickets visible to eligible students for ${exam?.exam_name ?? 'this exam'}.`}
+        confirmLabel="Publish"
+        pendingLabel="Publishing..."
+        isPending={publishMutation.isPending}
+        isDestructive={false}
+        onConfirm={handlePublish}
+      />
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Router — picks the correct view based on role
-// ---------------------------------------------------------------------------
 export default function HallTicketEligibility() {
   const { examId } = useParams({ strict: false }) as { examId: string }
   const roleName = useAuthStore(s => s.role?.name?.toLowerCase() ?? '')

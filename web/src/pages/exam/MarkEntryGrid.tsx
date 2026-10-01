@@ -4,6 +4,7 @@ import { useParams, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Loader2, Save, Upload, Download, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/PageHeader'
 import {
   Dialog,
   DialogContent,
@@ -21,16 +22,12 @@ import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections'
 import { QuickSendButton } from '@/components/communication/QuickSendButton'
 import { useExamStore } from '@/lib/examStore'
+import { useAuthStore } from '@/lib/authStore'
 import { toast } from 'sonner'
 import type { ExamSubjectConfig, MarkEntryItem } from '@/types/exam'
 
-// Cell edits are keyed by student, then subject-config, then component:
-// localValues[studentId][subjectConfigId][componentId] = "raw input string"
 type LocalValues = Record<string, Record<string, Record<string, string>>>
 
-// Excel column plan for export/import — mirrors the on-screen combined grid exactly:
-// Adm#, Student Name, then each subject's components + Total, then Grand Total at
-// the end. Total/Grand Total are computed, so import ignores those columns.
 type ExcelColumn =
   | { kind: 'admno' }
   | { kind: 'name' }
@@ -38,8 +35,6 @@ type ExcelColumn =
   | { kind: 'total'; subjectConfigId: string }
   | { kind: 'grandtotal' }
 
-// Renders a max-marks value as a clean integer-looking string (e.g. "10.00" -> "10")
-// for use inside "[..]" header suffixes.
 const fmtMax = (n: number | string | null | undefined): string => {
   if (n === null || n === undefined) return ''
   const v = Number(n)
@@ -57,7 +52,6 @@ export default function MarkEntryGrid() {
   const [isImporting, setIsImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // sectionId may be the string "null" when there's no section
   const resolvedSectionId = sectionId === 'null' ? '' : sectionId
 
   const { data: exam } = useExamDetail(examId)
@@ -69,15 +63,12 @@ export default function MarkEntryGrid() {
     [subjectsList],
   )
   const getSubjectName = (cfg: ExamSubjectConfig) =>
-    cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? cfg.subject_id
+    cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? 'Unknown subject'
 
   const classSection = classSections.find(
     (cs) => cs.class_id === classId && cs.section_id === (sectionId === 'null' ? null : sectionId)
   )
 
-  // The exam's own class-sections list doesn't always carry class_name/section_name
-  // (backend-dependent), so fall back to the classes master dropdown by id — same
-  // fallback MarkEntrySummary.tsx uses.
   const { data: classesList = [] } = useClassSectionsDropdown()
   const classNameMap = useMemo(() => Object.fromEntries(classesList.map((c) => [c.id, c.name])), [classesList])
   const sectionNameMap = useMemo(
@@ -89,17 +80,13 @@ export default function MarkEntryGrid() {
 
   const csLabel = [resolvedClassName, resolvedSectionName].filter(Boolean).join(' – ') || '—'
 
-  // Exam + class + section, e.g. "SA1 10 A" — the base for both the downloaded
-  // file's name and its sheet (tab) name.
   const excelBaseName = [exam?.exam_name, resolvedClassName, resolvedSectionName]
     .filter(Boolean)
     .join(' ')
     .trim() || 'Marks'
 
-  // Excel sheet names can't contain \ / ? * [ ] : and are capped at 31 chars.
   const excelSheetName = excelBaseName.replace(/[\\/?*[\]:]/g, '-').slice(0, 31)
 
-  // Windows filenames additionally disallow " < > |.
   const excelFileName = `${excelBaseName.replace(/[\\/?*:"<>|]/g, '-')}.xlsx`
 
   const subjectConfigs = useMemo(
@@ -113,17 +100,17 @@ export default function MarkEntryGrid() {
 
   const marksQueries = useMarksForSubjects(examId, classId, resolvedSectionId, subjectConfigIds)
   const isLoading = marksQueries.some((q) => q.isLoading)
+  const marksError = marksQueries.find((q) => q.isError)?.error
+  const canEnterMarks = useAuthStore(s =>
+    s.hasPermission('exams', 'update') || s.hasPermission('exam_marks', 'create')
+  )
   const saveMutation = useSaveMarksForSubject(examId)
 
-  // rowsBySubject[subjectConfigId] = MarkEntryItem[]
   const rowsBySubject: Record<string, MarkEntryItem[]> = {}
   subjectConfigs.forEach((cfg, i) => {
     rowsBySubject[cfg.id] = marksQueries[i]?.data ?? []
   })
 
-  // Students checked on the Mark Entry summary screen for this exact exam/class/section —
-  // when present, the grid is limited to just these students. Falls back to everyone when
-  // navigated to directly (e.g. a stale filter, or a bookmarked/refreshed URL).
   const markEntryFilter = useExamStore((s) => s.markEntryFilter)
   const selectedStudentIds =
     markEntryFilter.examId === examId &&
@@ -133,7 +120,6 @@ export default function MarkEntryGrid() {
       ? new Set(markEntryFilter.studentIds)
       : null
 
-  // Union of students across all subjects, preserving first-seen order.
   const students = useMemo(() => {
     const byId = new Map<string, { student_id: string; student_name: string; admission_number: string }>()
     subjectConfigs.forEach((cfg) => {
@@ -155,7 +141,7 @@ export default function MarkEntryGrid() {
   const componentMap: Record<string, { name: string; maxMarks?: number }> = {}
   subjectConfigs.forEach((cfg) => {
     cfg.components.forEach((comp) => {
-      componentMap[comp.id] = { name: comp.component_name, maxMarks: comp.max_marks ?? undefined }
+      componentMap[comp.id] = { name: comp.component_name, maxMarks: comp.max_marks != null ? Number(comp.max_marks) : undefined }
     })
   })
 
@@ -167,21 +153,14 @@ export default function MarkEntryGrid() {
     getRow(subjectConfigId, studentId)?.marks[compId]?.marks_obtained ??
     ''
 
-  // Absence for a subject is read-only here — it reflects whatever was already saved
-  // for that student/subject (e.g. via Attendance/other exam workflows), it's not
-  // editable from this grid.
   const isAbsent = (studentId: string, subjectConfigId: string) =>
     Object.values(getRow(subjectConfigId, studentId)?.marks ?? {}).some((m) => m.is_absent)
 
-  // Max marks for a subject's total = sum of "marks"-type, total-eligible components'
-  // max marks (remark/grade components don't contribute).
   const getSubjectMax = (cfg: ExamSubjectConfig) =>
     cfg.components
       .filter((c) => c.entry_type === 'marks' && c.include_in_total)
       .reduce((sum, c) => sum + Number(c.max_marks ?? 0), 0)
 
-  // Subject total = sum of obtained marks across eligible components. Returns
-  // obtained=null when nothing has been entered yet for that subject.
   const getSubjectTotal = (studentId: string, cfg: ExamSubjectConfig) => {
     const eligible = cfg.components.filter((c) => c.entry_type === 'marks' && c.include_in_total)
     const max = getSubjectMax(cfg)
@@ -215,8 +194,6 @@ export default function MarkEntryGrid() {
     return { obtained, max, anyEntered }
   }
 
-  // Grand-total max marks across all subjects — doesn't depend on any one student,
-  // used for the "Grand Total[..]" header.
   const grandMax = useMemo(
     () => subjectConfigs.reduce((sum, cfg) => sum + getSubjectMax(cfg), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -238,7 +215,6 @@ export default function MarkEntryGrid() {
     }))
   }
 
-  // Dirty student count — for the unsaved-changes banner.
   const dirtyStudentIds = useMemo(() => {
     const ids = new Set<string>()
     Object.entries(localValues).forEach(([studentId, bySubject]) => {
@@ -301,13 +277,11 @@ export default function MarkEntryGrid() {
       return
     }
     if (anySaved) {
-      toast.success(anyFailed ? 'Some subjects saved — see errors above' : 'Marks saved successfully')
+      toast.success(anyFailed ? 'Some subjects could not be saved' : 'Marks saved successfully')
       setLocalValues({})
     }
   }
 
-  // Column plan for the combined-grid Excel, in the same left-to-right order the
-  // on-screen table renders: Adm#, Student Name, then each subject's components + Total.
   const getExcelColumns = (): ExcelColumn[] => {
     const cols: ExcelColumn[] = [{ kind: 'admno' }, { kind: 'name' }]
     subjectConfigs.forEach((cfg) => {
@@ -320,14 +294,9 @@ export default function MarkEntryGrid() {
     return cols
   }
 
-  // "13", "ABS", or "" — same formatting the on-screen Total/Grand Total cells use.
-  // Max marks isn't repeated here since the column header already carries it, e.g. "Total[20]".
   const formatTotal = (t: { obtained: number | null; max: number; absent?: boolean }) =>
     t.absent ? 'ABS' : t.obtained !== null ? `${t.obtained}` : ''
 
-  // Header text without the trailing "[max]" suffix, e.g. "Telugu Written" or
-  // "Telugu Total" — used both to build the full header and, on import, to match an
-  // uploaded header back to a column regardless of what max marks it quotes.
   const excelBaseLabelFor = (c: ExcelColumn): string => {
     if (c.kind === 'admno') return 'Adm#'
     if (c.kind === 'name') return 'Student Name'
@@ -339,10 +308,6 @@ export default function MarkEntryGrid() {
     return `${subjectName} ${comp?.name ?? ''}`
   }
 
-  // Plain-text header for a column, e.g. "Telugu Written[10]" or "Telugu Total[20]".
-  // Flat and single-row (no merged cells, no hidden helper row) so the sheet can be
-  // filled in or even built from scratch by hand, not just downloaded — import
-  // matches columns back by this same text rather than by position or a hidden key.
   const excelHeaderFor = (c: ExcelColumn): string => {
     const base = excelBaseLabelFor(c)
     if (c.kind === 'mark') {
@@ -357,9 +322,6 @@ export default function MarkEntryGrid() {
     return base
   }
 
-  // Exports the grid exactly as shown on screen (current values, including unsaved
-  // edits, and the same Total / Grand Total columns) as a flat, single-header-row
-  // sheet — Total/Grand Total are read-only and recomputed on import, not parsed.
   const handleExportExcel = () => {
     const columns = getExcelColumns()
     const headerRow = columns.map(excelHeaderFor)
@@ -373,7 +335,6 @@ export default function MarkEntryGrid() {
       }
       const cfg = subjectConfigs.find((s) => s.id === c.subjectConfigId)!
       if (c.kind === 'total') return formatTotal(getSubjectTotal(student.student_id, cfg))
-      // mark
       const absent = isAbsent(student.student_id, cfg.id)
       if (absent) return ''
       const v = getLocalValue(student.student_id, cfg.id, c.componentId)
@@ -387,12 +348,6 @@ export default function MarkEntryGrid() {
     toast.success('Excel downloaded')
   }
 
-  // Imports a filled-in file back into the grid as unsaved edits — the user still
-  // reviews and clicks Save Marks to persist them. Columns are matched by header
-  // text (e.g. "Telugu Written") against this class-section's subjects and
-  // components — ignoring whatever "[max]" suffix the header quotes — not by
-  // position, so the file doesn't have to have started as an export — a hand-built
-  // sheet with the same headers works too.
   const handleImportExcel = async () => {
     if (!uploadFile) return
     setIsImporting(true)
@@ -488,72 +443,60 @@ export default function MarkEntryGrid() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading marks...</span>
       </div>
     )
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 min-w-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate({ to: `/exam/marks/${examId}/summary` as any })}
-            className="shrink-0"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0">
-            <h1 className="text-lg font-bold truncate">
-              Mark Entry — {exam?.exam_name ?? '…'}
-            </h1>
-            <p className="text-xs text-muted-foreground truncate">
-              {csLabel}
-              {selectedStudentIds && <span> · {students.length} selected student{students.length !== 1 ? 's' : ''}</span>}
-            </p>
+      <PageHeader
+        title={`Mark Entry - ${exam?.exam_name ?? ''}`}
+        subtitle={`${csLabel}${selectedStudentIds ? ` · ${students.length} selected student${students.length !== 1 ? 's' : ''}` : ''}`}
+        icon={<Save className="h-5 w-5" />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate({ to: `/exam/marks/${examId}/summary` as any })} className="gap-1">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+              <QuickSendButton
+                templateName="Mark Entry"
+                targetType="class_section_parents"
+                targetRef={{ class_id: classId, section_id: resolvedSectionId }}
+                recipientLabel={`Parents of ${csLabel}`}
+                variant="button"
+                label="Send Marks"
+                variables={{ exam_name: exam?.exam_name ?? '' }}
+                title="Send Mark Entry Message to parents"
+              />
+              <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={students.length === 0}>
+                <Download className="mr-1.5 h-4 w-4" />
+                Template
+              </Button>
+              {canEnterMarks && <Button variant="outline" size="sm" onClick={() => setUploadDialogOpen(true)}>
+                <Upload className="mr-1.5 h-4 w-4" />
+                Upload Excel
+              </Button>}
+              {canEnterMarks && <Button
+                size="sm"
+                onClick={handleSaveAll}
+                disabled={saveMutation.isPending || dirtyStudentIds.size === 0}
+              >
+                {saveMutation.isPending
+                  ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  : <Save className="mr-1.5 h-4 w-4" />}
+                Save Marks
+                {dirtyStudentIds.size > 0 && (
+                  <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
+                    {dirtyStudentIds.size}
+                  </Badge>
+                )}
+              </Button>}
           </div>
-        </div>
+        }
+      />
 
-        <div className="flex shrink-0 items-center gap-2">
-          <QuickSendButton
-            templateName="Mark Entry"
-            targetType="class_section_parents"
-            targetRef={{ class_id: classId, section_id: resolvedSectionId }}
-            recipientLabel={`Parents of ${csLabel}`}
-            variant="button"
-            label="Send Marks"
-            variables={{ exam_name: exam?.exam_name ?? '' }}
-            title="Send Mark Entry Message to parents"
-          />
-          <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={students.length === 0}>
-            <Download className="mr-1.5 h-4 w-4" />
-            Template
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setUploadDialogOpen(true)}>
-            <Upload className="mr-1.5 h-4 w-4" />
-            Upload Excel
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleSaveAll}
-            disabled={saveMutation.isPending || dirtyStudentIds.size === 0}
-          >
-            {saveMutation.isPending
-              ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-              : <Save className="mr-1.5 h-4 w-4" />}
-            Save Marks
-            {dirtyStudentIds.size > 0 && (
-              <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
-                {dirtyStudentIds.size}
-              </Badge>
-            )}
-          </Button>
-        </div>
-      </div>
-
-      {/* Unsaved changes banner */}
       {dirtyStudentIds.size > 0 && (
         <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
@@ -562,8 +505,11 @@ export default function MarkEntryGrid() {
         </div>
       )}
 
-      {/* Combined grid — all subjects side by side, like the mark-sheet spreadsheet */}
-      {subjectConfigs.length === 0 ? (
+      {marksError ? (
+        <div className="rounded-lg border bg-muted/20 p-8 text-center">
+          <p className="text-muted-foreground">{marksError instanceof Error ? marksError.message : 'Failed to load marks.'}</p>
+        </div>
+      ) : subjectConfigs.length === 0 ? (
         <div className="rounded-lg border bg-muted/20 p-8 text-center">
           <p className="text-muted-foreground">No subjects configured for this class-section.</p>
         </div>
@@ -645,6 +591,7 @@ export default function MarkEntryGrid() {
                                 placeholder="—"
                                 onChange={(e) => handleCellChange(student.student_id, cfg.id, comp.id, e.target.value)}
                                 min={0}
+                                readOnly={!canEnterMarks}
                                 max={comp.max_marks ?? undefined}
                               />
                             )}
@@ -677,7 +624,6 @@ export default function MarkEntryGrid() {
         </div>
       )}
 
-      {/* Excel Upload Dialog */}
       <Dialog
         open={uploadDialogOpen}
         onOpenChange={(open) => { setUploadDialogOpen(open); if (!open) setUploadFile(null) }}
@@ -695,7 +641,7 @@ export default function MarkEntryGrid() {
             <div className="rounded-lg border-2 border-dashed border-border p-6 text-center">
               {uploadFile ? (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-green-600">{uploadFile.name}</p>
+                  <p className="text-sm font-medium text-green-600 dark:text-green-400">{uploadFile.name}</p>
                   <p className="text-xs text-muted-foreground">{(uploadFile.size / 1024).toFixed(1)} KB</p>
                   <Button variant="outline" size="sm" onClick={() => setUploadFile(null)}>Remove</Button>
                 </div>

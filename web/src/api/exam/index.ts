@@ -266,12 +266,12 @@ export const deactivateExam = async (examId: string): Promise<void> => {
 // Backend: /exams/{exam_id}/dates
 // ---------------------------------------------------------------------------
 export const createExamDate = async (examId: string, data: Omit<ExamDatePayload, 'exam_id'>): Promise<ExamDate> => {
-  const response = await CAxios.post(`/exams/${examId}/dates`, data)
+  const response = await CAxios.post(`/exams/${examId}/dates`, { exam_id: examId, ...data })
   return response.data
 }
 
 export const bulkCreateExamDates = async (examId: string, dates: Omit<ExamDatePayload, 'exam_id'>[]): Promise<ExamDate[]> => {
-  const response = await CAxios.post(`/exams/${examId}/dates/bulk`, { dates })
+  const response = await CAxios.post(`/exams/${examId}/dates/bulk`, { dates: dates.map(d => ({ exam_id: examId, ...d })) })
   return response.data
 }
 

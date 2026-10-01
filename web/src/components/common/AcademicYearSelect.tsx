@@ -43,7 +43,6 @@ export const AcademicYearSelect: React.FC<AcademicYearSelectProps> = ({ value, o
       value={selectedOption}
       onChange={opt => {
         const val = opt ? opt.value : null;
-        console.log('AcademicYearSelect onChange', val);
         onChange(val);
       }}
       placeholder="Select Academic Year"

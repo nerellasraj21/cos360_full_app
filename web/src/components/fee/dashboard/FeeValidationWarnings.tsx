@@ -1,6 +1,5 @@
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import type { FeeValidationWarning } from '@/types/fee/dashboard';
 
 interface FeeValidationWarningsProps {
@@ -30,7 +29,7 @@ export function FeeValidationWarnings({ warnings, isLoading }: FeeValidationWarn
                         <p className="text-sm text-muted-foreground">No validation issues found in your fee configuration.</p>
                     </div>
                     <Badge variant="secondary" className="bg-accent text-accent-foreground">
-                        ✓ Validated
+                        Validated
                     </Badge>
                 </div>
             </Alert>
@@ -76,17 +75,6 @@ export function FeeValidationWarnings({ warnings, isLoading }: FeeValidationWarn
                             </div>
                             <p className="text-sm">{warning.description}</p>
                         </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="ml-4"
-                            onClick={() => {
-                                // TODO: Navigate to the specific section to fix the issue
-                                console.log('Navigate to fix:', warning);
-                            }}
-                        >
-                            Fix Issue
-                        </Button>
                     </div>
                 </Alert>
             ))}

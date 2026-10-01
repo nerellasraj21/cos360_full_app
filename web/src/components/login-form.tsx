@@ -61,9 +61,6 @@ export default function LoginForm({
           }
           navigate({ to: "/dashboard" });
         },
-        onError: (error) => {
-          console.error("Login error:", error);
-        },
       }
     );
   };
@@ -135,7 +132,7 @@ export default function LoginForm({
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
                       aria-label={
                         showPassword ? "Hide password" : "Show password"
                       }
@@ -151,7 +148,7 @@ export default function LoginForm({
                 <Button
                   type="submit"
                   className="w-full cursor-pointer"
-                  disabled={loginMutation.isPending || !selectedAcademicYearId}
+                  disabled={loginMutation.isPending || yearsLoading}
                 >
                   {loginMutation.isPending ? "Logging in..." : "Login"}
                 </Button>
@@ -163,10 +160,10 @@ export default function LoginForm({
                 </Link>
               </div>
               {loginMutation.isError && (
-                <div className="mt-4 p-2 sm:p-3 bg-red-50 border border-red-200 rounded-md text-xs sm:text-sm">
+                <div className="mt-4 p-2 sm:p-3 bg-destructive/10 border border-destructive/20 rounded-md text-xs sm:text-sm">
                   <div className="flex items-center">
                     <svg
-                      className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 mr-2"
+                      className="w-4 h-4 sm:w-5 sm:h-5 text-destructive mr-2"
                       fill="currentColor"
                       viewBox="0 0 20 20"
                     >
@@ -176,7 +173,7 @@ export default function LoginForm({
                         clipRule="evenodd"
                       />
                     </svg>
-                    <div className="text-red-700">
+                    <div className="text-destructive">
                       {loginMutation.error?.message ||
                         "Login failed. Please check your credentials and try again."}
                     </div>

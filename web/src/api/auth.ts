@@ -90,9 +90,9 @@ export async function fetchParentChildren(parentEntityId: string): Promise<Stude
   const items: ParentChildItem[] = Array.isArray(data) ? data : (Array.isArray((data as any)?.data) ? (data as any).data : []);
   return items.map(item => ({
     id: item.id || item.student_id || '',
-    name: `${item.first_name} ${item.last_name}`.trim(),
-    first_name: item.first_name,
-    last_name: item.last_name,
+    name: item.name || `${item.first_name || ''} ${item.last_name || ''}`.trim(),
+    first_name: item.first_name || '',
+    last_name: item.last_name || '',
     admission_number: item.admission_number || '',
     class_id: '',
     class_name: item.class_name || '',

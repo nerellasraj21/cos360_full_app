@@ -18,6 +18,7 @@ import { ShieldX, Plus, Trash2, Loader2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
@@ -286,7 +287,7 @@ function VehicleAddDialog() {
             {/* Vehicle Details */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label>Vehicle Name <span className="text-red-500">*</span></Label>
+                <Label>Vehicle Name <span className="text-destructive">*</span></Label>
                 <Input
                   value={form.name}
                   onChange={e => setField('name', e.target.value)}
@@ -294,7 +295,7 @@ function VehicleAddDialog() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Registration Number <span className="text-red-500">*</span></Label>
+                <Label>Registration Number <span className="text-destructive">*</span></Label>
                 <Input
                   value={form.registration_number}
                   onChange={e => setField('registration_number', e.target.value)}
@@ -329,7 +330,7 @@ function VehicleAddDialog() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Driving Licence No. <span className="text-red-500">*</span></Label>
+                <Label>Driving Licence No. <span className="text-destructive">*</span></Label>
                 <Input
                   value={form.driving_licence_no}
                   maxLength={DRIVING_LICENCE_MAX_LENGTH}
@@ -359,11 +360,7 @@ function VehicleAddDialog() {
               </div>
               <div className="space-y-1">
                 <Label>Driving Licence Expiry Date</Label>
-                <Input
-                  type="date"
-                  value={form.driving_licence_exp_date}
-                  onChange={e => setField('driving_licence_exp_date', e.target.value)}
-                />
+                <DatePicker value={form.driving_licence_exp_date} onChange={v => setField('driving_licence_exp_date', v)} />
               </div>
               <div className="space-y-1">
                 <Label>Bus Insurance Vendor</Label>
@@ -394,11 +391,7 @@ function VehicleAddDialog() {
               </div>
               <div className="space-y-1 col-span-2 max-w-xs">
                 <Label>Insurance Expiry Date</Label>
-                <Input
-                  type="date"
-                  value={form.insurance_expiry_date}
-                  onChange={e => setField('insurance_expiry_date', e.target.value)}
-                />
+                <DatePicker value={form.insurance_expiry_date} onChange={v => setField('insurance_expiry_date', v)} />
               </div>
             </div>
 
@@ -448,7 +441,7 @@ function VehicleAddDialog() {
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                               idx === 0
                                 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                                : 'bg-muted text-muted-foreground'
                             }`}>
                               {typeLabel}
                             </span>
@@ -482,7 +475,7 @@ function VehicleAddDialog() {
                               variant="ghost"
                               size="sm"
                               onClick={() => removeTrip(trip._key)}
-                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              className="h-7 w-7 p-0 text-destructive hover:text-destructive/80"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -735,7 +728,7 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={handleOpen} className="h-7 w-7 p-0">
+      <Button variant="ghost" size="sm" onClick={handleOpen} className="h-8 w-8 p-0" title="Edit">
         <Edit className="h-4 w-4" />
       </Button>
 
@@ -750,11 +743,11 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label>Vehicle Name <span className="text-red-500">*</span></Label>
+                <Label>Vehicle Name <span className="text-destructive">*</span></Label>
                 <Input value={form.name} onChange={e => setField('name', e.target.value)} placeholder="Bus 01" />
               </div>
               <div className="space-y-1">
-                <Label>Registration Number <span className="text-red-500">*</span></Label>
+                <Label>Registration Number <span className="text-destructive">*</span></Label>
                 <Input value={form.registration_number} onChange={e => setField('registration_number', e.target.value)} placeholder="KA01AB1234" />
               </div>
               <div className="space-y-1">
@@ -785,7 +778,7 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Driving Licence No. <span className="text-red-500">*</span></Label>
+                <Label>Driving Licence No. <span className="text-destructive">*</span></Label>
                 <Input
                   value={form.driving_licence_no}
                   maxLength={DRIVING_LICENCE_MAX_LENGTH}
@@ -811,7 +804,7 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
               </div>
               <div className="space-y-1">
                 <Label>Driving Licence Expiry Date</Label>
-                <Input type="date" value={form.driving_licence_exp_date} onChange={e => setField('driving_licence_exp_date', e.target.value)} />
+                <DatePicker value={form.driving_licence_exp_date} onChange={v => setField('driving_licence_exp_date', v)} />
               </div>
               <div className="space-y-1">
                 <Label>Bus Insurance Vendor</Label>
@@ -839,7 +832,7 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
               </div>
               <div className="space-y-1 col-span-2 max-w-xs">
                 <Label>Insurance Expiry Date</Label>
-                <Input type="date" value={form.insurance_expiry_date} onChange={e => setField('insurance_expiry_date', e.target.value)} />
+                <DatePicker value={form.insurance_expiry_date} onChange={v => setField('insurance_expiry_date', v)} />
               </div>
             </div>
 
@@ -886,7 +879,7 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                               idx === 0
                                 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                                : 'bg-muted text-muted-foreground'
                             }`}>
                               {typeLabel}
                             </span>
@@ -920,7 +913,7 @@ function VehicleEditDialog({ vehicle }: { vehicle: Vehicle }) {
                               variant="ghost"
                               size="sm"
                               onClick={() => removeTrip(trip._key)}
-                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              className="h-7 w-7 p-0 text-destructive hover:text-destructive/80"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -1073,7 +1066,6 @@ export default function VehiclePage() {
   }, new Map<string, number>());
 
   const columns: TableColumn<Vehicle>[] = [
-    { key: 'id', label: 'ID' },
     { key: 'name', label: 'Vehicle Name' },
     { key: 'registration_number', label: 'Reg. Number' },
     { key: 'driver_name', label: 'Driver', render: v => v || '—' },
@@ -1101,7 +1093,11 @@ export default function VehiclePage() {
     {
       key: '_edit' as any,
       label: 'Edit',
-      render: (_: any, row: Vehicle) => <VehicleEditDialog vehicle={row} />,
+      render: (_: any, row: Vehicle) => (
+        <PermissionGuard resource="vehicles" action="update">
+          <VehicleEditDialog vehicle={row} />
+        </PermissionGuard>
+      ),
     },
   ];
 

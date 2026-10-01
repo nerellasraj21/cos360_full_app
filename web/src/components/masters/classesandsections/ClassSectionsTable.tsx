@@ -219,7 +219,7 @@ export function ClassSectionsTable({
                     else handleDeselectAllColumns();
                   }}
                   onSelect={(e) => e.preventDefault()}
-                  className="cursor-pointer font-medium border-b border-b-gray-200"
+                  className="cursor-pointer font-medium border-b border-b-border"
                 >
                   Select All
                 </DropdownMenuCheckboxItem>

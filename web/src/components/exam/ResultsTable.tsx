@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Search } from 'lucide-react'
+import { FilterBar } from '@/components/ui/FilterBar'
+import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Search } from 'lucide-react'
 import type { StudentExamResult } from '@/types/exam'
 
 interface ResultsTableProps {
@@ -20,7 +21,7 @@ export function ResultsTable({ results, isLoading }: ResultsTableProps) {
   };
 
   const SortIcon = ({ colKey }: { colKey: string }) => {
-    if (sortKey !== colKey) return <ChevronsUpDown className="inline h-3 w-3 ml-1 opacity-50" />;
+    if (sortKey !== colKey) return <ChevronsUpDown className="inline h-3 w-3 ml-1 opacity-75" />;
     return sortDir === 'asc'
       ? <ChevronUp className="inline h-3 w-3 ml-1" />
       : <ChevronDown className="inline h-3 w-3 ml-1" />;
@@ -59,6 +60,7 @@ export function ResultsTable({ results, isLoading }: ResultsTableProps) {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading results...</span>
       </div>
     )
   }
@@ -71,7 +73,6 @@ export function ResultsTable({ results, isLoading }: ResultsTableProps) {
     )
   }
 
-  // Collect all unique subjects from first result for headers
   const subjectHeaders = results[0]?.subject_results?.map(sr => ({
     id: sr.subject_config_id,
     name: sr.subject_name,
@@ -79,12 +80,7 @@ export function ResultsTable({ results, isLoading }: ResultsTableProps) {
 
   return (
     <div className="space-y-3">
-      {/* Search */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-          <Filter className="h-3.5 w-3.5" />
-          <span>Filters</span>
-        </div>
+      <FilterBar className="mb-0">
         <div className="relative max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
@@ -94,7 +90,7 @@ export function ResultsTable({ results, isLoading }: ResultsTableProps) {
             className="pl-8 h-8 text-sm"
           />
         </div>
-      </div>
+      </FilterBar>
       <div className="overflow-x-auto rounded-lg border">
       <table className="w-full text-sm">
         <thead>
@@ -119,8 +115,8 @@ export function ResultsTable({ results, isLoading }: ResultsTableProps) {
           {displayResults.map((row, idx) => (
             <tr key={row.student_id} className="border-b hover:bg-muted/10" style={{ height: "48px" }}>
               <td className="px-3 py-2 text-muted-foreground align-middle">{idx + 1}</td>
-              <td className="sticky left-0 bg-card px-4 py-2 font-medium align-middle">{row.student_name}</td>
-              <td className="px-3 py-2 text-xs text-muted-foreground align-middle">{row.admission_number}</td>
+              <td className="sticky left-0 bg-card px-4 py-2 font-medium align-middle">{row.student_name ?? '—'}</td>
+              <td className="px-3 py-2 text-xs text-muted-foreground align-middle">{row.admission_number ?? '—'}</td>
               {subjectHeaders.map(s => {
                 const sr = row.subject_results?.find(r => r.subject_config_id === s.id)
                 return (

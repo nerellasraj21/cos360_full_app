@@ -15,9 +15,7 @@ export const usePermission = () => {
    * @returns boolean - true if user has permission, false otherwise
    */
   const checkPermission = (resource: string, action: string): boolean => {
-    const result = hasPermission(resource, action);
-    console.log(`usePermission.checkPermission: ${resource}:${action} = ${result}`);
-    return result;
+    return hasPermission(resource, action);
   }
 
   /**

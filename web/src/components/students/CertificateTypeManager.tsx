@@ -14,6 +14,7 @@ import {
 } from '@/api/certificateTypes';
 import type { CertificateTypeRead, CertificateTypeCreate } from '@/types/certificates/types';
 import { toast } from 'sonner';
+import { usePermission } from '@/hooks/usePermission';
 
 interface CertificateTypeManagerProps {
   onSelect?: (certificateType: CertificateTypeRead) => void;
@@ -23,6 +24,10 @@ interface CertificateTypeManagerProps {
 interface CertificateTypeFormData extends CertificateTypeCreate {}
 
 export const CertificateTypeManager: React.FC<CertificateTypeManagerProps> = ({ onSelect, className }) => {
+  const { checkPermission } = usePermission();
+  const canCreate = checkPermission('certificate_types', 'create');
+  const canUpdate = checkPermission('certificate_types', 'update');
+  const canDelete = checkPermission('certificate_types', 'delete');
   const [editingCertificateType, setEditingCertificateType] = useState<CertificateTypeRead | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState<CertificateTypeRead | null>(null);
@@ -53,7 +58,7 @@ export const CertificateTypeManager: React.FC<CertificateTypeManagerProps> = ({ 
   };
 
   const SortIcon = ({ col }: { col: typeof sortKey }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-50" />;
+    if (sortKey !== col) return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-75" />;
     return sortDir === 'asc'
       ? <ChevronUp className="ml-1 inline h-3 w-3" />
       : <ChevronDown className="ml-1 inline h-3 w-3" />;
@@ -152,10 +157,12 @@ export const CertificateTypeManager: React.FC<CertificateTypeManagerProps> = ({ 
               {filteredTypes.length} of {certificateTypes.length}
             </span>
           )}
-          <Button onClick={handleCreate} className="ml-auto flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Add Certificate Type
-          </Button>
+          {canCreate && (
+            <Button onClick={handleCreate} className="ml-auto flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Certificate Type
+            </Button>
+          )}
         </div>
         <div className="relative max-w-xs">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -242,24 +249,28 @@ export const CertificateTypeManager: React.FC<CertificateTypeManagerProps> = ({ 
                             <FileText className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(certificateType)}
-                          className="h-8 w-8 p-0"
-                          title="Edit Certificate Type"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(certificateType)}
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
-                          title="Delete Certificate Type"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {canUpdate && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(certificateType)}
+                            className="h-8 w-8 p-0"
+                            title="Edit Certificate Type"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(certificateType)}
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
+                            title="Delete Certificate Type"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

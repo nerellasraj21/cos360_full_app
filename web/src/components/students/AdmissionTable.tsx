@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { InfiniteScrollDropdown } from '@/components/dropdown/InfiniteScrollDropdown';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
@@ -166,25 +167,25 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
   // Helper functions to get display names
   const getAcademicYearName = (yearId: string) => {
     const year = academicYears.find(y => String(y.id) === String(yearId));
-    return year ? year.title : yearId;
+    return year ? year.title : 'N/A';
   };
 
   const getClassName = (classId: string) => {
     const classItem = classesData.find(c => c.id === classId);
-    return classItem ? classItem.name : `Class ${classId}`;
+    return classItem ? classItem.name : 'N/A';
   };
 
   const getSectionName = (classId: string, sectionId: string) => {
     const classItem = classesData.find(c => c.id === classId);
     if (classItem) {
       const section = classItem.sections.find(s => s.id === sectionId);
-      return section ? section.name : `Section ${sectionId}`;
+      return section ? section.name : 'N/A';
     }
-    return `Section ${sectionId}`;
+    return 'N/A';
   };
 
   const getStateName = (stateId: string) =>
-    states.find(s => s.id === stateId)?.name || stateId;
+    states.find(s => s.id === stateId)?.name || 'N/A';
 
   const getDistrictName = (districtId: string) => {
     if (districtsLoading) return 'Loading...';
@@ -201,6 +202,12 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
   const getSubCasteName = (subCasteId: string) =>
     allSubCastes.find(s => s.id === subCasteId)?.name || subCasteId;
+
+  const formatDate = (d?: string) => {
+    if (!d || d.startsWith('1900-01-01')) return 'N/A';
+    const parsed = new Date(d);
+    return isNaN(parsed.getTime()) ? 'N/A' : parsed.toLocaleDateString();
+  };
 
   const formatGender = (g?: string) => {
     if (!g) return 'N/A';
@@ -306,7 +313,10 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
     {
       key: 'admission_date',
       label: 'Admission Date',
-      render: (value) => new Date(value).toLocaleDateString()
+      render: (value) => {
+        const d = new Date(value);
+        return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
+      }
     },
     {
       key: 'is_active',
@@ -537,8 +547,8 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
         studentId: admission.student.id,
         data: updateData
       });
-    } catch (error) {
-      console.error('Error updating admission:', error);
+    } catch {
+      return;
     }
   };
 
@@ -553,8 +563,8 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
         studentId: toggleTarget.student_id,
         isActive: !toggleTarget.is_active
       });
-    } catch (error) {
-      console.error('Error toggling student status:', error);
+    } catch {
+      return;
     }
     setToggleTarget(null);
   };
@@ -564,7 +574,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
     const studentData = admission.student as any;
     return [
       { label: 'Admission Number', value: admission.admission_number },
-      { label: 'Admission Date', value: new Date(admission.admission_date).toLocaleDateString() },
+      { label: 'Admission Date', value: formatDate(admission.admission_date) },
       { label: 'Academic Year', value: getAcademicYearName(admission.admitted_academic_year_id || admission.academic_year_id || '') || 'N/A' },
       { label: 'Admitted Class', value: getClassName(admission.admitted_class_id || '') || 'N/A' },
       { label: 'Admitted Section', value: getSectionName(admission.admitted_class_id || '', admission.admitted_section_id || '') || 'N/A' },
@@ -577,7 +587,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
       { label: 'District', value: admission.district_id ? getDistrictName(admission.district_id) : 'N/A' },
       { label: 'Mandal', value: admission.mandal_id ? getMandalName(admission.mandal_id) : 'N/A' },
       { label: 'Student Name', value: `${studentData.first_name} ${studentData.last_name}` },
-      { label: 'Date of Birth', value: new Date(studentData.date_of_birth).toLocaleDateString() },
+      { label: 'Date of Birth', value: formatDate(studentData.date_of_birth) },
       { label: 'Gender', value: formatGender(studentData.gender) },
       { label: 'Aadhar Number', value: studentData.aadhar_number || 'N/A' },
       { label: 'APAAR Number', value: studentData.apaar_number || 'N/A' },
@@ -799,7 +809,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-dob">Date of Birth</Label>
-                  <Input id="edit-dob" type="date" value={editForm.date_of_birth} onChange={(e) => setEditForm(prev => ({ ...prev, date_of_birth: e.target.value }))} />
+                  <DatePicker value={editForm.date_of_birth} onChange={(v) => setEditForm(prev => ({ ...prev, date_of_birth: v }))} />
                 </div>
                 <div>
                   <Label htmlFor="edit-gender">Gender</Label>
@@ -925,12 +935,7 @@ const AdmissionTable = ({ searchQuery, searchResults, hasUpdatePermission = true
 
                 <div>
                   <Label htmlFor="edit-admission-date">Admission Date</Label>
-                  <Input
-                    id="edit-admission-date"
-                    type="date"
-                    value={editForm.admission_date}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, admission_date: e.target.value }))}
-                  />
+                  <DatePicker value={editForm.admission_date} onChange={(v) => setEditForm(prev => ({ ...prev, admission_date: v }))} />
                 </div>
 
                 <div>

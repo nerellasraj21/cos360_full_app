@@ -1,12 +1,13 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate } from '@tanstack/react-router';
+import { FolderOpen, Tag, CalendarDays, Link2, Coins, CreditCard, Receipt, Undo2, type LucideIcon } from 'lucide-react';
 
 interface NavigationItem {
     title: string;
     description: string;
     path: string;
-    icon: string;
+    icon: LucideIcon;
     color: string;
 }
 
@@ -15,57 +16,57 @@ const navigationItems: NavigationItem[] = [
         title: 'Fee Categories',
         description: 'Manage fee categories and their associated fee types',
         path: '/fee/categories',
-        icon: '📁',
-        color: 'bg-chart-1/10 border-chart-1/20',
+        icon: FolderOpen,
+        color: 'bg-chart-1/10 border-chart-1/20 hover:bg-chart-1/20',
     },
     {
         title: 'Fee Types',
         description: 'Manage individual fee types and their properties',
         path: '/fee/types',
-        icon: '🏷️',
-        color: 'bg-chart-2/10 border-chart-2/20',
+        icon: Tag,
+        color: 'bg-chart-2/10 border-chart-2/20 hover:bg-chart-2/20',
     },
     {
         title: 'Fee Terms',
         description: 'Configure fee terms and payment schedules',
         path: '/fee/terms',
-        icon: '📅',
-        color: 'bg-chart-3/10 border-chart-3/20',
+        icon: CalendarDays,
+        color: 'bg-chart-3/10 border-chart-3/20 hover:bg-chart-3/20',
     },
     {
         title: 'Fee Mappings',
         description: 'Configure fee mappings for classes and term amounts',
         path: '/fee/mappings',
-        icon: '🔗',
-        color: 'bg-chart-4/10 border-chart-4/20',
+        icon: Link2,
+        color: 'bg-chart-4/10 border-chart-4/20 hover:bg-chart-4/20',
     },
     {
         title: 'Fee Term Amounts',
         description: 'Manage fee term amount configurations',
         path: '/fee/term-amounts',
-        icon: '💰',
-        color: 'bg-chart-5/10 border-chart-5/20',
+        icon: Coins,
+        color: 'bg-chart-5/10 border-chart-5/20 hover:bg-chart-5/20',
     },
     {
         title: 'Fee Collection',
         description: 'Collect and manage fee payments from students',
         path: '/fee/collection',
-        icon: '💳',
-        color: 'bg-chart-6/10 border-chart-6/20',
+        icon: CreditCard,
+        color: 'bg-chart-1/10 border-chart-1/20 hover:bg-chart-1/20',
     },
     {
         title: 'Fee Receipts',
         description: 'View and manage fee payment receipts',
         path: '/fee/receipts',
-        icon: '🧾',
-        color: 'bg-chart-7/10 border-chart-7/20',
+        icon: Receipt,
+        color: 'bg-chart-2/10 border-chart-2/20 hover:bg-chart-2/20',
     },
     {
         title: 'Fee Refunds',
         description: 'Process and manage fee refunds for students',
         path: '/fee/refunds',
-        icon: '↩️',
-        color: 'bg-chart-1/10 border-chart-1/20',
+        icon: Undo2,
+        color: 'bg-chart-1/10 border-chart-1/20 hover:bg-chart-1/20',
     },
 ];
 
@@ -84,7 +85,7 @@ export function FeeNavigation() {
                     <Card key={item.path} className={`cursor-pointer transition-all hover:shadow-md ${item.color}`}>
                         <CardHeader className="pb-3">
                             <div className="flex items-center gap-3">
-                                <span className="text-2xl">{item.icon}</span>
+                                <item.icon className="h-6 w-6 text-foreground" />
                                 <div>
                                     <CardTitle className="text-base">{item.title}</CardTitle>
                                 </div>

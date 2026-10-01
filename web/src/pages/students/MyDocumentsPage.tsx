@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Table } from "@/components/common/table";
 import type { TableColumn } from "@/components/common/table";
-import { FileText, Download, Upload, Plus, FolderOpen } from "lucide-react";
+import { FileText, Plus, FolderOpen, Loader2 } from "lucide-react";
+import { DownloadButton } from "@/components/common/TableActions";
 import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from "sonner";
 import { useMyDocuments, useDownloadStudentDocument, useUploadMyDocument } from "@/api/hooks/students/documents";
@@ -102,17 +103,11 @@ export const MyDocumentsPage: React.FC = () => {
             key: "file_path",
             label: "Actions",
             render: (_, row) => (
-                <div className="flex gap-2">
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDownload(row.id)}
-                        disabled={downloadDocument.isPending}
-                    >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                    </Button>
-                </div>
+                <DownloadButton
+                    onClick={() => handleDownload(row.id)}
+                    disabled={downloadDocument.isPending}
+                    title="Download Document"
+                />
             )
         }
     ];
@@ -139,7 +134,7 @@ export const MyDocumentsPage: React.FC = () => {
                 <Card>
                     <CardContent className="p-6">
                         <div className="text-center text-muted-foreground">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                             Loading your documents...
                         </div>
                     </CardContent>
@@ -218,19 +213,19 @@ export const MyDocumentsPage: React.FC = () => {
                 </Card>
             )}
 
-            <div className="mt-6">
-            </div>
-
             <Card>
                 <CardHeader>
                     <CardTitle>My Documents</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (
-                        <div className="text-center py-4">Loading documents...</div>
+                        <div className="flex justify-center items-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                            <span className="ml-2">Loading documents...</span>
+                        </div>
                     ) : documents.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
-                            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <FileText className="h-12 w-12 mx-auto mb-4 opacity-75" />
                             <p>No documents found.</p>
                             <p className="text-sm">Documents uploaded for you will appear here.</p>
                         </div>

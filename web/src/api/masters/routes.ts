@@ -20,11 +20,7 @@ const handleApiError = (error: any): Error => {
 // Create Route
 export const createRoute = async (route: RouteInput): Promise<Route> => {
   try {
-    console.log('Creating route with payload:', route);
-    console.log('route_type:', route.route_type);
-    console.log('trip_type:', route.trip_type);
     const { data } = await CAxios.post(ROUTES_API_BASE, route);
-    console.log('Route created successfully:', data);
     return data;
   } catch (error) {
     throw handleApiError(error);

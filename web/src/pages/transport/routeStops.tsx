@@ -42,7 +42,6 @@ export default function RouteStopsPage() {
   const inlineSelectStyles = { ...selectStyles, control: (base: any, state: any) => ({ ...selectStyles.control(base, state), minHeight: '32px', fontSize: '12px' }) };
 
   const columns = useMemo(() => [
-    { key: 'id', label: 'ID' },
     {
       key: 'route_id',
       label: 'Route',

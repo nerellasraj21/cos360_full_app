@@ -175,8 +175,8 @@ export function SubjectConfigAccordion({
   }
 
   const label = classSection.section_name
-    ? `${classSection.class_name ?? classSection.class_id} — Section ${classSection.section_name}`
-    : (classSection.class_name ?? classSection.class_id)
+    ? `${classSection.class_name ?? 'Class'} — Section ${classSection.section_name}`
+    : (classSection.class_name ?? 'Class')
 
   return (
     <div className="rounded-lg border">
@@ -240,7 +240,6 @@ export function SubjectConfigAccordion({
 
               {isExpanded && (
                 <div className="bg-muted/5 px-6 pb-4 pt-2 space-y-3">
-                  {/* Subject-level settings */}
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                     <div className="space-y-1">
                       <label className="text-xs font-medium text-muted-foreground">Grade Scheme</label>
@@ -257,7 +256,6 @@ export function SubjectConfigAccordion({
                     </div>
                   </div>
 
-                  {/* Components table */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-medium">Mark Components</label>
@@ -272,7 +270,7 @@ export function SubjectConfigAccordion({
                         Add Component
                       </Button>
                     </div>
-                    <div className="overflow-hidden rounded border">
+                    <div className="overflow-x-auto rounded border">
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b bg-muted/30">
@@ -355,6 +353,7 @@ export function SubjectConfigAccordion({
                                   size="sm"
                                   onClick={() => removeComponent(subject.id, ci)}
                                   className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                  title="Remove component"
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>

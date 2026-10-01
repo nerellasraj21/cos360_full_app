@@ -1,5 +1,5 @@
 import { Fragment, useState, useMemo } from 'react'
-import { Plus, Edit, Trash2, Loader2, MessageSquare, ChevronDown, ChevronRight, ChevronUp, Save, X, GripVertical, Filter, Search, ChevronsUpDown } from 'lucide-react'
+import { Plus, Edit, Trash2, Loader2, MessageSquare, ChevronDown, ChevronRight, ChevronUp, Save, X, GripVertical, Search, ChevronsUpDown } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { FilterBar } from '@/components/ui/FilterBar'
 import { useForm, useFieldArray } from 'react-hook-form'
@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
@@ -35,7 +36,7 @@ export default function RemarkGradeSets() {
   const [sortKey, setSortKey] = useState<'name' | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
-  const { data: sets = [], isLoading } = useRemarkGradeSets()
+  const { data: sets = [], isLoading, isError, error } = useRemarkGradeSets()
   const createMutation = useCreateRemarkGradeSet()
   const updateMutation = useUpdateRemarkGradeSet()
   const deleteMutation = useDeleteRemarkGradeSet()
@@ -60,7 +61,7 @@ export default function RemarkGradeSets() {
   }
 
   const SortIcon = ({ col }: { col: typeof sortKey }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-50" />
+    if (sortKey !== col) return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-75" />
     return sortDir === 'asc'
       ? <ChevronUp className="ml-1 inline h-3 w-3" />
       : <ChevronDown className="ml-1 inline h-3 w-3" />
@@ -138,6 +139,15 @@ export default function RemarkGradeSets() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading remark grade sets...</span>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-lg border bg-muted/20 p-8 text-center">
+        <p className="text-muted-foreground">{error instanceof Error ? error.message : 'Failed to load remark grade sets.'}</p>
       </div>
     )
   }
@@ -173,7 +183,7 @@ export default function RemarkGradeSets() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">
@@ -277,7 +287,6 @@ export default function RemarkGradeSets() {
         </div>
       )}
 
-      {/* Create / Edit Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -317,7 +326,6 @@ export default function RemarkGradeSets() {
                     onDragEnd={handleOptionDragEnd}
                   >
                     <GripVertical className="h-4 w-4 flex-shrink-0 cursor-grab text-muted-foreground" />
-                    {/* Up / Down reorder buttons */}
                     <div className="flex flex-col">
                       <button
                         type="button"
@@ -363,6 +371,7 @@ export default function RemarkGradeSets() {
                       size="sm"
                       onClick={() => { remove(index); setIsDirty(true) }}
                       className="h-9 w-9 p-0 text-destructive hover:text-destructive"
+                      title="Remove option"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -394,28 +403,16 @@ export default function RemarkGradeSets() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Remark Grade Set?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            This will permanently delete this remark grade set.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              disabled={deleteMutation.isPending}
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget, { onSuccess: () => setDeleteTarget(null) })}
-            >
-              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+        title="Delete Remark Grade Set?"
+        description="This will permanently delete this remark grade set."
+        confirmLabel="Delete"
+        pendingLabel="Deleting..."
+        isPending={deleteMutation.isPending}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget, { onSuccess: () => setDeleteTarget(null) })}
+      />
     </div>
   )
 }

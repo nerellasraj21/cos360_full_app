@@ -200,7 +200,6 @@ export const useMenuData = () => {
     return useQuery({
         queryKey: ['menu', role?.name],
         queryFn: () => {
-            console.log('Loading menu data from authStore - User:', user, 'Authenticated:', isAuthenticated);
 
             if (!menuItems || menuItems.length === 0) {
                 console.warn('No menu data found in authStore, returning empty array');
@@ -229,7 +228,6 @@ export const useMenuData = () => {
             const feeEnrichedMenu = injectFeeSubmenu(filteredMenu, roleName);
             const enrichedMenu = injectSchoolSettings(feeEnrichedMenu, roleName);
             const orderedMenu = reorderMenu(enrichedMenu);
-            console.log('Transformed menu data:', orderedMenu);
             return orderedMenu;
         },
         enabled: !!user && !!menuItems && menuItems.length > 0

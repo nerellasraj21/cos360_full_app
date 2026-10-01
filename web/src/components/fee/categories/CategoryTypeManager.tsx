@@ -44,8 +44,6 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
     });
 
     // Debug logging
-    console.log('CategoryTypeManager - Terms data:', feeTerms);
-    console.log('CategoryTypeManager - Terms loading:', termsLoading);
 
     const createMutation = useCreateFeeType();
     const updateMutation = useUpdateFeeType();
@@ -173,14 +171,14 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
 
                         {/* Create/Edit Form */}
                         {showCreateForm && (
-                            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <div className="border border-border rounded-lg p-4 bg-muted">
                                 <h4 className="font-medium mb-4">
                                     {editingType ? 'Edit Fee Type' : 'Create New Fee Type'}
                                 </h4>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4" onChange={() => setIsFormDirty(true)}>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        <label className="block text-sm font-medium text-foreground mb-1">
                                             Fee Type Name *
                                         </label>
                                         <Input
@@ -191,7 +189,7 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        <label className="block text-sm font-medium text-foreground mb-1">
                                             Fee Term *
                                         </label>
                                         <Select
@@ -215,7 +213,6 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
                                                             }
                                                             return term.term_name;
                                                         })();
-                                                        console.log('CategoryTypeManager - Rendering term:', term.id, 'displayName:', displayName, 'term_name:', term.term_name);
                                                         return (
                                                             <SelectItem key={term.id} value={term.id}  >
                                                                 {displayName} 
@@ -236,9 +233,9 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
                                             id="fee_status_form"
                                             checked={formData.fee_status === 'active'}
                                             onChange={(e) => { setIsFormDirty(true); setFormData({ ...formData, fee_status: e.target.checked ? 'active' : 'inactive' }); }}
-                                            className="rounded border-gray-300"
+                                            className="rounded border-input"
                                         />
-                                        <label htmlFor="fee_status_form" className="text-sm font-medium text-gray-700">
+                                        <label htmlFor="fee_status_form" className="text-sm font-medium text-foreground">
                                             Active
                                         </label>
                                     </div>
@@ -261,22 +258,22 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
                         {/* Fee Types List */}
                         <div className="space-y-2">
                             {typesLoading ? (
-                                <div className="text-center py-4 text-gray-500">Loading fee types...</div>
+                                <div className="text-center py-4 text-muted-foreground">Loading fee types...</div>
                             ) : feeTypes.length > 0 ? (
                                 feeTypes.map((feeType: FeeType) => (
-                                    <div key={feeType.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white">
+                                    <div key={feeType.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
                                         <div className="flex-1">
-                                            <h4 className="font-medium text-gray-900">{feeType.type_name}</h4>
+                                            <h4 className="font-medium text-foreground">{feeType.type_name}</h4>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <span className={cn(
                                                     "px-2 py-1 text-xs rounded-full",
                                                     feeType.fee_status === 'active'
                                                         ? "bg-green-100 text-green-800"
-                                                        : "bg-gray-100 text-gray-800"
+                                                        : "bg-muted text-foreground"
                                                 )}>
                                                     {feeType.fee_status === 'active' ? 'Active' : 'Inactive'}
                                                 </span>
-                                                <span className="text-xs text-gray-500">
+                                                <span className="text-xs text-muted-foreground">
                                                     Term: {(() => {
                                                         const term = feeTerms.find(term => term.id === feeType.fee_term_id);
                                                         if (term) {
@@ -314,7 +311,7 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
                                     </div>
                                 ))
                             ) : (
-                                <div className="text-center py-8 text-gray-500">
+                                <div className="text-center py-8 text-muted-foreground">
                                     <p>No fee types found for this category.</p>
                                     <Button onClick={handleCreate} className="mt-2">
                                         Add First Fee Type
@@ -339,7 +336,7 @@ export function CategoryTypeManager({ category, open, onOpenChange }: CategoryTy
                         <DialogTitle>Delete Fee Type</DialogTitle>
                     </DialogHeader>
 
-                    <p className="text-gray-600">
+                    <p className="text-muted-foreground">
                         Are you sure you want to delete the fee type "{showDeleteDialog?.type_name}"?
                         This action cannot be undone and may affect existing fee mappings.
                     </p>

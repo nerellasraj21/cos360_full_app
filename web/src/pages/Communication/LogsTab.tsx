@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { ViewButton } from '@/components/common/TableActions';
 import { PermissionGuard } from '@/components/common';
-import { Eye, Loader2, ShieldX } from 'lucide-react';
+import { Eye, Loader2, ShieldX, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useLogs, useLogDetail } from '@/api/hooks/communication/communication';
 import type { Channel, NotificationStatus, NotificationLog, LogFilters } from '@/types/communication';
@@ -17,25 +17,24 @@ import type { Channel, NotificationStatus, NotificationLog, LogFilters } from '@
 // ─── Status badge ─────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<
   NotificationStatus,
-  { label: string; icon: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
+  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
 > = {
-  sent: { label: 'Sent', icon: '✅', variant: 'default' },
-  delivered: { label: 'Delivered', icon: '✅', variant: 'default' },
-  failed: { label: 'Failed', icon: '❌', variant: 'destructive' },
-  queued: { label: 'Queued', icon: '⏳', variant: 'secondary' },
+  sent: { label: 'Sent', variant: 'default' },
+  delivered: { label: 'Delivered', variant: 'default' },
+  failed: { label: 'Failed', variant: 'destructive' },
+  queued: { label: 'Queued', variant: 'secondary' },
 };
 
-const CHANNEL_ICONS: Record<Channel, string> = {
-  sms: '📱',
-  whatsapp: '💬',
-  email: '📧',
+const CHANNEL_LABELS: Record<Channel, string> = {
+  sms: 'SMS',
+  whatsapp: 'WhatsApp',
+  email: 'Email',
 };
 
 function StatusBadge({ status }: { status: NotificationStatus }) {
-  const cfg = STATUS_CONFIG[status] ?? { label: status, icon: '•', variant: 'secondary' as const };
+  const cfg = STATUS_CONFIG[status] ?? { label: status, variant: 'secondary' as const };
   return (
     <Badge variant={cfg.variant} className="gap-1">
-      <span aria-hidden="true">{cfg.icon}</span>
       {cfg.label}
     </Badge>
   );
@@ -65,7 +64,7 @@ function LogDetailModal({ logId, onClose }: { logId: string; onClose: () => void
               <tbody>
                 {[
                   ['Recipient', detail.recipient_name],
-                  ['Channel', `${CHANNEL_ICONS[detail.channel]} ${detail.channel.toUpperCase()}`],
+                  ['Channel', CHANNEL_LABELS[detail.channel]],
                   ['Phone', detail.recipient_phone ?? '—'],
                   ['Email', detail.recipient_email ?? '—'],
                   ['Status', null],
@@ -276,7 +275,7 @@ function LogsTabContent() {
                   <div>
                     <p className="font-medium">{log.recipient_name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {CHANNEL_ICONS[log.channel]} {log.channel.toUpperCase()}
+                      {CHANNEL_LABELS[log.channel]}
                     </p>
                   </div>
                   <StatusBadge status={log.status} />
@@ -304,7 +303,7 @@ function LogsTabContent() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                ←
+                <ChevronLeft className="h-4 w-4" />
               </Button>
               {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                 const p = i + 1;
@@ -326,7 +325,7 @@ function LogsTabContent() {
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                →
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -365,7 +364,7 @@ function LogRow({
         </div>
       </td>
       <td className="px-4 py-2 whitespace-nowrap">
-        {CHANNEL_ICONS[log.channel]} {log.channel.toUpperCase()}
+        {CHANNEL_LABELS[log.channel]}
       </td>
       <td className="px-4 py-2">
         <StatusBadge status={log.status} />

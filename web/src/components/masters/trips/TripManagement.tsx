@@ -199,8 +199,7 @@ export function TripManagement({ className }: TripManagementProps) {
         trip_number: formData.trip_number,
       };
 
-      const createdTrip = await tripsApi.createTrip(tripData);
-      console.log('Trip created:', createdTrip);
+      await tripsApi.createTrip(tripData);
       toast.success('Trip created successfully');
       setIsDirty(false);
       setShowCreateDialog(false);

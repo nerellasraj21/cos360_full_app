@@ -24,9 +24,6 @@ export function PermissionGuard({
   const { checkPermission } = usePermission();
   const hasPermission = checkPermission(resource, action);
 
-  // Debug logging
-  console.log(`PermissionGuard: Checking ${resource}:${action}`, { hasPermission });
-
   if (!hasPermission) {
     return <>{fallback}</>;
   }

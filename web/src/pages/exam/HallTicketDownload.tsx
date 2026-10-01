@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Download, Loader2, Eye, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { ArrowLeft, Download, Loader2, Eye, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { FilterBar } from '@/components/ui/FilterBar'
+import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections'
 import {
   useExamDetail,
   useHallTicketEligibility,
@@ -30,7 +33,7 @@ export default function HallTicketDownload() {
     else { setSortKey(key); setSortDir('asc') }
   }
   const SortIcon = ({ col }: { col: string }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-75" />
     return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />
   }
   const { data: exam } = useExamDetail(examId)
@@ -38,6 +41,9 @@ export default function HallTicketDownload() {
   const eligible = eligibleQuery.data ?? []
   const isLoading = eligibleQuery.isLoading
   const { data: examDates = [] } = useExamDates(examId)
+  const { data: classesList = [] } = useClassSectionsDropdown()
+  const classNameMap = Object.fromEntries(classesList.map(c => [c.id, c.name]))
+  const sectionNameMap = Object.fromEntries(classesList.flatMap(c => c.sections.map(sec => [sec.id, sec.name])))
 
   const filteredEligible = useMemo(() => {
     let items = eligible
@@ -46,13 +52,13 @@ export default function HallTicketDownload() {
       items = items.filter(s =>
         (s.student_name ?? '').toLowerCase().includes(q) ||
         (s.admission_number ?? '').toLowerCase().includes(q) ||
-        (s.class_name ?? '').toLowerCase().includes(q)
+        (classNameMap[s.class_id] ?? '').toLowerCase().includes(q)
       )
     }
     if (sortKey) {
       items = [...items].sort((a, b) => {
-        const aVal = String((a as any)[sortKey] ?? '')
-        const bVal = String((b as any)[sortKey] ?? '')
+        const aVal = sortKey === 'class_name' ? (classNameMap[a.class_id] ?? '') : String((a as any)[sortKey] ?? '')
+        const bVal = sortKey === 'class_name' ? (classNameMap[b.class_id] ?? '') : String((b as any)[sortKey] ?? '')
         return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
       })
     }
@@ -66,7 +72,7 @@ export default function HallTicketDownload() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `hall-tickets-${examId}.pdf`
+      a.download = `hall-tickets-${exam?.exam_name ?? 'exam'}.pdf`
       a.click()
       URL.revokeObjectURL(url)
       toast.success('Hall tickets downloaded')
@@ -84,7 +90,7 @@ export default function HallTicketDownload() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `hall-ticket-${studentId}.pdf`
+      a.download = `hall-ticket-${eligible.find(e => e.student_id === studentId)?.admission_number ?? 'student'}.pdf`
       a.click()
       URL.revokeObjectURL(url)
       toast.success('Downloaded')
@@ -97,36 +103,36 @@ export default function HallTicketDownload() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate({ to: `/exam/hall-tickets/${examId}` as any })}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-bold">Download Hall Tickets — {exam?.exam_name ?? '...'}</h1>
-            <p className="text-xs text-muted-foreground">{eligible.length} eligible students</p>
+      <PageHeader
+        title={`Download Hall Tickets - ${exam?.exam_name ?? ''}`}
+        subtitle={`${eligible.length} eligible students`}
+        icon={<Download className="h-5 w-5" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate({ to: `/exam/hall-tickets/${examId}` as any })} className="gap-1">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <Button onClick={handleDownloadAll} disabled={downloading === 'all' || eligible.length === 0}>
+              {downloading === 'all' ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Download All
+            </Button>
           </div>
-        </div>
-        <Button
-          onClick={handleDownloadAll}
-          disabled={downloading === 'all' || eligible.length === 0}
-        >
-          {downloading === 'all' ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          ) : (
-            <Download className="h-4 w-4 mr-2" />
-          )}
-          Download All
-        </Button>
-      </div>
+        }
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-muted-foreground">Loading students...</span>
+        </div>
+      ) : eligibleQuery.isError ? (
+        <div className="rounded-lg border bg-muted/20 p-8 text-center">
+          <p className="text-muted-foreground">{eligibleQuery.error instanceof Error ? eligibleQuery.error.message : 'Failed to load eligible students.'}</p>
         </div>
       ) : eligible.length === 0 ? (
         <div className="rounded-lg border bg-muted/20 p-8 text-center">
@@ -134,16 +140,12 @@ export default function HallTicketDownload() {
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-              <Filter className="h-3.5 w-3.5" />
-              <span>Filters</span>
-            </div>
+          <FilterBar className="mb-0">
             <div className="relative max-w-sm">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input placeholder="Search by student name or admission number..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
             </div>
-          </div>
+          </FilterBar>
           <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead>
@@ -161,10 +163,10 @@ export default function HallTicketDownload() {
               ) : filteredEligible.map((student, idx) => (
                 <tr key={student.student_id} className="border-b hover:bg-muted/10" style={{ height: '48px' }}>
                   <td className="px-4 py-2 text-muted-foreground text-sm">{idx + 1}</td>
-                  <td className="px-4 py-2 font-medium">{student.student_name}</td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">{student.admission_number}</td>
+                  <td className="px-4 py-2 font-medium">{student.student_name ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{student.admission_number ?? '—'}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">
-                    {student.class_name ?? '—'} {student.section_name ? `/ ${student.section_name}` : ''}
+                    {classNameMap[student.class_id] ?? '—'}{student.section_id && sectionNameMap[student.section_id] ? ` / ${sectionNameMap[student.section_id]}` : ''}
                   </td>
                   <td className="px-3 py-2 text-center">
                     <div className="flex items-center justify-center gap-2">
@@ -172,6 +174,7 @@ export default function HallTicketDownload() {
                         variant="ghost"
                         size="sm"
                         className="h-8 gap-1"
+                        title="Preview hall ticket"
                         onClick={() => setPreviewStudent(student)}
                       >
                         <Eye className="h-3 w-3" />
@@ -201,7 +204,6 @@ export default function HallTicketDownload() {
         </div>
       )}
 
-      {/* Preview Dialog */}
       <Dialog open={!!previewStudent} onOpenChange={() => setPreviewStudent(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>

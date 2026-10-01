@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Clock, ShieldCheck } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { ShieldCheck } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useAuthStore } from '@/lib/authStore'
@@ -17,7 +16,7 @@ const cardColors = [
   { color: 'text-red-500', bg: 'bg-red-500/10' },
   { color: 'text-purple-500', bg: 'bg-purple-500/10' },
   { color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
-  { color: 'text-gray-500', bg: 'bg-gray-500/10' },
+  { color: 'text-muted-foreground', bg: 'bg-muted' },
   { color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
 ]
 
@@ -51,24 +50,7 @@ function AdminDashboard() {
         title="Administration"
         subtitle="Manage system settings, users, roles, and organization-wide configurations"
         icon={<ShieldCheck className="h-5 w-5" />}
-        actions={
-          <Badge variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 text-sm">
-            <Clock className="h-3.5 w-3.5" />
-            Coming Soon
-          </Badge>
-        }
       />
-
-      {/* Coming Soon Banner */}
-      <div className="rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/20 p-8 text-center">
-        <ShieldCheck className="h-12 w-12 text-slate-500 mx-auto mb-3" />
-        <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-400">
-          Administration Dashboard — Coming Soon
-        </h2>
-        <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-          A centralized administration panel with system health, user stats, and quick actions is being built. Use the sidebar to access available admin sections.
-        </p>
-      </div>
 
       {/* Sections */}
       {sections.length > 0 && (

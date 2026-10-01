@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Loader2, ClipboardList, ChevronRight, BarChart3, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Search } from 'lucide-react'
+import { Loader2, ClipboardList, ChevronRight, BarChart3, ChevronUp, ChevronDown, ChevronsUpDown, Search } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { FilterBar } from '@/components/ui/FilterBar'
 import { Button } from '@/components/ui/button'
@@ -33,11 +33,10 @@ export default function MarkEntryExamList() {
     if (academicYears.length === 0) fetchAndSetAcademicYears()
   }, [academicYears.length, fetchAndSetAcademicYears])
 
-  const { data: exams = [], isLoading } = useExamList(
+  const { data: exams = [], isLoading, isError, error } = useExamList(
     selectedAcademicYearId ? { academic_year_id: selectedAcademicYearId } : {}
   )
 
-  // Only show exams that are in a state where marks can be entered
   const entryAllowed: ExamStatus[] = ['active', 'draft', 'locked']
   const markEntryExams = exams.filter(e => entryAllowed.includes(e.status))
 
@@ -51,7 +50,7 @@ export default function MarkEntryExamList() {
   }
 
   const SortIcon = ({ col }: { col: typeof sortKey }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-50" />
+    if (sortKey !== col) return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-75" />
     return sortDir === 'asc'
       ? <ChevronUp className="ml-1 inline h-3 w-3" />
       : <ChevronDown className="ml-1 inline h-3 w-3" />
@@ -91,11 +90,18 @@ export default function MarkEntryExamList() {
         </div>
       </FilterBar>
 
-      {/* List */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-muted-foreground">Loading exams...</span>
         </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-lg font-medium">Failed to load exams</p>
+            <p className="mt-1 text-sm text-muted-foreground">{error instanceof Error ? error.message : 'Please try again.'}</p>
+          </CardContent>
+        </Card>
       ) : markEntryExams.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
@@ -116,7 +122,7 @@ export default function MarkEntryExamList() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">

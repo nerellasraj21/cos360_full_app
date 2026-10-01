@@ -6,13 +6,18 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, XCircle, Eye, Clock, FileText, DollarSign, Calendar, User, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { CheckCircle, XCircle, Eye, Clock, Loader2, FileText, DollarSign, Calendar, User, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { usePendingExpenseApprovals, useApproveExpenseTransaction, useExpenseTransaction } from '@/hooks/expense';
 import { formatCurrency } from '@/lib/expenseValidation';
 import type { ExpenseTransaction } from '@/types/expense';
+import { logger } from '@/lib/config';
+
+const formatPaymentMethod = (method: string) =>
+  method.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 export function ExpenseApprovals() {
   const [selectedTransaction, setSelectedTransaction] = useState<ExpenseTransaction | null>(null);
@@ -95,7 +100,7 @@ export function ExpenseApprovals() {
       setApprovalDialog({ open: false, action: 'approve', transaction: null });
       refetch(); // Refresh the pending approvals list
     } catch (error) {
-      console.error('Approval action failed:', error);
+      logger.error('Approval action failed:', error);
     }
   };
 
@@ -103,29 +108,19 @@ export function ExpenseApprovals() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <Clock className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Loading pending approvals...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2 text-muted-foreground">Loading pending approvals...</span>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Pending Approvals</h2>
-          <p className="text-muted-foreground">Review and process expense approval requests</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <div className="text-2xl font-bold">{pendingTransactions.length}</div>
-            <div className="text-sm text-muted-foreground">Pending</div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Pending Approvals"
+        subtitle="Review and process expense approval requests"
+        icon={<CheckCircle className="h-5 w-5" />}
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -148,7 +143,7 @@ export function ExpenseApprovals() {
               <div>
                 <p className="text-sm font-medium">Total Amount</p>
                 <p className="text-2xl font-bold">
-                  {formatCurrency(pendingTransactions.reduce((sum, t) => sum + t.amount, 0))}
+                  {formatCurrency(pendingTransactions.reduce((sum, t) => sum + Number(t.amount), 0))}
                 </p>
               </div>
             </div>
@@ -208,16 +203,16 @@ export function ExpenseApprovals() {
                     <TableCell>
                       <div>
                         <div className="font-medium">{transaction.description}</div>
-                        <div className="text-sm text-muted-foreground">
-                          ID: {transaction.id.slice(0, 8)}...
-                        </div>
+                        {!!transaction.vendor_name && (
+                          <div className="text-sm text-muted-foreground">{transaction.vendor_name}</div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">
                       {formatCurrency(transaction.amount)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{transaction.payment_method}</Badge>
+                      <Badge variant="outline">{formatPaymentMethod(transaction.payment_method)}</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm">
@@ -293,7 +288,7 @@ export function ExpenseApprovals() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Payment Method</Label>
-                  <p>{transactionDetails.payment_method}</p>
+                  <p>{formatPaymentMethod(transactionDetails.payment_method)}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Transaction Date</Label>
@@ -347,7 +342,7 @@ export function ExpenseApprovals() {
       </Dialog>
 
       {/* Approval Confirmation Dialog */}
-      <Dialog open={approvalDialog.open} onOpenChange={() => setApprovalDialog({ open: false, action: 'approve', transaction: null })} guardDirty={true} onDirtyDiscard={() => { setApprovalComment(''); setApprovalDialog({ open: false, action: 'approve', transaction: null }); }}>
+      <Dialog open={approvalDialog.open} onOpenChange={() => setApprovalDialog({ open: false, action: 'approve', transaction: null })} guardDirty={!!approvalComment.trim()} onDirtyDiscard={() => { setApprovalComment(''); setApprovalDialog({ open: false, action: 'approve', transaction: null }); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

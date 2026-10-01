@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -31,11 +32,14 @@ import type {
   FeeRefundCreateRequest
 } from '@/types/fee/refund';
 import type { FeeTransaction } from '@/types/fee/transaction';
-import { Plus, Search, Eye, CheckCircle, XCircle, RefreshCw, DollarSign, X, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Loader2, Plus, Search, Eye, CheckCircle, XCircle, RefreshCw, DollarSign, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { PermissionGuard } from '@/components/common';
 import { usePermission } from '@/hooks/usePermission';
 import { ShieldX } from 'lucide-react';
+import { logger } from '@/lib/config';
+
+const formatReason = (reason: string) => reason.replace(/_/g, ' ');
 
 export default function FeeRefunds() {
   return (
@@ -193,7 +197,7 @@ function FeeRefundsContent() {
         const response = await searchTransactions(searchParams);
         setTransactions(Array.isArray(response) ? response : response?.items || []);
       } catch (error) {
-        console.error('Error fetching transactions:', error);
+        logger.error('Error fetching transactions:', error);
         toast.error('Failed to load transactions');
         setTransactions([]);
       } finally {
@@ -238,7 +242,7 @@ function FeeRefundsContent() {
         const studentsData = await fetchStudentsDropdown();
         setStudents(studentsData);
       } catch (error) {
-        console.error('Error fetching students:', error);
+        logger.error('Error fetching students:', error);
         toast.error('Failed to load students');
       } finally {
         setStudentsLoading(false);
@@ -339,18 +343,16 @@ function FeeRefundsContent() {
     // Always fetch transaction details for the refund
     let transactionData;
     try {
-      console.log('Fetching transaction details for refund:', refund.refund_number, 'transaction ID:', refund.fee_transaction_id);
       transactionData = await getTransactionById(refund.fee_transaction_id);
-      console.log('Transaction details fetched:', transactionData);
     } catch (error) {
-      console.error('Failed to fetch transaction details:', error);
+      logger.error('Failed to fetch transaction details:', error);
       // Continue with refund data only
     }
 
     const enhancedRefund = {
       ...refund,
       transaction_number: transactionData?.transaction_number || 'N/A',
-      transaction_amount: transactionData?.total_amount || 0,
+      transaction_amount: Number(transactionData?.total_amount || 0),
       transaction_date: transactionData?.transaction_date || '',
       payment_method: transactionData?.payment_method || 'N/A'
     };
@@ -394,7 +396,7 @@ function FeeRefundsContent() {
       const date = new Date(transaction.transaction_date).toLocaleDateString();
       return {
         value: transaction.id,
-        label: `${transaction.transaction_number} | ₹${Number(transaction.total_amount).toLocaleString()} | ${paymentMethod} | ${feeTypes} | ${date}`
+        label: `${transaction.transaction_number} | ₹${Number(transaction.total_amount).toLocaleString('en-IN')} | ${paymentMethod} | ${feeTypes} | ${date}`
       };
     });
   }, [transactions]);
@@ -419,7 +421,7 @@ function FeeRefundsContent() {
     setCreateForm(prev => ({
       ...prev,
       fee_transaction_id: option?.value || '',
-      refund_amount: selectedTransaction?.total_amount || 0 // Pre-fill refund amount with transaction amount
+      refund_amount: Number(selectedTransaction?.total_amount || 0)
     }));
   };
 
@@ -552,10 +554,8 @@ function FeeRefundsContent() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Loading refunds...</p>
-          </div>
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2 text-muted-foreground">Loading refunds...</span>
         </div>
       </div>
     );
@@ -573,35 +573,23 @@ function FeeRefundsContent() {
 
   return (
     <div className="space-y-6">
-      {/* Page Title */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Fee Refunds</h1>
-          <p className="text-muted-foreground mt-1">Manage fee refund requests and track their status</p>
-        </div>
-        {canCreate && (
+      <PageHeader
+        title="Fee Refunds"
+        subtitle="Manage fee refund requests and track their status"
+        icon={<RefreshCw className="h-5 w-5" />}
+        actions={canCreate ? (
           <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Create Refund Request
           </Button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* Create Refund Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogContent className="max-w-4xl max-h-[80vh]">
               <DialogHeader>
-                <div className="flex items-center justify-between">
-                  <DialogTitle>Create New Refund Request</DialogTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowCreateDialog(false)}
-                    className="h-6 w-6 p-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
+                <DialogTitle>Create New Refund Request</DialogTitle>
                 <DialogDescription>
                   Create a new fee refund request for a student
                 </DialogDescription>
@@ -780,7 +768,7 @@ function FeeRefundsContent() {
                 <DollarSign className="h-5 w-5 text-green-600" />
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Refund Amount</p>
-                  <p className="text-2xl font-bold">₹{refundStats.total_refund_amount.toLocaleString()}</p>
+                  <p className="text-2xl font-bold">₹{Number(refundStats.total_refund_amount).toLocaleString('en-IN')}</p>
                 </div>
               </div>
             </CardContent>
@@ -857,29 +845,38 @@ function FeeRefundsContent() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Status</label>
               <Select
-                value={searchParams.status}
-                onValueChange={(value) => handleSearch('status', value)}
+                value={searchParams.status || '__all__'}
+                onValueChange={(value) => handleSearch('status', value === '__all__' ? '' : value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
-                  <SelectItem value="requested">Requested</SelectItem>
+                  <SelectItem value="__all__">All statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                   <SelectItem value="processed">Processed</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Refund Reason</label>
-              <Input
-                value={searchParams.refund_reason}
-                onChange={(e) => handleSearch('refund_reason', e.target.value)}
-                placeholder="Filter by reason..."
-              />
+              <Select
+                value={searchParams.refund_reason || '__all__'}
+                onValueChange={(value) => handleSearch('refund_reason', value === '__all__' ? '' : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All reasons" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All reasons</SelectItem>
+                  <SelectItem value="fee_adjustment">Fee Adjustment</SelectItem>
+                  <SelectItem value="student_withdrawal">Student Withdrawal</SelectItem>
+                  <SelectItem value="excess_payment">Excess Payment</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Requested Date From</label>
@@ -972,11 +969,11 @@ function FeeRefundsContent() {
                         {refund.student_admission_num || 'N/A'}
                       </TableCell>
                       <TableCell className="font-medium">
-                        ₹{Number(refund.refund_amount).toLocaleString()}
+                        ₹{Number(refund.refund_amount).toLocaleString('en-IN')}
                       </TableCell>
                       <TableCell>
-                        <div className="max-w-xs truncate" title={refund.refund_reason}>
-                          {refund.refund_reason}
+                        <div className="max-w-xs truncate capitalize" title={formatReason(refund.refund_reason)}>
+                          {formatReason(refund.refund_reason)}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1051,7 +1048,7 @@ function FeeRefundsContent() {
                       <DollarSign className="h-5 w-5 text-green-600" />
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Refund Amount</p>
-                        <p className="text-2xl font-bold">₹{Number(selectedRefund.refund_amount).toLocaleString()}</p>
+                        <p className="text-2xl font-bold">₹{Number(selectedRefund.refund_amount).toLocaleString('en-IN')}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -1063,7 +1060,7 @@ function FeeRefundsContent() {
                       <CheckCircle className="h-5 w-5 text-blue-600" />
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Refund Reason</p>
-                        <p className="text-lg font-semibold">{selectedRefund.refund_reason.toUpperCase()}</p>
+                        <p className="text-lg font-semibold">{formatReason(selectedRefund.refund_reason)}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -1133,7 +1130,7 @@ function FeeRefundsContent() {
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Transaction Amount</p>
                         <p className="font-semibold text-green-600">
-                          ₹{Number(selectedRefund.transaction_amount || 0).toLocaleString()}
+                          ₹{Number(selectedRefund.transaction_amount || 0).toLocaleString('en-IN')}
                         </p>
                       </div>
                       <div>
@@ -1155,7 +1152,7 @@ function FeeRefundsContent() {
                 <CardContent className="space-y-4">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Refund Reason</p>
-                    <p className="text-sm">{selectedRefund.refund_reason}</p>
+                    <p className="text-sm capitalize">{formatReason(selectedRefund.refund_reason)}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>

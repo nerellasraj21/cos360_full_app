@@ -192,11 +192,6 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
       // Get the CURRENT academic year from store at submission time
       const currentAcademicYearId = useAcademicYearStore.getState().selectedAcademicYearId;
 
-      // Log ALL form data for debugging
-      console.log('===== FORM SUBMISSION STARTED =====');
-      console.log('Complete form data:', data);
-      console.log('Academic Year from store (at mount):', selectedAcademicYearId);
-      console.log('Academic Year from store (current):', currentAcademicYearId);
 
       // Validate academic year is selected
       if (!currentAcademicYearId || currentAcademicYearId.trim() === '') {
@@ -308,14 +303,8 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
         },
       };
 
-      // Log the complete payload before sending
-      console.log('===== PAYLOAD TO API =====');
-      console.log('Payload structure:', JSON.stringify(cleanedData, null, 2));
-      console.log('=========================');
 
       const result = await createAdmission.mutateAsync(cleanedData);
-      console.log('===== SUCCESS =====');
-      console.log('API Response:', result);
 
       // Upload pending photo if one was selected before creation
       if (pendingPhotoFile) {
@@ -333,10 +322,6 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
       await new Promise(resolve => setTimeout(resolve, 500));
       onComplete();
     } catch (error: any) {
-      console.error('===== ERROR =====');
-      console.error('Full error object:', error);
-      console.error('Error response:', error?.response);
-      console.error('Error data:', error?.response?.data);
 
       // Duplicate admission number — set field error and return to Student Details step
       // Note: handleApiError in the API layer converts Axios errors to plain Error objects,
@@ -404,13 +389,13 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>{steps[currentStep].title}</span>
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-muted-foreground">
                   Step {currentStep + 1} of {steps.length}
                 </span>
               </CardTitle>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-muted rounded-full h-2">
                 <div
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
                   style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
                 ></div>
               </div>

@@ -378,7 +378,7 @@ export function ExpenseCategoriesList({ onCreateCategory }: ExpenseCategoriesLis
                         <DialogTitle>Delete Expense Category</DialogTitle>
                     </DialogHeader>
 
-                    <p className="text-gray-600">
+                    <p className="text-muted-foreground">
                         Are you sure you want to delete the category "{selectedCategory?.name}"?
                         This action cannot be undone.
                     </p>

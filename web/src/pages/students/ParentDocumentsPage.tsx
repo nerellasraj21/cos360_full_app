@@ -2,6 +2,7 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, FolderOpen, Loader2 } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { useAllStudentDocuments } from "@/api/hooks/students/documents";
 import { useAuthStore } from "@/lib/authStore";
 import type { StudentAllDocumentItem } from "@/types/documents";
@@ -35,7 +36,7 @@ export const ParentDocumentsPage: React.FC = () => {
       <div className="container mx-auto p-6">
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground">
-            <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-75" />
             <p>No children linked to your account.</p>
           </CardContent>
         </Card>
@@ -45,6 +46,7 @@ export const ParentDocumentsPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      <PageHeader title="Documents" icon={<FolderOpen className="h-5 w-5" />} />
       <Card>
         <CardHeader>
           <CardTitle>
@@ -65,7 +67,7 @@ export const ParentDocumentsPage: React.FC = () => {
             </div>
           ) : documents.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
+              <FileText className="h-12 w-12 mx-auto mb-4 opacity-75" />
               <p>No documents found.</p>
             </div>
           ) : (

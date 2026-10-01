@@ -30,7 +30,7 @@ export default function AuditLogExamList() {
     if (academicYears.length === 0) fetchAndSetAcademicYears()
   }, [academicYears.length, fetchAndSetAcademicYears])
 
-  const { data: exams = [], isLoading } = useExamList(
+  const { data: exams = [], isLoading, isError, error } = useExamList(
     selectedAcademicYearId ? { academic_year_id: selectedAcademicYearId } : {}
   )
 
@@ -44,7 +44,7 @@ export default function AuditLogExamList() {
   }
 
   const SortIcon = ({ col }: { col: typeof sortKey }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-50" />
+    if (sortKey !== col) return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-75" />
     return sortDir === 'asc'
       ? <ChevronUp className="ml-1 inline h-3 w-3" />
       : <ChevronDown className="ml-1 inline h-3 w-3" />
@@ -88,6 +88,13 @@ export default function AuditLogExamList() {
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-lg font-medium">Failed to load exams</p>
+            <p className="mt-1 text-sm text-muted-foreground">{error instanceof Error ? error.message : 'Please try again.'}</p>
+          </CardContent>
+        </Card>
       ) : exams.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
@@ -99,7 +106,7 @@ export default function AuditLogExamList() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">

@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import type { TableColumn } from '@/components/common/table';
 import { ShieldX, Loader2, Plus, Trash2, Eye, Edit, Check, X } from 'lucide-react';
 import { TimePicker } from '@/components/ui/TimePicker';
 import {
@@ -34,7 +36,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 
-const createColumns = (onView: (routeId: string) => void) => [
+const createColumns = (onView: (routeId: string) => void): TableColumn<Route>[] => [
     { key: "route_name", label: "Route Name", editable: true },
     { key: "starting_stop", label: "Starting Point", editable: true },
     { key: "ending_stop", label: "Ending Point", editable: true },
@@ -186,6 +188,8 @@ function RouteAddDialog() {
                 });
             }
             handleClose();
+        } catch {
+            return;
         } finally {
             setSubmitting(false);
         }
@@ -379,6 +383,7 @@ function RouteStopsManager({
     });
 
     const [isAddOpen, setIsAddOpen] = useState(false);
+    const [stopToDelete, setStopToDelete] = useState<RouteStop | null>(null);
     const [addDraft, setAddDraft] = useState({
         name: '', number: '', fees: '', pickup_time: '', drop_time: '', is_active: true,
     });
@@ -657,23 +662,29 @@ function RouteStopsManager({
                                                 </div>
                                             ) : (
                                                 <div className="flex items-center justify-center gap-1">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="h-7 w-7 p-0"
-                                                        onClick={() => startEdit(stop)}
-                                                    >
-                                                        <Edit className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                                                        disabled={deleteMutation.isPending}
-                                                        onClick={() => deleteMutation.mutate(stop.id)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                    <PermissionGuard resource="route_stops" action="update">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-7 w-7 p-0"
+                                                            title="Edit"
+                                                            onClick={() => startEdit(stop)}
+                                                        >
+                                                            <Edit className="h-4 w-4" />
+                                                        </Button>
+                                                    </PermissionGuard>
+                                                    <PermissionGuard resource="route_stops" action="delete">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                                            title="Delete"
+                                                            disabled={deleteMutation.isPending}
+                                                            onClick={() => setStopToDelete(stop)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </PermissionGuard>
                                                 </div>
                                             )}
                                         </TableCell>
@@ -683,6 +694,21 @@ function RouteStopsManager({
                         </TableBody>
                     </Table>
                 )}
+
+                <ConfirmDialog
+                    open={!!stopToDelete}
+                    onOpenChange={(open) => { if (!open) setStopToDelete(null); }}
+                    title="Delete Stop"
+                    description={`Are you sure you want to delete the stop "${stopToDelete?.name ?? ''}"? This action cannot be undone.`}
+                    confirmLabel="Delete"
+                    pendingLabel="Deleting..."
+                    isPending={deleteMutation.isPending}
+                    onConfirm={() => {
+                        if (stopToDelete) {
+                            deleteMutation.mutate(stopToDelete.id, { onSuccess: () => setStopToDelete(null) });
+                        }
+                    }}
+                />
             </CardContent>
         </Card>
     );

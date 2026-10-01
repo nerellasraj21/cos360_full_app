@@ -7,6 +7,8 @@ import { useAcademicYearsDropdown } from '@/api/hooks/masters/academicyears';
 import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections';
 import { useStatesDropdown, useDistrictsDropdown, useMandalsDropdown } from '@/api/hooks/masters/locations';
 import { useNavigate } from '@tanstack/react-router';
+import { Loader2, GraduationCap } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 /**
  * Admission Details View - Display Complete Admission Information
@@ -57,24 +59,29 @@ function RouteComponent() {
   // Helper functions to get display names
   const getAcademicYearName = (yearId: string) => {
     const year = academicYears.find(y => y.id === yearId);
-    return year ? year.title : yearId;
+    return year ? year.title : 'N/A';
   };
 
   const getClassName = (classId: string) => {
     const classItem = classesData.find(c => c.id === classId);
-    return classItem ? classItem.name : classId;
+    return classItem ? classItem.name : 'N/A';
   };
 
   const getSectionName = (classId: string, sectionId: string) => {
     const classItem = classesData.find(c => c.id === classId);
     if (classItem) {
       const section = classItem.sections.find(s => s.id === sectionId);
-      return section ? section.name : sectionId;
+      return section ? section.name : 'N/A';
     }
-    return sectionId;
+    return 'N/A';
   };
 
-  const getStateName = (id: string) => states.find(s => s.id === id)?.name || id;
+  const getStateName = (id: string) => states.find(s => s.id === id)?.name || 'N/A';
+  const formatDate = (d?: string) => {
+    if (!d || d.startsWith('1900-01-01')) return 'N/A';
+    const parsed = new Date(d);
+    return isNaN(parsed.getTime()) ? 'N/A' : parsed.toLocaleDateString();
+  };
   const getDistrictName = (id: string) => districtsLoading ? 'Loading...' : (districts.find(d => d.id === id)?.name || 'N/A');
   const getMandalName = (id: string) => mandalsLoading ? 'Loading...' : (mandals.find(m => m.id === id)?.name || 'N/A');
   const formatGender = (g?: string) => {
@@ -84,15 +91,20 @@ function RouteComponent() {
   };
 
   if (isLoading) {
-    return <div className="p-6">Loading admission details...</div>;
+    return (
+      <div className="flex justify-center items-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading admission details...</span>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="p-6">Error loading admission: {error.message}</div>;
+    return <div className="p-6 text-destructive">Error loading admission: {error.message}</div>;
   }
 
   if (!admission) {
-    return <div className="p-6">Admission not found</div>;
+    return <div className="p-6 text-muted-foreground">Admission not found</div>;
   }
 
   const studentData = admission.student as any; // Cast to access all fields
@@ -100,7 +112,7 @@ function RouteComponent() {
   // Prepare data for table display
   const details = [
     { label: 'Admission Number', value: admission.admission_number },
-    { label: 'Admission Date', value: new Date(admission.admission_date).toLocaleDateString() },
+    { label: 'Admission Date', value: formatDate(admission.admission_date) },
     { label: 'Academic Year', value: getAcademicYearName(admission.academic_year_id || '') || 'N/A' },
     { label: 'Admitted Class', value: getClassName(admission.admitted_class_id || '') || 'N/A' },
     { label: 'Admitted Section', value: getSectionName(admission.admitted_class_id || '', admission.admitted_section_id || '') || 'N/A' },
@@ -113,7 +125,7 @@ function RouteComponent() {
     { label: 'District', value: districtId ? getDistrictName(districtId) : 'N/A' },
     { label: 'Mandal', value: (admission as any).mandal_id ? getMandalName((admission as any).mandal_id) : 'N/A' },
     { label: 'Student Name', value: `${studentData.first_name} ${studentData.last_name}` },
-    { label: 'Date of Birth', value: new Date(studentData.date_of_birth).toLocaleDateString() },
+    { label: 'Date of Birth', value: formatDate(studentData.date_of_birth) },
     { label: 'Gender', value: formatGender(studentData.gender) },
     { label: 'Aadhar Number', value: studentData.aadhar_number || 'N/A' },
     { label: 'APAAR Number', value: studentData.apaar_number || 'N/A' },
@@ -150,18 +162,19 @@ function RouteComponent() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Admission Details</h1>
-          <p className="text-muted-foreground">Admission #{admission.admission_number}</p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => navigate({ to: '/students/admission' })}
-        >
-          Back to List
-        </Button>
-      </div>
+      <PageHeader
+        title="Admission Details"
+        subtitle={`Admission #${admission.admission_number}`}
+        icon={<GraduationCap className="h-5 w-5" />}
+        actions={
+          <Button
+            variant="outline"
+            onClick={() => navigate({ to: '/students/admission' })}
+          >
+            Back to List
+          </Button>
+        }
+      />
 
       <Card>
         <CardHeader>

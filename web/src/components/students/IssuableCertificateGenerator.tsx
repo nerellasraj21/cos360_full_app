@@ -46,6 +46,7 @@ export function IssuableCertificateGenerator({
   const [editableHtml, setEditableHtml] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem("cert_logo_url") || "");
+  const [schoolName, setSchoolName] = useState(() => localStorage.getItem("cert_school_name") || "");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const { data: templates, isLoading: isLoadingTemplates } =
@@ -91,7 +92,7 @@ export function IssuableCertificateGenerator({
     const replacements: Record<string, string> = {
       // School
       school_logo: logoUrl || "",
-      school_name: "Your School Name",
+      school_name: schoolName,
       // Student identity
       student_name: s ? `${s.first_name} ${s.last_name}`.trim() : selectedStudent.name,
       admission_number: admissionDetail?.admission_number || selectedStudent.admission_number || "",
@@ -133,7 +134,7 @@ export function IssuableCertificateGenerator({
     });
 
     return html;
-  }, [templateData, selectedStudent, admissionDetail, resolvedClassName, resolvedSectionName, academicYearTitle, logoUrl]);
+  }, [templateData, selectedStudent, admissionDetail, resolvedClassName, resolvedSectionName, academicYearTitle, logoUrl, schoolName]);
 
   const displayHtml = editableHtml || filledHtml;
 
@@ -233,6 +234,19 @@ export function IssuableCertificateGenerator({
       {/* School Logo URL — persisted in localStorage */}
       <Card>
         <CardContent className="pt-4 pb-4">
+          <div className="flex items-center gap-3 mb-3">
+            <label className="text-sm font-medium whitespace-nowrap">School Name</label>
+            <input
+              type="text"
+              value={schoolName}
+              onChange={(e) => {
+                setSchoolName(e.target.value);
+                localStorage.setItem("cert_school_name", e.target.value);
+              }}
+              placeholder="Enter school name"
+              className="flex-1 px-3 py-1.5 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium whitespace-nowrap">School Logo URL</label>
             <input
@@ -255,7 +269,7 @@ export function IssuableCertificateGenerator({
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-1.5">
-            Paste your school logo image URL — it will appear in all certificates and is saved for next time.
+            The school name and logo URL appear in all certificates and are saved for next time.
           </p>
         </CardContent>
       </Card>

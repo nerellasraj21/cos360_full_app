@@ -260,12 +260,12 @@ export function ExpenseSettings() {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <Label htmlFor="category_filter">Filter by Category</Label>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <Select value={categoryFilter || '__all__'} onValueChange={(value) => setCategoryFilter(value === '__all__' ? '' : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="All categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="__all__">All Categories</SelectItem>
                   <SelectItem value="approval">Approval</SelectItem>
                   <SelectItem value="workflow">Workflow</SelectItem>
                   <SelectItem value="security">Security</SelectItem>
@@ -321,7 +321,7 @@ export function ExpenseSettings() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{setting.setting_category}</Badge>
+                        <Badge variant="outline" className="capitalize">{setting.setting_category}</Badge>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">

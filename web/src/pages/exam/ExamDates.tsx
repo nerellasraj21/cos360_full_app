@@ -1,8 +1,14 @@
 import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
-import { Plus, Edit, Trash2, Loader2, Calendar, ArrowLeft, Save, X, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { Plus, Edit, Trash2, Loader2, Calendar, ArrowLeft, Save, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DatePicker } from '@/components/ui/DatePicker'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { FilterBar } from '@/components/ui/FilterBar'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
+import { useClassSectionsDropdown } from '@/api/hooks/masters/classesandsections'
 import { TimePicker } from '@/components/ui/TimePicker'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -31,7 +37,14 @@ export default function ExamDates() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const { data: exam } = useExamDetail(id)
-  const { data: dates = [], isLoading } = useExamDates(id)
+  const { data: dates = [], isLoading, isError, error } = useExamDates(id)
+  const { data: classesList = [] } = useClassSectionsDropdown()
+  const { data: subjectsList = [] } = useSubjectsDropdown({ active_only: false })
+  const subjectNameMap = Object.fromEntries(subjectsList.map(s => [s.id, s.name]))
+  const classNameMap = Object.fromEntries(classesList.map(c => [c.id, c.name]))
+  const sectionNameMap = Object.fromEntries(classesList.flatMap(c => c.sections.map(sec => [sec.id, sec.name])))
+  const formSections = classesList.find(c => c.id === formData.class_id)?.sections ?? []
+  const canSave = !!formData.class_id && !!formData.subject_id && !!formData.exam_date
   const createMutation = useCreateExamDate()
   const updateMutation = useUpdateExamDate()
   const deleteMutation = useDeleteExamDate()
@@ -41,7 +54,7 @@ export default function ExamDates() {
     else { setSortKey(key); setSortDir('asc') }
   }
   const SortIcon = ({ col }: { col: string }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-75" />
     return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />
   }
   const filteredDates = useMemo(() => {
@@ -49,8 +62,8 @@ export default function ExamDates() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       items = items.filter(d =>
-        (d.subject_name ?? '').toLowerCase().includes(q) ||
-        (d.class_name ?? '').toLowerCase().includes(q) ||
+        (subjectNameMap[d.subject_id] ?? '').toLowerCase().includes(q) ||
+        (classNameMap[d.class_id] ?? '').toLowerCase().includes(q) ||
         (d.venue ?? '').toLowerCase().includes(q)
       )
     }
@@ -100,30 +113,40 @@ export default function ExamDates() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading exam dates...</span>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-lg border bg-muted/20 p-8 text-center">
+        <p className="text-muted-foreground">{error instanceof Error ? error.message : 'Failed to load exam dates.'}</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate({ to: `/exam/exams/${id}` as any })} className="gap-1">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <Calendar className="h-5 w-5 text-muted-foreground" />
-          <div>
-            <h1 className="text-xl font-bold">Exam Dates</h1>
-            {exam && <p className="text-sm text-muted-foreground">{exam.exam_name}</p>}
+      <PageHeader
+        title="Exam Dates"
+        subtitle={exam?.exam_name}
+        icon={<Calendar className="h-5 w-5" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate({ to: `/exam/exams/${id}` as any })} className="gap-1">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            {!isParent && (
+              <Button onClick={openCreate} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Date
+              </Button>
+            )}
           </div>
-        </div>
-        {!isParent && (
-          <Button onClick={openCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Date
-          </Button>
-        )}
-      </div>
+        }
+      />
 
       {dates.length === 0 ? (
         <Card>
@@ -141,17 +164,13 @@ export default function ExamDates() {
         </Card>
       ) : (
         <div className="space-y-3">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-            <Filter className="h-3.5 w-3.5" />
-            <span>Filters</span>
-          </div>
+        <FilterBar className="mb-0">
           <div className="relative max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input placeholder="Search by subject, class or venue..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
           </div>
-        </div>
-        <div className="overflow-hidden rounded-lg border">
+        </FilterBar>
+        <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">
@@ -172,9 +191,9 @@ export default function ExamDates() {
               ) : filteredDates.map((date, idx) => (
                 <tr key={date.id} className="border-b transition-colors hover:bg-muted/20" style={{ height: '48px' }}>
                   <td className="px-4 py-3 text-muted-foreground text-sm">{idx + 1}</td>
-                  <td className="px-4 py-3 font-medium">{date.subject_name ?? date.subject_id}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{date.class_name ?? date.class_id}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{date.section_name ?? date.section_id ?? '—'}</td>
+                  <td className="px-4 py-3 font-medium">{subjectNameMap[date.subject_id] ?? '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{classNameMap[date.class_id] ?? '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{(date.section_id && sectionNameMap[date.section_id]) || '—'}</td>
                   <td className="px-4 py-3">{date.exam_date}</td>
                   <td className="px-4 py-3 text-muted-foreground">{date.start_time ?? '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground">{date.end_time ?? '—'}</td>
@@ -182,13 +201,14 @@ export default function ExamDates() {
                   {!isParent && (
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(date)}>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit" onClick={() => openEdit(date)}>
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-destructive hover:text-destructive"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          title="Delete"
                           onClick={() => setDeleteTarget(date.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -204,7 +224,6 @@ export default function ExamDates() {
         </div>
       )}
 
-      {/* Add/Edit Form */}
       <Dialog open={showForm} onOpenChange={setShowForm} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -213,20 +232,44 @@ export default function ExamDates() {
           <div className="grid gap-3" onChange={() => setIsDirty(true)}>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-sm font-medium">Class ID</label>
-                <Input value={formData.class_id ?? ''} onChange={(e) => setFormData(p => ({ ...p, class_id: e.target.value }))} />
+                <label className="text-sm font-medium">Class *</label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-75"
+                  value={formData.class_id ?? ''}
+                  disabled={!!editTarget}
+                  onChange={(e) => setFormData(p => ({ ...p, class_id: e.target.value, section_id: null }))}
+                >
+                  <option value="">Select class</option>
+                  {classesList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
               </div>
               <div className="space-y-1">
-                <label className="text-sm font-medium">Section ID</label>
-                <Input value={formData.section_id ?? ''} onChange={(e) => setFormData(p => ({ ...p, section_id: e.target.value || null }))} placeholder="Optional" />
+                <label className="text-sm font-medium">Section</label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-75"
+                  value={formData.section_id ?? ''}
+                  disabled={!!editTarget || !formData.class_id}
+                  onChange={(e) => setFormData(p => ({ ...p, section_id: e.target.value || null }))}
+                >
+                  <option value="">All sections</option>
+                  {formSections.map(sec => <option key={sec.id} value={sec.id}>{sec.name}</option>)}
+                </select>
               </div>
               <div className="col-span-2 space-y-1">
-                <label className="text-sm font-medium">Subject ID</label>
-                <Input value={formData.subject_id ?? ''} onChange={(e) => setFormData(p => ({ ...p, subject_id: e.target.value }))} />
+                <label className="text-sm font-medium">Subject *</label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-75"
+                  value={formData.subject_id ?? ''}
+                  disabled={!!editTarget}
+                  onChange={(e) => setFormData(p => ({ ...p, subject_id: e.target.value }))}
+                >
+                  <option value="">Select subject</option>
+                  {subjectsList.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
+                </select>
               </div>
               <div className="col-span-2 space-y-1">
                 <label className="text-sm font-medium">Exam Date *</label>
-                <Input type="date" value={formData.exam_date ?? ''} onChange={(e) => setFormData(p => ({ ...p, exam_date: e.target.value }))} />
+                <DatePicker value={formData.exam_date ?? ''} onChange={(val) => { setFormData(p => ({ ...p, exam_date: val })); setIsDirty(true) }} />
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium">Start Time</label>
@@ -247,7 +290,7 @@ export default function ExamDates() {
               </DialogClose>
               <Button
                 onClick={handleSave}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={createMutation.isPending || updateMutation.isPending || !canSave}
                 className="gap-2"
               >
                 {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -259,24 +302,16 @@ export default function ExamDates() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirm */}
-      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Remove Exam Date?</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">This exam date will be permanently removed.</p>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              disabled={deleteMutation.isPending}
-              onClick={() => deleteTarget && deleteMutation.mutate({ examId: id, dateId: deleteTarget }, { onSuccess: () => setDeleteTarget(null) })}
-            >
-              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Remove
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+        title="Remove Exam Date?"
+        description="This exam date will be permanently removed."
+        confirmLabel="Remove"
+        pendingLabel="Removing..."
+        isPending={deleteMutation.isPending}
+        onConfirm={() => deleteTarget && deleteMutation.mutate({ examId: id, dateId: deleteTarget }, { onSuccess: () => setDeleteTarget(null) })}
+      />
     </div>
   )
 }

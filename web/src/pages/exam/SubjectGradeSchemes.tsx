@@ -1,5 +1,5 @@
 import { Fragment, useState, useMemo } from 'react'
-import { Plus, Edit, Trash2, Loader2, BookOpen, ChevronDown, ChevronRight, Save, Filter, Search, ChevronUp, ChevronsUpDown } from 'lucide-react'
+import { Plus, Edit, Trash2, Loader2, BookOpen, ChevronDown, ChevronRight, Save, Search, ChevronUp, ChevronsUpDown } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { FilterBar } from '@/components/ui/FilterBar'
 import { useForm } from 'react-hook-form'
@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
@@ -40,11 +41,11 @@ export default function SubjectGradeSchemes() {
     else { setSortKey(key); setSortDir('asc') }
   }
   const SortIcon = ({ col }: { col: string }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-75" />
     return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />
   }
 
-  const { data: schemes = [], isLoading } = useSubjectGradeSchemes()
+  const { data: schemes = [], isLoading, isError, error } = useSubjectGradeSchemes()
   const createMutation = useCreateSubjectGradeScheme()
   const updateMutation = useUpdateSubjectGradeScheme()
   const deleteMutation = useDeleteSubjectGradeScheme()
@@ -57,8 +58,8 @@ export default function SubjectGradeSchemes() {
     }
     if (sortKey) {
       items = [...items].sort((a, b) => {
-        const aVal = sortKey === 'bands' ? String(a.bands.length) : String((a as any)[sortKey] ?? '')
-        const bVal = sortKey === 'bands' ? String(b.bands.length) : String((b as any)[sortKey] ?? '')
+        const aVal = sortKey === 'bands' ? String((a.bands ?? []).length) : String((a as any)[sortKey] ?? '')
+        const bVal = sortKey === 'bands' ? String((b.bands ?? []).length) : String((b as any)[sortKey] ?? '')
         return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
       })
     }
@@ -114,6 +115,15 @@ export default function SubjectGradeSchemes() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading grade schemes...</span>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-lg border bg-muted/20 p-8 text-center">
+        <p className="text-muted-foreground">{error instanceof Error ? error.message : 'Failed to load grade schemes.'}</p>
       </div>
     )
   }
@@ -144,7 +154,7 @@ export default function SubjectGradeSchemes() {
               <Input placeholder="Search schemes..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
             </div>
           </FilterBar>
-          <div className="overflow-hidden rounded-lg border">
+          <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">
@@ -184,7 +194,7 @@ export default function SubjectGradeSchemes() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant="secondary">{scheme.bands.length} bands</Badge>
+                      <Badge variant="secondary">{(scheme.bands ?? []).length} bands</Badge>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
@@ -218,7 +228,6 @@ export default function SubjectGradeSchemes() {
         </div>
       )}
 
-      {/* Create / Edit Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -287,28 +296,16 @@ export default function SubjectGradeSchemes() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Subject Grade Scheme?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            This will permanently delete this grade scheme. Deletion is blocked if it's in use by an exam.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              disabled={deleteMutation.isPending}
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget, { onSuccess: () => setDeleteTarget(null) })}
-            >
-              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+        title="Delete Subject Grade Scheme?"
+        description="This will permanently delete this grade scheme. Deletion is blocked if it's in use by an exam."
+        confirmLabel="Delete"
+        pendingLabel="Deleting..."
+        isPending={deleteMutation.isPending}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget, { onSuccess: () => setDeleteTarget(null) })}
+      />
     </div>
   )
 }

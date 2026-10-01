@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, User, X } from 'lucide-react';
+import { DollarSign, User, X, Loader2 } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { useAcademicYearStore } from '@/lib/academicYearStore';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -52,12 +52,8 @@ export default function StudentFeeDetailPage({ studentId }: StudentFeeDetailPage
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <div className="text-center">
-          <div className="inline-block">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">Loading student details...</p>
-        </div>
+        <Loader2 className="h-6 w-6 animate-spin" />
+        <span className="ml-2 text-sm text-muted-foreground">Loading student details...</span>
       </div>
     );
   }
@@ -73,9 +69,8 @@ export default function StudentFeeDetailPage({ studentId }: StudentFeeDetailPage
         <Card>
           <CardContent className="py-8 text-center">
             <p className="text-sm text-destructive mb-4">
-              {isError ? `Error: ${(error as Error)?.message || 'Failed to load student'}` : 'Student not found'}
+              {isError ? (error as Error)?.message || 'Failed to load student' : 'Student not found'}
             </p>
-            <p className="text-xs text-muted-foreground mb-4">Student ID: {studentId}</p>
             <Button onClick={handleGoBack}>Back to Search</Button>
           </CardContent>
         </Card>
@@ -105,7 +100,7 @@ export default function StudentFeeDetailPage({ studentId }: StudentFeeDetailPage
               <div>
                 <h3 className="font-semibold text-lg">{studentName}</h3>
                 <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                  <Badge variant="outline">{admission.admission_number || student.id}</Badge>
+                  {!!admission.admission_number && <Badge variant="outline">{admission.admission_number}</Badge>}
                 </div>
               </div>
             </div>

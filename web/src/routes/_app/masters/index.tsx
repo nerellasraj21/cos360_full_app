@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Clock, Settings, Database } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Database } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useAuthStore } from '@/lib/authStore'
@@ -20,7 +19,7 @@ const cardColors = [
   { color: 'text-rose-500', bg: 'bg-rose-500/10' },
   { color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
   { color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
-  { color: 'text-gray-500', bg: 'bg-gray-500/10' },
+  { color: 'text-muted-foreground', bg: 'bg-muted' },
   { color: 'text-teal-500', bg: 'bg-teal-500/10' },
   { color: 'text-pink-500', bg: 'bg-pink-500/10' },
   { color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
@@ -58,24 +57,7 @@ function MastersDashboard() {
         title="Masters Dashboard"
         subtitle="Configure and manage all master data for the school system"
         icon={<Database className="h-5 w-5" />}
-        actions={
-          <Badge variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 text-sm">
-            <Clock className="h-3.5 w-3.5" />
-            Coming Soon
-          </Badge>
-        }
       />
-
-      {/* Coming Soon Banner */}
-      <div className="rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-950/20 p-8 text-center">
-        <Settings className="h-12 w-12 text-gray-500 mx-auto mb-3" />
-        <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-400">
-          Masters Dashboard — Coming Soon
-        </h2>
-        <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-          A unified overview and quick-access dashboard is being built. Use the sidebar menu to navigate individual master data sections.
-        </p>
-      </div>
 
       {/* Sections */}
       {sections.length > 0 && (

@@ -73,7 +73,7 @@ export function DesignationsTable({ className }: DesignationsTableProps) {
     };
 
     const SortIcon = ({ col }: { col: string }) => {
-        if (sortKey !== col) return <ChevronsUpDown className='h-3 w-3 ml-1 inline opacity-50' />;
+        if (sortKey !== col) return <ChevronsUpDown className='h-3 w-3 ml-1 inline opacity-75' />;
         if (sortDir === 'asc') return <ChevronUp className='h-3 w-3 ml-1 inline' />;
         return <ChevronDown className='h-3 w-3 ml-1 inline' />;
     };

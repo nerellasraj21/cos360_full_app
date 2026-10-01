@@ -256,7 +256,6 @@ export default function TimeTableEditor() {
     useEffect(() => {
         // Don't reset state during a background refetch (e.g. after save invalidation)
         if (frontendFetching && frontendTimetableData) return;
-        console.log('useEffect triggered: frontendTimetableData:', !!frontendTimetableData, 'isFrontendError:', isFrontendError, 'frontendError:', frontendError?.message, 'selectedSection:', selectedSection?.value);
         if (frontendTimetableData) {
             setTimetableData(frontendTimetableData);
 
@@ -292,19 +291,16 @@ export default function TimeTableEditor() {
                 setCustomEvents(extractedEvents);
             }
 
-            console.log('Set isEditing to false (data exists)');
         } else if (isFrontendError && frontendError?.message === 'Timetable not found for this section') {
             // 404 error, timetable not found
             setTimetableData(null);
             setRows([]);
             setIsEditing(canUpdate);
-            console.log('Set isEditing to', canUpdate, '(404 error)');
         } else if (selectedSection && !isFrontendError) {
             // No existing data, set to null
             setTimetableData(null);
             setRows([]);
             setIsEditing(canUpdate);
-            console.log('Set isEditing to', canUpdate, '(no data, no error)');
         }
     }, [frontendTimetableData, frontendFetching, selectedSection, isFrontendError, frontendError]);
 
@@ -383,15 +379,12 @@ export default function TimeTableEditor() {
     };
 
     const addRow = (type: 'subject' | 'special') => {
-        console.log('addRow called with type:', type, 'includeSaturday:', includeSaturday);
         const newRow = type === 'subject' ? getEmptySubjectRow(includeSaturday) : getEmptySpecialRow();
-        console.log('newRow:', newRow);
         setRows((prev) => {
             const updated = [
                 ...prev,
                 newRow,
             ];
-            console.log('rows after add:', updated);
             return updated;
         });
     };
@@ -583,7 +576,6 @@ export default function TimeTableEditor() {
         }
     };
 
-    console.log('Rendering component: isEditing:', isEditing, 'isClassAndSectionSelected:', isClassAndSectionSelected, 'rows length:', rows.length, 'frontendLoading:', frontendLoading, 'isFrontendError:', isFrontendError);
 
     return (
         <>

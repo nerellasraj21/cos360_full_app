@@ -1,3 +1,4 @@
+import { config } from "@/lib/config";
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,8 @@ import { useStudentCertificates, useDownloadCertificateDocument } from "@/api/ho
 import { useStudentsDropdown } from "@/api/hooks/students/useAdmission";
 import type { CertificateRead } from "@/api/hooks/students/certificates";
 
+const mediaBase = config.api.baseURL.replace(/\/api\/v\d+$/, '');
+
 export const StudentCertificatesPage: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<string>("");
 
@@ -24,7 +27,10 @@ export const StudentCertificatesPage: React.FC = () => {
   const handleDownload = async (certificateId: string) => {
     try {
       const result = await downloadCertificate.mutateAsync(certificateId);
-      window.location.href = result.presigned_url;
+      const url = result.presigned_url.startsWith('http')
+        ? result.presigned_url
+        : `${mediaBase}${result.presigned_url}`;
+      window.open(url, '_blank');
     } catch {
       // Error handled by mutation
     }
@@ -133,7 +139,7 @@ export const StudentCertificatesPage: React.FC = () => {
               </div>
             ) : certificates.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <FileText className="h-12 w-12 mx-auto mb-4 opacity-75" />
                 <p>No certificates found for this student.</p>
                 <p className="text-sm">
                   Certificates issued to the selected student will appear here.
@@ -157,7 +163,7 @@ export const StudentCertificatesPage: React.FC = () => {
         <Card>
           <CardContent className="p-6">
             <div className="text-center text-muted-foreground">
-              <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <Search className="h-12 w-12 mx-auto mb-4 opacity-75" />
               <p>Please select a student to view their certificates.</p>
             </div>
           </CardContent>

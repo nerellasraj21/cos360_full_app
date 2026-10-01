@@ -35,16 +35,18 @@ export interface StudentCreate {
   primary_phone?: string | null; // Optional — exactly 10 digits if provided
   father: ParentCreate;
   mother: ParentCreate;
+  guardian?: ParentCreate;
 }
 
 export interface ParentCreate {
   name: string;
-  email: string;
+  email?: string;
   phone?: string; // Optional
   occupation?: string; // Optional
   aadhar_number?: string; // Optional
   gender?: string; // Optional
   relation_to_student: string; // Required
+  salary_range?: string;
 }
 
 export interface StudentOut {

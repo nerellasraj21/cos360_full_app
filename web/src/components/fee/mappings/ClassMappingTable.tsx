@@ -23,6 +23,7 @@ import { feeStudentMappingsApi } from '@/api/fee/studentMappings';
 import { fetchStudentsDropdown } from '@/api/students/admissions';
 import type { FeeClassMapping, FeeType } from '@/types/fee';
 import { toast } from 'sonner';
+import { logger } from '@/lib/config';
 
 interface ClassMappingTableProps {
     className?: string;
@@ -133,7 +134,7 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                 successCount += result.success_count;
                 attemptedCount += result.total_count;
             } catch (error) {
-                console.error('[DEBUG] Failed to apply mandatory fee for section', section.id, error);
+                logger.error('[DEBUG] Failed to apply mandatory fee for section', section.id, error);
             }
         }
 
@@ -178,7 +179,7 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
         setFormData({
             class_id: mapping.class_id,
             fee_type_id: mapping.fee_type_id,
-            total_fee: mapping.total_fee,
+            total_fee: Number(mapping.total_fee),
             all_by_default: mapping.all_by_default
         });
         setIsFormDirty(false);
@@ -535,7 +536,7 @@ export function ClassMappingTable({ className, highlightKey = 0 }: ClassMappingT
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-foreground align-middle">
-                                                ₹{mapping.total_fee.toLocaleString()}
+                                                ₹{Number(mapping.total_fee).toLocaleString('en-IN')}
                                             </td>
                                             <td className="px-4 py-3 text-sm align-middle">
                                                 <div className="flex items-center gap-2">

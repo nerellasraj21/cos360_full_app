@@ -293,7 +293,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
     };
 
     const SortIcon = ({ col }: { col: string }) => {
-        if (sortKey !== col) return <ChevronsUpDown className='h-3 w-3 ml-1 inline opacity-50' />;
+        if (sortKey !== col) return <ChevronsUpDown className='h-3 w-3 ml-1 inline opacity-75' />;
         if (sortDir === 'asc') return <ChevronUp className='h-3 w-3 ml-1 inline' />;
         return <ChevronDown className='h-3 w-3 ml-1 inline' />;
     };
@@ -740,7 +740,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                             }
                                         }}
                                         onSelect={(e) => e.preventDefault()}
-                                        className="cursor-pointer font-medium border-b border-b-gray-200"
+                                        className="cursor-pointer font-medium border-b"
                                     >
                                         Select All
                                     </DropdownMenuCheckboxItem>
@@ -834,7 +834,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                 </TableHeader>
                                 <TableBody>
                                     {paginatedData.map((staffMember, index) => (
-                                        <TableRow key={staffMember.id} className="hover:bg-gray-50">
+                                        <TableRow key={staffMember.id} className="hover:bg-muted/50">
                                             <TableCell className="px-3 py-2 align-middle text-xs text-muted-foreground">{(currentPage - 1) * pageSize + index + 1}</TableCell>
                                             {filteredColumns.map(col => (
                                                 <TableCell key={col.key} className="py-2 align-middle">
@@ -923,7 +923,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                                     ))}
                                     {filteredData.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={filteredColumns.length + 2} className="text-center py-8 text-gray-500">
+                                            <TableCell colSpan={filteredColumns.length + 2} className="text-center py-8 text-muted-foreground">
                                                 No staff enrollments found
                                             </TableCell>
                                         </TableRow>
@@ -1133,7 +1133,7 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                     />
                     {phoneError ? (
                         <span className="text-red-500 text-sm">{phoneError}</span>
-                    ) : isValidPhone(formData.phone) && (
+                    ) : isValidPhone(formData.phone ?? "") && (
                         <span className="text-green-600 text-sm">Mobile number is valid</span>
                     )}
                 </div>
@@ -1643,10 +1643,6 @@ export function StaffEnrollmentTable({ className }: StaffEnrollmentTableProps) {
                             <div className="space-y-4">
                                 <h3 className="text-lg font-semibold text-foreground border-b pb-2">Account & Status</h3>
                                 <div className="space-y-3">
-                                    <div className="flex justify-between">
-                                        <span className="font-medium text-muted-foreground">User ID:</span>
-                                        <span className="text-foreground font-mono text-sm">{displayStaff.user_id}</span>
-                                    </div>
                                     <div className="flex justify-between">
                                         <span className="font-medium text-muted-foreground">Status:</span>
                                         <StatusBadge status={displayStaff.is_active} />

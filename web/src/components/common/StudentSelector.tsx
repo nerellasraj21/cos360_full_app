@@ -80,8 +80,7 @@ export const StudentSelector: React.FC<StudentSelectorProps> = ({
         >
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="flex-shrink-0 text-sm">
-              {selectedStudent?.gender === 'Male' ? '👦' :
-               selectedStudent?.gender === 'Female' ? '👧' : '🧑'}
+              <User className="h-4 w-4" />
             </div>
             {selectedStudent ? (
               <div className="flex flex-col items-start min-w-0 flex-1">
@@ -125,8 +124,7 @@ export const StudentSelector: React.FC<StudentSelectorProps> = ({
                       />
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <div className="flex-shrink-0 text-lg">
-                          {student.gender === 'Male' ? '👦' :
-                           student.gender === 'Female' ? '👧' : '🧑'}
+                          <User className="h-4 w-4" />
                         </div>
                         <div className="flex flex-col min-w-0 flex-1">
                           <div className="flex items-center gap-2">

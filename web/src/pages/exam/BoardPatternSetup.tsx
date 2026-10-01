@@ -1,5 +1,5 @@
 import { Fragment, useState, useMemo } from 'react'
-import { Plus, Edit, Trash2, Loader2, Layout, ChevronDown, ChevronRight, ChevronUp, Save, X, Filter, Search, ChevronsUpDown } from 'lucide-react'
+import { Plus, Edit, Trash2, Loader2, Layout, ChevronDown, ChevronRight, ChevronUp, Save, X, Search, ChevronsUpDown } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { FilterBar } from '@/components/ui/FilterBar'
 import { useForm, useFieldArray } from 'react-hook-form'
@@ -10,9 +10,9 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Card, CardContent } from '@/components/ui/card'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import ReactSelect from 'react-select'
 import { useSelectStyles } from '@/lib/useSelectStyles'
-// Note: nature dropdown uses native <select> to avoid Dialog overflow clipping
 import {
   Dialog,
   DialogClose,
@@ -69,7 +69,7 @@ export default function BoardPatternSetup() {
   const [sortKey, setSortKey] = useState<'board' | 'level' | 'is_active' | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
-  const { data: patterns = [], isLoading } = useBoardPatterns()
+  const { data: patterns = [], isLoading, isError, error } = useBoardPatterns()
   const createMutation = useCreateBoardPattern()
   const updateMutation = useUpdateBoardPattern()
   const deleteMutation = useDeleteBoardPattern()
@@ -95,7 +95,7 @@ export default function BoardPatternSetup() {
   }
 
   const SortIcon = ({ col }: { col: typeof sortKey }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-50" />
+    if (sortKey !== col) return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-75" />
     return sortDir === 'asc'
       ? <ChevronUp className="ml-1 inline h-3 w-3" />
       : <ChevronDown className="ml-1 inline h-3 w-3" />
@@ -148,7 +148,7 @@ export default function BoardPatternSetup() {
       exam_types: pattern.exam_types.map(et => ({
         exam_type_name: et.exam_type_name,
         nature: et.nature,
-        weightage_percent: et.weightage_percent ?? null,
+        weightage_percent: et.weightage_percent != null ? Number(et.weightage_percent) : null,
         count_per_year: et.count_per_year ?? null,
         sort_order: et.sort_order,
       })),
@@ -179,6 +179,15 @@ export default function BoardPatternSetup() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading board patterns...</span>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-lg border bg-muted/20 p-8 text-center">
+        <p className="text-muted-foreground">{error instanceof Error ? error.message : 'Failed to load board patterns.'}</p>
       </div>
     )
   }
@@ -212,7 +221,7 @@ export default function BoardPatternSetup() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">
@@ -253,7 +262,7 @@ export default function BoardPatternSetup() {
                             : <ChevronRight className="h-4 w-4 text-muted-foreground" />
                           }
                           <span className="font-medium">
-                            {pattern.board === 'Custom' ? pattern.custom_board_name : pattern.board}
+                            {pattern.board === 'Custom' ? (pattern.custom_board_name || 'Custom') : pattern.board}
                           </span>
                         </div>
                       </td>
@@ -300,7 +309,7 @@ export default function BoardPatternSetup() {
                                   <tr key={et.id} className="border-b last:border-0">
                                     <td className="px-3 py-2 font-medium">{et.exam_type_name}</td>
                                     <td className="px-3 py-2 capitalize text-muted-foreground">{et.nature}</td>
-                                    <td className="px-3 py-2">{et.weightage_percent ?? '—'}</td>
+                                    <td className="px-3 py-2">{et.weightage_percent != null ? Number(et.weightage_percent) : '—'}</td>
                                     <td className="px-3 py-2">{et.count_per_year ?? '—'}</td>
                                     <td className="px-3 py-2">{et.sort_order}</td>
                                   </tr>
@@ -319,7 +328,6 @@ export default function BoardPatternSetup() {
         </div>
       )}
 
-      {/* Create / Edit Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm} guardDirty={isDirty} onDirtyDiscard={() => setIsDirty(false)} modal={false}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -406,7 +414,7 @@ export default function BoardPatternSetup() {
                         <td className="px-2 py-1.5">
                           <Input
                             type="number"
-                            {...form.register(`exam_types.${index}.weightage_percent`)}
+                            {...form.register(`exam_types.${index}.weightage_percent`, { setValueAs: (v) => (v === '' || v == null ? null : Number(v)) })}
                             className="h-7 w-16 text-xs"
                             placeholder="10"
                           />
@@ -414,7 +422,7 @@ export default function BoardPatternSetup() {
                         <td className="px-2 py-1.5">
                           <Input
                             type="number"
-                            {...form.register(`exam_types.${index}.count_per_year`)}
+                            {...form.register(`exam_types.${index}.count_per_year`, { setValueAs: (v) => (v === '' || v == null ? null : Number(v)) })}
                             className="h-7 w-14 text-xs"
                             placeholder="2"
                           />
@@ -426,6 +434,7 @@ export default function BoardPatternSetup() {
                             size="sm"
                             onClick={() => { remove(index); setIsDirty(true) }}
                             className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                            title="Remove type"
                           >
                             <X className="h-3.5 w-3.5" />
                           </Button>
@@ -453,28 +462,16 @@ export default function BoardPatternSetup() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Board Pattern?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            This will permanently delete this board pattern. This cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              disabled={deleteMutation.isPending}
-              onClick={() => deleteTarget && handleDelete(deleteTarget)}
-            >
-              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+        title="Delete Board Pattern?"
+        description="This will permanently delete this board pattern. This cannot be undone."
+        confirmLabel="Delete"
+        pendingLabel="Deleting..."
+        isPending={deleteMutation.isPending}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+      />
     </div>
   )
 }

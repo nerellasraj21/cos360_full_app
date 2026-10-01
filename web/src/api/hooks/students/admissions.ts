@@ -121,11 +121,9 @@ export function useCreateAdmission() {
   return usePermissionProtectedMutation<StudentAdmissionResponse, Error, StudentAdmissionCreate>({
     mutationFn: createStudentAdmission,
     onSuccess: async (data) => {
-      console.log('✅ Admission created successfully:', data);
       toast.success('Student admission created successfully!');
 
       // Invalidate and refetch all admission-related queries
-      console.log('🔄 Invalidating queries...');
       await queryClient.invalidateQueries({
         queryKey: ['admissions'],
         refetchType: 'all' // Refetch all queries (active and inactive)
@@ -141,7 +139,6 @@ export function useCreateAdmission() {
         type: 'all'
       });
 
-      console.log('✅ Queries invalidated and refetched');
     },
     onError: (error) => {
       toast.error(`Failed to create admission: ${error.message}`);

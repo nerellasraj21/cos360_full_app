@@ -38,7 +38,7 @@ export default function TripsPage() {
             key: "vehicle_id",
             label: "Vehicle",
             editable: true,
-            render: (value: any) => vehicleMap.get(value) || value,
+            render: (value: any) => vehicleMap.get(value) || '—',
             renderEdit: (value: any, _row: any, onChange: (val: any) => void) => {
                 const vehicleOptions = vehicles?.map(v => ({
                     id: v.id,
@@ -59,7 +59,7 @@ export default function TripsPage() {
             key: "route_id",
             label: "Route",
             editable: true,
-            render: (value: any) => routeMap.get(value) || value,
+            render: (value: any) => routeMap.get(value) || '—',
             renderEdit: (value: any, _row: any, onChange: (val: any) => void) => (
                 <TransportRoutesDropdown
                     value={value}
@@ -72,7 +72,7 @@ export default function TripsPage() {
             key: "driver_id",
             label: "Driver",
             editable: true,
-            render: (value: any) => driverMap.get(value) || value,
+            render: (value: any) => driverMap.get(value) || '—',
             renderEdit: (value: any, _row: any, onChange: (val: any) => void) => (
                 <DriversDropdown
                     value={value}
@@ -170,6 +170,15 @@ export default function TripsPage() {
             total,
             onPageChange: handlePageChange,
             onPageSizeChange: handlePageSizeChange,
+        },
+        permissions: {
+            resource: 'TRANSPORT_TRIPS',
+            create: true,
+            read: true,
+            update: true,
+            delete: true,
+            list: true,
+            export: true,
         },
     };
 

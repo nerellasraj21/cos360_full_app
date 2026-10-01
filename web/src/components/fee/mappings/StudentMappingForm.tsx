@@ -23,6 +23,7 @@ import type { FeeClassMapping, FeeStudentMapping, FeeStudentMappingCreateRequest
 import type { StudentDropdownItem } from '@/types/admission';
 import type { ClassDropdown, SectionDropdown } from '@/types/masters/classesandsections';
 import type { FeeType } from '@/types/fee';
+import { logger } from '@/lib/config';
 
 const formSchema = z.object({
   student_id: z.string().min(1, 'Student is required'),
@@ -50,13 +51,13 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
   const createMutation = useCreateFeeStudentMapping();
   const updateMutation = useUpdateFeeStudentMapping();
   const [selectedClass, setSelectedClass] = useState<SelectOption>(
-    mapping?.class_id ? { value: mapping.class_id, label: `Class ${mapping.class_id}` } : null
+    mapping?.class_id ? { value: mapping.class_id, label: 'Loading...' } : null
   );
   const [selectedSection, setSelectedSection] = useState<SelectOption>(
-    mapping?.section_id ? { value: mapping.section_id, label: `Section ${mapping.section_id}` } : null
+    mapping?.section_id ? { value: mapping.section_id, label: 'Loading...' } : null
   );
   const [selectedStudent, setSelectedStudent] = useState<SelectOption>(
-    mapping?.student_id ? { value: mapping.student_id, label: `${mapping.student_admission_num} - Student ${mapping.student_id}` } : null
+    mapping?.student_id ? { value: mapping.student_id, label: mapping.student_admission_num || 'Loading...' } : null
   );
   const [students, setStudents] = useState<StudentDropdownItem[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(true);
@@ -120,7 +121,7 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
         const studentsData = await fetchStudentsDropdown(true, selectedClass?.value, selectedSection?.value);
         setStudents(studentsData);
       } catch (error) {
-        console.error('Error fetching students:', error);
+        logger.error('Error fetching students:', error);
         toast.error('Failed to load students');
       } finally {
         setStudentsLoading(false);
@@ -306,7 +307,7 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
       onSuccess();
     } catch (error) {
       // Mutation hooks already toast the failure; just log for debugging.
-      console.error('Error saving mapping:', error);
+      logger.error('Error saving mapping:', error);
     } finally {
       setLoading(false);
     }
@@ -544,7 +545,7 @@ export function StudentMappingForm({ mapping, academicYearId, onSuccess, onCance
         {isTransportFee && (
           <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-4 space-y-4">
             <p className="text-sm font-medium text-blue-700 dark:text-blue-300 flex items-center gap-2">
-              <span>🚌</span> Transport Details
+              Transport Details
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Bus */}

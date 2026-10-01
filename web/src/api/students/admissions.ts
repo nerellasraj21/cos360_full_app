@@ -78,15 +78,9 @@ export const createStudentAdmission = async (
   admissionData: StudentAdmissionCreate
 ): Promise<StudentAdmissionResponse> => {
   try {
-    console.log('🚀 API Call - Creating admission with data:', JSON.stringify(admissionData, null, 2));
     const { data } = await CAxios.post(STUDENT_ADMISSIONS, admissionData);
-    console.log('✅ API Success - Response:', data);
     return data;
   } catch (error: any) {
-    console.error('❌ API Error - Full error object:', error);
-    console.error('❌ API Error - Response:', error?.response);
-    console.error('❌ API Error - Response data:', error?.response?.data);
-    console.error('❌ API Error - Response status:', error?.response?.status);
     throw handleApiError(error);
   }
 };

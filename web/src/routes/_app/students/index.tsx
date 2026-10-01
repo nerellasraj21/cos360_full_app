@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Clock, GraduationCap } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { GraduationCap } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useAuthStore } from '@/lib/authStore'
@@ -57,26 +56,8 @@ function StudentsDashboard() {
         title="Students Dashboard"
         subtitle="Comprehensive management of student data, admissions, and records"
         icon={<GraduationCap className="h-5 w-5" />}
-        actions={
-          <Badge variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 text-sm">
-            <Clock className="h-3.5 w-3.5" />
-            Coming Soon
-          </Badge>
-        }
       />
 
-      {/* Coming Soon Banner */}
-      <div className="rounded-xl border-2 border-dashed border-blue-300 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-8 text-center">
-        <GraduationCap className="h-12 w-12 text-blue-500 mx-auto mb-3" />
-        <h2 className="text-xl font-semibold text-blue-700 dark:text-blue-400">
-          Students Dashboard — Coming Soon
-        </h2>
-        <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-          A unified dashboard with quick stats and shortcuts is being built. Use the sidebar menu to navigate individual sections.
-        </p>
-      </div>
-
-      {/* Sections */}
       {sections.length > 0 && (
         <div>
           <h3 className="text-xs font-semibold mb-3 text-muted-foreground uppercase tracking-wide">

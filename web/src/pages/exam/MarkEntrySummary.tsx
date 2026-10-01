@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Loader2, BarChart3, PenLine, AlertCircle, ServerCrash, Search, Users } from 'lucide-react'
+import { ArrowLeft, Loader2, BarChart3, PenLine, AlertCircle, AlertTriangle, Search, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -45,12 +46,10 @@ export default function MarkEntrySummary() {
     s.hasPermission('exams', 'update') || s.hasPermission('exam_marks', 'create')
   )
 
-  // Which of the exam's class-sections is currently selected in the filter.
   const [selectedCsId, setSelectedCsId] = useState<string>('')
   const [studentSearch, setStudentSearch] = useState('')
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set())
 
-  // Default to the first class-section once the list loads.
   useEffect(() => {
     if (!selectedCsId && classSections.length > 0) {
       setSelectedCsId(classSections[0].id)
@@ -61,7 +60,7 @@ export default function MarkEntrySummary() {
   const csLabel = (cs: typeof classSections[number]) => [
     cs.class_name ?? classNameMap[cs.class_id],
     cs.section_name ?? (cs.section_id ? sectionNameMap[cs.section_id] : null),
-  ].filter(Boolean).join(' – ') || cs.class_id
+  ].filter(Boolean).join(' – ') || 'Class'
 
   const configs = useMemo(
     () => subjectConfigs.filter(
@@ -86,7 +85,6 @@ export default function MarkEntrySummary() {
     [studentsData],
   )
 
-  // Default to "everyone selected" whenever the student list for the chosen class-section changes.
   useEffect(() => {
     setSelectedStudentIds(new Set(students.map((s) => s.id)))
   }, [students])
@@ -117,6 +115,7 @@ export default function MarkEntrySummary() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading mark entry...</span>
       </div>
     )
   }
@@ -137,51 +136,32 @@ export default function MarkEntrySummary() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate({ to: `/exam/exams/${examId}` as any })}
-          className="gap-1"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <BarChart3 className="h-5 w-5 text-muted-foreground" />
-        <div>
-          <h1 className="text-xl font-bold">Mark Entry</h1>
-          {exam && (
-            <p className="text-sm text-muted-foreground">
-              {exam.exam_name} · {exam.board} · {exam.exam_type}
-            </p>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title="Mark Entry"
+        subtitle={exam ? `${exam.exam_name} · ${exam.board} · ${exam.exam_type}` : undefined}
+        icon={<BarChart3 className="h-5 w-5" />}
+        actions={
+          <Button variant="outline" onClick={() => navigate({ to: `/exam/exams/${examId}` as any })} className="gap-1">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        }
+      />
 
-      {/* Backend endpoints not yet implemented */}
       {isBackendError && (
         <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 dark:border-amber-800 dark:bg-amber-900/20">
-          <ServerCrash className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
           <div className="space-y-1">
             <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-              Backend endpoints not yet available
+              Unable to load mark entry details
             </p>
             <p className="text-xs text-amber-700 dark:text-amber-400">
-              The mark entry subject list requires two endpoints that are not yet implemented on the backend:
-            </p>
-            <ul className="list-inside list-disc space-y-0.5 text-xs text-amber-700 dark:text-amber-400">
-              <li><code>GET /exams/{'{exam_id}'}/class-sections</code></li>
-              <li><code>GET /exams/{'{exam_id}'}/subject-configs</code></li>
-            </ul>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-              Please ask the backend developer to add these endpoints. They should return the{' '}
-              <code>ExamClassSection[]</code> and <code>ExamSubjectConfig[]</code> records linked to this exam.
+              The class-sections and subjects for this exam could not be loaded. Please refresh the page or try again later.
             </p>
           </div>
         </div>
       )}
 
-      {/* Empty state — no backend error but no data */}
       {!isBackendError && classSections.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-lg border bg-muted/20 py-12 text-center">
           <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
@@ -190,7 +170,6 @@ export default function MarkEntrySummary() {
         </div>
       )}
 
-      {/* Class-section filter */}
       {!isBackendError && classSections.length > 0 && (
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-muted-foreground">Class – Section</span>
@@ -212,10 +191,8 @@ export default function MarkEntrySummary() {
         </div>
       )}
 
-      {/* Students (left) + Subjects (right) */}
       {!isBackendError && selectedCs && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
-          {/* Students panel */}
           <div className="flex flex-col overflow-hidden rounded-lg border">
             <div className="flex items-center gap-2 border-b bg-muted/30 px-3 py-2.5">
               <Users className="h-4 w-4 text-muted-foreground" />
@@ -272,8 +249,7 @@ export default function MarkEntrySummary() {
             </div>
           </div>
 
-          {/* Subjects panel */}
-          <div className="overflow-hidden rounded-lg border">
+          <div className="overflow-x-auto rounded-lg border">
             <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3">
               <span className="font-semibold">{csLabel(selectedCs)}</span>
               {canEnterMarks && configs.length > 0 && (
@@ -316,7 +292,7 @@ export default function MarkEntrySummary() {
                     return (
                       <tr key={cfg.id} className="border-b transition-colors last:border-0">
                         <td className="px-4 py-3 font-medium">
-                          {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? cfg.subject_id}
+                          {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? 'Unknown subject'}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1">
@@ -324,7 +300,7 @@ export default function MarkEntrySummary() {
                               <Badge key={comp.id} variant="outline" className="text-xs">
                                 {comp.component_name}
                                 {comp.entry_type === 'marks' && comp.max_marks != null && (
-                                  <span className="ml-1 text-muted-foreground">[{comp.max_marks}]</span>
+                                  <span className="ml-1 text-muted-foreground">[{Number(comp.max_marks)}]</span>
                                 )}
                               </Badge>
                             ))}

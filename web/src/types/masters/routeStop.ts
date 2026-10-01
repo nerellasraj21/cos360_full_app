@@ -19,7 +19,7 @@ export interface RouteStopInput {
   reaching_time: string; // HH:MM:SS format
   pickup_time?: string;
   drop_time?: string;
-  fees: number;
+  fees?: number;
   is_active?: boolean;
 }
 

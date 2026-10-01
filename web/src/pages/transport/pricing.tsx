@@ -54,7 +54,6 @@ export default function TransportPricingPage() {
   const deleteMutation = useDeleteTransportPricing();
 
   const columns = useMemo(() => [
-    { key: 'id', label: 'ID' },
     {
       key: 'vehicle_id',
       label: 'Vehicle',
@@ -290,6 +289,7 @@ export default function TransportPricingPage() {
       <MasterPage<TransportPricing, TransportPricingInput>
         config={{
           title: 'Transport Pricing',
+          addButtonLabel: 'Add Pricing',
           columns,
           defaultValues,
           formFields,

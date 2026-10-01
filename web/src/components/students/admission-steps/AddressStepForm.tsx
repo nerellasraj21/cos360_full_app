@@ -79,7 +79,6 @@ export const AddressStepForm = () => {
             value={stateId || ''}
             required={false}
             onChange={(value) => {
-              console.log('State selected:', value);
               setValue('state_id', value || '', { shouldValidate: true, shouldDirty: true });
             }}
           />
@@ -94,7 +93,6 @@ export const AddressStepForm = () => {
           stateId={stateId || undefined}
           value={districtId || ''}
           onChange={(value) => {
-            console.log('District selected:', value);
             setValue('district_id', value || '', { shouldValidate: true, shouldDirty: true });
           }}
         />
@@ -105,7 +103,6 @@ export const AddressStepForm = () => {
           districtId={districtId || undefined}
           value={watch('mandal_id') || ''}
           onChange={(value) => {
-            console.log('Mandal selected:', value);
             setValue('mandal_id', value || '', { shouldValidate: true, shouldDirty: true });
           }}
         />

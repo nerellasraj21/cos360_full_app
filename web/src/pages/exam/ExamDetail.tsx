@@ -15,6 +15,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { DatePicker } from '@/components/ui/DatePicker'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import ReactSelect from 'react-select'
 import {
   useExamDetail,
@@ -91,7 +93,6 @@ export default function ExamDetail() {
   const classNameMap = Object.fromEntries(classesList.map(c => [c.id, c.name]))
   const sectionNameMap = Object.fromEntries(classesList.flatMap(c => c.sections.map(s => [s.id, s.name])))
 
-  // Must be before early returns — Rules of Hooks: hooks cannot be called conditionally
   useEffect(() => {
     if (exam) setActiveExam(exam.id, exam.exam_name)
   }, [exam?.id, exam?.exam_name])
@@ -100,6 +101,7 @@ export default function ExamDetail() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading exam...</span>
       </div>
     )
   }
@@ -169,11 +171,14 @@ export default function ExamDetail() {
     { key: 'overview', label: 'Overview', icon: ClipboardList },
     { key: 'dates', label: 'Dates', icon: Calendar },
     { key: 'marks', label: 'Marks', icon: BarChart3 },
+    ...(isAdmin ? [
+      { key: 'permissions', label: 'Permissions', icon: Users },
+      { key: 'audit', label: 'Audit Log', icon: FileText },
+    ] : []),
   ] as const
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
@@ -246,7 +251,6 @@ export default function ExamDetail() {
         )}
       </div>
 
-      {/* Tabs */}
       <div className="border-b">
         <nav className="-mb-px flex gap-4">
           {TABS.map(({ key, label, icon: Icon }) => (
@@ -267,7 +271,6 @@ export default function ExamDetail() {
         </nav>
       </div>
 
-      {/* Tab content */}
       {activeTab === 'overview' && (
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -277,7 +280,7 @@ export default function ExamDetail() {
               </CardHeader>
               <CardContent>
                 <p className="font-semibold">
-                  {academicYears.find(y => String(y.id) === String(exam.academic_year_id))?.title ?? exam.academic_year_id}
+                  {academicYears.find(y => String(y.id) === String(exam.academic_year_id))?.title ?? '—'}
                 </p>
               </CardContent>
             </Card>
@@ -299,7 +302,7 @@ export default function ExamDetail() {
               <CardContent>
                 <p className="font-semibold">
                   {exam.hall_ticket_min_attendance != null
-                    ? `${exam.hall_ticket_min_attendance}% minimum`
+                    ? `${Number(exam.hall_ticket_min_attendance)}% minimum`
                     : 'Not set'}
                 </p>
               </CardContent>
@@ -326,7 +329,7 @@ export default function ExamDetail() {
                 {exam.hall_ticket_published ? (
                   <>
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <p className="font-semibold text-green-600">Published</p>
+                    <p className="font-semibold text-green-600 dark:text-green-400">Published</p>
                   </>
                 ) : (
                   <>
@@ -339,7 +342,6 @@ export default function ExamDetail() {
 
           </div>
 
-          {/* Configured Subjects */}
           <div className="overflow-hidden rounded-lg border">
             <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-2.5">
               <h3 className="text-sm font-semibold">Configured Subjects</h3>
@@ -352,9 +354,7 @@ export default function ExamDetail() {
 
             {configsError || sectionsError ? (
               <div className="px-4 py-3 text-xs text-muted-foreground">
-                Subject list requires backend endpoints{' '}
-                <code>GET /exams/&#123;id&#125;/class-sections</code> and{' '}
-                <code>GET /exams/&#123;id&#125;/subject-configs</code> (not yet implemented).
+                Unable to load the subject list for this exam. Please refresh the page or try again later.
               </div>
             ) : subjectConfigs.length === 0 ? (
               <div className="px-4 py-3 text-xs text-muted-foreground">No subjects configured for this exam.</div>
@@ -367,7 +367,7 @@ export default function ExamDetail() {
                 const csLabel = [
                   cs.class_name ?? classNameMap[cs.class_id],
                   cs.section_name ?? (cs.section_id ? sectionNameMap[cs.section_id] : null),
-                ].filter(Boolean).join(' – ') || cs.class_id
+                ].filter(Boolean).join(' – ') || 'Class'
                 return (
                   <div key={cs.id} className="border-b px-4 py-3 last:border-0">
                     <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -388,7 +388,7 @@ export default function ExamDetail() {
                     <div className="flex flex-wrap gap-1.5">
                       {configs.map((cfg) => (
                         <Badge key={cfg.id} variant="secondary" className="text-xs">
-                          {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? cfg.subject_id}
+                          {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? 'Unknown subject'}
                         </Badge>
                       ))}
                     </div>
@@ -400,7 +400,7 @@ export default function ExamDetail() {
                 <div className="flex flex-wrap gap-1.5">
                   {subjectConfigs.map((cfg) => (
                     <Badge key={cfg.id} variant="secondary" className="text-xs">
-                      {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? cfg.subject_id}
+                      {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? 'Unknown subject'}
                     </Badge>
                   ))}
                 </div>
@@ -414,23 +414,16 @@ export default function ExamDetail() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-medium">Exam Dates</h3>
-            <Button
-              size="sm"
-              onClick={() => navigate({ to: `/exam/exams/${exam.id}/dates` as any })}
-              className="gap-1"
-            >
-              {isAdmin ? (
-                <>
-                  <Edit className="h-4 w-4" />
-                  Manage Dates
-                </>
-              ) : (
-                <>
-                  <Calendar className="h-4 w-4" />
-                  View All Dates
-                </>
-              )}
-            </Button>
+            {isAdmin && (
+              <Button
+                size="sm"
+                onClick={() => navigate({ to: `/exam/exams/${exam.id}/dates` as any })}
+                className="gap-1"
+              >
+                <Edit className="h-4 w-4" />
+                Manage Dates
+              </Button>
+            )}
           </div>
           {examDates.length === 0 ? (
             <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
@@ -449,7 +442,7 @@ export default function ExamDetail() {
               )}
             </div>
           ) : (
-            <div className="overflow-hidden rounded-lg border">
+            <div className="overflow-x-auto rounded-lg border">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40">
@@ -464,12 +457,12 @@ export default function ExamDetail() {
                   {examDates.map((d) => (
                     <tr key={d.id} className="border-b last:border-0 hover:bg-muted/20">
                       <td className="px-4 py-2.5 font-medium">
-                        {d.subject_name ?? subjectNameMap[d.subject_id] ?? d.subject_id}
+                        {d.subject_name ?? subjectNameMap[d.subject_id] ?? 'Unknown subject'}
                       </td>
                       <td className="px-4 py-2.5 text-muted-foreground">
-                        {d.class_name ?? classNameMap[d.class_id] ?? d.class_id}
+                        {d.class_name ?? classNameMap[d.class_id] ?? '—'}
                         {(d.section_name ?? (d.section_id ? sectionNameMap[d.section_id] : null)) &&
-                          ` – ${d.section_name ?? sectionNameMap[d.section_id!] ?? d.section_id}`}
+                          ` – ${d.section_name ?? sectionNameMap[d.section_id!]}`}
                       </td>
                       <td className="px-4 py-2.5">{d.exam_date}</td>
                       <td className="px-4 py-2.5 text-muted-foreground">
@@ -545,55 +538,30 @@ export default function ExamDetail() {
       )}
 
 
-      {/* Activate Dialog */}
-      <Dialog open={showActivate} onOpenChange={setShowActivate}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Activate Exam?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Activating <strong>{exam.exam_name}</strong> will allow mark entry and hall ticket processing.
-            You can still edit the exam after activation.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowActivate(false)}>Cancel</Button>
-            <Button
-              disabled={activateMutation.isPending}
-              onClick={() => activateMutation.mutate(undefined, { onSuccess: () => setShowActivate(false) })}
-              className="gap-2"
-            >
-              {activateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Activate
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={showActivate}
+        onOpenChange={setShowActivate}
+        title="Activate Exam?"
+        description={`Activating ${exam.exam_name} will allow mark entry and hall ticket processing. You can still edit the exam after activation.`}
+        confirmLabel="Activate"
+        pendingLabel="Activating..."
+        isPending={activateMutation.isPending}
+        isDestructive={false}
+        onConfirm={() => activateMutation.mutate(undefined, { onSuccess: () => setShowActivate(false) })}
+      />
 
-      {/* Deactivate Dialog */}
-      <Dialog open={showDeactivate} onOpenChange={setShowDeactivate}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Deactivate Exam?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            This will move <strong>{exam.exam_name}</strong> back to Draft. Mark entry and hall ticket processing will be paused.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowDeactivate(false)}>Cancel</Button>
-            <Button
-              variant="outline"
-              className="text-amber-600 hover:text-amber-600"
-              disabled={deactivateMutation.isPending}
-              onClick={() => deactivateMutation.mutate(undefined, { onSuccess: () => { setShowDeactivate(false); navigate({ to: '/exam/exams' as any }) } })}
-            >
-              {deactivateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Deactivate
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={showDeactivate}
+        onOpenChange={setShowDeactivate}
+        title="Deactivate Exam?"
+        description={`This will move ${exam.exam_name} back to Draft. Mark entry and hall ticket processing will be paused.`}
+        confirmLabel="Deactivate"
+        pendingLabel="Deactivating..."
+        isPending={deactivateMutation.isPending}
+        isDestructive={false}
+        onConfirm={() => deactivateMutation.mutate(undefined, { onSuccess: () => { setShowDeactivate(false); navigate({ to: '/exam/exams' as any }) } })}
+      />
 
-      {/* Edit Dialog */}
       <Dialog open={showEdit} onOpenChange={setShowEdit} modal={false} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -632,10 +600,9 @@ export default function ExamDetail() {
             </div>
             <div className="space-y-1">
               <label className="text-sm font-medium">Mark Entry Deadline</label>
-              <Input
-                type="date"
+              <DatePicker
                 value={editForm.mark_entry_deadline}
-                onChange={(e) => setEditForm(p => ({ ...p, mark_entry_deadline: e.target.value }))}
+                onChange={(v) => { setEditForm(p => ({ ...p, mark_entry_deadline: v })); setIsEditDirty(true) }}
               />
             </div>
             <div className="space-y-1">
@@ -651,18 +618,16 @@ export default function ExamDetail() {
             </div>
             <div className="space-y-1">
               <label className="text-sm font-medium">Attendance From</label>
-              <Input
-                type="date"
+              <DatePicker
                 value={editForm.attendance_from_date}
-                onChange={(e) => setEditForm(p => ({ ...p, attendance_from_date: e.target.value }))}
+                onChange={(v) => { setEditForm(p => ({ ...p, attendance_from_date: v })); setIsEditDirty(true) }}
               />
             </div>
             <div className="space-y-1">
               <label className="text-sm font-medium">Attendance To</label>
-              <Input
-                type="date"
+              <DatePicker
                 value={editForm.attendance_to_date}
-                onChange={(e) => setEditForm(p => ({ ...p, attendance_to_date: e.target.value }))}
+                onChange={(v) => { setEditForm(p => ({ ...p, attendance_to_date: v })); setIsEditDirty(true) }}
               />
             </div>
             <div className="space-y-1">
@@ -691,7 +656,6 @@ export default function ExamDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Clone Dialog */}
       <Dialog open={showClone} onOpenChange={setShowClone} guardDirty={isCloneDirty} onDirtyDiscard={() => setIsCloneDirty(false)}>
         <DialogContent>
           <DialogHeader>
@@ -716,24 +680,16 @@ export default function ExamDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
-      <Dialog open={showDelete} onOpenChange={setShowDelete}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Exam?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            This will permanently delete <strong>{exam.exam_name}</strong> and all its dates. This cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowDelete(false)}>Cancel</Button>
-            <Button variant="destructive" disabled={deleteMutation.isPending} onClick={handleDelete}>
-              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={showDelete}
+        onOpenChange={setShowDelete}
+        title="Delete Exam?"
+        description={`This will permanently delete ${exam.exam_name} and all its dates. This cannot be undone.`}
+        confirmLabel="Delete"
+        pendingLabel="Deleting..."
+        isPending={deleteMutation.isPending}
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

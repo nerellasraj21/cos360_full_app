@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Upload, Loader2, Filter, Receipt } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Upload, Loader2, Receipt } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { FilterBar } from '@/components/ui/FilterBar';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -71,7 +73,8 @@ export function ExpenseTransactionsPage() {
 
   // API hooks
   const { data: transactionsResponse, isLoading } = useExpenseTransactions({
-    ...filters
+    status_filter: filters.status_filter,
+    expense_type_id: filters.expense_type_id
   });
   const { data: expenseTypesDropdown } = useExpenseTypeDropdown();
 
@@ -80,11 +83,21 @@ export function ExpenseTransactionsPage() {
   const deleteMutation = useDeleteExpenseTransaction();
   const approveMutation = useApproveExpenseTransaction();
 
-  const transactions = transactionsResponse || [];
+  const transactions = (transactionsResponse || []).filter((t) => {
+    if (filters.date_from && t.transaction_date < filters.date_from) return false;
+    if (filters.date_to && t.transaction_date > filters.date_to) return false;
+    if (filters.vendor_name.trim() && !(t.vendor_name ?? '').toLowerCase().includes(filters.vendor_name.trim().toLowerCase())) return false;
+    return true;
+  });
+
+  const typeNameById = new Map((expenseTypesDropdown ?? []).map((t) => [t.id, t.name]));
+  const getTypeName = (id: string) => typeNameById.get(id) ?? '-';
+  const formatPaymentMethod = (method: string) =>
+    method.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
   // Handle form submission
   const handleSubmit = async () => {
-    if (!formData.expense_type_id || !formData.amount || !formData.vendor_name) {
+    if (!formData.expense_type_id || !formData.amount || !formData.vendor_name || !formData.description.trim()) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -143,7 +156,7 @@ export function ExpenseTransactionsPage() {
     setSelectedTransaction(transaction);
     setFormData({
       expense_type_id: transaction.expense_type_id,
-      amount: transaction.amount,
+      amount: Number(transaction.amount),
       transaction_date: transaction.transaction_date,
       description: transaction.description,
       reference_number: transaction.reference_number || '',
@@ -307,8 +320,8 @@ export function ExpenseTransactionsPage() {
       fallback={
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Access Denied</h2>
-            <p className="text-gray-600">You don't have permission to view expense transactions.</p>
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">You don't have permission to view expense transactions.</p>
           </div>
         </div>
       }
@@ -321,66 +334,63 @@ export function ExpenseTransactionsPage() {
         actions={<PermissionGuard resource="expense_transactions" action="create" fallback={null}><Button onClick={handleCreate} className="flex items-center gap-2"><Plus className="h-4 w-4" /> New Transaction</Button></PermissionGuard>}
       />
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground mb-2">
-            <Filter className="h-3.5 w-3.5" />
-            <span>Filters</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Select value={filters.status_filter} onValueChange={(value) => setFilters({ ...filters, status_filter: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+      <FilterBar>
+        <div className="w-44">
+          <Select value={filters.status_filter || '__all__'} onValueChange={(value) => setFilters({ ...filters, status_filter: value === '__all__' ? '' : value })}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-            <Select value={filters.expense_type_id} onValueChange={(value) => setFilters({ ...filters, expense_type_id: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
-                {expenseTypesDropdown?.map((type) => (
-                  <SelectItem key={type.id} value={type.id}>
-                    {type.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="w-48">
+          <Select value={filters.expense_type_id || '__all__'} onValueChange={(value) => setFilters({ ...filters, expense_type_id: value === '__all__' ? '' : value })}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Types</SelectItem>
+              {expenseTypesDropdown?.map((type) => (
+                <SelectItem key={type.id} value={type.id}>
+                  {type.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            <Input
-              type="date"
-              placeholder="From Date"
-              value={filters.date_from}
-              onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
-            />
+        <div className="w-44">
+          <DatePicker
+            value={filters.date_from}
+            onChange={(value) => setFilters({ ...filters, date_from: value })}
+            placeholder="From Date"
+            max={filters.date_to || undefined}
+          />
+        </div>
 
-            <Input
-              type="date"
-              placeholder="To Date"
-              value={filters.date_to}
-              onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
-            />
+        <div className="w-44">
+          <DatePicker
+            value={filters.date_to}
+            onChange={(value) => setFilters({ ...filters, date_to: value })}
+            placeholder="To Date"
+            min={filters.date_from || undefined}
+          />
+        </div>
 
-            <Input
-              placeholder="Vendor Name"
-              value={filters.vendor_name}
-              onChange={(e) => setFilters({ ...filters, vendor_name: e.target.value })}
-            />
-          </div>
-        </CardContent>
-      </Card>
+        <Input
+          className="w-48"
+          placeholder="Vendor Name"
+          value={filters.vendor_name}
+          onChange={(e) => setFilters({ ...filters, vendor_name: e.target.value })}
+        />
+      </FilterBar>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -399,6 +409,7 @@ export function ExpenseTransactionsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">S.No.</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Vendor</TableHead>
                       <TableHead>Type</TableHead>
@@ -408,12 +419,13 @@ export function ExpenseTransactionsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredTransactions.map((transaction) => (
-                      <TableRow key={transaction.id}>
+                    {filteredTransactions.map((transaction, idx) => (
+                      <TableRow key={transaction.id} style={{ height: '48px' }}>
+                        <TableCell>{idx + 1}</TableCell>
                         <TableCell>{new Date(transaction.transaction_date).toLocaleDateString()}</TableCell>
-                        <TableCell>{transaction.vendor_name}</TableCell>
-                        <TableCell>{transaction.expense_type_id}</TableCell>
-                        <TableCell>₹{transaction.amount.toLocaleString()}</TableCell>
+                        <TableCell>{transaction.vendor_name || '-'}</TableCell>
+                        <TableCell>{getTypeName(transaction.expense_type_id)}</TableCell>
+                        <TableCell>₹{Number(transaction.amount).toLocaleString('en-IN')}</TableCell>
                         <TableCell>
                           <StatusBadge status={transaction.status} />
                         </TableCell>
@@ -428,6 +440,7 @@ export function ExpenseTransactionsPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleView(transaction)}
+                                title="View"
                                 className="h-8 w-8 p-0"
                               >
                                 <Eye className="h-4 w-4" />
@@ -442,6 +455,7 @@ export function ExpenseTransactionsPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleEdit(transaction)}
+                                title="Edit"
                                 className="h-8 w-8 p-0"
                               >
                                 <Edit className="h-4 w-4" />
@@ -457,6 +471,7 @@ export function ExpenseTransactionsPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleApproval(transaction)}
+                                  title="Approve or reject"
                                   className="h-8 w-8 p-0"
                                 >
                                   <CheckCircle className="h-4 w-4" />
@@ -472,7 +487,8 @@ export function ExpenseTransactionsPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDelete(transaction)}
-                                className="h-8 w-8 p-0 text-destructive"
+                                title="Delete"
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -543,10 +559,9 @@ export function ExpenseTransactionsPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-1">Transaction Date *</label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={formData.transaction_date}
-                  onChange={(e) => setFormData({ ...formData, transaction_date: e.target.value })}
+                  onChange={(value) => { setFormData({ ...formData, transaction_date: value }); setIsFormDirty(true); }}
                 />
               </div>
 
@@ -569,7 +584,7 @@ export function ExpenseTransactionsPage() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label className="block text-sm font-medium mb-1">Description *</label>
                 <Input
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -593,7 +608,7 @@ export function ExpenseTransactionsPage() {
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
                   placeholder="0.00"
-                  readOnly
+                  readOnly={transactionItems.length > 0}
                 />
               </div>
             </div>
@@ -657,7 +672,7 @@ export function ExpenseTransactionsPage() {
                             <div className="flex-1">
                               <label className="block text-sm font-medium mb-1">Final Amount</label>
                               <Input
-                                value={`₹${(item.final_amount || 0).toLocaleString()}`}
+                                value={`₹${Number(item.final_amount || 0).toLocaleString('en-IN')}`}
                                 readOnly
                               />
                             </div>
@@ -754,11 +769,6 @@ export function ExpenseTransactionsPage() {
               {/* Basic Information */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Transaction ID</label>
-                  <p className="text-sm">{selectedTransaction.id}</p>
-                </div>
-
-                <div>
                   <label className="block text-sm font-medium mb-1">Status</label>
                   <StatusBadge status={selectedTransaction.status} />
                 </div>
@@ -770,22 +780,22 @@ export function ExpenseTransactionsPage() {
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Vendor</label>
-                  <p className="text-sm">{selectedTransaction.vendor_name}</p>
+                  <p className="text-sm">{selectedTransaction.vendor_name || '-'}</p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Type</label>
-                  <p className="text-sm">{selectedTransaction.expense_type_id}</p>
+                  <p className="text-sm">{getTypeName(selectedTransaction.expense_type_id)}</p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Payment Method</label>
-                  <p className="text-sm">{selectedTransaction.payment_method}</p>
+                  <p className="text-sm">{formatPaymentMethod(selectedTransaction.payment_method)}</p>
                 </div>
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium mb-1">Amount</label>
-                  <p className="text-2xl font-bold">₹{selectedTransaction.amount.toLocaleString()}</p>
+                  <p className="text-2xl font-bold">₹{Number(selectedTransaction.amount).toLocaleString('en-IN')}</p>
                 </div>
 
                 {selectedTransaction.description && (
@@ -818,7 +828,7 @@ export function ExpenseTransactionsPage() {
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Transaction: {selectedTransaction.vendor_name} - ₹{selectedTransaction.amount.toLocaleString()}
+                  Transaction: {selectedTransaction.vendor_name || 'Transaction'} - ₹{Number(selectedTransaction.amount).toLocaleString('en-IN')}
                 </p>
               </div>
 

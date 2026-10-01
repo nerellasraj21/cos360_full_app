@@ -18,6 +18,7 @@ import CAxios from '@/api/index';
 import Select, { type SingleValue } from 'react-select';
 import type { FeeStudentMappingBulkCreateRequest, FeeStudentMappingBulkResponse } from '@/types/fee/mapping';
 import type { StudentDropdownItem } from '@/types/admission';
+import { logger } from '@/lib/config';
 
 const formSchema = z.object({
   student_ids: z.array(z.string()).min(1, 'At least one student must be selected'),
@@ -77,7 +78,6 @@ export function BulkStudentMappingForm({ onSuccess, onCancel }: BulkStudentMappi
         setStudentsLoading(true);
 
         // Fetch students with class and section filter from the API
-        console.log('[DEBUG] Fetching students for class:', selectedClass.value, 'section:', selectedSection.value);
         const { data } = await CAxios.get('/students/admission/students/dropdown', {
           params: {
             class_id: selectedClass.value,
@@ -86,11 +86,9 @@ export function BulkStudentMappingForm({ onSuccess, onCancel }: BulkStudentMappi
           }
         });
 
-        console.log('[DEBUG] Students API response:', data);
-        console.log('[DEBUG] Number of students returned:', data?.length || 0);
         setStudents(data || []);
       } catch (error) {
-        console.error('[ERROR] Failed to fetch students:', error);
+        logger.error('[ERROR] Failed to fetch students:', error);
         toast.error('Failed to load students');
         setStudents([]);
       } finally {
@@ -165,19 +163,6 @@ export function BulkStudentMappingForm({ onSuccess, onCancel }: BulkStudentMappi
       }
 
       // Log the request data for debugging
-      console.log('[DEBUG] Bulk create request:', {
-        student_ids: data.student_ids,
-        class_id: data.class_id,
-        section_id: data.section_id,
-        fee_type_id: data.fee_type_id,
-        total_fee: data.total_fee,
-        academic_year_id: selectedAcademicYearId,
-        selected_students: selectedStudents.map(s => ({
-          id: s.id,
-          name: s.name,
-          admission_number: s.admission_number || s.admission_num
-        }))
-      });
 
       const requestData: FeeStudentMappingBulkCreateRequest = {
         ...data,
@@ -196,8 +181,8 @@ export function BulkStudentMappingForm({ onSuccess, onCancel }: BulkStudentMappi
         toast.error('Failed to create any mappings');
       }
     } catch (error: any) {
-      console.error('[ERROR] Bulk create failed:', error);
-      console.error('[ERROR] Response data:', error.response?.data);
+      logger.error('[ERROR] Bulk create failed:', error);
+      logger.error('[ERROR] Response data:', error.response?.data);
 
       // Extract more detailed error message
       let errorMessage = 'Failed to create bulk mappings';
@@ -467,7 +452,7 @@ export function BulkStudentMappingForm({ onSuccess, onCancel }: BulkStudentMappi
                 </div>
                 {selectedStudents.some(s => !s.admission_number && !s.admission_num) && (
                   <div className="text-sm text-destructive bg-destructive/10 p-2 rounded-md">
-                    ⚠️ Warning: Some selected students don't have admission numbers. This will cause the bulk creation to fail.
+                    Warning: Some selected students don't have admission numbers. This will cause the bulk creation to fail.
                   </div>
                 )}
               </div>

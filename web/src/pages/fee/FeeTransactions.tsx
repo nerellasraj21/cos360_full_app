@@ -37,6 +37,7 @@ import { Plus, Search, Eye, Edit, DollarSign, Receipt, Loader2, Filter, ChevronU
 import { toast } from 'sonner';
 import { PermissionGuard } from '@/components/common';
 import { usePermission } from '@/hooks/usePermission';
+import { logger } from '@/lib/config';
 
 export default function FeeTransactions() {
   return (
@@ -131,7 +132,6 @@ function FeeTransactionsContent() {
   const { data: transactionsResponse, isLoading, error, refetch } = useQuery({
     queryKey: ['fee-transactions', searchParams],
     queryFn: () => searchTransactions(searchParams),
-    enabled: true, // Always enabled for now to debug
   });
 
   const transactions: FeeTransaction[] = Array.isArray(transactionsResponse) ? transactionsResponse : transactionsResponse?.data || [];
@@ -159,8 +159,6 @@ function FeeTransactionsContent() {
   // Debug: Log student data to see the actual structure
   useEffect(() => {
     if (students.length > 0) {
-      console.log('[DEBUG] First student:', JSON.stringify(students[0], null, 2));
-      console.log('[DEBUG] Total students loaded:', students.length);
     }
   }, [students]);
 
@@ -179,7 +177,7 @@ function FeeTransactionsContent() {
                        (!isEmpty(student.first_name) && student.first_name) ||
                        (!isEmpty(student.last_name) && student.last_name) ||
                        // Fallback to ID with proper formatting
-                       `Student ${student.id}`;
+                       'Unnamed Student';
 
     return displayName;
   };
@@ -263,7 +261,7 @@ function FeeTransactionsContent() {
       refetch();
       setShowViewDialog(false);
     } catch (error) {
-      console.error('Failed to update transaction status:', error);
+      logger.error('Failed to update transaction status:', error);
       toast.error('Failed to update transaction status');
     }
   };
@@ -274,7 +272,7 @@ function FeeTransactionsContent() {
       setSelectedTransaction(detail);
       setShowViewDialog(true);
     } catch (error) {
-      console.error('Failed to fetch transaction details:', error);
+      logger.error('Failed to fetch transaction details:', error);
     }
   };
 
@@ -294,6 +292,8 @@ function FeeTransactionsContent() {
       student_admission_num: option?.admission_number || ''
     }));
   };
+
+  const [isCreating, setIsCreating] = useState(false);
 
   const handleCreateTransaction = async () => {
     try {
@@ -338,16 +338,16 @@ function FeeTransactionsContent() {
         })
       };
 
-      console.log('[DEBUG] Creating transaction with data:', transactionData);
 
+      setIsCreating(true);
       await createTransaction(transactionData);
       toast.success('Transaction created successfully');
       setShowCreateDialog(false);
       resetCreateForm();
       refetch();
     } catch (error: any) {
-      console.error('[ERROR] Failed to create transaction:', error);
-      console.error('[ERROR] Response data:', error.response?.data);
+      logger.error('[ERROR] Failed to create transaction:', error);
+      logger.error('[ERROR] Response data:', error.response?.data);
 
       // Extract detailed error message
       let errorMessage = 'Failed to create transaction';
@@ -364,6 +364,8 @@ function FeeTransactionsContent() {
       }
 
       toast.error(errorMessage, { duration: 5000 });
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -654,7 +656,7 @@ function FeeTransactionsContent() {
                                       const termDetails = await getTerm(value);
                                       setTermDetailsCache(prev => ({ ...prev, [value]: termDetails }));
                                     } catch (error) {
-                                      console.error('Failed to fetch term details:', error);
+                                      logger.error('Failed to fetch term details:', error);
                                     }
                                   }
                                 }}
@@ -787,9 +789,9 @@ function FeeTransactionsContent() {
                 </DialogClose>
                 <Button
                   onClick={handleCreateTransaction}
-                  disabled={!createForm.student_id || calculatedTotal <= 0}
+                  disabled={!createForm.student_id || calculatedTotal <= 0 || isCreating}
                 >
-                  Create Transaction
+                  {isCreating ? 'Creating...' : 'Create Transaction'}
                 </Button>
               </div>
             </DialogContent>
@@ -828,14 +830,14 @@ function FeeTransactionsContent() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Payment Method</label>
               <Select
-                value={searchParams.payment_method || ''}
-                onValueChange={(value) => handleSearch('payment_method', value)}
+                value={searchParams.payment_method || '__all__'}
+                onValueChange={(value) => handleSearch('payment_method', value === '__all__' ? '' : value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All methods" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All methods</SelectItem>
+                  <SelectItem value="__all__">All methods</SelectItem>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="upi">UPI</SelectItem>
                   <SelectItem value="cheque">Cheque</SelectItem>
@@ -846,14 +848,14 @@ function FeeTransactionsContent() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Status</label>
               <Select
-                value={searchParams.status || ''}
-                onValueChange={(value) => handleSearch('status', value)}
+                value={searchParams.status || '__all__'}
+                onValueChange={(value) => handleSearch('status', value === '__all__' ? '' : value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
+                  <SelectItem value="__all__">All statuses</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -913,7 +915,7 @@ function FeeTransactionsContent() {
               <div>
                 <p className="text-sm font-medium text-orange-800">Total Outstanding</p>
                 <p className="text-2xl font-bold text-orange-900">
-                  ₹{outstandingFees.total_outstanding.toLocaleString()}
+                  ₹{Number(outstandingFees.total_outstanding).toLocaleString('en-IN')}
                 </p>
               </div>
               <div className="text-right">
@@ -998,11 +1000,11 @@ function FeeTransactionsContent() {
                         </div>
                       </TableCell>
                       <TableCell className="font-medium">
-                        ₹{parseFloat(transaction.total_amount.toString()).toLocaleString()}
+                        ₹{Number(transaction.total_amount).toLocaleString('en-IN')}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {transaction.payment_method.toUpperCase()}
+                          {transaction.payment_method.replace(/_/g, ' ').toUpperCase()}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -1015,10 +1017,11 @@ function FeeTransactionsContent() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="h-8 w-8 p-0"
+                          title="View"
                           onClick={() => handleViewTransaction(transaction)}
                         >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
+                          <Eye className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -1055,7 +1058,7 @@ function FeeTransactionsContent() {
                       <DollarSign className="h-5 w-5 text-green-600" />
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
-                        <p className="text-2xl font-bold">₹{selectedTransaction.total_amount.toLocaleString()}</p>
+                        <p className="text-2xl font-bold">₹{Number(selectedTransaction.total_amount).toLocaleString('en-IN')}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -1067,7 +1070,7 @@ function FeeTransactionsContent() {
                       <Receipt className="h-5 w-5 text-blue-600" />
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Payment Method</p>
-                        <p className="text-lg font-semibold">{selectedTransaction.payment_method.toUpperCase()}</p>
+                        <p className="text-lg font-semibold">{selectedTransaction.payment_method.replace(/_/g, ' ').toUpperCase()}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -1267,7 +1270,7 @@ function FeeTransactionsContent() {
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Total Paid</p>
                         <p className="text-2xl font-bold text-green-600">
-                          ₹{transactionHistory.transactions.reduce((sum, t) => sum + t.total_amount, 0).toLocaleString()}
+                          ₹{transactionHistory.transactions.reduce((sum, t) => sum + Number(t.total_amount), 0).toLocaleString('en-IN')}
                         </p>
                       </div>
                     </div>
@@ -1329,13 +1332,13 @@ function FeeTransactionsContent() {
                               <div>
                                 <span className="text-muted-foreground">Amount:</span>
                                 <span className="ml-2 font-medium text-green-600">
-                                  ₹{transaction.total_amount.toLocaleString()}
+                                  ₹{Number(transaction.total_amount).toLocaleString('en-IN')}
                                 </span>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Method:</span>
                                 <span className="ml-2 font-medium">
-                                  {transaction.payment_method.toUpperCase()}
+                                  {transaction.payment_method.replace(/_/g, ' ').toUpperCase()}
                                 </span>
                               </div>
                               <div>

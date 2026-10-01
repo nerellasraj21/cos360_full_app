@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, CheckCircle, XCircle, Search, ClipboardCheck, Filter, X } from 'lucide-react';
+import { Loader2, Save, CheckCircle, XCircle, Search, ClipboardCheck, Filter, X, RefreshCw } from 'lucide-react';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { toast } from 'sonner';
 import { usePermission } from '@/hooks/usePermission';
@@ -265,7 +266,7 @@ const StaffAttendancePage: React.FC = () => {
                         <div className="flex items-center gap-2">
                             {hasUnsavedChanges && <Badge variant="secondary">Unsaved Changes</Badge>}
                             <Button variant="outline" size="sm" onClick={() => refetchAttendance()} disabled={attendanceFetching}>
-                                {attendanceFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🔄</span>}
+                                {attendanceFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                                 Refresh
                             </Button>
                             {canWrite && (
@@ -282,12 +283,7 @@ const StaffAttendancePage: React.FC = () => {
                 <div className="px-6 pb-4">
                     <div className="max-w-xs space-y-1.5">
                         <Label htmlFor="date-select">Date</Label>
-                        <Input
-                            id="date-select"
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => handleDateChange(e.target.value)}
-                        />
+                        <DatePicker value={selectedDate} onChange={handleDateChange} />
                     </div>
                 </div>
 
@@ -397,10 +393,10 @@ const StaffAttendancePage: React.FC = () => {
                                 const attendance = staffAttendances.get(staffMember.id);
                                 const status = attendance?.status || 'present';
                                 const statusStyles = {
-                                    present: 'bg-green-100 text-green-700 border-green-300',
-                                    absent: 'bg-red-100 text-red-700 border-red-300',
-                                    late: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-                                    half_day: 'bg-orange-100 text-orange-700 border-orange-300',
+                                    present: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800',
+                                    absent: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
+                                    late: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-800',
+                                    half_day: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800',
                                 }[status];
                                 const rowStyles = status === 'absent'
                                     ? 'border-red-200'

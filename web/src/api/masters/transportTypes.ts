@@ -12,11 +12,9 @@ import type {
 
 // Helper function to handle API errors
 const handleApiError = (error: any): Error => {
-  console.error('API Error:', error);
 
   if (error.response?.data) {
     const errorData = error.response.data;
-    console.error('Error Response Data:', errorData);
 
     // Handle FastAPI validation errors (422)
     if (Array.isArray(errorData.detail)) {
@@ -80,9 +78,7 @@ export const routeTypesApi = {
   // Create new route type
   create: async (data: RouteTypeCreate): Promise<RouteType> => {
     try {
-      console.log('Creating route type with payload:', data);
       const response = await CAxios.post(ROUTE_TYPES_BASE, data);
-      console.log('Route type created successfully:', response.data);
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -150,9 +146,7 @@ export const tripTypesApi = {
   // Create new trip type
   create: async (data: TripTypeCreate): Promise<TripType> => {
     try {
-      console.log('Creating trip type with payload:', data);
       const response = await CAxios.post(TRIP_TYPES_BASE, data);
-      console.log('Trip type created successfully:', response.data);
       return response.data;
     } catch (error) {
       throw handleApiError(error);

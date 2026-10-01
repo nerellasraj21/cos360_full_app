@@ -220,10 +220,10 @@ export default function ClassesAndSectionsPage() {
       fallback={
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+            <h2 className="text-xl font-semibold text-foreground mb-2">
               Access Denied
             </h2>
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               You don't have permission to view Classes & Sections.
             </p>
           </div>
@@ -233,7 +233,7 @@ export default function ClassesAndSectionsPage() {
       <div className="space-y-6">
         {!hasClassesListPermission ? (
           <div className="flex items-center justify-center h-32">
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               Permission not available for Classes.
             </p>
           </div>
@@ -241,7 +241,7 @@ export default function ClassesAndSectionsPage() {
           <>
             {!shouldFetchData ? (
                     <div className="flex items-center justify-center h-32">
-                      <p className="text-gray-600">
+                      <p className="text-muted-foreground">
                         You don't have permission to view class data.
                       </p>
                     </div>
@@ -331,7 +331,7 @@ export default function ClassesAndSectionsPage() {
                     const sectionCount = classData?.sections?.length ?? 0;
                     return sectionCount > 0 ? (
                       <p className="text-amber-600 dark:text-amber-400 text-sm font-medium">
-                        ⚠ This class has {sectionCount} section{sectionCount !== 1 ? "s" : ""}.
+                        This class has {sectionCount} section{sectionCount !== 1 ? "s" : ""}.
                         Deletion will fail if any section or class has linked student admissions,
                         fee mappings, or subject mappings. Deactivate instead if records exist.
                       </p>

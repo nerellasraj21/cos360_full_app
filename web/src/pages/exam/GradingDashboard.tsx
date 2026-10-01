@@ -69,14 +69,12 @@ export default function GradingDashboard() {
         icon={<Layers className="h-5 w-5" />}
       />
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Exam Grade Schemes" value={examCount} loading={loadingExam} />
         <StatCard label="Subject Grade Schemes" value={subjectCount} loading={loadingSubject} />
         <StatCard label="Remark Grade Sets" value={remarkCount} loading={loadingRemarks} />
       </div>
 
-      {/* Navigation Cards */}
       <div>
         <h3 className="text-lg font-semibold mb-4">Grading Sections</h3>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

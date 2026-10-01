@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { Loader2, Save, Upload, School, ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import {
   useSchoolSettings,
@@ -198,21 +199,18 @@ export default function SchoolSettingsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <School className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-xl font-bold">School Settings</h1>
-            <p className="text-sm text-muted-foreground">Manage school registration and identity information</p>
-          </div>
-        </div>
-        {!settings && (
-          <Badge variant="outline" className="text-amber-600 border-amber-300">
-            Not configured yet
-          </Badge>
-        )}
-      </div>
+      <PageHeader
+        title="School Settings"
+        subtitle="Manage school registration and identity information"
+        icon={<School className="h-5 w-5" />}
+        actions={
+          !settings && (
+            <Badge variant="outline" className="text-amber-600 border-amber-300">
+              Not configured yet
+            </Badge>
+          )
+        }
+      />
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <div className="grid gap-6 lg:grid-cols-3">
@@ -225,7 +223,7 @@ export default function SchoolSettingsPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2 space-y-1">
                   <label className="text-sm font-medium">School Name</label>
-                  <Input {...register('school_name')} placeholder="e.g. CampusGuru High School" />
+                  <Input {...register('school_name')} placeholder="e.g. Greenfield High School" />
                   <FieldError message={errors.school_name?.message} />
                 </div>
                 <div className="space-y-1">

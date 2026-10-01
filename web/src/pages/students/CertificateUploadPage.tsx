@@ -23,6 +23,7 @@ import {
 import { IssuableCertificateGenerator } from "@/components/students/IssuableCertificateGenerator";
 import { useStudentsDropdown } from "@/api/hooks/students/useAdmission";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/DatePicker";
 import type { CertificateRead, SelectorStudent } from "@/types/certificates/types";
 import { config } from "@/lib/config";
 
@@ -521,12 +522,7 @@ export const CertificateUploadPage: React.FC = () => {
 
                         <div className="space-y-2">
                           <Label>Issue Date *</Label>
-                          <input
-                            type="date"
-                            value={issuedDate}
-                            onChange={(e) => setIssuedDate(e.target.value)}
-                            className={inputClass}
-                          />
+                          <DatePicker value={issuedDate} onChange={setIssuedDate} />
                         </div>
 
                         <div className="space-y-2">
@@ -635,7 +631,7 @@ export const CertificateUploadPage: React.FC = () => {
                 </div>
               ) : certificates.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
+                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-75" />
                   <p>No certificates found.</p>
                 </div>
               ) : (
@@ -700,7 +696,8 @@ export const CertificateUploadPage: React.FC = () => {
                               {cert.file_path && (
                                 <Button
                                   size="sm"
-                                  variant="outline"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
                                   onClick={() => handleDownload(cert.id)}
                                   disabled={downloadCertificate.isPending}
                                   title="Download"

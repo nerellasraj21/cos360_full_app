@@ -244,6 +244,21 @@ export const getIconForMenuItem = (name: string) => {
 const normalizeUrl = (url: string): string =>
     url.toLowerCase().replace(/[-_\s]/g, '').replace(/\/+$/, '');
 
+const MODULE_ROUTE_MAP: Record<string, string> = {
+    'report': '/reports',
+    'reports': '/reports',
+    'administration': '/admin',
+    'feemanagement': '/fee',
+    'staffmanagement': '/staff',
+    'exammanagement': '/exam',
+    'timetablemanagement': '/TimeTable',
+};
+
+export const getModuleUrl = (name: string): string => {
+    const derivedName = name.toLowerCase().replace(/\s+/g, '');
+    return MODULE_ROUTE_MAP[derivedName] || `/${derivedName}`;
+};
+
 function RecursiveMenuItem({
     item,
     open,
@@ -275,23 +290,11 @@ function RecursiveMenuItem({
     const location = useLocation();
     const isActive = item.url && normalizeUrl(location.pathname) === normalizeUrl(item.url);
     
-    // Map module names to routes when they don't match the simple lowercase derivation
-    const MODULE_ROUTE_MAP: Record<string, string> = {
-        'report': '/reports',
-        'reports': '/reports',
-        'administration': '/admin',
-        'feemanagement': '/fee',
-        'staffmanagement': '/staff',
-        'exammanagement': '/exam',
-        'timetablemanagement': '/TimeTable',
-    };
-
     // For top-level items, always derive the dashboard URL from the name
     // (backend may send a child page URL like /masters/routeStops instead of /masters)
     const getDerivedUrl = (): string | null => {
         if (level === 0) {
-            const derivedName = item.name.toLowerCase().replace(/\s+/g, '');
-            return MODULE_ROUTE_MAP[derivedName] || `/${derivedName}`;
+            return getModuleUrl(item.name);
         }
         return item.url;
     };
@@ -382,7 +385,6 @@ export function Sidebar({
     menuData = [],
     isMobile = false
 }: SidebarProps) {
-    console.log('Sidebar received menuData:', menuData);
     const [open, setOpen] = useState(controlledOpen ?? !isMobile);
     const isControlled = controlledOpen !== undefined;
     const sidebarOpen = isControlled ? controlledOpen : open;

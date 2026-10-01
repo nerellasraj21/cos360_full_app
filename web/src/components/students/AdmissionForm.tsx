@@ -57,7 +57,6 @@ const AdmissionForm: React.FC<AdmissionFormProps> = ({ onComplete }) => {
       await createAdmission.mutateAsync(data);
       onComplete();
     } catch (error) {
-      console.error('Failed to create admission:', error);
     }
   };
 
@@ -72,6 +71,7 @@ const AdmissionForm: React.FC<AdmissionFormProps> = ({ onComplete }) => {
             <Input
               id="admission_date"
               type="date"
+              className="[color-scheme:light] dark:[color-scheme:dark]"
               {...register('admission_date', { required: 'Admission date is required' })}
             />
             {errors.admission_date && <p className="text-red-500 text-sm">{errors.admission_date.message}</p>}
@@ -148,6 +148,7 @@ const AdmissionForm: React.FC<AdmissionFormProps> = ({ onComplete }) => {
             <Input
               id="student.date_of_birth"
               type="date"
+              className="[color-scheme:light] dark:[color-scheme:dark]"
               {...register('student.date_of_birth', { required: 'Date of birth is required' })}
             />
             {(errors as any).student?.date_of_birth && <p className="text-red-500 text-sm">{(errors as any).student.date_of_birth.message}</p>}

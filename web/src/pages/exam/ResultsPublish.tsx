@@ -3,12 +3,10 @@ import { useParams, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, BarChart3, Send, Loader2, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog'
 import { useExamDetail, useComputeAggregate, usePublishResults } from '@/api/hooks/exam/useExam'
-import { toast } from 'sonner'
 
 export default function ResultsPublish() {
   const { id } = useParams({ strict: false }) as { id: string }
@@ -24,16 +22,13 @@ export default function ResultsPublish() {
   const canPublish = exam?.status === 'locked'
 
   const handleCompute = () => {
-    computeMutation.mutate(undefined, {
-      onSuccess: () => toast.success('Aggregates computed successfully'),
-    })
+    computeMutation.mutate()
   }
 
   const handlePublish = () => {
     publishMutation.mutate(undefined, {
       onSuccess: () => {
         setConfirmPublish(false)
-        toast.success('Results published successfully')
       },
     })
   }
@@ -42,36 +37,30 @@ export default function ResultsPublish() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading exam...</span>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate({ to: `/exam/exams/${id}` as any })}
-            className="gap-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-bold">Results — {exam?.exam_name ?? '...'}</h1>
-            <p className="text-xs text-muted-foreground">Compute aggregates and publish results</p>
+      <PageHeader
+        title={`Results - ${exam?.exam_name ?? ''}`}
+        subtitle="Compute aggregates and publish results"
+        icon={<BarChart3 className="h-5 w-5" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Badge variant={isPublished ? 'default' : 'secondary'} className="capitalize">
+              {exam?.status ?? '—'}
+            </Badge>
+            <Button variant="outline" onClick={() => navigate({ to: `/exam/exams/${id}` as any })} className="gap-1">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
           </div>
-        </div>
-        <Badge
-          variant={isPublished ? 'default' : 'secondary'}
-          className="capitalize"
-        >
-          {exam?.status ?? '—'}
-        </Badge>
-      </div>
+        }
+      />
 
-      {/* Step 1: Compute */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -96,7 +85,7 @@ export default function ResultsPublish() {
               )}
             </Button>
             {computeMutation.isSuccess && (
-              <span className="flex items-center gap-1 text-sm text-green-600">
+              <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
                 <CheckCircle className="h-4 w-4" /> Done
               </span>
             )}
@@ -109,7 +98,6 @@ export default function ResultsPublish() {
         </CardContent>
       </Card>
 
-      {/* Step 2: Publish */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -149,7 +137,6 @@ export default function ResultsPublish() {
         </CardContent>
       </Card>
 
-      {/* View Results */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">View Results</CardTitle>
@@ -165,30 +152,17 @@ export default function ResultsPublish() {
         </CardContent>
       </Card>
 
-      {/* Confirm Publish Dialog */}
-      <Dialog open={confirmPublish} onOpenChange={setConfirmPublish}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Publish Results?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            This will make results visible to all students and parents for{' '}
-            <strong>{exam?.exam_name}</strong>. This action cannot be undone without unlocking the exam.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmPublish(false)}>Cancel</Button>
-            <Button
-              variant="default"
-              onClick={handlePublish}
-              disabled={publishMutation.isPending}
-            >
-              {publishMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Publishing...</>
-              ) : 'Publish'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={confirmPublish}
+        onOpenChange={setConfirmPublish}
+        title="Publish Results?"
+        description={`This will make results visible to all students and parents for ${exam?.exam_name ?? 'this exam'}. This action cannot be undone without unlocking the exam.`}
+        confirmLabel="Publish"
+        pendingLabel="Publishing..."
+        isPending={publishMutation.isPending}
+        isDestructive={false}
+        onConfirm={handlePublish}
+      />
     </div>
   )
 }

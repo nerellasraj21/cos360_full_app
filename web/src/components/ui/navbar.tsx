@@ -1,6 +1,6 @@
 import { Button } from "./button";
 import { Input } from "./input";
-import { Menu, Search, Bell, User, ChevronDown, Sun, Moon, LogOut, X, Fullscreen, Calendar } from "lucide-react";
+import { Menu, Search, User, ChevronDown, Sun, Moon, LogOut, Fullscreen, Calendar } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import clsx from "clsx";
 import { useThemeStore } from "../../lib/themeStore";
@@ -61,47 +61,6 @@ export function Navbar({
                     >
                         <Menu className="w-5 h-5" />
                     </Button>
-
-
-                    {/* <div className="hidden lg:flex items-center relative flex-1 max-w-md">
-                        <Input
-                            placeholder="Search..."
-                            className="border-0 bg-muted/50 focus:ring-0 focus:bg-muted pl-8 h-9 w-full"
-                        />
-                        <Search className="w-4 h-4 text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div> */}
-
-
-                    {/* <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setMobileSearchOpen(!mobileSearchOpen)}
-                        className="lg:hidden shrink-0"
-                        aria-label="Toggle search"
-                    >
-                        {mobileSearchOpen ? <X className="w-5 h-5" /> : <Search className="w-5 h-5" />}
-                    </Button>
-
-                    <DropdownMenu.Root>
-                        <DropdownMenu.Trigger asChild>
-                            <Button variant="ghost" className="hidden md:flex items-center gap-1 shrink-0 cursor-pointer">
-                                <span className="hidden lg:inline">Mega Menu</span>
-                                <span className="lg:hidden">Menu</span>
-                                <ChevronDown className="w-4 h-4" />
-                            </Button>
-                        </DropdownMenu.Trigger>
-                        <DropdownMenu.Content className="bg-background border border-border rounded-md shadow-lg p-4 min-w-[200px] text-foreground">
-                            <DropdownMenu.Item className="py-2 px-3 hover:bg-muted rounded cursor-pointer">
-                                Dashboard
-                            </DropdownMenu.Item>
-                            <DropdownMenu.Item className="py-2 px-3 hover:bg-muted rounded cursor-pointer">
-                                Projects
-                            </DropdownMenu.Item>
-                            <DropdownMenu.Item className="py-2 px-3 hover:bg-muted rounded cursor-pointer">
-                                Settings
-                            </DropdownMenu.Item>
-                        </DropdownMenu.Content>
-                    </DropdownMenu.Root> */}
                 </div>
 
                 {/* Right Section */}
@@ -138,23 +97,13 @@ export function Navbar({
                         {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
                     </Button>
 
-                    {/* Notifications */}
-                    {/* <Button variant="ghost" size="icon" className="relative shrink-0 cursor-pointer">
-                        <Bell className="w-5 h-5" />
-                        <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-medium">
-                            3
-                        </span>
-                    </Button> */}
-
                     {/* User Menu */}
                     <DropdownMenu.Root>
                         <DropdownMenu.Trigger asChild>
                             <Button variant="ghost" className="flex items-center gap-2 px-2 sm:px-3 rounded-full cursor-pointer">
-                                <img
-                                    src="https://randomuser.me/api/portraits/women/44.jpg"
-                                    alt="User avatar"
-                                    className="w-8 h-8 rounded-full object-cover"
-                                />
+                                <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold uppercase">
+                                    {(user?.username || 'U').charAt(0)}
+                                </div>
                                 <span className="font-medium hidden sm:inline text-sm">{user?.username || 'User'}</span>
                                 <ChevronDown className="w-4 h-4 hidden sm:inline" />
                             </Button>
@@ -162,7 +111,7 @@ export function Navbar({
                         <DropdownMenu.Content className="bg-background border border-border rounded-md shadow-lg p-2 min-w-[150px] text-foreground">
                             <div className="px-3 py-2 border-b border-border mb-2">
                                 <p className="font-medium text-sm">{user?.username || 'User'}</p>
-                                <p className="text-xs text-muted-foreground">{user?.email || ''}</p>
+                                <p className="text-xs text-muted-foreground">{!!user?.email && user.email}</p>
                             </div>
                             <DropdownMenu.Item
                                 className="flex items-center gap-2 py-2 px-3 hover:bg-muted rounded cursor-pointer"
@@ -172,14 +121,14 @@ export function Navbar({
                             </DropdownMenu.Item>
                             <DropdownMenu.Separator className="my-1 bg-border h-px" />
                             <DropdownMenu.Item
-                                className="flex items-center gap-2 py-2 px-3 hover:bg-muted rounded cursor-pointer text-red-600 hover:text-red-700"
+                                className="flex items-center gap-2 py-2 px-3 hover:bg-muted rounded cursor-pointer text-destructive hover:text-destructive/80"
                                 onClick={() => {
                                     logoutMutation.mutate(undefined, {
                                         onSuccess: () => navigate({ to: "/login" }),
                                     });
                                 }}
                             >
-                                <LogOut className="w-4 h- cursor-pointer" /> Logout
+                                <LogOut className="w-4 h-4" /> Logout
                             </DropdownMenu.Item>
                         </DropdownMenu.Content>
                     </DropdownMenu.Root>

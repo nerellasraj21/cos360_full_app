@@ -37,38 +37,40 @@ export function SummaryStepForm() {
   const { data: castes = [] } = useCastesDropdown(true);
   const { data: subCastes = [] } = useSubCastesDropdown(formData.caste_id || undefined, true);
 
+  const genderLabel = (g?: string) => ({ M: 'Male', F: 'Female', O: 'Other' } as Record<string, string>)[g ?? ''] ?? g ?? '';
+
   // Helper functions to get display names
   const getAcademicYearName = (yearId: string) => {
     const year = academicYears.find(y => String(y.id) === String(yearId));
-    return year ? year.title : yearId;
+    return year ? year.title : '-';
   };
 
   const getClassName = (classId: string) => {
     const classItem = classes.find(c => String(c.id) === String(classId));
-    return classItem ? classItem.name : classId;
+    return classItem ? classItem.name : '-';
   };
 
   const getSectionName = (sections: any[], sectionId: string) => {
     const section = sections.find(s => String(s.id) === String(sectionId));
-    return section ? section.name : sectionId;
+    return section ? section.name : '-';
   };
 
   const getStateName = (stateId: string) => {
     if (!stateId) return '';
     const state = states.find(s => String(s.id) === String(stateId));
-    return state ? state.name : stateId;
+    return state ? state.name : '-';
   };
 
   const getCasteName = (casteId: string) => {
     if (!casteId) return '';
     const caste = castes.find(c => String(c.id) === String(casteId));
-    return caste ? caste.name : casteId;
+    return caste ? caste.name : '-';
   };
 
   const getSubCasteName = (subCasteId: string) => {
     if (!subCasteId) return '';
     const subCaste = subCastes.find(sc => String(sc.id) === String(subCasteId));
-    return subCaste ? subCaste.name : subCasteId;
+    return subCaste ? subCaste.name : '-';
   };
 
   return (
@@ -96,7 +98,7 @@ export function SummaryStepForm() {
           <p><strong>Admission Number:</strong> {formData.admission_number}</p>
           <p><strong>Name:</strong> {formData.student_first_name} {formData.student_last_name}</p>
           <p><strong>Date of Birth:</strong> {formData.student_date_of_birth}</p>
-          <p><strong>Gender:</strong> {formData.student_gender}</p>
+          <p><strong>Gender:</strong> {genderLabel(formData.student_gender)}</p>
           <p><strong>Aadhar Number:</strong> {formData.student_aadhar_number}</p>
           <p><strong>APAAR Number:</strong> {formData.student_apaar_number}</p>
           <p><strong>Caste:</strong> {getCasteName(formData.caste_id || '')}</p>
@@ -118,7 +120,7 @@ export function SummaryStepForm() {
             <p><strong>Phone:</strong> {formData.father_phone}</p>
             <p><strong>Occupation:</strong> {formData.father_occupation}</p>
             <p><strong>Aadhar:</strong> {formData.father_aadhar_number}</p>
-            <p><strong>Gender:</strong> {formData.father_gender}</p>
+            <p><strong>Gender:</strong> {genderLabel(formData.father_gender)}</p>
             <p><strong>Relation:</strong> {formData.father_relation_to_student}</p>
           </div>
           <div>
@@ -128,7 +130,7 @@ export function SummaryStepForm() {
             <p><strong>Phone:</strong> {formData.mother_phone}</p>
             <p><strong>Occupation:</strong> {formData.mother_occupation}</p>
             <p><strong>Aadhar:</strong> {formData.mother_aadhar_number}</p>
-            <p><strong>Gender:</strong> {formData.mother_gender}</p>
+            <p><strong>Gender:</strong> {genderLabel(formData.mother_gender)}</p>
             <p><strong>Relation:</strong> {formData.mother_relation_to_student}</p>
           </div>
           {formData.guardian_name && (
@@ -139,7 +141,7 @@ export function SummaryStepForm() {
               <p><strong>Phone:</strong> {formData.guardian_phone}</p>
               <p><strong>Occupation:</strong> {formData.guardian_occupation}</p>
               <p><strong>Aadhar:</strong> {formData.guardian_aadhar_number}</p>
-              <p><strong>Gender:</strong> {formData.guardian_gender}</p>
+              <p><strong>Gender:</strong> {genderLabel(formData.guardian_gender)}</p>
               <p><strong>Relation:</strong> {formData.guardian_relation_to_student}</p>
             </div>
           )}

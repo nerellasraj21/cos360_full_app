@@ -185,7 +185,7 @@ export const StudentStepForm = () => {
                 admissionNumberField.onBlur(e);
                 await checkAdmissionNumberExists(e.target.value);
               }}
-              placeholder={apiAdmissionType === 'primary' ? 'e.g. 20260001' : 'e.g. 2026001'}
+              placeholder={apiAdmissionType === 'pre_primary' ? `e.g. ${new Date().getFullYear()}0001` : 'e.g. 001'}
               className="flex-1"
             />
             {(isCheckingNum || isVerifyingNextNumber) && (
@@ -228,6 +228,7 @@ export const StudentStepForm = () => {
           <Input
             id="student_date_of_birth"
             type="date"
+            className="[color-scheme:light] dark:[color-scheme:dark]"
             {...register('student_date_of_birth')}
           />
           {errors.student_date_of_birth && (

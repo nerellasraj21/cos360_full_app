@@ -167,7 +167,7 @@ export const ParentsStepForm = () => {
               id="father_relation_to_student"
               value="Father"
               readOnly
-              className="bg-gray-100"
+              className="bg-muted"
             />
           </div>
         </div>
@@ -310,7 +310,7 @@ export const ParentsStepForm = () => {
               id="mother_relation_to_student"
               value="Mother"
               readOnly
-              className="bg-gray-100"
+              className="bg-muted"
             />
           </div>
         </div>
@@ -319,7 +319,7 @@ export const ParentsStepForm = () => {
         <div className="space-y-4 col-span-2">
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-medium">Guardian's Information (Optional)</h3>
-            <span className="text-xs text-gray-500">Optional</span>
+            <span className="text-xs text-muted-foreground">Optional</span>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

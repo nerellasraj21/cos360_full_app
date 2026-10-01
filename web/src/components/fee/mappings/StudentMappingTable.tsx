@@ -195,26 +195,26 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
                 className="pl-9"
               />
             </div>
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <Select value={selectedClass || '__all__'} onValueChange={(value) => setSelectedClass(value === '__all__' ? '' : value)}>
               <SelectTrigger><SelectValue placeholder="Filter by class" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Classes</SelectItem>
+                <SelectItem value="__all__">All Classes</SelectItem>
                 {classesData.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={selectedSection} onValueChange={setSelectedSection}>
+            <Select value={selectedSection || '__all__'} onValueChange={(value) => setSelectedSection(value === '__all__' ? '' : value)}>
               <SelectTrigger><SelectValue placeholder="Filter by section" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Sections</SelectItem>
+                <SelectItem value="__all__">All Sections</SelectItem>
                 {selectedClass && classesData.find(c => c.id === selectedClass)?.sections.map(s => (
                   <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Select value={selectedFeeType} onValueChange={setSelectedFeeType}>
+            <Select value={selectedFeeType || '__all__'} onValueChange={(value) => setSelectedFeeType(value === '__all__' ? '' : value)}>
               <SelectTrigger><SelectValue placeholder="Filter by fee type" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Fee Types</SelectItem>
+                <SelectItem value="__all__">All Fee Types</SelectItem>
                 {feeTypes.map(ft => <SelectItem key={ft.id} value={ft.id}>{ft.type_name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -265,7 +265,7 @@ export function StudentMappingTable({ academicYearId }: StudentMappingTableProps
                       <Badge variant="outline">{getFeeTypeName(mapping.fee_type_id)}</Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium">₹{parseFloat(mapping.total_fee).toLocaleString()}</div>
+                      <div className="font-medium">₹{Number(mapping.total_fee).toLocaleString('en-IN')}</div>
                     </TableCell>
                     <TableCell>
                       <TableActionGroup>

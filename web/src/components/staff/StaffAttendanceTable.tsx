@@ -3,6 +3,7 @@ import { EditButton, DeleteButton, TableActionGroup } from '@/components/common/
 import { Edit, Trash2, Plus, Calendar, User, CheckCircle, XCircle, Clock, Search, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -257,12 +258,7 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                     <h2 className="text-lg font-semibold text-foreground">Staff Attendance</h2>
                     <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        <Input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => handleDateChange(e.target.value)}
-                            className="w-40"
-                        />
+                        <DatePicker value={selectedDate} onChange={handleDateChange} className="w-44" />
                     </div>
                 </div>
                 {canCreate && (
@@ -427,10 +423,9 @@ export function StaffAttendanceTable({ className }: StaffAttendanceTableProps) {
                             <label className="block text-sm font-medium text-foreground mb-1">
                                 Date *
                             </label>
-                            <Input
-                                type="date"
+                            <DatePicker
                                 value={formData.date}
-                                onChange={(e) => { setFormData({ ...formData, date: e.target.value }); setIsFormDirty(true); }}
+                                onChange={(v) => { setFormData({ ...formData, date: v }); setIsFormDirty(true); }}
                                 required
                             />
                         </div>

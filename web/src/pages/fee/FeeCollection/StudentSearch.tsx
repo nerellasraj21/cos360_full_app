@@ -92,7 +92,7 @@ export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
           <ClassesDropdown
             value={classId || ''}
             onChange={(val) => {
-              setClassId(val || null);
+              setClassId(val ? String(val) : null);
               setSectionId(null);
             }}
             placeholder="Class"
@@ -102,7 +102,7 @@ export default function StudentSearch({ onSelectStudent }: StudentSearchProps) {
           <SectionsByClassDropdown
             classId={classId || undefined}
             value={sectionId || ''}
-            onChange={(val) => setSectionId(val || null)}
+            onChange={(val) => setSectionId(val ? String(val) : null)}
             placeholder="Section"
           />
         </div>

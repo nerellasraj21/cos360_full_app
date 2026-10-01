@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Plus, Eye, Trash2, Loader2, ClipboardList, Edit, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { FilterBar } from '@/components/ui/FilterBar'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { DatePicker } from '@/components/ui/DatePicker'
 import { useExamList, useDeleteExam, useExamGradeSchemes, useUpdateExam, useExamDetail } from '@/api/hooks/exam/useExam'
 import { useSubjectsDropdown } from '@/api/hooks/masters/subjects'
 import { useAcademicYearStore } from '@/lib/academicYearStore'
@@ -26,9 +29,6 @@ import { useAuthStore } from '@/lib/authStore'
 import { isAdminRoleName } from '@/lib/roleUtils'
 import type { ExamListItem, ExamStatus, ExamNature, ExamBoard, ExamLevel } from '@/types/exam'
 
-// ---------------------------------------------------------------------------
-// Edit Exam Dialog (subcomponent)
-// ---------------------------------------------------------------------------
 interface EditExamDialogProps {
   examId: string
   onClose: () => void
@@ -101,10 +101,9 @@ function EditExamDialog({ examId, onClose }: EditExamDialogProps) {
         </div>
         <div className="space-y-1">
           <label className="text-sm font-medium">Mark Entry Deadline</label>
-          <Input
-            type="date"
+          <DatePicker
             value={form.mark_entry_deadline}
-            onChange={(e) => setForm(p => ({ ...p, mark_entry_deadline: e.target.value }))}
+            onChange={(v) => setForm(p => ({ ...p, mark_entry_deadline: v }))}
           />
         </div>
         <div className="space-y-1">
@@ -120,18 +119,16 @@ function EditExamDialog({ examId, onClose }: EditExamDialogProps) {
         </div>
         <div className="space-y-1">
           <label className="text-sm font-medium">Attendance From</label>
-          <Input
-            type="date"
+          <DatePicker
             value={form.attendance_from_date}
-            onChange={(e) => setForm(p => ({ ...p, attendance_from_date: e.target.value }))}
+            onChange={(v) => setForm(p => ({ ...p, attendance_from_date: v }))}
           />
         </div>
         <div className="space-y-1">
           <label className="text-sm font-medium">Attendance To</label>
-          <Input
-            type="date"
+          <DatePicker
             value={form.attendance_to_date}
-            onChange={(e) => setForm(p => ({ ...p, attendance_to_date: e.target.value }))}
+            onChange={(v) => setForm(p => ({ ...p, attendance_to_date: v }))}
           />
         </div>
         <div className="space-y-1">
@@ -165,7 +162,6 @@ function EditExamDialog({ examId, onClose }: EditExamDialogProps) {
   )
 }
 
-// ---------------------------------------------------------------------------
 
 const STATUS_BADGE: Record<ExamStatus, string> = {
   draft: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
@@ -204,11 +200,11 @@ export default function ExamList() {
     else { setSortKey(key); setSortDir('asc') }
   }
   const SortIcon = ({ col }: { col: string }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-75" />
     return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />
   }
 
-  const { data: exams = [], isLoading } = useExamList(
+  const { data: exams = [], isLoading, isError, error } = useExamList(
     selectedAcademicYearId
       ? {
           academic_year_id: selectedAcademicYearId,
@@ -253,7 +249,6 @@ export default function ExamList() {
         actions={isAdmin ? <Button onClick={() => navigate({ to: '/exam/exams/create' as any })} disabled={!hasGradingSetup} title={!hasGradingSetup ? 'Set up grading schemes before creating an exam' : ''} className="gap-2"><Plus className="h-4 w-4" /> Create Exam</Button> : null}
       />
 
-      {/* Grading warning */}
       {isAdmin && !hasGradingSetup && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
           <p className="text-sm text-amber-800 dark:text-amber-200">
@@ -268,13 +263,7 @@ export default function ExamList() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="space-y-2">
-      <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-        <Filter className="h-3.5 w-3.5" />
-        <span>Filters</span>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
+      <FilterBar>
         <div className="relative max-w-60">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
@@ -309,16 +298,21 @@ export default function ExamList() {
             <SelectItem value="custom">Custom</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-      </div>
+      </FilterBar>
 
-      {/* List */}
       {isLoading ? (
         <div className="space-y-2">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="h-14 animate-pulse rounded-lg bg-muted/50" />
           ))}
         </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-lg font-medium">Failed to load exams</p>
+            <p className="mt-1 text-sm text-muted-foreground">{error instanceof Error ? error.message : 'Please try again.'}</p>
+          </CardContent>
+        </Card>
       ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
@@ -435,7 +429,6 @@ export default function ExamList() {
         </div>
       )}
 
-      {/* Edit Dialog */}
       <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null); }} guardDirty={isEditDirty} onDirtyDiscard={() => setIsEditDirty(false)}>
         <DialogContent className="max-w-lg" onChange={() => setIsEditDirty(true)}>
           <DialogHeader>
@@ -447,24 +440,16 @@ export default function ExamList() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
-      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Exam?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            This will permanently delete <strong>{deleteTarget?.exam_name}</strong> and all its dates. This cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button variant="destructive" disabled={deleteMutation.isPending} onClick={handleDelete}>
-              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+        title="Delete Exam?"
+        description={`This will permanently delete ${deleteTarget?.exam_name ?? 'this exam'} and all its dates. This cannot be undone.`}
+        confirmLabel="Delete"
+        pendingLabel="Deleting..."
+        isPending={deleteMutation.isPending}
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

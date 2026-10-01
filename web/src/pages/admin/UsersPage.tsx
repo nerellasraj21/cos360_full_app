@@ -12,15 +12,16 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { adminUsersApi, type UserWithDetails, type UserUpdatePayload } from '@/api/admin/users';
 
 const ROLE_COLORS: Record<string, string> = {
-  Admin: 'bg-purple-100 text-purple-700',
-  Teacher: 'bg-blue-100 text-blue-700',
-  Staff: 'bg-green-100 text-green-700',
-  Student: 'bg-yellow-100 text-yellow-700',
-  Parent: 'bg-orange-100 text-orange-700',
+  Admin: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300',
+  Teacher: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
+  Staff: 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300',
+  Student: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300',
+  Parent: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300',
 };
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
@@ -30,7 +31,7 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
 };
 
 function RoleBadge({ role }: { role: string }) {
-  const cls = ROLE_COLORS[role] ?? 'bg-gray-100 text-gray-700';
+  const cls = ROLE_COLORS[role] ?? 'bg-muted text-muted-foreground';
   return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{role}</span>;
 }
 
@@ -42,9 +43,7 @@ function ViewUserDialog({ user, open, onClose }: { user: UserWithDetails | null;
     ['Username', user.username],
     ['Email', user.email ?? '—'],
     ['Role', <RoleBadge key="role" role={user.role_name} />],
-    ['Status', user.is_active
-      ? <Badge variant="outline" className="text-green-600 border-green-300">Active</Badge>
-      : <Badge variant="outline" className="text-red-500 border-red-300">Inactive</Badge>],
+    ['Status', <StatusBadge key="status" status={user.is_active} />],
     ['Entity Type', user.entity_type ? ENTITY_TYPE_LABELS[user.entity_type] ?? user.entity_type : '—'],
     ['Entity Name', user.entity_name ?? '—'],
     ['Created', user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'],
@@ -185,7 +184,7 @@ function ResetPasswordDialog({
           <div className="space-y-1.5">
             <Label htmlFor="confirm-pw">Confirm Password</Label>
             <Input id="confirm-pw" type="password" value={confirm} onChange={e => setConfirm(e.target.value)} />
-            {mismatch && <p className="text-xs text-red-500">Passwords do not match</p>}
+            {mismatch && <p className="text-xs text-destructive">Passwords do not match</p>}
           </div>
         </div>
         <DialogFooter>
@@ -371,21 +370,21 @@ export default function UsersPage() {
                           : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
-                        {user.is_active
-                          ? <Badge variant="outline" className="text-green-600 border-green-300">Active</Badge>
-                          : <Badge variant="outline" className="text-red-500 border-red-300">Inactive</Badge>}
+                        {<StatusBadge status={user.is_active} />}
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewUser(user)} title="View">
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditUser(user)} title="Edit">
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setResetUser(user)} title="Reset Password">
-                            <KeyRound className="h-3.5 w-3.5" />
-                          </Button>
+                          <PermissionGuard resource="user_management" action="update">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditUser(user)} title="Edit">
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setResetUser(user)} title="Reset Password">
+                              <KeyRound className="h-3.5 w-3.5" />
+                            </Button>
+                          </PermissionGuard>
                         </div>
                       </TableCell>
                     </TableRow>

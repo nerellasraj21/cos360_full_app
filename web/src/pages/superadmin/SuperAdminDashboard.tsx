@@ -87,7 +87,7 @@ const SuperAdminDashboard = () => {
             case 'healthy': return 'text-green-600';
             case 'warning': return 'text-yellow-600';
             case 'unhealthy': return 'text-red-600';
-            default: return 'text-gray-600';
+            default: return 'text-muted-foreground';
         }
     };
 

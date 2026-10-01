@@ -89,6 +89,7 @@ export default function StudentTransportPage() {
 
     const config: MasterPageConfig<StudentTransportOut, StudentTransportCreate> = {
         title: "Student Transport",
+        addButtonLabel: "Add Student Transport",
         columns,
         defaultValues,
         formFields,

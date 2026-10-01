@@ -24,6 +24,7 @@ import type {
   FeeReceiptListResponse
 } from '@/types/fee/receipt';
 import type { FeeTransaction } from '@/types/fee/transaction';
+import { logger } from '@/lib/config';
 
 interface ReceiptManagementProps {
   className?: string;
@@ -76,7 +77,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
       const response = await feeReceiptsApi.searchReceipts(searchParams);
       setReceipts(Array.isArray(response) ? response as unknown as FeeReceipt[] : response.items || []);
     } catch (error) {
-      console.error('Error loading receipts:', error);
+      logger.error('Error loading receipts:', error);
       toast.error('Failed to load receipts');
     } finally {
       setLoading(false);
@@ -104,7 +105,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
       const list = raw.filter((tx) => !tx.receipt_generated);
       setTransactions(list);
     } catch (error) {
-      console.error('Error loading transactions:', error);
+      logger.error('Error loading transactions:', error);
       toast.error('Failed to load transactions');
     } finally {
       setTransactionsLoading(false);
@@ -118,7 +119,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
       setReceiptContent(null);
       setVerification(null);
     } catch (error) {
-      console.error('Error loading receipt:', error);
+      logger.error('Error loading receipt:', error);
       toast.error('Failed to load receipt details');
     }
   };
@@ -130,7 +131,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
       const content = await feeReceiptsApi.getReceiptContent(selectedReceipt.id);
       setReceiptContent(content);
     } catch (error) {
-      console.error('Error loading receipt content:', error);
+      logger.error('Error loading receipt content:', error);
       toast.error('Failed to load receipt content');
     }
   };
@@ -142,7 +143,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
       const verificationResult = await feeReceiptsApi.verifyReceipt(selectedReceipt.id);
       setVerification(verificationResult);
     } catch (error) {
-      console.error('Error verifying receipt:', error);
+      logger.error('Error verifying receipt:', error);
       toast.error('Failed to verify receipt integrity');
     }
   };
@@ -155,7 +156,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
       setSelectedReceipt(reprintedReceipt);
       setShowReprintDialog(true);
     } catch (error) {
-      console.error('Error reprinting receipt:', error);
+      logger.error('Error reprinting receipt:', error);
       toast.error('Failed to reprint receipt');
     }
   };
@@ -171,7 +172,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
       });
       setShowReprintDialog(false);
     } catch (error) {
-      console.error('Error printing receipt:', error);
+      logger.error('Error printing receipt:', error);
       toast.error('Failed to print receipt');
     }
   };
@@ -183,7 +184,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
       toast.success('Receipt PDF downloaded');
       setShowReprintDialog(false);
     } catch (error) {
-      console.error('Error downloading receipt:', error);
+      logger.error('Error downloading receipt:', error);
       toast.error('Failed to download receipt PDF');
     }
   };
@@ -211,7 +212,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
       await feeReceiptsApi.downloadReceiptPdf(selectedReceipt.id, selectedReceipt.receipt_number);
       toast.success('Receipt PDF downloaded');
     } catch (error) {
-      console.error('Error downloading receipt:', error);
+      logger.error('Error downloading receipt:', error);
       toast.error('Failed to download receipt PDF');
     }
   };
@@ -275,7 +276,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                             <div className="flex flex-col">
                               <span className="font-medium">{transaction.transaction_number}</span>
                               <span className="text-sm text-muted-foreground">
-                                {transaction.student_admission_num || 'N/A'} • ₹{transaction.total_amount.toLocaleString()} • {transaction.payment_method.toUpperCase()}
+                                {transaction.student_admission_num || 'N/A'} • ₹{Number(transaction.total_amount).toLocaleString('en-IN')} • {transaction.payment_method.replace(/_/g, ' ').toUpperCase()}
                               </span>
                             </div>
                           </SelectItem>
@@ -292,18 +293,18 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
               </div>
 
               {selectedTransactionId && (
-                <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="bg-muted p-3 rounded-lg">
                   {(() => {
                     const selectedTx = transactions.find(tx => tx.id === selectedTransactionId);
                     return selectedTx ? (
                       <div className="space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="font-medium">{selectedTx.transaction_number}</span>
-                          <Badge variant="default">₹{selectedTx.total_amount.toLocaleString()}</Badge>
+                          <Badge variant="default">₹{Number(selectedTx.total_amount).toLocaleString('en-IN')}</Badge>
                         </div>
                         <div className="text-sm text-muted-foreground">
                           <div>Student: {selectedTx.student_admission_num || 'N/A'}</div>
-                          <div>Payment: {selectedTx.payment_method.toUpperCase()}</div>
+                          <div>Payment: {selectedTx.payment_method.replace(/_/g, ' ').toUpperCase()}</div>
                           <div>Date: {new Date(selectedTx.transaction_date).toLocaleDateString()}</div>
                         </div>
                       </div>
@@ -536,7 +537,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Total Amount</Label>
-                  <p className="text-lg font-semibold">₹{receiptContent.total_amount.toLocaleString()}</p>
+                  <p className="text-lg font-semibold">₹{Number(receiptContent.total_amount).toLocaleString('en-IN')}</p>
                 </div>
                 {receiptContent.payment_reference && (
                   <div>
@@ -572,7 +573,7 @@ export function ReceiptManagement({ className }: ReceiptManagementProps) {
                       <TableRow key={index}>
                         <TableCell>{item.fee_type_name}</TableCell>
                         <TableCell>{item.fee_term_name}</TableCell>
-                        <TableCell className="text-right">₹{item.amount_paid.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">₹{Number(item.amount_paid).toLocaleString('en-IN')}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

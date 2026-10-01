@@ -7,7 +7,7 @@ import { AlertTriangle } from "lucide-react";
 export default function NotFound() {
   return (
     <div className={cn("flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted")}> 
-      <Card className={cn("w-full max-w-md shadow-2xl border-0 bg-white/90 dark:bg-background/80 backdrop-blur-lg")}> 
+      <Card className={cn("w-full max-w-md shadow-2xl border-0 bg-card/90 backdrop-blur-lg")}> 
         <CardContent className={cn("flex flex-col items-center py-12")}> 
           <span className={cn("bg-destructive/10 rounded-full p-4 mb-6")}> 
             <AlertTriangle className={cn("w-16 h-16 text-destructive")} />

@@ -31,7 +31,7 @@ import { useFeeSummary, useFeeSummarySmsPreview, useSendFeeSummarySms, useTermsD
 import type { SmsSummaryPreview, TermsDueItem } from '@/types/fee';
 
 export function formatCurrency(amount: number): string {
-  return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `₹${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 interface FeeSummaryItem {
@@ -464,14 +464,14 @@ export default function FeeSummaryTab({ studentId, classId, onNavigateToOldFees 
                           {group.name} Total
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(group.items.reduce((s, i) => s + i.term_amount, 0))}
+                          {formatCurrency(group.items.reduce((s, i) => s + Number(i.term_amount), 0))}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(group.items.reduce((s, i) => s + i.paid_amount, 0))}
+                          {formatCurrency(group.items.reduce((s, i) => s + Number(i.paid_amount), 0))}
                         </TableCell>
                         <TableCell />
                         <TableCell className="text-right text-red-600">
-                          {formatCurrency(group.items.reduce((s, i) => s + i.adjusted_pending, 0))}
+                          {formatCurrency(group.items.reduce((s, i) => s + Number(i.adjusted_pending), 0))}
                         </TableCell>
                         <TableCell />
                       </TableRow>

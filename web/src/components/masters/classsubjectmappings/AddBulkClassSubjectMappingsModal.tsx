@@ -92,7 +92,7 @@ export function AddBulkClassSubjectMappingsModal({
   const handleSectionChange = (options: MultiValue<SelectOption>) => {
     // If "All Sections" is selected, only use that option
     const hasAllSections = options?.some(opt => opt.value === "ALL_SECTIONS");
-    const newSelection = hasAllSections ? [ALL_SECTIONS_OPTION] : (options || []);
+    const newSelection: SelectOption[] = hasAllSections ? [ALL_SECTIONS_OPTION] : [...(options || [])];
     setSelectedSections(newSelection);
     setIsFormDirty(true);
   };

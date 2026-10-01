@@ -104,7 +104,7 @@ export function GradeBandEditor({ bands, onChange, readOnly = false }: GradeBand
                 )}
                 <td className="px-2 py-1.5">
                   {readOnly ? (
-                    <span>{band.from_percent}</span>
+                    <span>{Number(band.from_percent)}</span>
                   ) : (
                     <Input
                       type="number"
@@ -118,7 +118,7 @@ export function GradeBandEditor({ bands, onChange, readOnly = false }: GradeBand
                 </td>
                 <td className="px-2 py-1.5">
                   {readOnly ? (
-                    <span>{band.to_percent}</span>
+                    <span>{Number(band.to_percent)}</span>
                   ) : (
                     <Input
                       type="number"
@@ -183,7 +183,7 @@ export function GradeBandEditor({ bands, onChange, readOnly = false }: GradeBand
                         onChange={(e) => updateBand(index, 'is_pass', e.target.checked)}
                         className="h-4 w-4"
                       />
-                      <span className={`text-xs font-medium ${band.is_pass ? 'text-green-600' : 'text-red-500'}`}>
+                      <span className={`text-xs font-medium ${band.is_pass ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
                         {band.is_pass ? 'Pass' : 'Fail'}
                       </span>
                     </label>
@@ -197,6 +197,7 @@ export function GradeBandEditor({ bands, onChange, readOnly = false }: GradeBand
                       size="sm"
                       onClick={() => removeBand(index)}
                       className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                      title="Remove band"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>

@@ -32,7 +32,6 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
 
    // Update academic_year_id when selectedAcademicYearId changes
    useEffect(() => {
-     console.log('AddClassAndSectionsModal: selectedAcademicYearId changed:', selectedAcademicYearId);
      setClassData(prev => ({
        ...prev,
        academic_year_id: selectedAcademicYearId || '',
@@ -87,8 +86,6 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    console.log('AddClassAndSectionsModal: Submitting with classData:', classData);
-    console.log('AddClassAndSectionsModal: selectedAcademicYearId:', selectedAcademicYearId);
 
     // Validate required fields
     if (!classData.name.trim()) {
@@ -100,7 +97,6 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
       return;
     }
     if (!classData.academic_year_id || !isValidUUID(classData.academic_year_id)) {
-      console.error('AddClassAndSectionsModal: Invalid academic_year_id:', classData.academic_year_id);
       toast.error('Valid academic year is required');
       return;
     }
@@ -110,7 +106,6 @@ export function AddClassAndSectionsModal({ onSubmit, isPending }: AddClassAndSec
     }
 
     const submitData = { ...classData, sections };
-    console.log('AddClassAndSectionsModal: Submitting data:', submitData);
     onSubmit(submitData);
     setIsOpen(false);
     setIsDirty(false);

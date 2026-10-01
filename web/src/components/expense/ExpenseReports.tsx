@@ -1,19 +1,17 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, FileText, BarChart3, TrendingUp, Calendar, DollarSign } from 'lucide-react';
+import { FileText, BarChart3, TrendingUp, Calendar, DollarSign, Loader2 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { useExpenseCategoryReport, useExpenseTypeReport, useExpenseTrendReport, useExpenseExportStatus } from '@/hooks/expense';
 import { formatCurrency } from '@/lib/expenseValidation';
-import { expenseNotifications } from '@/lib/expenseNotifications';
 import type { ExpenseReportFilter } from '@/types/expense';
-
-type ExportFormat = 'csv' | 'excel' | 'pdf' | 'json';
 
 export function ExpenseReports() {
   const [reportType, setReportType] = useState<'category' | 'type' | 'trend'>('category');
@@ -21,12 +19,11 @@ export function ExpenseReports() {
     start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     end_date: new Date().toISOString().split('T')[0]
   });
-  const [exportFormat, setExportFormat] = useState<ExportFormat>('csv');
-  const [exportId, setExportId] = useState<string | null>(null);
+  const [exportId] = useState<string | null>(null);
 
-  const { data: categoryReport, refetch: refetchCategory } = useExpenseCategoryReport(filters);
-  const { data: typeReport, refetch: refetchType } = useExpenseTypeReport(filters);
-  const { data: trendReport, refetch: refetchTrend } = useExpenseTrendReport(filters);
+  const { data: categoryReport, refetch: refetchCategory, isLoading: categoryLoading } = useExpenseCategoryReport(filters);
+  const { data: typeReport, refetch: refetchType, isLoading: typeLoading } = useExpenseTypeReport(filters);
+  const { data: trendReport, refetch: refetchTrend, isLoading: trendLoading } = useExpenseTrendReport(filters);
   const { data: exportStatus } = useExpenseExportStatus(exportId || '');
 
   const currentReport = reportType === 'category' ? categoryReport :
@@ -46,15 +43,8 @@ export function ExpenseReports() {
     }
   };
 
-  const handleExport = async () => {
-    try {
-      // This would call the export API
-      expenseNotifications.exportStarted();
-      // setExportId(exportResponse.export_id);
-    } catch (error) {
-      expenseNotifications.genericError('Failed to start export');
-    }
-  };
+  const reportLoading = reportType === 'category' ? categoryLoading :
+                        reportType === 'type' ? typeLoading : trendLoading;
 
   const renderCategoryReport = () => (
     <div className="space-y-4">
@@ -274,19 +264,11 @@ export function ExpenseReports() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Expense Reports</h2>
-          <p className="text-muted-foreground">Generate and analyze expense reports</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Expense Reports"
+        subtitle="Generate and analyze expense reports"
+        icon={<BarChart3 className="h-5 w-5" />}
+      />
 
       {/* Report Configuration */}
       <Card>
@@ -294,7 +276,7 @@ export function ExpenseReports() {
           <CardTitle>Report Configuration</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="report_type">Report Type</Label>
               <Select value={reportType} onValueChange={(value: any) => setReportType(value)}>
@@ -311,38 +293,22 @@ export function ExpenseReports() {
 
             <div>
               <Label htmlFor="start_date">Start Date</Label>
-              <Input
-                id="start_date"
-                type="date"
+              <DatePicker
                 value={filters.start_date}
-                onChange={(e) => setFilters(prev => ({ ...prev, start_date: e.target.value }))}
+                onChange={(value) => setFilters(prev => ({ ...prev, start_date: value }))}
+                max={filters.end_date}
               />
             </div>
 
             <div>
               <Label htmlFor="end_date">End Date</Label>
-              <Input
-                id="end_date"
-                type="date"
+              <DatePicker
                 value={filters.end_date}
-                onChange={(e) => setFilters(prev => ({ ...prev, end_date: e.target.value }))}
+                onChange={(value) => setFilters(prev => ({ ...prev, end_date: value }))}
+                min={filters.start_date}
               />
             </div>
 
-            <div>
-              <Label htmlFor="export_format">Export Format</Label>
-              <Select value={exportFormat} onValueChange={(value: any) => setExportFormat(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="csv">CSV</SelectItem>
-                  <SelectItem value="excel">Excel</SelectItem>
-                  <SelectItem value="pdf">PDF</SelectItem>
-                  <SelectItem value="json">JSON</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <div className="mt-4">
@@ -355,7 +321,14 @@ export function ExpenseReports() {
       </Card>
 
       {/* Report Content */}
-      {currentReport && (
+      {reportLoading && (
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2 text-muted-foreground">Loading report...</span>
+        </div>
+      )}
+
+      {!reportLoading && currentReport && (
         <div>
           {reportType === 'category' && renderCategoryReport()}
           {reportType === 'type' && renderTypeReport()}
@@ -376,7 +349,7 @@ export function ExpenseReports() {
               </Badge>
               <span className="text-sm">
                 {exportStatus.status === 'completed' && exportStatus.file_url && (
-                  <a href={exportStatus.file_url} className="text-blue-600 hover:underline">
+                  <a href={exportStatus.file_url} className="text-primary hover:underline">
                     Download Report
                   </a>
                 )}

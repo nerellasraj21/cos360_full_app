@@ -153,14 +153,7 @@ export const useAuthStore = create<AuthState>()(
           }
         }
 
-        const hasPerm = permissionsMap[resource]?.includes(action) || false;
-        console.log(`authStore.hasPermission: Checking ${resource}:${action}`, {
-          permissionsMap,
-          resourceExists: !!permissionsMap[resource],
-          actionsForResource: permissionsMap[resource],
-          hasPerm
-        });
-        return hasPerm;
+        return permissionsMap[resource]?.includes(action) || false;
       },
     }),
     {

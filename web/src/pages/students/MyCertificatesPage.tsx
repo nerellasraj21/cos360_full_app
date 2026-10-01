@@ -1,4 +1,5 @@
 import React from "react";
+import { config } from "@/lib/config";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DownloadButton } from "@/components/common/TableActions";
 import { FileText, Loader2, ScrollText } from "lucide-react";
@@ -7,6 +8,8 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { useMyCertificates, useDownloadCertificateDocument } from "@/api/hooks/students/certificates";
 import { useAuthStore } from "@/lib/authStore";
 import type { CertificateRead } from "@/types/certificates/types";
+
+const mediaBase = config.api.baseURL.replace(/\/api\/v\d+$/, '');
 
 export const MyCertificatesPage: React.FC = () => {
   const { isAuthenticated } = useAuthStore();
@@ -19,7 +22,10 @@ export const MyCertificatesPage: React.FC = () => {
   const handleDownload = async (certificateId: string) => {
     try {
       const result = await downloadCertificate.mutateAsync(certificateId);
-      window.location.href = result.presigned_url;
+      const url = result.presigned_url.startsWith('http')
+        ? result.presigned_url
+        : `${mediaBase}${result.presigned_url}`;
+      window.open(url, '_blank');
     } catch {
       // handled by mutation
     }
@@ -61,7 +67,7 @@ export const MyCertificatesPage: React.FC = () => {
             </div>
           ) : certificates.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
+              <FileText className="h-12 w-12 mx-auto mb-4 opacity-75" />
               <p>No certificates found.</p>
               <p className="text-sm">Certificates issued to you will appear here.</p>
             </div>

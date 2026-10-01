@@ -402,7 +402,7 @@ export function MasterPage<
                       }
                     }}
                     onSelect={(e) => e.preventDefault()}
-                    className="cursor-pointer font-medium border-b border-b-gray-200"
+                    className="cursor-pointer font-medium border-b border-b-border"
                   >
                     Select All
                   </DropdownMenuCheckboxItem>
@@ -533,7 +533,7 @@ export function MasterPage<
           action="read"
           fallback={
             <div className="flex items-center justify-center h-32">
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 You don't have permission to view this data.
               </p>
             </div>

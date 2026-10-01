@@ -391,21 +391,18 @@ const RolesPermissionsPage: React.FC = () => {
 
   const handleCreateAcademicYear = () => {
     // Mock implementation - in real app would call API
-    console.log('Creating academic year:', academicYearForm);
     setIsAcademicYearDialogOpen(false);
     setAcademicYearForm({ title: '', start_date: '', end_date: '', is_active: true });
   };
 
   const handleCreateFeeCategory = () => {
     // Mock implementation - in real app would call API
-    console.log('Creating fee category:', feeCategoryForm);
     setIsFeeCategoryDialogOpen(false);
     setFeeCategoryForm({ category_name: '', academic_year_id: '', is_active: true });
   };
 
   const handleCreateClass = () => {
     // Mock implementation - in real app would call API
-    console.log('Creating class:', classForm);
     setIsClassDialogOpen(false);
     setClassForm({ class_name: '', sections: [{ section_name: '' }] });
   };
@@ -489,7 +486,7 @@ const RolesPermissionsPage: React.FC = () => {
       case 'read': return 'bg-blue-100 text-blue-800';
       case 'update': return 'bg-yellow-100 text-yellow-800';
       case 'delete': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      default: return 'bg-muted text-foreground';
     }
   };
 
@@ -880,13 +877,6 @@ const RolesPermissionsPage: React.FC = () => {
           >
             Permission Matrix
           </Button>
-          {/* <Button
-            variant={activeTab === 'operations' ? 'default' : 'ghost'}
-            onClick={() => setActiveTab('operations')}
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary"
-          >
-            Operations
-          </Button> */}
         </div>
 
         {activeTab === 'roles' && (

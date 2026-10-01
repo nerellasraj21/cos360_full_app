@@ -12,33 +12,7 @@ import { ParentProfileEdit } from '@/components/parent/ParentProfileEdit';
 import type { ParentProfileOut } from '@/types/parent';
 
 export function ParentProfile() {
-  return (
-    // <PermissionGuard
-    //   resource="parent_profile"
-    //   action="read_own"
-    //   fallback={
-    //     <div className="p-6 space-y-6">
-    //       <div className="flex items-center justify-center min-h-[400px]">
-    //         <Card className="w-full max-w-md">
-    //           <CardContent className="pt-6">
-    //             <div className="text-center space-y-4">
-    //               <User className="h-16 w-16 text-muted-foreground mx-auto" />
-    //               <div>
-    //                 <h2 className="text-xl font-semibold text-foreground">Access Denied</h2>
-    //                 <p className="text-muted-foreground mt-2">
-    //                   You don't have permission to view your profile.
-    //                 </p>
-    //               </div>
-    //             </div>
-    //           </CardContent>
-    //         </Card>
-    //       </div>
-    //     </div>
-    //   }
-    // >
-      <ParentProfileContent />
-    // </PermissionGuard>
-  );
+  return <ParentProfileContent />;
 }
 
 function ParentProfileContent() {
@@ -99,7 +73,6 @@ function ParentProfileContent() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <PageHeader title="My Profile" icon={<User className="h-5 w-5" />} subtitle="Manage your personal information and view your children" />
 
@@ -111,7 +84,6 @@ function ParentProfileContent() {
         </PermissionGuard>
       </div>
 
-      {/* Profile Information */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -161,7 +133,6 @@ function ParentProfileContent() {
         </CardContent>
       </Card>
 
-      {/* Children Information */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

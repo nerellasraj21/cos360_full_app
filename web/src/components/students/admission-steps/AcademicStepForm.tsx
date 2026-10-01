@@ -42,6 +42,7 @@ export const AcademicStepForm = () => {
           <Input
             id="admission_date"
             type="date"
+            className="[color-scheme:light] dark:[color-scheme:dark]"
             max={new Date().toISOString().split('T')[0]}
             {...register('admission_date', {
               required: 'Admission date is required',

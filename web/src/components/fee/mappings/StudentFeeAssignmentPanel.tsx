@@ -28,6 +28,7 @@ import { fetchStudentsDropdown } from '@/api/students/admissions';
 import { formatCurrency } from '@/pages/fee/FeeCollection/FeeSummaryTab';
 import type { StudentDropdownItem } from '@/types/admission';
 import type { FeeClassMapping } from '@/types/fee/mapping';
+import { logger } from '@/lib/config';
 
 type StudentOption = { value: string; label: string } | null;
 
@@ -43,7 +44,7 @@ export function StudentFeeAssignmentPanel() {
     setStudentsLoading(true);
     fetchStudentsDropdown(false, selectedClassId || undefined, selectedSectionId || undefined)
       .then(setStudents)
-      .catch(console.error)
+      .catch((error) => logger.error('Failed to load students', error))
       .finally(() => setStudentsLoading(false));
   }, [selectedClassId, selectedSectionId]);
 

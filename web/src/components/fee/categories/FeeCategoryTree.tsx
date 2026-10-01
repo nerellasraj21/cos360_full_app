@@ -15,6 +15,7 @@ import { CategoryTypeManager } from './CategoryTypeManager';
 import type { FeeCategory, FeeCategoryInput, CategoryStatus } from '@/types/fee/category';
 import type { FeeType } from '@/types/fee/type';
 import { toast } from 'sonner';
+import { logger } from '@/lib/config';
 
 interface FeeCategoryTreeProps {
     className?: string;
@@ -266,7 +267,6 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
         setCurrentPage(1); // Reset to first page
     };
 
-    console.log('[FeeCategoryTree] Render check:', { isLoading, error, categoriesLength: categories.length });
 
     if (isLoading && !isFetching && !categoriesResponse) {
         return (
@@ -280,7 +280,7 @@ export function FeeCategoryTree({ className }: FeeCategoryTreeProps) {
     }
 
     if (error) {
-        console.error('[FeeCategoryTree] Error loading categories:', error);
+        logger.error('[FeeCategoryTree] Error loading categories:', error);
         return (
             <div className={cn("p-6", className)}>
                 <div className="text-center py-8 text-red-600">

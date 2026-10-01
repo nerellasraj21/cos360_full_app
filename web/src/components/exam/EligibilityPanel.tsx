@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Loader2, CheckCircle, XCircle, AlertTriangle, Filter, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { FilterBar } from '@/components/ui/FilterBar'
+import { Loader2, CheckCircle, XCircle, AlertTriangle, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import type { HallTicketEligibility } from '@/types/exam'
 import { useOverrideHallTicket } from '@/api/hooks/exam/useExam'
 
@@ -11,6 +12,12 @@ interface EligibilityPanelProps {
   items: HallTicketEligibility[]
   isLoading?: boolean
   showOverride?: boolean
+}
+
+const REASON_LABEL: Record<string, string> = {
+  FEE_PENDING: 'Fee payment pending',
+  LOW_ATTENDANCE: 'Attendance below requirement',
+  BOTH: 'Fee pending and low attendance',
 }
 
 export function EligibilityPanel({ examId, items, isLoading, showOverride }: EligibilityPanelProps) {
@@ -24,7 +31,7 @@ export function EligibilityPanel({ examId, items, isLoading, showOverride }: Eli
     else { setSortKey(key); setSortDir('asc') }
   }
   const SortIcon = ({ col }: { col: string }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-75" />
     return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />
   }
   const filteredItems = useMemo(() => {
@@ -50,6 +57,7 @@ export function EligibilityPanel({ examId, items, isLoading, showOverride }: Eli
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading students...</span>
       </div>
     )
   }
@@ -64,16 +72,12 @@ export function EligibilityPanel({ examId, items, isLoading, showOverride }: Eli
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-          <Filter className="h-3.5 w-3.5" />
-          <span>Filters</span>
-        </div>
+      <FilterBar className="mb-0">
         <div className="relative max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input placeholder="Search by student name or admission number..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
         </div>
-      </div>
+      </FilterBar>
       <div className="overflow-x-auto rounded-lg border">
       <table className="w-full text-sm">
         <thead>
@@ -94,8 +98,8 @@ export function EligibilityPanel({ examId, items, isLoading, showOverride }: Eli
           ) : filteredItems.map((item, idx) => (
             <tr key={item.student_id} className="border-b hover:bg-muted/10" style={{ height: '48px' }}>
               <td className="px-3 py-2 text-muted-foreground text-sm">{idx + 1}</td>
-              <td className="px-4 py-2 font-medium">{item.student_name}</td>
-              <td className="px-3 py-2 text-xs text-muted-foreground">{item.admission_number}</td>
+              <td className="px-4 py-2 font-medium">{item.student_name ?? '—'}</td>
+              <td className="px-3 py-2 text-xs text-muted-foreground">{item.admission_number ?? '—'}</td>
               <td className="px-3 py-2 text-center">
                 {item.attendance_override ? (
                   <Badge variant="outline" className="gap-1 text-xs">
@@ -126,7 +130,7 @@ export function EligibilityPanel({ examId, items, isLoading, showOverride }: Eli
               <td className="px-3 py-2">
                 {item.ineligibility_reason ? (
                   <p className="text-xs text-destructive">
-                    • {String(item.ineligibility_reason).replace(/_/g, ' ')}
+                    {REASON_LABEL[item.ineligibility_reason] ?? String(item.ineligibility_reason).replace(/_/g, ' ').toLowerCase()}
                   </p>
                 ) : (
                   <span className="text-xs text-muted-foreground">—</span>
@@ -137,23 +141,25 @@ export function EligibilityPanel({ examId, items, isLoading, showOverride }: Eli
                   <div className="flex items-center justify-center gap-1">
                     {!item.attendance_ok && (
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         className="text-xs h-7 px-2"
+                        title="Override attendance requirement"
                         disabled={item.attendance_override || overrideMutation.isPending}
                         onClick={() => overrideMutation.mutate({
                           studentId: item.student_id,
                           overrides: { attendance_override: true },
                         })}
                       >
-                        Att.
+                        Attendance
                       </Button>
                     )}
                     {!item.fee_paid && (
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         className="text-xs h-7 px-2"
+                        title="Override fee requirement"
                         disabled={item.fee_override || overrideMutation.isPending}
                         onClick={() => overrideMutation.mutate({
                           studentId: item.student_id,

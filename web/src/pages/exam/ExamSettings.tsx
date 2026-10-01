@@ -39,7 +39,7 @@ const settingsSchema = z.object({
 type SettingsForm = z.infer<typeof settingsSchema>
 
 export default function ExamSettingsPage() {
-  const { data: settings, isLoading } = useExamSettings()
+  const { data: settings, isLoading, isError, error } = useExamSettings()
   const updateMutation = useUpdateExamSettings()
 
   const form = useForm<SettingsForm>({
@@ -61,8 +61,8 @@ export default function ExamSettingsPage() {
       form.reset({
         default_board: settings.default_board ?? null,
         custom_board_name: settings.custom_board_name ?? null,
-        hall_ticket_min_attendance: settings.hall_ticket_min_attendance ?? 75,
-        hall_ticket_min_fee_paid_pct: settings.hall_ticket_min_fee_paid_pct ?? null,
+        hall_ticket_min_attendance: settings.hall_ticket_min_attendance != null ? Number(settings.hall_ticket_min_attendance) : 75,
+        hall_ticket_min_fee_paid_pct: settings.hall_ticket_min_fee_paid_pct != null ? Number(settings.hall_ticket_min_fee_paid_pct) : null,
         grace_max_per_subject: settings.grace_max_per_subject ?? 2,
         grace_max_subjects: settings.grace_max_subjects ?? 3,
         grace_auto_apply: settings.grace_auto_apply ?? false,
@@ -79,6 +79,15 @@ export default function ExamSettingsPage() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading settings...</span>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-lg border bg-muted/20 p-8 text-center">
+        <p className="text-muted-foreground">{error instanceof Error ? error.message : 'Failed to load exam settings.'}</p>
       </div>
     )
   }
@@ -90,7 +99,6 @@ export default function ExamSettingsPage() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Board Configuration */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Board Configuration</CardTitle>
@@ -143,7 +151,6 @@ export default function ExamSettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Hall Ticket Settings */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Hall Ticket Settings</CardTitle>
@@ -175,7 +182,6 @@ export default function ExamSettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Fee Payment Policy */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Fee Payment Policy</CardTitle>

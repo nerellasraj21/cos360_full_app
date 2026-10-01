@@ -85,6 +85,21 @@ export interface StaffInput {
   department?: string;
   is_active?: boolean;
   role_id?: string;
+  work_org?: string;
+  work_from_date?: string;
+  work_to_date?: string;
+  subjects_dealt?: string;
+  work_remarks?: string;
+  bank_name?: string;
+  bank_branch?: string;
+  account_number?: string;
+  ifsc_code?: string;
+  account_holder_name?: string;
+  account_type?: 'Savings' | 'Current';
+  last_drawn_salary?: number;
+  current_salary?: number;
+  pf_account_number?: string;
+  uan_number?: string;
 }
 
 export interface StaffUpdateRequest {

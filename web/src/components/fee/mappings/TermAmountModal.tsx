@@ -1,16 +1,3 @@
-/*
- * Term Amount Modal Component
- * 
- * BACKEND INTEGRATION TODO:
- * When implementing the backend, uncomment the following:
- * 1. Import statements for API hooks (lines ~8-9)
- * 2. useFeeTermAmounts and useFeeType hook calls (lines ~25-27)
- * 3. useSetTermAmounts mutation hook (lines ~28)
- * 4. Replace mock data with API data (lines ~30-85)
- * 
- * The component currently uses sample fee type data with term structures.
- */
-
 import React, { useState, useEffect } from 'react';
 import { Calculator, AlertCircle, CheckCircle, DivideSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,6 +11,7 @@ import { useFeeTerm, useFeeTermDates } from '@/hooks/fee/useFeeTerms';
 import { usePermission } from '@/hooks/usePermission';
 import type { FeeClassMapping, FeeTermAmount, FeeTermAmountCreateRequest } from '@/types/fee';
 import { toast } from 'sonner';
+import { logger } from '@/lib/config';
 
 interface TermAmountModalProps {
     mapping: FeeClassMapping;
@@ -34,8 +22,8 @@ interface TermAmountModalProps {
 interface TermAmountFormData {
     term_number: number;
     term_amount: number;
-    term_id?: string;  // ⚠️ DEPRECATED - For backward compatibility only
-    term_date_id?: string;  // ✅ NEW - Use this for new code
+    term_id?: string;  // DEPRECATED - For backward compatibility only
+    term_date_id?: string;  // NEW - Use this for new code
     term_name?: string;
     due_date?: string;
 }
@@ -72,7 +60,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
         if (open && !termAmountsLoading) {
             // Check if fee term exists and has valid ID
             if (!feeTerm?.id) {
-                console.warn('Fee term not found or invalid for fee type:', feeType?.id);
+                logger.warn('Fee term not found or invalid for fee type:', feeType?.id);
                 // Fallback to existing data or default
                 const fallbackTerms = existingTermAmounts.length > 0 ? existingTermAmounts.length : 1;
                 const initialTermAmounts: TermAmountFormData[] = [];
@@ -81,7 +69,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                     const existingAmount = existingTermAmounts[i];
                     initialTermAmounts.push({
                         term_number: i + 1,
-                        term_amount: existingAmount ? existingAmount.term_amount : 0,
+                        term_amount: existingAmount ? Number(existingAmount.term_amount) : 0,
                         term_date_id: existingAmount?.term_date_id || existingAmount?.term_id || `fallback_term_${i + 1}`,
                         term_id: existingAmount?.term_id,  // Keep for backward compatibility
                         term_name: existingAmount?.term_name || `Term ${i + 1}`,
@@ -99,12 +87,6 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
             const initialTermAmounts: TermAmountFormData[] = [];
 
             // Check if we have term dates available (these should have unique IDs for each term)
-            console.log('TermAmountModal: Initializing with:', {
-                feeTermId: feeTerm.id,
-                numberOfTerms,
-                termDatesCount: termDates?.length,
-                existingTermAmountsCount: existingTermAmounts.length
-            });
 
             if (termDates && termDates.length === numberOfTerms) {
                 for (let i = 0; i < numberOfTerms; i++) {
@@ -116,22 +98,22 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                     // old (now deleted) term_date_id, which the backend would reject.
                     initialTermAmounts.push({
                         term_number: i + 1,
-                        term_amount: existingAmount ? existingAmount.term_amount : 0,
-                        term_date_id: termDate.id, // ✅ Always the current term date
-                        term_id: feeTerm.id, // ⚠️ Keep for backward compatibility
+                        term_amount: existingAmount ? Number(existingAmount.term_amount) : 0,
+                        term_date_id: termDate.id, // Always the current term date
+                        term_id: feeTerm.id, // Keep for backward compatibility
                         term_name: feeTerm.term_name ? `${feeTerm.term_name} - Term ${i + 1}` : `Term ${i + 1}`,
                         due_date: termDate.fee_term_date
                     });
                 }
             } else {
                 // Fallback: Use fee_term.id with term number suffix to ensure uniqueness
-                console.warn('Term dates not available or mismatched count, using fallback term IDs');
+                logger.warn('Term dates not available or mismatched count, using fallback term IDs');
                 for (let i = 0; i < numberOfTerms; i++) {
                     const existingAmount = existingTermAmounts[i];
 
                     initialTermAmounts.push({
                         term_number: i + 1,
-                        term_amount: existingAmount ? existingAmount.term_amount : 0,
+                        term_amount: existingAmount ? Number(existingAmount.term_amount) : 0,
                         term_date_id: existingAmount?.term_date_id || `${feeTerm.id}_term_${i + 1}`, // Ensure uniqueness
                         term_id: existingAmount?.term_id || feeTerm.id, // Keep for backward compatibility
                         term_name: existingAmount?.term_name || (feeTerm.term_name ? `${feeTerm.term_name} - Term ${i + 1}` : `Term ${i + 1}`),
@@ -262,7 +244,6 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                 }
             });
 
-            console.log('TermAmountModal: Saving term amounts:', { toUpdate, toCreate });
 
             if (toUpdate.length > 0) {
                 mutationStarted = true;
@@ -283,7 +264,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
             setIsFormDirty(false);
             onOpenChange(false);
         } catch (error) {
-            console.error('TermAmountModal: Save error:', error);
+            logger.error('TermAmountModal: Save error:', error);
             // The mutation hooks toast their own failures; anything thrown before a
             // mutation ran would otherwise disappear silently.
             if (!mutationStarted) {
@@ -348,7 +329,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                             <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
                                     <span className="font-medium text-foreground">Fee Type:</span>
-                                    <div className="text-foreground">{feeType?.type_name || `Fee Type ${mapping.fee_type_id}`}</div>
+                                    <div className="text-foreground">{feeType?.type_name || 'Fee Type'}</div>
                                     <div className="text-xs text-muted-foreground">{feeType?.fee_category_name || 'Category info not available'}</div>
                                 </div>
                                 <div>
@@ -385,13 +366,13 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                         <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
                                 <span className="font-medium text-foreground">Fee Type:</span>
-                                <div className="text-foreground">{feeType?.type_name || `Fee Type ${mapping.fee_type_id}`}</div>
+                                <div className="text-foreground">{feeType?.type_name || 'Fee Type'}</div>
                                 <div className="text-xs text-muted-foreground">{feeType?.fee_category_name || 'Category info not available'}</div>
                             </div>
                             <div>
                                 <span className="font-medium text-foreground">Total Amount:</span>
                                 <div className="text-lg font-semibold text-foreground">
-                                    ₹{(mapping.total_fee || 0).toLocaleString()}
+                                    ₹{Number(mapping.total_fee || 0).toLocaleString('en-IN')}
                                 </div>
                             </div>
                             <div>
@@ -464,7 +445,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                                             />
                                         </div>
                                         <div className="w-20 text-right text-sm text-muted-foreground">
-                                            ₹{(termAmount.term_amount || 0).toLocaleString()}
+                                            ₹{Number(termAmount.term_amount || 0).toLocaleString('en-IN')}
                                         </div>
                                     </div>
                                 );
@@ -478,7 +459,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                             <div>
                                 <div className="text-sm font-medium text-foreground">Total Term Amount:</div>
                                 <div className="text-lg font-semibold text-foreground">
-                                    ₹{(getTotalTermAmount() || 0).toLocaleString()}
+                                    ₹{Number(getTotalTermAmount() || 0).toLocaleString('en-IN')}
                                 </div>
                             </div>
                             <div className="text-right">
@@ -508,7 +489,7 @@ export function TermAmountModal({ mapping, open, onOpenChange }: TermAmountModal
                         {!isValidDistribution() && (
                             <div className="mt-2 p-2 bg-destructive/10 border border-destructive/30 rounded text-sm text-destructive">
                                 <AlertCircle className="h-4 w-4 inline mr-1" />
-                                The sum of term amounts must equal the total fee amount (₹{(mapping.total_fee || 0).toLocaleString()}).
+                                The sum of term amounts must equal the total fee amount (₹{Number(mapping.total_fee || 0).toLocaleString('en-IN')}).
                             </div>
                         )}
                     </div>

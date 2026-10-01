@@ -4,11 +4,12 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Check, Loader2, Save,
-  Plus, Trash2, AlertCircle, Copy, X,
+  Plus, Trash2, AlertCircle, Copy, X, ClipboardList,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { DatePicker } from '@/components/ui/DatePicker'
 import ReactSelect from 'react-select'
 import { useSelectStyles } from '@/lib/useSelectStyles'
@@ -77,11 +78,9 @@ export default function CreateExam() {
     venue: '',
   })
 
-  // E1: copy config panel state
   const [showCopyPanel, setShowCopyPanel] = useState(false)
   const [copyTargetKeys, setCopyTargetKeys] = useState<Set<string>>(new Set())
 
-  // Available classes from backend
   const [availableClasses, setAvailableClasses] = useState<any[]>([])
 
   const createMutation = useCreateExamFull()
@@ -103,28 +102,24 @@ export default function CreateExam() {
     },
   })
 
-  // Ensure academic years are loaded into the store
   useEffect(() => {
     if (academicYears.length === 0) {
       fetchAndSetAcademicYears()
     }
   }, [academicYears.length, fetchAndSetAcademicYears])
 
-  // Keep form academic_year_id in sync with the globally selected academic year
   useEffect(() => {
     if (selectedAcademicYearId) {
       form.setValue('academic_year_id', selectedAcademicYearId)
     }
   }, [selectedAcademicYearId])
 
-  // Load available classes — correct endpoint: /masters/class_sections/read_all
   useEffect(() => {
     CAxios.get('/masters/class_sections/read_all').then(r => {
       setAvailableClasses(r.data ?? [])
     }).catch(() => {})
   }, [])
 
-  // Bulk-fetch subjects for all selected classes via /by-classes
   const selectedClassIds = useMemo(
     () => [...new Set(classSections.map(cs => cs.class_id))],
     [classSections]
@@ -144,7 +139,6 @@ export default function CreateExam() {
     return result
   }, [byClassesData])
 
-  // Auto-sync hidden exam_type with exam_name
   const watchedExamName = form.watch('exam_name')
   useEffect(() => {
     form.setValue('exam_type', watchedExamName || '', { shouldValidate: false })
@@ -177,7 +171,6 @@ export default function CreateExam() {
     setNewDate(prev => ({ ...prev, subject_id: '', exam_date: '', start_time: '', end_time: '', venue: '' }))
   }
 
-  // E1: copy subject configs from active class-section to selected targets
   const copyConfigToTargets = () => {
     const [srcClassId, srcSectionId] = validActiveTab.split('|')
     const srcConfigs = subjectConfigs.filter(
@@ -210,7 +203,6 @@ export default function CreateExam() {
     toast.success(`Config copied to ${copyTargetKeys.size} class-section(s)`)
   }
 
-  // Active tab: fall back to first class-section if current tab was removed
   const validActiveTab = classSections.find(
     cs => `${cs.class_id}|${cs.section_id ?? ''}` === activeClassTab
   )
@@ -219,7 +211,6 @@ export default function CreateExam() {
       ? `${classSections[0].class_id}|${classSections[0].section_id ?? ''}`
       : ''
 
-  // Only count configs for currently selected class-sections (ignore stale wizard data)
   const selectedCsKeys = new Set(classSections.map(cs => `${cs.class_id}|${cs.section_id ?? ''}`))
   const activeConfigs = subjectConfigs.filter(cfg => selectedCsKeys.has(`${cfg.class_id}|${cfg.section_id ?? ''}`))
 
@@ -250,7 +241,6 @@ export default function CreateExam() {
       setActiveSection(2)
       return
     }
-    // Filter out blank/unconfigured subject configs AND stale configs for deselected class-sections
     const isBlankConfig = (cfg: SubjectConfigPayload) =>
       cfg.components.length === 1 &&
       !cfg.components[0].component_name?.trim() &&
@@ -268,7 +258,6 @@ export default function CreateExam() {
       return
     }
 
-    // Validate the remaining (non-blank) configs
     for (const cfg of configsToSend) {
       for (const comp of cfg.components) {
         if (!comp.component_name?.trim()) {
@@ -284,7 +273,6 @@ export default function CreateExam() {
       }
     }
 
-    // Sanitize: empty strings → null, string numbers → number
     const raw = form.getValues()
     const details = {
       ...raw,
@@ -325,10 +313,9 @@ export default function CreateExam() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Create Exam</h1>
+      <PageHeader title="Create Exam" subtitle="Set up a new examination" icon={<ClipboardList className="h-5 w-5" />} />
 
       <div className="rounded-lg border bg-card">
-        {/* Wizard tab bar */}
         <div className="flex overflow-x-auto border-b">
           {WIZARD_TABS.map(({ num, label }) => {
             const isActive = activeSection === num
@@ -359,10 +346,8 @@ export default function CreateExam() {
           })}
         </div>
 
-        {/* Tab content */}
         <div className="px-5 py-4">
 
-          {/* Section 1: Exam Details */}
           {activeSection === 1 && (
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1 md:col-span-2">
@@ -470,7 +455,6 @@ export default function CreateExam() {
             </div>
           )}
 
-          {/* Section 2: Class & Sections */}
           {activeSection === 2 && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">Select which class-section combinations this exam applies to</p>
@@ -495,7 +479,6 @@ export default function CreateExam() {
             </div>
           )}
 
-          {/* Section 3: Subject Configuration */}
           {activeSection === 3 && (
             <div className="space-y-3">
               {classSections.length === 0 ? (
@@ -504,7 +487,6 @@ export default function CreateExam() {
                 </div>
               ) : (
                 <>
-                  {/* Class-section tabs */}
                   <div className="flex flex-wrap gap-0 border-b">
                     {classSections.map((cs) => {
                       const classInfo = availableClasses.find(c => c.id === cs.class_id)
@@ -512,7 +494,7 @@ export default function CreateExam() {
                       const tabKey = `${cs.class_id}|${cs.section_id ?? ''}`
                       const tabLabel = classInfo
                         ? (sectionInfo ? `${classInfo.name} – ${sectionInfo.name}` : classInfo.name)
-                        : cs.class_id
+                        : 'Class'
                       const isActive = validActiveTab === tabKey
                       const configuredCount = subjectConfigs.filter(
                         c => c.class_id === cs.class_id && c.section_id === cs.section_id
@@ -539,7 +521,6 @@ export default function CreateExam() {
                     })}
                   </div>
 
-                  {/* E1: Copy config to other classes */}
                   {classSections.length > 1 && validActiveTab && (
                     <div className="flex items-center justify-end gap-2">
                       {showCopyPanel ? (
@@ -550,7 +531,7 @@ export default function CreateExam() {
                             .map(cs => {
                               const ci = availableClasses.find(c => c.id === cs.class_id)
                               const si = ci?.sections?.find((s: any) => s.id === cs.section_id)
-                              const lbl = ci ? (si ? `${ci.name} – ${si.name}` : ci.name) : cs.class_id
+                              const lbl = ci ? (si ? `${ci.name} – ${si.name}` : ci.name) : 'Class'
                               const k = `${cs.class_id}|${cs.section_id ?? ''}`
                               return (
                                 <label key={k} className="flex items-center gap-1 cursor-pointer">
@@ -590,7 +571,6 @@ export default function CreateExam() {
                     </div>
                   )}
 
-                  {/* Active class-section accordion */}
                   {classSections
                     .filter(cs => `${cs.class_id}|${cs.section_id ?? ''}` === validActiveTab)
                     .map((cs) => {
@@ -632,7 +612,6 @@ export default function CreateExam() {
             </div>
           )}
 
-          {/* Section 4: Exam Dates */}
           {activeSection === 4 && (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">Add exam dates now or later from the exam detail page</p>
@@ -649,7 +628,7 @@ export default function CreateExam() {
                           const sectionInfo = classInfo?.sections?.find((s: any) => s.id === cs.section_id)
                           const label = classInfo
                             ? (sectionInfo ? `${classInfo.name} – ${sectionInfo.name}` : classInfo.name)
-                            : cs.class_id
+                            : 'Class'
                           const k = `${cs.class_id}|${cs.section_id ?? ''}`
                           return (
                             <label key={k} className="flex items-center gap-1.5 cursor-pointer py-0.5">
@@ -730,10 +709,10 @@ export default function CreateExam() {
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-amber-600">Select class-sections first (go to the <button type="button" className="underline" onClick={() => setActiveSection(2)}>Class & Sections</button> tab).</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">Select class-sections first (go to the <button type="button" className="underline" onClick={() => setActiveSection(2)}>Class & Sections</button> tab).</p>
               )}
 
-              <div className="overflow-hidden rounded-md border">
+              <div className="overflow-x-auto rounded-md border">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b bg-muted/30">
@@ -751,8 +730,8 @@ export default function CreateExam() {
                       const sectionInfo = classInfo?.sections?.find((s: any) => s.id === ed.section_id)
                       const csLabel = classInfo
                         ? (sectionInfo ? `${classInfo.name} – ${sectionInfo.name}` : classInfo.name)
-                        : ed.class_id
-                      const subjectName = (subjectsByClass[ed.class_id] ?? []).find(s => s.id === ed.subject_id)?.name ?? ed.subject_id
+                        : 'Class'
+                      const subjectName = (subjectsByClass[ed.class_id] ?? []).find(s => s.id === ed.subject_id)?.name ?? 'Subject'
                       return (
                         <tr key={i} className="border-b last:border-0">
                           <td className="px-2 py-1">{subjectName}</td>
@@ -765,6 +744,7 @@ export default function CreateExam() {
                               type="button" variant="ghost" size="sm"
                               onClick={() => setExamDates(examDates.filter((_, j) => j !== i))}
                               className="h-6 w-6 p-0 text-destructive"
+                              title="Remove date"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
@@ -790,7 +770,6 @@ export default function CreateExam() {
             </div>
           )}
 
-          {/* Section 5: Review & Submit */}
           {activeSection === 5 && (
             <div className="space-y-4">
               {missingItems.length > 0 && (
@@ -856,7 +835,7 @@ export default function CreateExam() {
                         const sectionInfo = classInfo?.sections?.find((s: any) => s.id === cs.section_id)
                         const label = classInfo
                           ? (sectionInfo ? `${classInfo.name} – ${sectionInfo.name}` : classInfo.name)
-                          : cs.class_id
+                          : 'Class'
                         return (
                           <Badge key={`${cs.class_id}-${cs.section_id}`} variant="outline" className="text-xs">{label}</Badge>
                         )
@@ -886,7 +865,7 @@ export default function CreateExam() {
                         const configs = subjectConfigs.filter(c => c.class_id === cs.class_id && c.section_id === cs.section_id)
                         const classInfo = availableClasses.find(c => c.id === cs.class_id)
                         const sectionInfo = classInfo?.sections?.find((s: any) => s.id === cs.section_id)
-                        const csLabel = classInfo ? (sectionInfo ? `${classInfo.name} – ${sectionInfo.name}` : classInfo.name) : cs.class_id
+                        const csLabel = classInfo ? (sectionInfo ? `${classInfo.name} – ${sectionInfo.name}` : classInfo.name) : 'Class'
                         const totalSubjects = (subjectsByClass[cs.class_id] ?? []).length
                         const csTotal = configs.reduce((sum, cfg) => {
                           return sum + cfg.components.filter(c => c.include_in_total && c.entry_type === 'marks').reduce((s, c) => s + (c.max_marks ?? 0), 0)
@@ -902,7 +881,7 @@ export default function CreateExam() {
                             </div>
                             <div className="flex flex-wrap gap-1.5">
                               {configs.map(cfg => {
-                                const subjectName = (subjectsByClass[cfg.class_id] ?? []).find(s => s.id === cfg.subject_id)?.name ?? cfg.subject_id
+                                const subjectName = (subjectsByClass[cfg.class_id] ?? []).find(s => s.id === cfg.subject_id)?.name ?? 'Subject'
                                 const sTotal = cfg.components.filter(c => c.include_in_total && c.entry_type === 'marks').reduce((s, c) => s + (c.max_marks ?? 0), 0)
                                 return (
                                   <span key={cfg.subject_id} className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs">
@@ -948,8 +927,8 @@ export default function CreateExam() {
                           {examDates.map((ed, i) => {
                             const classInfo = availableClasses.find(c => c.id === ed.class_id)
                             const sectionInfo = classInfo?.sections?.find((s: any) => s.id === ed.section_id)
-                            const csLabel = classInfo ? (sectionInfo ? `${classInfo.name}–${sectionInfo.name}` : classInfo.name) : ed.class_id
-                            const subjectName = (subjectsByClass[ed.class_id] ?? []).find(s => s.id === ed.subject_id)?.name ?? ed.subject_id
+                            const csLabel = classInfo ? (sectionInfo ? `${classInfo.name}–${sectionInfo.name}` : classInfo.name) : 'Class'
+                            const subjectName = (subjectsByClass[ed.class_id] ?? []).find(s => s.id === ed.subject_id)?.name ?? 'Subject'
                             return (
                               <tr key={i} className="border-b last:border-0">
                                 <td className="px-3 py-1.5">{subjectName}</td>
@@ -973,7 +952,6 @@ export default function CreateExam() {
         </div>
       </div>
 
-      {/* Bottom actions */}
       <div className="flex items-center justify-between rounded-lg border bg-card px-5 py-4">
         <Button
           variant="outline"
@@ -986,7 +964,7 @@ export default function CreateExam() {
         </Button>
         <div className="flex items-center gap-3">
           {missingItems.length > 0 && (
-            <p className="text-xs text-amber-600">
+            <p className="text-xs text-amber-600 dark:text-amber-400">
               Fix {missingItems.length} issue{missingItems.length !== 1 ? 's' : ''} before submitting
             </p>
           )}
