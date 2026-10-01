@@ -14,5 +14,6 @@ class Options:
     allow_same_database: bool = False
     confirm_target: str | None = None
     orphan_policy: str = "null"
+    clear_media_references: bool = False
     batch_size: int = 1000
     out_dir: Path = Path("migration_reports")

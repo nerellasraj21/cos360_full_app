@@ -11,6 +11,8 @@ from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from .catalog import (
+    MEDIA_FILE_RECORDS,
+    MEDIA_REFERENCE_COLUMNS,
     MENU_REFERENCES,
     SCHEMA_NAME_COLUMNS,
     SKIP_PLATFORM_TABLES,
@@ -285,6 +287,8 @@ class Migrator:
             "inserted": 0,
             "quarantined": 0,
             "nulled_foreign_keys": 0,
+            "media_references_cleared": 0,
+            "media_records_skipped": 0,
             "filtered_out": 0,
             "dropped_columns": plan["dropped"],
             "missing_required_columns": plan["missing_required"],
@@ -376,6 +380,19 @@ class Migrator:
             if info_column and info_column in row:
                 row[info_column] = str(scope.tenant_uuid)
 
+        if tenant_scoped and self.opts.clear_media_references:
+            record_column = MEDIA_FILE_RECORDS.get(name)
+            if record_column and row.get(record_column) is not None:
+                self.quarantine.write(
+                    "media_record_skipped", scope.name, name, f"{record_column} pointed at a file", raw
+                )
+                stats["media_records_skipped"] += 1
+                return None
+            for column in MEDIA_REFERENCE_COLUMNS.get(name, []):
+                if row.get(column) is not None:
+                    row[column] = None
+                    stats["media_references_cleared"] += 1
+
         string_column = STRING_TENANT_COLUMNS.get(name)
         if string_column and row.get(string_column) is not None:
             row[string_column] = self.schema_to_tenant.get(str(row[string_column]), row[string_column])
@@ -462,7 +479,14 @@ class Migrator:
                 entry["error"] = "Row counts in the target do not match what was inserted"
 
     def _finish(self) -> None:
-        totals = {"source_rows": 0, "inserted": 0, "quarantined": 0, "nulled_foreign_keys": 0}
+        totals = {
+            "source_rows": 0,
+            "inserted": 0,
+            "quarantined": 0,
+            "nulled_foreign_keys": 0,
+            "media_references_cleared": 0,
+            "media_records_skipped": 0,
+        }
         for entry in self.report["tenants"].values():
             for stats in entry["tables"].values():
                 for key in totals:

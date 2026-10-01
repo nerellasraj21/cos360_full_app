@@ -40,10 +40,14 @@ def _summarise(report: dict) -> None:
         inserted = sum(t["inserted"] for t in tables.values())
         quarantined = sum(t["quarantined"] for t in tables.values())
         nulled = sum(t["nulled_foreign_keys"] for t in tables.values())
+        cleared = sum(t["media_references_cleared"] for t in tables.values())
+        skipped = sum(t["media_records_skipped"] for t in tables.values())
         dropped = sorted({c for t in tables.values() for c in t["dropped_columns"]})
         print(
             f"\n[{name}] {entry['status']}  source rows {source}, inserted {inserted}, quarantined {quarantined}, nulled FKs {nulled}"
         )
+        if cleared or skipped:
+            print(f"  media: {cleared} file references cleared, {skipped} file records skipped")
         if entry.get("remapped_ids"):
             print(f"  ids remapped after collisions: {entry['remapped_ids']}")
         if entry.get("source_only_tables"):
@@ -83,6 +87,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--allow-nonempty-platform", action="store_true", help="merge into non-empty platform tables")
     parser.add_argument("--orphan-policy", choices=["null", "quarantine"], default="null")
+    parser.add_argument(
+        "--clear-media-references",
+        action="store_true",
+        help="set photo, logo and similar columns to NULL and skip document, certificate and attachment rows "
+        "that point at files, because the files are not migrated",
+    )
     parser.add_argument("--batch-size", type=int, default=1000)
     parser.add_argument("--out-dir", default="migration_reports")
     args = parser.parse_args(argv)
@@ -100,6 +110,7 @@ def main(argv: list[str] | None = None) -> int:
         allow_nonempty_platform=args.allow_nonempty_platform,
         confirm_target=args.confirm_target,
         orphan_policy=args.orphan_policy,
+        clear_media_references=args.clear_media_references,
         batch_size=args.batch_size,
         out_dir=Path(args.out_dir),
     )

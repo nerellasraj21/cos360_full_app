@@ -65,7 +65,7 @@ graph LR
 
 A command-line tool that copies the old schema-per-tenant data into the shared database, with a read-only plan, a guarded execute step, per-tenant transactions and a quarantine file for rows that cannot be inserted.
 - Roles: Operators with database access; there is no API or UI.
-- Note: The tool is backend/legacy_migration, outside the app package; media files and tables that exist only in the source are not migrated, and the report lists the source-only tables.
+- Note: The tool is backend/legacy_migration, outside the app package; media files and tables that exist only in the source are not migrated, and --clear-media-references removes the references that would dangle, and the report lists the source-only tables.
 - Flows: [tenants-and-admin/migrate-legacy-data](#tenants-and-adminmigrate-legacy-data)
 - Shaped by: [tenants-and-admin/migration-merges-menu-copies](#tenants-and-adminmigration-merges-menu-copies), [tenants-and-admin/migration-quarantines-bad-rows](#tenants-and-adminmigration-quarantines-bad-rows)
 
@@ -269,6 +269,7 @@ Implements: `feature:tenants-and-admin/legacy-data-migration`
 6. A primary key already used by an earlier tenant gets a new id, and foreign keys in that tenant are rewritten; a row whose parent is missing has a nullable key set to NULL or is quarantined.
 7. Rows that fail to convert or insert are written to quarantine.jsonl with the reason, and the tenant continues.
 8. The tool recounts every table through row-level security and marks the tenant failed if a count differs from what it inserted.
+9. With --clear-media-references, photo, logo and similar columns are set to NULL and document, certificate and attachment rows that point at files are skipped and logged, because the files are not migrated.
 
 - Result: A report.json with per-table source, inserted and quarantined counts, dropped columns, remapped ids and menu name variants.
 
@@ -291,6 +292,8 @@ flowchart TD
   s6 --> s7
   s8["8. The tool recounts every table through row-level security and marks ..."]
   s7 --> s8
+  s9["9. With --clear-media-references, photo, logo and similar columns are ..."]
+  s8 --> s9
 ```
 
 Shaped by: [platform/shared-schema-rls](#platformshared-schema-rls), [tenants-and-admin/migration-merges-menu-copies](#tenants-and-adminmigration-merges-menu-copies), [tenants-and-admin/migration-quarantines-bad-rows](#tenants-and-adminmigration-quarantines-bad-rows)

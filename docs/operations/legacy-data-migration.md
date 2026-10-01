@@ -50,7 +50,7 @@ Run from `backend/`.
 4. **Check.** The tool re-counts every table through row-level security and marks a tenant failed if the counts differ from what it inserted. Then check the quarantine file, log in as an admin of the migrated school, and spot-check records.
 5. To redo a tenant, add `--replace`. It deletes that tenant's rows in the target first.
 
-Options: `--platform-schema` (default `public`), `--orphan-policy null|quarantine`, `--batch-size`, `--out-dir`.
+Options: `--platform-schema` (default `public`), `--orphan-policy null|quarantine`, `--clear-media-references`, `--batch-size`, `--out-dir`.
 
 ## What it does
 
@@ -60,11 +60,15 @@ Options: `--platform-schema` (default `public`), `--orphan-policy null|quarantin
 - **Tenant tables.** Each row gets `tenant_id`. Columns are matched by name: source columns the new schema does not have are dropped and listed, and a required new column that the source lacks is a **blocker** if the table has rows.
 - **Id collisions.** Primary keys are global now. If two schemas hold the same id (for example seeded copies), the later tenant's row gets a new id and every foreign key in that tenant that pointed at it is rewritten, including the known columns that reference another table without a foreign key.
 - **Orphans.** The old schemas had no foreign keys, so rows pointing at missing parents are likely. A nullable column is set to NULL (`--orphan-policy null`, the default) and logged; a required column quarantines the row. Rows that depend on a quarantined row are quarantined too.
+- **Media references (`--clear-media-references`).** Because the files are not migrated, this option removes what would dangle:
+  - `students.photo`, `staff.photo`, `school_settings.image_url` and `principal_signature_url`, `fee_receipts.pdf_file_path` and `file_audit_log.s3_key` are set to NULL.
+  - Rows that exist only for a file are **skipped**: `student_documents`, `student_certificates` and `expense_attachments` rows with a file path, and `stale_file_registry` rows. A certificate record with no file is kept.
+  - Every skipped row is written to `quarantine.jsonl` as `media_record_skipped`, and the report counts `media_references_cleared` and `media_records_skipped` per table. Those skipped rows are not in the new database.
 - **Informational columns.** `stale_file_registry.tenant_schema` and `file_audit_log.tenant_schema` now hold the tenant id.
 
 ## Not covered
 
-- **Media files.** Photos, logos, signatures and certificate files are not moved, and the stored URLs are not rewritten. Photos and logos used unprefixed paths shared by every tenant, and the school logo file name is the same for all of them, so which school a file on disk belongs to cannot be known. Plan the media move separately.
+- **Media files are deliberately left behind.** The uploads in the old deployment were test files, so nothing is moved. Without `--clear-media-references`, the columns that point at files are copied unchanged and refer to files that do not exist, so photos and logos show as missing and document, certificate and attachment downloads fail. If real files are added to the old deployment before cutover, this needs a proper plan: the school logo file name is the same for every school, so a file on disk cannot be matched to its school.
 - **Tables that exist only in the source** are listed per tenant as `source_only_tables` and are not migrated.
 - **Per-schema `alembic_version`** is ignored.
 - **Running tenants in separate runs** works, but a primary key that collides with a row from an earlier run is remapped only after the insert fails. Migrating all tenants in one run is cleaner.

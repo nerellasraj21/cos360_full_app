@@ -12,6 +12,19 @@ SPECIAL_PLATFORM_TABLES = {"menus"}
 SCHEMA_NAME_COLUMNS = {"stale_file_registry": "tenant_schema", "file_audit_log": "tenant_schema"}
 STRING_TENANT_COLUMNS = {"report_audit": "tenant_id", "super_admin_audit": "tenant_id"}
 MENU_REFERENCES = {"role_menu_permissions": "menu_id"}
+MEDIA_REFERENCE_COLUMNS = {
+    "students": ["photo"],
+    "staff": ["photo"],
+    "school_settings": ["image_url", "principal_signature_url"],
+    "fee_receipts": ["pdf_file_path"],
+    "file_audit_log": ["s3_key"],
+}
+MEDIA_FILE_RECORDS = {
+    "student_documents": "file_path",
+    "student_certificates": "file_path",
+    "expense_attachments": "file_path",
+    "stale_file_registry": "s3_key",
+}
 
 _LOOSE_CANDIDATES = {
     "expense_transactions": [

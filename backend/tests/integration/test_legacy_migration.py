@@ -409,3 +409,43 @@ async def test_missing_required_column_is_a_blocker_and_stops_execution(sim):
             run(_options(sim, replace=True, tenants=[b]))
     finally:
         _sql(engine, "ALTER TABLE legacy_b.roles RENAME COLUMN name_old TO name")
+
+
+async def test_clear_media_references_nulls_references_and_skips_file_records(sim):
+    engine = sim["engine"]
+    a = sim["names"]["a"]
+    _sql(
+        engine,
+        "INSERT INTO legacy_a.school_settings (id, image_url, principal_signature_url) "
+        "VALUES (gen_random_uuid(), '/media/school/images/x.png', '/media/school/signatures/y.png')",
+    )
+    _sql(
+        engine,
+        "INSERT INTO legacy_a.stale_file_registry (id, s3_key, tenant_schema, expires_at, created_at) "
+        "VALUES (gen_random_uuid(), 'legacy_a/documents/old.pdf', 'legacy_a', now(), now())",
+    )
+    try:
+        kept = run(_options(sim, replace=True, tenants=[a]))
+        assert kept["tenants"][a]["tables"]["school_settings"]["media_references_cleared"] == 0
+        assert kept["tenants"][a]["tables"]["stale_file_registry"]["inserted"] == 1
+        async with open_tenant_session(sim["ids"]["a"]) as session:
+            image = (await session.execute(text("SELECT image_url FROM school_settings"))).scalar_one()
+        assert image == "/media/school/images/x.png"
+
+        cleared = run(_options(sim, replace=True, tenants=[a], clear_media_references=True))
+        tables = cleared["tenants"][a]["tables"]
+        assert tables["school_settings"]["inserted"] == 1
+        assert tables["school_settings"]["media_references_cleared"] == 2
+        assert tables["stale_file_registry"]["inserted"] == 0
+        assert tables["stale_file_registry"]["media_records_skipped"] == 1
+        for stats in tables.values():
+            assert stats["inserted"] + stats["quarantined"] + stats["media_records_skipped"] == stats["source_rows"]
+        async with open_tenant_session(sim["ids"]["a"]) as session:
+            row = (await session.execute(text("SELECT image_url, principal_signature_url FROM school_settings"))).one()
+            registry = (await session.execute(text("SELECT count(*) FROM stale_file_registry"))).scalar_one()
+        assert row == (None, None) and registry == 0
+        lines = [json.loads(line) for line in Path(cleared["quarantine_file"]).read_text(encoding="utf-8").splitlines()]
+        assert any(r["kind"] == "media_record_skipped" and r["table"] == "stale_file_registry" for r in lines)
+    finally:
+        _sql(engine, "DELETE FROM legacy_a.school_settings")
+        _sql(engine, "DELETE FROM legacy_a.stale_file_registry")
